@@ -87,6 +87,8 @@ For example:
         SHOW_CHECK_WARNINGS: FALSE
         ...
 
+.. _inspect_cmd:
+
 How to generate cmd files
 -------------------------
 

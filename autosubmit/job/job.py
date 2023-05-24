@@ -2029,8 +2029,8 @@ class Job(object):
         """
         Create the script content to be run for the job
 
-        :param as_conf: config
-        :type as_conf: config
+        :param as_conf: Autosubmit configuration object
+        :type as_conf: AutosubmitConfig
         :return: script code
         :rtype: str
         """
