@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import collections
-from log.log import Log, AutosubmitCritical, AutosubmitError
+from log.log import Log, AutosubmitCritical
 from autosubmit.job.job_common import Status, Type
 from bscearth.utils.date import sum_str_hours
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal, \
@@ -88,7 +88,6 @@ class JobPackager(object):
         self._maxTotalProcessors = 0
 
     def compute_weight(self, job_list):
-        job = self
         jobs_by_section = dict()
         held_jobs = self._jobs_list.get_held_jobs()
         jobs_held_by_section = dict()

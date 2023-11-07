@@ -74,7 +74,7 @@ import re
 import random
 import signal
 import datetime
-import log.fd_show as fd_show
+# import log.fd_show as fd_show
 import portalocker
 from pkg_resources import require, resource_listdir, resource_string, resource_filename
 #import importlib

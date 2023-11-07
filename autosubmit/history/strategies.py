@@ -20,7 +20,7 @@ from abc import ABCMeta, abstractmethod
 import autosubmit.history.database_managers.database_models as Models
 import traceback
 from .internal_logging import Logging
-from .database_managers.database_manager import DEFAULT_LOCAL_ROOT_DIR, DEFAULT_HISTORICAL_LOGS_DIR
+from .database_managers.database_manager import DEFAULT_HISTORICAL_LOGS_DIR
 
 class PlatformInformationHandler:
   def __init__(self, strategy):

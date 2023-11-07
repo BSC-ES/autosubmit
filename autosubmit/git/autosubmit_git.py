@@ -93,8 +93,6 @@ class AutosubmitGit:
         :param as_conf: experiment configuration
         :type as_conf: autosubmitconfigparser.config.AutosubmitConfig
         """
-        proj_dir = os.path.join(
-            BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, BasicConfig.LOCAL_PROJ_DIR)
         dirname_path = as_conf.get_project_dir()
         if path.isdir(dirname_path):
             Log.debug("Checking git directory status...")
@@ -168,10 +166,10 @@ class AutosubmitGit:
                 Log.info("Making a backup of your current proj folder at {0}".format(
                     project_backup_path))
                 shutil.move(project_path, project_backup_path)
-            #shutil.make_archive(project_backup_path, 'zip', project_path)
-            #project_backup_path = project_backup_path + ".zip"
+            # shutil.make_archive(project_backup_path, 'zip', project_path)
+            # project_backup_path = project_backup_path + ".zip"
 
-        if os.path.exists(os.path.join(project_path,project_destination)):
+        if os.path.exists(os.path.join(project_path, project_destination)):
             Log.info("Using project folder: {0}", project_path)
             # print("Force {0}".format(force))
             if not force:
@@ -204,10 +202,10 @@ class AutosubmitGit:
                                                                              git_project_origin,
                                                                              project_destination)
         try:
-            ##command 0
+            # command 0
             Log.debug('Clone command: {0}', command_0)
             try:
-                git_version = subprocess.check_output("git --version",shell=True)
+                git_version = subprocess.check_output("git --version", shell=True)
                 git_version = git_version.decode(locale.getlocale()[1]).split(" ")[-1].strip("\n")
 
                 version_int = ""
@@ -218,11 +216,11 @@ class AutosubmitGit:
                 git_version = 2251
             if git_remote_project_path == '':
                 command_0 = "cd {0} ; {1}".format(project_path, command_0)
-                output_0 = subprocess.check_output(command_0, shell=True)
+                subprocess.check_output(command_0, shell=True)
             else:
                 command_0 = "cd {0} ; {1}".format(project_path, command_0)
                 hpcarch.send_command(command_0)
-            ##command 1
+            # command 1
 
             if os.path.exists(os.path.join(git_path, ".githooks")) and git_version > 2136:
                 for root_dir, dirs, files in os.walk(os.path.join(git_path, ".githooks")):
@@ -265,9 +263,9 @@ class AutosubmitGit:
                         command_githook = "cd {0} ; {1}".format(git_path, command_githook)
                         as_conf.parse_githooks()
                         subprocess.check_output(command_githook, shell=True)
-                    command_1 = "cd {0}; {1} ".format(git_path,command_1)
+                    command_1 = "cd {0}; {1} ".format(git_path, command_1)
                     Log.debug(f'Githook + Checkout and Submodules: {command_githook} {command_1}')
-                    output_1 = subprocess.check_output(command_1, shell=True)
+                    subprocess.check_output(command_1, shell=True)
                 except BaseException as e:
                     submodule_failure = True
                     Log.printlog("Trace: {0}".format(str(e)), 6014)
@@ -280,7 +278,7 @@ class AutosubmitGit:
                     hpcarch.send_command(command_githook)
                 command_1 = "cd {0}; {1} ".format(project_path, command_1)
                 hpcarch.send_command(command_1)
-        except subprocess.CalledProcessError as e:
+        except subprocess.CalledProcessError:
             shutil.rmtree(project_path)
             if os.path.exists(project_backup_path):
                 Log.info("Restoring proj folder...")
@@ -295,5 +293,3 @@ class AutosubmitGit:
             shutil.rmtree(project_backup_path)
 
         return True
-
-

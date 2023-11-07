@@ -23,8 +23,7 @@ Module containing functions to manage autosubmit's database.
 import os
 import sqlite3
 import multiprocessing
-import autosubmit
-from log.log import Log, AutosubmitCritical, AutosubmitError
+from log.log import Log, AutosubmitCritical
 Log.get_logger("Autosubmit")
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 

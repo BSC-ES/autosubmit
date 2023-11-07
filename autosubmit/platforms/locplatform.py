@@ -27,8 +27,8 @@ from autosubmit.platforms.headers.local_header import LocalHeader
 
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from time import sleep
-from log.log import Log, AutosubmitError, AutosubmitCritical
-import threading
+from log.log import Log, AutosubmitError
+
 class LocalPlatform(ParamikoPlatform):
     """
     Class to manage jobs to localhost
@@ -249,8 +249,6 @@ class LocalPlatform(ParamikoPlatform):
             os.rename(os.path.join(path_root, src),os.path.join(path_root, dest))
             return True
         except IOError as e:
-            raise AutosubmitError('File {0} does not exists, something went wrong with the platform'.format(
-                path_root), 6004, str(e))
             if must_exist:
                 raise AutosubmitError("File {0} does not exists".format(
                     os.path.join(path_root,src)), 6004, str(e))

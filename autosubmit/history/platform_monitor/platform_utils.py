@@ -16,7 +16,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 from time import mktime
 from datetime import datetime
 
@@ -48,7 +47,7 @@ def parse_output_number(string_number):
             number = float(string_number)
         try:
             number = float(number) * multiplier
-        except Exception as exp:
+        except Exception:
             number = 0.0
             pass        
     return number
@@ -59,7 +58,7 @@ def try_parse_time_to_timestamp(input_):
   """
   try:
     return int(mktime(datetime.strptime(input_, SLURM_DATETIME_FORMAT).timetuple()))
-  except Exception as e:
+  except Exception:
     return 0
 
 def read_example(example_name):

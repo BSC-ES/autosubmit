@@ -21,7 +21,7 @@
 import os
 from collections import defaultdict
 
-from log.log import Log,AutosubmitCritical,AutosubmitError
+from log.log import Log,AutosubmitError
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from .submitter import Submitter

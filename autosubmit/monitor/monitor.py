@@ -520,8 +520,8 @@ class Monitor:
         Log.result('Status txt created at {0}', output_file)
 
     def write_output_txt_recursive(self, job, output_file, level, path):
-        log_out = ""
-        log_err = ""
+        # log_out = ""
+        # log_err = ""
         # + " " + log_out + " " + log_err + "\n"
         output = level + job.name + " " + \
             Status().VALUE_TO_KEY[job.status] + "\n"

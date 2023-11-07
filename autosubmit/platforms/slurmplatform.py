@@ -435,7 +435,6 @@ class SlurmPlatform(ParamikoPlatform):
                         detailed_data[name] = extra_data
                         steps.append(name)
                 submit = start = finish = energy = nnodes = ncpus = 0
-                status = "UNKNOWN"
                 # Take first line as source
                 line = lines[0].strip().split()
                 ncpus = int(line[2] if len(line) > 2 else 0)

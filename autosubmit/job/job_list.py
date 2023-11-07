@@ -1946,12 +1946,12 @@ class JobList(object):
             select_jobs_by_name = jobs_to_check[0]
             unparsed_jobs = jobs_to_check[1]
         if not ";" in unparsed_jobs:
-            if '[':
+            if '[' in unparsed_jobs:
                 select_all_jobs_by_section = unparsed_jobs
                 filter_jobs_by_section = ""
             else:
                 select_all_jobs_by_section = ""
-                filter_jobs_by_section = unparsed_jbos
+                filter_jobs_by_section = unparsed_jobs
         else:
             aux = unparsed_jobs.split(';')
             select_all_jobs_by_section = aux[0]
