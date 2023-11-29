@@ -148,6 +148,11 @@ Edit or generate a `minimal.yml` with the following parameters, leaving the rest
 
 .. important:: The final configuration will be loaded in the following order: `PRE`:`$expid/%PROJDIR%/$as_proj_config_path` ->  `$expid/conf` ->  `POST`. Overwriting the parameters in the order they are loaded.
 
+.. note::
+
+  ``PROJECT_SUBMODULES`` can be set to ``false`` (without quotes), which will be
+  evaluated as ``False`` in Python, and will disable the Git submodules (i.e. no
+  submodules will be cloned).
 
 CUSTOM_CONFIG: Syntax
 ^^^^^^^^^^^^^^^^^^^^^

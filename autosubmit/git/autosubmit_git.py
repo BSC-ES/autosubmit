@@ -14,18 +14,22 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
+from os import path
+
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import locale
-from os import path
 import os
-from shutil import rmtree
-import subprocess
 import shutil
+import subprocess
+from shutil import rmtree
+from time import time
+from typing import List, Union
+
 # from autosubmit import Autosubmit
 from autosubmitconfigparser.config.basicconfig import BasicConfig
-from time import time
-from log.log import Log, AutosubmitCritical, AutosubmitError
+from log.log import Log, AutosubmitCritical
+
 Log.get_logger("Autosubmit")
 
 
@@ -141,10 +145,8 @@ class AutosubmitGit:
         git_project_branch = as_conf.get_git_project_branch()
         git_remote_project_path = as_conf.get_git_remote_project_root()
 
-        if git_project_branch == '':
-            git_project_branch = 'master'
         git_project_commit = as_conf.get_git_project_commit()
-        git_project_submodules = as_conf.get_submodules_list()
+        git_project_submodules: Union[False, List[str]] = as_conf.get_submodules_list()
         git_project_submodules_depth = as_conf.get_project_submodules_depth()
         max_depth = -1
         if len(git_project_submodules_depth) > 0:
@@ -235,27 +237,28 @@ class AutosubmitGit:
             else:
                 command_1 += "git checkout; "
 
-            if git_project_submodules.__len__() <= 0:
-                if max_depth > 0:
-                    Log.info("Depth is incompatible with --recursive, ignoring recursive option")
-                    command_1 += " git submodule update --init --depth {0}; ".format(max_depth)
-                else:
-                    command_1 += " git submodule update --init --recursive; "
-            else:
-                command_1 += " git submodule init; ".format(project_destination)
-                index_submodule = 0
-                for submodule in git_project_submodules:
+            if git_project_submodules is not False:
+                if len(git_project_submodules) == 0:
                     if max_depth > 0:
                         Log.info("Depth is incompatible with --recursive, ignoring recursive option")
-                        if index_submodule < len(git_project_submodules_depth):
-                            command_1 += " git submodule update --init --depth {0} {1}; ".format(
-                                git_project_submodules_depth[index_submodule], submodule)
-                        else:
-                            command_1 += " git submodule update --init --depth {0} {1}; ".format(
-                                max_depth, submodule)
+                        command_1 += " git submodule update --init --depth {0}; ".format(max_depth)
                     else:
-                        command_1 += " git submodule update --init --recursive {0}; ".format(submodule)
-                    index_submodule += 1
+                        command_1 += " git submodule update --init --recursive; "
+                else:
+                    command_1 += " git submodule init; ".format(project_destination)
+                    index_submodule = 0
+                    for submodule in git_project_submodules:
+                        if max_depth > 0:
+                            Log.info("Depth is incompatible with --recursive, ignoring recursive option")
+                            if index_submodule < len(git_project_submodules_depth):
+                                command_1 += " git submodule update --init --depth {0} {1}; ".format(
+                                    git_project_submodules_depth[index_submodule], submodule)
+                            else:
+                                command_1 += " git submodule update --init --depth {0} {1}; ".format(
+                                    max_depth, submodule)
+                        else:
+                            command_1 += " git submodule update --init --recursive {0}; ".format(submodule)
+                        index_submodule += 1
             if git_remote_project_path == '':
                 try:
                     if len(command_githook) > 0:
