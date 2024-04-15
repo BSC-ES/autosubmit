@@ -99,55 +99,122 @@ of how to install Autosubmit with Conda.
 .. raw:: html
 
    <div>
-        <div class="row gap-4">
-            <div class="col" style="min-width: 20rem;">
-                <p class="fs-4">
-                  <i class="fa-solid fa-gear fs-4" style="color: #4E8490;"></i>
-                  Automation
-                </p>
-                <p>Management of job submission and dependencies without user intervention.</p>
+      <div class="row g-0 mb-4 pb-4" id="community-logos">
+         <div class="col-lg-3 col-md-4 col-xs-6">
+            <div class="community-logo">
+               <img class="img-fluid dark-light" src="_static/logos/bsc.svg" alt="BSC" title="BSC, Barcelona Supercomputing Center" />
             </div>
-            <div class="col" style="min-width: 20rem;">
-                <p class="fs-4">
-                  <i class="fa-solid fa-fingerprint fs-4" style="color: #4E8490;"></i>
-                  Data Provenance
-                </p>
-                <p>Experiments with unique PIDs, use of open standards for data provenance
-                   in the experiments and workflows.</p>
+         </div>
+         <div class="col-lg-3 col-md-4 col-xs-6">
+            <div class="community-logo">
+               <img class="img-fluid dark-light" src="_static/logos/upc.svg" alt="UPC" title="UPC, Universitat Politècnica de Catalunya" />
             </div>
-            <div class="col" style="min-width: 20rem;">
-                <p class="fs-4">
-                  <i class="fa-solid fa-clock-rotate-left fs-4" style="color: #4E8490;"></i>
-                  Fault Tolerance
-                </p>
-                <p>Automatic retrials and ability to re-run specific parts of
-                   the experiment in case of failure.</p>
+         </div>
+         <div class="col-lg-3 col-md-4 col-xs-6">
+            <div class="community-logo">
+               <img class="img-fluid dark-light" src="_static/logos/edito-model-lab.png" alt="EDITO" title="EDITO, European Digital Twin Ocean Model Lab" />
             </div>
-            <div class="col" style="min-width: 20rem;">
-                <p class="fs-4">
-                  <i class="fa-solid fa-sitemap fs-4" style="color: #4E8490;"></i>
-                  Resource Management
-                </p>
-                <p>Individual platform configuration, allowing users
-                   to run their experiments without having to modify job scripts.</p>
+         </div>
+         <div class="col-lg-3 col-md-4 col-xs-6">
+            <div class="community-logo">
+               <img class="img-fluid dark-light" src="_static/logos/destination-earth.svg" alt="DestinE" title="DestinE, Destination Earth" />
             </div>
-            <div class="col" style="min-width: 20rem;">
-                <p class="fs-4">
-                  <i class="fa-solid fa-server fs-4" style="color: #4E8490;"></i>
-                  Multiplatform
-                </p>
-                <p>Widely used to run experiments on different platforms simultaneously, using batch schedulers such as Slurm, PBS, LSF. It is deployed and used on various HPC and cloud systems.</p>
+         </div>
+         <div class="col-lg-3 col-md-4 col-xs-6">
+            <div class="community-logo">
+               <img class="img-fluid dark-light" src="_static/logos/copernicus.svg" alt="Copernicus" title="Copernicus Atmospheric Ensemble" />
             </div>
-            <div class="col" style="min-width: 20rem;">
-                <p class="fs-4">
-                  <i class="fa-brands fa-gitlab fs-4" style="color: #4E8490;"></i>
-                  Open Source
-                </p>
-                <p>Autosubmit code is hosted at BSC Earth Sciences' GitLab, licensed
-                   under the GPLv3 License, and under active development.</p>
+         </div>
+         <div class="col-lg-3 col-md-4 col-xs-6">
+            <div class="community-logo">
+               <img class="img-fluid dark-light" src="_static/logos/esiwace.png" alt="ESiWACE" title="ESiWACE, Centre of Excellence in Simulation of Weather and Climate in Europe" />
             </div>
-        </div>
-    </div>
+         </div>
+         <div class="col-lg-3 col-md-4 col-xs-6">
+            <div class="community-logo">
+               <img class="img-fluid dark-light" src="_static/logos/hanami.png" alt="HANAMI" title="HANAMI" />
+            </div>
+         </div>
+         <div class="col-lg-3 col-md-4 col-xs-6">
+            <div class="community-logo">
+               <img class="img-fluid dark-light" src="_static/logos/eerie.png" alt="EERIE" title="EERIE, European Eddy-Rich Earth System Models" />
+            </div>
+         </div>
+         <div class="col-lg-3 col-md-4 col-xs-6">
+            <div class="community-logo">
+               <img class="img-fluid dark-light" src="_static/logos/specs.png" alt="SPECS" title="SPECS, Seasonal-to-decadal climate Prediction for the Improvement of European Climate Services" />
+            </div>
+         </div>
+         <div class="col-lg-3 col-md-4 col-xs-6">
+            <div class="community-logo">
+               <img class="img-fluid dark-light" src="_static/logos/kit.png" alt="KIT" title="KIT, Karlsruhe Institute of Technology" />
+            </div>
+         </div>
+         <div class="col-lg-3 col-md-4 col-xs-6">
+            <div class="community-logo">
+               <img class="img-fluid dark-light" src="_static/logos/is-enes.png" alt="IS-ENES" title="IS-ENES, Infrastructure for the European Network for Earth System Modelling" />
+            </div>
+         </div>
+         <div class="col-lg-3 col-md-4 col-xs-6">
+            <div class="community-logo">
+               <img class="img-fluid dark-light" src="_static/logos/aq-watch.png" alt="AQ-WATCH" title="AQ-WATCH" />
+            </div>
+         </div>
+         <div class="col-lg-3 col-md-4 col-xs-6">
+            <div class="community-logo">
+               <img class="img-fluid dark-light" src="_static/logos/cams.png" alt="CAMS" title="CAMS, Copernicus Atmosphere Monitoring Service " />
+            </div>
+         </div>
+      </div>
+      <div class="row gap-4">
+         <div class="col" style="min-width: 20rem;">
+             <p class="fs-4">
+               <i class="fa-solid fa-gear fs-4" style="color: #4E8490;"></i>
+               Automation
+             </p>
+             <p>Management of job submission and dependencies without user intervention.</p>
+         </div>
+         <div class="col" style="min-width: 20rem;">
+             <p class="fs-4">
+               <i class="fa-solid fa-fingerprint fs-4" style="color: #4E8490;"></i>
+               Data Provenance
+             </p>
+             <p>Experiments with unique PIDs, use of open standards for data provenance
+                in the experiments and workflows.</p>
+         </div>
+         <div class="col" style="min-width: 20rem;">
+             <p class="fs-4">
+               <i class="fa-solid fa-clock-rotate-left fs-4" style="color: #4E8490;"></i>
+               Fault Tolerance
+             </p>
+             <p>Automatic retrials and ability to re-run specific parts of
+                the experiment in case of failure.</p>
+         </div>
+         <div class="col" style="min-width: 20rem;">
+             <p class="fs-4">
+               <i class="fa-solid fa-sitemap fs-4" style="color: #4E8490;"></i>
+               Resource Management
+             </p>
+             <p>Individual platform configuration, allowing users
+                to run their experiments without having to modify job scripts.</p>
+         </div>
+         <div class="col" style="min-width: 20rem;">
+             <p class="fs-4">
+               <i class="fa-solid fa-server fs-4" style="color: #4E8490;"></i>
+               Multiplatform
+             </p>
+             <p>Widely used to run experiments on different platforms simultaneously, using batch schedulers such as Slurm, PBS, LSF. It is deployed and used on various HPC and cloud systems.</p>
+         </div>
+         <div class="col" style="min-width: 20rem;">
+             <p class="fs-4">
+               <i class="fa-brands fa-gitlab fs-4" style="color: #4E8490;"></i>
+               Open Source
+             </p>
+             <p>Autosubmit code is hosted at BSC Earth Sciences' GitLab, licensed
+                under the GPLv3 License, and under active development.</p>
+         </div>
+      </div>
+   </div>
 
 Contact Us
 ==========

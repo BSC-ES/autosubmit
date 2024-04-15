@@ -15,3 +15,17 @@ figure {
 .code-block-caption {
     padding: 0 0 1rem 0 !important;
 }
+
+#community-logos {}
+
+.community-logo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    height: 160px;
+}
+
+html[data-theme="dark"] .community-logo img {
+    filter: invert(100%) hue-rotate(-180deg) !important;
+}
