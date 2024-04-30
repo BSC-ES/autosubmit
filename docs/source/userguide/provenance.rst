@@ -11,12 +11,8 @@ Each Autosubmit experiment is assigned a :doc:`unique experiment ID <expids>`
 (also called expid). It also provides a central database and utilities
 that permit experiments to be referenced.
 
-Every Autosubmit command issued by a user generates a timestamped log
-file in ``<EXPID>/tmp/ASLOGS/``. For example, when the user runs
-``autosubmit create <EXPID>`` and ``autosubmit run <EXPID>``, these
-commands should create files like ``<EXPID>/tmp/ASLOGS/20230808_092350_create.log``
-and ``<EXPID>/tmp/ASLOGS/20230808_092400_run.log``, with the same content
-that was displayed in the console output to the user running it.
+The commands issued by users generate log files, and become part of the
+Autosubmit experiment, as explained in the :doc:`Traceability section <traceability>`.
 
 Users can :ref:`archive Autosubmit experiments <archive>`. These archives contain the complete
 logs and other files in the experiment directory, and can be later unarchived
