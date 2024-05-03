@@ -2076,6 +2076,8 @@ class Job(object):
             # append to a list all names don't matter the location, inside additional_template_content that  starts with % and ends with %
             placeholders_inside_additional_template = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', additional_template_content,flags=re.IGNORECASE)
             for placeholder in placeholders_inside_additional_template:
+                if placeholder in self.default_parameters.values():
+                    continue
                 placeholder = placeholder[1:-1]
                 value = str(parameters.get(placeholder.upper(),""))
                 if not value:
