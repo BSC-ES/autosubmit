@@ -6213,14 +6213,6 @@ class Autosubmit:
                         job.status = Status.KEY_TO_VALUE[status]
                 job_list.save()
 
-
-
-
-
-
-
-
-
     @staticmethod
     def cat_log(exp_or_job_id: str, file: Union[None, str], mode: Union[None, str], inspect:bool=False) -> bool:
         """The cat-log command allows users to view Autosubmit logs using the command-line.
