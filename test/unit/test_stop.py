@@ -1,36 +1,22 @@
 import inspect
-from unittest import TestCase
-import io
-import sys
-from contextlib import suppress, redirect_stdout
-from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from autosubmit.autosubmit import Autosubmit, AutosubmitCritical
+from autosubmit.autosubmit import Autosubmit
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 
 from unittest.mock import MagicMock
 
-import os
 from unittest import TestCase
-from copy import copy
-import networkx
-from networkx import DiGraph
-#import patch
-from textwrap import dedent
-import shutil
 import tempfile
 from mock import Mock, patch
 from random import randrange
 from pathlib import Path
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_common import Type
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
-from log.log import AutosubmitCritical
 
 """
 This file contains the test for the `autosubmit stop` command. Found in /autosubmit.py line 6079.
