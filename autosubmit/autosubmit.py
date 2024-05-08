@@ -134,6 +134,7 @@ class Autosubmit:
 
     def __init__(self):
         self._experiment_data = {}
+        self.command = None
 
     @property
     def experiment_data(self):
@@ -778,7 +779,6 @@ class Autosubmit:
             return Autosubmit.cat_log(args.ID, args.file, args.mode, args.inspect)
         elif args.command == 'stop':
             return Autosubmit.stop(args.expid, args.cancel, args.only_cancel, args.status, args.all, args.force)
-
     @staticmethod
     def _init_logs(args, console_level='INFO', log_level='DEBUG', expid='None'):
         Log.set_console_level(console_level)
@@ -843,6 +843,8 @@ class Autosubmit:
             for expid in expids:
                 as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
                 as_conf.reload(force_load=True)
+                as_conf.set_last_as_command(args.command)
+
                 if len(as_conf.experiment_data) == 0:
                     if args.command not in ["expid", "upgrade"]:
                         raise AutosubmitCritical(
@@ -6109,10 +6111,10 @@ class Autosubmit:
         """
         def retrieve_expids():
             # Retrieve all expids in use by autosubmit attached to my current user
-            # Bash command: ps -ef | grep "$(whoami)" | grep "autosubmit" | grep "run" | awk '{print $NF}' | sort -u
+            # Bash command: ps -ef | grep "$(whoami)" | grep "autosubmit" | grep -oP '(?<=run )\S+'
             expids = []
             try:
-                command = 'ps -ef | grep "$(whoami)" | grep "autosubmit" | grep "run" | awk \'{print $NF}\' | sort -u'
+                command = f'ps -ef | grep "$(whoami)" | grep "autosubmit" | grep -oP \'(?<=run )\S+\''
                 process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
                 output, error = process.communicate()
                 output = output.decode(locale.getlocale()[1])
@@ -6121,6 +6123,7 @@ class Autosubmit:
                 expids = output.split('\n')
                 # delete empty strings
                 expids = [x for x in expids if x]
+
             except Exception as e:
                 raise AutosubmitCritical(
                     "An error occurred while retrieving the expids", 7011, str(e))

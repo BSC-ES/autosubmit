@@ -304,7 +304,8 @@ class ParamikoPlatform(Platform):
             self.connected = True
             if not self.log_retrieval_process_active and (as_conf is None or str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "false"):
                 self.log_retrieval_process_active = True
-                self.recover_job_logs()
+                if as_conf.experiment_data["ASMISC"].get("COMMAND", "").lower() == "run":
+                    self.recover_job_logs()
         except SSHException:
             raise
         except IOError as e:

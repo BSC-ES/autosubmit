@@ -32,6 +32,7 @@ from autosubmit.autosubmit import Autosubmit
 from typing import Union
 
 
+
 def exit_from_error(e: BaseException):
     trace = traceback.format_exc()
     try:
