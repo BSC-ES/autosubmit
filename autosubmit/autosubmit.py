@@ -664,10 +664,14 @@ class Autosubmit:
             group.add_argument('expid', help='experiment identifier', nargs='?')
             group.add_argument('-a', '--all', default=False, action='store_true',
                                help='Stop all user autosubmit processes')
-            subparser.add_argument('-k', '--kill', default=False, action='store_true',
+            subparser.add_argument('-c', '--cancel', default=False, action='store_true',
                                    help='Kills active jobs and set them to failure')
+            subparser.add_argument('-oc', '--only_cancel', default=False, action='store_true',
+                                   help='Cancel active jobs if process is stopped')
             subparser.add_argument('-s', '--status', default="FAILED", action='store', metavar='STATUS',
-                                   help='Final status of killed jobs. Options are WAITING,COMPLETED,FAILED,SUSPENDED. Default is FAILED.')
+                                   help='Final status of killed jobs. Default is FAILED.')
+            subparser.add_argument('-f', '--force', default=False, action='store_true',
+                                   help='Force stop autosubmit process, equivalent to kill -9')
             args, unknown = parser.parse_known_args()
             if args.version:
                 Log.info(Autosubmit.autosubmit_version)
@@ -773,7 +777,7 @@ class Autosubmit:
         elif args.command == 'cat-log':
             return Autosubmit.cat_log(args.ID, args.file, args.mode, args.inspect)
         elif args.command == 'stop':
-            return Autosubmit.stop(args.expid, args.kill, args.status, args.all)
+            return Autosubmit.stop(args.expid, args.cancel, args.only_cancel, args.status, args.all, args.force)
 
     @staticmethod
     def _init_logs(args, console_level='INFO', log_level='DEBUG', expid='None'):
@@ -6076,7 +6080,7 @@ class Autosubmit:
 
 
     @staticmethod
-    def stop(expids, cancel=False, status="FAILED", all=False, force=False):
+    def stop(expids, cancel=False, only_cancel=False, status="FAILED", all=False, force=False):
         """
         The stop command allows users to stop the desired experiments.
 
@@ -6084,8 +6088,10 @@ class Autosubmit:
 
         :param expids: List of experiments to stop
         :param cancel: Cancel all jobs in the remote and local platform queues
+        :param only_cancel: Cancel all jobs in the remote and local platform queues if process is already stopped
         :param status: desired final status of the jobs canceled (default: FAILED)
         :param all: All user experiments
+
         :return:
         """
         def retrieve_expids():
@@ -6106,23 +6112,28 @@ class Autosubmit:
                 raise AutosubmitCritical(
                     "An error occurred while retrieving the expids", 7011, str(e))
             return expids
-        def proccess_id(expid):
+        def proccess_id(expid=None):
             # Retrieve the process id of the autosubmit process
             # Bash command: ps -ef | grep "$(whoami)" | grep "autosubmit" | grep "run" | grep "expid" | awk '{print $2}'
             try:
-                command = f'ps -ef | grep "$(whoami)" | grep "autosubmit" | grep "run" | grep "{expid}" | awk \'{{print $2}}\''
+                command = f'ps -ef | grep "$(whoami)" | grep "autosubmit" | grep "run" | grep "{expid}" '
                 process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
                 output, error = process.communicate()
                 output = output.decode(locale.getlocale()[1])
-                # delete empty strings
                 output = output.split('\n')
+                # delete noise
+                if output:
+                   output = [x.split()[1] for x in output if x and "grep" not in x]
+
             except Exception as e:
                 raise AutosubmitCritical(
                     "An error occurred while retrieving the process id", 7011, str(e))
-            return output[0]
+            return output[0] if output else ""
         if status not in Status.VALUE_TO_KEY.values():
             raise AutosubmitCritical("Invalid status. Expected one of {0}".format(Status.VALUE_TO_KEY.keys()), 7011)
         # First retrieve expids
+        if only_cancel:
+            cancel=True
         if all:
             expids = retrieve_expids()
         else:
@@ -6133,38 +6144,59 @@ class Autosubmit:
                 expids = expids.split(" ")
         # Obtain the proccess id
         errors = ""
+        valid_expids = []
         for expid in expids:
-            process_id = proccess_id(expid)
-            if process_id:
+            process_id_ = proccess_id(expid)
+            if not process_id_ and only_cancel:
+                valid_expids.append(expid)
+            elif process_id_:
                 # Send the signal to stop the autosubmit process
                 try:
                     if force:
-                        os.kill(int(process_id), signal.SIGKILL) # don't wait for logs
+                        try:
+                            os.kill(int(process_id_), signal.SIGKILL) # don't wait for logs
+                        except:
+                            continue
                     else:
-                        os.kill(int(process_id), signal.SIGINT) # wait for logs
-                        if not cancel:
-                            process_end = False
-                            while(not process_end):
-                                process_active = process_id(expid)
-                                if process_id != process_active:
-                                    process_end = True
-                    if cancel:
-                        # call prepare_run to obtain the platforms and as_conf
-                        job_list, submitter, exp_history, host, as_conf, platforms_to_test, packages_persistence, _ = Autosubmit.prepare_run(
-                            expid)
-                        # get active jobs
-                        active_jobs = [job for job in job_list.get_job_list() if
-                                       job.status in [Status.QUEUING, Status.RUNNING, Status.SUBMITTED]]
-                        # change status of active jobs
-                        for job in active_jobs:
-                            # Cancel from the remote platform
-                            job.platform.send_command(job.platform.cancel_cmd + " " + str(job.id), ignore_log=True)
-                        status = status.upper()
-                        job.status = Status.VALUE_TO_KEY[status]
-                        job_list.save()
+                        try:
+                            os.kill(int(process_id_), signal.SIGINT) # wait for logs
+                        except:
+                            continue
+                    valid_expids.append(expid)
                 except Exception as e:
-                    errors += f"An error occurred while stopping the autosubmit process for expid {expid}: {str(e)}\n"
-        Log.warning(errors)
+                    Log.warning(f"An error occurred while stopping the autosubmit process for expid:{expid}: {str(e)}")
+        for expid in valid_expids:
+            if not force:
+                Log.info(f"Checking the status of the expid:{expid}")
+                process_end = False
+                while (not process_end):
+                    if not proccess_id(expid):
+                        process_end = True
+                    else:
+                        Log.info(f"Waiting for the autosubmit run to safety stop {expid}")
+                        sleep(5)
+            if cancel:
+                # call prepare_run to obtain the platforms and as_conf
+                job_list, _, _, _, as_conf, _, _, _ = Autosubmit.prepare_run(
+                    expid)
+                # get active jobs
+                active_jobs = [job for job in job_list.get_job_list() if
+                               job.status in [Status.QUEUING, Status.RUNNING, Status.SUBMITTED]]
+                # change status of active jobs
+                status = status.upper()
+
+                for job in active_jobs:
+                    # Cancel from the remote platform
+                    Log.info(f'Cancelling job {job.name} on platform {job.platform.name}')
+                    try:
+                        job.platform.send_command(job.platform.cancel_cmd + " " + str(job.id), ignore_log=True)
+                    except Exception as e:
+                        Log.warning(f"{str(e)}")
+                    Log.info(f"Changing status of job {job.name} to {status}")
+                    if status in Status.VALUE_TO_KEY.values():
+                        job.status = Status.KEY_TO_VALUE[status]
+                job_list.save()
+
 
 
 
