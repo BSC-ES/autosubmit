@@ -835,56 +835,69 @@ class Autosubmit:
             if 'all' not in BasicConfig.ALLOWED_HOSTS[args.command] and not (host in BasicConfig.ALLOWED_HOSTS[args.command] or fullhost in BasicConfig.ALLOWED_HOSTS[args.command]):
                 raise AutosubmitCritical(message, 7071)
         if (expid != 'None' and expid) and args.command not in expid_less and args.command not in global_log_command:
-            as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
-            as_conf.reload(force_load=True)
-            if len(as_conf.experiment_data) == 0:
-                if args.command not in ["expid", "upgrade"]:
-                    raise AutosubmitCritical(
-                        "Experiment {0} has no yml data. Please, if you really wish to use AS 4 prompt:\nautosubmit upgrade {0}".format(
-                            expid), 7012)
-            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
-            tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
-            aslogs_path = os.path.join(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
-            if not os.path.exists(exp_path):
-                raise AutosubmitCritical("Experiment does not exist", 7012)
-            # delete is treated differently
-            if args.command not in ["monitor", "describe", "delete", "report", "stats", "dbfix", "stop"]:
-                owner, eadmin, currentOwner = Autosubmit._check_ownership(expid, raise_error=True)
+            if "," in expid:
+                expids = expid.split(",")
             else:
-                owner, eadmin, currentOwner = Autosubmit._check_ownership(expid, raise_error=False)
+                expids = expid.split(" ")
+            expids = [x.strip() for x in expids]
+            for expid in expids:
+                as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
+                as_conf.reload(force_load=True)
+                if len(as_conf.experiment_data) == 0:
+                    if args.command not in ["expid", "upgrade"]:
+                        raise AutosubmitCritical(
+                            "Experiment {0} has no yml data. Please, if you really wish to use AS 4 prompt:\nautosubmit upgrade {0}".format(
+                                expid), 7012)
+                exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+                tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
+                aslogs_path = os.path.join(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
+                if not os.path.exists(exp_path):
+                    raise AutosubmitCritical("Experiment does not exist", 7012)
+                # delete is treated differently
+                if args.command not in ["monitor", "describe", "delete", "report", "stats", "dbfix"]:
+                    owner, eadmin, currentOwner = Autosubmit._check_ownership(expid, raise_error=True)
+                else:
+                    owner, eadmin, currentOwner = Autosubmit._check_ownership(expid, raise_error=False)
 
             if not os.path.exists(tmp_path):
                 os.mkdir(tmp_path)
             if not os.path.exists(aslogs_path):
                 os.mkdir(aslogs_path)
-            if owner:
-                os.chmod(tmp_path, 0o775)
-                with suppress(PermissionError, FileNotFoundError, Exception): # for -txt option
-                    os.chmod(f'{exp_path}/status', 0o775)
-
-                Log.set_file(os.path.join(aslogs_path, args.command + '.log'), "out", log_level)
-                Log.set_file(os.path.join(aslogs_path, args.command + '_err.log'), "err")
-                if args.command in ["run"]:
-                    if os.path.exists(os.path.join(aslogs_path, 'jobs_active_status.log')):
-                        os.remove(os.path.join(aslogs_path, 'jobs_active_status.log'))
-                    if os.path.exists(os.path.join(aslogs_path, 'jobs_failed_status.log')):
-                        os.remove(os.path.join(aslogs_path, 'jobs_failed_status.log'))
-                        Log.set_file(os.path.join(aslogs_path, 'jobs_active_status.log'), "status")
-                        Log.set_file(os.path.join(aslogs_path, 'jobs_failed_status.log'), "status_failed")
+            if args.command == "stop":
+                exp_id = "_".join(expids)
+                Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
+                                          args.command + exp_id + '.log'), "out", log_level)
+                Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
+                                          args.command + exp_id + '_err.log'), "err")
             else:
-                st = os.stat(tmp_path)
-                oct_perm = str(oct(st.st_mode))[-3:]
-                if int(oct_perm[1]) in [6, 7] or int(oct_perm[2]) in [6, 7]:
-                    Log.set_file(os.path.join(tmp_path, args.command + '.log'), "out", log_level)
-                    Log.set_file(os.path.join(tmp_path, args.command + '_err.log'), "err")
+                if owner:
+                    os.chmod(tmp_path, 0o775)
+                    with suppress(PermissionError, FileNotFoundError, Exception): # for -txt option
+                        os.chmod(f'{exp_path}/status', 0o775)
+
+                    Log.set_file(os.path.join(aslogs_path, args.command + '.log'), "out", log_level)
+                    Log.set_file(os.path.join(aslogs_path, args.command + '_err.log'), "err")
+                    if args.command in ["run"]:
+                        if os.path.exists(os.path.join(aslogs_path, 'jobs_active_status.log')):
+                            os.remove(os.path.join(aslogs_path, 'jobs_active_status.log'))
+                        if os.path.exists(os.path.join(aslogs_path, 'jobs_failed_status.log')):
+                            os.remove(os.path.join(aslogs_path, 'jobs_failed_status.log'))
+                            Log.set_file(os.path.join(aslogs_path, 'jobs_active_status.log'), "status")
+                            Log.set_file(os.path.join(aslogs_path, 'jobs_failed_status.log'), "status_failed")
                 else:
-                    Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                              args.command + expid + '.log'), "out", log_level)
-                    Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                              args.command + expid + '_err.log'), "err")
-                    Log.printlog(
-                        "Permissions of {0} are {1}. The log is being written in the {2} path instead of {1}. Please tell to the owner to fix the permissions".format(
-                            tmp_path, oct_perm, BasicConfig.GLOBAL_LOG_DIR))
+                    st = os.stat(tmp_path)
+                    oct_perm = str(oct(st.st_mode))[-3:]
+                    if int(oct_perm[1]) in [6, 7] or int(oct_perm[2]) in [6, 7]:
+                        Log.set_file(os.path.join(tmp_path, args.command + '.log'), "out", log_level)
+                        Log.set_file(os.path.join(tmp_path, args.command + '_err.log'), "err")
+                    else:
+                        Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
+                                                  args.command + expid + '.log'), "out", log_level)
+                        Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
+                                                  args.command + expid + '_err.log'), "err")
+                        Log.printlog(
+                            "Permissions of {0} are {1}. The log is being written in the {2} path instead of {1}. Please tell to the owner to fix the permissions".format(
+                                tmp_path, oct_perm, BasicConfig.GLOBAL_LOG_DIR))
             Log.file_path = tmp_path
             if owner:
                 if "update_version" in args:
@@ -6091,7 +6104,7 @@ class Autosubmit:
         :param only_cancel: Cancel all jobs in the remote and local platform queues if process is already stopped
         :param status: desired final status of the jobs canceled (default: FAILED)
         :param all: All user experiments
-
+        :param force: Force stop the autosubmit process, equivalent to kill -9
         :return:
         """
         def retrieve_expids():
@@ -6129,6 +6142,8 @@ class Autosubmit:
                 raise AutosubmitCritical(
                     "An error occurred while retrieving the process id", 7011, str(e))
             return output[0] if output else ""
+        # Starts there
+
         if status not in Status.VALUE_TO_KEY.values():
             raise AutosubmitCritical("Invalid status. Expected one of {0}".format(Status.VALUE_TO_KEY.keys()), 7011)
         # First retrieve expids
@@ -6142,6 +6157,7 @@ class Autosubmit:
                 expids = expids.split(",")
             else:
                 expids = expids.split(" ")
+        expids = [x.strip() for x in expids]
         # Obtain the proccess id
         errors = ""
         valid_expids = []

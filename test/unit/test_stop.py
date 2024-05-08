@@ -35,11 +35,22 @@ from log.log import AutosubmitCritical
 """
 This file contains the test for the `autosubmit stop` command. Found in /autosubmit.py line 6079.
 
-Possible usages:
+    usage: autosubmit stop [-h] [-a] [-c] [-oc] [-s STATUS] [-f] [expid]
 
-autosubmit stop expids
-autosubmit stop expids [--kill] [status] [--force] 
-autosubmit stop --all [--kill] [status] [--force]
+    Stop an autosubmit process
+
+    positional arguments:
+      expid                 experiment identifier
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      -a, --all             Stop all current user autosubmit processes, if not defined use expid separated by ,
+      -c, --cancel          Kills active jobs and set them to failure
+      -oc, --only_cancel    Cancel active jobs if process is stopped
+      -s STATUS, --status STATUS
+                            Final status of killed jobs. Default is FAILED.
+      -f, --force           Force stop autosubmit process, equivalent to kill -9. If not used, autosubmit will try to stop the process gracefully.
+
 
 """
 

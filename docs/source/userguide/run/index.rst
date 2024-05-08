@@ -412,6 +412,39 @@ Finally, you can launch Autosubmit *run* in background and with ``nohup`` (conti
 How to stop the experiment
 --------------------------
 
+From Autosubmit 4.1.6, you can stop an experiment using the command `autosubmit stop`
+
+Options:
+::
+
+    usage: autosubmit stop [-h] [-a] [-c] [-oc] [-s STATUS] [-f] [expid]
+
+    Stop an autosubmit process
+
+    positional arguments:
+      expid                 experiment identifier
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      -a, --all             Stop all current user autosubmit processes, if not defined use expid separated by ,
+      -c, --cancel          Kills active jobs and set them to failure
+      -oc, --only_cancel    Cancel active jobs if process is stopped
+      -s STATUS, --status STATUS
+                            Final status of killed jobs. Default is FAILED.
+      -f, --force           Force stop autosubmit process, equivalent to kill -9. If not used, autosubmit will try to stop the process gracefully.
+
+Examples:
+~~~~~~~~~
+
+.. code-block:: bash
+
+    autosubmit stop cxxx
+    autosubmit stop cxxx, cyyy
+    autosubmit stop -a
+    autosubmit stop -a -f
+    autosubmit stop -a -c
+
+
 You can stop Autosubmit by sending a signal to the process.
 To get the process identifier (PID) you can use the ps command on a shell interpreter/terminal.
 ::

@@ -19,6 +19,7 @@ from multiprocessing import Process, Queue
 def processed(fn):
     def wrapper(*args, **kwargs):
         process = Process(target=fn, args=args, kwargs=kwargs, name=f"{args[0].name}_platform")
+        process.daemon = True  # Set the process as a daemon process
         process.start()
         return process
 
