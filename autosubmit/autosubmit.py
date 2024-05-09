@@ -126,6 +126,15 @@ class MyParser(argparse.ArgumentParser):
         self.print_help()
         sys.exit(2)
 
+class CancelAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, values)
+        if values:
+            if namespace.filter_status.upper() == "SUBMITTED, QUEUING, RUNNING " or namespace.target.upper() == "FAILED":
+                pass
+            else:
+                parser.error("-fs and -t can only be used when --cancel is provided")
+
 
 class Autosubmit:
     """
@@ -660,19 +669,21 @@ class Autosubmit:
 
             # stop
             subparser = subparsers.add_parser(
-                'stop', description='Stop an autosubmit process')
+                'stop', description='Completly stops an autosubmit run process')
             group = subparser.add_mutually_exclusive_group(required=True)
-            group.add_argument('expid', help='experiment identifier', nargs='?')
-            group.add_argument('-a', '--all', default=False, action='store_true',
-                               help='Stop all user autosubmit processes')
-            subparser.add_argument('-c', '--cancel', default=False, action='store_true',
-                                   help='Kills active jobs and set them to failure')
-            subparser.add_argument('-oc', '--only_cancel', default=False, action='store_true',
-                                   help='Cancel active jobs if process is stopped')
-            subparser.add_argument('-s', '--status', default="FAILED", action='store', metavar='STATUS',
-                                   help='Final status of killed jobs. Default is FAILED.')
+            group.add_argument('expid', help='experiment identifier, stops the listed expids separated by ","', nargs='?')
             subparser.add_argument('-f', '--force', default=False, action='store_true',
-                                   help='Force stop autosubmit process, equivalent to kill -9')
+                                   help='Forces to stop autosubmit process, equivalent to kill -9')
+            group.add_argument('-a', '--all', default=False, action='store_true',
+                               help='Stop all current running autosubmit processes, will ask for confirmation')
+            group.add_argument('-fa', '--force_all', default=False, action='store_true',
+                               help='Stop all current running autosubmit processes')
+            subparser.add_argument('-c', '--cancel', action=CancelAction, default=False, nargs=0,
+                                help='Orders to the schedulers to stop active jobs.')
+            subparser.add_argument('-fs', '--filter_status', type=str, default="SUBMITTED, QUEUING, RUNNING",
+                                help='Select the status (one or more) to filter the list of jobs.')
+            subparser.add_argument('-t', '--target', type=str, default="FAILED", metavar='STATUS',
+                                help='Final status of killed jobs. Default is FAILED.')
             args, unknown = parser.parse_known_args()
             if args.version:
                 Log.info(Autosubmit.autosubmit_version)
@@ -778,7 +789,7 @@ class Autosubmit:
         elif args.command == 'cat-log':
             return Autosubmit.cat_log(args.ID, args.file, args.mode, args.inspect)
         elif args.command == 'stop':
-            return Autosubmit.stop(args.expid, args.cancel, args.only_cancel, args.status, args.all, args.force)
+            return Autosubmit.stop(args.expid, args.force, args.all, args.force_all, args.cancel, args.filter_status, args.target)
     @staticmethod
     def _init_logs(args, console_level='INFO', log_level='DEBUG', expid='None'):
         Log.set_console_level(console_level)
@@ -6094,19 +6105,26 @@ class Autosubmit:
         return job_list
 
 
+
+
     @staticmethod
-    def stop(expids, cancel=False, only_cancel=False, status="FAILED", all=False, force=False):
+    def stop(expids, force=False, all=False, force_all=False, cancel=False, current_status="", status='FAILED'):
         """
         The stop command allows users to stop the desired experiments.
-
-        It is possible to use ``autosubmit stop -kill`` to also cancel all jobs in the remote and local platform queues and set them to failed if ``--status`` flag is not prompt.
-
-        :param expids: List of experiments to stop
-        :param cancel: Cancel all jobs in the remote and local platform queues
-        :param only_cancel: Cancel all jobs in the remote and local platform queues if process is already stopped
-        :param status: desired final status of the jobs canceled (default: FAILED)
-        :param all: All user experiments
-        :param force: Force stop the autosubmit process, equivalent to kill -9
+        :param expids: expids to stop
+        :type expids: str
+        :param force: force the stop of the experiment
+        :type force: bool
+        :param all: stop all experiments
+        :type all: bool
+        :param force_all: force the stop of all experiments
+        :type force_all: bool
+        :param cancel: cancel the jobs of the experiment
+        :type cancel: bool
+        :param current_status: what status to change # defaults to all active jobs.
+        :type current_status: str
+        :param status: status to change the active jobs to
+        :type status: str
         :return:
         """
         def retrieve_expids():
@@ -6123,11 +6141,11 @@ class Autosubmit:
                 expids = output.split('\n')
                 # delete empty strings
                 expids = [x for x in expids if x]
-
             except Exception as e:
                 raise AutosubmitCritical(
                     "An error occurred while retrieving the expids", 7011, str(e))
             return expids
+
         def proccess_id(expid=None):
             # Retrieve the process id of the autosubmit process
             # Bash command: ps -ef | grep "$(whoami)" | grep "autosubmit" | grep "run" | grep "expid" | awk '{print $2}'
@@ -6146,27 +6164,30 @@ class Autosubmit:
                     "An error occurred while retrieving the process id", 7011, str(e))
             return output[0] if output else ""
         # Starts there
-
         if status not in Status.VALUE_TO_KEY.values():
             raise AutosubmitCritical("Invalid status. Expected one of {0}".format(Status.VALUE_TO_KEY.keys()), 7011)
         # First retrieve expids
-        if only_cancel:
-            cancel=True
+        if force_all:
+            all=True
         if all:
             expids = retrieve_expids()
+            if not all_yes:
+                expids = [expid.lower() for expid in expids if input(f"Do you really want to stop: {expid} (y/n)[enter=y]? ").lower() in ["true","yes","y","1",""]]
         else:
             expids = expids.lower()
             if "," in expids:
                 expids = expids.split(",")
             else:
                 expids = expids.split(" ")
+
         expids = [x.strip() for x in expids]
         # Obtain the proccess id
         errors = ""
         valid_expids = []
         for expid in expids:
             process_id_ = proccess_id(expid)
-            if not process_id_ and only_cancel:
+            if not process_id_:
+                Log.info(f"Expid {expid} was not running")
                 valid_expids.append(expid)
             elif process_id_:
                 # Send the signal to stop the autosubmit process
@@ -6186,13 +6207,14 @@ class Autosubmit:
                     Log.warning(f"An error occurred while stopping the autosubmit process for expid:{expid}: {str(e)}")
         for expid in valid_expids:
             if not force:
-                Log.info(f"Checking the status of the expid:{expid}")
+                Log.info(f"Checking the status of the expid: {expid}")
                 process_end = False
                 while (not process_end):
                     if not proccess_id(expid):
+                        Log.info(f"Expid {expid} is stopped")
                         process_end = True
                     else:
-                        Log.info(f"Waiting for the autosubmit run to safety stop {expid}")
+                        Log.info(f"Waiting for the autosubmit run to safety stop: {expid}")
                         sleep(5)
             if cancel:
                 # call prepare_run to obtain the platforms and as_conf
@@ -6203,7 +6225,8 @@ class Autosubmit:
                                job.status in [Status.QUEUING, Status.RUNNING, Status.SUBMITTED]]
                 # change status of active jobs
                 status = status.upper()
-
+                if not active_jobs:
+                    Log.info(f"No active jobs found for expid {expid}")
                 for job in active_jobs:
                     # Cancel from the remote platform
                     Log.info(f'Cancelling job {job.name} on platform {job.platform.name}')
