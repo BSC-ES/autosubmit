@@ -1222,6 +1222,20 @@ class Autosubmit:
                     yaml.dump(yaml_data, output)
 
     @staticmethod
+    def replace_expid_in_default(content, new_expid):
+        # Find the DEFAULT section
+        default_section_match = re.search(r'(DEFAULT:[\s\S]*?)(?=\w+:|$)', content)
+
+        if default_section_match:
+            default_section = default_section_match.group(1)
+
+            # Replace EXPID in the DEFAULT section
+            new_default_section = re.sub(rf'(EXPID:).*', rf'\1 "    {new_expid}"', default_section)
+            # Replace the old DEFAULT section
+            content = content.replace(default_section, new_default_section)
+
+        return content
+    @staticmethod
     def as_conf_default_values(exp_id,hpc="local",minimal_configuration=False,git_repo="",git_branch="main",git_as_conf=""):
         """
         Replace default values in as_conf files
@@ -1248,9 +1262,7 @@ class Autosubmit:
                     search = re.search('TO: .*', content, re.MULTILINE)
                     if search is not None:
                         content = content.replace(search.group(0), "TO: \"\"")
-                    search = re.search('EXPID: .*', content, re.MULTILINE)
-                    if search is not None:
-                        content = content.replace(search.group(0),"EXPID: \""+exp_id+"\"")
+                    Autosubmit.replace_expid_in_default(content, exp_id)
                     search = re.search('HPCARCH: .*', content, re.MULTILINE)
                     if search is not None:
                         content = content.replace(search.group(0),"HPCARCH: \""+hpc+"\"")
