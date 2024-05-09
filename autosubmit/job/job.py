@@ -181,6 +181,7 @@ class Job(object):
         self._chunk = None
         self._member = None
         self.date = None
+        self.date_split = None
         self.name = name
         self._split = None
         self._delay = None
