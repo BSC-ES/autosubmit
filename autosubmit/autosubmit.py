@@ -1222,18 +1222,20 @@ class Autosubmit:
                     yaml.dump(yaml_data, output)
 
     @staticmethod
-    def replace_expid_in_default(content, new_expid):
-        # Find the DEFAULT section
-        default_section_match = re.search(r'(DEFAULT:[\s\S]*?)(?=\w+:|$)', content)
-
-        if default_section_match:
-            default_section = default_section_match.group(1)
-
-            # Replace EXPID in the DEFAULT section
-            new_default_section = re.sub(rf'(EXPID:).*', rf'\1 "    {new_expid}"', default_section)
-            # Replace the old DEFAULT section
-            content = content.replace(default_section, new_default_section)
-
+    def replace_parameter_inside_section(content, parameter, new_value, section):
+        # same but for any section any parameter, not only EXPID case insensitive
+        # Find the any section
+        if section:
+            section_match = re.search(rf'({section}:[\s\S]*?{parameter}:.*?)(?=\n|$)', content, re.IGNORECASE)
+            if section_match:
+                section = section_match.group(1)
+                # Replace parameter in the section
+                new_section = re.sub(rf'({parameter}:).*', rf'\1 "{new_value}"', section)
+                # Replace the old section
+                content = content.replace(section, new_section)
+        else:
+            # replace only the parameter
+            content = re.sub(rf'({parameter}:).*', rf'\1 "{new_value}"', content)
         return content
     @staticmethod
     def as_conf_default_values(exp_id,hpc="local",minimal_configuration=False,git_repo="",git_branch="main",git_as_conf=""):
@@ -1262,7 +1264,7 @@ class Autosubmit:
                     search = re.search('TO: .*', content, re.MULTILINE)
                     if search is not None:
                         content = content.replace(search.group(0), "TO: \"\"")
-                    Autosubmit.replace_expid_in_default(content, exp_id)
+                    content = Autosubmit.replace_parameter_inside_section(content, "EXPID", exp_id, "DEFAULT")
                     search = re.search('HPCARCH: .*', content, re.MULTILINE)
                     if search is not None:
                         content = content.replace(search.group(0),"HPCARCH: \""+hpc+"\"")
@@ -1279,9 +1281,6 @@ class Autosubmit:
                         search = re.search('PROJECT_BRANCH: .*', content, re.MULTILINE)
                         if search is not None:
                             content = content.replace(search.group(0), "PROJECT_BRANCH: \""+git_branch+"\"")
-
-
-
                 with open(os.path.join(BasicConfig.LOCAL_ROOT_DIR, exp_id,"conf", as_conf_file), 'w') as f:
                     f.write(content)
 
