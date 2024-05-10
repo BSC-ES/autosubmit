@@ -417,22 +417,29 @@ From Autosubmit 4.1.6, you can stop an experiment using the command `autosubmit 
 Options:
 ::
 
-    usage: autosubmit stop [-h] [-a] [-c] [-oc] [-s STATUS] [-f] [expid]
+usage: autosubmit stop [-h] [-f] [-a] [-fa] [-c] [-fs FILTER_STATUS]
+                       [-t STATUS]
+                       [expid]
 
-    Stop an autosubmit process
+Completly stops an autosubmit run process
 
     positional arguments:
-      expid                 experiment identifier
+      expid                 experiment identifier, stops the listed expids
+                            separated by ","
 
     optional arguments:
       -h, --help            show this help message and exit
-      -a, --all             Stop all current user autosubmit processes, if not defined use expid separated by ,
-      -c, --cancel          Kills active jobs and set them to failure
-      -oc, --only_cancel    Cancel active jobs if process is stopped
-      -s STATUS, --status STATUS
+      -f, --force           Forces to stop autosubmit process, equivalent to kill
+                            -9
+      -a, --all             Stop all current running autosubmit processes, will
+                            ask for confirmation
+      -fa, --force_all      Stop all current running autosubmit processes
+      -c, --cancel          Orders to the schedulers to stop active jobs.
+      -fs FILTER_STATUS, --filter_status FILTER_STATUS
+                            Select the status (one or more) to filter the list of
+                            jobs. Default is SUBMITTED, QUEUING, RUNNING.
+      -t STATUS, --target STATUS
                             Final status of killed jobs. Default is FAILED.
-      -f, --force           Force stop autosubmit process, equivalent to kill -9. If not used, autosubmit will try to stop the process gracefully.
-
 Examples:
 ~~~~~~~~~
 
@@ -443,6 +450,7 @@ Examples:
     autosubmit stop -a
     autosubmit stop -a -f
     autosubmit stop -a -c
+    autosubmit stop -fa --cancel -fs "SUBMITTED, QUEUING, RUNNING" -t "FAILED"
 
 
 You can stop Autosubmit by sending a signal to the process.

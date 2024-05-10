@@ -128,13 +128,11 @@ class MyParser(argparse.ArgumentParser):
 
 class CancelAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        setattr(namespace, self.dest, values)
-        if values:
-            if namespace.filter_status.upper() == "SUBMITTED, QUEUING, RUNNING " or namespace.target.upper() == "FAILED":
-                pass
-            else:
-                parser.error("-fs and -t can only be used when --cancel is provided")
-
+        setattr(namespace, self.dest, True)
+        if namespace.filter_status.upper() == "SUBMITTED, QUEUING, RUNNING " or namespace.target.upper() == "FAILED":
+            pass
+        else:
+            parser.error("-fs and -t can only be used when --cancel is provided")
 
 class Autosubmit:
     """
@@ -813,7 +811,7 @@ class Autosubmit:
                       "readme", "changelog", "configure", "unarchive",
                       "cat-log"]
         if args.command == "stop":
-            if args.all:
+            if args.all or args.force_all:
                 expid_less.append("stop")
         global_log_command = ["delete", "archive", "upgrade"]
         if "offer" in args:
@@ -1906,7 +1904,7 @@ class Autosubmit:
         return exp_history
     @staticmethod
     def prepare_run(expid, notransitive=False, start_time=None, start_after=None,
-                       run_only_members=None,recover = False):
+                       run_only_members=None, recover = False, check_scripts= False):
         """
         Prepare the run of the experiment.
         :param expid: a string with the experiment id.
@@ -1996,7 +1994,8 @@ class Autosubmit:
         # This function, looks at %JOBS.$JOB.FILE% ( mandatory ) and %JOBS.$JOB.CHECK% ( default True ).
         # Checks the contents of the .sh/.py/r files and looks for AS placeholders.
         try:
-            job_list.check_scripts(as_conf)
+            if check_scripts:
+                job_list.check_scripts(as_conf)
         except Exception as e:
             raise AutosubmitCritical(
                 "Error while checking job templates", 7014, str(e))
@@ -6129,10 +6128,10 @@ class Autosubmit:
         """
         def retrieve_expids():
             # Retrieve all expids in use by autosubmit attached to my current user
-            # Bash command: ps -ef | grep "$(whoami)" | grep "autosubmit" | grep -oP '(?<=run )\S+'
             expids = []
             try:
-                command = f'ps -ef | grep "$(whoami)" | grep "autosubmit" | grep -oP \'(?<=run )\S+\''
+                command = 'ps -ef | grep "$(whoami)" | grep -oP "(?<=run )\w{4}" | sort -u'
+
                 process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
                 output, error = process.communicate()
                 output = output.decode(locale.getlocale()[1])
@@ -6145,7 +6144,6 @@ class Autosubmit:
                 raise AutosubmitCritical(
                     "An error occurred while retrieving the expids", 7011, str(e))
             return expids
-
         def proccess_id(expid=None):
             # Retrieve the process id of the autosubmit process
             # Bash command: ps -ef | grep "$(whoami)" | grep "autosubmit" | grep "run" | grep "expid" | awk '{print $2}'
@@ -6166,13 +6164,23 @@ class Autosubmit:
         # Starts there
         if status not in Status.VALUE_TO_KEY.values():
             raise AutosubmitCritical("Invalid status. Expected one of {0}".format(Status.VALUE_TO_KEY.keys()), 7011)
+        if "," in current_status:
+            current_status = current_status.upper().split(",")
+        else:
+            current_status = current_status.upper().split(" ")
+        try:
+            current_status = [Status.KEY_TO_VALUE[x.strip()] for x in current_status]
+        except:
+            raise AutosubmitCritical("Invalid status -fs. All values must match one of {0}".format(Status.VALUE_TO_KEY.keys()), 7011)
+
+
         # First retrieve expids
         if force_all:
             all=True
         if all:
             expids = retrieve_expids()
-            if not all_yes:
-                expids = [expid.lower() for expid in expids if input(f"Do you really want to stop: {expid} (y/n)[enter=y]? ").lower() in ["true","yes","y","1",""]]
+            if not force_all:
+                expids = [expid.lower() for expid in expids if input(f"Do you really want to stop the experiment: {expid} (y/n)[enter=y]? ").lower() in ["true","yes","y","1",""]]
         else:
             expids = expids.lower()
             if "," in expids:
@@ -6219,14 +6227,15 @@ class Autosubmit:
             if cancel:
                 # call prepare_run to obtain the platforms and as_conf
                 job_list, _, _, _, as_conf, _, _, _ = Autosubmit.prepare_run(
-                    expid)
+                    expid,check_scripts=False)
                 # get active jobs
                 active_jobs = [job for job in job_list.get_job_list() if
-                               job.status in [Status.QUEUING, Status.RUNNING, Status.SUBMITTED]]
+                               job.status in current_status]
                 # change status of active jobs
                 status = status.upper()
                 if not active_jobs:
                     Log.info(f"No active jobs found for expid {expid}")
+                    return
                 for job in active_jobs:
                     # Cancel from the remote platform
                     Log.info(f'Cancelling job {job.name} on platform {job.platform.name}')

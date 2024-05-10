@@ -21,23 +21,23 @@ from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 """
 This file contains the test for the `autosubmit stop` command. Found in /autosubmit.py line 6079.
 
-    usage: autosubmit stop [-h] [-a] [-c] [-oc] [-s STATUS] [-f] [expid]
+positional arguments:
+  expid                 experiment identifier, stops the listed expids
+                        separated by ","
 
-    Stop an autosubmit process
-
-    positional arguments:
-      expid                 experiment identifier
-
-    optional arguments:
-      -h, --help            show this help message and exit
-      -a, --all             Stop all current user autosubmit processes, if not defined use expid separated by ,
-      -c, --cancel          Kills active jobs and set them to failure
-      -oc, --only_cancel    Cancel active jobs if process is stopped
-      -s STATUS, --status STATUS
-                            Final status of killed jobs. Default is FAILED.
-      -f, --force           Force stop autosubmit process, equivalent to kill -9. If not used, autosubmit will try to stop the process gracefully.
-
-
+optional arguments:
+  -h, --help            show this help message and exit
+  -f, --force           Forces to stop autosubmit process, equivalent to kill
+                        -9
+  -a, --all             Stop all current running autosubmit processes, will
+                        ask for confirmation
+  -fa, --force_all      Stop all current running autosubmit processes
+  -c, --cancel          Orders to the schedulers to stop active jobs.
+  -fs FILTER_STATUS, --filter_status FILTER_STATUS
+                        Select the status (one or more) to filter the list of
+                        jobs.
+  -t STATUS, --target STATUS
+                        Final status of killed jobs. Default is FAILED.
 """
 
 class TestStop(TestCase):
@@ -94,7 +94,7 @@ class TestStop(TestCase):
                 mock_job_list = MagicMock()
                 mock_job_list.return_value = self.job_list
                 with patch('autosubmit.autosubmit.Autosubmit.load_job_list', return_value=mock_job_list):
-                    self.autosubmit.stop(fake_running_expid,force=True)
+                    self.autosubmit.stop(fake_running_expid,force=True,all=False,force_all=False,cancel=False,current_status="RUNNING",status="FAILED")
 
 class FakeBasicConfig:
     def __init__(self):

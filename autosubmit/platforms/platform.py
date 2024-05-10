@@ -848,7 +848,3 @@ class Platform(object):
                     self.restore_connection(None)
                 except:
                     pass
-            time.sleep(1)
-
-
-

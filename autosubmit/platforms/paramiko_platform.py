@@ -425,7 +425,7 @@ class ParamikoPlatform(Platform):
         except Exception as e:
             try:
                 os.remove(file_path)
-            except Exception as e:
+            except Exception:
                 pass
             if str(e) in "Garbage":
                 if not ignore_log:
