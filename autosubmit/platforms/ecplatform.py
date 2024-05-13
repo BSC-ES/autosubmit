@@ -174,6 +174,7 @@ class EcPlatform(ParamikoPlatform):
                 as_conf is None or str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS',
                                                                                  "false")).lower() == "false"):
             self.log_retrieval_process_active = True
+
             if as_conf.experiment_data["ASMISC"].get("COMMAND","").lower() == "run":
                 self.recover_job_logs()
 
@@ -208,6 +209,12 @@ class EcPlatform(ParamikoPlatform):
         try:
             if output.lower().find("yes") != -1:
                 self.connected = True
+                if not self.log_retrieval_process_active and (
+                        as_conf is None or str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS',
+                                                                                             "false")).lower() == "false"):
+                    self.log_retrieval_process_active = True
+                    if as_conf.experiment_data["ASMISC"].get("COMMAND", "").lower() == "run":
+                        self.recover_job_logs()
                 return "OK"
             else:
                 self.connected = False

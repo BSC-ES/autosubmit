@@ -2680,7 +2680,8 @@ class JobList(object):
             # Log name has this format:
                 # a02o_20000101_fc0_2_SIM.20240212115021.err
                 # $jobname.$(YYYYMMDDHHMMSS).err or .out
-            self.update_log_status(job, as_conf)
+            if not first_time:
+                self.update_log_status(job, as_conf)
             if job.synchronize is not None and len(str(job.synchronize)) > 0:
                 tmp = [parent for parent in job.parents if parent.status == Status.COMPLETED]
                 if len(tmp) != len(job.parents):

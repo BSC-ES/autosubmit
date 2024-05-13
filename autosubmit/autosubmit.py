@@ -2136,6 +2136,7 @@ class Autosubmit:
                 except Exception as e:
                     raise AutosubmitCritical("Error in run initialization", 7014, str(e))  # Changing default to 7014
                 Log.debug("Running main running loop")
+                did_run = False
                 #########################
                 # AUTOSUBMIT - MAIN LOOP
                 #########################
@@ -2155,6 +2156,9 @@ class Autosubmit:
                 max_recovery_retrials = as_conf.experiment_data.get("CONFIG",{}).get("RECOVERY_RETRIALS",3650)  # (72h - 122h )
                 recovery_retrials = 0
                 while job_list.get_active():
+                    for job in [job for job in job_list.get_job_list() if job.status == Status.READY]:
+                        job.update_parameters(as_conf, {})
+                    did_run = True
                     try:
                         if Autosubmit.exit:
                             Autosubmit.terminate(threading.enumerate())
@@ -2318,7 +2322,15 @@ class Autosubmit:
 
 
                 Log.result("No more jobs to run.")
-
+                if not did_run and len(job_list.get_completed_without_logs()) > 0:
+                    #connect to platforms
+                    Log.info(f"Connecting to the platforms, to recover missing logs")
+                    submitter = Autosubmit._get_submitter(as_conf)
+                    submitter.load_platforms(as_conf)
+                    if submitter.platforms is None:
+                        raise AutosubmitCritical("No platforms configured!!!", 7014)
+                    platforms = [value for value in submitter.platforms.values()]
+                    Autosubmit.restore_platforms(platforms, as_conf=as_conf, expid=expid)
                 # Wait for all remaining threads of I/O, close remaining connections
                 # search hint - finished run
                 Log.info("Waiting for all logs to be updated")
@@ -2330,6 +2342,7 @@ class Autosubmit:
                     if len(job_list.get_completed_without_logs()) == 0:
                         break
                     for job in job_list.get_completed_without_logs():
+                        job.platform = submitter.platforms[job.platform_name.upper()]
                         job_list.update_log_status(job, as_conf)
                     sleep(1)
                     if remaining % 10 == 0:

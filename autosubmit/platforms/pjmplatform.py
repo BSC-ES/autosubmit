@@ -65,6 +65,12 @@ class PJMPlatform(ParamikoPlatform):
         tmp_path = os.path.join(exp_id_path, "tmp")
         self._submit_script_path = os.path.join(
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh")
+        self._submit_script_base_name = os.path.join(
+            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
+        self._submit_script_file = open(self._submit_script_path, 'wb').close()
+
+    def generate_new_name_submit_script_file(self):
+        self._submit_script_path = self._submit_script_base_name + os.urandom(16).hex() + ".sh"
         self._submit_script_file = open(self._submit_script_path, 'wb').close()
 
     def submit_error(self,output):
@@ -158,6 +164,10 @@ class PJMPlatform(ParamikoPlatform):
 
     def open_submit_script(self):
         self._submit_script_file = open(self._submit_script_path, 'wb').close()
+        # remove file
+        with suppress(FileNotFoundError):
+            os.remove(self._submit_script_path)
+        self.generate_new_name_submit_script_file()
         self._submit_script_file = open(self._submit_script_path, 'ab')
 
     def get_submit_script(self):
@@ -197,6 +207,8 @@ class PJMPlatform(ParamikoPlatform):
             self.send_file(self.get_submit_script(), False)
             cmd = os.path.join(self.get_files_path(),
                                os.path.basename(self._submit_script_path))
+            # remove file after submisison
+            cmd = f"{cmd} ; rm {cmd}"
             try:
                 self.send_command(cmd)
             except AutosubmitError as e:
