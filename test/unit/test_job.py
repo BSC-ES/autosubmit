@@ -196,6 +196,8 @@ class TestJob(TestCase):
 
         write_mock = Mock().write = Mock()
         open_mock = Mock(return_value=write_mock)
+        self.job.default_parameters = MagicMock()
+        self.job.default_parameters.get = MagicMock(return_value=[])
         with patch.object(builtins, "open", open_mock):
             # act
             self.job.create_script(config)
