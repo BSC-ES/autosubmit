@@ -64,3 +64,19 @@ Autosubmit logos in both SVG and PNG files are available for download:
 | |img_as_short_icon.png| | |as_short_icon.svg| | |as_short_icon.png| |  
 +-------------------------+---------------------+---------------------+  
 
+Presentations
+=============
+
+.. raw:: html
+
+    <iframe
+        src="https://docs.google.com/presentation/d/e/2PACX-1vSvfOhIr5bfWzjFgLjmN_hySYNcF8tBpyyKeogcsVNWUVwohlnRyl4mtxLJYAxZxsKKjbmd2MMDE4-E/embed?start=false&loop=false&delayms=3000"
+        frameborder="0"
+        width="100%"
+        height="450px"
+        allowfullscreen="true"
+        mozallowfullscreen="true"
+        webkitallowfullscreen="true"></iframe>
+
+
+`Full Screen <https://docs.google.com/presentation/d/e/2PACX-1vSvfOhIr5bfWzjFgLjmN_hySYNcF8tBpyyKeogcsVNWUVwohlnRyl4mtxLJYAxZxsKKjbmd2MMDE4-E/pub?output=pdf>`_
