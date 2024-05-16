@@ -417,11 +417,11 @@ From Autosubmit 4.1.6, you can stop an experiment using the command `autosubmit 
 Options:
 ::
 
-usage: autosubmit stop [-h] [-f] [-a] [-fa] [-c] [-fs FILTER_STATUS]
+    usage: autosubmit stop [-h] [-f] [-a] [-fa] [-c] [-fs FILTER_STATUS]
                        [-t STATUS]
                        [expid]
 
-Completly stops an autosubmit run process
+    Completely stops an autosubmit run process
 
     positional arguments:
       expid                 experiment identifier, stops the listed expids
@@ -440,6 +440,8 @@ Completly stops an autosubmit run process
                             jobs. Default is SUBMITTED, QUEUING, RUNNING.
       -t STATUS, --target STATUS
                             Final status of killed jobs. Default is FAILED.
+
+
 Examples:
 ~~~~~~~~~
 

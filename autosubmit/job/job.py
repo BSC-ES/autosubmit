@@ -2177,7 +2177,6 @@ class Job(object):
         return out
 
     def write_submit_time(self, hold=False, enable_vertical_write=False, wrapper_submit_time=None):
-        # type: (bool, bool) -> None
         """
         Writes submit date and time to TOTAL_STATS file. It doesn't write if hold is True.
         """
