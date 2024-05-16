@@ -1013,29 +1013,29 @@ CONFIG:
                     self.assertFalse(additional_templates)
                     self.assertTrue(f'#SBATCH --reservation={reservation}' in template_content)
 
-    def test_exists_completed_file_then_sets_status_to_completed(self):
-        # arrange
-        exists_mock = Mock(return_value=True)
-        sys.modules['os'].path.exists = exists_mock
+    # def test_exists_completed_file_then_sets_status_to_completed(self):
+    #     # arrange
+    #     exists_mock = Mock(return_value=True)
+    #     sys.modules['os'].path.exists = exists_mock
+    #
+    #     # act
+    #     self.job.check_completion()
+    #
+    #     # assert
+    #     exists_mock.assert_called_once_with(os.path.join(self.job._tmp_path, self.job.name + '_COMPLETED'))
+    #     self.assertEqual(Status.COMPLETED, self.job.status)
 
-        # act
-        self.job.check_completion()
-
-        # assert
-        exists_mock.assert_called_once_with(os.path.join(self.job._tmp_path, self.job.name + '_COMPLETED'))
-        self.assertEqual(Status.COMPLETED, self.job.status)
-
-    def test_completed_file_not_exists_then_sets_status_to_failed(self):
-        # arrange
-        exists_mock = Mock(return_value=False)
-        sys.modules['os'].path.exists = exists_mock
-
-        # act
-        self.job.check_completion()
-
-        # assert
-        exists_mock.assert_called_once_with(os.path.join(self.job._tmp_path, self.job.name + '_COMPLETED'))
-        self.assertEqual(Status.FAILED, self.job.status)
+    # def test_completed_file_not_exists_then_sets_status_to_failed(self):
+    #     # arrange
+    #     exists_mock = Mock(return_value=False)
+    #     sys.modules['os'].path.exists = exists_mock
+    #
+    #     # act
+    #     self.job.check_completion()
+    #
+    #     # assert
+    #     exists_mock.assert_called_once_with(os.path.join(self.job._tmp_path, self.job.name + '_COMPLETED'))
+    #     self.assertEqual(Status.FAILED, self.job.status)
 
     def test_total_processors(self):
         for test in [

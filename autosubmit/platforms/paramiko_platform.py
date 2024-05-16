@@ -1,4 +1,5 @@
 import copy
+import threading
 
 import locale
 from contextlib import suppress
@@ -302,9 +303,9 @@ class ParamikoPlatform(Platform):
             self._ftpChannel = paramiko.SFTPClient.from_transport(self.transport,window_size=pow(4, 12) ,max_packet_size=pow(4, 12) )
             self._ftpChannel.get_channel().settimeout(120)
             self.connected = True
-            if not self.log_retrieval_process_active and (as_conf is None or str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "false"):
+            if not self.log_retrieval_process_active and as_conf and str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() != "false":
                 self.log_retrieval_process_active = True
-                if as_conf.experiment_data["ASMISC"].get("COMMAND", "").lower() == "run":
+                if as_conf.misc_data["ASMISC"].get("COMMAND", "").lower() == "run":
                     self.recover_job_logs()
         except SSHException:
             raise
@@ -992,6 +993,13 @@ class ParamikoPlatform(Platform):
         self.poller.register(session_fileno, select.POLLIN)
         self.x11_status_checker(session, session_fileno)
         pass
+
+
+    def send_command_non_blocking(self, command, ignore_log):
+        thread = threading.Thread(target=self.send_command, args=(command, ignore_log))
+        thread.start()
+        return thread
+
     def send_command(self, command, ignore_log=False, x11 = False):
         """
         Sends given command to HPC
@@ -1383,7 +1391,14 @@ class ParamikoPlatform(Platform):
             raise AutosubmitError("Couldn't send the file {0} to HPC {1}".format(
                 self.remote_log_dir, self.host), 6004, str(e))
 
-
+    def check_absolute_file_exists(self, src):
+        try:
+            if self._ftpChannel.stat(src):
+                return True
+            else:
+                return False
+        except:
+            return False
 class ParamikoPlatformException(Exception):
     """
     Exception raised from HPC queues

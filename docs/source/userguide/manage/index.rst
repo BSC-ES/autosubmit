@@ -120,19 +120,44 @@ Example:
 How to migrate an experiment
 ----------------------------
 
-To migrate an experiment from one user to another, you need to add two parameters for each platform in the platforms configuration file:
+The Autosubmit Migrate command is used to migrate data from one user to another.
 
- * USER_TO: <target_user> # Mandatory
- * TEMP_DIR: <hpc_temporary_directory> # Mandatory, can be left empty if there are no files on that platform
- * SAME_USER: false|true # Default False
-
- * PROJECT_TO: <project> # Optional, if not specified project will remain the same
- * HOST_TO: <cluster_ip> # Optional, avoid alias if possible, try use direct ip.
+To migrate it, you need to generate a new file inside $expid/conf/ with the **new user** information for each platform that you want to migrate.
 
 
-.. warning:: The USER_TO must be a different user , in case you want to maintain the same user, put SAME_USER: True.
+Platform file example: $expid/conf/platforms.yml
+::
 
-.. warning:: The temporary directory must be readable by both users (old owner and new owner)
+    PLATFORMS:
+        test-local:
+            type: ps
+            host: 127.0.0.1
+            user: "original_owner"
+            project: "original_project"
+            scratch_dir: "/tmp/scratch"
+        no-migrated-platform:
+            ...
+
+Migrate file example: $expid/conf/migrate.yml
+::
+
+    AS_MISC: True # Important to set this flag to True
+    PLATFORMS:
+        test-local: # must match the one in platforms file
+            type: ps
+            host: 127.0.0.1 # can change
+            user: new_user # can change
+            project: new_project  # can change
+            scratch_dir: "/tmp/scratch"
+            temp_dir: "/tmp/scratch/migrate_tmp_dir" # must be in the same fileystem
+            same_user: False # If the user is the same in the new platform, set this flag to True
+
+
+.. warning:: The USER in the migrate file must be a different user, in case you want to maintain the same user, put SAME_USER: True.
+
+.. warning:: The temporary directory(%PLATFORMS.TEST-LOCAL.TEMP_DIR%) must be set in the $expid/conf/migrate.yml file.
+
+.. warning:: The temporary directory(%PLATFORMS.TEST-LOCAL.TEMP_DIR%) must be readable by both users (old owner and new owner)
     Example for a RES account to BSC account the tmp folder must have rwx|rwx|--- permissions.
     The temporary directory must be in the same filesystem.
 
