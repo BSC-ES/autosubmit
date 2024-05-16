@@ -27,6 +27,53 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'VERSION')) as f:
     version = f.read().strip()
 
+install_requires = [
+    'xlib==0.21',
+    'setuptools<=68.2.2',
+    'bscearth.utils<=0.5.2',
+    'requests<=2.31.0',
+    'networkx<=2.6.3',
+    'portalocker<=2.7.0',
+    'paramiko<=3.4',
+    'pyparsing==3.1.1',
+    'matplotlib<=3.8.3',
+    'packaging<=23.2',
+    'ruamel.yaml.clib<=0.2.8',
+    'typing_extensions<=4.9.0',
+    'typing<=3.7.4.3',
+    'psutil<=5.6.1',
+    'networkx<=2.6.3',
+    'py3dotplus==1.1.0',
+    'matplotlib<=3.8.3',
+    'numpy<2',
+    'ruamel.yaml==0.17.21',
+    'rocrate==0.*',
+    'autosubmitconfigparser==1.0.67',
+    'configparser',
+    'setproctitle',
+    # 'sqlalchemy[mypy]' # TODO: pending Postgres MR
+]
+
+pg_require = [
+    'psycopg2'
+]
+
+tests_require = [
+    'pytest==8.2.*',
+    'pytest-cov',
+    'pytest-mock',
+    # 'testcontainers'  # TODO: pending Postgres MR
+]
+
+# You can add more groups, e.g. all_require = tests_require + graph_require, etc...
+all_require = tests_require + pg_require
+
+extras_require = {
+    'postgres': pg_require,
+    'tests': tests_require,
+    'all': all_require
+}
+
 setup(
     name='autosubmit',
     license='GNU GPL v3',
@@ -39,33 +86,8 @@ setup(
     url='http://www.bsc.es/projects/earthscience/autosubmit/',
     download_url='https://earth.bsc.es/wiki/doku.php?id=tools:autosubmit',
     keywords=['climate', 'weather', 'workflow', 'HPC'],
-    install_requires=[
-        'xlib==0.21',
-        'setuptools<=68.2.2',
-        'bscearth.utils<=0.5.2',
-        'requests<=2.31.0',
-        'networkx<=2.6.3',
-        'portalocker<=2.7.0',
-        'paramiko<=3.4',
-        'pyparsing==3.1.1',
-        'matplotlib<=3.8.3',
-        'argparse<=1.4.0',
-        'packaging<=23.2',
-        'ruamel.yaml.clib<=0.2.8',
-        'typing_extensions<=4.9.0',
-        'typing<=3.7.4.3',
-        'psutil<=5.6.1',
-        'networkx<=2.6.3',
-        'py3dotplus==1.1.0',
-        'matplotlib<=3.8.3',
-        'numpy<2',
-        'ruamel.yaml==0.17.21',
-        'rocrate==0.*',
-        'autosubmitconfigparser==1.0.67',
-        'configparser',
-        'pathlib',
-        'setproctitle'
-    ],
+    install_requires=install_requires,
+    extras_require=extras_require,
     classifiers=[
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
@@ -88,4 +110,3 @@ setup(
     },
     scripts=['bin/autosubmit']
 )
-
