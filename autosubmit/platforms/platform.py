@@ -85,6 +85,7 @@ class Platform(object):
         self._submit_hold_cmd = None
         self._submit_command_name = None
         self._submit_cmd = None
+        self._submit_cmd_x11 = None
         self._checkhost_cmd = None
         self.cancel_cmd = None
         self.otp_timeout = None
@@ -308,7 +309,8 @@ class Platform(object):
                         save = True
                         if not inspect:
                             job_list.save()
-                        valid_packages_to_submit.append(package)
+                        if package.x11 != "true":
+                            valid_packages_to_submit.append(package)
                         # Log.debug("FD end-submit: {0}".format(log.fd_show.fd_table_status_str(open()))
                     except (IOError, OSError):
                         if package.jobs[0].id != 0:
@@ -840,6 +842,9 @@ class Platform(object):
                         continue
                 job.children = children
                 job.platform = self
+                if job.x11:
+                    Log.debug("Job {0} is an X11 job, skipping log retrieval as they're written in the ASLOGS".format(job.name))
+                    continue
                 try:
                     job.retrieve_logfiles(self, raise_error=True)
                     if job.wrapper_type != "vertical":

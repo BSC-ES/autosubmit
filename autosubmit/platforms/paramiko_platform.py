@@ -896,25 +896,27 @@ class ParamikoPlatform(Platform):
 
     def flush_out(self,session):
         while session.recv_ready():
-            sys.stdout.write(session.recv(4096))
+            sys.stdout.write(session.recv(4096).decode(locale.getlocale()[1]))
         while session.recv_stderr_ready():
-            sys.stderr.write(session.recv_stderr(4096))
+            sys.stderr.write(session.recv_stderr(4096).decode(locale.getlocale()[1]))
 
     @threaded
     def x11_status_checker(self, session, session_fileno):
+        poller = None
         self.transport.accept()
         while not session.exit_status_ready():
             try:
-                if sys.platform != "linux":
-                    self.poller = self.poller.kqueue()
-                else:
-                    self.poller = self.poller.poll()
+                if type(self.poller) is not list:
+                    if sys.platform != "linux":
+                        poller = self.poller.kqueue()
+                    else:
+                        poller = self.poller.poll()
                 # accept subsequent x11 connections if any
                 if len(self.transport.server_accepts) > 0:
                     self.transport.accept()
-                if not self.poller:  # this should not happen, as we don't have a timeout.
+                if not poller:  # this should not happen, as we don't have a timeout.
                     break
-                for fd, event in self.poller:
+                for fd, event in poller:
                     if fd == session_fileno:
                         self.flush_out(session)
                     # data either on local/remote x11 socket
@@ -962,12 +964,22 @@ class ParamikoPlatform(Platform):
                     if display is None or not display:
                         display = "localhost:0"
                     self.local_x11_display = xlib_connect.get_display(display)
-                    chan.request_x11(handler=self.x11_handler)
+                    chan = self.transport.open_session()
+                    chan.request_x11(single_connection=False,handler=self.x11_handler)
                 else:
-                    chan.settimeout(timeout)
+                    chan = self.transport.open_session()
                 if x11 == "true":
-                    command = command + " ; sleep infinity"
-                    chan.exec_command(command)
+                    if "timeout" in command:
+                        timeout_command = command.split("timeout ")[1].split(" ")[0]
+                        if timeout_command == 0:
+                            timeout_command = "infinity"
+                        command = f'{command} ; sleep {timeout_command} 2>/dev/null'
+                    #command = f'export display {command}'
+                    Log.info(command)
+                    try:
+                        chan.exec_command(command)
+                    except BaseException as e:
+                        raise AutosubmitCritical("Failed to execute command: %s" % e)
                     chan_fileno = chan.fileno()
                     self.poller.register(chan_fileno, select.POLLIN)
                     self.x11_status_checker(chan, chan_fileno)
@@ -1032,8 +1044,13 @@ class ParamikoPlatform(Platform):
                 channel.settimeout(timeout)
                 stdin.close()
                 channel.shutdown_write()
-            stdout_chunks.append(stdout.channel.recv(len(stdout.channel.in_buffer)))
-            while not channel.closed or channel.recv_ready() or channel.recv_stderr_ready():
+                stdout_chunks.append(stdout.channel.recv(len(stdout.channel.in_buffer)))
+
+            aux_stderr = []
+            i = 0
+            x11_exit = False
+
+            while (not channel.closed or channel.recv_ready() or channel.recv_stderr_ready() ) and not x11_exit:
                 # stop if channel was closed prematurely, and there is no data in the buffers.
                 got_chunk = False
                 readq, _, _ = select.select([stdout.channel], [], [], 2)
@@ -1041,17 +1058,28 @@ class ParamikoPlatform(Platform):
                     if c.recv_ready():
                         stdout_chunks.append(
                             stdout.channel.recv(len(c.in_buffer)))
-                        #stdout_chunks.append(" ")
                         got_chunk = True
                     if c.recv_stderr_ready():
                         # make sure to read stderr to prevent stall
                         stderr_readlines.append(
                             stderr.channel.recv_stderr(len(c.in_stderr_buffer)))
-                        #stdout_chunks.append(" ")
                         got_chunk = True
                 if x11 == "true":
-                    got_chunk = True
-                    break
+                    if len(stderr_readlines) > 0:
+                        aux_stderr.extend(stderr_readlines)
+                        for stderr_line in stderr_readlines:
+                            stderr_line = stderr_line.decode(lang)
+                            if "salloc" in stderr_line: # salloc is the command to allocate resources in slurm, for pjm it is different
+                                job_id = re.findall(r'\d+', stderr_line)
+                                if job_id:
+                                    stdout_chunks.append(job_id[0].encode(lang))
+                                    x11_exit = True
+                    else:
+                        x11_exit = True
+                    if not x11_exit:
+                        stderr_readlines = []
+                    else:
+                        stderr_readlines = aux_stderr
                 if not got_chunk and stdout.channel.exit_status_ready() and not stderr.channel.recv_stderr_ready() and not stdout.channel.recv_ready():
                     # indicate that we're not going to read from this channel anymore
                     stdout.channel.shutdown_read()
@@ -1082,7 +1110,7 @@ class ParamikoPlatform(Platform):
                 elif errorLine.find("syntax error") != -1:
                     raise AutosubmitCritical("Syntax error",7052,self._ssh_output_err)
                 elif errorLine.find("refused") != -1 or errorLine.find("slurm_persist_conn_open_without_init") != -1 or errorLine.find("slurmdbd") != -1 or errorLine.find("submission failed") != -1 or errorLine.find("git clone") != -1 or errorLine.find("sbatch: error: ") != -1 or errorLine.find("not submitted") != -1 or errorLine.find("invalid") != -1 or "[ERR.] PJM".lower() in errorLine:
-                    if "[ERR.] PJM".lower() in errorLine or (self._submit_command_name == "sbatch" and (errorLine.find("policy") != -1 or errorLine.find("invalid") != -1) ) or (self._submit_command_name == "sbatch" and errorLine.find("argument") != -1) or (self._submit_command_name == "bsub" and errorLine.find("job not submitted") != -1) or self._submit_command_name == "ecaccess-job-submit" or self._submit_command_name == "qsub ":
+                    if "salloc: error" in errorLine or "salloc: unrecognized option" in errorLine or "[ERR.] PJM".lower() in errorLine or (self._submit_command_name == "sbatch" and (errorLine.find("policy") != -1 or errorLine.find("invalid") != -1) ) or (self._submit_command_name == "sbatch" and errorLine.find("argument") != -1) or (self._submit_command_name == "bsub" and errorLine.find("job not submitted") != -1) or self._submit_command_name == "ecaccess-job-submit" or self._submit_command_name == "qsub ":
                         raise AutosubmitError(errorLine, 7014, "Bad Parameters.")
                     raise AutosubmitError('Command {0} in {1} warning: {2}'.format(command, self.host,self._ssh_output_err, 6005))
 
@@ -1103,8 +1131,10 @@ class ParamikoPlatform(Platform):
         except IOError as e:
             raise AutosubmitError(str(e),6016)
         except BaseException as e:
+            if type(stderr_readlines) is str:
+                stderr_readlines = '\n'.join(stderr_readlines)
             raise AutosubmitError('Command {0} in {1} warning: {2}'.format(
-                command, self.host, '\n'.join(stderr_readlines)), 6005, str(e))
+                command, self.host, stderr_readlines), 6005, str(e))
 
     def parse_job_output(self, output):
         """

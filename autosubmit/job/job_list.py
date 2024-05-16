@@ -2570,6 +2570,9 @@ class JobList(object):
         if not hasattr(job,"updated_log") or not job.updated_log:  # hasattr for backward compatibility (job.updated_logs is only for newer jobs, as the loaded ones may not have this set yet)
             # order path_to_logs by name and get the two last element
             log_file = False
+            if hasattr(job, "x11") and job.x11:
+                job.updated_log = True
+                return
             if job.wrapper_type == "vertical" and job.fail_count > 0:
                 for log_recovered in self.path_to_logs.glob(f"{job.name}.*._{job.fail_count}.out"):
                     if job.local_logs[0][-4] in log_recovered.name:
