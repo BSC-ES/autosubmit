@@ -1838,6 +1838,7 @@ class Job(object):
         self.check = as_conf.jobs_data[self.section].get("CHECK", False)
         self.check_warnings = as_conf.jobs_data[self.section].get("CHECK_WARNINGS", False)
         self.shape = as_conf.jobs_data[self.section].get("SHAPE", "")
+        self.script = as_conf.jobs_data[self.section].get("SCRIPT", "")
         if self.checkpoint: # To activate placeholder sustitution per <empty> in the template
             parameters["AS_CHECKPOINT"] = self.checkpoint
         parameters['JOBNAME'] = self.name
@@ -1960,34 +1961,38 @@ class Job(object):
         :rtype: str
         """
         self.update_parameters(as_conf, self.parameters)
-        try:
-            if as_conf.get_project_type().lower() != "none" and len(as_conf.get_project_type()) > 0:
-                template_file = open(os.path.join(as_conf.get_project_dir(), self.file), 'r')
-                template = ''
-                if as_conf.get_remote_dependencies() == "true":
+        if self.script:
+            Log.warning(f"Custom script for job {self.name} is being used, file contents are ignored.")
+            template = self.script
+        else:
+            try:
+                if as_conf.get_project_type().lower() != "none" and len(as_conf.get_project_type()) > 0:
+                    template_file = open(os.path.join(as_conf.get_project_dir(), self.file), 'r')
+                    template = ''
+                    if as_conf.get_remote_dependencies() == "true":
+                        if self.type == Type.BASH:
+                            template = 'sleep 5' + "\n"
+                        elif self.type == Type.PYTHON2:
+                            template = 'time.sleep(5)' + "\n"
+                        elif self.type == Type.PYTHON3 or self.type == Type.PYTHON:
+                            template = 'time.sleep(5)' + "\n"
+                        elif self.type == Type.R:
+                            template = 'Sys.sleep(5)' + "\n"
+                    template += template_file.read()
+                    template_file.close()
+                else:
                     if self.type == Type.BASH:
-                        template = 'sleep 5' + "\n"
+                        template = 'sleep 5'
                     elif self.type == Type.PYTHON2:
                         template = 'time.sleep(5)' + "\n"
                     elif self.type == Type.PYTHON3 or self.type == Type.PYTHON:
                         template = 'time.sleep(5)' + "\n"
                     elif self.type == Type.R:
-                        template = 'Sys.sleep(5)' + "\n"
-                template += template_file.read()
-                template_file.close()
-            else:
-                if self.type == Type.BASH:
-                    template = 'sleep 5'
-                elif self.type == Type.PYTHON2:
-                    template = 'time.sleep(5)' + "\n"
-                elif self.type == Type.PYTHON3 or self.type == Type.PYTHON:
-                    template = 'time.sleep(5)' + "\n"
-                elif self.type == Type.R:
-                    template = 'Sys.sleep(5)'
-                else:
-                    template = ''
-        except Exception as e:
-            template = ''
+                        template = 'Sys.sleep(5)'
+                    else:
+                        template = ''
+            except Exception as e:
+                template = ''
 
         if self.type == Type.BASH:
             snippet = StatisticsSnippetBash
