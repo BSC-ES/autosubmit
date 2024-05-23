@@ -252,6 +252,7 @@ class Job(object):
         self.start_time_written = False
         self.submit_time_timestamp = None # for wrappers, all jobs inside a wrapper are submitted at the same time
         self.finish_time_timestamp = None # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
+        self._script = None # Inline code to be executed
     def _init_runtime_parameters(self):
         # hetjobs
         self.het = {'HETSIZE': 0}
@@ -287,6 +288,15 @@ class Job(object):
     @name.setter
     def name(self, value):
         self._name = value
+
+    @property
+    @autosubmit_parameter(name='script')
+    def script(self):
+        """Allows to launch inline code instead of using the file parameter"""
+        return self._script
+    @script.setter
+    def script(self, value):
+        self._script = value
 
     @property
     @autosubmit_parameter(name='fail_count')
@@ -1961,7 +1971,7 @@ class Job(object):
         :rtype: str
         """
         self.update_parameters(as_conf, self.parameters)
-        if self.script:
+        if self.script and self.file:
             Log.warning(f"Custom script for job {self.name} is being used, file contents are ignored.")
             template = self.script
         else:

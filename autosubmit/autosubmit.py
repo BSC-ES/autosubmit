@@ -2129,7 +2129,7 @@ class Autosubmit:
                     Log.debug("Preparing run")
                     # This function is called only once, when the experiment is started. It is used to initialize the experiment and to check the correctness of the configuration files.
                     # If there are issues while running, this function will be called again to reinitialize the experiment.
-                    job_list, submitter , exp_history, host , as_conf, platforms_to_test, packages_persistence, _ = Autosubmit.prepare_run(expid, notransitive,start_time, start_after, run_only_members)
+                    job_list, submitter , exp_history, host , as_conf, platforms_to_test, packages_persistence, _ = Autosubmit.prepare_run(expid, notransitive, start_time, start_after, run_only_members)
                 except AutosubmitCritical as e:
                     #e.message += " HINT: check the CUSTOM_DIRECTIVE syntax in your jobs configuration files."
                     raise AutosubmitCritical(e.message, 7014, e.trace)

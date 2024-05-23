@@ -3,11 +3,7 @@ import math
 
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from log.log import Log, AutosubmitCritical
-import os
-from autosubmit.job.job_package_persistence import JobPackagePersistence
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from typing import Dict
-from bscearth.utils.date import date2str, previous_day, chunk_end_date, chunk_start_date, subs_dates
+from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates
 
 # Copyright 2017-2020 Earth Sciences Department, BSC-CNS
 

@@ -2664,6 +2664,10 @@ class JobList(object):
                     job.status = Status.FAILED
                     job.packed = False
                     save = True
+        else:
+            for job in [ job for job in self._job_list if job.status in [ Status.WAITING, Status.READY, Status.DELAYED, Status.PREPARED ] ]:
+                job.fail_count = 0
+                job.packed = False
         # Check checkpoint jobs, the status can be Any
         for job in self.check_special_status():
             job.status = Status.READY
