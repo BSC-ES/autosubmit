@@ -4825,8 +4825,14 @@ class Autosubmit:
                         job_list.add_logs(prev_job_list_logs)
                     job_list.save()
                     as_conf.save()
-                    JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                          "job_packages_" + expid).reset_table()
+                    try:
+                        as_conf.check_conf_files(True)
+                        packages_persistence = JobPackagePersistence(
+                            os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"), "job_packages_" + expid)
+                        packages_persistence.reset_table()
+                        packages_persistence.reset_table(wrappers)
+                    except:
+                        pass
                     groups_dict = dict()
 
                     # Setting up job historical database header. Must create a new run.
@@ -4863,20 +4869,15 @@ class Autosubmit:
                                                        expand_list=expand, expanded_status=status)
                             groups_dict = job_grouping.group_jobs()
                         # WRAPPERS
-
                         if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrappers:
-                            as_conf.check_conf_files(True)
-                            packages_persistence = JobPackagePersistence(
-                                os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"), "job_packages_" + expid)
-                            packages_persistence.reset_table(True)
                             job_list_wr = Autosubmit.load_job_list(
                                 expid, as_conf, notransitive=notransitive, monitor=True, new=False)
                             Autosubmit.generate_scripts_andor_wrappers(
                                 as_conf, job_list_wr, job_list_wr.get_job_list(), packages_persistence, True)
-
                             packages = packages_persistence.load(True)
                         else:
                             packages = None
+
                         Log.info("\nPlotting the jobs list...")
                         monitor_exp = Monitor()
                         # if output is set, use output
@@ -5602,6 +5603,9 @@ class Autosubmit:
                 final_list = list(set(final_list))
                 performed_changes = {}
                 for job in final_list:
+                    if final_status in [Status.WAITING, Status.PREPARED, Status.DELAYED, Status.READY]:
+                        job.packed = False
+                        job.fail_count = 0
                     if job.status in [Status.QUEUING, Status.RUNNING,
                                       Status.SUBMITTED] and job.platform.name not in definitive_platforms:
                         Log.printlog("JOB: [{1}] is ignored as the [{0}] platform is currently offline".format(
