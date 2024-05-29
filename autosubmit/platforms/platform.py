@@ -1,9 +1,7 @@
-import copy
+import atexit
 
 import queue
-
-import time
-
+import setproctitle
 import locale
 import os
 
@@ -13,14 +11,23 @@ from typing import List, Union
 
 from autosubmit.helpers.parameters import autosubmit_parameter
 from log.log import AutosubmitCritical, AutosubmitError, Log
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Event
 
+# stop the background task gracefully before exit
+def stop_background(stop_event, process):
+    # request the background thread stop
+    stop_event.set()
+    # wait for the background thread to stop
+    process.join()
 
 def processed(fn):
     def wrapper(*args, **kwargs):
+        stop_event = Event()
+        args = (args[0], stop_event)
         process = Process(target=fn, args=args, kwargs=kwargs, name=f"{args[0].name}_platform")
         process.daemon = True  # Set the process as a daemon process
         process.start()
+        atexit.register(stop_background, stop_event, process)
         return process
 
     return wrapper
@@ -816,11 +823,12 @@ class Platform(object):
         raise NotImplementedError
 
     @processed
-    def recover_job_logs(self):
+    def recover_job_logs(self, event):
+        setproctitle.setproctitle(f"autosubmit log {self.expid} recovery {self.name.lower()}")
         job_names_processed = set()
         self.connected = False
         self.restore_connection(None)
-        while True:
+        while not event.is_set():
             try:
                 job,children = self.recovery_queue.get()
                 if job.wrapper_type != "vertical":

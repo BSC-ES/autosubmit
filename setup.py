@@ -64,7 +64,9 @@ setup(
         'rocrate==0.*',
         'autosubmitconfigparser==1.0.62',
         'configparser',
-        'pathlib'
+        'pathlib',
+        'setproctitle'
+
     ],
     extras_require={
         ':python_version <= "3.7"':
