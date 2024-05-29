@@ -31,9 +31,15 @@ class WrapperFactory(object):
         self.exception = "This type of wrapper is not supported for this platform"
 
     def get_wrapper(self, wrapper_builder, **kwargs):
-        wrapper_data = kwargs['wrapper_data']
+        wrapper_data = kwargs['wrapper_data'] # this refers to the object with all parameters init
         wrapper_data.wallclock = kwargs['wallclock']
         if wrapper_data.het.get("HETSIZE",0) <= 1:
+            if not str(kwargs['num_processors_value']).isdigit():
+                kwargs['num_processors_value'] = 1
+            if str(wrapper_data.nodes).isdigit() and int(wrapper_data.nodes) > 1 and int(kwargs['num_processors_value']) <= 1:
+                kwargs['num_processors'] = "#"
+            else:
+                kwargs['num_processors'] = self.processors(kwargs['num_processors_value'])
             kwargs['allocated_nodes'] = self.allocated_nodes()
             kwargs['dependency'] = self.dependency(kwargs['dependency'])
             kwargs['partition'] = self.partition(wrapper_data.partition)
@@ -43,14 +49,7 @@ class WrapperFactory(object):
             kwargs["custom_directives"] = self.custom_directives(wrapper_data.custom_directives)
             kwargs['queue'] = self.queue(wrapper_data.queue)
             kwargs['threads'] = self.threads(wrapper_data.threads)
-            if str(kwargs['num_processors']).isdigit():
-                kwargs['num_processors_value'] = int(wrapper_data.processors)
-            else:
-                kwargs['num_processors_value'] = 1
-            if str(wrapper_data.nodes).isdigit() and int(wrapper_data.nodes) > 1 and kwargs['num_processors'] == '1':
-                kwargs['num_processors'] = "#"
-            else:
-                kwargs['num_processors'] = self.processors(wrapper_data.processors)
+
         kwargs["executable"] = wrapper_data.executable
 
         kwargs['header_directive'] = self.header_directives(**kwargs)
