@@ -279,7 +279,7 @@ class SlurmHeader(object):
 {kwargs["tasks"]}
 {kwargs["exclusive"]}
 {kwargs["custom_directives"]}
-
+{kwargs.get("reservation","#")}
 #
     """
         else:

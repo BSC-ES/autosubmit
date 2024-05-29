@@ -455,7 +455,7 @@ class PJMPlatform(ParamikoPlatform):
     {kwargs["tasks"]}
     {kwargs["exclusive"]}
     {kwargs["custom_directives"]}
-    
+
     #PJM -g {kwargs["project"]}
     #PJM -o {kwargs["name"]}.out
     #PJM -e {kwargs["name"]}.err

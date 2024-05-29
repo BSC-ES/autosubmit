@@ -49,6 +49,7 @@ class WrapperFactory(object):
             kwargs["custom_directives"] = self.custom_directives(wrapper_data.custom_directives)
             kwargs['queue'] = self.queue(wrapper_data.queue)
             kwargs['threads'] = self.threads(wrapper_data.threads)
+            kwargs['reservation'] = self.reservation(wrapper_data.reservation)
 
         kwargs["executable"] = wrapper_data.executable
 
@@ -88,6 +89,9 @@ class WrapperFactory(object):
     def allocated_nodes(self):
         return ''
 
+    def reservation(self, reservation):
+        return '#' if not reservation else self.reservation_directive(reservation)
+
     def dependency(self, dependency):
         return '#' if dependency is None else self.dependency_directive(dependency)
     def queue(self, queue):
@@ -117,6 +121,8 @@ class WrapperFactory(object):
             return '\n'.join(str(s) for s in custom_directives)
         return ""
 
+    def reservation_directive(self, reservation):
+        return '#'
     def dependency_directive(self, dependency):
         raise NotImplemented(self.exception)
     def queue_directive(self, queue):
@@ -161,6 +167,8 @@ class SlurmWrapperFactory(WrapperFactory):
     def allocated_nodes(self):
         return self.platform.allocated_nodes()
 
+    def reservation_directive(self, reservation):
+        return "#SBATCH --reservation={0}".format(reservation)
     def dependency_directive(self, dependency):
         return '#SBATCH --dependency=afterok:{0}'.format(dependency)
     def queue_directive(self, queue):
@@ -206,6 +214,8 @@ class PJMWrapperFactory(WrapperFactory):
     def allocated_nodes(self):
         return self.platform.allocated_nodes()
 
+    def reservation_directive(self, reservation):
+        return "#" # Reservation directive doesn't exist in PJM, they're handled directly by admins
 
     def queue_directive(self, queue):
         return '#PJM --qos={0}'.format(queue)

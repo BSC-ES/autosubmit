@@ -408,6 +408,7 @@ class JobPackageThread(JobPackageBase):
         self.exclusive = jobs[0].exclusive
         self.custom_directives = jobs[0].custom_directives
         self.wallclock = '00:00'
+        self.reservation = jobs[0].reservation
         if configuration is not None:
             self.inner_retrials = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,
                                                                                 {}).get("RETRIALS",self.jobs[0].retrials)
@@ -427,6 +428,7 @@ class JobPackageThread(JobPackageBase):
             if wr_executable:
                 self.executable = wr_executable
             if jobs[0].het.get("HETSIZE", 1) <= 1:
+
                 wr_queue = configuration.get_wrapper_queue(configuration.experiment_data["WRAPPERS"][self.current_wrapper_section])
                 if wr_queue is not None and len(str(wr_queue)) > 0:
                     self.queue = wr_queue
@@ -469,6 +471,7 @@ class JobPackageThread(JobPackageBase):
                 wr_threads = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("THREADS",None)
                 if wr_threads:
                     self.threads = wr_threads
+                self.reservation = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("RESERVATION",self.reservation)
 
         self.parameters["CURRENT_PROJ"] = self._project
         self.parameters["NUMTHREADS"] = self.threads
@@ -481,7 +484,7 @@ class JobPackageThread(JobPackageBase):
         self.memory_per_task = jobs[0].memory_per_task
         self.parameters["NODES"] = self.nodes
         self.processors = self._num_processors
-        self.parameters["RESERVATION"] = jobs[0].reservation # have to look
+        self.parameters["RESERVATION"] = self.reservation # have to look
         self.parameters['TASKS'] = self.tasks
         self.parameters["EXECUTABLE"] = self.executable # have to look
         self.method = method
