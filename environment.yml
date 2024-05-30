@@ -43,4 +43,5 @@ dependencies:
   - requests
   - configobj
   - psutil
+  - setproctitle
 
