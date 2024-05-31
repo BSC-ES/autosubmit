@@ -23,7 +23,7 @@ from threading import Thread
 import threading
 import getpass
 from paramiko.agent import Agent
-
+from autosubmit.helpers.utils import terminate_child_process
 def threaded(fn):
     def wrapper(*args, **kwargs):
         thread = Thread(target=fn, args=args, kwargs=kwargs, name=f"{args[0].name}_X11")
@@ -114,8 +114,8 @@ class ParamikoPlatform(Platform):
         if display is None:
             display = "localhost:0"
         self.local_x11_display = xlib_connect.get_display(display)
-
-
+        self.log_retrieval_process_active = False
+        terminate_child_process(self.expid, self.name)
     def test_connection(self,as_conf):
         """
         Test if the connection is still alive, reconnect if not.
@@ -326,7 +326,6 @@ class ParamikoPlatform(Platform):
             else:
                 raise AutosubmitError(
                     "Couldn't establish a connection to the specified host, wrong configuration?", 6003, str(e))
-
     def check_completed_files(self, sections=None):
         if self.host == 'localhost':
             return None
