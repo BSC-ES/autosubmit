@@ -55,7 +55,7 @@ class Platform(object):
         self._default_queue = None
         self._partition = None
         self.ec_queue = "hpc"
-        self.processors_per_node = "1"
+        self.processors_per_node = None
         self.scratch_free_space = None
         self.custom_directives = None
         self._host = ''

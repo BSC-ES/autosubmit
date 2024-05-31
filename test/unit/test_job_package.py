@@ -75,8 +75,8 @@ class TestJobPackage(TestCase):
         self.jobs[0]._platform = self.platform
         self.jobs[0].retrials = 0
         self.jobs[1].wallclock = "00:00"
-        self.jobs[1].threads = ""
-        self.jobs[1].tasks = ""
+        self.jobs[1].threads = "1"
+        self.jobs[1].tasks = "1"
         self.jobs[1].exclusive = True
         self.jobs[1].queue = "debug2"
         self.jobs[1].partition = "debug2"

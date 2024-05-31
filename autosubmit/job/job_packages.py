@@ -52,6 +52,7 @@ class JobPackageBase(object):
 
     def __init__(self, jobs):
         # type: (List[Job]) -> None
+        self.nodes = ""
         self._common_script = None
         self._jobs = jobs # type: List[Job]
         self._expid = jobs[0].expid # type: str
@@ -399,12 +400,11 @@ class JobPackageThread(JobPackageBase):
         if not hasattr(self,"_num_processors"):
             self._num_processors = '0'
         self.parameters = dict()
-        self.nodes = jobs[0].nodes
+        self.nodes = jobs[0].nodes if not self.nodes else self.nodes
         self.queue = jobs[0].queue
         self.parameters["CURRENT_QUEUE"] = self.queue
         self.partition = jobs[0].partition
-        self.tasks = jobs[0].tasks if int(jobs[0].tasks) > 1  else ""
-        self.threads = jobs[0].threads if int(jobs[0].threads) > 1  else ""
+        self.tasks = jobs[0].tasks
         self.exclusive = jobs[0].exclusive
         self.custom_directives = jobs[0].custom_directives
         self.wallclock = '00:00'
@@ -423,12 +423,9 @@ class JobPackageThread(JobPackageBase):
                     if job.export.lower() not in "none" and len(job.export) > 0:
                         self.export = job.export
                         break
-            wr_executable = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section, {}).get(
-                "EXECUTABLE", None)
-            if wr_executable:
-                self.executable = wr_executable
+            self.executable = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section, {}).get(
+                "EXECUTABLE", self.executable)
             if jobs[0].het.get("HETSIZE", 1) <= 1:
-
                 wr_queue = configuration.get_wrapper_queue(configuration.experiment_data["WRAPPERS"][self.current_wrapper_section])
                 if wr_queue is not None and len(str(wr_queue)) > 0:
                     self.queue = wr_queue
@@ -436,9 +433,7 @@ class JobPackageThread(JobPackageBase):
                 wr_partition = configuration.get_wrapper_partition(configuration.experiment_data["WRAPPERS"][self.current_wrapper_section])
                 if wr_partition and len(str(wr_partition)) > 0:
                     self.partition = wr_partition
-                wr_exclusive = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("EXCLUSIVE",None)
-                if wr_exclusive is not None:
-                    self.exclusive = wr_exclusive
+                self.exclusive = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("EXCLUSIVE",self.exclusive)
                 wr_custom_directives = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("CUSTOM_DIRECTIVES",[])
                 # parse custom_directives
                 if type(wr_custom_directives) is list:
@@ -462,15 +457,9 @@ class JobPackageThread(JobPackageBase):
                     wr_custom_directives = []
                 if len(str(wr_custom_directives)) > 0:
                     self.custom_directives = wr_custom_directives
-                wr_tasks = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("TASKS",None)
-                if wr_tasks:
-                    self.tasks = wr_tasks
-                wr_nodes = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("NODES",None)
-                if wr_nodes:
-                    self.nodes = wr_nodes
-                wr_threads = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("THREADS",None)
-                if wr_threads:
-                    self.threads = wr_threads
+                self.tasks = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("TASKS",self.tasks)
+                self.nodes = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("NODES",self.nodes)
+                self.threads = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("THREADS",self.threads)
                 self.reservation = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("RESERVATION",self.reservation)
 
         self.parameters["CURRENT_PROJ"] = self._project

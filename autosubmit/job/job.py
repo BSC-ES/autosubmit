@@ -1403,25 +1403,23 @@ class Job(object):
             # Get the max tasks, each element can be a str or int
             self.het['TASKS'] = list()
             if len(self.tasks) == 1:
-                if int(self.tasks) <= 1 and int(job_platform.processors_per_node) > 1 and int(
-                        self.processors) > int(job_platform.processors_per_node):
+                if int(job_platform.processors_per_node) > 1 and int(self.tasks) > int(job_platform.processors_per_node):
                     self.tasks = job_platform.processors_per_node
                 for task in range(self.het['HETSIZE']):
-                    if int(self.tasks) <= 1 < int(job_platform.processors_per_node) and int(
-                            self.processors) > int(job_platform.processors_per_node):
+                    if int(job_platform.processors_per_node) > 1 and int(task) > int(
+                            job_platform.processors_per_node):
                         self.het['TASKS'].append(str(job_platform.processors_per_node))
                     else:
                         self.het['TASKS'].append(str(self.tasks))
                 self.tasks = str(max([int(x) for x in self.tasks]))
             else:
                 for task in self.tasks:
-                    if int(task) <= 1 < int(job_platform.processors_per_node) and int(
-                            self.processors) > int(job_platform.processors_per_node):
+                    if int(job_platform.processors_per_node) > 1 and int(task) > int(
+                            job_platform.processors_per_node):
                         task = job_platform.processors_per_node
                     self.het['TASKS'].append(str(task))
         else:
-            if int(self.tasks) <= 1 < int(job_platform.processors_per_node) and int(
-                    self.processors) > int(job_platform.processors_per_node):
+            if int(job_platform.processors_per_node) > 1 and int(self.tasks) > int(job_platform.processors_per_node):
                 self.tasks = job_platform.processors_per_node
             self.tasks = str(self.tasks)
 
