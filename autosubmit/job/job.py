@@ -1419,7 +1419,7 @@ class Job(object):
                         task = job_platform.processors_per_node
                     self.het['TASKS'].append(str(task))
         else:
-            if int(job_platform.processors_per_node) > 1 and int(self.tasks) > int(job_platform.processors_per_node):
+            if job_platform.processors_per_node and int(job_platform.processors_per_node) > 1 and int(self.tasks) > int(job_platform.processors_per_node):
                 self.tasks = job_platform.processors_per_node
             self.tasks = str(self.tasks)
 

@@ -60,6 +60,8 @@ class JobPackageBase(object):
         self.export = jobs[0].export 
         self.x11 = jobs[0].x11
         self.het = dict()
+        self._num_processors = '0'
+        self._threads = '0'
         try:
             self._tmp_path = jobs[0]._tmp_path
             self._platform = jobs[0]._platform
@@ -291,6 +293,8 @@ class JobPackageArray(JobPackageBase):
         self._array_size_id = "[1-" + str(len(jobs)) + "]"
         self._wallclock = '00:00'
         self._num_processors = '0'
+        self._threads = '0'
+
         for job in jobs:
             if job.wallclock > self._wallclock:
                 self._wallclock = job.wallclock
@@ -459,11 +463,9 @@ class JobPackageThread(JobPackageBase):
                     self.custom_directives = wr_custom_directives
                 self.tasks = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("TASKS",self.tasks)
                 self.nodes = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("NODES",self.nodes)
-                self.threads = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("THREADS",self.threads)
                 self.reservation = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("RESERVATION",self.reservation)
 
         self.parameters["CURRENT_PROJ"] = self._project
-        self.parameters["NUMTHREADS"] = self.threads
         self.het = jobs[0].het
 
         # Memory needs more work outside this branch
@@ -596,7 +598,7 @@ class JobPackageThreadWrapped(JobPackageThread):
         self._common_script = None
         self._wallclock = '00:00'
         self._num_processors = '0'
-        self.threads = '1'
+        self._threads = '1'
         self.current_wrapper_section = wrapper_section
 
 
@@ -669,12 +671,14 @@ class JobPackageVertical(JobPackageThread):
     :param: dependency:
     """
     def __init__(self, jobs, dependency=None,configuration=None,wrapper_section="WRAPPERS", wrapper_info = []):
-        self._num_processors = 0
+
+        super(JobPackageVertical, self).__init__(jobs, dependency,configuration=configuration,wrapper_section=wrapper_section, wrapper_info = wrapper_info)
         for job in jobs:
             if int(job.processors) >= int(self._num_processors):
                 self._num_processors = job.processors
                 self._threads = job.threads
-        super(JobPackageVertical, self).__init__(jobs, dependency,configuration=configuration,wrapper_section=wrapper_section, wrapper_info = wrapper_info)
+        self._threads = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section, {}).get("THREADS",
+                                                                                                            self._threads)
         for job in jobs:
             self._wallclock = sum_str_hours(self._wallclock, job.wallclock)
         self._name = self._expid + '_' + self.FILE_PREFIX + "_{0}_{1}_{2}".format(str(int(time.time())) +
@@ -756,13 +760,15 @@ class JobPackageHorizontal(JobPackageThread):
     def __init__(self, jobs, dependency=None, jobs_resources=dict(),method='ASThread',configuration=None,wrapper_section="WRAPPERS"):
         super(JobPackageHorizontal, self).__init__(jobs, dependency, jobs_resources,configuration=configuration,wrapper_section=wrapper_section)
         self.method = method
-
         self._queue = self.queue
         for job in jobs:
             if job.wallclock > self._wallclock:
                 self._wallclock = job.wallclock
             self._num_processors = str(int(self._num_processors) + int(job.processors))
             self._threads = job.threads
+        self._threads = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section, {}).get("THREADS",
+                                                                                                            self._threads)
+
         self._name = self._expid + '_' + self.FILE_PREFIX + "_{0}_{1}_{2}".format(str(int(time.time())) +
                                                                                   str(random.randint(1, 10000)),
                                                                                   self._num_processors,

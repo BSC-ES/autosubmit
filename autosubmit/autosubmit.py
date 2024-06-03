@@ -4826,13 +4826,13 @@ class Autosubmit:
                     job_list.save()
                     as_conf.save()
                     try:
-                        as_conf.check_conf_files(True)
                         packages_persistence = JobPackagePersistence(
                             os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"), "job_packages_" + expid)
                         packages_persistence.reset_table()
-                        packages_persistence.reset_table(wrappers)
+                        packages_persistence.reset_table(True)
                     except:
                         pass
+
                     groups_dict = dict()
 
                     # Setting up job historical database header. Must create a new run.

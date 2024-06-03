@@ -64,7 +64,7 @@ class TestJobPackage(TestCase):
         self._wrapper_factory.as_conf = self.as_conf
 
         self.jobs[0].wallclock = "00:00"
-        self.jobs[0].threads = "1"
+        self.jobs[0]._threads = "1"
         self.jobs[0].tasks = "1"
         self.jobs[0].exclusive = True
         self.jobs[0].queue = "debug"
@@ -75,7 +75,7 @@ class TestJobPackage(TestCase):
         self.jobs[0]._platform = self.platform
         self.jobs[0].retrials = 0
         self.jobs[1].wallclock = "00:00"
-        self.jobs[1].threads = "1"
+        self.jobs[1]._threads = "1"
         self.jobs[1].tasks = "1"
         self.jobs[1].exclusive = True
         self.jobs[1].queue = "debug2"
@@ -131,7 +131,7 @@ class TestJobPackage(TestCase):
         self.assertEqual(self.job_package_wrapper.inner_retrials, 0)
         self.assertEqual(self.job_package_wrapper.queue, "debug")
         self.assertEqual(self.job_package_wrapper.partition, "debug")
-        self.assertEqual(self.job_package_wrapper.threads, "1")
+        self.assertEqual(self.job_package_wrapper._threads, "1")
         self.assertEqual(self.job_package_wrapper.tasks, "1")
 
         options_slurm = {
@@ -148,7 +148,7 @@ class TestJobPackage(TestCase):
         self.assertEqual(self.job_package_wrapper.inner_retrials, 30)
         self.assertEqual(self.job_package_wrapper.queue, "bsc32")
         self.assertEqual(self.job_package_wrapper.partition, "bsc32")
-        self.assertEqual(self.job_package_wrapper.threads, "30")
+        self.assertEqual(self.job_package_wrapper._threads, "30")
         self.assertEqual(self.job_package_wrapper.tasks, "40")
         self.assertEqual(self.job_package_wrapper.custom_directives, ['#SBATCH --mem=1000'])
 
