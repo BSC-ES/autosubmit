@@ -144,8 +144,14 @@ RUN if [ -n "${GIT_REF}" ] ; then \
 RUN autosubmit configure \
       -db "${AUTOSUBMIT_ROOT_DIR}/database/" \
       -dbf autosubmit.db \
-      -lr "${AUTOSUBMIT_ROOT_DIR}/experiments/" && \
-    autosubmit install
+      -lr "${AUTOSUBMIT_ROOT_DIR}/experiments/"
+
+# Copy the default config file /home/${MAMBA_USER}/.autosubmitrc to ${AUTOSUBMIT_ROOT_DIR}/autosubmitrc
+RUN cp "/home/${MAMBA_USER}/.autosubmitrc" "${AUTOSUBMIT_ROOT_DIR}/autosubmitrc" && \
+    chown -R "${MAMBA_USER}:${MAMBA_USER}" "${AUTOSUBMIT_ROOT_DIR}"
+
+# Set AUTOSUBMIT_CONFIGURATION to the path of the Autosubmit configuration file.
+ENV AUTOSUBMIT_CONFIGURATION="${AUTOSUBMIT_ROOT_DIR}/autosubmitrc"
 
 # Set AUTOSUBMIT_CONFIGURATION to the path of the Autosubmit configuration file.
 ENV AUTOSUBMIT_CONFIGURATION="${AUTOSUBMIT_ROOT_DIR}/autosubmitrc"

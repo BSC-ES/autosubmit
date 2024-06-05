@@ -1,0 +1,10 @@
+images:
+  autosubmitDemo:
+    image: autosubmit/edito-demo:as-4.0.105-api-4.0.0b8
+    imagePullPolicy: IfNotPresent
+  autosubmitDemoGUI:
+    image: autosubmit/gui:edito-demo
+    imagePullPolicy: IfNotPresent
+
+ingress:
+  host: localhost

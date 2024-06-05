@@ -16,6 +16,10 @@ cache:
 
 prepare:
   stage: prepare
+  rules:
+    - changes:
+        - 'docker/**'
+      when: never
   script:
     - git submodule sync --recursive
     - git submodule update --init --recursive
@@ -26,6 +30,10 @@ prepare:
 
 test_python3:
   stage: test
+  rules:
+    - changes:
+        - 'docker/**'
+      when: never
   script:
     - conda activate autosubmit3
     - pytest
@@ -52,5 +60,9 @@ test_python3:
 
 clean:
   stage: clean
+  rules:
+    - changes:
+        - 'docker/**'
+      when: never
   script:
     - conda clean --all --yes
