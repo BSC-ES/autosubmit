@@ -24,6 +24,7 @@ import threading
 import getpass
 from paramiko.agent import Agent
 from autosubmit.helpers.utils import terminate_child_process
+
 def threaded(fn):
     def wrapper(*args, **kwargs):
         thread = Thread(target=fn, args=args, kwargs=kwargs, name=f"{args[0].name}_X11")

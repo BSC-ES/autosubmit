@@ -1,21 +1,15 @@
-import signal
-
+import collections
+import subprocess
 import os
 import pwd
-from autosubmit.job.job_list_persistence import JobListPersistencePkl, JobListPersistenceDb
-
+import signal
+import locale
 from autosubmit.notifications.mail_notifier import MailNotifier
 
 from autosubmit.notifications.notifier import Notifier
 
-from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 from log.log import AutosubmitCritical, Log
-
-import subprocess
-import locale
-
 
 def terminate_child_process(expid, platform=None):
     # get pid of the main process
@@ -73,7 +67,7 @@ def check_experiment_ownership(expid, basic_config, raise_error=False, logger=No
         if current_owner_ID <= 0 and logger:
             logger.info("Current owner '{0}' of experiment {1} does not exist anymore.", current_owner_name, expid)
     is_owner = current_owner_ID == my_user_ID
-    eadmin_user = os.popen('id -u eadmin').read().strip()  # If eadmin no exists, it would be "" so INT() would fail.
+    eadmin_user = os.popen('id -u eadmin').read().strip() # If eadmin no exists, it would be "" so INT() would fail.
     if eadmin_user != "":
         is_eadmin = my_user_ID == int(eadmin_user)
     else:
@@ -142,56 +136,4 @@ def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=N
         else:
             raise AutosubmitCritical("Issues while checking the connectivity of platforms.", 7010, issues + "\n" + ssh_config_issues)
 
-def get_submitter(as_conf):
-    """
-    Returns the submitter corresponding to the communication defined on autosubmit's config file
-    :param as_conf: AutosubmitConfigParser
-    :return: Submitter
-    """
-    try:
-        communications_library = as_conf.get_communications_library()
-    except Exception as e:
-        communications_library = 'paramiko'
-    if communications_library == 'paramiko':
-        return ParamikoSubmitter()
-    else:
-        # only paramiko is available right now.
-        return ParamikoSubmitter()
 
-def get_job_list_persistence(expid, as_conf):
-    """
-    Returns the JobListPersistence corresponding to the storage type defined on autosubmit's config file
-
-    :return: job_list_persistence
-    :rtype: JobListPersistence
-    """
-    storage_type = as_conf.get_storage_type()
-    if storage_type == 'pkl':
-        return JobListPersistencePkl()
-    elif storage_type == 'db':
-        return JobListPersistenceDb(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                    "job_list_" + expid)
-    raise AutosubmitCritical('Storage type not known', 7014)
-    # [A-Za-z09]+ variable is not needed, LOG is global thus it will be read if available
-    ## type: (str, BasicConfig, bool, Log) -> Tuple[bool, bool, str]
-    my_user_ID = os.getuid()
-    current_owner_ID = 0
-    current_owner_name = "NA"
-    try:
-        current_owner_ID = os.stat(os.path.join(basic_config.LOCAL_ROOT_DIR, expid)).st_uid
-        current_owner_name = pwd.getpwuid(os.stat(os.path.join(basic_config.LOCAL_ROOT_DIR, expid)).st_uid).pw_name
-    except Exception as e:
-        if logger:
-            logger.info("Error while trying to get the experiment's owner information.")
-    finally:
-        if current_owner_ID <= 0 and logger:
-            logger.info("Current owner '{0}' of experiment {1} does not exist anymore.", current_owner_name, expid)
-    is_owner = current_owner_ID == my_user_ID
-    eadmin_user = os.popen('id -u eadmin').read().strip() # If eadmin no exists, it would be "" so INT() would fail.
-    if eadmin_user != "":
-        is_eadmin = my_user_ID == int(eadmin_user)
-    else:
-        is_eadmin = False
-    if not is_owner and raise_error:
-        raise AutosubmitCritical("You don't own the experiment {0}.".format(expid), 7012)
-    return is_owner, is_eadmin, current_owner_name

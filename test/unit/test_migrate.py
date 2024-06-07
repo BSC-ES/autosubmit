@@ -14,7 +14,7 @@ from test.unit.utils.common import create_database, generate_expid
 
 class TestMigrate:
 
-    @pytest.fixture(scope='class', autouse=True)
+    @pytest.fixture(scope='class')
     def migrate_tmpdir(self, tmpdir_factory):
         folder = tmpdir_factory.mktemp(f'migrate_tests')
         os.mkdir(folder.join('scratch'))
