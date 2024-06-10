@@ -1,3 +1,12 @@
+4.1.7 - X11, Migrate, script and Bug fixes 
+=====================================
+- Migrate added, a feature to change the ownership of the experiments (/scratch and autosubmit_data paths)
+- X11 added ( If you have to use an older version, after using this one. Autosubmit will complain until you perform create -f and recovery)
+- Multiple QoL and bug fixes for wrappers and fixed horizontal ones.
+- Added a new parameter `SCRIPT` that allows to write templates in the yaml config.
+- Fixed an issue with STAT file.
+- Fixed all issues related to zombie processors. 
+
 4.1.6 - Bug fixes
 =====================
 - Fixed issues with additional files and dates
