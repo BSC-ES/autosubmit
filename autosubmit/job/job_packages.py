@@ -464,7 +464,11 @@ class JobPackageThread(JobPackageBase):
                 self.tasks = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("TASKS",self.tasks)
                 self.nodes = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("NODES",self.nodes)
                 self.reservation = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("RESERVATION",self.reservation)
-
+                wr_threads = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section,{}).get("THREADS",None)
+                if wr_threads:
+                    self.threads = wr_threads
+                else:
+                    self.threads = jobs[0].threads
         self.parameters["CURRENT_PROJ"] = self._project
         self.het = jobs[0].het
 
@@ -500,7 +504,7 @@ class JobPackageThread(JobPackageBase):
         return jobs_scripts
     @property
     def queue(self):
-        if (not str(self.nodes).isdigit() or (self.nodes.isdigit() and int(self.nodes) < 1)) and (not self._num_processors.isdigit() or (self._num_processors.isdigit() and int(self._num_processors) <= 1)):
+        if (not str(self.nodes).isdigit() or (str(self.nodes).isdigit() and int(self.nodes) < 1)) and (not str(self._num_processors).isdigit() or (str(self._num_processors).isdigit() and int(self._num_processors) <= 1)):
             return self.platform.serial_platform.serial_queue
         else:
             return self._queue
