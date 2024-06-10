@@ -1226,9 +1226,13 @@ class ParamikoPlatform(Platform):
         if job.type == Type.BASH:
             executable = 'bash'
         elif job.type == Type.PYTHON:
-            executable = 'python'
+            executable = 'python3'
+        elif job.type == Type.PYTHON2:
+            executable = 'python2'
         elif job.type == Type.R:
             executable = 'Rscript'
+        if job.executable != '':
+            executable = '' # Alternative: use job.executable with substituted placeholders
         remote_logs = (job.script_name + ".out."+str(job.fail_count), job.script_name + ".err."+str(job.fail_count))
         if timeout < 1:
             command = export + ' nohup ' + executable + ' {0} > {1} 2> {2} & echo $!'.format(
