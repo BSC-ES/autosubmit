@@ -5,6 +5,7 @@
   Included sample helm charts (tested with minikube).
 - #1373: Update installation instructions with `rsync`, and fix
   our `Dockerfile` adding `rsync` and `subversion`.
+- #1207: Add experiment path in `autosubmit describe`.
 
 4.1.10 - Hotfix
 ===============

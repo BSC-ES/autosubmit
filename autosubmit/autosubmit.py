@@ -3395,9 +3395,10 @@ class Autosubmit:
                     return False
                 hpc = as_conf.get_platform()
                 description = get_experiment_descrip(experiment_id)
-                Log.info("Describing {0}", experiment_id)
+                Log.result("Describing {0}", experiment_id)
 
                 Log.result("Owner: {0}", user)
+                Log.result("Location: {0}", exp_path)
                 Log.result("Created: {0}", created)
                 Log.result("Model: {0}", model)
                 Log.result("Branch: {0}", branch)
