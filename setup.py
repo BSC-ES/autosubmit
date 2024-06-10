@@ -62,7 +62,7 @@ setup(
         'numpy<2',
         'ruamel.yaml==0.17.21',
         'rocrate==0.*',
-        'autosubmitconfigparser==1.0.65',
+        'autosubmitconfigparser==1.0.66',
         'configparser',
         'pathlib',
         'setproctitle'
