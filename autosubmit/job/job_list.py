@@ -627,7 +627,8 @@ class JobList(object):
         else:
             if not start:
                 start = 0
-            if end is None:
+            if not end:
+                Log.warning("End value not found in the list, returning empty list. Check if the value is missing or the variable that composes the end is not defined.")
                 return []
             return [number_gen for number_gen in range(int(start), int(end) + 1, int(step))]
 
