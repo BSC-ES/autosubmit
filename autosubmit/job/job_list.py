@@ -628,7 +628,7 @@ class JobList(object):
             if not start:
                 start = 0
             if not end:
-                Log.warning("End value not found in the list, returning empty list. Check if the value is missing or the variable that composes the end is not defined.")
+                Log.warning("SPLITS Issue: Invalid SPLIT_TO: START:END value. Returning empty list. Check the configuration file.")
                 return []
             return [number_gen for number_gen in range(int(start), int(end) + 1, int(step))]
 
