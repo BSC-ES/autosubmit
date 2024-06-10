@@ -16,8 +16,10 @@ build/
 
 # Coverage files
 coverage/
-/.coverage
+.coverage
 test/coverage.xml
+coverage.xml
+test/htmlcov
 
 # Docker
 dockerfiles/id_rsa*

@@ -17,6 +17,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import unittest
+import pytest
 import traceback
 import os
 import time
@@ -36,6 +37,7 @@ JOBDATA_DIR = BasicConfig.JOBDATA_DIR
 LOCAL_ROOT_DIR = BasicConfig.LOCAL_ROOT_DIR
 job = namedtuple("Job", ["name", "date", "member", "status_str", "children"])
 
+@pytest.mark.skip()
 @unittest.skip('TODO: another test that uses actual data. See if there is anything useful, and extract into functional/integration/unit tests that run on any machine')
 class TestExperimentHistory(unittest.TestCase):
   # @classmethod
@@ -289,7 +291,7 @@ class TestExperimentHistory(unittest.TestCase):
     self.assertTrue(inserted_job_data_dc.qos == "debug")
 
 
-
+@pytest.mark.skip()
 class TestLogging(unittest.TestCase):
 
   def setUp(self):

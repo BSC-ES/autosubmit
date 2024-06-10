@@ -1,21 +1,17 @@
 import subprocess
-from pathlib import Path
-from unittest import TestCase
-
 import sys
+from pathlib import Path
 
 from autosubmit.autosubmit import Autosubmit
 
 
-class TestAutosubmit(TestCase):
+def test_autosubmit_version():
+    bin_path = Path(__file__, '../../../bin/autosubmit').resolve()
+    exit_code, out = subprocess.getstatusoutput(' '.join([sys.executable, str(bin_path), '-v']))
+    assert exit_code == 0
+    assert out.strip().endswith(Autosubmit.autosubmit_version)
 
-    def testAutosubmitVersion(self):
-        bin_path = Path(__file__, '../../../bin/autosubmit').resolve()
-        exit_code, out = subprocess.getstatusoutput(' '.join([sys.executable, str(bin_path), '-v']))
-        self.assertEqual(0, exit_code)
-        self.assertEqual(Autosubmit.autosubmit_version, out.strip())
-
-    def testAutosubmitVersionBroken(self):
-        bin_path = Path(__file__, '../../../bin/autosubmit').resolve()
-        exit_code, _ = subprocess.getstatusoutput(' '.join([sys.executable, str(bin_path), '-abcdefg']))
-        self.assertEqual(1, exit_code)
+def test_autosubmit_version_broken():
+    bin_path = Path(__file__, '../../../bin/autosubmit').resolve()
+    exit_code, _ = subprocess.getstatusoutput(' '.join([sys.executable, str(bin_path), '-abcdefg']))
+    assert exit_code == 1

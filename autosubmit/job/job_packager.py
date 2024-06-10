@@ -722,8 +722,8 @@ class JobPackagerVertical(object):
         :return: List of jobs that are wrapped together.
         :rtype: List() of Job Object
         """
-        self.total_wallclock = "00:00" # reset total wallclock for package
         job.update_parameters(wrapper_info[-1],{}) # update_parameter has moved, so this is now needed.
+        self.total_wallclock = job.wallclock # reset total wallclock for package
         stack = [(job, 1)]
         while stack:
             job, level = stack.pop()

@@ -72,7 +72,8 @@ PLATFORMS:
         MAX_WALLCLOCK: 48:00
         TEMP_DIR: ''
         MAX_PROCESSORS: 99999
-        queue: dummy     
+        queue: dummy
+        DISABLE_RECOVERY_THREADS: True
     pytest-slurm:
         type: slurm
         host: 127.0.0.1
@@ -85,6 +86,7 @@ PLATFORMS:
         TEMP_DIR: ''
         MAX_PROCESSORS: 99999
         PROCESSORS_PER_NODE: 123
+        DISABLE_RECOVERY_THREADS: True
     pytest-ecaccess:
         type: ecaccess
         version: slurm
@@ -93,13 +95,15 @@ PLATFORMS:
         EC_QUEUE: hpc
         user: {scheduler_tmpdir.owner}
         project: whatever
-        scratch_dir: {scheduler_tmpdir}/scratch       
+        scratch_dir: {scheduler_tmpdir}/scratch
+        DISABLE_RECOVERY_THREADS: True
     pytest-ps:
         type: ps
         host: 127.0.0.1
         user: {scheduler_tmpdir.owner}
         project: whatever
-        scratch_dir: {scheduler_tmpdir}/scratch       
+        scratch_dir: {scheduler_tmpdir}/scratch
+        DISABLE_RECOVERY_THREADS: True
         """)
     # add a job of each platform type
     with jobs_path.open('w') as f:

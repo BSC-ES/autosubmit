@@ -12,6 +12,7 @@ from log.log import AutosubmitCritical
 from test.unit.utils.common import create_database, init_expid
 
 
+@pytest.mark.skip('This test requires a running SSH server, with password-less authentication')
 class TestMigrate:
 
     @pytest.fixture(scope='class')

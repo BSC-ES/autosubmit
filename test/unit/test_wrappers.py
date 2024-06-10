@@ -566,7 +566,7 @@ class TestWrappers(TestCase):
         wrapper_limits["min_h"] = 2
         wrapper_limits["max_by_section"] = max_wrapped_job_by_section
         returned_packages = self.job_packager._build_vertical_packages(
-            section_list, wrapper_limits)
+            section_list, wrapper_limits, self.wrapper_info)
         self.job_list._ordered_jobs_by_date_member["WRAPPERS"]["d1"] = dict()
         self.job_list._ordered_jobs_by_date_member["WRAPPERS"]["d1"]["m1"] = [d1_m1_1_s3]
 

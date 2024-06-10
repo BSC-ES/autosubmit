@@ -17,6 +17,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import unittest
+import pytest
 import time
 import random
 import os
@@ -35,6 +36,7 @@ BasicConfig.read()
 JOBDATA_DIR = BasicConfig.JOBDATA_DIR
 LOCAL_ROOT_DIR = BasicConfig.LOCAL_ROOT_DIR
 
+@pytest.mark.skip()
 @unittest.skip('TODO: looks like another test that used actual experiments data')
 class TestExperimentStatusDatabaseManager(unittest.TestCase):
   """ Covers Experiment Status Database Manager """

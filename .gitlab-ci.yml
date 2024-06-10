@@ -21,14 +21,14 @@ prepare:
     - git submodule update --init --recursive
     - conda update -n base -c defaults conda
     - conda update conda
-    - conda install -n autosubmit3 coverage=6
+    - conda install -n autosubmit3 pytest pytest-cov pytest-mock
     - conda env update -f environment.yml -n autosubmit3 python=3.7.3
 
 test_python3:
   stage: test
   script:
     - conda activate autosubmit3
-    - python3 -m 'nose' --exclude=regression  --verbosity=3 test/unit --with-coverage --cover-package=autosubmit --cover-inclusive --cover-xml --cover-xml-file=test/coverage.xml
+    - pytest
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   # These artifacts are saved with every build in GitLab and can be reviewed later. If
   # we have a folder with HTML files, as in this example, users can navigate with their
