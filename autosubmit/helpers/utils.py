@@ -1,4 +1,3 @@
-import collections
 import subprocess
 import os
 import pwd
@@ -10,6 +9,30 @@ from autosubmit.notifications.notifier import Notifier
 
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from log.log import AutosubmitCritical, Log
+
+
+def check_jobs_file_exists(as_conf, current_section_name=None):
+    if str(as_conf.experiment_data.get("PROJECT", {}).get("PROJECT_TYPE", "none")).lower() != "none":
+        templates_dir = f"{as_conf.experiment_data.get('ROOTDIR','')}/proj/{as_conf.experiment_data.get('PROJECT', {}).get('PROJECT_DESTINATION', '')}"
+        if not os.path.exists(templates_dir):
+            raise AutosubmitCritical(f"Templates directory {templates_dir} does not exist", 7011)
+
+        # List of files that doesn't exist.
+        missing_files = ""
+        # Check if all files in jobs_data exist or only current section
+        if current_section_name:
+            jobs_data = [as_conf.jobs_data.get(current_section_name, {})]
+        else:
+            jobs_data = as_conf.jobs_data.values()
+        for data in jobs_data:
+            if "SCRIPT" not in data:
+                if "FILE" in data:
+                    if not os.path.exists(f"{templates_dir}/{data['FILE']}"):
+                        missing_files += f"{templates_dir}/{data['FILE']} \n"
+                    else:
+                        Log.result(f"File {templates_dir}/{data['FILE']} exists")
+        if missing_files:
+            raise AutosubmitCritical(f"Templates not found:\n{missing_files}", 7011)
 
 def terminate_child_process(expid, platform=None):
     # get pid of the main process

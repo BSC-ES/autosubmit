@@ -86,7 +86,7 @@ from typing import List
 import autosubmit.history.utils as HUtils
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 import autosubmit.statistics.utils as StatisticsUtils
-from autosubmit.helpers.utils import proccess_id, terminate_child_process
+from autosubmit.helpers.utils import proccess_id, terminate_child_process, check_jobs_file_exists
 
 from contextlib import suppress
 
@@ -1485,6 +1485,7 @@ class Autosubmit:
             signal.signal(signal.SIGINT, signal_handler)
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             as_conf.check_conf_files(True)
+
             project_type = as_conf.get_project_type()
             safetysleeptime = as_conf.get_safetysleeptime()
             Log.debug("The Experiment name is: {0}", expid)
@@ -2501,6 +2502,12 @@ class Autosubmit:
         save_2 = False
         wrapper_errors = {}
         any_job_submitted = False
+        # Check section jobs
+        if not only_wrappers and not inspect :
+            jobs_section = set([job.section for job in job_list.get_ready()])
+            for section in jobs_section:
+                if check_jobs_file_exists(as_conf, section):
+                    raise AutosubmitCritical(f"Job {self.name} does not have a correct template// template not found", 7014)
         try:
             for platform in platforms_to_test:
                 packager = JobPackager(as_conf, platform, job_list, hold=hold)

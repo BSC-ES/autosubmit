@@ -1994,8 +1994,9 @@ class Job(object):
         :rtype: str
         """
         self.update_parameters(as_conf, self.parameters)
-        if self.script and self.file:
-            Log.warning(f"Custom script for job {self.name} is being used, file contents are ignored.")
+        if self.script:
+            if self.file:
+                Log.warning(f"Custom script for job {self.name} is being used, file contents are ignored.")
             template = self.script
         else:
             try:
