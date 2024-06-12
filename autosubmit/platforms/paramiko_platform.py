@@ -934,7 +934,7 @@ class ParamikoPlatform(Platform):
                 pass
 
 
-    def exec_command(self, command, bufsize=-1, timeout=0, get_pty=False,retries=3, x11=False):
+    def exec_command(self, command, bufsize=-1, timeout=30, get_pty=False,retries=3, x11=False):
         """
         Execute a command on the SSH server.  A new `.Channel` is opened and
         the requested command is execed.  The command's input and output
