@@ -959,7 +959,7 @@ class ParamikoPlatform(Platform):
         while retries > 0:
             try:
                 chan = self.transport.open_session()
-                if x11 == "true":
+                if x11:
                     display = os.getenv('DISPLAY')
                     if display is None or not display:
                         display = "localhost:0"
@@ -968,7 +968,7 @@ class ParamikoPlatform(Platform):
                     chan.request_x11(single_connection=False,handler=self.x11_handler)
                 else:
                     chan = self.transport.open_session()
-                if x11 == "true":
+                if x11:
                     if "timeout" in command:
                         timeout_command = command.split("timeout ")[1].split(" ")[0]
                         if timeout_command == 0:
@@ -1064,7 +1064,7 @@ class ParamikoPlatform(Platform):
                         stderr_readlines.append(
                             stderr.channel.recv_stderr(len(c.in_stderr_buffer)))
                         got_chunk = True
-                if x11 == "true":
+                if x11:
                     if len(stderr_readlines) > 0:
                         aux_stderr.extend(stderr_readlines)
                         for stderr_line in stderr_readlines:

@@ -544,7 +544,7 @@ class SlurmPlatform(ParamikoPlatform):
             if outputlines.find("failed") != -1:
                 raise AutosubmitCritical(
                     "Submission failed. Command Failed", 7014)
-            if x11 == "true":
+            if x11:
                 return int(outputlines.splitlines()[0])
             else:
                 jobs_id = []
@@ -570,7 +570,7 @@ class SlurmPlatform(ParamikoPlatform):
         else:
             x11 = job.x11
 
-        if x11 == "true":
+        if x11:
             return export + self.get_submit_cmd_x11(job.x11_options.strip(""), job_script.strip(""), job)
         else:
             try:
