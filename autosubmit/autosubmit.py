@@ -853,8 +853,8 @@ class Autosubmit:
             expids = [x.strip() for x in expids]
             for expid in expids:
                 as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
-                as_conf.reload(force_load=True)
                 as_conf.set_last_as_command(args.command)
+                as_conf.reload(force_load=True)
 
                 if len(as_conf.experiment_data) == 0:
                     if args.command not in ["expid", "upgrade"]:
