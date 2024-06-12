@@ -304,9 +304,9 @@ class ParamikoPlatform(Platform):
             self._ftpChannel = paramiko.SFTPClient.from_transport(self.transport,window_size=pow(4, 12) ,max_packet_size=pow(4, 12) )
             self._ftpChannel.get_channel().settimeout(120)
             self.connected = True
-            if not self.log_retrieval_process_active and as_conf and str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() != "false":
+            if not self.log_retrieval_process_active and (as_conf is None or str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "false"):
                 self.log_retrieval_process_active = True
-                if as_conf.misc_data["ASMISC"].get("COMMAND", "").lower() == "run":
+                if as_conf.experiment_data["ASMISC"].get("COMMAND", "").lower() == "run":
                     self.recover_job_logs()
         except SSHException:
             raise
@@ -937,7 +937,7 @@ class ParamikoPlatform(Platform):
     def exec_command(self, command, bufsize=-1, timeout=0, get_pty=False,retries=3, x11=False):
         """
         Execute a command on the SSH server.  A new `.Channel` is opened and
-        the requested command is executed.  The command's input and output
+        the requested command is execed.  The command's input and output
         streams are returned as Python ``file``-like objects representing
         stdin, stdout, and stderr.
 
