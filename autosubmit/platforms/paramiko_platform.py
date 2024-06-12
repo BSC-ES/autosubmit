@@ -1326,9 +1326,9 @@ class ParamikoPlatform(Platform):
             if hasattr(self.header, 'get_custom_directives'):
                 header = header.replace(
                     '%CUSTOM_DIRECTIVES%', self.header.get_custom_directives(job))
-            if hasattr(self.header, 'get_exclusivity'):
+            if hasattr(self.header, 'get_exclusive_directive'):
                 header = header.replace(
-                    '%EXCLUSIVITY_DIRECTIVE%', self.header.get_exclusivity(job))
+                    '%EXCLUSIVE_DIRECTIVE%', self.header.get_exclusive_directive(job))
             if hasattr(self.header, 'get_account_directive'):
                 header = header.replace(
                     '%ACCOUNT_DIRECTIVE%', self.header.get_account_directive(job))

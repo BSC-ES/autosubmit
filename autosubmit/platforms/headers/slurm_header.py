@@ -116,6 +116,7 @@ class SlurmHeader(object):
             if job.parameters['CURRENT_PROJ'] != '':
                 return "SBATCH -A {0}".format(job.parameters['CURRENT_PROJ'])
         return ""
+
     def get_exclusive_directive(self, job, het=-1):
         """
         Returns account directive for the specified job
@@ -421,6 +422,7 @@ class SlurmHeader(object):
 #
 #%QUEUE_DIRECTIVE%
 #%PARTITION_DIRECTIVE%
+#%EXCLUSIVE_DIRECTIVE%
 #%ACCOUNT_DIRECTIVE%
 #%MEMORY_DIRECTIVE%
 #%THREADS_PER_TASK_DIRECTIVE%
@@ -445,6 +447,7 @@ class SlurmHeader(object):
 #
 #%QUEUE_DIRECTIVE%
 #%PARTITION_DIRECTIVE%
+#%EXCLUSIVE_DIRECTIVE%
 #%ACCOUNT_DIRECTIVE%
 #%MEMORY_DIRECTIVE%
 #%MEMORY_PER_TASK_DIRECTIVE%
