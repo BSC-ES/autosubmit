@@ -958,7 +958,6 @@ class ParamikoPlatform(Platform):
         """
         while retries > 0:
             try:
-                chan = self.transport.open_session()
                 if x11:
                     display = os.getenv('DISPLAY')
                     if display is None or not display:
