@@ -934,7 +934,7 @@ class ParamikoPlatform(Platform):
                 pass
 
 
-    def exec_command(self, command, bufsize=-1, timeout=None, get_pty=False,retries=3, x11=False):
+    def exec_command(self, command, bufsize=-1, timeout=0, get_pty=False,retries=3, x11=False):
         """
         Execute a command on the SSH server.  A new `.Channel` is opened and
         the requested command is executed.  The command's input and output
@@ -997,7 +997,7 @@ class ParamikoPlatform(Platform):
                 retries = retries - 1
         if retries <= 0:
             return False , False, False
-    def exec_command_x11(self, command, bufsize=-1, timeout=None, get_pty=False,retries=3, x11=False):
+    def exec_command_x11(self, command, bufsize=-1, timeout=0, get_pty=False,retries=3, x11=False):
         session = self.transport.open_session()
         session.request_x11(handler=self.x11_handler)
         session.exec_command(command + " ; sleep infinity")

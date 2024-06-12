@@ -151,7 +151,7 @@ class DicJobs:
 
         if splits == "auto" and running != "chunk":
             raise AutosubmitCritical("SPLITS=auto is only allowed for running=chunk")
-        else:
+        elif splits != "auto":
             splits = int(splits)
         frequency = int(parameters[section].get("FREQUENCY", 1))
         if running == 'once':
