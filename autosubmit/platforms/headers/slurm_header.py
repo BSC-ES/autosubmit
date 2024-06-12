@@ -380,7 +380,7 @@ class SlurmHeader(object):
         header = header.replace("%WALLCLOCK%", job.wallclock)
         header = header.replace("%JOBNAME%", job.name)
 
-        if job.x11 == "true":
+        if job.x11:
             header = header.replace(
                 '%X11%', "SBATCH --x11=batch")
         else:
