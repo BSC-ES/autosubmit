@@ -1,4 +1,12 @@
-4.1.7 - X11, Migrate, script and Bug fixes 
+4.1.8 - Bug fixes.
+=====================
+- Fixed an issue with a socket connection left open.
+- Fixed an issue with log recovery being disabled by default.
+- Added exclusive parameter
+- Fixed some X11 routines called by default
+
+
+4.1.7 - X11, Migrate, script and Bug fixes
 =====================================
 - Migrate added, a feature to change the ownership of the experiments (/scratch and autosubmit_data paths)
 - X11 added ( If you have to use an older version, after using this one. Autosubmit will complain until you perform create -f and recovery)
