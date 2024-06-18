@@ -3341,8 +3341,11 @@ class Autosubmit:
             experiments_ids = []
             basic_conf = BasicConfig()
             for f in Path(basic_conf.LOCAL_ROOT_DIR).glob("????"):
-                if f.is_dir() and f.owner() == get_from_user:
-                    experiments_ids.append(f.name)
+                try:
+                    if f.is_dir() and f.owner() == get_from_user:
+                        experiments_ids.append(f.name)
+                except:
+                    pass # if it reachs there it means that f.owner() doesn't exist anymore( owner is an id) so we just skip it and continue
         else:
             experiments_ids = experiments_ids.split(' ')
         for experiment_id in experiments_ids:
@@ -3359,6 +3362,7 @@ class Autosubmit:
                 except Exception as e:
                     Log.warning(
                         "The user does not exist anymore in the system, using id instead")
+                    continue
 
                 created = datetime.datetime.fromtimestamp(
                     os.path.getmtime(as_conf.conf_folder_yaml))
