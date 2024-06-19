@@ -165,6 +165,21 @@ of how to install Autosubmit with Conda.
                <img class="img-fluid dark-light" src="_static/logos/cams.png" alt="CAMS" title="CAMS, Copernicus Atmosphere Monitoring Service " />
             </div>
          </div>
+         <div class="col-lg-3 col-md-4 col-xs-6">
+            <div class="community-logo">
+               <img class="img-fluid dark-light" src="_static/logos/bdrc-logo.png" alt="BDRC" title="BDRC, Barcelona Dust Regional Center " />
+            </div>
+         </div>
+         <div class="col-lg-3 col-md-4 col-xs-6">
+            <div class="community-logo">
+               <img class="img-fluid dark-light" src="_static/logos/dustclim.png" alt="DUSTCLIM" title="DUSTCLIM, Dust Storms Assessment for the development of user-oriented Climate services in Northern Africa, the Middle East and Europe " />
+            </div>
+         </div>
+         <div class="col-lg-3 col-md-4 col-xs-6">
+            <div class="community-logo">
+               <img class="img-fluid dark-light" src="_static/logos/caliope.png" alt="CALIOPE" title="CALIOPE, CALIdad del aire Operacional Para España " />
+            </div>
+         </div>
       </div>
       <div class="row gap-4">
          <div class="col" style="min-width: 20rem;">
