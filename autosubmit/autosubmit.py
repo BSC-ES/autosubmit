@@ -3433,16 +3433,16 @@ class Autosubmit:
         :type smtp_hostname: str
         """
         try:
-            home_path = os.path.expanduser('~')
+            home_path = Path.home()
             autosubmitapi_url = "http://192.168.11.91:8081" + " # Replace me?"
             # Setting default values
             if not advanced and database_path is None and local_root_path is None:
-                database_path = os.path.join(home_path, "autosubmit")
-                local_root_path = os.path.join(home_path, "autosubmit")
-                global_logs_path = os.path.join(home_path, "autosubmit", "logs")
-                structures_path = os.path.join(home_path, "autosubmit", "metadata", "structures")
-                historicdb_path = os.path.join(home_path, "autosubmit", "metadata", "data")
-                historiclog_path = os.path.join(home_path, "autosubmit", "metadata", "logs")
+                database_path = home_path / 'autosubmit'
+                local_root_path = home_path / 'autosubmit'
+                global_logs_path = home_path / 'autosubmit/logs'
+                structures_path = home_path / 'autosubmit/metadata/structures'
+                historicdb_path = home_path / 'autosubmit/metadata/data'
+                historiclog_path = home_path / 'autosubmit/metadata/logs'
                 database_filename = "autosubmit.db"
 
             while database_path is None:
@@ -3450,7 +3450,7 @@ class Autosubmit:
                 if database_path.find("~/") < 0:
                     database_path = None
                     Log.error("Not a valid path. You must include '~/' at the beginning.")
-            database_path = database_path.replace('~', home_path)
+            database_path = Path(database_path).expanduser().resolve()
             # if not os.path.exists(database_path):
             HUtils.create_path_if_not_exists(database_path)
             # Log.error("Database path does not exist.")
@@ -3463,25 +3463,25 @@ class Autosubmit:
                 if local_root_path.find("~/") < 0:
                     local_root_path = None
                     Log.error("Not a valid path. You must include '~/' at the beginning.")
-            local_root_path = local_root_path.replace('~', home_path)
+            local_root_path = Path(local_root_path).expanduser().resolve()
 
             # if not os.path.exists(local_root_path):
             HUtils.create_path_if_not_exists(local_root_path)
             # Log.error("Local Root path does not exist.")
             # return False
             # else:
-            global_logs_path = os.path.join(local_root_path, "logs")
-            structures_path = os.path.join(local_root_path, "metadata", "structures")
-            historicdb_path = os.path.join(local_root_path, "metadata", "data")
-            historiclog_path = os.path.join(local_root_path, "metadata", "logs")
+            global_logs_path = local_root_path / 'logs'
+            structures_path = local_root_path / 'metadata/structures'
+            historicdb_path = local_root_path / 'metadata/data'
+            historiclog_path = local_root_path / 'metadata/logs'           
 
             if platforms_conf_path is not None and len(str(platforms_conf_path)) > 0:
-                platforms_conf_path = platforms_conf_path.replace('~', home_path)
-                if not os.path.exists(platforms_conf_path):
+                platforms_conf_path = Path(platforms_conf_path).expanduser().resolve()
+                if not platforms_conf_path.exists():
                     Log.error("platforms.yml path does not exist.")
                     return False
             if jobs_conf_path is not None and len(str(jobs_conf_path)) > 0:
-                jobs_conf_path = jobs_conf_path.replace('~', home_path)
+                jobs_conf_path = Path(jobs_conf_path).expanduser().resolve()
                 if not os.path.exists(jobs_conf_path):
                     Log.error("jobs.yml path does not exist.")
                     return False
@@ -3492,37 +3492,37 @@ class Autosubmit:
                 rc_path = '.'
             else:
                 rc_path = home_path
-            rc_path = os.path.join(rc_path, '.autosubmitrc')
+            rc_path = rc_path.joinpath('.autosubmitrc')
 
             config_file = open(rc_path, 'w')
             Log.info("Writing configuration file...")
             try:
                 parser = ConfigParser()
                 parser.add_section('database')
-                parser.set('database', 'path', database_path)
+                parser.set('database', 'path', str(database_path))
                 if database_filename is not None and len(str(database_filename)) > 0:
-                    parser.set('database', 'filename', database_filename)
+                    parser.set('database', 'filename', str(database_filename))
                 parser.add_section('local')
-                parser.set('local', 'path', local_root_path)
+                parser.set('local', 'path', str(local_root_path))
                 if (jobs_conf_path is not None and len(str(jobs_conf_path)) > 0) or (
                         platforms_conf_path is not None and len(str(platforms_conf_path)) > 0):
                     parser.add_section('conf')
                     if jobs_conf_path is not None:
-                        parser.set('conf', 'jobs', jobs_conf_path)
+                        parser.set('conf', 'jobs', str(jobs_conf_path))
                     if platforms_conf_path is not None:
-                        parser.set('conf', 'platforms', platforms_conf_path)
+                        parser.set('conf', 'platforms', str(platforms_conf_path))
                 if smtp_hostname is not None or mail_from is not None:
                     parser.add_section('mail')
                     parser.set('mail', 'smtp_server', smtp_hostname)
                     parser.set('mail', 'mail_from', mail_from)
                 parser.add_section("globallogs")
-                parser.set("globallogs", "path", global_logs_path)
+                parser.set("globallogs", "path", str(global_logs_path))
                 parser.add_section("structures")
-                parser.set("structures", "path", structures_path)
+                parser.set("structures", "path", str(structures_path))
                 parser.add_section("historicdb")
-                parser.set("historicdb", "path", historicdb_path)
+                parser.set("historicdb", "path", str(historicdb_path))
                 parser.add_section("historiclog")
-                parser.set("historiclog", "path", historiclog_path)
+                parser.set("historiclog", "path", str(historiclog_path))
                 parser.add_section("autosubmitapi")
                 parser.set("autosubmitapi", "url", autosubmitapi_url)
                 # parser.add_section("hosts")
@@ -3537,12 +3537,12 @@ class Autosubmit:
                 HUtils.create_path_if_not_exists(historiclog_path)
                 Log.result(
                     "Directories configured successfully: \n\t{5} \n\t{0} \n\t{1} \n\t{2} \n\t{3} \n\t{4}".format(
-                        local_root_path,
-                        global_logs_path,
-                        structures_path,
-                        historicdb_path,
-                        historiclog_path,
-                        database_path
+                        str(local_root_path),
+                        str(global_logs_path),
+                        str(structures_path),
+                        str(historicdb_path),
+                        str(historiclog_path),
+                        str(database_path)
                     ))
             except (IOError, OSError) as e:
                 raise AutosubmitCritical(
@@ -3564,7 +3564,7 @@ class Autosubmit:
         not_enough_screen_size_msg = 'The size of your terminal is not enough to draw the configuration wizard,\n' \
                                      'so we\'ve closed it to prevent errors. Resize it and then try it again.'
 
-        home_path = os.path.expanduser('~')
+        home_path = Path(home_path).expanduser().resolve()
 
         try:
             d = dialog.Dialog(
