@@ -530,6 +530,111 @@ Example3: 1-to-N dependency
    :align: center
    :alt: 1_to_N
 
+Job Splits with calendar
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+For jobs running at any level, it may be useful to split each task into different parts based on the calendar.
+This behaviour can be achieved setting the SPLITS: to "auto" and using the %EXPERIMENT.SPLITSIZE% and %EXPERIMENT.SPLITSIZEUNIT% variables.
+
+Example4: Auto split
+
+.. code-block:: yaml
+
+    experiment:
+        DATELIST: 19900101
+        MEMBERS: fc0
+        # Chunk size unit. STRING: hour, day, month, year
+        CHUNKSIZEUNIT: month
+        # Split size unit. STRING: hour, day, month, year and lower than CHUNKSIZEUNIT
+        SPLITSIZEUNIT: day # default CHUNKSIZEUNIT-1 (month-1 == day)
+        # Chunk size. NUMERIC: 4, 6, 12
+        CHUNKSIZE: 1
+        # Split size. NUMERIC: 4, 6, 12
+        SPLITSIZE: 15
+        # Split policy. STRING: flexible, strict
+        SPLITPOLICY: flexible
+        # Total number of chunks in experiment. NUMERIC: 30, 15, 10
+        NUMCHUNKS: 2
+        # Calendar used. LIST: standard, noleap
+        CALENDAR: standard
+
+
+    JOBS:
+      APP:
+        FILE: app.sh
+        FOR:
+          DEPENDENCIES:
+          - APP_ENERGY_ONSHORE:
+              SPLITS_FROM:
+                all:
+                  SPLITS_TO: previous
+            OPA_ENERGY_ONSHORE_1:
+              SPLITS_FROM:
+                all:
+                  SPLITS_TO: all
+            OPA_ENERGY_ONSHORE_2:
+              SPLITS_FROM:
+                all:
+                  SPLITS_TO: all
+          NAME: '%RUN.APP_NAMES%'
+          SPLITS: '1'
+        PLATFORM: 'local'
+        RUNNING: chunk
+        WALLCLOCK: 00:05
+      DN:
+        DEPENDENCIES:
+          APP_ENERGY_ONSHORE-1:
+            SPLITS_TO: '1'
+          DN:
+            SPLITS_FROM:
+              all:
+                SPLITS_TO: previous
+        FILE: dn.sh
+        PLATFORM: 'local'
+        RUNNING: chunk
+        SPLITS: auto
+        WALLCLOCK: 00:05
+      OPA:
+        CHECK: on_submission
+        FILE: opa.sh
+        FOR:
+          DEPENDENCIES:
+          - DN:
+              SPLITS_FROM:
+                all:
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+            OPA_ENERGY_ONSHORE_1:
+              SPLITS_FROM:
+                all:
+                  SPLITS_TO: previous
+          - DN:
+              SPLITS_FROM:
+                all:
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+            OPA_ENERGY_ONSHORE_2:
+              SPLITS_FROM:
+                all:
+                  SPLITS_TO: previous
+          NAME: '%RUN.OPA_NAMES%'
+          SPLITS: '[auto, auto]'
+        PLATFORM: 'local'
+        RUNNING: chunk
+        WALLCLOCK: 00:05
+    RUN:
+      APP_NAMES:
+      - ENERGY_ONSHORE
+      OPA_NAMES:
+      - energy_onshore_1
+      - energy_onshore_2
+
+
+
+.. figure:: fig/splits_auto.png
+   :name: auto
+   :width: 100%
+   :align: center
+   :alt: auto
+
 Job delay
 ~~~~~~~~~
 

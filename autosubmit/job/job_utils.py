@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
+import copy
+
 import math
 
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from log.log import Log, AutosubmitCritical
-from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates
+from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates, add_hours
 
 # Copyright 2017-2020 Earth Sciences Department, BSC-CNS
 
@@ -100,17 +102,8 @@ def calendar_get_month_days(date_str):
     else:
         return 31
 
+def get_chunksize_in_hours(date_str,chunk_unit,chunk_length):
 
-def calendar_split_size_isvalid(date_str, split_size, split_unit, chunk_unit, chunk_length):
-    """
-    Check if the split size is valid for the calendar
-    :param date_str: Date in string format (YYYYMMDD)
-    :param split_size: Size of the split
-    :param split_unit: Unit of the split
-    :param chunk_unit: Unit of the chunk
-    :param chunk_length: Size of the chunk
-    :return: Boolean
-    """
     if is_leap_year(int(date_str[0:4])):
         num_days_in_a_year = 366
     else:
@@ -123,6 +116,22 @@ def calendar_split_size_isvalid(date_str, split_size, split_unit, chunk_unit, ch
         chunk_size_in_hours = 24 * chunk_length
     else:
         chunk_size_in_hours = chunk_length
+    return chunk_size_in_hours
+def calendar_split_size_isvalid(date_str, split_size, split_unit, chunk_unit, chunk_length, chunk_size_in_hours):
+    """
+    Check if the split size is valid for the calendar
+    :param date_str: Date in string format (YYYYMMDD)
+    :param split_size: Size of the split
+    :param split_unit: Unit of the split
+    :param chunk_unit: Unit of the chunk
+    :param chunk_length: Size of the chunk
+    :param chunk_size_in_hours: chunk size in hours
+    :return: Boolean
+    """
+    if is_leap_year(int(date_str[0:4])):
+        num_days_in_a_year = 366
+    else:
+        num_days_in_a_year = 365
 
     if split_unit == "year":
         split_size_in_hours = num_days_in_a_year * 24 * split_size
@@ -150,7 +159,7 @@ def calendar_chunk_section(exp_data, section, date, chunk):
     :param parameters:
     :return:
     """
-    date_str = date2str(date)
+    #next_auto_date = date
     splits = 0
     jobs_data = exp_data.get('JOBS', {})
     split_unit = str(exp_data.get("EXPERIMENT", {}).get('SPLITSIZEUNIT', jobs_data.get(section,{}).get("SPLITSIZEUNIT", None))).lower()
@@ -182,16 +191,16 @@ def calendar_chunk_section(exp_data, section, date, chunk):
         else:
             num_max_splits = run_days
         split_size = get_split_size(exp_data, section)
-        if not calendar_split_size_isvalid(date_str, split_size, split_unit, chunk_unit, chunk_length):
+        chunk_size_in_hours = get_chunksize_in_hours(date2str(chunk_start),chunk_unit,chunk_length)
+        if not calendar_split_size_isvalid(date2str(chunk_start), split_size, split_unit, chunk_unit, chunk_length, chunk_size_in_hours):
             raise AutosubmitCritical(f"Invalid split size for the calendar. The split size is {split_size} and the unit is {split_unit}.")
         splits = num_max_splits / split_size
         if not splits.is_integer() and split_policy == "flexible":
             Log.warning(f"The number of splits:{num_max_splits}/{split_size} is not an integer. The number of splits will be rounded up due the flexible split policy.\n You can modify the SPLITPOLICY parameter in the section {section} to 'strict' to avoid this behavior.")
         elif not splits.is_integer() and split_policy == "strict":
-            raise AutosubmitCritical(f"The number of splits is not an integer. The number of splits will be rounded up due the strict split policy.\n You can modify the SPLITPOLICY parameter in the section {section} to 'flexible' to roundup the number.")
+            raise AutosubmitCritical(f"The number of splits is not an integer. Autosubmit can't continue.\nYou can modify the SPLITPOLICY parameter in the section {section} to 'flexible' to roundup the number. Or change the SPLITSIZE parameter to a value in which the division is an integer.")
         splits = math.ceil(splits)
-        Log.info(f"For the section {section} with date:{date_str} the number of splits is {splits}.")
-
+        Log.info(f"For the section {section} with date:{date2str(chunk_start)} the number of splits is {splits}.")
     return splits
 
 def get_split_size_unit(data, section):

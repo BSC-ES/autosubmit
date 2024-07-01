@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import copy
 
 # Copyright 2017-2020 Earth Sciences Department, BSC-CNS
 
@@ -266,7 +267,9 @@ class DicJobs:
                 count = 0
                 for chunk in (chunk for chunk in self._chunk_list):
                     if splits == "auto":
-                        splits = calendar_chunk_section(self.experiment_data, section, date, chunk)
+                        real_splits = calendar_chunk_section(self.experiment_data, section, date, chunk)
+                    else:
+                        real_splits = splits
                     count += 1
                     if delay == -1 or delay < chunk:
                         if count % frequency == 0 or count == len(self._chunk_list):
@@ -278,14 +281,14 @@ class DicJobs:
                                     self._dic[section][date][member][chunk] = tmp_dic[chunk][date]
                             else:
                                 self._dic[section][date][member][chunk] = []
-                                self._create_jobs_split(splits, section, date, member, chunk, priority,
+                                self._create_jobs_split(real_splits, section, date, member, chunk, priority,
                                                         default_job_type,
                                                         self._dic[section][date][member][chunk])
 
     def _create_jobs_split(self, splits, section, date, member, chunk, priority, default_job_type, section_data):
         splits_list = [-1] if splits <= 0 else range(1, splits + 1)
         for split in splits_list:
-            self.build_job(section, priority, date, member, chunk, default_job_type, section_data, split)
+            self.build_job(section, priority, date, member, chunk, default_job_type, section_data, splits, split)
 
     def update_jobs_filtered(self, current_jobs, next_level_jobs):
         if type(next_level_jobs) is dict:
@@ -617,7 +620,7 @@ class DicJobs:
                     jobs.append(dic[c])
         return jobs
 
-    def build_job(self, section, priority, date, member, chunk, default_job_type, section_data, split=-1):
+    def build_job(self, section, priority, date, member, chunk, default_job_type, section_data, splits, split=-1):
         name = self.experiment_data.get("DEFAULT", {}).get("EXPID", "")
         if date:
             name += "_" + date2str(date, self._date_format)
@@ -637,6 +640,7 @@ class DicJobs:
             job.member = member
             job.chunk = chunk
             job.split = split
+            job.splits = splits
             job.update_dict_parameters(self.as_conf)
             section_data.append(job)
             self.changes["NEWJOBS"] = True
@@ -647,4 +651,5 @@ class DicJobs:
                                                                                             Status.READY] else \
                 self._job_list[name].status
             section_data.append(self._job_list[name])
+            self._job_list[name].splits = splits
         self.workflow_jobs.append(name)

@@ -1,3 +1,8 @@
+4.1.9 - Splits fixes
+=====================
+- Splits calendar: Added a full example in the documentation.
+- Splits calendar: Fixed some issues with the split="auto".
+
 4.1.8 - Bug fixes.
 =====================
 - Fixed an issue with a socket connection left open.

@@ -1700,7 +1700,8 @@ class Job(object):
                 jobs_in_wrapper = jobs_in_wrapper.split(" ")
             if self.section.upper() in jobs_in_wrapper:
                 self.retrials = wrapper_data.get("RETRIALS", self.retrials)
-        self.splits = as_conf.jobs_data.get(self.section,{}).get("SPLITS", None)
+        if not self.splits:
+            self.splits = as_conf.jobs_data.get(self.section,{}).get("SPLITS", None)
         self.delete_when_edgeless = as_conf.jobs_data.get(self.section,{}).get("DELETE_WHEN_EDGELESS", True)
         self.dependencies = str(as_conf.jobs_data.get(self.section,{}).get("DEPENDENCIES",""))
         self.running = as_conf.jobs_data.get(self.section,{}).get("RUNNING", "once")
@@ -1880,7 +1881,8 @@ class Job(object):
         parameters['MEMBER'] = self.member
         parameters['SPLIT'] = self.split
         parameters['SHAPE'] = self.shape
-        parameters['SPLITS'] = self.splits
+        if parameters.get('SPLITS', "auto") == "auto":
+            parameters['SPLITS'] = self.splits
         parameters['DELAY'] = self.delay
         parameters['FREQUENCY'] = self.frequency
         parameters['SYNCHRONIZE'] = self.synchronize
