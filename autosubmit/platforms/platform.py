@@ -331,7 +331,7 @@ class Platform(object):
                                 if job_tmp.section not in error_msg:
                                     error_msg += job_tmp.section + "&"
                             if e.message.lower().find("bad parameters") != -1:
-                                error_message += "\ncheck job and queue specified in jobs.conf. Sections that could be affected: {0}".format(
+                                error_message += "\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {0}".format(
                                     error_msg[:-1])
                             else:
                                 error_message += "\ncheck that {1} platform has set the correct scheduler. Sections that could be affected: {0}".format(

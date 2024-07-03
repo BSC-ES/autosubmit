@@ -172,7 +172,7 @@ class ParamikoPlatform(Platform):
                     pass
                 retry += 1
             if not self.connected:
-                trace = 'Can not create ssh or sftp connection to {0}: Connection could not be established to platform {1}\n Please, check your expid platform.conf to see if there are mistakes in the configuration\n Also Ensure that the login node listed on HOST parameter is available(try to connect via ssh on a terminal)\n Also you can put more than one host using a comma as separator'.format(
+                trace = 'Can not create ssh or sftp connection to {0}: Connection could not be established to platform {1}\n Please, check your expid on the PLATFORMS definition in YAML to see if there are mistakes in the configuration\n Also Ensure that the login node listed on HOST parameter is available(try to connect via ssh on a terminal)\n Also you can put more than one host using a comma as separator'.format(
                     self.host, self.name)
                 raise AutosubmitCritical(
                     'Experiment cant no continue without unexpected behaviour, Stopping Autosubmit', 7050, trace)
@@ -322,7 +322,7 @@ class ParamikoPlatform(Platform):
         except BaseException as e:
             self.connected = False
             if "Authentication failed." in str(e):
-                raise AutosubmitCritical("Authentication Failed, please check the platform.conf of {0}".format(
+                raise AutosubmitCritical("Authentication Failed, please check the definition of PLATFORMS in YAML of {0}".format(
                     self._host_config['hostname']), 7050, str(e))
             if not reconnect and "," in self._host_config['hostname']:
                 self.restore_connection(as_conf)
@@ -466,7 +466,7 @@ class ParamikoPlatform(Platform):
                 os.path.join(self.get_files_path(), filename)))
             if str(e).lower().find("garbage") != -1:
                 raise AutosubmitCritical(
-                    "Wrong User or invalid .ssh/config. Or invalid user in platform.conf or public key not set ", 7051, str(e))
+                    "Wrong User or invalid .ssh/config. Or invalid user in the definition of PLATFORMS in YAML or public key not set ", 7051, str(e))
 
     def move_file(self, src, dest, must_exist=False):
         """

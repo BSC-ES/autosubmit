@@ -215,7 +215,7 @@ class ParamikoSubmitter(Submitter):
 
                 platforms[section] = remote_platform
             except Exception as e:
-                raise_message = "Error in platform.conf: SCRATCH_DIR, PROJECT, USER, EXPID must be defined for platform {0}".format(section)
+                raise_message = "Error in the definition of PLATFORM in YAML: SCRATCH_DIR, PROJECT, USER, EXPID must be defined for platform {0}".format(section)
             # Executes update_cmds() from corresponding Platform Object
             # Save platform into result dictionary
 

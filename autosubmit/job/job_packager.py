@@ -325,7 +325,7 @@ class JobPackager(object):
     def error_message_policy(self,min_h,min_v,wrapper_limits,wallclock_sum,balanced):
         message = f"Wrapper couldn't be formed under {self.wrapper_policy[self.current_wrapper_section]} POLICY due minimum limit not being reached: [wrappable:{wrapper_limits['min']} < defined_min:{min_h*min_v}] [wrappable_h:{min_h} < defined_min_h:{wrapper_limits['min_h']}]|[wrappeable_v:{min_v} < defined_min_v:{wrapper_limits['min_v']}] "
         if min_v > 1:
-            message += f"\nCheck your configuration: Check if current {wallclock_sum} vertical wallclock has reached the max defined on platforms.conf."
+            message += f"\nCheck your configuration: Check if current {wallclock_sum} vertical wallclock has reached the max defined on PLATFORMS definition in YAML."
         else:
             message += "\nCheck your configuration: Only jobs_in_wrappers are active, check your jobs_in_wrapper dependencies."
         if not balanced:

@@ -135,7 +135,7 @@ class SlurmPlatform(ParamikoPlatform):
                                 if job_tmp.section not in error_msg:
                                     error_msg += job_tmp.section + "&"
                         if has_trace_bad_parameters:
-                            error_message+="Check job and queue specified in jobs.conf. Sections that could be affected: {0}".format(error_msg[:-1])
+                            error_message+="Check job and queue specified in your JOBS definition in YAML. Sections that could be affected: {0}".format(error_msg[:-1])
                         else:
                             error_message+="\ncheck that {1} platform has set the correct scheduler. Sections that could be affected: {0}".format(
                                     error_msg[:-1], self.name)

@@ -318,7 +318,7 @@ class JobList(object):
                     self._ordered_jobs_by_date_member[wrapper_section] = {}
             except BaseException as e:
                 raise AutosubmitCritical(
-                    "Some section jobs of the wrapper:{0} are not in the current job_list defined in jobs.conf".format(
+                    "Some section jobs of the wrapper:{0} are missing from your JOBS definition in YAML".format(
                         wrapper_section), 7014, str(e))
         # divide job_list per platform name
         job_list_per_platform = self.split_by_platform()
