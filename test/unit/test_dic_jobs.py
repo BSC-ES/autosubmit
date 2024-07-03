@@ -206,9 +206,9 @@ class TestDicJobs(TestCase):
         chunk = 2
         # act
         section_data = []
-        self.dictionary.build_job(section, priority, date, member, chunk, Type.BASH,section_data)
+        self.dictionary.build_job(section, priority, date, member, chunk,Type.BASH,section_data,splits=1)
         section = 'fake-section2'
-        self.dictionary.build_job(section, priority, date, member, chunk, Type.BASH,section_data)
+        self.dictionary.build_job(section, priority, date, member, chunk, Type.BASH,section_data,splits=1)
         # assert
         self.assertEqual(Status.WAITING, section_data[0].status)
         self.assertEqual(Status.RUNNING, section_data[1].status)

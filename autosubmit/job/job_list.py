@@ -165,7 +165,7 @@ class JobList(object):
     @staticmethod
     def check_split_set_to_auto(as_conf):
         # If this is true, the workflow needs to be recreated on create
-        for job_name, values in as_conf.experiment_data["JOBS"].items():
+        for job_name, values in as_conf.experiment_data.get("JOBS",{}).items():
             if values.get("SPLITS", None) == "auto":
                 return True
         return False
@@ -855,7 +855,7 @@ class JobList(object):
             if "," in filter_to[filter_type][0]:
                 filter_to[filter_type] = filter_to[filter_type][1:]
 
-    def _unify_to_filters(self, filter_to_apply, splits):
+    def _unify_to_filters(self, filter_to_apply, splits = None):
         """
         Unify all filter_to filters into a single dictionary ( of current selection )
         :param filter_to_apply: Filters to apply

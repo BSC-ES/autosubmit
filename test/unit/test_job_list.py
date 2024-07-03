@@ -304,7 +304,7 @@ class TestJobList(TestCase):
         parameters = {'fake-key': 'fake-value',
                       'fake-key2': 'fake-value2'}
         graph = networkx.DiGraph()
-        as_conf = Mock()
+        as_conf = MagicMock()
         job_list.graph = graph
         # act
         job_list.generate(
@@ -374,7 +374,7 @@ class TestJobList(TestCase):
         parameters = {'fake-key': 'fake-value',
                       'fake-key2': 'fake-value2'}
         graph = networkx.DiGraph()
-        as_conf = Mock()
+        as_conf = MagicMock()
         job_list.graph = graph
         # act
         job_list.generate(

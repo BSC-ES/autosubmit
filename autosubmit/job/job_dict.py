@@ -620,7 +620,7 @@ class DicJobs:
                     jobs.append(dic[c])
         return jobs
 
-    def build_job(self, section, priority, date, member, chunk, default_job_type, section_data, splits, split=-1):
+    def build_job(self, section, priority, date, member, chunk, default_job_type, section_data, splits=1, split=-1):
         name = self.experiment_data.get("DEFAULT", {}).get("EXPID", "")
         if date:
             name += "_" + date2str(date, self._date_format)
