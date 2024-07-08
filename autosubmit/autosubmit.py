@@ -2626,14 +2626,18 @@ class Autosubmit:
                 expid, as_conf, notransitive=notransitive, monitor=True, new=False)
             Log.debug("Job list restored from {0} files", pkl_dir)
         except AutosubmitError as e:
-            raise AutosubmitCritical(e.message, e.code, e.trace)
-        except AutosubmitCritical as e:
-            raise
-        except BaseException as e:
-            raise
-        finally:
             if profile:
                 profiler.stop()
+            raise AutosubmitCritical(e.message, e.code, e.trace)
+        except AutosubmitCritical as e:
+            if profile:
+                profiler.stop()
+            raise
+        except BaseException as e:
+            if profile:
+                profiler.stop()
+            raise
+
         try:
             jobs = []
             if not isinstance(job_list, type([])):
@@ -2691,10 +2695,9 @@ class Autosubmit:
                 else:
                     jobs = job_list.get_job_list()
         except BaseException as e:
-            raise AutosubmitCritical("Issues during the job_list generation. Maybe due I/O error", 7040, str(e))
-        finally:
             if profile:
                 profiler.stop()
+            raise AutosubmitCritical("Issues during the job_list generation. Maybe due I/O error", 7040, str(e))
 
         # WRAPPERS
         try:
@@ -2719,10 +2722,9 @@ class Autosubmit:
                 packages = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
                                                  "job_packages_" + expid).load()
         except BaseException as e:
-            raise AutosubmitCritical("Issues during the wrapper loading, may be related to IO issues", 7040, str(e))
-        finally:
             if profile:
                 profiler.stop()
+            raise AutosubmitCritical("Issues during the wrapper loading, may be related to IO issues", 7040, str(e))
 
         groups_dict = dict()
         try:
@@ -2736,12 +2738,11 @@ class Autosubmit:
                     jobs), job_list, expand_list=expand, expanded_status=status)
                 groups_dict = job_grouping.group_jobs()
         except BaseException as e:
+            if profile:
+                profiler.stop()
             raise AutosubmitCritical(
                 "Jobs can't be grouped, perhaps you're using an invalid format. Take a look into readthedocs", 7011,
                 str(e))
-        finally:
-            if profile:
-                profiler.stop()
 
         monitor_exp = Monitor()
         try:

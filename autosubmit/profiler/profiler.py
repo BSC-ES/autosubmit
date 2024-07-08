@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2015-2023 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2024 Earth Sciences Department, BSC-CNS
 
 # This file is part of Autosubmit.
 
@@ -21,6 +21,7 @@ import cProfile
 import io
 import os
 import pstats
+from enum import Enum
 from datetime import datetime
 from pathlib import Path
 from pstats import SortKey
@@ -33,6 +34,11 @@ from log.log import Log, AutosubmitCritical
 
 _UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
 
+class ProfilerState(Enum):
+    """Enumeration of profiler states"""
+    STOPPED = "stopped"
+    STARTED = "started"
+
 class Profiler:
     """Class to profile the execution of experiments."""
 
@@ -44,28 +50,47 @@ class Profiler:
         self._mem_init = 0
         self._mem_final = 0
 
-        # Error handling flags
-        self._started = False
-        self._finished = False
+        # Error handling
+        self._state = ProfilerState.STOPPED
+
+    @property
+    def started(self):
+        """
+        Check if the profiler is in the started state.
+
+        Returns:
+            bool: True if the profiler is in the started state, False otherwise.
+        """
+        return self._state == ProfilerState.STARTED
+
+    @property
+    def stopped(self):
+        """
+        Check if the profiler is in the stopped state.
+
+        Returns:
+            bool: True if the profiler is in the stopped state, False otherwise.
+        """
+        return self._state == ProfilerState.STOPPED
 
     def start(self) -> None:
         """Function to start the profiling process."""
-        if self._started:
+        if self.started:
             raise AutosubmitCritical('The profiling process was already started.', 7074)
 
-        self._started = True
+        self._state = ProfilerState.STARTED
         self._profiler.enable()
         self._mem_init += _get_current_memory()
 
     def stop(self) -> None:
         """Function to finish the profiling process."""
-        if not self._started or self._finished:
-            raise AutosubmitCritical('Cannot stop the profiler because was not running.', 7074)
+        if not self.started or self.stopped:
+            raise AutosubmitCritical('Cannot stop the profiler because it was not running.', 7074)
 
         self._profiler.disable()
         self._mem_final += _get_current_memory()
         self._report()
-        self._finished = True
+        self._state = ProfilerState.STOPPED
 
     def _report(self) -> None:
         """Function to print the final report into the stdout, log and filesystem."""
@@ -127,7 +152,6 @@ def _generate_title(title="") -> str:
     separator = "=" * max_len
     message = title.center(max_len)
     return "\n".join([separator, message, separator])
-
 
 def _get_current_memory() -> int:
     """

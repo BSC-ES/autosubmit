@@ -1,48 +1,51 @@
-from unittest import TestCase, mock
+import pytest
 from autosubmit.profiler.profiler import Profiler
 from log.log import AutosubmitCritical
 
+@pytest.fixture
+def profiler():
+    """ Creates a profiler object and yields it to the test. """
+    yield Profiler("a000")
 
-class TestProfiler(TestCase):
-    def setUp(self):
-        self.profiler = Profiler("a000")
+# Black box techniques for status machine based software
+#
+#   O--->__init__----> start
+#                           |
+#                           |
+#                         stop (----> report) --->0
 
-    # Black box techniques for status machine based software
-    #
-    #   O---->__init__------> start
-    #                           |
-    #                           |
-    #                         stop ----> report --->0
+# Transition coverage
+def test_transitions(profiler):
+    # __init__ -> start
+    profiler.start()
 
-    # Transition coverage
-    def test_transitions(self):
-        # __init__ -> start
-        self.profiler.start()
+    # start -> stop
+    profiler.stop()
 
-        # start -> stop
-        self.profiler.stop()
+def test_transitions_fail_cases(profiler):
+    # __init__ -> stop
+    with pytest.raises(AutosubmitCritical):
+        profiler.stop()
 
-    def test_transitions_fail_cases(self):
-        # __init__ -> stop
-        self.assertRaises(AutosubmitCritical, self.profiler.stop)
+    # start -> start
+    profiler.start()
+    with pytest.raises(AutosubmitCritical):
+        profiler.start()
 
-        # start -> start
-        self.profiler.start()
-        self.assertRaises(AutosubmitCritical, self.profiler.start)
+    # stop -> stop
+    profiler.stop()
+    with pytest.raises(AutosubmitCritical):
+        profiler.stop()
 
-        # stop -> stop
-        self.profiler.stop()
-        self.assertRaises(AutosubmitCritical, self.profiler.stop)
+# White box tests
+def test_writing_permission_check_fails(profiler, mocker):
+    mocker.patch("os.access", return_value=False)
 
-    # White box tests
-    @mock.patch("os.access")
-    def test_writing_permission_check_fails(self, mock_response):
-        mock_response.return_value = False
+    profiler.start()
+    with pytest.raises(AutosubmitCritical):
+        profiler.stop()
 
-        self.profiler.start()
-        self.assertRaises(AutosubmitCritical, self.profiler.stop)
-
-    def test_memory_profiling_loop(self):
-        self.profiler.start()
-        bytearray(1024*1024)
-        self.profiler.stop()
+def test_memory_profiling_loop(profiler):
+    profiler.start()
+    bytearray(1024*1024)
+    profiler.stop()
