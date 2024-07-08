@@ -442,6 +442,7 @@ class JobList(object):
                     self.graph.nodes.get(job.name)["job"] = job
                 if dependencies and changes:
                     job = self.graph.nodes.get(job.name)['job']
+                    ## Adds the dependencies to the job, and if not possible, adds the job to the problematic_dependencies
                     problematic_dependencies = self._manage_job_dependencies(dic_jobs, job, date_list, member_list, chunk_list,
                                                   dependencies_keys,
                                                   dependencies, self.graph)
@@ -1080,7 +1081,7 @@ class JobList(object):
                     elif not self.actual_job_depends_on_previous_chunk:
                         graph.add_edge(parent.name, job.name)
                     elif not self.actual_job_depends_on_special_chunk and self.actual_job_depends_on_previous_chunk:
-                        if job.running == "chunk" and job.chunk == 1:
+                        if job.running == "chunk" and job.chunk == 1 or job.running == "member" and parent.running == "member" or job.running == "chunk" and parent.running == "chunk":
                             graph.add_edge(parent.name, job.name)
             else:
                 if job.section == parent.section:
@@ -1221,7 +1222,7 @@ class JobList(object):
         :param graph: Graph
         :return: problematic_dependencies
         """
-        # self.depends_on_previous_chunk = dict()
+        # Initialize variables
         depends_on_previous_section = set()
         distances_of_current_section = {}
         distances_of_current_section_member = {}
@@ -1328,6 +1329,7 @@ class JobList(object):
                 if aux_key in distances_of_current_section_member:
                     if distance > distances_of_current_section_member[aux_key]:
                         distances_of_current_section_member[aux_key] = distance
+        ### Adding the dependency to the graph if possible
         sections_to_calculate = [key for key in dependencies_keys_aux if key not in dependencies_to_del]
         natural_sections = list()
         # Parse first sections with special filters if any
@@ -1344,6 +1346,7 @@ class JobList(object):
             filters_to_apply.pop("FROM_STEP", None)
             if len(filters_to_apply) > 0:
                 dependencies_of_that_section = dic_jobs.as_conf.jobs_data[dependency.section].get("DEPENDENCIES", {})
+                ## Adds the dependencies to the job, and if not possible, adds the job to the problematic_dependencies
                 special_dependencies, problematic_dependencies = self._calculate_filter_dependencies(filters_to_apply, dic_jobs, job, dependency, date, member, chunk,
                                                   graph,
                                                   dependencies_keys_without_special_chars,
@@ -1372,7 +1375,7 @@ class JobList(object):
                     key_aux_stripped = key_aux_stripped.split("+")[0]
 
                 dependencies_of_that_section.append(key_aux_stripped)
-
+            ## Adds the dependencies to the job, and if not possible, adds the job to the problematic_dependencies
             problematic_dependencies = self._calculate_natural_dependencies(dic_jobs, job, dependency, date,
                                                member, chunk, graph,
                                                dependencies_keys_without_special_chars,
