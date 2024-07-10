@@ -9,7 +9,7 @@ import os
 import pwd
 from log.log import AutosubmitCritical
 
-from test.unit.utils.common import create_database, generate_expid
+from test.unit.utils.common import create_database, init_expid
 
 
 class TestMigrate:
@@ -53,7 +53,7 @@ path = {folder}
         os.environ['AUTOSUBMIT_CONFIGURATION'] = str(folder.join('autosubmitrc'))
         create_database(str(folder.join('autosubmitrc')))
         assert "tests.db" in [Path(f).name for f in folder.listdir()]
-        generate_expid(str(folder.join('autosubmitrc')), platform='pytest-local')
+        init_expid(str(folder.join('autosubmitrc')), platform='pytest-local',create=False)
         assert "t000" in [Path(f).name for f in folder.listdir()]
         return folder
 

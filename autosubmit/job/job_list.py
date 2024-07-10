@@ -1879,7 +1879,7 @@ class JobList(object):
         """
         unsubmitted = [job for job in self._job_list if (platform is None or job.platform.name == platform.name) and
                        (
-                               job.status != Status.SUBMITTED and job.status != Status.QUEUING and job.status == Status.RUNNING and job.status == Status.COMPLETED)]
+                               job.status != Status.SUBMITTED and job.status != Status.QUEUING and job.status != Status.RUNNING)]
 
         if wrapper:
             return [job for job in unsubmitted if job.packed is False]

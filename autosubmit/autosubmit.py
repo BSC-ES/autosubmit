@@ -1473,6 +1473,7 @@ class Autosubmit:
          :rtype: bool
          """
         try:
+            Log.info(f"Inspecting experiment {expid}")
             Autosubmit._check_ownership(expid, raise_error=True)
             exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
             tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
