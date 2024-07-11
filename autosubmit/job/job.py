@@ -143,7 +143,7 @@ class Job(object):
     # This is crashing the code
     # I added it for the assertions of unit testing... since job obj != job obj when it was saved & load
     # since it points to another section of the memory.
-    # Unfortunatelly, this is crashing the code everywhere else
+    # Unfortunately, this is crashing the code everywhere else
 
     # def __eq__(self, other):
     #     return self.name == other.name and self.id == other.id

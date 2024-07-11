@@ -28,7 +28,7 @@ Command list
 * test  Test experiment
 * testcase  Test case experiment
 * monitor  Plot specified experiment
-* stats  Plot statistics for specified experiment
+* stats  Plot statistics and summaries for specified experiment
 * setstatus  Sets job status for an experiment
 * recovery  Recover specified experiment
 * clean  Clean specified experiment

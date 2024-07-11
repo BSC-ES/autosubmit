@@ -37,20 +37,64 @@ from autosubmit.job.job import Job
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
+from autosubmit.monitor.diagram import create_stats_report
 from log.log import Log, AutosubmitCritical
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
-from .diagram import create_bar_diagram
 from typing import Dict, List
 
 GENERAL_STATS_OPTION_MAX_LENGTH = 1000
 
+
+def _display_file_xdg(a_file: str) -> None:
+    """Displays the PDF for the user.
+
+    Tries to use the X Desktop Group tool ``xdg-open``. If that fails,
+    it fallbacks to ``mimeopen``. If this latter fails too, then it
+    propagates the possible ``subprocess.CalledProcessError`` exception,
+    or another exception or error raised.
+
+    :param a_file: A file to be displayed.
+    :type a_file: str
+    :return: Nothing.
+    :rtype: None
+    :raises subprocess.CalledProcessError: raised by ``subprocess.check_output`` of
+        either ``xdg-open`` or ``mimeopen``.
+    """
+    try:
+        subprocess.check_output(["xdg-open", a_file])
+    except subprocess.CalledProcessError:
+        subprocess.check_output(["mimeopen", a_file])
+
+
+def _display_file(a_file: str):
+    """Display a file for the user.
+
+    The file is displayed using the user preferred application.
+    This is achieved first checking if the user is on Linux or
+    not. If not, we try to use ``open``.
+
+    If ``open`` fails, then we try the same approach used on
+    Linux (maybe it is not macOS nor windows?).
+
+    But, if the user is already on Linux, then we simply call
+    ``xdg-open``. And if ``xdg-open`` fails, we still fallback
+    to ``mimeopen``.
+    """
+    if sys.platform != "linux":
+        try:
+            subprocess.check_output(["open", a_file])
+        except subprocess.CalledProcessError:
+            _display_file_xdg(a_file)
+    else:
+        _display_file_xdg(a_file)
+
+
 class Monitor:
     """Class to handle monitoring of Jobs at HPC."""
     _table = dict([(Status.UNKNOWN, 'white'), (Status.WAITING, 'gray'), (Status.READY, 'lightblue'), (Status.PREPARED, 'skyblue'),
-                   (Status.SUBMITTED, 'cyan'), (Status.HELD,
-                                                'salmon'), (Status.QUEUING, 'pink'), (Status.RUNNING, 'green'),
-                   (Status.COMPLETED, 'yellow'), (Status.FAILED, 'red'), (Status.DELAYED,'lightcyan') ,(Status.SUSPENDED, 'orange'), (Status.SKIPPED, 'lightyellow')])
+         (Status.SUBMITTED, 'cyan'), (Status.HELD, 'salmon'), (Status.QUEUING, 'pink'), (Status.RUNNING, 'green'), (Status.COMPLETED, 'yellow'), (Status.FAILED, 'red'), (Status.DELAYED, 'lightcyan'),
+         (Status.SUSPENDED, 'orange'), (Status.SKIPPED, 'lightyellow')])
 
     def __init__(self):
         self.nodes_plotted = None
@@ -286,7 +330,7 @@ class Monitor:
                         if color:
                             # label = None doesn't disable label, instead it sets it to nothing and complain about invalid syntax
                             if label:
-                                exp.add_edge(pydotplus.Edge(node_job, node_child,style="dashed",color=color,label=label))
+                                exp.add_edge(pydotplus.Edge(node_job, node_child, style="dashed", color=color, label=label))
                             else:
                                 exp.add_edge(pydotplus.Edge(node_job, node_child,style="dashed",color=color))
                         else:
@@ -424,7 +468,6 @@ class Monitor:
 
             Log.printlog("{0}\nSpecified output doesn't have an available viewer installed or graphviz is not installed. The output was only written in txt".format(message),7014)
 
-
     def generate_output_txt(self, expid, joblist, path, classictxt=False, job_list_object=None):
         """
         Function that generates a representation of the jobs in a txt file
@@ -488,8 +531,9 @@ class Monitor:
                 self.write_output_txt_recursive(
                     child, output_file, "_" + level, path)
 
-    def generate_output_stats(self, expid, joblist, output_format="pdf", period_ini=None, period_fi=None, show=False, queue_time_fixes=None):
-        # type: (str, List[Job], str, datetime.datetime, datetime.datetime, bool, Dict[str, int]) -> None
+    def generate_output_stats(self, expid, joblist, output_format="pdf", section_summary=False, jobs_summary=False, hide=False, period_ini=None, period_fi=None,
+                              show=False, queue_time_fixes=None):
+        # type: (str, List[Job], str, bool, bool, bool, datetime.datetime, datetime.datetime, bool, Dict[str, int]) -> None
         """
         Plots stats for joblist and stores it in a file
 
@@ -500,56 +544,54 @@ class Monitor:
         :type joblist: JobList
         :param output_format: file format for plot
         :type output_format: str (png, pdf, ps)
+        :param section_summary: if true, will plot a summary of the experiment
+        :type section_summary: bool
+        :param jobs_summary: if true, will plot a list of jobs summary
+        :type jobs_summary: bool
+        :param hide: if true, will hide the plot
+        :type hide: bool
         :param period_ini: initial datetime of filtered period
         :type period_ini: datetime
         :param period_fi: final datetime of filtered period
         :type period_fi: datetime
-        :param show: if true, will open the new plot with the default viewer
+        :param show: if true, will open the new plot(s) with the default viewer
         :type show: bool
         """
         Log.info('Creating stats file')
         is_owner, is_eadmin, _ = HelperUtils.check_experiment_ownership(expid, BasicConfig, raise_error=False, logger=Log)
         now = time.localtime()
-        output_date = time.strftime("%Y%m%d_%H%M", now)
+        output_date = time.strftime("%Y%m%d_%H%M%S", now)
         output_filename = "{}_statistics_{}.{}".format(expid, output_date, output_format)
-        output_complete_path = os.path.join(BasicConfig.DEFAULT_OUTPUT_DIR, output_filename)
-        is_default_path = True 
+        output_complete_path_stats = os.path.join(BasicConfig.DEFAULT_OUTPUT_DIR, output_filename)
+        is_default_path = True
         if is_owner or is_eadmin:
             HUtils.create_path_if_not_exists_group_permission(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "stats"))
-            output_complete_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "stats", output_filename)
+            output_complete_path_stats = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "stats", output_filename)
             is_default_path = False
         else:
             if os.path.exists(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "stats")) and os.access(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "stats"), os.W_OK):
-                output_complete_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "stats", output_filename)
+                output_complete_path_stats = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "stats", output_filename)
                 is_default_path = False
             elif os.path.exists(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_TMP_DIR)) and os.access(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_TMP_DIR), os.W_OK):
-                    output_complete_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_TMP_DIR, output_filename)
-                    is_default_path = False
+                output_complete_path_stats = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_TMP_DIR,
+                                                          output_filename)
+                is_default_path = False
         if is_default_path:
             Log.info("You don't have enough permissions to the experiment's ({}) folder. The output file will be created in the default location: {}".format(expid, BasicConfig.DEFAULT_OUTPUT_DIR))
-            HUtils.create_path_if_not_exists_group_permission(BasicConfig.DEFAULT_OUTPUT_DIR)                
+            HUtils.create_path_if_not_exists_group_permission(BasicConfig.DEFAULT_OUTPUT_DIR)
 
-        show = create_bar_diagram(expid, joblist, self.get_general_stats(expid), output_complete_path, period_ini, period_fi, queue_time_fixes)
-        Log.result('Stats created at {0}', output_complete_path)
-        if show:
+        stats_report = create_stats_report(
+            expid, joblist, self.get_general_stats(expid), str(output_complete_path_stats),
+            section_summary, jobs_summary, hide, period_ini, period_fi, queue_time_fixes
+        )
+        if stats_report.show:
             try:
-                if sys.platform != "linux":
-                    try:
-                        subprocess.check_output(["open", output_complete_path])
-                    except Exception as e:
-                        try:
-                            subprocess.check_output(["xdg-open", output_complete_path])
-                        except Exception as e:
-                            subprocess.check_output(["mimeopen", output_complete_path])
-                else:
-                    try:
-                        subprocess.check_output(["xdg-open", output_complete_path])
-                    except Exception as e:
-                        subprocess.check_output(["mimeopen", output_complete_path])
-
+                for report_file in stats_report.report_files():
+                    _display_file(report_file)
             except subprocess.CalledProcessError:
-                Log.printlog('File {0} could not be opened, only the txt option will show'.format(output_complete_path), 7068)
-
+                Log.printlog(
+                    'File {0} could not be opened, only the txt option will show'.format(output_complete_path_stats),
+                    7068)
 
     @staticmethod
     def clean_plot(expid):
@@ -594,7 +636,7 @@ class Monitor:
 
     @staticmethod
     def get_general_stats(expid):
-        # type: (str) -> List[str]
+        # type: (str) -> List
         """
         Returns all the options in the sections of the %expid%_GENERAL_STATS. Options with values larger than GENERAL_STATS_OPTION_MAX_LENGTH characters are not added.
 

@@ -311,6 +311,10 @@ class Autosubmit:
                                                                             'in number of hours back')
             subparser.add_argument('-o', '--output', choices=('pdf', 'png', 'ps', 'svg'), default='pdf',
                                    help='type of output for generated plot')
+            subparser.add_argument('--section_summary', action='store_true', default=False,
+                                   help='Includes section summary in the plot')
+            subparser.add_argument('--jobs_summary', action='store_true', default=False,
+                                   help='Includes jobs summary in the plot')
             subparser.add_argument('--hide', action='store_true', default=False,
                                    help='hides plot window')
             subparser.add_argument('-nt', '--notransitive', action='store_true',
@@ -715,8 +719,8 @@ class Autosubmit:
                                       args.expand_status, args.hide_groups, args.notransitive, args.check_wrapper,
                                       args.txt_logfiles, args.profile, detail=False)
         elif args.command == 'stats':
-            return Autosubmit.statistics(args.expid, args.filter_type, args.filter_period, args.output, args.hide,
-                                         args.notransitive, args.database)
+            return Autosubmit.statistics(args.expid, args.filter_type, args.filter_period, args.output,
+                                         args.section_summary, args.jobs_summary, args.hide, args.notransitive, args.database)
         elif args.command == 'clean':
             return Autosubmit.clean(args.expid, args.project, args.plot, args.stats)
         elif args.command == 'recovery':
@@ -2781,7 +2785,7 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def statistics(expid, filter_type, filter_period, file_format, hide, notransitive=False, db = False):
+    def statistics(expid, filter_type, filter_period, file_format, section_summary, jobs_summary, hide, notransitive=False, db = False):
         """
         Plots statistics graph for a given experiment.
         Plot is created in experiment's plot folder with name <expid>_<date>_<time>.<file_format>
@@ -2792,6 +2796,10 @@ class Autosubmit:
         :param filter_type: type of the jobs to plot
         :param filter_period: period to plot
         :param file_format: plot's file format. It can be pdf, png, ps or svg
+        :param section_summary: shows summary statistics
+        :type section_summary: bool
+        :param jobs_summary: shows jobs statistics
+        :type jobs_summary: bool
         :param hide: hides plot window
         :type hide: bool
         :param notransitive: Reduces workflow linkage complexity
@@ -2805,7 +2813,7 @@ class Autosubmit:
             as_conf.check_conf_files(False)
 
             pkl_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl')
-            job_list = Autosubmit.load_job_list(expid, as_conf, notransitive=notransitive)
+            job_list = Autosubmit.load_job_list(expid, as_conf, notransitive=notransitive, new=False)
             for job in job_list.get_job_list():
                 job._init_runtime_parameters()
                 job.update_dict_parameters(as_conf)
@@ -2839,7 +2847,7 @@ class Autosubmit:
                     Log.info("Plotting stats...")
                     monitor_exp = Monitor()
                     # noinspection PyTypeChecker
-                    monitor_exp.generate_output_stats(expid, jobs, file_format, period_ini, period_fi, not hide,
+                    monitor_exp.generate_output_stats(expid, jobs, file_format, section_summary, jobs_summary, not hide, period_ini, period_fi, not hide,
                                                       queue_time_fixes)
                     Log.result("Stats plot ready")
                 except Exception as e:
