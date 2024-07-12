@@ -22,17 +22,17 @@ def test_describe(
         input_experiment_list,
         get_from_user,
         not_described,
-        autosubmit_exp: Callable,
+        create_autosubmit_exp: Callable,
         create_as_conf: Callable,
         mocker: MockerFixture) -> None:
-    Log = mocker.patch('autosubmit.autosubmit.Log')
+    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
 
     exp = None
     expids = input_experiment_list.replace(',', ' ').split(' ')
     for expid in expids:
         if expid not in _EXPIDS:
             continue
-        exp = autosubmit_exp(expid)
+        exp = create_autosubmit_exp(expid)
 
         basic_config = mocker.MagicMock()
         config_values = {
@@ -41,7 +41,7 @@ def test_describe(
         }
         for key, value in config_values.items():
             basic_config.__setattr__(key, value)
-        basic_config.get.side_effect = lambda key, default='': config_values.get(key, default)
+        basic_config.get.side_effect = lambda key_, default='': config_values.get(key_, default)
         for basic_config_location in [
             'autosubmit.autosubmit.BasicConfig',
             'autosubmitconfigparser.config.configcommon.BasicConfig'
@@ -76,11 +76,11 @@ def test_describe(
 
     # Log.printlog is only called when an experiment is not described
     # TODO: We could re-design the class to make this behaviour clearer.
-    assert Log.printlog.call_count == (1 if not_described else 0)
+    assert mocked_log.printlog.call_count == (1 if not_described else 0)
 
     if exp and not not_described:
         log_result_output = [
-            line_tuple.args[0].format(line_tuple.args[1]) for line_tuple in Log.result.mock_calls
+            line_tuple.args[0].format(line_tuple.args[1]) for line_tuple in mocked_log.result.mock_calls
         ]
         root_dir = exp.exp_path.parent
         for expid in expids:

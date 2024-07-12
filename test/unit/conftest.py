@@ -1,19 +1,22 @@
-# Fixtures available to multiple test files must be created in this file.
 from contextlib import suppress
-
-import pytest
 from dataclasses import dataclass
 from pathlib import Path
-from ruamel.yaml import YAML
-from shutil import rmtree
 from tempfile import TemporaryDirectory
-from typing import Any, Dict, Callable, List, Protocol, Optional
+from typing import Any, Dict, Callable, List, Protocol, Optional, TYPE_CHECKING
 
-from autosubmit.autosubmit import Autosubmit
-from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
+import pytest
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from ruamel.yaml import YAML
+
+from autosubmit.autosubmit import Autosubmit
+from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
+
+if TYPE_CHECKING:
+    import pytest_mock
+
+"""Fixtures available to multiple Autosubmit tests."""
 
 
 @dataclass
@@ -28,15 +31,19 @@ class AutosubmitExperiment:
     platform: ParamikoPlatform
 
 
+class AutosubmitExperimentFactory(Protocol):
+    def __call__(self, expid: str) -> AutosubmitExperiment: ...
+
+
 @pytest.fixture(scope='function')
-def autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> Callable:
+def create_autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> AutosubmitExperimentFactory:
     """Create an instance of ``Autosubmit`` with an experiment."""
 
     original_root_dir = BasicConfig.LOCAL_ROOT_DIR
     tmp_dir = TemporaryDirectory()
     tmp_path = Path(tmp_dir.name)
 
-    def _create_autosubmit_exp(expid: str):
+    def _create_autosubmit_exp(expid: str) -> AutosubmitExperiment:
         # directories used when searching for logs to cat
         root_dir = tmp_path
         BasicConfig.LOCAL_ROOT_DIR = str(root_dir)
@@ -75,7 +82,7 @@ def autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> Ca
     def finalizer():
         BasicConfig.LOCAL_ROOT_DIR = original_root_dir
         if tmp_path and tmp_path.exists():
-            rmtree(tmp_path)
+            tmp_dir.cleanup()
 
     request.addfinalizer(finalizer)
 
@@ -118,7 +125,8 @@ def create_as_conf() -> Callable:  # May need to be changed to use the autosubmi
     return _create_as_conf
 
 
-class AutosubmitConfigFactory(Protocol):  # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
+class AutosubmitConfigFactory(Protocol):
+    """Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf."""
 
     def __call__(self, expid: str, experiment_data: Optional[Dict], *args: Any, **kwargs: Any) -> AutosubmitConfig: ...
 
@@ -173,7 +181,7 @@ def autosubmit_config(
     def finalizer() -> None:
         BasicConfig.LOCAL_ROOT_DIR = original_root_dir
         with suppress(FileNotFoundError):
-            rmtree(tmp_path)
+            tmp_dir.cleanup()
 
     request.addfinalizer(finalizer)
 
