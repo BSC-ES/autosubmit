@@ -4651,7 +4651,7 @@ class Autosubmit:
         :return: True if successful, False if not
         :rtype: bool
         """
-
+        Log.info(" **** INSIDE _copy_code")
         project_destination = as_conf.get_project_destination()
         if project_destination is None or len(project_destination) == 0:
             if project_type.lower() != "none":
@@ -4704,16 +4704,25 @@ class Autosubmit:
             Log.debug("{0}", output)
 
         elif project_type == "local":
+            Log.info(" **** project_type : local")
             local_project_path = as_conf.get_local_project_path()
             if local_project_path is None or len(local_project_path) == 0:
                 raise AutosubmitCritical("Empty project path! please change this parameter to a valid one.", 7014)
+            ### check if local_project_path is a valid path
+            if not Path(local_project_path).is_dir():
+                raise AutosubmitCritical("Local project path is not a valid path and/or it doesnt exist.", 7014)
+            ###
             project_path = os.path.join(
                 BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_PROJ_DIR)
             local_destination = os.path.join(project_path, project_destination)
+            
+            Log.info(" **** project_type : local check vars: \n{0} - local_project_path (as_conf)\n{2} - project_path (basic config) \n{3} - project_destination (as_conf.get_project_destination)\n{1} - local_destination (project_path + project_destination)\n\n",local_project_path,local_destination,project_path,project_destination)
 
             if os.path.exists(project_path):
+                Log.info(" **** if path exist: project path")
                 Log.info("Using project folder: {0}", project_path)
                 if os.path.exists(local_destination):
+                    Log.info(" **** if path exist: local destination")
                     if force:
                         try:
                             cmd = ["rsync -ach --info=progress2 " +
@@ -4723,8 +4732,11 @@ class Autosubmit:
                             raise AutosubmitCritical(f"Can not rsync {local_project_path} into {project_path}."
                                                      f" Exiting...", 7063)
                 else:
-                    os.mkdir(local_destination)
+                    Log.info(" **** else path exist: local destination")
+                    # os.makedirs(local_destination) #to create intermediate dirs            #os.mkdir(local_destination)
+                    Path(local_destination).mkdir(parents=True)     #this will create parents dirs if its needed
                     try:
+                        Log.info(" **** try cp -R {0} & {1}",local_project_path, local_destination)
                         output = subprocess.check_output(
                             "cp -R " + local_project_path + "/* " + local_destination, shell=True)
                     except subprocess.CalledProcessError:
@@ -4735,13 +4747,16 @@ class Autosubmit:
                         raise AutosubmitCritical(f"Can not copy {local_project_path} into {project_path}."
                                                  f" Exiting...", 7063)
             else:
-                os.mkdir(project_path)
-                os.mkdir(local_destination)
+                Log.info(" **** else path exist: project path")
+                # os.makedirs(xxxx) #to create intermediate dirs            
+                Path(project_path).mkdir(parents=True)     #this will vreate parents dirs if its needed
+                Path(local_destination).mkdir(parents=True) 
                 Log.debug(
                     "The project folder {0} has been created.", project_path)
                 Log.info("Copying {0} into {1}",
                          local_project_path, project_path)
                 try:
+                    Log.info(" **** else try cp -R {0} & {1}",local_project_path, local_destination)
                     output = subprocess.check_output(
                         "cp -R " + local_project_path + "/* " + local_destination, shell=True)
                 except subprocess.CalledProcessError:
