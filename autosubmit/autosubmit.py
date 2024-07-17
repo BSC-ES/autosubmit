@@ -4729,8 +4729,6 @@ class Autosubmit:
         :return: True if successful, False if not
         :rtype: bool
         """
-
-
         project_destination = as_conf.get_project_destination()
         if project_destination is None or len(project_destination) == 0:
             if project_type.lower() != "none":
@@ -4786,43 +4784,54 @@ class Autosubmit:
             local_project_path = as_conf.get_local_project_path()
             if local_project_path is None or len(local_project_path) == 0:
                 raise AutosubmitCritical("Empty project path! please change this parameter to a valid one.", 7014)
-            project_path = os.path.join(
-                BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_PROJ_DIR)
-            local_destination = os.path.join(project_path, project_destination)
+            # check if local_project_path is a valid path
+            if not Path(local_project_path).is_dir():
+                raise AutosubmitCritical("Local project path is not a valid path and/or it does not exist.", 7014)
+            
+            project_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid,BasicConfig.LOCAL_PROJ_DIR)
+            local_destination = project_path.joinpath(project_destination)
 
-            if os.path.exists(project_path):
+            if project_path.exists():
                 Log.info("Using project folder: {0}", project_path)
-                if os.path.exists(local_destination):
+                # TODO: It accepts a dir with ext name, but we assume that it is already created. Should we accept it?
+                if local_destination.is_dir():
                     if force:
                         try:
                             cmd = ["rsync -ach --info=progress2 " +
-                                   local_project_path + "/* " + local_destination]
+                                   local_project_path + "/* " + str(local_destination)]
                             subprocess.call(cmd, shell=True)
                         except (subprocess.CalledProcessError, IOError):
                             raise AutosubmitCritical(f"Can not rsync {local_project_path} into {project_path}."
                                                      f" Exiting...", 7063)
                 else:
-                    os.mkdir(local_destination)
+                    invalid_char_pattern = re.compile(r'[^a-zA-Z0-9/_\\-]')
+                    # check local_destination is a well-formatted path & create it
+                    # if local_destination.suffix : 
+                    #    raise AutosubmitCritical("Local destination path is not a valid path: ", 7014, local_destination)
+                    if invalid_char_pattern.search(str(local_destination)):
+                        raise AutosubmitCritical("Local destination path contains invalid characters ", 7014)
+
+                    Path(local_destination).mkdir(parents=True)
                     try:
-                        output = subprocess.check_output(
-                            "cp -R " + local_project_path + "/* " + local_destination, shell=True)
+                        subprocess.check_output(
+                            "cp -R " + str(local_project_path) + "/* " + str(local_destination), shell=True)
                     except subprocess.CalledProcessError:
                         try:
                             shutil.rmtree(project_path)
-                        except Exception as e:
+                        except Exception:
                             pass
                         raise AutosubmitCritical(f"Can not copy {local_project_path} into {project_path}."
                                                  f" Exiting...", 7063)
             else:
-                os.mkdir(project_path)
-                os.mkdir(local_destination)
+                Path(project_path).mkdir(parents=True)
+                Path(local_destination).mkdir(parents=True) 
                 Log.debug(
                     "The project folder {0} has been created.", project_path)
                 Log.info("Copying {0} into {1}",
                          local_project_path, project_path)
                 try:
                     output = subprocess.check_output(
-                        "cp -R " + local_project_path + "/* " + local_destination, shell=True)
+                        "cp -R " + str(local_project_path) + "/* " + str(local_destination), shell=True)
                 except subprocess.CalledProcessError:
                     try:
                         shutil.rmtree(project_path)
