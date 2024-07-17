@@ -2585,7 +2585,7 @@ class Autosubmit:
                           only_wrappers=False, hold=False) -> bool:
         """Gets READY jobs and send them to the platforms if there is available space on the queues.
 
-        :param hold: 
+        :param hold:
         :param as_conf: autosubmit config object
         :type as_conf: AutosubmitConfig object
         :param job_list: job list to check
