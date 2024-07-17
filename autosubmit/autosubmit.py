@@ -4712,16 +4712,18 @@ class Autosubmit:
             if not Path(local_project_path).is_dir():
                 raise AutosubmitCritical("Local project path is not a valid path and/or it doesnt exist.", 7014)
             ###
-            project_path = os.path.join(
-                BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_PROJ_DIR)
-            local_destination = os.path.join(project_path, project_destination)
-            
+            #project_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_PROJ_DIR)
+            #local_destination = os.path.join(project_path, project_destination)
+            project_path = BasicConfig.LOCAL_ROOT_DIR.joinpath(expid,BasicConfig.LOCAL_PROJ_DIR)
+            local_destination = project_path.joinpath(project_destination)
             Log.info(" **** project_type : local check vars: \n{0} - local_project_path (as_conf)\n{2} - project_path (basic config) \n{3} - project_destination (as_conf.get_project_destination)\n{1} - local_destination (project_path + project_destination)\n\n",local_project_path,local_destination,project_path,project_destination)
 
-            if os.path.exists(project_path):
+            #if os.path.exists(project_path):
+            if project_path.exists():
                 Log.info(" **** if path exist: project path")
                 Log.info("Using project folder: {0}", project_path)
-                if os.path.exists(local_destination):
+                #if os.path.exists(local_destination):
+                if local_destination.exists():
                     Log.info(" **** if path exist: local destination")
                     if force:
                         try:
