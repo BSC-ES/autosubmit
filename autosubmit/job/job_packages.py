@@ -45,6 +45,16 @@ def threaded(fn):
         thread.start()
         return thread
     return wrapper
+def jobs_in_wrapper_str(as_conf, current_wrapper):
+    jobs_in_wrapper = as_conf.experiment_data["WRAPPERS"].get(current_wrapper, {}).get("JOBS_IN_WRAPPER", "")
+    if "," in jobs_in_wrapper:
+        jobs_in_wrapper = jobs_in_wrapper.split(",")
+    elif "&" in jobs_in_wrapper:
+        jobs_in_wrapper = jobs_in_wrapper.split("&")
+    else:
+        jobs_in_wrapper = jobs_in_wrapper.split(" ")
+    jobs_in_wrapper = [job.strip(" ,") for job in jobs_in_wrapper]
+    return "&".join(jobs_in_wrapper)
 class JobPackageBase(object):
     """
     Class to manage the package of jobs to be submitted by autosubmit
@@ -685,10 +695,7 @@ class JobPackageVertical(JobPackageThread):
                                                                                                             self._threads)
         for job in jobs:
             self._wallclock = sum_str_hours(self._wallclock, job.wallclock)
-        self._name = self._expid + '_' + self.FILE_PREFIX + "_{0}_{1}_{2}".format(str(int(time.time())) +
-                                                                                  str(random.randint(1, 10000)),
-                                                                                  self._num_processors,
-                                                                                  len(self._jobs))
+        self._name = f"{self._expid}_{self.FILE_PREFIX}_{jobs_in_wrapper_str(configuration,self.current_wrapper_section)}_{str(int(time.time())) + str(random.randint(1, 10000))}_{self._num_processors}_{len(self._jobs)}"
 
     def parse_time(self):
         format_ = "minute"
@@ -756,6 +763,9 @@ class JobPackageVertical(JobPackageThread):
                                                  directives=self._custom_directives,threads=self._threads,method=self.method.lower(),retrials=self.inner_retrials, wallclock_by_level=wallclock_by_level,partition=self.partition,wrapper_data=self,num_processors_value=self._num_processors)
 
 
+
+
+
 class JobPackageHorizontal(JobPackageThread):
     """
     Class to manage a horizontal thread-based package of jobs to be submitted by autosubmit
@@ -772,11 +782,8 @@ class JobPackageHorizontal(JobPackageThread):
             self._threads = job.threads
         self._threads = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section, {}).get("THREADS",
                                                                                                             self._threads)
+        self._name = f"{self._expid}_{self.FILE_PREFIX}_{jobs_in_wrapper_str(configuration,self.current_wrapper_section)}_{str(int(time.time())) + str(random.randint(1, 10000))}_{self._num_processors}_{len(self._jobs)}"
 
-        self._name = self._expid + '_' + self.FILE_PREFIX + "_{0}_{1}_{2}".format(str(int(time.time())) +
-                                                                                  str(random.randint(1, 10000)),
-                                                                                  self._num_processors,
-                                                                                  len(self._jobs))
         self._jobs_resources = jobs_resources
 
     def _common_script_content(self):
@@ -800,10 +807,8 @@ class JobPackageHybrid(JobPackageThread):
         self._num_processors = int(num_processors)
         self._threads = all_jobs[0].threads
         self._wallclock = total_wallclock
-        self._name = self._expid + '_' + self.FILE_PREFIX + "_{0}_{1}_{2}".format(str(int(time.time())) +
-                                                                                  str(random.randint(1, 10000)),
-                                                                                  self._num_processors,
-                                                                                  len(self._jobs))
+        self._name = f"{self._expid}_{self.FILE_PREFIX}_{jobs_in_wrapper_str(configuration,self.current_wrapper_section)}_{str(int(time.time())) + str(random.randint(1, 10000))}_{self._num_processors}_{len(self._jobs)}"
+
 
     @property
     def _jobs_scripts(self):

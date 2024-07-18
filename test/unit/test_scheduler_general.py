@@ -84,6 +84,7 @@ PLATFORMS:
         MAX_WALLCLOCK: 48:00
         TEMP_DIR: ''
         MAX_PROCESSORS: 99999
+        PROCESSORS_PER_NODE: 123
     pytest-ecaccess:
         type: ecaccess
         version: slurm
@@ -126,7 +127,46 @@ JOBS:
             NAME: [pjm, slurm, ecaccess, ps]
         RUNNING: once
         wallclock: 00:01
-        """)
+    wrap:
+        SCRIPT: |
+            echo "Hello World, I'm a wrapper"
+        For:
+             NAME: [horizontal,vertical,vertical_horizontal,horizontal_vertical]
+             DEPENDENCIES: [wrap_horizontal-1,wrap_vertical-1,wrap_vertical_horizontal-1,wrap_horizontal_vertical-1]
+        QUEUE: gp_debug
+        PLATFORM: pytest-slurm
+        RUNNING: chunk
+        wallclock: 00:01
+Wrappers:
+    wrapper_h:
+        type: horizontal
+        jobs_in_wrapper: wrap_horizontal
+    wrapper_v:
+        type: vertical
+        jobs_in_wrapper: wrap_vertical
+    wrapper_vh:
+        type: vertical-horizontal
+        jobs_in_wrapper: wrap_vertical_horizontal
+    wrapper_hv:
+        type: horizontal-vertical
+        jobs_in_wrapper: wrap_horizontal_vertical
+EXPERIMENT:
+    # List of start dates
+    DATELIST: '20000101'
+    # List of members.
+    MEMBERS: fc0 fc1
+    # Unit of the chunk size. Can be hour, day, month, or year.
+    CHUNKSIZEUNIT: month
+    # Size of each chunk.
+    CHUNKSIZE: '4'
+    # Number of chunks of the experiment.
+    NUMCHUNKS: '2'
+    CHUNKINI: ''
+    # Calendar used for the experiment. Can be standard or noleap.
+    CALENDAR: standard
+  """)
+
+
 
 
 
@@ -147,29 +187,52 @@ JOBS:
 @pytest.fixture
 def generate_cmds(prepare_scheduler):
     init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid='t000', create=True)
-    Autosubmit.inspect(expid='t000',check_wrapper=False,force=True, lst=None, filter_chunks=None, filter_status=None, filter_section=None)
+    Autosubmit.inspect(expid='t000', check_wrapper=True, force=True, lst=None, filter_chunks=None, filter_status=None, filter_section=None)
     return prepare_scheduler
 
-@pytest.mark.parametrize("scheduler", ['pjm', 'slurm', 'ecaccess', 'ps'])
-def test_default_parameters(scheduler: str, generate_cmds):
+@pytest.mark.parametrize("scheduler, job_type", [
+    ('pjm', 'SINGLE'),
+    ('slurm', 'SINGLE'),
+    ('ecaccess', 'SINGLE'),
+    ('ps', 'SINGLE'),
+    ('slurm', 'horizontal'),
+    ('slurm', 'vertical'),
+    ('slurm', 'horizontal_vertical'),
+    ('slurm', 'vertical_horizontal')
+])
+def test_scheduler_job_types(scheduler, job_type, generate_cmds):
+    # Test code that uses scheduler and job_typedef test_default_parameters(scheduler: str, job_type: str, generate_cmds):
     """
     Test that the default parameters are correctly set in the scheduler files. It is a comparasion line to line, so the new templates must match the same line order as the old ones. Additional default parameters must be filled in the files/base_{scheduler}.yml as well as any change in the order
     :param generate_cmds: fixture that generates the templates.
+    :param scheduler: Target scheduler
+    :param job_type: Wrapped or not
     :return:
     """
 
     # Load the base file for each scheduler
     scheduler = scheduler.upper()
+    job_type = job_type.upper()
     expected_data = {}
-    for base_f in _get_script_files_path().glob('base_*.cmd'):
-        if scheduler in base_f.stem.split('_')[1].upper():
-            expected_data = Path(base_f).read_text()
-            break
+    if job_type == "SINGLE":
+        for base_f in _get_script_files_path().glob('base_*.cmd'):
+            if scheduler in base_f.stem.split('_')[1].upper():
+                expected_data = Path(base_f).read_text()
+                break
+    else:
+        expected_data = (Path(_get_script_files_path()) / Path(f"base_{job_type.lower()}_{scheduler.lower()}.cmd")).read_text()
     if not expected_data:
-        raise NotImplemented
+        assert False, f"Could not find the expected data for {scheduler} and {job_type}"
 
     # Get the actual default parameters for the scheduler
-    actual = Path(f"{generate_cmds.strpath}/t000/tmp/t000_BASE_{scheduler}.cmd").read_text()
+    if job_type == "SINGLE":
+        actual = Path(f"{generate_cmds.strpath}/t000/tmp/t000_BASE_{scheduler}.cmd").read_text()
+    else:
+        for asthread in Path(f"{generate_cmds.strpath}/t000/tmp").glob(f"*ASThread_WRAP_{job_type}_[0-9]*.cmd"):
+            actual = asthread.read_text()
+            break
+        else:
+            assert False, f"Could not find the actual data for {scheduler} and {job_type}"
     # Remove all after # Autosubmit header
     # ###################
     # count number of lines in expected
@@ -178,7 +241,7 @@ def test_default_parameters(scheduler: str, generate_cmds):
     actual = '\n'.join(actual)
     # Compare line to line
     for i, (line1, line2) in enumerate(zip(expected_data.split('\n'), actual.split('\n'))):
-        if "PJM -o" in line1 or "PJM -e" in line1 or "#SBATCH --output" in line1 or "#SBATCH --error" in line1: # output error will be different
+        if "PJM -o" in line1 or "PJM -e" in line1 or "#SBATCH --output" in line1 or "#SBATCH --error" in line1 or "#SBATCH -J" in line1: # output error will be different
             continue
         elif "##" in line1 or "##" in line2: # comment line
             continue

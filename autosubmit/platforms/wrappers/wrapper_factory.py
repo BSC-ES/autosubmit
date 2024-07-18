@@ -101,7 +101,7 @@ class WrapperFactory(object):
     def nodes(self, nodes):
         return '#' if not nodes else self.nodes_directive(nodes)
     def tasks(self, tasks):
-        return '#' if not tasks else self.tasks_directive(tasks)
+        return '#' if not tasks or int(tasks) < 1 else self.tasks_directive(tasks)
     def partition(self, partition):
         return '#' if not partition else self.partition_directive(partition)
     def threads(self, threads):

@@ -264,8 +264,8 @@ def get_job_package_code(expid, job_name):
             packages = packages_wrapper if len(packages_wrapper) > len(packages_wrapper_plus) else packages_wrapper_plus
             for exp, package_name, _job_name in packages:
                 if job_name == _job_name:
-                    code = int(package_name.split("_")[2])
-                    return code            
+                    code = int(package_name.split("_")[-3])
+                    return code
     except Exception as e:
         pass
     return 0

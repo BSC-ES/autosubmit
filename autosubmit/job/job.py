@@ -258,7 +258,7 @@ class Job(object):
         # hetjobs
         self.het = {'HETSIZE': 0}
         self.parameters = dict()
-        self._tasks = '1'
+        self._tasks = '0'
         self._nodes = ""
         self.default_parameters = {'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%',
                               'M': '%M%', 'M_': '%M_%', 'm': '%m%', 'm_': '%m_%'}
@@ -1606,7 +1606,7 @@ class Job(object):
         self.nodes = job_data.get("NODES",platform_data.get("NODES",""))
         self.exclusive = job_data.get("EXCLUSIVE",platform_data.get("EXCLUSIVE",False))
         self.threads = job_data.get("THREADS",platform_data.get("THREADS","1"))
-        self.tasks = job_data.get("TASKS",platform_data.get("TASKS","1"))
+        self.tasks = job_data.get("TASKS",platform_data.get("TASKS","0"))
         self.reservation = job_data.get("RESERVATION",as_conf.platforms_data.get(job_platform.name, {}).get("RESERVATION", ""))
         self.hyperthreading = job_data.get("HYPERTHREADING",platform_data.get("HYPERTHREADING","none"))
         self.queue = job_data.get("QUEUE",platform_data.get("QUEUE",""))

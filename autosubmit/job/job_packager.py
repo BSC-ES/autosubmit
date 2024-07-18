@@ -337,7 +337,7 @@ class JobPackager(object):
         Check if the packages are ready to be built
         :return: List of jobs ready to be built, boolean indicating if packages can't be built for other reasons ( max_total_jobs...)
         """
-        Log.info("Calculating size limits for {0}".format(self._platform.name))
+        Log.info("Calculating possible ready jobs for {0}".format(self._platform.name))
         jobs_ready = list()
         if len(self._jobs_list.jobs_to_run_first) > 0:
             jobs_ready = [job for job in self._jobs_list.jobs_to_run_first if
@@ -438,9 +438,11 @@ class JobPackager(object):
             return []
         max_jobs_to_submit = min(self._max_wait_jobs_to_submit, self._max_jobs_to_submit)
         section_jobs_to_submit = dict()
-        for job in jobs_ready:
-            job.update_parameters(self._as_config, {})  # Ensure to have the correct processors for the wrapper building code
+
+        for job in [job for job in jobs_ready]:
             if job.section not in section_jobs_to_submit: # This is to fix TOTAL_JOBS when is set at job_level # Only for non-wrapped jobs
+                job.update_parameters(self._as_config,
+                                      {})  # Ensure to have the correct processors for the wrapper building code
                 if int(job.max_waiting_jobs) != int(job.platform.max_waiting_jobs):
                     section_max_wait_jobs_to_submit = int(job.max_waiting_jobs) - int(self.waiting_jobs)
                 else:
@@ -450,13 +452,13 @@ class JobPackager(object):
                 else:
                     section_max_jobs_to_submit = None
 
-                if section_max_jobs_to_submit is not None or section_max_wait_jobs_to_submit is not None:
-                    if section_max_jobs_to_submit is None:
-                        section_max_jobs_to_submit = self._max_jobs_to_submit
-                    if section_max_wait_jobs_to_submit is None:
-                        section_max_wait_jobs_to_submit = self._max_wait_jobs_to_submit
+                if section_max_jobs_to_submit is None:
+                    section_max_jobs_to_submit = self._max_jobs_to_submit
+                if section_max_wait_jobs_to_submit is None:
+                    section_max_wait_jobs_to_submit = self._max_wait_jobs_to_submit
 
-                    section_jobs_to_submit ={job.section:min(section_max_wait_jobs_to_submit,section_max_jobs_to_submit)}
+                section_jobs_to_submit ={job.section:min(section_max_wait_jobs_to_submit,section_max_jobs_to_submit)}
+                Log.result(f"Section:{job.section} can submit {section_jobs_to_submit[job.section]} jobs at this time")
         jobs_to_submit = sorted(
             jobs_ready, key=lambda k: k.priority, reverse=True)
         for job in [failed_job for failed_job in jobs_to_submit if failed_job.fail_count > 0]:
@@ -498,7 +500,7 @@ class JobPackager(object):
                 built_packages_tmp.append(self._build_hybrid_package(jobs, wrapper_limits, section,wrapper_info=current_info))
             else:
                 built_packages_tmp = self._build_vertical_packages(jobs, wrapper_limits)
-
+            Log.result(f"Built {len(built_packages_tmp)} wrappers for {wrapper_name}")
             packages_to_submit,max_jobs_to_submit = self.check_packages_respect_wrapper_policy(built_packages_tmp,packages_to_submit,max_jobs_to_submit,wrapper_limits,any_simple_packages)
 
         # Now, prepare the packages for non-wrapper jobs
@@ -720,6 +722,8 @@ class JobPackagerVertical(object):
         :return: List of jobs that are wrapped together.
         :rtype: List() of Job Object
         """
+        self.total_wallclock = "00:00" # reset total wallclock for package
+        job.update_parameters(wrapper_info[-1],{}) # update_parameter has moved, so this is now needed.
         stack = [(job, 1)]
         while stack:
             job, level = stack.pop()
@@ -907,9 +911,7 @@ class JobPackagerHorizontal(object):
         if horizontal_vertical:
             self._current_processors = 0
         jobs_by_section = dict()
-        Log.info(f"Updating inner job parameters")
         for job in self.job_list:
-            job.update_parameters(wrapper_info[-1],{})
             if job.section not in jobs_by_section:
                 jobs_by_section[job.section] = list()
             jobs_by_section[job.section].append(job)
@@ -920,6 +922,7 @@ class JobPackagerHorizontal(object):
             for job in jobs_by_section[section]:
                 if jobs_processed % 10 == 0 and jobs_processed > 0:
                     Log.info(f"Wrapper package creation is still ongoing. So far {jobs_processed} jobs have been wrapped.")
+                job.update_parameters(wrapper_info[-1], {})
                 if str(job.processors).isdigit() and str(job.nodes).isdigit() and int(job.nodes) > 1 and int(job.processors) <= 1:
                     job.processors = 0
                 if job.total_processors == "":
@@ -939,6 +942,7 @@ class JobPackagerHorizontal(object):
                         self._current_processors += total_processors
                         current_package_by_section[section] += 1
                 else:
+                    Log.result(f"Wrapper package creation is finished. {jobs_processed} jobs have been wrapped together.")
                     break
                 jobs_processed += 1
 
