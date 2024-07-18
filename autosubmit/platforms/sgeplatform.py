@@ -144,6 +144,7 @@ class SgePlatform(ParamikoPlatform):
         :return: True
         :rtype: bool
         """
+        self.main_process_id = os.getpid()
         self.connected = True
         self.connected(as_conf,True)
 

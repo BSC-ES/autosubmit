@@ -121,6 +121,7 @@ class LocalPlatform(ParamikoPlatform):
 
 
     def test_connection(self,as_conf):
+        self.main_process_id = os.getpid()
         if not self.connected:
             self.connect(as_conf)
 

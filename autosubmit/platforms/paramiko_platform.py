@@ -121,6 +121,8 @@ class ParamikoPlatform(Platform):
         """
         Test if the connection is still alive, reconnect if not.
         """
+        self.main_process_id = os.getpid()
+
         try:
             if not self.connected:
                 self.reset()

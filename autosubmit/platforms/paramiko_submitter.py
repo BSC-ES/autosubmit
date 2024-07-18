@@ -155,7 +155,7 @@ class ParamikoSubmitter(Submitter):
                 else:
                     raise Exception(
                         "Queue type not specified on platform {0}".format(section))
-
+                remote_platform.main_process_id = os.getpid()
             except ParamikoPlatformException as e:
                 Log.error("Queue exception: {0}".format(str(e)))
                 return None

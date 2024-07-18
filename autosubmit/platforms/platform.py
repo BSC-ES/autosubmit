@@ -104,7 +104,7 @@ class Platform(object):
             self.pw = None
         self.recovery_queue = Queue()
         self.log_retrieval_process_active = False
-
+        self.main_process_id = None
 
     @property
     @autosubmit_parameter(name='current_arch')
@@ -831,9 +831,10 @@ class Platform(object):
         job_names_processed = set()
         self.connected = False
         self.restore_connection(None)
-        while not event.is_set():
+        # check if id of self.main_process exists with ps ax | grep self.main_process_id
+        while not event.is_set() and os.system(f"ps ax | grep {str(self.main_process_id)} | grep -v grep > /dev/null 2>&1") == 0:
             try:
-                job,children = self.recovery_queue.get()
+                job,children = self.recovery_queue.get(block=False)
                 if job.wrapper_type != "vertical":
                     if f'{job.name}_{job.fail_count}' in job_names_processed:
                         continue
