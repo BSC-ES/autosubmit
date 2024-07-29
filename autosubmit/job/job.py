@@ -1655,7 +1655,9 @@ class Job(object):
         if as_conf.get_project_type() != "none":
             parameters['EXTENDED_HEADER'] = self.read_header_tailer_script(self.ext_header_path, as_conf, True)
             parameters['EXTENDED_TAILER'] = self.read_header_tailer_script(self.ext_tailer_path, as_conf, False)
-        else: # If not, this show a warning when it tries to check the script
+        elif self.ext_header_path or self.ext_tailer_path:
+            Log.warning("An extended header or tailer is defined in {0}, but it is ignored in dummy projects.", self._section)
+        else:
             parameters['EXTENDED_HEADER'] = ""
             parameters['EXTENDED_TAILER'] = ""
         parameters['CURRENT_QUEUE'] = self.queue
