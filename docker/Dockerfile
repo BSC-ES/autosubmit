@@ -1,4 +1,4 @@
-FROM mambaorg/micromamba:1.4.9-bullseye-slim AS micromamba
+FROM mambaorg/micromamba:1-bookworm-slim AS micromamba
 
 # The micromamba image is referenced in a multi-stage build.
 # Note that around 90% of the content of this image is actually
@@ -9,7 +9,7 @@ FROM mambaorg/micromamba:1.4.9-bullseye-slim AS micromamba
 # image autosubmit-base, for example, with the users, permissions,
 # dependencies, and SSH. Which would tremendously reduce this.
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 ARG AUTOSUBMIT_ROOT_DIR=/app/autosubmit/
 
@@ -41,7 +41,7 @@ USER $MAMBA_USER
 
 SHELL ["/usr/local/bin/_dockerfile_shell.sh"]
 
-ENTRYPOINT ["/usr/local/bin/_entrypoint.sh"]
+# ENTRYPOINT ["/usr/local/bin/_entrypoint.sh"]
 # Optional: if you want to customize the ENTRYPOINT and have a conda
 # environment activated, then do this:
 # ENTRYPOINT ["/usr/local/bin/_entrypoint.sh", "my_entrypoint_program"]
@@ -79,7 +79,7 @@ USER $MAMBA_USER
 WORKDIR "${AUTOSUBMIT_ROOT_DIR}"
 
 ENV ENV_NAME=base
-ENV PATH "$MAMBA_ROOT_PREFIX/bin:/usr/bin:/usr/local/bin:$PATH"
+ENV PATH="$MAMBA_ROOT_PREFIX/bin:/usr/bin:/usr/local/bin:$PATH"
 
 # The directories the container will use for Autosubmit files.
 USER root
@@ -95,21 +95,22 @@ RUN mkdir -pv "${AUTOSUBMIT_ROOT_DIR}/logs" && \
 # TODO: add something like xpdf=3.04+git20210103-3 if GUI/X is needed.
 RUN apt update && \
     apt install -y \
-      bash=5.1-2+deb11u1 \
-      ca-certificates=20210119 \
-      curl=7.74.0-1.3+deb11u7 \
-      desktop-file-utils=0.26-1 \
-      dialog=1.3-20201126-1 \
-      graphviz=2.42.2-5 \
-      iputils-ping=3:20210202-1 \
-      less=551-2 \
-      net-tools=1.60+git20181103.0eebece-1 \
-      openssh-server=1:8.4p1-5+deb11u1 \
-      python3-tk=3.9.2-1 \
-      sqlite3=3.34.1-3 \
-      sudo=1.9.5p2-3+deb11u1 \
-      vim=2:8.2.2434-3+deb11u1 \
-      xdg-utils=1.1.3-4.1 && \
+      gcc \
+      bash \
+      ca-certificates \
+      curl \
+      desktop-file-utils \
+      dialog \
+      graphviz \
+      iputils-ping \
+      less \
+      net-tools \
+      openssh-server \
+      python3-tk \
+      sqlite3 \
+      sudo \
+      vim \
+      xdg-utils && \
     update-ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -126,7 +127,18 @@ RUN micromamba install --yes --name base --channel conda-forge \
     /usr/local/bin/_activate_current_env.sh
 
 # Install Autosubmit.
-RUN pip install autosubmit==4.0.84
+# If GIT_REF is set, it will install from the specified branch/tag/commit.
+# Otherwise, if AUTOSUBMIT_VERSION is set, it will install the specified version from pypi.
+# Otherwise, it will install the latest version from pypi.
+ARG GIT_REF
+ARG AUTOSUBMIT_VERSION
+RUN if [ -n "${GIT_REF}" ] ; then \
+      pip install git+https://earth.bsc.es/gitlab/es/autosubmit.git@${GIT_REF}; \
+    elif [ -n "${AUTOSUBMIT_VERSION}" ] ; then \
+      pip install autosubmit==${AUTOSUBMIT_VERSION}; \
+    else \
+      pip install autosubmit; \
+    fi
 
 # Configure Autosubmit.
 RUN autosubmit configure \
@@ -134,6 +146,9 @@ RUN autosubmit configure \
       -dbf autosubmit.db \
       -lr "${AUTOSUBMIT_ROOT_DIR}/experiments/" && \
     autosubmit install
+
+# Set AUTOSUBMIT_CONFIGURATION to the path of the Autosubmit configuration file.
+ENV AUTOSUBMIT_CONFIGURATION="${AUTOSUBMIT_ROOT_DIR}/autosubmitrc"
 
 # SSH (for Autosubmit local platform.)
 USER root
@@ -174,7 +189,7 @@ USER $MAMBA_USER
 
 EXPOSE 22
 
-LABEL maintainer="kinow"
+LABEL maintainer="Autosubmit team"
 
 ENTRYPOINT ["/bin/bash", "entrypoint.sh"]
 CMD ["autosubmit"]
