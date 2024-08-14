@@ -580,14 +580,13 @@ class Monitor:
             Log.info("You don't have enough permissions to the experiment's ({}) folder. The output file will be created in the default location: {}".format(expid, BasicConfig.DEFAULT_OUTPUT_DIR))
             HUtils.create_path_if_not_exists_group_permission(BasicConfig.DEFAULT_OUTPUT_DIR)
 
-        stats_report = create_stats_report(
+        show = create_stats_report(
             expid, joblist, self.get_general_stats(expid), str(output_complete_path_stats),
             section_summary, jobs_summary, hide, period_ini, period_fi, queue_time_fixes
         )
-        if stats_report.show:
+        if show:
             try:
-                for report_file in stats_report.report_files():
-                    _display_file(report_file)
+                _display_file(str(output_complete_path_stats))
             except subprocess.CalledProcessError:
                 Log.printlog(
                     'File {0} could not be opened, only the txt option will show'.format(output_complete_path_stats),

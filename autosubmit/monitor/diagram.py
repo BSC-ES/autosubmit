@@ -103,26 +103,6 @@ class JobData:
         return len(JobData.__annotations__)
 
 
-@dataclass
-class StatsReport:
-    """A data class with the stat report file names, and a flag.
-
-    The flag defines whether the bar diagram was generated, and is
-    used to control whether the PDF files are displayed to the user
-    or not (in which case, a warning is displayed on the terminal).
-    """
-    stats_file: Union[str, None] = None
-    jobs_file: Union[str, None] = None
-    jobs_section_file: Union[str, None] = None
-    show: bool = True
-
-    def report_files(self) -> List[str]:
-        return filter(
-            lambda x: x is not None,
-            [self.stats_file, self.jobs_file, self.jobs_section_file]
-        )
-
-
 def _seq(start, end, step):
     """From: https://pynative.com/python-range-for-float-numbers/"""
     sample_count = int(abs(end - start) / step)
@@ -151,20 +131,19 @@ def create_stats_report(
         expid: str, jobs_list: List[Job], general_stats: List, output_file: str,
         section_summary: bool, jobs_summary: bool, hide: bool, period_ini: datetime = None,
         period_fi: datetime = None, queue_fix_times: Dict[str, int] = None
-) -> StatsReport:
+) -> bool:
     """Function to create the stats report.
 
     Produces one or more PDF files, depending on the parameters.
 
     Also produces CSV files with the data from each PDF.
     """
-    exp_stats = populate_statistics(jobs_list, period_ini, period_fi, queue_fix_times)
-    plot = create_bar_diagram(expid, exp_stats, jobs_list, general_stats, output_file)
+    # Close all figures first... just in case.
+    plt.close('all')
 
-    stats_report = StatsReport()
-    stats_report.plot = plot
-    stats_report.show = hide
-    stats_report.stats_file = output_file
+    exp_stats = populate_statistics(jobs_list, period_ini, period_fi, queue_fix_times)
+    plot = create_bar_diagram(expid, exp_stats, jobs_list, general_stats)
+    create_csv_stats(exp_stats, jobs_list, output_file)
 
     if plot:
         if section_summary:
@@ -173,7 +152,6 @@ def create_stats_report(
             headers = JobAggData.headers()
             _create_table(
                 jobs_data,
-                job_section_output_file,
                 headers,
                 doc_title=f"SECTION SUMMARY - {expid}",
                 table_title="Aggregated by Job Section"
@@ -183,15 +161,13 @@ def create_stats_report(
                 job_section_output_file,
                 headers
             )
-            stats_report.jobs_section_file = job_section_output_file
-            Log.result(f'Section Summary created at {job_section_output_file}')
+            Log.result(f'Section Summary created')
         if jobs_summary:
             jobs_data = _get_job_list_data(jobs_list, exp_stats.jobs_stat)
             jobs_output_file = output_file.replace("statistics", "jobs_summary")
             headers = JobData.headers()
             _create_table(
                 jobs_data,
-                jobs_output_file,
                 headers,
                 doc_title=f"JOBS SUMMARY - {expid}",
                 table_title="Job List"
@@ -201,18 +177,24 @@ def create_stats_report(
                 jobs_output_file,
                 headers
             )
-            stats_report.jobs_file = jobs_output_file
-            Log.result(f'Jobs Summary created at {jobs_output_file}')
+            Log.result(f'Jobs Summary created')
 
-    Log.result(f'Stats created at {output_file}')
+        with PdfPages(output_file) as pdf:
+            for figure_number in plt.get_fignums():
+                plt.figure(figure_number)
+                pdf.savefig()
+                plt.close()
 
-    return stats_report
+            d = pdf.infodict()
+            d['expid'] = expid
+
+        Log.result(f'Stats created at {output_file}')
+
+    return hide
 
 
-def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job], general_stats: List[str],
-                       output_file: Union[str, LiteralString, bytes]) -> bool:
+def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job], general_stats: List[str]) -> bool:
     # Error prevention
-    plt.close('all')
     normal_plots_count = 0
     failed_jobs_plots_count = 0
     try:
@@ -316,14 +298,9 @@ def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job], 
         try:
             # Building legends
             build_legends(legends_plot, rects, exp_stats, general_stats)
-            plt.savefig(output_file)
         except Exception as exp:
             print(exp)
             print((traceback.format_exc()))
-    try:
-        create_csv_stats(exp_stats, jobs_list, output_file)
-    except Exception:
-        Log.info(f'Error while creating csv stats:\n{err_message}')
     return plot
 
 
@@ -529,7 +506,6 @@ def _get_job_list_data(jobs_list: List[Job], jobs_stats: List[JobStat]) -> List[
 
 def _create_table(
         jobs_data: List[Union[JobData, JobAggData]],
-        output_file: str,
         headers: List[str],
         doc_title: str,
         table_title: str
@@ -539,8 +515,6 @@ def _create_table(
 
     :param jobs_data: jobs data for the table
     :type jobs_data: List[Union[JobData, JobAggData]]
-    :param output_file: output file
-    :type output_file: str
     :param headers: Table headers.
     :type headers: List[str]
     :param doc_title: The PDF document title.
@@ -552,7 +526,6 @@ def _create_table(
     data = [job_data.values() for job_data in jobs_data]
 
     table_height = len(jobs_data) * TABLE_ROW_HEIGHT + 2
-    pdf_pages = PdfPages(output_file)
 
     fig = plt.figure(figsize=(TABLE_WIDTH, table_height))
 
@@ -614,9 +587,6 @@ def _create_table(
     # Save table
     plt.tight_layout()
     plt.subplots_adjust(left=0, right=1, top=0.7, bottom=0.1)
-    pdf_pages.savefig(fig, bbox_inches='tight')
-    pdf_pages.close()
-    plt.close(fig)
 
 
 def _create_csv(
