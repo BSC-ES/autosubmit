@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+preferred-citation:
+  type: article
+  authors:
+  - family-names: "Manubens-Gil"
+    given-names: "Domingo"
+  - family-names: "Vegas-Regidor"
+    given-names: "Javier"
+  - family-names: "Prodhomme"
+    given-names: "Chloe"
+  - family-names: "Mula-Valls"
+    given-names: "Oriol"
+  - family-name: "J. Doblas-Reyes"
+    given-name: "Francisco"
+  journal: "2016 International Conference on High Performance Computing & Simulation (HPCS)"
+  start: 895 # First page number
+  end: 900 # Last page number
+  title: "Seamless management of ensemble climate prediction experiments on HPC platforms"
+  year: 2016
+  publisher: "IEEE"
+  keywords:
+    - conference
+  languages:
+    - en
+  doi: 10.1109/HPCSim.2016.7568429
+  url: "https://ieeexplore.ieee.org/document/7568429"
