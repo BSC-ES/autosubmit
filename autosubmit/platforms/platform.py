@@ -13,6 +13,8 @@ from autosubmit.helpers.parameters import autosubmit_parameter
 from log.log import AutosubmitCritical, AutosubmitError, Log
 from multiprocessing import Process, Queue, Event
 
+import time
+
 # stop the background task gracefully before exit
 def stop_background(stop_event, process):
     # request the background thread stop
@@ -832,28 +834,33 @@ class Platform(object):
         self.connected = False
         self.restore_connection(None)
         # check if id of self.main_process exists with ps ax | grep self.main_process_id
+        max_logs_to_process = 60
         while not event.is_set() and os.system(f"ps ax | grep {str(self.main_process_id)} | grep -v grep > /dev/null 2>&1") == 0:
+            time.sleep(60)
+            logs_processed = 0 # avoid deadlocks just in case
             try:
-                job,children = self.recovery_queue.get(block=False)
-                if job.wrapper_type != "vertical":
-                    if f'{job.name}_{job.fail_count}' in job_names_processed:
-                        continue
-                else:
-                    if f'{job.name}' in job_names_processed:
-                        continue
-                job.children = children
-                job.platform = self
-                if job.x11:
-                    Log.debug("Job {0} is an X11 job, skipping log retrieval as they're written in the ASLOGS".format(job.name))
-                    continue
-                try:
-                    job.retrieve_logfiles(self, raise_error=True)
+                while not self.recovery_queue.empty() and logs_processed < max_logs_to_process:
+                    logs_processed += 1
+                    job,children = self.recovery_queue.get(block=False)
                     if job.wrapper_type != "vertical":
-                        job_names_processed.add(f'{job.name}_{job.fail_count}')
+                        if f'{job.name}_{job.fail_count}' in job_names_processed:
+                            continue
                     else:
-                        job_names_processed.add(f'{job.name}')
-                except:
-                    pass
+                        if f'{job.name}' in job_names_processed:
+                            continue
+                    job.children = children
+                    job.platform = self
+                    if job.x11:
+                        Log.debug("Job {0} is an X11 job, skipping log retrieval as they're written in the ASLOGS".format(job.name))
+                        continue
+                    try:
+                        job.retrieve_logfiles(self, raise_error=True)
+                        if job.wrapper_type != "vertical":
+                            job_names_processed.add(f'{job.name}_{job.fail_count}')
+                        else:
+                            job_names_processed.add(f'{job.name}')
+                    except:
+                        pass
             except queue.Empty:
                 pass
             except (IOError, OSError):
