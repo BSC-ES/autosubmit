@@ -1,3 +1,7 @@
+4.1.10 - Hotfix
+===============
+- Fixed an issue with the performance of the log retrieval.
+ 
 4.1.9 - Zombies, splits, tests and bug fixes
 =====================================
 - Splits calendar: Added a complete example to the documentation.
