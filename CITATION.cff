@@ -20,7 +20,11 @@ preferred-citation:
   year: 2016
   publisher: "IEEE"
   keywords:
-    - conference
+    - earth system modelling
+    - climate
+    - weather
+    - high performance computing
+    - workflow manager
   languages:
     - en
   doi: 10.1109/HPCSim.2016.7568429
