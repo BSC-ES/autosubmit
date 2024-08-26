@@ -15,24 +15,38 @@ To create a new experiment, just run the command:
 Options:
 ::
 
-    usage: autosubmit expid [-h] [-y COPY | -dm | -min [ -repo GIT_PATH -b BRANCH -config AS_CONF ] ] [-p PATH] -H HPC -d DESCRIPTION
-
-        -h, --help            show this help message and exit
-        -y COPY, --copy COPY  makes a copy of the specified experiment
-        -op, -operational     creates a new experiment, starting with "o"
-        -dm, --dummy          creates a new experiment with default values, usually for testing
-        -min, --minimal_config
-            creates a new experiment with minimal configuration files, usually for using a custom configuration
-        -repo GIT_PATH, --git_repo GIT_PATH
-            sets the git_repository
-        -b BRANCH, --git_branch BRANCH
-            sets the branch to use for the git repository
-        -config, --git_as_conf
-            sets the configuration folder to use for the experiment, relative to repo root
-        -local, --use_local_minimal obtains the minimal configuration for local files
-        -H HPC, --HPC HPC     specifies the HPC to use for the experiment, default is localhost
-        -d DESCRIPTION, --description DESCRIPTION
-            sets a description for the experiment to store in the database.
+    usage: autosubmit expid [-h] [-y COPY] [-dm] [-min] [-repo GIT_REPO]
+                            [-b GIT_BRANCH] [-conf GIT_AS_CONF] [-local] [-op]
+                            [-H HPC] -d DESCRIPTION [-t]
+                            [-fs {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}]
+    
+    Creates a new experiment
+    
+    optional arguments:
+      -h, --help            show this help message and exit
+      -y COPY, --copy COPY  makes a copy of the specified experiment
+      -dm, --dummy          creates a new experiment with default values, usually
+                            for testing
+      -min, --minimal_configuration
+                            creates a new experiment with minimal configuration,
+                            usually combined with -repo
+      -repo GIT_REPO, --git_repo GIT_REPO
+                            sets a git repository for the experiment
+      -b GIT_BRANCH, --git_branch GIT_BRANCH
+                            sets a git branch for the experiment
+      -conf GIT_AS_CONF, --git_as_conf GIT_AS_CONF
+                            sets the git path to as_conf
+      -local, --use_local_minimal
+                            uses local minimal file instead of git
+      -op, --operational    creates a new experiment with operational experiment
+                            id
+      -H HPC, --HPC HPC     specifies the HPC to use for the experiment
+      -d DESCRIPTION, --description DESCRIPTION
+                            sets a description for the experiment to store in the
+                            database.
+      -t, --testcase        creates a new experiment with testcase experiment id
+      -fs {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}, --filter_status {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}
+                            Select the original status to filter the list of jobs
 
 Example:
 ::
@@ -108,7 +122,7 @@ This command creates a new experiment with default values, useful for testing:
 Example:
 ::
 
-    autosubmit expid -H ithaca -dm "experiment is about..."
+    autosubmit expid -H ithaca -dm -d "experiment is about..."
 
 Create a test case experiment
 ------------------------------------
@@ -127,21 +141,35 @@ To create a test case experiment, use the command:
 Options:
 ::
 
-    usage: autosubmit testcase [-h] [-y COPY] -d DESCRIPTION [-c CHUNKS]
-                               [-m MEMBER] [-s STARDATE] [-H HPC] [-b BRANCH]
-
-        expid                 experiment identifier
-
-         -h, --help            show this help message and exit
-         -c CHUNKS, --chunks CHUNKS
-                               chunks to run
-         -m MEMBER, --member MEMBER
-                               member to run
-         -s STARDATE, --stardate STARDATE
-                               stardate to run
-         -H HPC, --HPC HPC     HPC to run experiment on it
-         -b BRANCH, --branch BRANCH
-                               branch from git to run (or revision from subversion)
+    usage: autosubmit testcase [-h] [-y COPY | -min] -d DESCRIPTION [-c CHUNKS]
+                               [-m MEMBER] [-s STARDATE] -H HPC [-repo GIT_REPO]
+                               [-b GIT_BRANCH] [-conf GIT_AS_CONF] [-local]
+    
+    create test case experiment
+    
+    optional arguments:
+      -h, --help            show this help message and exit
+      -y COPY, --copy COPY  makes a copy of the specified experiment
+      -min, --minimal_configuration
+                            creates a new experiment with minimal configuration,
+                            usually combined with -repo
+      -d DESCRIPTION, --description DESCRIPTION
+                            description of the test case
+      -c CHUNKS, --chunks CHUNKS
+                            chunks to run
+      -m MEMBER, --member MEMBER
+                            member to run
+      -s STARDATE, --stardate STARDATE
+                            stardate to run
+      -H HPC, --HPC HPC     HPC to run experiment on it
+      -repo GIT_REPO, --git_repo GIT_REPO
+                            sets a git repository for the experiment
+      -b GIT_BRANCH, --git_branch GIT_BRANCH
+                            sets a git branch for the experiment
+      -conf GIT_AS_CONF, --git_as_conf GIT_AS_CONF
+                            sets the git path to as_conf
+      -local, --use_local_minimal
+                            uses local minimal file instead of git
 
 Example:
 ::
