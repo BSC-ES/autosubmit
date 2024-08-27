@@ -136,6 +136,13 @@ class LsfPlatform(ParamikoPlatform):
         {6}
         #
         ###############################################################################
-        """.format(filename, queue, project, wallclock, num_procs, dependency,
-                   '\n'.ljust(13).join(str(s) for s in directives))
+        """.format(
+            kwargs["filename"],
+            kwargs["queue"],
+            kwargs["project"],
+            kwargs["wallclock"],
+            kwargs["num_procs"],
+            kwargs["dependency"],
+            "\n".ljust(13).join(str(s) for s in kwargs["directives"]),
+        )
 

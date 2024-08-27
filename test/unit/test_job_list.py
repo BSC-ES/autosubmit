@@ -1,3 +1,4 @@
+import inspect
 from unittest.mock import MagicMock
 
 import os

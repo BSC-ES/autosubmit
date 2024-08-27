@@ -2512,7 +2512,7 @@ class Autosubmit:
             jobs_section = set([job.section for job in job_list.get_ready()])
             for section in jobs_section:
                 if check_jobs_file_exists(as_conf, section):
-                    raise AutosubmitCritical(f"Job {self.name} does not have a correct template// template not found", 7014)
+                    raise AutosubmitCritical(f"Job {section} does not have a correct template// template not found", 7014)
         try:
             for platform in platforms_to_test:
                 packager = JobPackager(as_conf, platform, job_list, hold=hold)
@@ -3573,7 +3573,7 @@ class Autosubmit:
         not_enough_screen_size_msg = 'The size of your terminal is not enough to draw the configuration wizard,\n' \
                                      'so we\'ve closed it to prevent errors. Resize it and then try it again.'
 
-        home_path = Path(home_path).expanduser().resolve()
+        home_path = Path("~").expanduser().resolve()
 
         try:
             d = dialog.Dialog(
