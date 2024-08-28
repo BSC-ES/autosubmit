@@ -194,11 +194,14 @@ To test the experiment, use the command:
 
 Options:
 ::
+    usage: autosubmit test [-h] -c CHUNKS [-m MEMBER] [-s STARDATE] [-H HPC] [-b BRANCH] [-v] EXPID
 
-    usage: autosubmit test [-h] -c CHUNKS [-m MEMBER] [-s STARDATE] [-H HPC] [-b BRANCH] expid
+     test experiment
 
-        expid                 experiment identifier
+     positional arguments:
+        EXPID                 experiment identifier
 
+     options:
          -h, --help            show this help message and exit
          -c CHUNKS, --chunks CHUNKS
                                chunks to run
@@ -208,7 +211,8 @@ Options:
                                stardate to run
          -H HPC, --HPC HPC     HPC to run experiment on it
          -b BRANCH, --branch BRANCH
-                               branch from git to run (or revision from subversion)
+                               branch of git to run (or revision from subversion)
+         -v, --update_version  Update experiment version
 
 Example:
 ::

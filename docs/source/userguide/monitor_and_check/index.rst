@@ -17,12 +17,18 @@ If any template has an inconsistency it will replace them for an empty value on 
 Options:
 ::
 
-    usage: autosubmit check [-h -nt] expid
+    usage: autosubmit check [-h] [-nt] [-v] EXPID
 
-      expid                 experiment identifier
-      -nt                   --notransitive
-                                prevents doing the transitive reduction when plotting the workflow
+    check configuration for specified experiment
+
+    positional arguments:
+      EXPID                 experiment identifier
+
+    options:
       -h, --help            show this help message and exit
+      -nt, --notransitive   Disable transitive reduction
+      -v, --update_version  Update experiment version
+
 
 Example:
 ::
@@ -90,56 +96,56 @@ To generate  the cmd files of the current non-active jobs experiment, it is poss
     autosubmit inspect EXPID
 
 EXPID is the experiment identifier.
-
-Usage
-~~~~~
-
 Options:
 ::
+   usage: autosubmit inspect [-h] [-nt] [-f] [-cw] [-v] [-q]
+                          [-fl LIST | -fc FILTER_CHUNKS | -fs {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN} | -ft FILTER_TYPE]
+                          EXPID
 
-    usage: autosubmit inspect [-h]  [-fl] [-fc] [-fs] [-ft]  [-cw] expid
+    Generate all .cmd files
 
-      expid                 experiment identifier
+    positional arguments:
+      EXPID                 experiment identifier
 
+    options:
       -h, --help            show this help message and exit
+      -nt, --notransitive   Disable transitive reduction
+      -f, --force           Overwrite all cmd
+      -cw, --check_wrapper  Generate possible wrapper in the current workflow
+      -v, --update_version  Update experiment version
+      -q, --quick           Only checks one job per each section
+      -fl LIST, --list LIST
+                            Supply the list of job names to be filtered. Default = "Any". LIST = "b037_20101101_fc3_21_sim
+                            b037_20111101_fc4_26_sim"
+      -fc FILTER_CHUNKS, --filter_chunks FILTER_CHUNKS
+                            Supply the list of chunks to filter the list of jobs. Default = "Any". LIST = "[ 19601101 [ fc0 [1 2
+                            3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"
+      -fs {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}, --filter_status {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}
+                             Select the original status to filter the list of jobs
+      -ft FILTER_TYPE, --filter_type FILTER_TYPE
+                             Select the job type to filter the list of jobs
 
-      -fl FILTER_LIST, --list
-                            List of job names to be generated
-      -fc FILTER_CHUNK, --filter_chunk
-                            List of chunks to be generated
-      -fs FILTER_STATUS, --filter_status
-                            List of status to be generated
-      -ft FILTER_TYPE, --filter_type
-                            List of types to be generated
-
-      -cw                   --checkwrapper
-                                Generate the wrapper cmd with the current filtered jobs
-
-      -f                    --force
-                                Generate all cmd files
-
-Example
-~~~~~~~
-
-with autosubmit.lock present or not:
-::
-
-    autosubmit inspect expid
+Examples:
 
 with autosubmit.lock present or not:
 ::
 
-    autosubmit inspect expid -f
+    autosubmit inspect cxxx
+
+with autosubmit.lock present or not:
+::
+
+    autosubmit inspect cxxx -f
 
 without autosubmit.lock:
 ::
 
-    autosubmit inspect expid -fl [-fc,-fs or ft]
+    autosubmit inspect cxxx -fl [-fc,-fs or ft]
 
 To generate cmd for wrappers:
 ::
 
-    autosubmit inspect expid -cw -f
+    autosubmit inspect cxxx -cw -f
 
 
 With autosubmit.lock and no (-f) force, it will only generate all files that are not submitted.
@@ -149,7 +155,7 @@ Without autosubmit.lock, it will generate all unless filtered by -fl,fc,fs or ft
 To generate cmd only for a single job of the section :
 ::
 
-    autosubmit inspect expid -q
+    autosubmit inspect cxxx -q
 
 How to monitor an experiment
 ----------------------------
@@ -164,34 +170,47 @@ To monitor the status of the experiment, use the command:
 Options:
 ::
 
-    usage: autosubmit monitor [-h] [-o {pdf,png,ps,svg,txt}] [-group_by {date,member,chunk,split} -expand -expand_status] [-fl] [-fc] [-fs] [-ft] [-cw] expid [-txt] [-txtlog]
+   usage: autosubmit monitor [-h] [-o {pdf,png,ps,svg,txt}] [-group_by {date,member,chunk,split,automatic}] [-expand EXPAND]
+                          [-expand_status EXPAND_STATUS] [--hide_groups] [-cw]
+                          [-fl LIST | -fc FILTER_CHUNKS | -fs {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN} | -ft FILTER_TYPE]
+                          [--hide] [-txt | -txtlog] [-nt] [-v] [-p]
+                          expid
 
-      expid                 Experiment identifier.
+    plots specified experiment
 
-      -h, --help            Show this help message and exit.
-      -o {pdf,png,ps,svg}, --output {pdf,png,ps,svg,txt}
-                            Type of output for generated plot (or text file).
+    positional arguments:
+      expid                 experiment identifier
+
+    options:
+      -h, --help            show this help message and exit
+      -o {pdf,png,ps,svg,txt}, --output {pdf,png,ps,svg,txt}
+                            chooses type of output for generated plot
       -group_by {date,member,chunk,split,automatic}
-                            Criteria to use for grouping jobs.
-      -expand,              List of dates/members/chunks to expand.
-      -expand_status,       Status(es) to expand.
-      -fl FILTER_LIST, --list
-                            List of job names to be filtered.
-      -fc FILTER_CHUNK, --filter_chunk
-                            List of chunks to be filtered.
-      -fs FILTER_STATUS, --filter_status
-                            Status to be filtered.
-      -ft FILTER_TYPE, --filter_type
-                            Type to be filtered.
-      --hide,               Hide the plot.
-      -txt, --text          
-                            Generates a tree view format that includes job name, children number, and status in a file in the /status/ folder. If possible, shows the results in the terminal.                            
-      -txtlog, --txt_logfiles  
-                            Generates a list of job names, status, .out path, and .err path as a file in /status/ (AS <3.12 behaviour).
-      -nt                   --notransitive
-                                Prevents doing the transitive reduction when plotting the workflow.
-      -cw                   --check_wrapper
-                                Generate the wrapper in the current workflow.
+                            Groups the jobs automatically or by date, member, chunk or split
+      -expand EXPAND        Supply the list of dates/members/chunks to filter the list of jobs. Default = "Any". LIST = "[
+                            19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"
+      -expand_status EXPAND_STATUS
+                            Select the stat uses to be expanded
+      --hide_groups         Hides the groups from the plot
+      -cw, --check_wrapper  Generate possible wrapper in the current workflow
+      -fl LIST, --list LIST
+                            Supply the list of job names to be filtered. Default = "Any". LIST = "b037_20101101_fc3_21_sim
+                            b037_20111101_fc4_26_sim"
+      -fc FILTER_CHUNKS, --filter_chunks FILTER_CHUNKS
+                            Supply the list of chunks to filter the list of jobs. Default = "Any". LIST = "[ 19601101 [ fc0 [1 2
+                            3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"
+     -fs {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}, --filter_status {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}
+                            Select the original status to filter the list of jobs
+     -ft FILTER_TYPE, --filter_type FILTER_TYPE
+                           Select the job type to filter the list of jobs
+     --hide                hides plot window
+     -txt, --text          Generates only txt status file
+     -txtlog, --txt_logfiles
+                           Generates only txt status file(AS < 3.12b behaviour)
+     -nt, --notransitive   Disable transitive reduction
+      -v, --update_version  Update experiment version
+      -p, --profile         Prints performance parameters of the execution of this command.
+
                                 
 Example:
 ::
@@ -202,13 +221,13 @@ The location where the user can find the generated plots with date and timestamp
 
 ::
 
-    <experiments_directory>/cxxx/plot/cxxx_<date>_<time>.pdf
+    <experiments_directory>/<EXPID>/plot/<EXPID>_<DATE>_<TIME>.pdf
 
 The location where the user can find the txt output containing the status of each job and the path to out and err log files.
 
 ::
 
-    <experiments_directory>/cxxx/status/cxxx_<date>_<time>.txt
+    <experiments_directory>/<EXPID>/status/<EXPID>_<DATE>_<TIME>.txt
 
 .. hint::
     Very large plots may be a problem for some pdf and image viewers.
@@ -445,7 +464,7 @@ How to get details about the experiment
 To get details about the experiment, use the command:
 ::
 
-    autosubmit describe {EXPID} {-u USERNAME}
+    autosubmit describe [EXPID] [-u USERNAME]
 
 
 
@@ -457,21 +476,25 @@ It displays information about the experiment. Currently it describes owner,descr
 Options:
 ::
 
-    usage: autosubmit describe [-h ] expid
+    usage: autosubmit describe [-h] [-u USER] [-v] [EXPID]
 
-      expid                 experiment identifier
-      -u USERNAME, --user USERNAME username of the user who submitted the experiment
+    Show details for specified experiment
+
+    positional arguments:
+      EXPID                 experiment identifier, can be a list of expid separated by comma or spaces
+
+    options:
       -h, --help            show this help message and exit
+      -u USER, --user USER  username, default is current user or listed expid
+      -v, --update_version  Update experiment version
+
 
 Examples:
 ::
-
-.. code-block:: bash
-
-    autosubmit describe cxxx
-    autosubmit describe "cxxx cyyy"
-    autosubmit describe cxxx,cyyy
-    autosubmit describe -u dbeltran
+   autosubmit describe cxxx
+   autosubmit describe "cxxx cyyy"
+   autosubmit describe cxxx,cyyy
+   autosubmit describe -u dbeltran
 
 .. _autoStatistics:
 
@@ -488,23 +511,26 @@ The following command could be adopted to generate the plots for visualizing the
 Options:
 ::
 
-    usage: autosubmit stats [-h] [-ft] [-fp] [-o {pdf,png,ps,svg}] [--section_summary] [--jobs_summary] [--hide] [-nt] [-v] [-db] expid
+    usage: autosubmit stats [-h] [-ft FILTER_TYPE] [-fp FILTER_PERIOD] [-o {pdf,png,ps,svg}] [--hide] [-nt] [-v] [-db] EXPID
 
-      expid                 experiment identifier
+    plots statistics for specified experiment
 
+    positional arguments:
+      EXPID                 experiment identifier
+
+    options:
       -h, --help            show this help message and exit
       -ft FILTER_TYPE, --filter_type FILTER_TYPE
                             Select the job type to filter the list of jobs
       -fp FILTER_PERIOD, --filter_period FILTER_PERIOD
-                            Select the period of time to filter the jobs
-                            from current time to the past in number of hours back
+                           Select the period to filter jobs from current time to the past in number of hours back
       -o {pdf,png,ps,svg}, --output {pdf,png,ps,svg}
                             type of output for generated plot
-      --section_summary     Includes section summary in the plot
-      --jobs_summary        Includes jobs summary in the plot
-      --hide,               hide the plot
-      -nt                   --notransitive
-                                prevents doing the transitive reduction when plotting the workflow
+      --hide                hides plot window
+      -nt, --notransitive   Disable transitive reduction
+      -v, --update_version  Update experiment version
+      -db, --database       Use database for statistics
+
 
 Example:
 ::
@@ -515,7 +541,7 @@ The location where user can find the generated plots with date and timestamp can
 
 ::
 
-    <experiments_directory>/cxxx/plot/cxxx_statistics_<date>_<time>.pdf
+    <experiments_directory>/<EXPID>/plot/<EXPID>_statistics_<DATE>_<TIME>.pdf
 
 For including the summaries:
 ::
@@ -525,8 +551,8 @@ For including the summaries:
 The location will be:
 ::
 
-        <experiments_directory>/cxxx/stats/cxxx_section_summary_<date>_<time>.pdf
-        <experiments_directory>/cxxx/stats/cxxx_jobs_summary_<date>_<time>.pdf
+        <experiments_directory>/<EXPID>/stats/<EXPID>_section_summary_<DATE>_<TIME>.pdf
+        <experiments_directory>/<EXPID>/stats/<EXPID>_jobs_summary_<DATE>_<TIME>.pdf
 
 Console output description
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -614,7 +640,7 @@ The allowed format for this feature is the same as the Autosubmit configuration 
 The location where user can put this stats is in the file:
 ::
 
-    <experiments_directory>/cxxx/tmp/cxxx_GENERAL_STATS
+    <experiments_directory>/<EXPID>/tmp/<EXPID>_GENERAL_STATS
 
 .. hint:: If it is not yet created, you can manually create the file: ```expid_GENERAL_STATS``` inside the ```tmp``` folder.
 
@@ -634,27 +660,33 @@ The command can be called with:
 Alternatively it also can be called as follows:
 ::
 
-    autosubmit report expid -all
+    autosubmit report EXPID
 
 Or combined as follows:
 ::
 
-    autosubmit report expid -all -t "absolute_file_path"
+    autosubmit report EXPID -t "absolute_file_path"
 
 Options:
 ::
+   usage: autosubmit report [-h] [-t TEMPLATE] [-all] [-fp FOLDER_PATH] [-p] [-v] EXPID
 
-    usage: autosubmit report [-all] [-t] [-fp] [-p] expid
+   Show metrics..
 
-        expid                                Experiment identifier
+   positional arguments:
+   EXPID            experiment identifier
 
-        -t, --template <path_to_template>    Allows to select a set of parameters to be extracted
+   options:
+   -h, --help            show this help message and exit
+   -t TEMPLATE, --template TEMPLATE
+   Supply the metric template.
+   -all, --show_all_parameters
+   Writes a file containing all parameters
+   -fp FOLDER_PATH, --folder_path FOLDER_PATH
+   Allows to select a non-default folder.
+   -p, --placeholders    disables the substitution of placeholders by -
+   -v, --update_version  Update experiment version
 
-        -fp, --show_all_parameters           All parameters will be extracted to a different file
-
-        -fp, --folder_path                   By default, all parameters will be put into experiment tmp folder
-
-        -p, --placeholders                   disable the replacement by - if the variable doesn't exist
 
 Autosubmit parameters are encapsulated by %_%, once you know how the parameter is called you can create a template similar to the one as follows:
 

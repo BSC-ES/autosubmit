@@ -12,9 +12,9 @@ Job packages, or "wrappers", are jobs created as bundles of different tasks (sub
 
 .. code-block:: bash
 
-	autosubmit create  <expid>  -cw  # Unstarted experiment
-	autosubmit monitor <expid> -cw # Ongoing experiment
-	autosubmit inspect <expid> -cw -f # Visualize wrapper cmds
+	autosubmit create  EXPID  -cw  # Unstarted experiment
+	autosubmit monitor EXPID -cw # Ongoing experiment
+	autosubmit inspect EXPID -cw -f # Visualize wrapper cmds
 
 Basic configuration
 -------------------

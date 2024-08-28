@@ -18,21 +18,25 @@ otherwise.
 
 Options:
 ::
+    usage: autosubmit run [-h] [-nt] [-v] [-st START_TIME] [-sa START_AFTER] [-rom RUN_ONLY_MEMBERS] [-p] EXPID
 
-    usage: autosubmit run [-h] expid
+    runs specified experiment
 
-      expid       experiment identifier
-      -nt                   --notransitive
-                                prevents doing the transitive reduction when plotting the workflow
-      -v                    --update_version
-                                update the experiment version to match the actual autosubmit version
-      -st                   --start_time
-                                Sets the starting time for the experiment. Accepted format: 'yyyy-mm-dd HH:MM:SS' or 'HH:MM:SS' (defaults to current day).
-      -sa                   --start_after 
-                                Sets a experiment expid that will be tracked for completion. When this experiment is completed, the current instance of Autosubmit run will start.
-      -rom,--run_only_members  --run_members
-                                Sets a list of members allowed to run. The list must have the format '### ###' where '###' represents the name of the member as set in the conf files.
-      -h, --help  show this help message and exit
+    positional arguments:
+      EXPID                 experiment identifier
+
+    options:
+      -h, --help            show this help message and exit
+      -nt, --notransitive   Disable transitive reduction
+      -v, --update_version  Update experiment version
+      -st START_TIME, --start_time START_TIME
+                            Sets the starting time for this experiment
+      -sa START_AFTER, --start_after START_AFTER
+                            Sets a experiment expid which completion will trigger the start of this experiment.
+      -rom RUN_ONLY_MEMBERS, --run_only_members RUN_ONLY_MEMBERS
+                            Sets members allowed on this run.
+      -p, --profile         Prints performance parameters of the execution of this command.
+
 
 Example:
 
@@ -96,7 +100,7 @@ Once you've already loaded / installed the Autosubmit version do you want:
 
 .. code-block:: bash
 
-    autosubmit upgrade $expid
+    autosubmit upgrade $EXPID
     autosubmit create $EXPID -np
     autosubmit recovery $EXPID -s --all -f -np
     # Add your key to ssh agent ( if encrypted )
@@ -419,12 +423,12 @@ Options:
 
     usage: autosubmit stop [-h] [-f] [-a] [-fa] [-c] [-fs FILTER_STATUS]
                        [-t STATUS]
-                       [expid]
+                       [EXPID]
 
     Completely stops an autosubmit run process
 
     positional arguments:
-      expid                 experiment identifier, stops the listed expids
+      EXPID                 experiment identifier, stops the listed expids
                             separated by ","
 
     optional arguments:
@@ -438,6 +442,7 @@ Options:
       -fs FILTER_STATUS, --filter_status FILTER_STATUS
                             Select the status (one or more) to filter the list of
                             jobs. Default is SUBMITTED, QUEUING, RUNNING.
+			    
       -t STATUS, --target STATUS
                             Final status of killed jobs. Default is FAILED.
 

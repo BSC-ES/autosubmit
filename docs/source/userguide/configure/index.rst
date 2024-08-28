@@ -40,24 +40,33 @@ Experiment workflow, which contains all the jobs and its dependencies, will be s
 
 Options:
 ::
+   usage: autosubmit create [-h] [-np] [--hide] [-d] [-o {pdf,png,ps,svg}] [-group_by {date,member,chunk,split,automatic}]
+                         [-expand EXPAND] [-expand_status EXPAND_STATUS] [-nt] [-cw] [-v] [-p] [-f]
+                         EXPID
 
-    usage: autosubmit create [-group_by {date,member,chunk,split} -expand -expand_status] [-h] [-np] [-cw] expid
+    create specified experiment joblist
 
-      expid          experiment identifier
+    positional arguments:
+      EXPID                 experiment identifier
 
-      -h, --help     show this help message and exit
-      -np, --noplot  omit plot creation
-      --hide,        hide the plot
+    options:
+      -h, --help            show this help message and exit
+      -np, --noplot         omit plot
+      --hide                hides plot window
+      -d, --detail          Show Job List view in terminal
+      -o {pdf,png,ps,svg}, --output {pdf,png,ps,svg}
+                            chooses type of output for generated plot
       -group_by {date,member,chunk,split,automatic}
-                            criteria to use for grouping jobs
-      -expand,              list of dates/members/chunks to expand
-      -expand_status,       status(es) to expand
-      -nt                   --notransitive
-                                prevents doing the transitive reduction when plotting the workflow
-      -cw                   --check_wrapper
-                                Generate the wrapper in the current workflow
-      -d                    --detail
-                                Shows Job List view in terminal
+                            Groups the jobs automatically or by date, member, chunk or split
+      -expand EXPAND        Supply the list of dates/members/chunks to filter the list of jobs. Default = "Any". LIST = "[
+                            19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"
+      -expand_status EXPAND_STATUS
+                            Select the statuses to be expanded
+      -nt, --notransitive   Disable transitive reduction
+      -cw, --check_wrapper  Generate possible wrapper in the current workflow
+      -v, --update_version  Update experiment version
+      -p, --profile         Prints performance parameters of the execution of this command.
+      -f, --force           force regenerate job_list
 
 Example:
 ::
