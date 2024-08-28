@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import inspect
 import tempfile
+
 from mock import MagicMock, ANY
 from mock import patch
 
@@ -11,9 +12,11 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistenceDb
-from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical
+from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, jobs_in_wrapper_str
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+import pytest
+from autosubmit.job.job_packages import jobs_in_wrapper_str
 
 
 class FakeBasicConfig:
@@ -206,3 +209,21 @@ class TestJobPackage(TestCase):
         self.job_package._create_scripts.is_called_once_with()
         self.job_package._send_files.is_called_once_with()
         self.job_package._do_submission.is_called_once_with()
+
+@pytest.fixture
+def mock_as_conf():
+    class MockAsConf:
+        experiment_data = {
+            "WRAPPERS": {
+                "current_wrapper": {
+                    "JOBS_IN_WRAPPER": "job1 job2 job3"
+                }
+            }
+        }
+    return MockAsConf()
+
+def test_jobs_in_wrapper_str(mock_as_conf):
+    # Arrange
+    current_wrapper = "current_wrapper"
+    result = jobs_in_wrapper_str(mock_as_conf, current_wrapper)
+    assert result == "job1_job2_job3"
