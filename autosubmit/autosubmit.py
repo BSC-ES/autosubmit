@@ -673,7 +673,7 @@ class Autosubmit:
 
             # stop
             subparser = subparsers.add_parser(
-                'stop', description='Completly stops an autosubmit run process')
+                'stop', description='Completely stops an autosubmit run process')
             group = subparser.add_mutually_exclusive_group(required=True)
             group.add_argument('expid', help='experiment identifier, stops the listed expids separated by ","', nargs='?')
             subparser.add_argument('-f', '--force', default=False, action='store_true',
