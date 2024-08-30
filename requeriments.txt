@@ -8,7 +8,6 @@ portalocker<=2.7.0
 paramiko<=3.4
 pyparsing==3.1.1
 matplotlib<=3.8.3
-argparse<=1.4.0
 packaging<=23.2
 ruamel.yaml.clib<=0.2.8
 typing_extensions<=4.9.0
@@ -21,7 +20,6 @@ numpy<2
 ruamel.yaml==0.17.21
 rocrate==0.*
 autosubmitconfigparser==1.0.67
-pathlib
 configparser
 pytest
 pytest-cov
