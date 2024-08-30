@@ -271,7 +271,7 @@ Platform configuration
         # Example platform with all options specified
         ## Platform name
         # PLATFORM:
-        ## Queue type. Options: PBS, SGE, PS, LSF, ecaccess, SLURM
+        ## Queue type. Options: PBS, SGE, PS, ecaccess, SLURM
         # TYPE:
         ## Version of queue manager to use. Needed only in PBS (options: 10, 11, 12) and ecaccess (options: pbs, loadleveler)
         # VERSION:
@@ -308,7 +308,7 @@ Platform configuration
         # TOTAL_JOBS: 6
 
     ithaca:
-        # Queue type. Options: ps, SGE, LSF, SLURM, PBS, eceaccess
+        # Queue type. Options: ps, SGE, SLURM, PBS, eceaccess
         TYPE: SGE
         HOST: ithaca
         PROJECT: cfu
@@ -605,7 +605,7 @@ In this section, we describe the platform configuration using `-QOS` and also `P
             SCRATCH_DIR: /gpfs/scratch
 
         marenostrum4:
-            # Queue type. Options: ps, SGE, LSF, SLURM, PBS, eceaccess
+            # Queue type. Options: ps, SGE, SLURM, PBS, eceaccess
             TYPE: slurm
             HOST: mn1.bsc.es,mn2.bsc.es,mn3.bsc.es
             PROJECT: bsc32
@@ -640,18 +640,6 @@ In this section, we describe the platform configuration using `-QOS` and also `P
             TEST_SUITE: False
             SERIAL_QUEUE: debug
             QUEUE: debug
-
-        nord3:
-            TYPE: lsf
-            HOST: nord1.bsc.es
-            PROJECT: bsc32
-            USER: bsc32070
-            ADD_PROJECT_TO_HOST: False
-            SCRATCH_DIR: /gpfs/scratch
-            TEST_SUITE: False
-            MAX_WALLCLOCK: 48:00
-            MAX_PROCESSORS: 1024
-            PROCESSORS_PER_NODE: 16
 
         transfer_node:
             TYPE: ps

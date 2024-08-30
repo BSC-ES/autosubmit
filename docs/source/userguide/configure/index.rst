@@ -286,7 +286,7 @@ identifier and add this text:
 
 This will create a platform named "new_platform". The options specified are all mandatory:
 
-* TYPE: queue type for the platform. Options supported are PBS, SGE, PS, LSF, ecaccess and SLURM.
+* TYPE: queue type for the platform. Options supported are PBS, SGE, PS, ecaccess and SLURM.
 
 * HOST: hostname of the platform
 
@@ -363,15 +363,13 @@ Example:
 .. code-block:: yaml
 
     PLATFORMS:
-        marenostrum3:
-            TYPE: LSF
+        marenostrum5:
+            TYPE: slurm
             HOST: mn-bsc32
             PROJECT: bsc32
             ADD_PROJECT_TO_HOST: false
-            USER: bsc32XXX
+            USER: bsc032XXX
             SCRATCH_DIR: /gpfs/scratch
-            TEST_SUITE: True
-            EXCLUSIVITY: True
 
 Of course, you can configure only one or both. For example, for reservation it would be:
 
@@ -383,8 +381,8 @@ Example:
 .. code-block:: YAML
 
     PLATFORMS:
-        marenostrum3:
-            TYPE: LSF
+        marenostrum5:
+            TYPE: slurm
             ...
             RESERVATION: your-reservation-id
 

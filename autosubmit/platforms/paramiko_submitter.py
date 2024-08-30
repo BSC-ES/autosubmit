@@ -26,7 +26,6 @@ from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from .submitter import Submitter
 from autosubmit.platforms.psplatform import PsPlatform
-from autosubmit.platforms.lsfplatform import LsfPlatform
 from autosubmit.platforms.pbsplatform import PBSPlatform
 from autosubmit.platforms.sgeplatform import SgePlatform
 from autosubmit.platforms.ecplatform import EcPlatform
@@ -139,9 +138,6 @@ class ParamikoSubmitter(Submitter):
                         asconf.expid, section, config)
                 elif platform_type == 'ps':
                     remote_platform = PsPlatform(
-                        asconf.expid, section, config)
-                elif platform_type == 'lsf':
-                    remote_platform = LsfPlatform(
                         asconf.expid, section, config)
                 elif platform_type == 'ecaccess':
                     remote_platform = EcPlatform(

@@ -41,17 +41,6 @@ PLATFORMS:
     TEST_SUITE: 'False'
     SERIAL_QUEUE: debug
     QUEUE: debug
-  NORD3:
-    TYPE: lsf
-    HOST: nord1.bsc.es
-    PROJECT: bsc32
-    USER: bsc32070
-    ADD_PROJECT_TO_HOST: 'False'
-    SCRATCH_DIR: /gpfs/scratch
-    TEST_SUITE: 'False'
-    MAX_WALLCLOCK: 48:00
-    MAX_PROCESSORS: '1024'
-    PROCESSORS_PER_NODE: '16'
   TRANSFER_NODE:
     TYPE: ps
     HOST: dt01.bsc.es

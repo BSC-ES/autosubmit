@@ -35,8 +35,8 @@ class JobPackager(object):
 
     :param as_config: Autosubmit basic configuration.\n
     :type as_config: AutosubmitConfig object.\n
-    :param platform: A particular platform we are dealing with, e.g. Lsf Platform.\n
-    :type platform: Specific Platform Object, e.g. LsfPlatform(), EcPlatform(), ...\n
+    :param platform: A particular platform we are dealing with, e.g. Slurm Platform.\n
+    :type platform: Specific Platform Object, e.g. SlurmPlatform(), EcPlatform(), ...\n
     :param jobs_list: Contains the list of the jobs, along other properties.\n
     :type jobs_list: JobList object.
     """

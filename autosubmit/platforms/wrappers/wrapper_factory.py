@@ -238,23 +238,6 @@ class PJMWrapperFactory(WrapperFactory):
     def partition_directive(self, partition):
         return '#PJM -g {0}'.format(partition)
 
-class LSFWrapperFactory(WrapperFactory):
-
-    def vertical_wrapper(self, **kwargs):
-        return PythonVerticalWrapperBuilder(**kwargs)
-
-    def horizontal_wrapper(self, **kwargs):
-        return PythonHorizontalWrapperBuilder(**kwargs)
-
-    def header_directives(self, **kwargs):
-        return self.platform.wrapper_header(**kwargs)
-
-    def queue_directive(self, queue):
-        return queue
-
-    def dependency_directive(self, dependency):
-        return '#BSUB -w \'done({0})\' [-ti]'.format(dependency)
-
 
 class EcWrapperFactory(WrapperFactory):
 
