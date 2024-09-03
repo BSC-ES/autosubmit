@@ -2,7 +2,9 @@
 =====================
 
 - #1408: Updated our Docker image to work with Kubernetes.
-  Included sample helm charts (tested with minikube)
+  Included sample helm charts (tested with minikube).
+- #1373: Update installation instructions with `rsync`, and fix
+  our `Dockerfile` adding `rsync` and `subversion`.
 
 4.1.10 - Hotfix
 ===============

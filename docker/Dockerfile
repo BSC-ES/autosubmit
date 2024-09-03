@@ -106,8 +106,10 @@ RUN apt update && \
       less \
       net-tools \
       openssh-server \
+      rsync \
       python3-tk \
       sqlite3 \
+      subversion \
       sudo \
       vim \
       xdg-utils && \
