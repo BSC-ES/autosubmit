@@ -58,6 +58,15 @@ pg_require = [
     'psycopg2'
 ]
 
+docs_require = [
+    'livereload',
+    'pydata-sphinx-theme==0.15.*',
+    'sphinx==5.*',
+    'sphinx-autobuild==2021.3.*',
+    'sphinx_rtd_theme',
+    'sphinx-reredirects==0.1.*'
+]
+
 tests_require = [
     'pytest==8.2.*',
     'pytest-cov',
@@ -71,6 +80,7 @@ all_require = tests_require + pg_require
 extras_require = {
     'postgres': pg_require,
     'tests': tests_require,
+    'docs': docs_require,
     'all': all_require
 }
 

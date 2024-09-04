@@ -40,7 +40,8 @@ Experiment workflow, which contains all the jobs and its dependencies, will be s
 
 Options:
 ::
-   usage: autosubmit create [-h] [-np] [--hide] [-d] [-o {pdf,png,ps,svg}] [-group_by {date,member,chunk,split,automatic}]
+
+    usage: autosubmit create [-h] [-np] [--hide] [-d] [-o {pdf,png,ps,svg}] [-group_by {date,member,chunk,split,automatic}]
                          [-expand EXPAND] [-expand_status EXPAND_STATUS] [-nt] [-cw] [-v] [-p] [-f]
                          EXPID
 

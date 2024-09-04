@@ -98,6 +98,7 @@ To generate  the cmd files of the current non-active jobs experiment, it is poss
 EXPID is the experiment identifier.
 Options:
 ::
+
    usage: autosubmit inspect [-h] [-nt] [-f] [-cw] [-v] [-q]
                           [-fl LIST | -fc FILTER_CHUNKS | -fs {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN} | -ft FILTER_TYPE]
                           EXPID
@@ -491,6 +492,7 @@ Options:
 
 Examples:
 ::
+
    autosubmit describe cxxx
    autosubmit describe "cxxx cyyy"
    autosubmit describe cxxx,cyyy
@@ -669,6 +671,7 @@ Or combined as follows:
 
 Options:
 ::
+
    usage: autosubmit report [-h] [-t TEMPLATE] [-all] [-fp FOLDER_PATH] [-p] [-v] EXPID
 
    Show metrics..

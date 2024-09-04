@@ -1,4 +1,4 @@
-To build the docs, install the `requirements.txt` in this folder and then run
+To build the docs, install the optional group `docs` with `pip`, and then run
 `make html`.
 
 That should create a version identical to the one from ReadTheDocs, which can

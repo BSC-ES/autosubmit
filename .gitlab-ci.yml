@@ -1,33 +1,33 @@
 before_script:
   - export GIT_SSL_NO_VERIFY=1
   - export PATH="$HOME/miniconda2/bin:$PATH"
+  # 2024-09-04: We deleted autosubmit3 env (00:00:04).
+  # - conda env remove -y -n autosubmit3
+  # 2024-09-04: Installed a new env autosubmit4 (00:00:55).
+  # - conda create -n autosubmit4 python=3.9 graphviz bcrypt pip sqlite rsync curl
+  # And then we use this environment to create venv's (faster) and install Autosubmit.
+  # We always activate the same environment
+  - conda activate autosubmit4
+  - test -f venv/bin/python || python3 -m venv venv
+  - source venv/bin/activate
+  - python3 -V
 
 stages:
-  - prepare
-  - docs
   - test
-  - report
-  - clean
+  - docs
 
 cache:
   paths:
     - test/coverage.xml
     - test/unit/files
-
-prepare:
-  stage: prepare
-  script:
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - conda update -n base -c defaults conda
-    - conda update conda
-    - conda install -n autosubmit3 pytest pytest-cov pytest-mock
-    - conda env update -f environment.yml -n autosubmit3 python=3.7.3
+    - venv
 
 test_python3:
   stage: test
   script:
-    - conda activate autosubmit3
+    - pip install --upgrade pip
+    # This installs default dependencies, plus those for running tests and for building docs.
+    - pip install -e .[tests]
     - pytest
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   # These artifacts are saved with every build in GitLab and can be reviewed later. If
@@ -39,18 +39,9 @@ test_python3:
         coverage_format: cobertura
         path: test/coverage.xml
 
-# FIXME: Our GitLab worker has 3.7, but pydata-sphinx-theme requires 3.8+
-# docs:
-#   stage: docs
-#   script:
-#     - conda activate autosubmit3
-#     - pip install -e .
-#     - cd docs
-#     - pip install -r requirements.txt
-#     - make html
-
-
-clean:
-  stage: clean
+docs:
+  stage: docs
   script:
-    - conda clean --all --yes
+    - pip install -e .[docs]
+    - cd docs
+    - make html

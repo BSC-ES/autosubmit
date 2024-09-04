@@ -69,6 +69,7 @@ use, unless it is unarchived.
 
 Options:
 ::
+
    usage: autosubmit archive [-h] [-nclean] [-uc] [-v] [--rocrate] EXPID
 
     archives an experiment
@@ -101,6 +102,7 @@ To unarchive an experiment, use the command:
 
 Options:
 ::
+
    usage: autosubmit unarchive [-h] [-nclean] [-uc] [-v] [--rocrate] EXPID
 
     unarchives an experiment
@@ -131,6 +133,7 @@ To delete the experiment, use the command:
 
 Options:
 ::
+
     usage: autosubmit delete [-h] [-f] [-v] EXPID
 
     delete specified experiment
@@ -157,10 +160,12 @@ How to migrate an experiment
 
 The Autosubmit Migrate command is used to migrate data from one user to another.
 ::
+
    autosubmit migrate EXPID
 
 Options:
 ::
+
    usage: autosubmit migrate [-h] [-o] [-p] [-r] [-v] [-fs {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}] EXPID
 
     Migrate experiments from current user to another
@@ -267,6 +272,7 @@ It checks experiment configuration and copy code from original repository to pro
 
 Options:
 ::
+
     usage: autosubmit refresh [-h] [-mc] [-jc] [-v] EXPID
 
     refresh project directory for an experiment
@@ -302,17 +308,18 @@ Use the command:
 
 Options:
 ::
-   usage: autosubmit updatedescrip [-h] [-v] EXPID DESCRIPTION
 
-    Updates the experiment's description.
+    usage: autosubmit updatedescrip [-h] [-v] EXPID DESCRIPTION
 
-    positional arguments:
-      EXPID                 experiment identifier
-      DESCRIPTION           New description.
+        Updates the experiment's description.
 
-    options:
-      -h, --help            show this help message and exit
-      -v, --update_version  Update experiment version
+        positional arguments:
+          EXPID                 experiment identifier
+          DESCRIPTION           New description.
+
+        options:
+          -h, --help            show this help message and exit
+          -v, --update_version  Update experiment version
 
 
 Autosubmit will validate the provided data and print the results in the command line.
