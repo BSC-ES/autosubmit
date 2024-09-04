@@ -554,10 +554,10 @@ class TestJobList(TestCase):
 
             # check that name is the same
             for index,job in enumerate(job_list._job_list):
-                self.assertEquals(job_list2._job_list[index].name, job.name)
+                self.assertEqual(job_list2._job_list[index].name, job.name)
             # check that status is the same
             for index,job in enumerate(job_list._job_list):
-                self.assertEquals(job_list2._job_list[index].status, job.status)
+                self.assertEqual(job_list2._job_list[index].status, job.status)
             self.assertEqual(job_list2._date_list, job_list._date_list)
             self.assertEqual(job_list2._member_list, job_list._member_list)
             self.assertEqual(job_list2._chunk_list, job_list._chunk_list)
@@ -582,10 +582,10 @@ class TestJobList(TestCase):
             # assert
             # check that name is the same
             for index, job in enumerate(job_list._job_list):
-                self.assertEquals(job_list3._job_list[index].name, job.name)
+                self.assertEqual(job_list3._job_list[index].name, job.name)
             # check that status is the same
             for index,job in enumerate(job_list._job_list):
-                self.assertEquals(job_list3._job_list[index].status, job.status)
+                self.assertEqual(job_list3._job_list[index].status, job.status)
             self.assertEqual(job_list3._date_list, job_list._date_list)
             self.assertEqual(job_list3._member_list, job_list._member_list)
             self.assertEqual(job_list3._chunk_list, job_list._chunk_list)

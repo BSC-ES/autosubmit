@@ -59,7 +59,7 @@ class TestRoCrate(TestCase):
                 relative_path=d,
                 encoding_format=None
             )
-        self.assertEquals(1, len(self.empty_rocrate.data_entities))
+        self.assertEqual(1, len(self.empty_rocrate.data_entities))
 
     def test_add_dir_and_files(self):
         with TemporaryDirectory() as d:
@@ -75,13 +75,13 @@ class TestRoCrate(TestCase):
                     relative_path=str(sub_path),
                     encoding_format=None
                 )
-        self.assertEquals(2, len(self.empty_rocrate.data_entities))
+        self.assertEqual(2, len(self.empty_rocrate.data_entities))
         for entity in self.empty_rocrate.data_entities:
             if entity.source.name == 'file.txt':
                 properties = entity.properties()
                 self.assertTrue(properties['sdDatePublished'])
                 self.assertTrue(properties['dateModified'])
-                self.assertEquals(properties['encodingFormat'], 'text/plain')
+                self.assertEqual(properties['encodingFormat'], 'text/plain')
                 break
         else:
             self.fail('Failed to locate the entity for files/file.txt')
@@ -102,13 +102,13 @@ class TestRoCrate(TestCase):
                         relative_path=str(sub_path),
                         encoding_format=encoding
                     )
-            self.assertEquals(2, len(self.empty_rocrate.data_entities))
+            self.assertEqual(2, len(self.empty_rocrate.data_entities))
             for entity in self.empty_rocrate.data_entities:
                 if entity.source.name == 'file.txt':
                     properties = entity.properties()
                     self.assertTrue(properties['sdDatePublished'])
                     self.assertTrue(properties['dateModified'])
-                    self.assertEquals(properties['encodingFormat'], encoding)
+                    self.assertEqual(properties['encodingFormat'], encoding)
                     break
             else:
                 self.fail('Failed to locate the entity for files/file.txt')
@@ -123,14 +123,14 @@ class TestRoCrate(TestCase):
             jobs = tests[0]
             expected = tests[1]
             result = _get_action_status(jobs)
-            self.assertEquals(expected, result)
+            self.assertEqual(expected, result)
 
     def test_create_formal_parameter(self):
         formal_parameter = _create_formal_parameter(self.empty_rocrate, 'Name')
         properties = formal_parameter.properties()
-        self.assertEquals('#Name-param', properties['@id'])
-        self.assertEquals('FormalParameter', properties['@type'])
-        self.assertEquals('Name', properties['name'])
+        self.assertEqual('#Name-param', properties['@id'])
+        self.assertEqual('FormalParameter', properties['@type'])
+        self.assertEqual('Name', properties['name'])
 
     def test_create_parameter(self):
         formal_parameter = _create_formal_parameter(self.empty_rocrate, 'Answer')
@@ -143,8 +143,8 @@ class TestRoCrate(TestCase):
             extra='test'
         )
         properties = parameter.properties()
-        self.assertEquals(42, properties['value'])
-        self.assertEquals('test', properties['extra'])
+        self.assertEqual(42, properties['value'])
+        self.assertEqual('test', properties['extra'])
 
     def test_get_local_project_entity(self):
         project_path = '/tmp/project'
@@ -162,10 +162,10 @@ class TestRoCrate(TestCase):
             self.empty_rocrate
         )
 
-        self.assertEquals(project_entity['@id'], project_url)
-        self.assertEquals(project_entity['targetProduct'], 'Autosubmit')
-        self.assertEquals(project_entity['codeRepository'], project_url)
-        self.assertEquals(project_entity['version'], '')
+        self.assertEqual(project_entity['@id'], project_url)
+        self.assertEqual(project_entity['targetProduct'], 'Autosubmit')
+        self.assertEqual(project_entity['codeRepository'], project_url)
+        self.assertEqual(project_entity['version'], '')
 
     def test_get_dummy_project_entity(self):
         project_url = ''
@@ -179,10 +179,10 @@ class TestRoCrate(TestCase):
             self.empty_rocrate
         )
 
-        self.assertEquals(project_entity['@id'], project_url)
-        self.assertEquals(project_entity['targetProduct'], 'Autosubmit')
-        self.assertEquals(project_entity['codeRepository'], project_url)
-        self.assertEquals(project_entity['version'], '')
+        self.assertEqual(project_entity['@id'], project_url)
+        self.assertEqual(project_entity['targetProduct'], 'Autosubmit')
+        self.assertEqual(project_entity['codeRepository'], project_url)
+        self.assertEqual(project_entity['version'], '')
 
     def test_get_subversion_or_other_project_entity(self):
         for key in ['SVN', 'SUBVERSION', 'MERCURY', '', ' ']:
@@ -214,9 +214,9 @@ class TestRoCrate(TestCase):
             self.as_conf,
             self.empty_rocrate
         )
-        self.assertEquals(project_entity['@id'], self.project_url)
-        self.assertEquals(project_entity['targetProduct'], 'Autosubmit')
-        self.assertEquals(project_entity['codeRepository'], self.project_url)
+        self.assertEqual(project_entity['@id'], self.project_url)
+        self.assertEqual(project_entity['targetProduct'], 'Autosubmit')
+        self.assertEqual(project_entity['codeRepository'], self.project_url)
         self.assertTrue(len(project_entity['version']) > 0)
 
     @patch('subprocess.check_output')
@@ -226,14 +226,14 @@ class TestRoCrate(TestCase):
         with self.assertRaises(AutosubmitCritical) as cm:
             _get_git_branch_and_commit(project_path='')
 
-        self.assertEquals(cm.exception.message, 'Failed to retrieve project branch...')
+        self.assertEqual(cm.exception.message, 'Failed to retrieve project branch...')
 
         mocked_check_output.reset_mock()
         mocked_check_output.side_effect = ['master', error]
         with self.assertRaises(AutosubmitCritical) as cm:
             _get_git_branch_and_commit(project_path='')
 
-        self.assertEquals(cm.exception.message, 'Failed to retrieve project commit SHA...')
+        self.assertEqual(cm.exception.message, 'Failed to retrieve project commit SHA...')
 
     @patch('autosubmit.provenance.rocrate.BasicConfig')
     @patch('autosubmit.provenance.rocrate.get_experiment_descrip')
@@ -376,7 +376,7 @@ class TestRoCrate(TestCase):
                     path=Path(temp_dir)
                 )
 
-            self.assertEquals(cm.exception.message, 'Failed to read the Autosubmit Project for RO-Crate...')
+            self.assertEqual(cm.exception.message, 'Failed to read the Autosubmit Project for RO-Crate...')
 
     @patch('autosubmit.provenance.rocrate.BasicConfig')
     @patch('autosubmit.provenance.rocrate.get_experiment_descrip')
@@ -446,7 +446,7 @@ class TestRoCrate(TestCase):
                     path=Path(temp_dir)
                 )
 
-            self.assertEquals(cm.exception.message,
+            self.assertEqual(cm.exception.message,
                               'Could not locate a type in RO-Crate for parameter APP.OBJ type object')
 
     @patch('autosubmit.autosubmit.Log')
@@ -466,8 +466,8 @@ class TestRoCrate(TestCase):
         with self.assertRaises(AutosubmitCritical) as cm, tempfile.TemporaryDirectory() as temp_dir:
             autosubmit.rocrate(self.expid, path=Path(path=Path(temp_dir)))
 
-        self.assertEquals(cm.exception.message, 'You must provide an ROCRATE configuration key when using RO-Crate...')
-        self.assertEquals(mocked_Log.error.call_count, 1)
+        self.assertEqual(cm.exception.message, 'You must provide an ROCRATE configuration key when using RO-Crate...')
+        self.assertEqual(mocked_Log.error.call_count, 1)
 
     @patch('autosubmit.autosubmit.JobList')
     @patch('autosubmit.autosubmit.AutosubmitConfig')
@@ -754,5 +754,5 @@ class TestRoCrate(TestCase):
             )
             self.assertIsNotNone(crate)
             data_entities_ids = [data_entity['@id'] for data_entity in crate.data_entities]
-            self.assertEquals(len(data_entities_ids), len(set(data_entities_ids)), f'Duplicate IDs found in the RO-Crate data entities: {str(data_entities_ids)}')
+            self.assertEqual(len(data_entities_ids), len(set(data_entities_ids)), f'Duplicate IDs found in the RO-Crate data entities: {str(data_entities_ids)}')
 

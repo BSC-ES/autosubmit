@@ -97,7 +97,7 @@ CONFIG:
             source_name = Path(source_yaml.name)
             output_text = Path(temp_dir, expid, 'conf', f'{source_name.stem}_{expid}.yml').read_text()
 
-            self.assertNotEquals(source_text, output_text)
+            self.assertNotEqual(source_text, output_text)
             self.assertFalse('# sim' in source_text)
             self.assertTrue('# sim' in output_text)
             self.assertFalse('# 42' in source_text)

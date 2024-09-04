@@ -1179,7 +1179,7 @@ CONFIG:
         ]:
             self.job.date = test[0]
             self.job.date_format = test[1]
-            self.assertEquals(test[2], self.job.sdate)
+            self.assertEqual(test[2], self.job.sdate)
 
     def test__repr__(self):
         self.job.name = "dummy-name"

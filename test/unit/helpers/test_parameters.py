@@ -31,7 +31,7 @@ class TestParameters(TestCase):
         # ``Job`` becomes ``JOB``.
         self.assertTrue(parameter_group in PARAMETERS)
         self.assertTrue(parameter_name in PARAMETERS[parameter_group])
-        self.assertEquals('This parameter is the job name.', PARAMETERS[parameter_group][parameter_name])
+        self.assertEqual('This parameter is the job name.', PARAMETERS[parameter_group][parameter_name])
 
 
     def test_autosubmit_decorator_using_array(self):
@@ -56,7 +56,7 @@ class TestParameters(TestCase):
         self.assertTrue(parameter_group in PARAMETERS)
         for parameter_name in parameter_names:
             self.assertTrue(parameter_name in PARAMETERS[parameter_group])
-            self.assertEquals('This parameter is the job name.', PARAMETERS[parameter_group][parameter_name])
+            self.assertEqual('This parameter is the job name.', PARAMETERS[parameter_group][parameter_name])
 
 
     def test_autosubmit_decorator_no_group(self):
@@ -79,7 +79,7 @@ class TestParameters(TestCase):
         # ``Job`` becomes ``JOB``.
         self.assertTrue(Job.__name__.upper() in PARAMETERS)
         self.assertTrue(parameter_name in PARAMETERS[Job.__name__.upper()])
-        self.assertEquals('This parameter is the job name.', PARAMETERS[Job.__name__.upper()][parameter_name])
+        self.assertEqual('This parameter is the job name.', PARAMETERS[Job.__name__.upper()][parameter_name])
 
 
     def test_autosubmit_class_decorator(self):
@@ -102,6 +102,6 @@ class TestParameters(TestCase):
         self.assertTrue(len(PARAMETERS) > 0)
         self.assertTrue('JOB' in PARAMETERS)
         self.assertTrue('JOBNAME' in PARAMETERS['JOB'])
-        self.assertEquals('The value!', PARAMETERS['JOB']['JOBNAME'])
+        self.assertEqual('The value!', PARAMETERS['JOB']['JOBNAME'])
 
 
