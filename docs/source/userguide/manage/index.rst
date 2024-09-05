@@ -254,19 +254,22 @@ To only pick the remote files, the user B, must do
 
     autosubmit migrate --pickup EXPID --onlyremote
 
-How to refresh the experiment project
--------------------------------------
+How to synchronize with the project's latest changes
+----------------------------------------------------
 
-To refresh the project directory of the experiment, use the command:
+Autosubmit supports directly feching files from the repository, which could be local or remote.
+
+In order to synchronize with remote, use the command:
+
 ::
 
     autosubmit refresh EXPID
 
-*EXPID* is the experiment identifier.
+where *EXPID* is the experiment identifier.
 
-It checks experiment configuration and copy code from original repository to project directory.
+It checks the experiment configuration and copies code from the original repository to project directory.
 
-.. warning:: DO NOT USE THIS COMMAND IF YOU ARE NOT SURE !
+.. warning:: THIS WILL OVERWRITE LOCAL CHANGES!
     Project directory ( <expid>/proj will be overwritten and you may loose local changes.
 
 
