@@ -922,7 +922,7 @@ class JobPackagerHorizontal(object):
                 if jobs_processed % 10 == 0 and jobs_processed > 0:
                     Log.info(f"Wrapper package creation is still ongoing. So far {jobs_processed} jobs have been wrapped.")
                 job.update_parameters(wrapper_info[-1], {})
-                if str(job.processors).isdigit() and str(job.nodes).isdigit() and int(job.nodes) > 1 and int(job.processors) <= 1:
+                if str(job.processors).isdigit() and str(job.nodes).isdigit() and int(job.nodes) > 0 and int(job.processors) <= 1:
                     job.processors = 0
                 if job.total_processors == "":
                     job_total_processors = 0

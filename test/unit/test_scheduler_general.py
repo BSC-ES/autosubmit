@@ -109,7 +109,7 @@ PLATFORMS:
     with jobs_path.open('w') as f:
         f.write(f"""
 JOBS:
-    job:
+    nodes:
         SCRIPT: |
             echo "Hello World"
         For: 
@@ -118,8 +118,7 @@ JOBS:
             NAME: [pjm, slurm, ecaccess, ps]
         RUNNING: once
         wallclock: 00:01
-        PROCESSORS: 5
-        nodes: 2
+        nodes: 1
         threads: 40
         tasks: 90
     base:
@@ -170,10 +169,6 @@ EXPERIMENT:
     CALENDAR: standard
   """)
 
-
-
-
-
     expid_dir = Path(f"{scheduler_tmpdir.strpath}/scratch/whatever/{scheduler_tmpdir.owner}/t000")
     dummy_dir = Path(f"{scheduler_tmpdir.strpath}/scratch/whatever/{scheduler_tmpdir.owner}/t000/dummy_dir")
     real_data = Path(f"{scheduler_tmpdir.strpath}/scratch/whatever/{scheduler_tmpdir.owner}/t000/real_data")
@@ -195,10 +190,12 @@ def generate_cmds(prepare_scheduler):
     return prepare_scheduler
 
 @pytest.mark.parametrize("scheduler, job_type", [
-    ('pjm', 'SINGLE'),
-    ('slurm', 'SINGLE'),
-    ('ecaccess', 'SINGLE'),
-    ('ps', 'SINGLE'),
+    ('pjm', 'DEFAULT'),
+    ('slurm', 'DEFAULT'),
+    ('ecaccess', 'DEFAULT'),
+    ('ps', 'DEFAULT'),
+    ('pjm', 'NODES'),
+    ('slurm', 'NODES'),
     ('slurm', 'horizontal'),
     ('slurm', 'vertical'),
     ('slurm', 'horizontal_vertical'),
@@ -218,10 +215,15 @@ def test_scheduler_job_types(scheduler, job_type, generate_cmds):
     scheduler = scheduler.upper()
     job_type = job_type.upper()
     expected_data = {}
-    if job_type == "SINGLE":
+    if job_type == "DEFAULT":
         for base_f in _get_script_files_path().glob('base_*.cmd'):
             if scheduler in base_f.stem.split('_')[1].upper():
                 expected_data = Path(base_f).read_text()
+                break
+    elif job_type == "NODES":
+        for nodes_f in _get_script_files_path().glob('nodes_*.cmd'):
+            if scheduler in nodes_f.stem.split('_')[1].upper():
+                expected_data = Path(nodes_f).read_text()
                 break
     else:
         expected_data = (Path(_get_script_files_path()) / Path(f"base_{job_type.lower()}_{scheduler.lower()}.cmd")).read_text()
@@ -229,8 +231,10 @@ def test_scheduler_job_types(scheduler, job_type, generate_cmds):
         assert False, f"Could not find the expected data for {scheduler} and {job_type}"
 
     # Get the actual default parameters for the scheduler
-    if job_type == "SINGLE":
+    if job_type == "DEFAULT":
         actual = Path(f"{generate_cmds.strpath}/t000/tmp/t000_BASE_{scheduler}.cmd").read_text()
+    elif job_type == "NODES":
+        actual = Path(f"{generate_cmds.strpath}/t000/tmp/t000_NODES_{scheduler}.cmd").read_text()
     else:
         for asthread in Path(f"{generate_cmds.strpath}/t000/tmp").glob(f"*ASThread_WRAP_{job_type}_[0-9]*.cmd"):
             actual = asthread.read_text()

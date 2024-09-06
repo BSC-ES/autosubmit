@@ -55,7 +55,7 @@ class SlurmHeader(object):
                 job_nodes = 0
             else:
                 job_nodes = job.het['NODES'][het]
-            if len(job.het['PROCESSORS']) == 0 or job.het['PROCESSORS'][het] == '' or job.het['PROCESSORS'][het] == '1' and int(job_nodes) > 1:
+            if len(job.het['PROCESSORS']) == 0 or job.het['PROCESSORS'][het] == '' or job.het['PROCESSORS'][het] == '1' and int(job_nodes) > 0:
                 return ""
             else:
                 return "SBATCH -n {0}".format(job.het['PROCESSORS'][het])
@@ -63,7 +63,7 @@ class SlurmHeader(object):
             job_nodes = 0
         else:
             job_nodes = job.nodes
-        if job.processors == '' or job.processors == '1' and int(job_nodes) > 1:
+        if job.processors == '' or job.processors == '1' and int(job_nodes) > 0:
             return ""
         else:
             return "SBATCH -n {0}".format(job.processors)
