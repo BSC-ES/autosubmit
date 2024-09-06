@@ -857,7 +857,6 @@ class Autosubmit:
             expids = [x.strip() for x in expids]
             for expid in expids:
                 as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
-                as_conf.set_last_as_command(args.command)
                 as_conf.reload(force_load=True)
 
                 if len(as_conf.experiment_data) == 0:
@@ -871,11 +870,7 @@ class Autosubmit:
                 if not os.path.exists(exp_path):
                     raise AutosubmitCritical("Experiment does not exist", 7012)
                 # delete is treated differently
-                if args.command not in ["monitor", "describe", "delete", "report", "stats", "dbfix"]:
-                    owner, eadmin, currentOwner = Autosubmit._check_ownership(expid, raise_error=True)
-                else:
-                    owner, eadmin, currentOwner = Autosubmit._check_ownership(expid, raise_error=False)
-
+                owner, eadmin, current_owner = Autosubmit._check_ownership_and_set_last_command(as_conf, expid, args.command)
             if not os.path.exists(tmp_path):
                 os.mkdir(tmp_path)
             if not os.path.exists(aslogs_path):
@@ -970,56 +965,42 @@ class Autosubmit:
             "Autosubmit is running with {0}", Autosubmit.autosubmit_version)
 
     @staticmethod
+    def _check_ownership_and_set_last_command(as_conf, expid, command):
+        if command not in ["monitor", "describe", "delete", "report", "stats", "dbfix"]:
+            owner, eadmin, current_owner = Autosubmit._check_ownership(expid, raise_error=True)
+        else:
+            owner, eadmin, current_owner = Autosubmit._check_ownership(expid, raise_error=False)
+        if owner:
+            as_conf.set_last_as_command(command)
+        return owner, eadmin, current_owner
+
+
+    @staticmethod
     def _check_ownership(expid, raise_error=False):
         """
-        Check if user owns or if it is edamin
-        :return: owner,eadmin
-        :rtype: boolean,boolean
+        Check if the user owns and if it is edamin
+        :return: the owner, eadmin and current_owner
+        :rtype: boolean, boolean, str
         """
-        # return HelperUtils.check_experiment_ownership(expid, BasicConfig, raise_error, Log)
-        # Read current login
-        # Read current user uid
-        my_user = os.getuid()
-        # Read eadmin user uid
-        owner = False
+        current_owner = None
         eadmin = False
-        # execute a id -u eadmin and supress error message
-        FNULL = open(os.devnull, 'w')
-        id_eadmin = subprocess.call(['id', '-u', 'eadmin'],
-                                    stdout=FNULL,
-                                    stderr=subprocess.STDOUT)
-
-        # id_eadmin = subprocess.Popen('id -u eadmin',stdout=fp)
-        ret = False
-        # Handling possible failure of retrieval of current owner data
-        currentOwner_id = 0
-        currentOwner = "empty"
+        owner = False
+        current_user_id = os.getuid()
+        admin_user = "eadmin" # to be improved in #944
         try:
-            currentOwner_id = os.stat(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)).st_uid
-            currentOwner = pwd.getpwuid(os.stat(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)).st_uid).pw_name
-        except Exception as e:
-            pass
-        finally:
-            if currentOwner_id <= 0:
-                Log.info("Current owner '{0}' of experiment {1} does not exist anymore.", currentOwner, expid)
-        if currentOwner_id == my_user:
+            eadmin = current_user_id == pwd.getpwnam(admin_user).pw_uid
+        except:
+            Log.info(f"Autosubmit admin user: {admin_user} is not set")
+        current_owner_id = Path(BasicConfig.LOCAL_ROOT_DIR, expid).stat().st_uid
+        try:
+            current_owner = pwd.getpwuid(current_owner_id).pw_name
+        except (TypeError,KeyError):
+            Log.warning(f"Current owner of experiment {expid} could not be retrieved. The owner is no longer in the system database.")
+        if current_owner_id == current_user_id:
             owner = True
-        if my_user == id_eadmin:
-            eadmin = True
-        if owner and raise_error:
-            try:
-                current_user_id = pwd.getpwuid(os.getuid())[0]
-                current_owner_id = pwd.getpwuid(os.stat(os.path.join(
-                    BasicConfig.LOCAL_ROOT_DIR, expid)).st_uid).pw_name
-                if current_user_id != current_owner_id:
-                    raise AutosubmitCritical(
-                        "You don't own the experiment {0}.".format(expid), 7012)
-            except BaseException as e:
-                raise AutosubmitCritical(
-                    "User or owner does not exists", 7012, str(e))
-            except AutosubmitCritical as e:
-                raise
-        return owner, eadmin, currentOwner
+        elif raise_error:
+            raise AutosubmitCritical("You don't own the experiment {0}.".format(expid), 7012)
+        return owner, eadmin, current_owner
 
     @staticmethod
     def _delete_expid(expid_delete, force=False):
@@ -1045,7 +1026,7 @@ class Autosubmit:
                                 "structure_{0}.db".format(expid_delete)) + "\n"
         message += os.path.join(BasicConfig.LOCAL_ROOT_DIR, BasicConfig.JOBDATA_DIR,
                                 "job_data_{0}.db".format(expid_delete)) + "\n"
-        owner, eadmin, currentOwner = Autosubmit._check_ownership(expid_delete)
+        owner, eadmin, current_owner = Autosubmit._check_ownership(expid_delete)
         if expid_delete == '' or expid_delete is None and not os.path.exists(
                 os.path.join(str(BasicConfig.LOCAL_ROOT_DIR), str(expid_delete))):
             Log.printlog("Experiment directory does not exist.", Log.WARNING)
@@ -1056,8 +1037,10 @@ class Autosubmit:
             try:
                 if owner or (force and eadmin):
                     if force and eadmin:
-                        Log.info("Preparing deletion of experiment {0} from owner: {1}, as eadmin.", expid_delete,
-                                 currentOwner)
+                        if current_owner:
+                            Log.info(f"Preparing deletion of experiment {expid_delete} as eadmin. Current owner: {current_owner}")
+                        else:
+                            Log.info(f"Preparing deletion of experiment {expid_delete} as eadmin. Current owner: Unknown")
                     try:
                         Log.info("Deleting experiment from database...")
                         try:
