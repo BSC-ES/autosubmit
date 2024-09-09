@@ -111,6 +111,7 @@ RUN apt update && \
       sqlite3 \
       subversion \
       sudo \
+      tini \
       vim \
       xdg-utils && \
     update-ca-certificates && \
@@ -193,11 +194,13 @@ sudo service ssh restart
 exec "\$@"
 EOF
 
+RUN chmod a+x /usr/local/bin/entrypoint.sh
+
 USER $MAMBA_USER
 
 EXPOSE 22
 
 LABEL maintainer="Autosubmit team"
 
-ENTRYPOINT ["/bin/bash", "entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint.sh"]
 CMD ["autosubmit"]
