@@ -3,20 +3,6 @@
 How to restart the experiment
 =============================
 
-How to do a full restart of the experiment
-------------------------------------------
-
-By default, Autosubmit will assume we want to recover from a failed run.
-
-If that is not our case, and we want to start from scratch we must issue the following commands:
-
-::
-
-    # clears all COMPLETE files 
-    autosubmit create cxxx
-    # sets all tasks to WAITING 
-    autosubmit recovery cxxx --all -s
-
 How to recover an experiment
 ----------------------------
 
