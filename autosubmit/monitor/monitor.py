@@ -34,6 +34,7 @@ import autosubmit.helpers.utils as HelperUtils
 
 from autosubmit.job.job_common import Status
 from autosubmit.job.job import Job
+from autosubmit.helpers.utils import NaturalSort
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
@@ -319,7 +320,7 @@ class Monitor:
             return
         self.nodes_plotted.add(job)
         if job.has_children() != 0:
-            for child in sorted(job.children, key=lambda k: k.name):
+            for child in sorted(job.children, key=lambda k: NaturalSort(k.name)):
                 node_child, skip = self._check_node_exists(
                     exp, child, groups, hide_groups)
                 color, label = self._check_final_status(job, child)
