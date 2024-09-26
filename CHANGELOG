@@ -6,6 +6,9 @@
 - #1373: Update installation instructions with `rsync`, and fix
   our `Dockerfile` adding `rsync` and `subversion`.
 - #1207: Add experiment path in `autosubmit describe`.
+- #1397: Use `tini` as entrypoint in our Docker image.
+- #1428: Use natural sort order for graph entries (adapted from Cylc),
+  enable doctests to be executed with pytest.
 
 4.1.10 - Hotfix
 ===============
