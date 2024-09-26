@@ -29,8 +29,10 @@ sphinx:
 formats: all
 
 # Optionally declare the Python requirements required to build your docs
+# https://docs.readthedocs.io/en/stable/config-file/v2.html#packages
 python:
    install:
    - method: pip
      path: .
-   - requirements: docs/requirements.txt
+     extra_requirements:
+       - docs
