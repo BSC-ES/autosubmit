@@ -23,6 +23,7 @@ import datetime
 import json
 import mimetypes
 import os
+import time
 import subprocess
 from pathlib import Path
 from textwrap import dedent
@@ -545,7 +546,7 @@ def create_rocrate_archive(
                 encoding_format=None,
                 exampleOfWork={'@id': formal_parameter['@id']})
             create_action.append_to('result', {'@id': file_entity['@id']})
-
+    
     # Merge with user provided values.
     # NOTE: It is important that this call happens after the JSON-LD has
     #       been constructed by ro-crate-py, as methods like ``add`` will
@@ -555,8 +556,13 @@ def create_rocrate_archive(
         patch = json.loads(rocrate_json['PATCH'])
         for jsonld_node in patch['@graph']:
             crate.add_or_update_jsonld(jsonld_node)
-
+    
     # Write RO-Crate ZIP.
-    crate.write_zip(Path(path, f"{expid}.zip"))
+    #What date/time we want to use to define the zip file? I guess it should be the LAST modification time, right?
+    #Should I re-use the code in archive() using the full date instead of only the year? The problem is that the
+    #zip is defined in this function so all the (modified) code should be moved here. Still, I'm exploring other posibilites
+    #to query the las modified time within this function (Not very used to the code still...)
+    date = time.strftime("%Y%m%d", time.localtime(os.path.getmtime(path)))
+    crate.write_zip(Path(path, f"{expid}-{date}.zip"))
     Log.info(f'RO-Crate archive written to {experiment_path}')
     return crate
