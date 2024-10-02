@@ -631,6 +631,12 @@ class Autosubmit:
             subparser.add_argument('expid', help='experiment identifier')
             subparser.add_argument('-v', '--update_version', action='store_true',
                                    default=False, help='Update experiment version')
+            # Provenance
+            subparser = subparsers.add_parser(
+                'provenance', description = 'Produce provenance for autosubmit')
+            subparser.add_argument('expid', help='experiment identifier')
+            subparser.add_argument('--rocrate', action='store_true', default=False,
+                                   help='Produce an RO-Crate file')
             # Archive
             subparser = subparsers.add_parser(
                 'archive', description='archives an experiment')
@@ -775,11 +781,13 @@ class Autosubmit:
             return Autosubmit.update_version(args.expid)
         elif args.command == 'upgrade':
             return Autosubmit.upgrade_scripts(args.expid,files=args.files)
+        elif args.command == 'provenance':
+            return Autosubmit.provenance(args.expid, rocrate=args.rocrate)
         elif args.command == 'archive':
-                return Autosubmit.archive(args.expid, noclean=args.noclean, uncompress=args.uncompress, rocrate=args.rocrate)
+            return Autosubmit.archive(args.expid, noclean=args.noclean, uncompress=args.uncompress, rocrate=args.rocrate)
         elif args.command == 'unarchive':
             return Autosubmit.unarchive(args.expid, uncompressed=args.uncompressed, rocrate=args.rocrate)
-
+        
         elif args.command == 'readme':
             if os.path.isfile(Autosubmit.readme_path):
                 with open(Autosubmit.readme_path) as f:
@@ -2399,6 +2407,12 @@ class Autosubmit:
                         exp_history.finish_current_experiment_run()
                     except Exception:
                         Log.warning("Database is locked")
+                # Create rocrate object if requested
+                rocrate_data = as_conf.experiment_data.get("ROCRATE", None)
+                if rocrate_data:
+                    Autosubmit.provenance(expid, rocrate=True)
+                else:
+                    print("rocrate.yml not found in CONFIG. Can't create rocrate object. ")
         except BaseLockException:
             raise
         except AutosubmitCritical:
@@ -4212,7 +4226,33 @@ class Autosubmit:
 
         from autosubmit.provenance.rocrate import create_rocrate_archive
         return create_rocrate_archive(as_conf, rocrate_json, jobs, start_time, end_time, path)
+    
+    @staticmethod
+    def provenance(expid: str, rocrate: bool = False) -> None:
+        """
+        :param expid: experiment identifier
+        :type expid: str
+        :param rocrate: flag to enable RO-Crate
+        :type rocrate: bool
+        """
+        
+        if not rocrate:
+            msg = "Can not create RO-Crate ZIP file. Argument '--rocrate' required"
+            raise AutosubmitCritical(msg, 7012)
 
+        aslogs_folder = Path(
+            BasicConfig.LOCAL_ROOT_DIR,
+            expid,
+            BasicConfig.LOCAL_TMP_DIR,
+            BasicConfig.LOCAL_ASLOG_DIR
+        )
+
+        try:
+            Autosubmit.rocrate(expid, Path(aslogs_folder))
+            Log.info('RO-Crate ZIP file created!')
+        except Exception as e:
+            raise AutosubmitCritical(f"Error creating RO-Crate ZIP file: {str(e)}", 7012)
+    
     @staticmethod
     def archive(expid, noclean=True, uncompress=True, rocrate=False):
         """
