@@ -1,4 +1,4 @@
-from .tests_commands import *
+from .tests_commands import create_database_cmd
 import os
 import subprocess
 import string
