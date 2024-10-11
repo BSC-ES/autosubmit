@@ -496,7 +496,7 @@ def create_rocrate_archive(
                     f"Could not locate a type in RO-Crate for parameter {param_name} type {python_type}", 7014)
             # The formal parameters are added to the workflow (main entity).
             additional_type = PARAMETER_TYPES_MAP[python_type]
-            if type(additional_type) != str:
+            if type(additional_type) is not str:
                 additional_type = PARAMETER_TYPES_MAP[python_type](additional_type)
             formal_parameter = _create_formal_parameter(
                 crate,

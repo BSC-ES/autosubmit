@@ -659,7 +659,7 @@ class JobList(object):
         """
         filters = []
         if level_to_check == "DATES_FROM":
-            if type(value_to_check) != str:
+            if type(value_to_check) is not str:
                 value_to_check = date2str(value_to_check, "%Y%m%d")  # need to convert in some cases
             try:
                 values_list = [date2str(date_, "%Y%m%d") for date_ in self._date_list]  # need to convert in some cases
@@ -714,8 +714,8 @@ class JobList(object):
             # Will enter chunks_from, and obtain [{DATES_TO: "20020201", MEMBERS_TO: "fc2", CHUNKS_TO: "ALL", SPLITS_TO: "2"]
             if "CHUNKS_FROM" in filter:
                 filters_to_apply_c = self._check_chunks({"CHUNKS_FROM": (filter.pop("CHUNKS_FROM"))}, current_job)
-                if len(filters_to_apply_c) > 0 and (type(filters_to_apply_c) != list or (
-                        type(filters_to_apply_c) == list and len(filters_to_apply_c[0]) > 0)):
+                if len(filters_to_apply_c) > 0 and (type(filters_to_apply_c) is not list or (
+                        type(filters_to_apply_c) is list and len(filters_to_apply_c[0]) > 0)):
                     filters_to_apply[i].update(filters_to_apply_c)
             # IGNORED
             if "SPLITS_FROM" in filter:

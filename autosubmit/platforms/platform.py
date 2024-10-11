@@ -98,7 +98,7 @@ class Platform(object):
         if not self.two_factor_auth:
             self.pw = None
         elif auth_password is not None and self.two_factor_auth:
-            if type(auth_password) == list:
+            if type(auth_password) is list:
                 self.pw = auth_password[0]
             else:
                 self.pw = auth_password
