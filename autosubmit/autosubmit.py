@@ -58,7 +58,6 @@ from .platforms.paramiko_submitter import ParamikoSubmitter
 from .platforms.platform import Platform
 from .migrate.migrate import Migrate
 
-dialog = None
 from time import sleep
 import argparse
 import subprocess
@@ -89,6 +88,8 @@ import autosubmit.statistics.utils as StatisticsUtils
 from autosubmit.helpers.utils import proccess_id, terminate_child_process, check_jobs_file_exists
 
 from contextlib import suppress
+
+dialog = None
 
 """
 Main module for autosubmit. Only contains an interface class to all functionality implemented on autosubmit

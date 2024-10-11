@@ -24,8 +24,10 @@ import os
 import sqlite3
 import multiprocessing
 from log.log import Log, AutosubmitCritical
-Log.get_logger("Autosubmit")
 from autosubmitconfigparser.config.basicconfig import BasicConfig
+
+Log.get_logger("Autosubmit")
+
 
 CURRENT_DATABASE_VERSION = 1
 TIMEOUT = 10

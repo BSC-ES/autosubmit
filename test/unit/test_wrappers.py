@@ -3,6 +3,7 @@ from operator import attrgetter
 
 import shutil
 import tempfile
+import inspect
 
 from unittest import TestCase
 from mock import MagicMock
@@ -1939,7 +1940,6 @@ class TestWrappers(TestCase):
         return job
 
 
-import inspect
 class FakeBasicConfig:
     def __init__(self):
         pass

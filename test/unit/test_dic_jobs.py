@@ -7,6 +7,7 @@ from mock import Mock
 import math
 import shutil
 import tempfile
+import inspect
 
 from autosubmit.job.job import Job
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
@@ -604,7 +605,6 @@ class TestDicJobs(TestCase):
 
 
 
-import inspect
 class FakeBasicConfig:
     def __init__(self):
         pass
