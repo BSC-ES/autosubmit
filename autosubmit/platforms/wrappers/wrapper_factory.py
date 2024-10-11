@@ -72,16 +72,16 @@ class WrapperFactory(object):
         return wrapper_cmd
 
     def vertical_wrapper(self, **kwargs):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
 
     def horizontal_wrapper(self, **kwargs):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
 
     def hybrid_wrapper_horizontal_vertical(self, **kwargs):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
 
     def hybrid_wrapper_vertical_horizontal(self, **kwargs):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
 
     def header_directives(self, **kwargs):
         pass
@@ -124,21 +124,21 @@ class WrapperFactory(object):
     def reservation_directive(self, reservation):
         return '#'
     def dependency_directive(self, dependency):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
     def queue_directive(self, queue):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
     def processors_directive(self, processors):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
     def nodes_directive(self, nodes):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
     def tasks_directive(self, tasks):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
     def partition_directive(self, partition):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
     def exclusive_directive(self, exclusive):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
     def threads_directive(self, threads):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
 
 class SlurmWrapperFactory(WrapperFactory):
 
