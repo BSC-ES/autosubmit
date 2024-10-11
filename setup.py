@@ -71,6 +71,7 @@ tests_require = [
     'pytest==8.2.*',
     'pytest-cov',
     'pytest-mock',
+    'ruff==0.6.2',
     # 'testcontainers'  # TODO: pending Postgres MR
 ]
 
