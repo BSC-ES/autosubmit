@@ -99,7 +99,7 @@ class SlurmPlatform(ParamikoPlatform):
         """
         try:
 
-            valid_packages_to_submit = [ package for package in valid_packages_to_submit if package.x11 != True]
+            valid_packages_to_submit = [ package for package in valid_packages_to_submit if package.x11 is not True]
             if len(valid_packages_to_submit) > 0:
                 duplicated_jobs_already_checked = False
                 platform = valid_packages_to_submit[0].jobs[0].platform

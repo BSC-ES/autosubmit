@@ -230,7 +230,7 @@ class ExperimentHistory:
             should_create_new_run = self.should_we_create_a_new_run(job_list, len(update_these_changes),
                                                                     current_experiment_run_dc, chunk_unit, chunk_size,
                                                                     create)
-            if len(update_these_changes) > 0 and should_create_new_run == False:
+            if len(update_these_changes) > 0 and should_create_new_run is False:
                 self.manager.update_many_job_data_change_status(update_these_changes)
             if should_create_new_run:
                 return self.create_new_experiment_run(chunk_unit, chunk_size, current_config, job_list)
