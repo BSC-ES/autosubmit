@@ -120,7 +120,7 @@ class SlurmPlatform(ParamikoPlatform):
                             #cancel bad submitted job if jobid is encountered
                             for id_ in jobid:
                                 self.send_command(self.cancel_job(id_))
-                    except:
+                    except Exception:
                         pass
                     jobs_id = None
                     self.connected = False

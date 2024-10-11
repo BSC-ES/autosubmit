@@ -859,7 +859,7 @@ class Platform(object):
                             job_names_processed.add(f'{job.name}_{job.fail_count}')
                         else:
                             job_names_processed.add(f'{job.name}')
-                    except:
+                    except Exception:
                         pass
             except queue.Empty:
                 pass
@@ -868,5 +868,5 @@ class Platform(object):
             except Exception as e:
                 try:
                     self.restore_connection(None)
-                except:
+                except Exception:
                     pass

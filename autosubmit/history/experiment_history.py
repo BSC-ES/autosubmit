@@ -223,7 +223,7 @@ class ExperimentHistory:
             try:
                 current_experiment_run_dc = self.manager.get_experiment_run_dc_with_max_id()
                 update_these_changes = self._get_built_list_of_changes(job_list)
-            except:
+            except Exception:
                 current_experiment_run_dc = 0
                 update_these_changes = []
                 # ("no runs")

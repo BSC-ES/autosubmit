@@ -224,7 +224,7 @@ class JobList(object):
                 self.graph = nx.DiGraph()
         except AutosubmitCritical:
             raise
-        except:
+        except Exception:
             self.graph = nx.DiGraph()
         self._dic_jobs = DicJobs(date_list, member_list, chunk_list, date_format, default_retrials, as_conf)
         self._dic_jobs.graph = self.graph
@@ -663,7 +663,7 @@ class JobList(object):
                 value_to_check = date2str(value_to_check, "%Y%m%d")  # need to convert in some cases
             try:
                 values_list = [date2str(date_, "%Y%m%d") for date_ in self._date_list]  # need to convert in some cases
-            except:
+            except Exception:
                 values_list = self._date_list
         elif level_to_check == "MEMBERS_FROM":
             values_list = self._member_list  # Str list
@@ -2512,7 +2512,7 @@ class JobList(object):
             try:
                 Log.status("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job_id, Status(
                 ).VALUE_TO_KEY[job.status], platform_name, queue)
-            except:
+            except Exception:
                 Log.debug("Couldn't print job status for job {0}".format(job.name))
         for job in failed_job_list:
             if len(job.queue) < 1:
@@ -3162,7 +3162,7 @@ class JobList(object):
                     results.append(self._recursion_print(root, 0, visited, nocolor=True))
                 else:
                     results.append("Cannot find root.")
-        except:
+        except Exception:
             return f'Job List object'
         return "\n".join(results)
 

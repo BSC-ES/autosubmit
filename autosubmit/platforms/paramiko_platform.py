@@ -135,7 +135,7 @@ class ParamikoPlatform(Platform):
                     try:
                         transport = self._ssh.get_transport()
                         transport.send_ignore()
-                    except:
+                    except Exception:
                         message = "Timeout connection"
                 return message
 
@@ -770,9 +770,9 @@ class ParamikoPlatform(Platform):
                                     try:
                                         if self.cancel_cmd is not None:
                                             job.platform.send_command(self.cancel_cmd + " " + str(job.id))
-                                    except:
+                                    except Exception:
                                         pass
-                            except:
+                            except Exception:
                                 job_status = Status.FAILED
                 if job_status in self.job_status['COMPLETED']:
                     job_status = Status.COMPLETED
@@ -1432,7 +1432,7 @@ class ParamikoPlatform(Platform):
                 return True
             else:
                 return False
-        except:
+        except Exception:
             return False
 class ParamikoPlatformException(Exception):
     """

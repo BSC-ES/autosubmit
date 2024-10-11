@@ -34,7 +34,7 @@ def perform_test(expids):
             # put it in a single file
             with open(f"{VERSION}_multi_test.txt", "a") as myfile:
                 myfile.write(output)
-        except:
+        except Exception:
             raise Exception(f"Error in {expid}")
 
     # print to_exclude in format ["a001","a002"]

@@ -242,7 +242,7 @@ class Log:
                     status_file_handler.addFilter(custom_filter)
                     Log.log.addHandler(status_file_handler)
                 os.chmod(file_path, 509)
-            except: # retry again
+            except Exception: # retry again
                 pass
 
     @staticmethod
@@ -272,7 +272,7 @@ class Log:
                 status_file_handler.setFormatter(LogFormatter(False))
                 status_file_handler.addFilter(custom_filter)
                 Log.log.addHandler(status_file_handler)
-        except:  # retry again
+        except Exception:  # retry again
             pass
     @staticmethod
     def set_console_level(level):

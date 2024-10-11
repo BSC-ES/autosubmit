@@ -2149,7 +2149,7 @@ class Job(object):
                 filename = os.path.basename(os.path.splitext(additional_file)[0])
                 full_path = os.path.join(self._tmp_path,filename ) + "_" + self.name[5:]
                 open(full_path, 'wb').write(additional_template_content.encode(lang))
-            except:
+            except Exception:
                 pass
         for key, value in parameters.items():
             # parameters[key] can have '\\' characters that are interpreted as escape characters
@@ -2766,7 +2766,7 @@ class WrapperJob(Job):
         try:
             self._platform.send_command(
                 self._platform.cancel_cmd + " " + str(self.id))
-        except:
+        except Exception:
             Log.info(f'Job with {self.id} was finished before canceling it')
 
         for job in self.job_list:

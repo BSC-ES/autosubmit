@@ -989,7 +989,7 @@ class Autosubmit:
         admin_user = "eadmin" # to be improved in #944
         try:
             eadmin = current_user_id == pwd.getpwnam(admin_user).pw_uid
-        except:
+        except Exception:
             Log.info(f"Autosubmit admin user: {admin_user} is not set")
         current_owner_id = Path(BasicConfig.LOCAL_ROOT_DIR, expid).stat().st_uid
         try:
@@ -1346,7 +1346,7 @@ class Autosubmit:
         except OSError as e:
             try:
                 Autosubmit._delete_expid(exp_id, True)
-            except:
+            except Exception:
                 pass
             raise AutosubmitCritical("Error while creating the experiment structure: {0}".format(str(e)), 7011)
 
@@ -1362,7 +1362,7 @@ class Autosubmit:
         except Exception as e:
             try:
                 Autosubmit._delete_expid(exp_id, True)
-            except:
+            except Exception:
                 pass
             raise AutosubmitCritical("Error while creating the experiment configuration: {0}".format(str(e)), 7011)
         # Change template values by default values specified from the commandline
@@ -1371,7 +1371,7 @@ class Autosubmit:
         except Exception as e:
             try:
                 Autosubmit._delete_expid(exp_id, True)
-            except:
+            except Exception:
                 pass
             raise AutosubmitCritical("Error while setting the default values: {0}".format(str(e)), 7011)
 
@@ -2378,7 +2378,7 @@ class Autosubmit:
                     # Database is locked, may be related to my local db todo 4.1.1
                     try:
                         exp_history.finish_current_experiment_run()
-                    except:
+                    except Exception:
                         Log.warning("Database is locked")
         except (portalocker.AlreadyLocked, portalocker.LockException) as e:
             message = "We have detected that there is another Autosubmit instance using the experiment\n. Stop other Autosubmit instances that are using the experiment or delete autosubmit.lock file located on tmp folder"
@@ -3242,7 +3242,7 @@ class Autosubmit:
                         job_parameters = job.update_parameters(as_conf, {})
                         for key, value in job_parameters.items():
                             jobs_parameters["JOBS"+"."+job.section+"."+key] = value
-                except:
+                except Exception:
                     pass
                 if len(jobs_parameters) > 0:
                     del as_conf.experiment_data["JOBS"]
@@ -3336,7 +3336,7 @@ class Autosubmit:
                 try:
                     if f.is_dir() and f.owner() == get_from_user:
                         experiments_ids.append(f.name)
-                except:
+                except Exception:
                     pass # if it reachs there it means that f.owner() doesn't exist anymore( owner is an id) so we just skip it and continue
         else:
             experiments_ids = experiments_ids.split(' ')
@@ -4125,7 +4125,7 @@ class Autosubmit:
                 os.popen(bash_command).read()
                 exp_history.initialize_database()
 
-            except:
+            except Exception:
                 Log.warning("It was not possible to restore the jobs_data.db file... , a new blank db will be created")
                 result = os.popen("rm {0}".format(database_path)).read()
 
@@ -4507,7 +4507,7 @@ class Autosubmit:
                     job_list = JobList(expid, BasicConfig, YAMLParserFactory(),Autosubmit._get_job_list_persistence(expid, as_conf), as_conf)
                     try:
                          prev_job_list_logs = Autosubmit.load_logs_from_previous_run(expid, as_conf)
-                    except:
+                    except Exception:
                         prev_job_list_logs = None
                     date_format = ''
                     if as_conf.get_chunk_size_unit() == 'hour':
@@ -4544,7 +4544,7 @@ class Autosubmit:
                             os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"), "job_packages_" + expid)
                         packages_persistence.reset_table()
                         packages_persistence.reset_table(True)
-                    except:
+                    except Exception:
                         pass
 
                     groups_dict = dict()
@@ -6016,7 +6016,7 @@ class Autosubmit:
             current_status = current_status.upper().split(" ")
         try:
             current_status = [Status.KEY_TO_VALUE[x.strip()] for x in current_status]
-        except:
+        except Exception:
             raise AutosubmitCritical("Invalid status -fs. All values must match one of {0}".format(Status.VALUE_TO_KEY.keys()), 7011)
 
 
@@ -6049,12 +6049,12 @@ class Autosubmit:
                     if force:
                         try:
                             os.kill(int(process_id_), signal.SIGKILL) # don't wait for logs
-                        except:
+                        except Exception:
                             continue
                     else:
                         try:
                             os.kill(int(process_id_), signal.SIGINT) # wait for logs
-                        except:
+                        except Exception:
                             continue
                     valid_expids.append(expid)
                 except Exception as e:
