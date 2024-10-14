@@ -4246,8 +4246,10 @@ class Autosubmit:
           try:
             Autosubmit.rocrate(expid, Path(aslogs_folder))
             Log.info('RO-Crate ZIP file created!')
-          except Exception as e: 
-                raise(f"Error creating RO-Crate ZIP file: {str(e)}", 7012)
+          except Exception as e:
+            raise AutosubmitCritical(
+                f"Error creating RO-Crate ZIP file: {str(e)}", 7012)
+
 
         else :
            raise AutosubmitCritical(
