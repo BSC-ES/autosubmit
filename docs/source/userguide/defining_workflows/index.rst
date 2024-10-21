@@ -23,12 +23,13 @@ be finished before launching the job that has the DEPENDENCIES attribute.
 
 .. code-block:: yaml
 
-   One:
-       FILE: one.sh
+  JOBS:
+    One:
+      FILE: one.sh
 
-   Two:
-       FILE: two.sh
-       DEPENDENCIES: One
+    Two:
+      FILE: two.sh
+      DEPENDENCIES: One
 
 
 The resulting workflow can be seen in Fi165gure :numref:`simple`
@@ -52,24 +53,25 @@ To set at what level a job has to run you have to use the RUNNING attribute. It 
 member and chunk corresponding to running once, once per startdate, once per member or once per chunk respectively.
 
 .. code-block:: yaml
+    
+    JOBS:
+      once:
+          FILE: Once.sh
 
-    once:
-        FILE: Once.sh
+      date:
+          FILE: date.sh
+          DEPENDENCIES: once
+          RUNNING: date
 
-    date:
-        FILE: date.sh
-        DEPENDENCIES: once
-        RUNNING: date
+      member:
+          FILE: Member.sh
+          DEPENDENCIES: date
+          RUNNING: member
 
-    member:
-        FILE: Member.sh
-        DEPENDENCIES: date
-        RUNNING: member
-
-    chunk:
-        FILE: Chunk.sh
-        DEPENDENCIES: member
-        RUNNING: chunk
+      chunk:
+          FILE: Chunk.sh
+          DEPENDENCIES: member
+          RUNNING: chunk
 
 
 The resulting workflow can be seen in Figure :numref:`running` for a experiment with 2 startdates, 2 members and 2 chunks.
@@ -98,19 +100,20 @@ sim-1 on the DEPENDENCIES attribute. As you can see, you can add as much depende
 
 .. code-block:: yaml
 
-   ini:
-       FILE: ini.sh
-       RUNNING: member
+   JOBS:
+    ini:
+        FILE: ini.sh
+        RUNNING: member
 
-   sim:
-       FILE: sim.sh
-       DEPENDENCIES: ini sim-1
-       RUNNING: chunk
+    sim:
+        FILE: sim.sh
+        DEPENDENCIES: ini sim-1
+        RUNNING: chunk
 
-   postprocess:
-       FILE: postprocess.sh
-       DEPENDENCIES: sim
-       RUNNING: chunk
+    postprocess:
+        FILE: postprocess.sh
+        DEPENDENCIES: sim
+        RUNNING: chunk
 
 
 The resulting workflow can be seen in Figure :numref:`dprevious`
@@ -142,24 +145,25 @@ jobs to be finished. That is the case of the postprocess combine dependency on t
 
 .. code-block:: yaml
 
-    ini:
-        FILE: ini.sh
-        RUNNING: member
+    JOBS:
+      ini:
+          FILE: ini.sh
+          RUNNING: member
 
-    sim:
-        FILE: sim.sh
-        DEPENDENCIES: ini sim-1
-        RUNNING: chunk
+      sim:
+          FILE: sim.sh
+          DEPENDENCIES: ini sim-1
+          RUNNING: chunk
 
-    postprocess:
-        FILE: postprocess.sh
-        DEPENDENCIES: sim
-        RUNNING: chunk
+      postprocess:
+          FILE: postprocess.sh
+          DEPENDENCIES: sim
+          RUNNING: chunk
 
-    combine:
-        FILE: combine.sh
-        DEPENDENCIES: postprocess
-        RUNNING: member
+      combine:
+          FILE: combine.sh
+          DEPENDENCIES: postprocess
+          RUNNING: member
 
 
 The resulting workflow can be seen in Figure :numref:`dependencies`
@@ -232,39 +236,41 @@ The status are ordered, so if you select "RUNNING" status, the task will be run 
 
 .. code-block:: yaml
 
-    ini:
-        FILE: ini.sh
-        RUNNING: member
+    JOBS:
+      ini:
+          FILE: ini.sh
+          RUNNING: member
 
-    sim:
-        FILE: sim.sh
-        DEPENDENCIES: ini sim-1
-        RUNNING: chunk
+      sim:
+          FILE: sim.sh
+          DEPENDENCIES: ini sim-1
+          RUNNING: chunk
 
-    postprocess:
-        FILE: postprocess.sh
-        DEPENDENCIES:
-            SIM:
-                STATUS: "RUNNING"
-        RUNNING: chunk
+      postprocess:
+          FILE: postprocess.sh
+          DEPENDENCIES:
+              SIM:
+                  STATUS: "RUNNING"
+          RUNNING: chunk
 
 
 The ``FROM_STEP`` keyword can be used to select the **internal** step of the dependency that you want to check. The possible value is an integer. Additionally, the target dependency, must call to `%AS_CHECKPOINT%` inside their scripts. This will create a checkpoint that will be used to check the amount of steps processed.
 
 .. code-block:: yaml
 
-  A:
-    FILE: a.sh
-    RUNNING: once
-    SPLITS: 2
-  A_2:
-    FILE: a_2.sh
-    RUNNING: once
-    DEPENDENCIES:
-      A:
-        SPLIT_TO: "2"
-        STATUS: "RUNNING"
-        FROM_STEP: 2
+  JOBS:
+    A:
+      FILE: a.sh
+      RUNNING: once
+      SPLITS: 2
+    A_2:
+      FILE: a_2.sh
+      RUNNING: once
+      DEPENDENCIES:
+        A:
+          SPLIT_TO: "2"
+          STATUS: "RUNNING"
+          FROM_STEP: 2
 
 There is now a new function that is automatically added in your scripts which is called ``as_checkpoint``. This is the function that is generating the checkpoint file. You can see the function below:
 
@@ -299,27 +305,28 @@ To select an specific task, you have to combine the ``STATUS`` and ``CHUNKS_TO``
 
 .. code-block:: yaml
 
-  A:
-    FILE: a
-    RUNNING: once
-    SPLITS: 1
-  B:
-    FILE: b
-    RUNNING: once
-    SPLITS: 2
-    DEPENDENCIES: A
-  C:
-    FILE: c
-    RUNNING: once
-    SPLITS: 1
-    DEPENDENCIES: B
-  RECOVER_B_2:
-    FILE: fix_b
-    RUNNING: once
-    DEPENDENCIES:
-      B:
-        SPLIT_TO: "2"
-        STATUS: "RUNNING"
+  JOBS:
+    A:
+      FILE: a
+      RUNNING: once
+      SPLITS: 1
+    B:
+      FILE: b
+      RUNNING: once
+      SPLITS: 2
+      DEPENDENCIES: A
+    C:
+      FILE: c
+      RUNNING: once
+      SPLITS: 1
+      DEPENDENCIES: B
+    RECOVER_B_2:
+      FILE: fix_b
+      RUNNING: once
+      DEPENDENCIES:
+        B:
+          SPLIT_TO: "2"
+          STATUS: "RUNNING"
 
 Job frequency
 ~~~~~~~~~~~~~
@@ -334,25 +341,26 @@ an integer I for this attribute and the job will run only once for each I iterat
 
 .. code-block:: yaml
 
-    ini:
-        FILE: ini.sh
-        RUNNING: member
+    JOBS:
+      ini:
+          FILE: ini.sh
+          RUNNING: member
 
-    sim:
-        FILE: sim.sh
-        DEPENDENCIES: ini sim-1
-        RUNNING: chunk
+      sim:
+          FILE: sim.sh
+          DEPENDENCIES: ini sim-1
+          RUNNING: chunk
 
-    postprocess:
-        FILE: postprocess.sh
-        DEPENDENCIES: sim
-        RUNNING: chunk
-        FREQUENCY: 3
+      postprocess:
+          FILE: postprocess.sh
+          DEPENDENCIES: sim
+          RUNNING: chunk
+          FREQUENCY: 3
 
-    combine:
-        FILE: combine.sh
-        DEPENDENCIES: postprocess
-        RUNNING: member
+      combine:
+          FILE: combine.sh
+          DEPENDENCIES: postprocess
+          RUNNING: member
 
 
 The resulting workflow can be seen in Figure :numref:`frequency`
@@ -378,19 +386,20 @@ of synchronization do you want. See the below examples with and without this par
 
 .. code-block:: ini
 
-    ini:
-        FILE: ini.sh
-        RUNNING: member
+    JOBS:
+      ini:
+          FILE: ini.sh
+          RUNNING: member
 
-    sim:
-        FILE: sim.sh
-        DEPENDENCIES: INI SIM-1
-        RUNNING: chunk
+      sim:
+          FILE: sim.sh
+          DEPENDENCIES: INI SIM-1
+          RUNNING: chunk
 
-    ASIM:
-        FILE: asim.sh
-        DEPENDENCIES: SIM
-        RUNNING: chunk
+      ASIM:
+          FILE: asim.sh
+          DEPENDENCIES: SIM
+          RUNNING: chunk
 
 The resulting workflow can be seen in Figure :numref:`nosync`
 
@@ -444,30 +453,31 @@ There is also an special character '*' that can be used to specify that the spli
 
 .. code-block:: yaml
 
-    ini:
-        FILE: ini.sh
-        RUNNING: once
+    JOBS:
+      ini:
+          FILE: ini.sh
+          RUNNING: once
 
-    sim:
-        FILE: sim.sh
-        DEPENDENCIES: ini sim-1
-        RUNNING: once
+      sim:
+          FILE: sim.sh
+          DEPENDENCIES: ini sim-1
+          RUNNING: once
 
-    asim:
-        FILE: asim.sh
-        DEPENDENCIES: sim
-        RUNNING: once
-        SPLITS: 3
+      asim:
+          FILE: asim.sh
+          DEPENDENCIES: sim
+          RUNNING: once
+          SPLITS: 3
 
-    post:
-        FILE: post.sh
-        RUNNING: once
-        DEPENDENCIES:
-            asim:
-                SPLITS_FROM:
-                    2,3: # [2:3] is also valid
-                        splits_to: 1,2*,3* # 1,[2:3]* is also valid, you can also specify the step with [2:3:step]
-        SPLITS: 3
+      post:
+          FILE: post.sh
+          RUNNING: once
+          DEPENDENCIES:
+              asim:
+                  SPLITS_FROM:
+                      2,3: # [2:3] is also valid
+                          splits_to: 1,2*,3* # 1,[2:3]* is also valid, you can also specify the step with [2:3:step]
+          SPLITS: 3
 
 In this example:
 
@@ -486,19 +496,20 @@ Example2: N-to-1 dependency
 
 .. code-block:: yaml
 
-  TEST:
-    FILE: TEST.sh
-    RUNNING: once
-    SPLITS: '4'
-  TEST2:
-    FILE: TEST2.sh
-    DEPENDENCIES:
-      TEST:
-        SPLITS_FROM:
-          "[1:2]":
-            SPLITS_TO: "[1:4]*\\2"
-    RUNNING: once
-    SPLITS: '2'
+  JOBS:
+    TEST:
+      FILE: TEST.sh
+      RUNNING: once
+      SPLITS: '4'
+    TEST2:
+      FILE: TEST2.sh
+      DEPENDENCIES:
+        TEST:
+          SPLITS_FROM:
+            "[1:2]":
+              SPLITS_TO: "[1:4]*\\2"
+      RUNNING: once
+      SPLITS: '2'
 
 .. figure:: fig/splits_n_to_1.png
    :name: N_to_1
@@ -510,19 +521,20 @@ Example3: 1-to-N dependency
 
 .. code-block:: yaml
 
-  TEST:
-    FILE: TEST.sh
-    RUNNING: once
-    SPLITS: '2'
-  TEST2:
-    FILE: TEST2.sh
-    DEPENDENCIES:
-      TEST:
-        SPLITS_FROM:
-          "[1:4]":
-            SPLITS_TO: "[1:2]*\\2"
-    RUNNING: once
-    SPLITS: '4'
+  JOBS:
+    TEST:
+      FILE: TEST.sh
+      RUNNING: once
+      SPLITS: '2'
+    TEST2:
+      FILE: TEST2.sh
+      DEPENDENCIES:
+        TEST:
+          SPLITS_FROM:
+            "[1:4]":
+              SPLITS_TO: "[1:2]*\\2"
+      RUNNING: once
+      SPLITS: '4'
 
 .. figure:: fig/splits_1_to_n.png
    :name: 1_to_N
@@ -647,25 +659,26 @@ an integer N for this attribute and the job will run only after N chunks.
 
 .. code-block:: yaml
 
-    ini:
-        FILE: ini.sh
-        RUNNING: member
+    JOBS:
+      ini:
+          FILE: ini.sh
+          RUNNING: member
 
-    sim:
-        FILE: sim.sh
-        DEPENDENCIES: ini sim-1
-        RUNNING: chunk
+      sim:
+          FILE: sim.sh
+          DEPENDENCIES: ini sim-1
+          RUNNING: chunk
 
-    asim:
-        FILE: asim.sh
-        DEPENDENCIES:  sim asim-1
-        RUNNING:  chunk
-        DELAY:  2
+      asim:
+          FILE: asim.sh
+          DEPENDENCIES:  sim asim-1
+          RUNNING:  chunk
+          DELAY:  2
 
-    post:
-        FILE:  post.sh
-        DEPENDENCIES:  sim asim
-        RUNNING:  chunk
+      post:
+          FILE:  post.sh
+          DEPENDENCIES:  sim asim
+          RUNNING:  chunk
 
 The resulting workflow can be seen in Figure :numref:`delay`
 
@@ -688,19 +701,20 @@ Example 1: How to select an specific chunk
 
 .. code-block:: yaml
 
-    SIM:
-        FILE: templates/sim.tmpl.sh
-        DEPENDENCIES: INI SIM-1 POST-1 CLEAN-5
-            INI:
-            SIM-1:
-            POST-1:
-              CHUNKS_FROM:
-                all:
-                    chunks_to: 1
-            CLEAN-5:
-        RUNNING: chunk
-        WALLCLOCK: 0:30
-        PROCESSORS: 768
+    JOBS:
+      SIM:
+          FILE: templates/sim.tmpl.sh
+          DEPENDENCIES: INI SIM-1 POST-1 CLEAN-5
+              INI:
+              SIM-1:
+              POST-1:
+                CHUNKS_FROM:
+                  all:
+                      chunks_to: 1
+              CLEAN-5:
+          RUNNING: chunk
+          WALLCLOCK: 0:30
+          PROCESSORS: 768
 
 .. figure:: fig/select_chunks.png
    :name: select_chunks

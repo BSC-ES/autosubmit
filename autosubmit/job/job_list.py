@@ -1190,7 +1190,9 @@ class JobList(object):
                     edge_added = True
             if parent.section == job.section:
                 self.actual_job_depends_on_special_chunk = True
-            if edge_added:
+
+            # Only fill this if, per example, jobs.A.Dependencies.A or jobs.A.Dependencies.A-N is set.
+            if edge_added and job.section in dependencies_keys_without_special_chars:
                 if job.name not in self.depends_on_previous_special_section:
                     self.depends_on_previous_special_section[job.name] = set()
                 if job.section not in self.depends_on_previous_special_section:
@@ -1206,6 +1208,25 @@ class JobList(object):
                                                        member_list, dependency.section, possible_parents)
 
         return special_dependencies, problematic_dependencies
+
+    def get_filters_to_apply(self, job, dependency):
+        filters_to_apply = self._filter_current_job(job, copy.deepcopy(dependency.relationships))
+        filters_to_apply.pop("STATUS", None)
+        # Don't do perform special filter if only "FROM_STEP" is applied
+        if "FROM_STEP" in filters_to_apply:
+            if filters_to_apply.get("CHUNKS_TO","none") == "none" and filters_to_apply.get("MEMBERS_TO","none") == "none" and filters_to_apply.get("DATES_TO","none") == "none" and filters_to_apply.get("SPLITS_TO","none") == "none":
+                filters_to_apply = {}
+        filters_to_apply.pop("FROM_STEP", None)
+
+        # If the selected filter is "natural" for all filters_to, trigger the natural dependency calculation
+        all_natural = True
+        for f_value in filters_to_apply.values():
+            if f_value.lower() != "natural":
+                all_natural = False
+                break
+        if all_natural:
+            filters_to_apply = {}
+        return filters_to_apply
 
     def _manage_job_dependencies(self, dic_jobs, job, date_list, member_list, chunk_list, dependencies_keys,
                                  dependencies,
@@ -1341,9 +1362,8 @@ class JobList(object):
                                                                                  dependency)
             if skip:
                 continue
-            filters_to_apply = self._filter_current_job(job, copy.deepcopy(dependency.relationships))
-            filters_to_apply.pop("STATUS", None)
-            filters_to_apply.pop("FROM_STEP", None)
+            filters_to_apply = self.get_filters_to_apply(job, dependency)
+
             if len(filters_to_apply) > 0:
                 dependencies_of_that_section = dic_jobs.as_conf.jobs_data[dependency.section].get("DEPENDENCIES", {})
                 ## Adds the dependencies to the job, and if not possible, adds the job to the problematic_dependencies

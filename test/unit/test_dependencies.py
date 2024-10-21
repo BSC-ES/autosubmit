@@ -8,6 +8,7 @@ import unittest
 from copy import deepcopy
 from datetime import datetime
 from mock import patch
+from mock.mock import MagicMock
 
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job import Job
@@ -435,6 +436,84 @@ class TestJobList(unittest.TestCase):
         self.assertEqual(str(job_list.jobs_edges.get("RUNNING", ())), str({job}))
         job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent2)
         self.assertEqual(len(job.edge_info.get("RUNNING", "")), 2)
+
+    def test_add_special_conditions_chunks_to_once(self):
+        # Method from job_list
+        job = Job("child", 1, Status.WAITING, 1)
+        job.section = "child_one"
+        job.date = datetime.strptime("20200128", "%Y%m%d")
+        job.member = "fc0"
+        job.chunk = 1
+        job.split = 1
+        job.splits = 1
+        job.max_checkpoint_step = 0
+
+        job_two = Job("child", 1, Status.WAITING, 1)
+        job_two.section = "child_one"
+        job_two.date = datetime.strptime("20200128", "%Y%m%d")
+        job_two.member = "fc0"
+        job_two.chunk = 2
+        job_two.split = 1
+        job_two.splits = 1
+        job_two.max_checkpoint_step = 0
+
+        special_conditions = {"STATUS": "RUNNING", "FROM_STEP": "1"}
+        special_conditions_two = {"STATUS": "RUNNING", "FROM_STEP": "2"}
+
+        parent = Job("parent", 1, Status.RUNNING, 1)
+        parent.section = "parent_one"
+        parent.date = datetime.strptime("20200128", "%Y%m%d")
+        parent.member = None
+        parent.chunk = None
+        parent.split = None
+        parent.splits = None
+        parent.max_checkpoint_step = 0
+        job.status = Status.WAITING
+        job_two.status = Status.WAITING
+
+        job_list = Mock(wraps=self.JobList)
+        job_list._job_list = [job, job_two, parent]
+
+        dependency = MagicMock()
+        dependency.relationships = {'CHUNKS_FROM': {'1': {'FROM_STEP': '1'}, '2': {'FROM_STEP': '2'}, }, 'STATUS': 'RUNNING'}
+        filters_to_apply = job_list.get_filters_to_apply(job, dependency)
+        filters_to_apply_two = job_list.get_filters_to_apply(job_two, dependency)
+
+        assert filters_to_apply == {}
+        assert filters_to_apply_two == {}
+
+        job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent)
+        job_list.add_special_conditions(job_two, special_conditions_two, filters_to_apply_two, parent)
+
+        dependency = MagicMock()
+        dependency.relationships = {'CHUNKS_FROM': {'1': {'FROM_STEP': '1', 'CHUNKS_TO':'natural'}, '2': {'FROM_STEP': '2', 'CHUNKS_TO':'natural'}, }, 'STATUS': 'RUNNING'}
+        filters_to_apply = job_list.get_filters_to_apply(job, dependency)
+        filters_to_apply_two = job_list.get_filters_to_apply(job_two, dependency)
+
+        assert filters_to_apply == {}
+        assert filters_to_apply_two == {}
+
+        job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent)
+        job_list.add_special_conditions(job_two, special_conditions_two, filters_to_apply_two, parent)
+
+        self.assertEqual(job.max_checkpoint_step, 1)
+        self.assertEqual(job_two.max_checkpoint_step, 2)
+
+        value = job.edge_info.get("RUNNING", "").get("parent", ())
+        self.assertEqual((value[0].name, value[1]), (parent.name, "1"))
+        self.assertEqual(len(job.edge_info.get("RUNNING", "")), 1)
+
+        value_two = job_two.edge_info.get("RUNNING", "").get("parent", ())
+        self.assertEqual((value_two[0].name, value_two[1]), (parent.name, "2"))
+        self.assertEqual(len(job_two.edge_info.get("RUNNING", "")), 1)
+
+        dependency = MagicMock()
+        dependency.relationships = {'CHUNKS_FROM': {'1': {'FROM_STEP': '1', 'CHUNKS_TO':'natural', 'DATES_TO': "dummy"}, '2': {'FROM_STEP': '2', 'CHUNKS_TO':'natural', 'DATES_TO': "dummy"}, }, 'STATUS': 'RUNNING'}
+        filters_to_apply = job_list.get_filters_to_apply(job, dependency)
+        filters_to_apply_two = job_list.get_filters_to_apply(job_two, dependency)
+
+        assert filters_to_apply == {'CHUNKS_TO': 'natural', 'DATES_TO': 'dummy'}
+        assert filters_to_apply_two == {'CHUNKS_TO': 'natural', 'DATES_TO': 'dummy'}
 
     @patch('autosubmit.job.job_dict.date2str')
     def test_jobdict_get_jobs_filtered(self, mock_date2str):
