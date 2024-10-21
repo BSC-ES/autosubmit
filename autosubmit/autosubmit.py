@@ -1605,7 +1605,6 @@ class Autosubmit:
                     as_conf, job_list, jobs_cw, packages_persistence, False)
 
             Log.info("no more scripts to generate, now proceed to check them manually")
-            time.sleep(safetysleeptime)
         except AutosubmitCritical as e:
             raise
         except AutosubmitError as e:
