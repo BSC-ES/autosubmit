@@ -75,8 +75,8 @@ import signal
 import datetime
 # import log.fd_show as fd_show
 import portalocker
-from pkg_resources import require, resource_listdir, resource_string, resource_filename
-#import importlib
+from importlib.resources import read_text, files as read_files
+from importlib.metadata import version
 from collections import defaultdict
 from pyparsing import nestedExpr
 from .history.experiment_status import ExperimentStatus
@@ -165,8 +165,7 @@ class Autosubmit:
         with open(version_path) as f:
             autosubmit_version = f.read().strip()
     else:
-        #autosubmit_version = importlib.metadata.version("autosubmit")[0]
-        autosubmit_version = require("autosubmit")[0].version
+        autosubmit_version = version("autosubmit") # from importlib.metadata
 
     exit = False
 
@@ -1167,16 +1166,13 @@ class Autosubmit:
                             yield '.'.join([*keys, key]).upper(), value
                         else:
                             yield key, value
-        template_files = resource_listdir('autosubmitconfigparser.config', 'files')
-        # template_files = [file.name for file in importlib.resources.files('autosubmitconfigparser.config').joinpath('files').iterdir() if
-        #                   file.is_file()]
+        template_files = [file.name for file in (read_files('autosubmitconfigparser.config')/'files').iterdir() if file.is_file()]
         if parameters is None:
             parameters = PARAMETERS
         parameter_comments = dict(_recurse_into_parameters(parameters))
 
         for as_conf_file in template_files:
-            origin = resource_filename('autosubmitconfigparser.config', str(Path('files', as_conf_file)))
-            #origin = importlib.resources.files('autosubmitconfigparser.config').joinpath('files', as_conf_file)
+            origin = str(read_files('autosubmitconfigparser.config')/f'files/{as_conf_file}')
             target = None
 
             if dummy:
@@ -3775,8 +3771,7 @@ class Autosubmit:
         """
         if not os.path.exists(BasicConfig.DB_PATH):
             Log.info("Creating autosubmit database...")
-            qry = resource_string('autosubmit.database', 'data/autosubmit.sql').decode(locale.getlocale()[1])
-            #qry = importlib.resources.read_text('autosubmit.database', 'data/autosubmit.sql').decode(locale.getlocale()[1])
+            qry = read_files('autosubmit.database').joinpath('data/autosubmit.sql').read_text(locale.getlocale()[1])
             if not create_db(qry):
                 raise AutosubmitCritical("Can not write database file", 7004)
             Log.result("Autosubmit database created successfully")
