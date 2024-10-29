@@ -8,6 +8,7 @@ from ruamel.yaml import YAML
 from shutil import rmtree
 from tempfile import TemporaryDirectory
 from typing import Any, Dict, Callable, List, Protocol, Optional
+import os
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
@@ -27,7 +28,6 @@ class AutosubmitExperiment:
     status_dir: Path
     platform: ParamikoPlatform
 
-
 @pytest.fixture(scope='function')
 def autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> Callable:
     """Create an instance of ``Autosubmit`` with an experiment."""
@@ -36,17 +36,21 @@ def autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> Ca
     tmp_dir = TemporaryDirectory()
     tmp_path = Path(tmp_dir.name)
 
+
     def _create_autosubmit_exp(expid: str):
-        # directories used when searching for logs to cat
         root_dir = tmp_path
         BasicConfig.LOCAL_ROOT_DIR = str(root_dir)
-        exp_path = root_dir / expid
-        exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
-        aslogs_dir = exp_tmp_dir / BasicConfig.LOCAL_ASLOG_DIR
-        status_dir = exp_path / 'status'
-        aslogs_dir.mkdir(parents=True, exist_ok=True)
-        status_dir.mkdir(parents=True, exist_ok=True)
-
+        exp_path = BasicConfig.expid_dir(expid)
+        
+        # directories used when searching for logs to cat
+        exp_tmp_dir = BasicConfig.expid_tmp_dir(expid) 
+        aslogs_dir = BasicConfig.expid_aslog_dir(expid) 
+        status_dir =exp_path / 'status'
+        if not os.path.exists(aslogs_dir):
+            os.makedirs(aslogs_dir)
+        if not os.path.exists(status_dir):
+            os.makedirs(status_dir)
+        
         platform_config = {
             "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
             "LOCAL_TMP_DIR": str(exp_tmp_dir),
@@ -59,7 +63,7 @@ def autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> Ca
             'QUEUING': [],
             'FAILED': []
         }
-        submit_platform_script = aslogs_dir / 'submit_local.sh'
+        submit_platform_script = aslogs_dir.joinpath('submit_local.sh')
         submit_platform_script.touch(exist_ok=True)
 
         return AutosubmitExperiment(
@@ -94,7 +98,7 @@ def autosubmit() -> Autosubmit:
 @pytest.fixture(scope='function')
 def create_as_conf() -> Callable:  # May need to be changed to use the autosubmit_config one
     def _create_as_conf(autosubmit_exp: AutosubmitExperiment, yaml_files: List[Path], experiment_data: Dict[str, Any]):
-        conf_dir = autosubmit_exp.exp_path / 'conf'
+        conf_dir = autosubmit_exp.exp_path.joinpath('conf')
         conf_dir.mkdir(parents=False, exist_ok=False)
         basic_config = BasicConfig
         parser_factory = YAMLParserFactory()
@@ -116,7 +120,6 @@ def create_as_conf() -> Callable:  # May need to be changed to use the autosubmi
         return as_conf
 
     return _create_as_conf
-
 
 class AutosubmitConfigFactory(Protocol):  # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
 

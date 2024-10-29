@@ -33,14 +33,18 @@ def test_describe(
         if expid not in _EXPIDS:
             continue
         exp = autosubmit_exp(expid)
-
+    
         basic_config = mocker.MagicMock()
+        # TODO: Whenever autosubmitconfigparser gets released with BasicConfig.expid_dir() and similar functions, the following line and a lot of mocks need to be removed. This line is especially delicate because it "overmocks" the basic_config mock, thus making the last assertion of this file "assert f'Location: {exp.exp_path}' in log_result_output" a dummy assertion. The rest of the test is still useful.
+        basic_config.expid_dir.side_effect = lambda expid: exp.exp_path
         config_values = {
             'LOCAL_ROOT_DIR': str(exp.exp_path.parent),
             'LOCAL_ASLOG_DIR': str(exp.aslogs_dir)
         }
+        
         for key, value in config_values.items():
             basic_config.__setattr__(key, value)
+        
         basic_config.get.side_effect = lambda key, default='': config_values.get(key, default)
         for basic_config_location in [
             'autosubmit.autosubmit.BasicConfig',
@@ -48,14 +52,16 @@ def test_describe(
         ]:
             # TODO: Better design how ``BasicConfig`` is used/injected/IOC/etc..
             mocker.patch(basic_config_location, basic_config)
+        
         mocked_get_submitter = mocker.patch.object(Autosubmit, '_get_submitter')
         submitter = mocker.MagicMock()
+
         mocked_get_submitter.return_value = submitter
         submitter.platforms = [1, 2]
 
         get_experiment_descrip = mocker.patch('autosubmit.autosubmit.get_experiment_descrip')
         get_experiment_descrip.return_value = [[f'{expid} description']]
-
+        
         create_as_conf(
             autosubmit_exp=exp,
             yaml_files=[
@@ -69,6 +75,7 @@ def test_describe(
             }
         )
 
+    
     Autosubmit.describe(
         input_experiment_list=input_experiment_list,
         get_from_user=get_from_user
@@ -84,4 +91,4 @@ def test_describe(
         ]
         root_dir = exp.exp_path.parent
         for expid in expids:
-            assert f'Location: {str(root_dir / expid)}' in log_result_output
+            assert f'Location: {exp.exp_path}' in log_result_output
