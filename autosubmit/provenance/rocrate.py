@@ -562,7 +562,7 @@ def create_rocrate_archive(
     #Should I re-use the code in archive() using the full date instead of only the year? The problem is that the
     #zip is defined in this function so all the (modified) code should be moved here. Still, I'm exploring other posibilites
     #to query the las modified time within this function (Not very used to the code still...)
-    date = time.strftime("%Y%m%d", time.localtime(os.path.getmtime(path)))
+    date = time.strftime("%Y%m%d%H%M%S", time.localtime(os.path.getmtime(path)))
     crate.write_zip(Path(path, f"{expid}-{date}.zip"))
     Log.info(f'RO-Crate archive written to {experiment_path}')
     return crate
