@@ -2319,19 +2319,34 @@ class JobList(object):
             if job.name == name:
                 return job
 
-    def get_jobs_by_section(self, section_list):
+    def get_jobs_by_section(self, section_list: list, banned_jobs: list = None,
+                            get_only_non_completed: bool = False) -> list:
         """
-        Returns the job that its name matches parameter section
-        :parameter section_list: list of sections to look for
-        :type section_list: list
-        :return: found job
-        :rtype: job
+        Get jobs by section.
+
+        This method filters jobs based on the provided section list and banned jobs list.
+        It can also filter out completed jobs if specified.
+
+        Parameters:
+        section_list (list): List of sections to filter jobs by.
+        banned_jobs (list, optional): List of jobs names to exclude from the result. Defaults to an empty list.
+        get_only_non_completed (bool, optional): If True, only non-completed jobs are included. Defaults to False.
+
+        Returns:
+        list: List of jobs that match the criteria.
         """
-        jobs_by_section = list()
+        if banned_jobs is None:
+            banned_jobs = []
+
+        jobs = []
         for job in self._job_list:
-            if job.section in section_list:
-                jobs_by_section.append(job)
-        return jobs_by_section
+            if job.section.upper() in section_list and job.name not in banned_jobs:
+                if get_only_non_completed:
+                    if job.status != Status.COMPLETED:
+                        jobs.append(job)
+                else:
+                    jobs.append(job)
+        return jobs
 
     def get_in_queue_grouped_id(self, platform):
         # type: (object) -> Dict[int, List[Job]]

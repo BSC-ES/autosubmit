@@ -31,12 +31,11 @@ def prepare_basic_config(tmpdir):
 
 
 @pytest.fixture(scope='function')
-def setup_job_list(create_as_conf, tmpdir, mocker, prepare_basic_config):
+def setup_job_list(autosubmit_config, tmpdir, mocker, prepare_basic_config):
     experiment_id = 'random-id'
-    as_conf = create_as_conf
+    as_conf = autosubmit_config(experiment_id, {})
     as_conf.experiment_data = dict()
     as_conf.experiment_data["JOBS"] = dict()
-    as_conf.jobs_data = as_conf.experiment_data["JOBS"]
     as_conf.experiment_data["PLATFORMS"] = dict()
     job_list = JobList(experiment_id, prepare_basic_config, YAMLParserFactory(),
                        JobListPersistenceDb(tmpdir, 'db'), as_conf)

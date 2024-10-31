@@ -1,0 +1,117 @@
+JOBS:
+  SIM:
+    DEPENDENCIES:
+      SIM-1: {}
+      DQC_BASIC-3: {}
+    SCRIPT: |
+      echo "Running"
+    WALLCLOCK: 04:00
+    RUNNING: chunk
+    CHECK: on_submission
+  DQC_BASIC:
+    SCRIPT: |
+      echo "Running"
+    WALLCLOCK: 00:15
+    NODES: 1
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 16
+    RUNNING: chunk
+    CHECK: on_submission
+    DEPENDENCIES:
+      SIM: {}
+
+wrappers:
+  wrapper_sim:
+    TYPE: "vertical"
+    JOBS_IN_WRAPPER: "SIM"
+    MAX_WRAPPED: 2
+    POLICY: "strict"
+
+EXPERIMENT:
+  # Number of chunks of the experiment.
+  NUMCHUNKS: '3'
+  # List of start dates
+  DATELIST: '20000101'
+  # List of members.
+  MEMBERS: fc0
+  # Unit of the chunk size. Can be hour, day, month, or year.
+  CHUNKSIZEUNIT: month
+  # Size of each chunk.
+  CHUNKSIZE: '4'
+  CHUNKINI: ''
+  # Calendar used for the experiment. Can be standard or noleap.
+  CALENDAR: standard
+PROJECT:
+  # Type of the project.
+  PROJECT_TYPE: none
+  # Folder to hold the project sources.
+  PROJECT_DESTINATION: ''
+GIT:
+  PROJECT_ORIGIN: ''
+  PROJECT_BRANCH: ''
+  PROJECT_COMMIT: ''
+  PROJECT_SUBMODULES: ''
+  FETCH_SINGLE_BRANCH: true
+SVN:
+  PROJECT_URL: ''
+  PROJECT_REVISION: ''
+LOCAL:
+  PROJECT_PATH: ''
+PROJECT_FILES:
+  FILE_PROJECT_CONF: ''
+  FILE_JOBS_CONF: ''
+  JOB_SCRIPTS_TYPE: ''
+RERUN:
+  RERUN: false
+  RERUN_JOBLIST: ''
+
+
+CONFIG:
+  # Current version of Autosubmit.
+  AUTOSUBMIT_VERSION: "4.1.10"
+  # Maximum number of jobs permitted in the waiting status.
+  MAXWAITINGJOBS: 20
+  # Total number of jobs in the workflow.
+  TOTALJOBS: 20
+  SAFETYSLEEPTIME: 10
+  RETRIALS: 0
+
+
+PLATFORMS:
+  MARENOSTRUM5:
+    TYPE: slurm
+    HOST: mn5-gpp
+    PROJECT: ehpc01
+    HPC_PROJECT_DIR: /gpfs/projects/ehpc01
+    USER: blabla
+    QUEUE: gp_debug
+    SCRATCH_DIR: /gpfs/scratch
+    PROJECT_SCRATCH: /gpfs/scratch/ehpc01
+    CONTAINER_DIR: /gpfs/projects/ehpc01/containers
+    FDB_DIR: /gpfs/scratch/ehpc01/experiments
+    FDB_PROD: /gpfs/projects/ehpc01/dte/fdb
+    ADD_PROJECT_TO_HOST: false
+    TEMP_DIR: ''
+    PROCESSORS_PER_NODE: 112
+    APP_PARTITION: gp_bsces
+    EXCLUSIVE: 'True'
+    CUSTOM_DIRECTIVES: "['#SBATCH -q gp_ehpc']"
+    HPCARCH_SHORT: MN5
+    MAX_WALLCLOCK: 00:01
+    PARTITION: ehpc01
+    NODES: 284
+    TASKS: 8
+    THREADS: 14
+
+MAIL:
+  NOTIFICATIONS: False
+  TO:
+STORAGE:
+  TYPE: pkl
+  COPY_REMOTE_LOGS: true
+DEFAULT:
+  # Job experiment ID.
+  EXPID: "a00h"
+  # Default HPC platform name.
+  HPCARCH: "marenostrum5"

@@ -1645,9 +1645,10 @@ class TestWrappers(TestCase):
                           'max_by_section': {'S2': 9999999, 'S3': 9999999},
                           'max_h': 9999999,
                           'max_v': 9999999,
-                          'min': 2,
+                          'min': 1,
                           'min_h': 1,
-                          'min_v': 2
+                          'min_v': 1,
+                          'real_min': 2
                           }
         returned_wrapper_limits = self.job_packager.calculate_wrapper_bounds(section_list)
         self.assertDictEqual(returned_wrapper_limits, wrapper_limits)
@@ -1664,7 +1665,8 @@ class TestWrappers(TestCase):
                           'max_v': 5*4,
                           'min': 3,
                           'min_h': 2,
-                          'min_v': 3
+                          'min_v': 3,
+                          'real_min': 3
                           }
         returned_wrapper_limits = self.job_packager.calculate_wrapper_bounds(section_list)
         self.assertDictEqual(returned_wrapper_limits, wrapper_limits)
@@ -1676,7 +1678,8 @@ class TestWrappers(TestCase):
                           'max_v': 5,
                           'min': 3,
                           'min_h': 2,
-                          'min_v': 3
+                          'min_v': 3,
+                          'real_min': 3,
                           }
         returned_wrapper_limits = self.job_packager.calculate_wrapper_bounds(section_list)
         self.assertDictEqual(returned_wrapper_limits, wrapper_limits)
@@ -1688,7 +1691,8 @@ class TestWrappers(TestCase):
                           'max_v': 5,
                           'min': 3,
                           'min_h': 2,
-                          'min_v': 3
+                          'min_v': 3,
+                          'real_min': 3
                           }
         returned_wrapper_limits = self.job_packager.calculate_wrapper_bounds(section_list)
         self.assertDictEqual(returned_wrapper_limits, wrapper_limits)
@@ -1700,24 +1704,40 @@ class TestWrappers(TestCase):
                             'max_v': 5,
                             'min': 3,
                             'min_h': 2,
-                            'min_v': 3
-                            }
+                            'min_v': 3,
+                            'real_min': 3
+                          }
         returned_wrapper_limits = self.job_packager.calculate_wrapper_bounds(section_list)
         self.assertDictEqual(returned_wrapper_limits, wrapper_limits)
+
         self.job_packager._as_config.experiment_data["WRAPPERS"][self.job_packager.current_wrapper_section]["MIN_WRAPPED"] = 3
         self.job_packager._as_config.experiment_data["WRAPPERS"][self.job_packager.current_wrapper_section]["MAX_WRAPPED"] = 5
         self.job_packager._as_config.experiment_data["WRAPPERS"][self.job_packager.current_wrapper_section]["MIN_WRAPPED_H"] = 2
         self.job_packager._as_config.experiment_data["WRAPPERS"][self.job_packager.current_wrapper_section]["MIN_WRAPPED_V"] = 3
         self.job_packager._as_config.experiment_data["WRAPPERS"][self.job_packager.current_wrapper_section]["MAX_WRAPPED_H"] = 4
         self.job_packager._as_config.experiment_data["WRAPPERS"][self.job_packager.current_wrapper_section]["MAX_WRAPPED_V"] = 5
+
         returned_wrapper_limits = self.job_packager.calculate_wrapper_bounds(section_list)
         self.assertDictEqual(returned_wrapper_limits, wrapper_limits)
+
         del self.job_packager._as_config.experiment_data["WRAPPERS"]["MIN_WRAPPED"]
         del self.job_packager._as_config.experiment_data["WRAPPERS"]["MAX_WRAPPED"]
         del self.job_packager._as_config.experiment_data["WRAPPERS"]["MIN_WRAPPED_H"]
         del self.job_packager._as_config.experiment_data["WRAPPERS"]["MIN_WRAPPED_V"]
         del self.job_packager._as_config.experiment_data["WRAPPERS"]["MAX_WRAPPED_H"]
         del self.job_packager._as_config.experiment_data["WRAPPERS"]["MAX_WRAPPED_V"]
+        returned_wrapper_limits = self.job_packager.calculate_wrapper_bounds(section_list)
+        self.assertDictEqual(returned_wrapper_limits, wrapper_limits)
+
+        wrapper_limits = {'max': 5*4,
+                            'max_by_section': {'S2': 5*4, 'S3': 5*4},
+                            'max_h': 4,
+                            'max_v': 5,
+                            'min': 3,
+                            'min_h': 2,
+                            'min_v': 3,
+                            'real_min': 3
+                          }
         returned_wrapper_limits = self.job_packager.calculate_wrapper_bounds(section_list)
         self.assertDictEqual(returned_wrapper_limits, wrapper_limits)
 
@@ -1786,7 +1806,8 @@ class TestWrappers(TestCase):
                             'max_v': 9999999,
                             'min': 2,
                             'min_h': 1,
-                            'min_v': 2
+                            'min_v': 2,
+                            'real_min': 2
                          }
         package = [d1_m1_1_s2, d1_m1_1_s2, d1_m1_1_s2, d1_m1_1_s2, d1_m1_1_s2]
         packages_h = [JobPackageHorizontal(
@@ -1805,7 +1826,8 @@ class TestWrappers(TestCase):
                             'max_v': 2,
                             'min': 2,
                             'min_h': 2,
-                            'min_v': 2
+                            'min_v': 2,
+                            'real_min': 2
                          }
         self.job_packager.jobs_in_wrapper = {self.job_packager.current_wrapper_section: {'S2': 2, 'S3': 2}}
         packages_to_submit = []
@@ -1818,10 +1840,8 @@ class TestWrappers(TestCase):
 
         self.job_packager.wrapper_policy["WRAPPER_V"] = "mixed"
         packages_to_submit = []
-        self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit, max_jobs_to_submit, wrapper_limits)
-        error = self.job_packager.wrappers_with_error['expid_d1_m1_1_s2,expid_d1_m1_1_s2,expid_d1_m1_1_s2,expid_d1_m1_1_s2,expid_d1_m1_1_s2']
-        # check error not empty
-        assert error != ""
+        with self.assertRaises(log.log.AutosubmitCritical):
+            self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit, max_jobs_to_submit, wrapper_limits)
         self.job_packager.wrapper_policy["WRAPPER_V"] = "strict"
         packages_to_submit = []
         with self.assertRaises(log.log.AutosubmitCritical):

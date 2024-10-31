@@ -107,6 +107,7 @@ class Platform(object):
         self.recovery_queue = Queue()
         self.log_retrieval_process_active = False
         self.main_process_id = None
+        self.max_waiting_jobs = 20
 
     @property
     @autosubmit_parameter(name='current_arch')

@@ -1,4 +1,5 @@
 # Fixtures available to multiple test files must be created in this file.
+from contextlib import suppress
 
 import pytest
 from dataclasses import dataclass
@@ -6,7 +7,7 @@ from pathlib import Path
 from ruamel.yaml import YAML
 from shutil import rmtree
 from tempfile import TemporaryDirectory
-from typing import Any, Dict, Callable, List
+from typing import Any, Dict, Callable, List, Protocol, Optional
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
@@ -91,7 +92,7 @@ def autosubmit() -> Autosubmit:
 
 
 @pytest.fixture(scope='function')
-def create_as_conf() -> Callable:
+def create_as_conf() -> Callable:  # May need to be changed to use the autosubmit_config one
     def _create_as_conf(autosubmit_exp: AutosubmitExperiment, yaml_files: List[Path], experiment_data: Dict[str, Any]):
         conf_dir = autosubmit_exp.exp_path / 'conf'
         conf_dir.mkdir(parents=False, exist_ok=False)
@@ -115,3 +116,65 @@ def create_as_conf() -> Callable:
         return as_conf
 
     return _create_as_conf
+
+
+class AutosubmitConfigFactory(Protocol):  # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
+
+    def __call__(self, expid: str, experiment_data: Optional[Dict], *args: Any, **kwargs: Any) -> AutosubmitConfig: ...
+
+
+@pytest.fixture(scope="function")
+def autosubmit_config(
+        request: pytest.FixtureRequest,
+        mocker: "pytest_mock.MockerFixture") -> AutosubmitConfigFactory:
+    """Return a factory for ``AutosubmitConfig`` objects.
+
+    Abstracts the necessary mocking in ``AutosubmitConfig`` and related objects,
+    so that if we need to modify these, they can all be done in a single place.
+
+    It is able to create any configuration, based on the ``request`` parameters.
+
+    When the function (see ``scope``) finishes, the object and paths created are
+    cleaned (see ``finalizer`` below).
+    """
+
+    original_root_dir = BasicConfig.LOCAL_ROOT_DIR
+    tmp_dir = TemporaryDirectory()
+    tmp_path = Path(tmp_dir.name)
+
+    # Mock this as otherwise BasicConfig.read resets our other mocked values above.
+    mocker.patch.object(BasicConfig, "read", autospec=True)
+
+    def _create_autosubmit_config(expid: str, experiment_data: Dict = None, *_, **kwargs) -> AutosubmitConfig:
+        """Create an instance of ``AutosubmitConfig``."""
+        root_dir = tmp_path
+        BasicConfig.LOCAL_ROOT_DIR = str(root_dir)
+        exp_path = root_dir / expid
+        exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
+        aslogs_dir = exp_tmp_dir / BasicConfig.LOCAL_ASLOG_DIR
+        conf_dir = exp_path / "conf"
+        aslogs_dir.mkdir(parents=True)
+        conf_dir.mkdir()
+
+        if not expid:
+            raise ValueError("No value provided for expid")
+        config = AutosubmitConfig(
+            expid=expid,
+            basic_config=BasicConfig
+        )
+        if experiment_data is not None:
+            config.experiment_data = experiment_data
+
+        for arg, value in kwargs.items():
+            setattr(config, arg, value)
+
+        return config
+
+    def finalizer() -> None:
+        BasicConfig.LOCAL_ROOT_DIR = original_root_dir
+        with suppress(FileNotFoundError):
+            rmtree(tmp_path)
+
+    request.addfinalizer(finalizer)
+
+    return _create_autosubmit_config
