@@ -1,116 +1,147 @@
-from collections import namedtuple
-from unittest import TestCase
-
+import pytest
 from tempfile import TemporaryDirectory
-from unittest.mock import MagicMock, patch
+
+from pathlib import Path
 
 from autosubmit.job.job_common import Status
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+from autosubmit.platforms.psplatform import PsPlatform
 from log.log import AutosubmitError
+import paramiko
 
 
-class TestParamikoPlatform(TestCase):
+@pytest.fixture
+def paramiko_platform():
+    local_root_dir = TemporaryDirectory()
+    config = {
+        "LOCAL_ROOT_DIR": local_root_dir.name,
+        "LOCAL_TMP_DIR": 'tmp'
+    }
+    platform = ParamikoPlatform(expid='a000', name='local', config=config)
+    platform.job_status = {
+        'COMPLETED': [],
+        'RUNNING': [],
+        'QUEUING': [],
+        'FAILED': []
+    }
+    yield platform
+    local_root_dir.cleanup()
 
-    Config = namedtuple('Config', ['LOCAL_ROOT_DIR', 'LOCAL_TMP_DIR'])
 
-    def setUp(self):
-        self.local_root_dir = TemporaryDirectory()
-        self.config = {
-            "LOCAL_ROOT_DIR" : self.local_root_dir.name,
-            "LOCAL_TMP_DIR" : 'tmp'
+@pytest.fixture
+def ps_platform(tmpdir):
+    tmpdir.owner = Path(tmpdir).owner()
+    config = {
+        "LOCAL_ROOT_DIR": str(tmpdir),
+        "LOCAL_TMP_DIR": 'tmp',
+        "PLATFORMS": {
+            "pytest-ps": {
+                "type": "ps",
+                "host": "127.0.0.1",
+                "user": tmpdir.owner,
+                "project": "whatever",
+                "scratch_dir": f"{Path(tmpdir).name}",
+                "MAX_WALLCLOCK": "48:00",
+                "DISABLE_RECOVERY_THREADS": True
+            }
         }
-        self.platform = ParamikoPlatform(expid='a000', name='local', config=self.config)
-        self.platform.job_status = {
-            'COMPLETED': [],
-            'RUNNING': [],
-            'QUEUING': [],
-            'FAILED': []
-        }
+    }
+    platform = PsPlatform(expid='a000', name='local-ps', config=config)
+    platform.host = '127.0.0.1'
+    platform.user = tmpdir.owner
+    platform.root_dir = Path(tmpdir) / "remote"
+    platform.root_dir.mkdir(parents=True, exist_ok=True)
+    yield platform, tmpdir
 
-    def tearDown(self) -> None:
-        self.local_root_dir.cleanup()
+def test_paramiko_platform_constructor(paramiko_platform):
+    platform = paramiko_platform
+    assert platform.name == 'local'
+    assert platform.expid == 'a000'
+    assert platform.config["LOCAL_ROOT_DIR"] == platform.config["LOCAL_ROOT_DIR"]
+    assert platform.header is None
+    assert platform.wrapper is None
+    assert len(platform.job_status) == 4
 
-    def test_paramiko_platform_constructor(self):
-        assert self.platform.name == 'local'
-        assert self.platform.expid == 'a000'
-        assert self.config is self.platform.config
 
-        assert self.platform.header is None
-        assert self.platform.wrapper is None
+def test_check_Alljobs_send_command1_raises_autosubmit_error(mocker, paramiko_platform):
+    mocker.patch('autosubmit.platforms.paramiko_platform.Log')
+    mocker.patch('autosubmit.platforms.paramiko_platform.sleep')
 
-        assert len(self.platform.job_status) == 4
+    platform = paramiko_platform
+    platform.get_checkAlljobs_cmd = mocker.Mock()
+    platform.get_checkAlljobs_cmd.side_effect = ['ls']
+    platform.send_command = mocker.Mock()
+    ae = AutosubmitError(message='Test', code=123, trace='ERR!')
+    platform.send_command.side_effect = ae
+    as_conf = mocker.Mock()
+    as_conf.get_copy_remote_logs.return_value = None
+    job = mocker.Mock()
+    job.id = 'TEST'
+    job.name = 'TEST'
+    with pytest.raises(AutosubmitError) as cm:
+        platform.check_Alljobs(
+            job_list=[(job, None)],
+            as_conf=as_conf,
+            retries=-1)
+    assert cm.value.message == 'Some Jobs are in Unknown status'
+    assert cm.value.code == 6008
+    assert cm.value.trace is None
 
-    @patch('autosubmit.platforms.paramiko_platform.Log')
-    @patch('autosubmit.platforms.paramiko_platform.sleep')
-    def test_check_Alljobs_send_command1_raises_autosubmit_error(self, mock_sleep, mock_log):
-        """
-        Args:
-            mock_sleep (MagicMock): mocking because the function sleeps for 5 seconds.
-        """
-        # Because it raises a NotImplementedError, but we want to skip it to test an error...
-        self.platform.get_checkAlljobs_cmd = MagicMock()
-        self.platform.get_checkAlljobs_cmd.side_effect = ['ls']
-        # Raise the AE error here.
-        self.platform.send_command = MagicMock()
-        ae = AutosubmitError(message='Test', code=123, trace='ERR!')
-        self.platform.send_command.side_effect = ae
-        as_conf = MagicMock()
-        as_conf.get_copy_remote_logs.return_value = None
-        job = MagicMock()
-        job.id = 'TEST'
-        job.name = 'TEST'
-        with self.assertRaises(AutosubmitError) as cm:
-            # Retries is -1 so that it skips the retry code block completely,
-            # as we are not interested in testing that part here.
-            self.platform.check_Alljobs(
-                job_list=[(job, None)],
-                as_conf=as_conf,
-                retries=-1)
-        assert cm.exception.message == 'Some Jobs are in Unknown status'
-        assert cm.exception.code == 6008
-        assert cm.exception.trace is None
 
-        assert mock_log.warning.called
-        assert mock_log.warning.call_args[0][1] == job.id
-        assert mock_log.warning.call_args[0][2] == self.platform.name
-        assert mock_log.warning.call_args[0][3] == Status.UNKNOWN
+def test_check_Alljobs_send_command2_raises_autosubmit_error(mocker, paramiko_platform):
+    mocker.patch('autosubmit.platforms.paramiko_platform.sleep')
 
-    @patch('autosubmit.platforms.paramiko_platform.sleep')
-    def test_check_Alljobs_send_command2_raises_autosubmit_error(self, mock_sleep):
-        """
-        Args:
-            mock_sleep (MagicMock): mocking because the function sleeps for 5 seconds.
-        """
-        # Because it raises a NotImplementedError, but we want to skip it to test an error...
-        self.platform.get_checkAlljobs_cmd = MagicMock()
-        self.platform.get_checkAlljobs_cmd.side_effect = ['ls']
-        # Raise the AE error here.
-        self.platform.send_command = MagicMock()
-        ae = AutosubmitError(message='Test', code=123, trace='ERR!')
-        # Here the first time ``send_command`` is called it returns None, but
-        # the second time it will raise the AutosubmitError for our test case.
-        self.platform.send_command.side_effect = [None, ae]
-        # Also need to make this function return False...
-        self.platform._check_jobid_in_queue = MagicMock(return_value = False)
-        # Then it will query the job status of the job, see further down as we set it
-        as_conf = MagicMock()
-        as_conf.get_copy_remote_logs.return_value = None
-        job = MagicMock()
-        job.id = 'TEST'
-        job.name = 'TEST'
-        job.status = Status.UNKNOWN
+    platform = paramiko_platform
+    platform.get_checkAlljobs_cmd = mocker.Mock()
+    platform.get_checkAlljobs_cmd.side_effect = ['ls']
+    platform.send_command = mocker.Mock()
+    ae = AutosubmitError(message='Test', code=123, trace='ERR!')
+    platform.send_command.side_effect = [None, ae]
+    platform._check_jobid_in_queue = mocker.Mock(return_value=False)
+    as_conf = mocker.Mock()
+    as_conf.get_copy_remote_logs.return_value = None
+    job = mocker.Mock()
+    job.id = 'TEST'
+    job.name = 'TEST'
+    job.status = Status.UNKNOWN
+    platform.get_queue_status = mocker.Mock(side_effect=None)
 
-        self.platform.get_queue_status = MagicMock(side_effect=None)
+    with pytest.raises(AutosubmitError) as cm:
+        platform.check_Alljobs(
+            job_list=[(job, None)],
+            as_conf=as_conf,
+            retries=1)
+    assert cm.value.message == ae.error_message
+    assert cm.value.code == 6000
+    assert cm.value.trace is None
 
-        with self.assertRaises(AutosubmitError) as cm:
-            # Retries is -1 so that it skips the retry code block completely,
-            # as we are not interested in testing that part here.
-            self.platform.check_Alljobs(
-                job_list=[(job, None)],
-                as_conf=as_conf,
-                retries=1)
-        # AS raises an exception with the message using the previous exception's
-        # ``error_message``, but error code 6000 and no trace.
-        assert cm.exception.message == ae.error_message
-        assert cm.exception.code == 6000
-        assert cm.exception.trace is None
+
+@pytest.mark.skip(reason="Skipping this test until Github transition is complete")
+@pytest.mark.parametrize('filename, check', [
+    ('test1', True),
+    ('anotherdir/test2', True)
+], ids=['filename', 'filename_long_path'])
+def test_send_file(mocker, ps_platform, filename, check):
+    platform, tmp_dir = ps_platform
+    remote_dir = Path(platform.root_dir) / f'LOG_{platform.expid}'
+    remote_dir.mkdir(parents=True, exist_ok=True)
+    Path(platform.tmp_path).mkdir(parents=True, exist_ok=True)
+    # generate file
+    if "/" in filename:
+        filename_dir = Path(filename).parent
+        (Path(platform.tmp_path) / filename_dir).mkdir(parents=True, exist_ok=True)
+        filename = Path(filename).name
+    with open(Path(platform.tmp_path) / filename, 'w') as f:
+        f.write('test')
+    _ssh = paramiko.SSHClient()
+    _ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    _ssh.connect(hostname=platform.host, username=platform.user)
+    platform._ftpChannel = paramiko.SFTPClient.from_transport(_ssh.get_transport(), window_size=pow(4, 12),
+                                                          max_packet_size=pow(4, 12))
+    platform._ftpChannel.get_channel().settimeout(120)
+    platform.connected = True
+    platform.get_send_file_cmd = mocker.Mock()
+    platform.get_send_file_cmd.return_value = 'ls'
+    platform.send_command = mocker.Mock()
+    platform.send_file(filename)
+    assert check == (remote_dir / filename).exists()

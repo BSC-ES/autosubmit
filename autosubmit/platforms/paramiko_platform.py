@@ -13,6 +13,9 @@ import select
 import re
 from datetime import timedelta
 import random
+
+from pathlib import Path
+
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_common import Type
 from autosubmit.platforms.platform import Platform
@@ -368,31 +371,33 @@ class ParamikoPlatform(Platform):
                 return ""
         return ""
 
-    def send_file(self, filename, check=True):
+    def send_file(self, filename: str, check: bool = True) -> bool:
         """
-        Sends a local file to the platform
-        :param check:
-        :param filename: name of the file to send
-        :type filename: str
-        """
+        Sends a local file to the platform.
 
+        :param filename: Name of the file to send.
+        :type filename: str
+        :param check: Whether to check and delete the remote file before sending. Defaults to True.
+        :type check: bool
+        :return: True if the file was sent successfully, False otherwise.
+        :rtype: bool
+        :raises AutosubmitError: If the file cannot be sent or the connection is not active.
+        """
+        local_path = Path(self.tmp_path) / filename
+        remote_path = Path(self.get_files_path()) / local_path.name
         if check:
+            Log.debug(f"Cleaning remote file: {remote_path}")
             self.check_remote_log_dir()
-            self.delete_file(filename)
+            self.delete_file(local_path.name)
         try:
-            local_path = os.path.join(os.path.join(self.tmp_path, filename))
-            remote_path = os.path.join(
-                self.get_files_path(), os.path.basename(filename))
-            self._ftpChannel.put(local_path, remote_path)
-            self._ftpChannel.chmod(remote_path, os.stat(local_path).st_mode)
+            self._ftpChannel.put(str(local_path), str(remote_path))
+            self._ftpChannel.chmod(str(remote_path), local_path.stat().st_mode)
+            Log.debug(f"File {local_path} sent to {remote_path}")
             return True
         except IOError as e:
-            raise AutosubmitError('Can not send file {0} to {1}'.format(os.path.join(
-                self.tmp_path, filename), os.path.join(self.get_files_path(), filename)), 6004, str(e))
+            raise AutosubmitError(f'Can not send file {local_path} to {remote_path}', 6004, str(e))
         except BaseException as e:
-            raise AutosubmitError(
-                'Send file failed. Connection seems to no be active', 6004)
-
+            raise AutosubmitError('Send file failed. Connection seems to no be active', 6004, str(e))
 
     def get_list_of_files(self):
         return self._ftpChannel.get(self.get_files_path)
@@ -456,6 +461,7 @@ class ParamikoPlatform(Platform):
         """
 
         try:
+            Log.debug(f"Deleting file {filename}, full_path: {os.path.join(self.get_files_path(), filename)}")
             self._ftpChannel.remove(os.path.join(
                 self.get_files_path(), filename))
             return True
