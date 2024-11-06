@@ -50,7 +50,7 @@ path = {folder}
     os.environ['AUTOSUBMIT_CONFIGURATION'] = str(folder.join('autosubmitrc'))
     create_database(str(folder.join('autosubmitrc')))
     assert "tests.db" in [Path(f).name for f in folder.listdir()]
-    init_expid(str(folder.join('autosubmitrc')), platform='local', create=False)
+    init_expid(str(folder.join('autosubmitrc')), platform='local', create=False, test_type='test')
     assert "t000" in [Path(f).name for f in folder.listdir()]
     return folder
 

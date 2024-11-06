@@ -1003,95 +1003,148 @@ class Autosubmit:
         return owner, eadmin, current_owner
 
     @staticmethod
-    def _delete_expid(expid_delete, force=False):
+    def _delete_expid(expid_delete: str, force: bool = False) -> bool:
         """
-        Removes an experiment from path and database
-        If current user is eadmin and -f has been sent, it deletes regardless
-        of experiment owner
+        Removes an experiment from the path and database.
+        If the current user is eadmin and the -f flag has been sent, it deletes regardless of experiment owner.
 
+        :param expid_delete: Identifier of the experiment to delete.
         :type expid_delete: str
-        :param expid_delete: identifier of the experiment to delete
-        :type force: boolean
-        :param force: True if the force flag has been sent
-        :return: True if successfully deleted, False otherwise
-        :rtype: boolean
+        :param force: If True, does not ask for confirmation.
+        :type force: bool
+
+        :returns: True if successfully deleted, False otherwise.
+        :rtype: bool
+
+        :raises AutosubmitCritical: If the experiment does not exist or if there are insufficient permissions.
         """
-        message = "The {0} experiment was removed from the local disk and from the database.".format(expid_delete)
-        message += " Note that this action does not delete any data written by the experiment.\n"
-        message += "Complete list of files/directories deleted:\n"
-        for root, dirs, files in os.walk(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid_delete)):
-            for dir_ in dirs:
-                message += os.path.join(root, dir_) + "\n"
-        message += os.path.join(BasicConfig.LOCAL_ROOT_DIR, BasicConfig.STRUCTURES_DIR,
-                                "structure_{0}.db".format(expid_delete)) + "\n"
-        message += os.path.join(BasicConfig.LOCAL_ROOT_DIR, BasicConfig.JOBDATA_DIR,
-                                "job_data_{0}.db".format(expid_delete)) + "\n"
-        owner, eadmin, current_owner = Autosubmit._check_ownership(expid_delete)
-        if expid_delete == '' or expid_delete is None and not os.path.exists(
-                os.path.join(str(BasicConfig.LOCAL_ROOT_DIR), str(expid_delete))):
+        experiment_path = Path(f"{BasicConfig.LOCAL_ROOT_DIR}/{expid_delete}")
+        structure_db_path = Path(f"{BasicConfig.STRUCTURES_DIR}/structure_{expid_delete}.db")
+        job_data_db_path = Path(f"{BasicConfig.JOBDATA_DIR}/job_data_{expid_delete}")
+
+        if not experiment_path.exists():
             Log.printlog("Experiment directory does not exist.", Log.WARNING)
+            return False
+
+        owner, eadmin, _ = Autosubmit._check_ownership(expid_delete)
+        if not (owner or (force and eadmin)):
+            Autosubmit._raise_permission_error(eadmin, expid_delete)
+
+        message = Autosubmit._generate_deletion_message(expid_delete, experiment_path, structure_db_path,
+                                                        job_data_db_path)
+        error_message = Autosubmit._perform_deletion(experiment_path, structure_db_path, job_data_db_path, expid_delete)
+
+        if not error_message:
+            Log.printlog(message, Log.RESULT)
         else:
-            # Deletion workflow continues as usual, a disjunction is included for the case when
-            # force is sent, and user is eadmin
-            error_message = ""
-            try:
-                if owner or (force and eadmin):
-                    if force and eadmin:
-                        if current_owner:
-                            Log.info(f"Preparing deletion of experiment {expid_delete} as eadmin. Current owner: {current_owner}")
-                        else:
-                            Log.info(f"Preparing deletion of experiment {expid_delete} as eadmin. Current owner: Unknown")
-                    try:
-                        Log.info("Deleting experiment from database...")
-                        try:
-                            ret = delete_experiment(expid_delete)
-                            if ret:
-                                Log.result("Experiment {0} deleted".format(expid_delete))
-                        except BaseException as e:
-                            error_message += 'Can not delete experiment entry: {0}\n'.format(str(e))
-                        Log.info("Removing experiment directory...")
-                        try:
-                            shutil.rmtree(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid_delete))
-                        except BaseException as e:
-                            error_message += 'Can not delete directory: {0}\n'.format(str(e))
-                        try:
-                            Log.info("Removing Structure db...")
-                            structures_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, BasicConfig.STRUCTURES_DIR,
-                                                           "structure_{0}.db".format(expid_delete))
-                            if os.path.exists(structures_path):
-                                os.remove(structures_path)
-                        except BaseException as e:
-                            error_message += 'Can not delete structure: {0}\n'.format(str(e))
-                        try:
-                            Log.info("Removing job_data db...")
-                            job_data_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, BasicConfig.JOBDATA_DIR,
-                                                         "job_data_{0}.db".format(expid_delete))
-                            if os.path.exists(job_data_path):
-                                os.remove(job_data_path)
-                        except BaseException as e:
-                            error_message += 'Can not delete job_data: {0}\n'.format(str(e))
-                    except OSError as e:
-                        error_message += 'Can not delete directory: {0}\n'.format(str(e))
-                else:
-                    if not eadmin:
-                        raise AutosubmitCritical(
-                            'Detected Eadmin user however, -f flag is not found.  {0} can not be deleted!'.format(
-                                expid_delete), 7012)
-                    else:
-                        raise AutosubmitCritical(
-                            'Current user is not the owner of the experiment. {0} can not be deleted!'.format(
-                                expid_delete), 7012)
-                if error_message == "":
-                    Log.printlog(message, Log.RESULT)
-                else:
-                    Log.printlog(error_message, Log.ERROR)
-            except Exception as e:
-                # Avoid calling Log at this point since it is possible that tmp folder is already deleted.
-                error_message += "Couldn't delete the experiment".format(str(e))
-            if error_message != "":
-                raise AutosubmitError(
-                    "Some experiment files weren't correctly deleted\nPlease if the trace shows DATABASE IS LOCKED, report it to git\nIf there are I/O issues, wait until they're solved and then use this command again.\n",
-                    error_message, 6004)
+            Log.printlog(error_message, Log.ERROR)
+            raise AutosubmitError(
+                "Some experiment files weren't correctly deleted\nPlease if the trace shows DATABASE IS LOCKED, report it to git\nIf there are I/O issues, wait until they're solved and then use this command again.\n",
+                error_message, 6004
+            )
+
+        return not bool(error_message)  # if there is a non-empty error, return False
+
+    @staticmethod
+    def _raise_permission_error(eadmin: bool, expid_delete: str) -> None:
+        """
+        Raise a permission error if the current user is not allowed to delete the experiment.
+
+        :param eadmin: Indicates if the current user is an eadmin.
+        :type eadmin: bool
+        :param expid_delete: Identifier of the experiment to delete.
+        :type expid_delete: str
+
+        :raises AutosubmitCritical: If the user does not have permission to delete the experiment.
+        """
+        if not eadmin:
+            raise AutosubmitCritical(
+                f"Detected Eadmin user however, -f flag is not found. {expid_delete} cannot be deleted!", 7012)
+        else:
+            raise AutosubmitCritical(
+                f"Current user is not the owner of the experiment. {expid_delete} cannot be deleted!", 7012)
+
+    @staticmethod
+    def _generate_deletion_message(expid_delete: str, experiment_path: Path, structure_db_path: Path,
+                                   job_data_db_path: Path) -> str:
+        """
+        Generate a message detailing what is being deleted from an experiment.
+
+        :param expid_delete: Identifier of the experiment to delete.
+        :type expid_delete: str
+        :param experiment_path: Path to the experiment directory.
+        :type experiment_path: Path
+        :param structure_db_path: Path to the structure database file.
+        :type structure_db_path: Path
+        :param job_data_db_path: Path to the job data database file.
+        :type job_data_db_path: Path
+
+        :return: A message detailing the deletion of the experiment.
+        :rtype: str
+        """
+        message_parts = [
+            f"The {expid_delete} experiment was removed from the local disk and from the database.\n",
+            "Note that this action does not delete any data written by the experiment.\n",
+            "Complete list of files/directories deleted:\n"
+        ]
+        message_parts.extend(f"{path}\n" for path in experiment_path.rglob('*'))
+        message_parts.append(f"{structure_db_path}\n")
+        message_parts.append(f"{job_data_db_path}.db\n")
+        message_parts.append(f"{job_data_db_path}.sql\n")
+        message = '\n'.join(message_parts)
+        return message
+
+    @staticmethod
+    def _perform_deletion(experiment_path: Path, structure_db_path: Path, job_data_db_path: Path,
+                          expid_delete: str) -> str:
+        """
+        Perform the deletion of an experiment, including its directory, structure database, and job data database.
+
+        :param experiment_path: Path to the experiment directory.
+        :type experiment_path: Path
+        :param structure_db_path: Path to the structure database file.
+        :type structure_db_path: Path
+        :param job_data_db_path: Path to the job data database file.
+        :type job_data_db_path: Path
+        :param expid_delete: Identifier of the experiment to delete.
+        :type expid_delete: str
+        :return: An error message if any errors occurred during deletion, otherwise an empty string.
+        :rtype: str
+        """
+        error_message = ""
+        Log.info("Deleting experiment from database...")
+        try:
+            ret = delete_experiment(expid_delete)
+            if ret:
+                Log.result(f"Experiment {expid_delete} deleted")
+        except BaseException as e:
+            error_message += f"Cannot delete experiment entry: {e}\n"
+
+        Log.info("Removing experiment directory...")
+        try:
+            shutil.rmtree(experiment_path)
+        except BaseException as e:
+            error_message += f"Cannot delete directory: {e}\n"
+
+        Log.info("Removing Structure db...")
+        try:
+            if structure_db_path.exists():
+                os.remove(structure_db_path)
+        except BaseException as e:
+            error_message += f"Cannot delete structure: {e}\n"
+
+        Log.info("Removing job_data db...")
+        try:
+            db_path = job_data_db_path.with_suffix(".db")
+            sql_path = job_data_db_path.with_suffix(".sql")
+            if db_path.exists():
+                os.remove(db_path)
+            if sql_path.exists():
+                os.remove(sql_path)
+        except BaseException as e:
+            error_message += f"Cannot delete job_data: {e}\n"
+
+        return error_message
 
     @staticmethod
     def copy_as_config(exp_id,copy_id):
@@ -1376,22 +1429,24 @@ class Autosubmit:
         return exp_id
 
     @staticmethod
-    def delete(expid, force):
+    def delete(expid: str, force: bool) -> bool:
         """
-        Deletes and experiment from database and experiment's folder
+        Deletes an experiment from the database, the experiment's folder database entry and all the related metadata files.
 
-        :type force: bool
+        :param expid: Identifier of the experiment to delete.
         :type expid: str
-        :param expid: identifier of the experiment to delete
-        :param force: if True, does not ask for confirmation
+        :param force: If True, does not ask for confirmation.
+        :type force: bool
 
-        :returns: True if successful, False if not
+        :returns: True if successful, False otherwise.
         :rtype: bool
+
+        :raises AutosubmitCritical: If the experiment does not exist or if there are insufficient permissions.
         """
+        experiment_path = Path(f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}")
 
-        if os.path.exists(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)):
-            if force or Autosubmit._user_yes_no_query("Do you want to delete " + expid + " ?"):
-
+        if experiment_path.exists():
+            if force or Autosubmit._user_yes_no_query(f"Do you want to delete {expid} ?"):
                 Log.debug('Enter Autosubmit._delete_expid {0}', expid)
                 try:
                     return Autosubmit._delete_expid(expid, force)
