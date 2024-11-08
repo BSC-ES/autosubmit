@@ -1228,6 +1228,36 @@ class JobList(object):
             filters_to_apply = {}
         return filters_to_apply
 
+    def _normalize_auto_keyword(self, job: Job, dependency: Dependency) -> Dependency:
+        """
+        Normalize the 'auto' keyword in the dependency relationships for a job.
+
+        This function adjusts the 'SPLITS_TO' value in the dependency relationships
+        if it contains the 'auto' keyword. The 'auto' keyword is replaced with the
+        actual number of splits for the job.
+
+        :param job: The job object containing job details.
+        :param dependency: The dependency object containing dependency details.
+        :return: The dependency object with the attribute relationships updated with the correct number of splits.
+        """
+        if job.splits and dependency.distance and dependency.relationships and job.running == "chunk":
+            job_name_separated = job.name.split("_")
+            if dependency.sign == "-":
+                auto_chunk = int(job_name_separated[3]) - int(dependency.distance)
+            else:
+                auto_chunk = int(job_name_separated[3]) + int(dependency.distance)
+            if auto_chunk < 1:
+                auto_chunk = int(job_name_separated[3])
+            auto_chunk = str(auto_chunk)
+            # Get first split of the given chunk
+            auto_job_name = "_".join(job_name_separated[:3]) + f"_{auto_chunk}_1_{dependency.section}"
+            auto_splits = str(self.graph.nodes[auto_job_name]['job'].splits)
+            for filters_to_keys, filters_to in dependency.relationships.get("SPLITS_FROM", {}).items():
+                if "auto" in filters_to.get("SPLITS_TO", "").lower():
+                    filters_to["SPLITS_TO"] = filters_to["SPLITS_TO"].lower()
+                    filters_to["SPLITS_TO"] = filters_to["SPLITS_TO"].replace("auto", auto_splits)
+        return dependency
+
     def _manage_job_dependencies(self, dic_jobs, job, date_list, member_list, chunk_list, dependencies_keys,
                                  dependencies,
                                  graph):
@@ -1362,6 +1392,7 @@ class JobList(object):
                                                                                  dependency)
             if skip:
                 continue
+            self._normalize_auto_keyword(job, dependency)
             filters_to_apply = self.get_filters_to_apply(job, dependency)
 
             if len(filters_to_apply) > 0:

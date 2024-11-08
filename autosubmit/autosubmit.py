@@ -1645,18 +1645,24 @@ class Autosubmit:
                         jobs_aux.append(job)
                     jobs_cw = jobs_aux
                 del jobs_aux
+            file_paths = ""
+
             if isinstance(jobs, type([])):
                 for job in jobs:
+                    file_paths += f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}/tmp/{job.name}.cmd\n"
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, jobs, packages_persistence, False)
             if len(jobs_cw) > 0:
                 for job in jobs_cw:
+                    file_paths += f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}/tmp/{job.name}.cmd\n"
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, jobs_cw, packages_persistence, False)
 
-            Log.info("no more scripts to generate, now proceed to check them manually")
+            Log.info("No more scripts to generate, you can proceed to check them manually")
+            Log.result(file_paths)
+
         except AutosubmitCritical as e:
             raise
         except AutosubmitError as e:
