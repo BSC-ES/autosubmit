@@ -20,54 +20,26 @@
 """Script for handling experiment monitoring"""
 import os
 import sys
-import traceback
-from contextlib import suppress
 
-scriptdir = os.path.abspath(os.path.dirname(sys.argv[0]))
-sys.path.append(scriptdir)
-sys.path.append(os.path.normpath(os.path.join(scriptdir, os.pardir)))
+script_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
+sys.path.append(script_dir)
+sys.path.append(os.path.normpath(os.path.join(script_dir, os.pardir)))
 # noinspection PyUnresolvedReferences
-from log.log import Log, AutosubmitCritical , AutosubmitError
+from log.log import Log, AutosubmitCritical, AutosubmitError
+from autosubmit import delete_lock_file, exit_from_error
 from autosubmit.autosubmit import Autosubmit
-from typing import Union
 
-
-
-def exit_from_error(e: BaseException):
-    trace = traceback.format_exc()
-    try:
-        Log.debug(trace)
-    except:
-        print(trace)
-    with suppress(FileNotFoundError, PermissionError):
-        os.remove(os.path.join(Log.file_path, "autosubmit.lock"))
-    if isinstance(e, (AutosubmitCritical, AutosubmitError)):
-        e: Union[AutosubmitError, AutosubmitCritical] = e
-        if e.trace:
-            Log.debug("Trace: {0}", str(e.trace))
-        Log.critical("{1} [eCode={0}]", e.code, e.message)
-    else:
-        msg = "A not admitted configuration or error in the code has happened: {0}.\n Please report it to Autosubmit Developers through Git"
-        args = [str(e)]
-        Log.critical(msg.format(*args))
-    Log.info("More info at https://autosubmit.readthedocs.io/en/master/troubleshooting/error-codes.html")
-    os._exit(1)
 
 # noinspection PyProtectedMember
 def main():
     try:
         return_value = Autosubmit.parse_args()
-        if os.path.exists(os.path.join(Log.file_path, "autosubmit.lock")):
-            os.remove(os.path.join(Log.file_path, "autosubmit.lock"))
-        if type(return_value) is int:
-            os._exit(return_value)
-        os._exit(0)
-    except AutosubmitError as e:
-        exit_from_error(e)
-    except AutosubmitCritical as e:
-        exit_from_error(e)
+        delete_lock_file()
+        return_value = return_value if type(return_value) is int else 0
+        os._exit(return_value)
     except BaseException as e:
         exit_from_error(e)
+
 
 if __name__ == "__main__":
     main()

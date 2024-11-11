@@ -21,7 +21,6 @@ import requests
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import threading
-import traceback
 from bscearth.utils.date import date2str
 from configparser import ConfigParser
 from distutils.util import strtobool
@@ -74,10 +73,11 @@ import random
 import signal
 import datetime
 # import log.fd_show as fd_show
-import portalocker
-from importlib.resources import read_text, files as read_files
+from importlib.resources import files as read_files
 from importlib.metadata import version
 from collections import defaultdict
+from portalocker import Lock
+from portalocker.exceptions import BaseLockException
 from pyparsing import nestedExpr
 from .history.experiment_status import ExperimentStatus
 from .history.experiment_history import ExperimentHistory
@@ -2188,10 +2188,8 @@ class Autosubmit:
             raise AutosubmitCritical("Failure during the loading of the experiment configuration, check file paths",
                                      7014, str(e))
 
-        # checking if there is a lock file to avoid multiple running on the same expid
         try:
-            # Portalocker is used to avoid multiple autosubmit running on the same experiment, we have to change this system in #806
-            with portalocker.Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
+            with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
                 try:
                     Log.debug("Preparing run")
                     # This function is called only once, when the experiment is started. It is used to initialize the experiment and to check the correctness of the configuration files.
@@ -2382,10 +2380,7 @@ class Autosubmit:
                                 7051, e.message)
                     except AutosubmitCritical as e:  # Critical errors can't be recovered. Failed configuration or autosubmit error
                         raise AutosubmitCritical(e.message, e.code, e.trace)
-                    except (portalocker.AlreadyLocked, portalocker.LockException) as e:
-                        message = "We have detected that there is another Autosubmit instance using the experiment\n. Stop other Autosubmit instances that are using the experiment or delete autosubmit.lock file located on tmp folder"
-                        raise AutosubmitCritical(message, 7000)
-                    except BaseException as e:
+                    except BaseException:
                         raise # If this happens, there is a bug in the code or an exception not-well caught
                 Log.result("No more jobs to run.")
                 if not did_run and len(job_list.get_completed_without_logs()) > 0:
@@ -2438,14 +2433,13 @@ class Autosubmit:
                         exp_history.finish_current_experiment_run()
                     except Exception:
                         Log.warning("Database is locked")
-        except (portalocker.AlreadyLocked, portalocker.LockException) as e:
-            message = "We have detected that there is another Autosubmit instance using the experiment\n. Stop other Autosubmit instances that are using the experiment or delete autosubmit.lock file located on tmp folder"
-            terminate_child_process(expid)
-            raise AutosubmitCritical(message, 7000)
-        except AutosubmitCritical as e:
+        except BaseLockException:
             terminate_child_process(expid)
             raise
-        except BaseException as e:
+        except AutosubmitCritical:
+            terminate_child_process(expid)
+            raise
+        except BaseException:
             terminate_child_process(expid)
             raise
         finally:
@@ -4076,7 +4070,7 @@ class Autosubmit:
         backup_pkl_path = os.path.join(
             pkl_folder_path, "job_list_{}_backup.pkl".format(expid))
         try:
-            with portalocker.Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
+            with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
                 # Not locked
                 Log.info("Looking for backup file {}".format(backup_pkl_path))
                 if os.path.exists(backup_pkl_path):
@@ -4132,13 +4126,8 @@ class Autosubmit:
                 else:
                     Log.info(
                         "Backup file not found. Pkl restore operation stopped. No changes have been made.")
-        except (portalocker.AlreadyLocked, portalocker.LockException) as e:
-            message = "Another Autosubmit instance using the experiment\n. Stop other Autosubmit instances that are using the experiment or delete autosubmit.lock file located on the /tmp folder."
-            raise AutosubmitCritical(message, 7000)
         except AutosubmitCritical as e:
             raise AutosubmitCritical(e.message, e.code, e.trace)
-        except BaseException as e:
-            raise
 
     @staticmethod
     def database_backup(expid):
@@ -4506,8 +4495,7 @@ class Autosubmit:
             Autosubmit._check_ownership(expid, raise_error=True)
             exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
             tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
-            # Encapsulating the lock
-            with portalocker.Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1) as fh:
+            with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1) as fh:
                 try:
                     Log.info(
                         "Preparing .lock file to avoid multiple instances with same expid.")
@@ -4669,23 +4657,14 @@ class Autosubmit:
                         Autosubmit.detail(job_list)
                     return True
                 # catching Exception
-                except KeyboardInterrupt as e:
+                except KeyboardInterrupt:
                     # Setting signal handler to handle subsequent CTRL-C
                     signal.signal(signal.SIGINT, signal_handler_create)
                     fh.flush()
                     os.fsync(fh.fileno())
                     raise AutosubmitCritical("Stopped by user input", 7010)
-                except BaseException as e:
+                except BaseException:
                     raise
-        except (portalocker.AlreadyLocked, portalocker.LockException) as e:
-            message = "We have detected that there is another Autosubmit instance using the experiment\n. Stop other Autosubmit instances that are using the experiment or delete autosubmit.lock file located on tmp folder"
-            raise AutosubmitCritical(message, 7000)
-        except AutosubmitError as e:
-            raise
-        except AutosubmitCritical as e:
-            raise
-        except BaseException as e:
-            raise
         finally:
             if profile:
                 profiler.stop()
@@ -5211,9 +5190,8 @@ class Autosubmit:
         tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
         section_validation_message = " "
         job_validation_message = " "
-        # checking if there is a lock file to avoid multiple running on the same expid
         try:
-            with portalocker.Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
+            with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
                 Log.info(
                     "Preparing .lock file to avoid multiple instances with same expid.")
 
@@ -5452,11 +5430,6 @@ class Autosubmit:
                                                 groups=groups_dict,
                                                 job_list_object=job_list)
                 return True
-        except (portalocker.AlreadyLocked, portalocker.LockException) as e:
-            message = "We have detected that there is another Autosubmit instance using the experiment\n. Stop other Autosubmit instances that are using the experiment or delete autosubmit.lock file located on tmp folder"
-            raise AutosubmitCritical(message, 7000)
-        except (AutosubmitError, AutosubmitCritical):
-            raise
         except BaseException as e:
             raise AutosubmitCritical(
                 "An Error has occurred while setting some of the workflow jobs, no changes were made", 7040, str(e))

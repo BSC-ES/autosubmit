@@ -9,6 +9,9 @@
 - #1397: Use `tini` as entrypoint in our Docker image.
 - #1428: Use natural sort order for graph entries (adapted from Cylc),
   enable doctests to be executed with pytest.
+- #945: Fix portalocker releasing the lock when a portalocker exception
+  is raised. Now it prints the warnings but only releases the lock when
+  the command finished (successfully or not).
 
 4.1.10 - Hotfix
 ===============
