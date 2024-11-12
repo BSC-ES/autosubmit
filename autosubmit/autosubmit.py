@@ -4724,16 +4724,13 @@ class Autosubmit:
                 raise AutosubmitCritical("Autosubmit couldn't identify the project destination.", 7014)
 
         if project_type == "git":
-            submitter = Autosubmit._get_submitter(as_conf)
-            submitter.load_platforms(as_conf)
             try:
-                hpcarch = submitter.platforms.get(as_conf.get_platform(), "local")
-            except BaseException as e:
-                error = str(e)
-                try:
-                    hpcarch = submitter.platforms[as_conf.get_platform()]
-                except Exception as e:
-                    hpcarch = "local"
+                submitter = Autosubmit._get_submitter(as_conf)
+                submitter.load_platforms(as_conf)
+                hpcarch = submitter.platforms[as_conf.get_platform()]
+            except AutosubmitCritical as e:
+                Log.warning(f"{e.message}\nRemote git cloning is disabled")
+                hpcarch = "local"
             return AutosubmitGit.clone_repository(as_conf, force, hpcarch)
         elif project_type == "svn":
             svn_project_url = as_conf.get_svn_project_url()
