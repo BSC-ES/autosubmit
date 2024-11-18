@@ -2578,12 +2578,6 @@ class Autosubmit:
                 if error_message != "":
                     raise AutosubmitCritical("Submission Failed due wrong configuration:{0}".format(error_message),
                                              7014)
-                if not inspect:
-                    for package in valid_packages_to_submit:
-                        wrapper_time = None
-                        for job in package.jobs: # if jobs > 1 == wrapped == same submission time
-                            job.write_submit_time(wrapper_submit_time=wrapper_time)
-                            wrapper_time = job.submit_time_timestamp
 
             if wrapper_errors and not any_job_submitted and len(job_list.get_in_queue()) == 0:
                 # Deadlock situation

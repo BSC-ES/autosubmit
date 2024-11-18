@@ -18,12 +18,15 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import locale
 import os
+from pathlib import Path
 from xml.dom.minidom import parseString
 import subprocess
 
+from matplotlib.patches import PathPatch
 
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.headers.local_header import LocalHeader
+from autosubmit.platforms.wrappers.wrapper_factory import LocalWrapperFactory
 
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from time import sleep
@@ -64,6 +67,9 @@ class LocalPlatform(ParamikoPlatform):
         self.job_status['RUNNING'] = ['0']
         self.job_status['QUEUING'] = []
         self.job_status['FAILED'] = []
+        self._allow_wrappers = True
+        self._wrapper = LocalWrapperFactory(self)
+
         self.update_cmds()
 
     def update_cmds(self):
@@ -100,28 +106,25 @@ class LocalPlatform(ParamikoPlatform):
         return [int(element.firstChild.nodeValue) for element in jobs_xml]
 
     def get_submit_cmd(self, job_script, job, hold=False, export=""):
-        wallclock = self.parse_time(job.wallclock)
-        seconds = int(wallclock.days * 86400 + wallclock.seconds * 60)
+        if job:
+            wallclock = self.parse_time(job.wallclock)
+            seconds = int(wallclock.days * 86400 + wallclock.seconds * 60)
+        else:
+            seconds = 24 * 3600
         if export == "none" or export == "None" or export is None or export == "":
             export = ""
         else:
             export += " ; "
-        return self.get_call(job_script, job, export=export,timeout=seconds)
-
+        command = self.get_call(job_script, job, export=export,timeout=seconds)
+        return f"cd {self.remote_log_dir} ; {command}"
     def get_checkjob_cmd(self, job_id):
         return self.get_pscall(job_id)
 
-    def connect(self, as_conf, reconnect=False):
+    def connect(self, as_conf={}, reconnect=False):
         self.connected = True
-        if not self.log_retrieval_process_active and (
-                as_conf is None or str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS',"false")).lower() == "false"):
-            self.log_retrieval_process_active = True
-            if as_conf and as_conf.misc_data.get("AS_COMMAND","").lower() == "run":
-                self.recover_job_logs()
-
+        self.spawn_log_retrieval_process(as_conf)
 
     def test_connection(self,as_conf):
-        self.main_process_id = os.getpid()
         if not self.connected:
             self.connect(as_conf)
 
@@ -151,10 +154,7 @@ class LocalPlatform(ParamikoPlatform):
         return True
 
     def send_file(self, filename, check=True):
-        self.check_remote_log_dir()
-        self.delete_file(filename,del_cmd=True)
-        command = '{0} {1} {2}'.format(self.put_cmd, os.path.join(self.tmp_path, filename),
-                                       os.path.join(self.tmp_path, 'LOG_' + self.expid, filename))
+        command = f'{self.put_cmd} {os.path.join(self.tmp_path, Path(filename).name)} {os.path.join(self.tmp_path, "LOG_" + self.expid, Path(filename).name)}'
         try:
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError:
@@ -164,6 +164,17 @@ class LocalPlatform(ParamikoPlatform):
             raise
         return True
 
+    def remove_multiple_files(self, filenames):
+        log_dir = os.path.join(self.tmp_path, 'LOG_{0}'.format(self.expid))
+        multiple_delete_previous_run = os.path.join(
+            log_dir, "multiple_delete_previous_run.sh")
+        if os.path.exists(log_dir):
+            lang = locale.getlocale()[1]
+            if lang is None:
+                lang = 'UTF-8'
+            open(multiple_delete_previous_run, 'wb+').write(("rm -f" + filenames).encode(lang))
+            os.chmod(multiple_delete_previous_run, 0o770)
+        return ""
 
     def get_file(self, filename, must_exist=True, relative_path='',ignore_log = False,wrapper_failed=False):
         local_path = os.path.join(self.tmp_path, relative_path)
@@ -187,40 +198,28 @@ class LocalPlatform(ParamikoPlatform):
         return True
 
     # Moves .err .out
-    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3, first=True):
+    def check_file_exists(self, src, wrapper_failed=False, sleeptime=1, max_retries=1):
         """
-        Moves a file on the platform
+        Checks if a file exists in the platform
         :param src: source name
         :type src: str
-        :param: wrapper_failed: if True, the wrapper failed.
+        :param wrapper_failed: checks inner jobs files
         :type wrapper_failed: bool
-
+        :param sleeptime: time to sleep
+        :type sleeptime: int
+        :param max_retries: maximum number of retries
+        :type max_retries: int
+        :return: True if the file exists, False otherwise
+        :rtype: bool
         """
-        file_exist = False
-        remote_path = os.path.join(self.get_files_path(), src)
-        retries = 0
-        # Not first is meant for vertical_wrappers. There you have to download STAT_{MAX_LOGS} then STAT_{MAX_LOGS-1} and so on
-        if not first:
-            max_retries = 1
-            sleeptime = 0
-        while not file_exist and retries < max_retries:
-            try:
-                file_exist = os.path.isfile(os.path.join(self.get_files_path(),src))
-                if not file_exist:  # File doesn't exist, retry in sleep-time
-                    if first:
-                        Log.debug("{2} File does not exist.. waiting {0}s for a new retry (retries left: {1})", sleeptime,
-                                 max_retries - retries, remote_path)
-                    if not wrapper_failed:
-                        sleep(sleeptime)
-                        sleeptime = sleeptime + 5
-                        retries = retries + 1
-                    else:
-                        retries = 9999
-            except BaseException as e:  # Unrecoverable error
-                Log.printlog("File does not exist, logs {0} {1}".format(self.get_files_path(),src),6001)
-                file_exist = False  # won't exist
-                retries = 999  # no more retries
-        return file_exist
+        sleeptime = 1
+        for i in range(max_retries):
+            if os.path.isfile(os.path.join(self.get_files_path(), src)):
+                return True
+            sleep(sleeptime)
+        Log.warning("File {0} does not exist".format(src))
+        return False
+
 
     def delete_file(self, filename,del_cmd  = False):
         if del_cmd:
@@ -281,3 +280,18 @@ class LocalPlatform(ParamikoPlatform):
         :type remote_logs: (str, str)
         """
         return
+
+    def check_completed_files(self, sections=None):
+        command = "find %s " % self.remote_log_dir
+        if sections:
+            for i, section in enumerate(sections.split()):
+                command += " -name *%s_COMPLETED" % section
+                if i < len(sections.split()) - 1:
+                    command += " -o "
+        else:
+            command += " -name *_COMPLETED"
+
+        if self.send_command(command, True):
+            return self._ssh_output
+        else:
+            return None

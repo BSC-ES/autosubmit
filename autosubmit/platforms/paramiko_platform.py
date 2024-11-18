@@ -1,8 +1,6 @@
-import copy
-import threading
-
 import locale
 from contextlib import suppress
+from pathlib import Path
 from time import sleep
 import sys
 import socket
@@ -13,9 +11,6 @@ import select
 import re
 from datetime import timedelta
 import random
-
-from pathlib import Path
-
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_common import Type
 from autosubmit.platforms.platform import Platform
@@ -26,7 +21,7 @@ from threading import Thread
 import threading
 import getpass
 from paramiko.agent import Agent
-from autosubmit.helpers.utils import terminate_child_process
+import time
 
 def threaded(fn):
     def wrapper(*args, **kwargs):
@@ -118,13 +113,10 @@ class ParamikoPlatform(Platform):
         if display is None:
             display = "localhost:0"
         self.local_x11_display = xlib_connect.get_display(display)
-        self.log_retrieval_process_active = False
-        terminate_child_process(self.expid, self.name)
     def test_connection(self,as_conf):
         """
         Test if the connection is still alive, reconnect if not.
         """
-        self.main_process_id = os.getpid()
 
         try:
             if not self.connected:
@@ -138,7 +130,7 @@ class ParamikoPlatform(Platform):
                     try:
                         transport = self._ssh.get_transport()
                         transport.send_ignore()
-                    except Exception:
+                    except:
                         message = "Timeout connection"
                 return message
 
@@ -153,6 +145,7 @@ class ParamikoPlatform(Platform):
             self.connected = False
             raise AutosubmitCritical(str(e),7051)
             #raise AutosubmitError("[{0}] connection failed for host: {1}".format(self.name, self.host), 6002, e.message)
+
 
     def restore_connection(self, as_conf):
         try:
@@ -309,10 +302,9 @@ class ParamikoPlatform(Platform):
             self._ftpChannel = paramiko.SFTPClient.from_transport(self.transport,window_size=pow(4, 12) ,max_packet_size=pow(4, 12) )
             self._ftpChannel.get_channel().settimeout(120)
             self.connected = True
-            if not self.log_retrieval_process_active and (as_conf is None or str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "false"):
-                self.log_retrieval_process_active = True
-                if as_conf and as_conf.misc_data.get("AS_COMMAND", "").lower() == "run":
-                    self.recover_job_logs()
+            self.spawn_log_retrieval_process(as_conf)
+
+
         except SSHException:
             raise
         except IOError as e:
@@ -371,33 +363,31 @@ class ParamikoPlatform(Platform):
                 return ""
         return ""
 
-    def send_file(self, filename: str, check: bool = True) -> bool:
+    def send_file(self, filename, check=True):
         """
-        Sends a local file to the platform.
-
-        :param filename: Name of the file to send.
+        Sends a local file to the platform
+        :param check:
+        :param filename: name of the file to send
         :type filename: str
-        :param check: Whether to check and delete the remote file before sending. Defaults to True.
-        :type check: bool
-        :return: True if the file was sent successfully, False otherwise.
-        :rtype: bool
-        :raises AutosubmitError: If the file cannot be sent or the connection is not active.
         """
-        local_path = Path(self.tmp_path) / filename
-        remote_path = Path(self.get_files_path()) / local_path.name
+
         if check:
-            Log.debug(f"Cleaning remote file: {remote_path}")
             self.check_remote_log_dir()
-            self.delete_file(local_path.name)
+            self.delete_file(filename)
         try:
-            self._ftpChannel.put(str(local_path), str(remote_path))
-            self._ftpChannel.chmod(str(remote_path), local_path.stat().st_mode)
-            Log.debug(f"File {local_path} sent to {remote_path}")
+            local_path = os.path.join(os.path.join(self.tmp_path, filename))
+            remote_path = os.path.join(
+                self.get_files_path(), os.path.basename(filename))
+            self._ftpChannel.put(local_path, remote_path)
+            self._ftpChannel.chmod(remote_path, os.stat(local_path).st_mode)
             return True
         except IOError as e:
-            raise AutosubmitError(f'Can not send file {local_path} to {remote_path}', 6004, str(e))
+            raise AutosubmitError('Can not send file {0} to {1}'.format(os.path.join(
+                self.tmp_path, filename), os.path.join(self.get_files_path(), filename)), 6004, str(e))
         except BaseException as e:
-            raise AutosubmitError('Send file failed. Connection seems to no be active', 6004, str(e))
+            raise AutosubmitError(
+                'Send file failed. Connection seems to no be active', 6004)
+
 
     def get_list_of_files(self):
         return self._ftpChannel.get(self.get_files_path)
@@ -461,7 +451,6 @@ class ParamikoPlatform(Platform):
         """
 
         try:
-            Log.debug(f"Deleting file {filename}, full_path: {os.path.join(self.get_files_path(), filename)}")
             self._ftpChannel.remove(os.path.join(
                 self.get_files_path(), filename))
             return True
@@ -539,7 +528,8 @@ class ParamikoPlatform(Platform):
         if cmd is None:
             return None
         if self.send_command(cmd,x11=x11):
-            job_id = self.get_submitted_job_id(self.get_ssh_output(),x11=job.x11)
+            x11 = False if job is None else job.x11
+            job_id = self.get_submitted_job_id(self.get_ssh_output(),x11=x11)
             Log.debug("Job ID: {0}", job_id)
             return int(job_id)
         else:
@@ -631,7 +621,19 @@ class ParamikoPlatform(Platform):
                 self.get_ssh_output()).strip("\n")
             # URi: define status list in HPC Queue Class
             if job_status in self.job_status['COMPLETED'] or retries == 0:
-                job_status = Status.COMPLETED
+                # The Local platform has only 0 or 1, so it neccesary to look for the completed file.
+                # Not sure why it is called over_wallclock but is the only way to return a value
+                if self.type == "local":  # wrapper has a different check completion
+                    if not job.is_wrapper:
+                        job_status = job.check_completion(over_wallclock=True)
+                    else:
+                        if Path(f"{self.remote_log_dir}/WRAPPER_FAILED").exists():
+                            job_status = Status.FAILED
+                        else:
+                            job_status = Status.COMPLETED
+                else:
+                    job_status = Status.COMPLETED
+
             elif job_status in self.job_status['RUNNING']:
                 job_status = Status.RUNNING
                 if not is_wrapper:
@@ -663,8 +665,14 @@ class ParamikoPlatform(Platform):
             Log.error(
                 'check_job() The job id ({0}) status is {1}.', job_id, job_status)
 
-        if job_status in [Status.FAILED, Status.COMPLETED]:
+        if job_status in [Status.FAILED, Status.COMPLETED, Status.UNKNOWN]:
             job.updated_log = False
+            # backup for end time in case that the stat file is not found
+            job.end_time_placeholder = int(time.time())
+        if job_status in [Status.RUNNING, Status.COMPLETED] and job.new_status in [Status.QUEUING, Status.SUBMITTED]:
+            # backup for start time in case that the stat file is not found
+            job.start_time_timestamp = int(time.time())
+
         if submit_hold_check:
             return job_status
         else:
@@ -776,9 +784,9 @@ class ParamikoPlatform(Platform):
                                     try:
                                         if self.cancel_cmd is not None:
                                             job.platform.send_command(self.cancel_cmd + " " + str(job.id))
-                                    except Exception:
+                                    except:
                                         pass
-                            except Exception:
+                            except:
                                 job_status = Status.FAILED
                 if job_status in self.job_status['COMPLETED']:
                     job_status = Status.COMPLETED
@@ -1229,18 +1237,23 @@ class ParamikoPlatform(Platform):
         :return: command to execute script
         :rtype: str
         """
-        executable = ''
-        if job.type == Type.BASH:
-            executable = 'bash'
-        elif job.type == Type.PYTHON:
-            executable = 'python3'
-        elif job.type == Type.PYTHON2:
-            executable = 'python2'
-        elif job.type == Type.R:
-            executable = 'Rscript'
-        if job.executable != '':
-            executable = '' # Alternative: use job.executable with substituted placeholders
-        remote_logs = (job.script_name + ".out."+str(job.fail_count), job.script_name + ".err."+str(job.fail_count))
+        if job: # If job is None, it is a wrapper
+            executable = ''
+            if job.type == Type.BASH:
+                executable = 'bash'
+            elif job.type == Type.PYTHON:
+                executable = 'python3'
+            elif job.type == Type.PYTHON2:
+                executable = 'python2'
+            elif job.type == Type.R:
+                executable = 'Rscript'
+            if job.executable != '':
+                executable = '' # Alternative: use job.executable with substituted placeholders
+            remote_logs = (job.script_name + ".out."+str(job.fail_count), job.script_name + ".err."+str(job.fail_count))
+        else:
+            executable = 'python3' # wrappers are always python3
+            remote_logs = (f"{job_script}.out", f"{job_script}.err")
+
         if timeout < 1:
             command = export + ' nohup ' + executable + ' {0} > {1} 2> {2} & echo $!'.format(
                 os.path.join(self.remote_log_dir, job_script),
@@ -1438,7 +1451,7 @@ class ParamikoPlatform(Platform):
                 return True
             else:
                 return False
-        except Exception:
+        except:
             return False
 class ParamikoPlatformException(Exception):
     """

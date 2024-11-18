@@ -151,7 +151,8 @@ class PJMPlatform(ParamikoPlatform):
                         job.hold = hold
                         job.id = str(jobs_id[i])
                         job.status = Status.SUBMITTED
-                        job.write_submit_time(hold=hold)
+                        job.wrapper_name = package.name
+
                     i += 1
             save = True
         except AutosubmitError as e:
@@ -483,13 +484,10 @@ class PJMPlatform(ParamikoPlatform):
     def allocated_nodes():
         return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
 
-    def check_file_exists(self, filename, wrapper_failed=False, sleeptime=5, max_retries=3, first=True):
+    def check_file_exists(self, filename, wrapper_failed=False, sleeptime=5, max_retries=3):
         file_exist = False
         retries = 0
-        # Not first is meant for vertical_wrappers. There you have to download STAT_{MAX_LOGS} then STAT_{MAX_LOGS-1} and so on
-        if not first:
-            max_retries = 1
-            sleeptime = 0
+
         while not file_exist and retries < max_retries:
             try:
                 # This return IOError if path doesn't exist
@@ -497,9 +495,6 @@ class PJMPlatform(ParamikoPlatform):
                     self.get_files_path(), filename))
                 file_exist = True
             except IOError as e:  # File doesn't exist, retry in sleeptime
-                if first:
-                    Log.debug("{2} File does not exist.. waiting {0}s for a new retry (retries left: {1})", sleeptime,
-                              max_retries - retries, os.path.join(self.get_files_path(), filename))
                 if not wrapper_failed:
                     sleep(sleeptime)
                     sleeptime = sleeptime + 5

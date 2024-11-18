@@ -99,7 +99,7 @@ class SlurmPlatform(ParamikoPlatform):
         """
         try:
 
-            valid_packages_to_submit = [ package for package in valid_packages_to_submit if package.x11 is not True]
+            valid_packages_to_submit = [ package for package in valid_packages_to_submit if package.x11 != True]
             if len(valid_packages_to_submit) > 0:
                 duplicated_jobs_already_checked = False
                 platform = valid_packages_to_submit[0].jobs[0].platform
@@ -120,7 +120,7 @@ class SlurmPlatform(ParamikoPlatform):
                             #cancel bad submitted job if jobid is encountered
                             for id_ in jobid:
                                 self.send_command(self.cancel_job(id_))
-                    except Exception:
+                    except:
                         pass
                     jobs_id = None
                     self.connected = False
@@ -189,6 +189,8 @@ class SlurmPlatform(ParamikoPlatform):
                         job.hold = hold
                         job.id = str(jobs_id[i])
                         job.status = Status.SUBMITTED
+                        job.wrapper_name = package.name
+
                     # Check if there are duplicated jobnames
                     if not duplicated_jobs_already_checked:
                         job_name = package.name if hasattr(package, "name") else package.jobs[0].name
@@ -651,37 +653,30 @@ class SlurmPlatform(ParamikoPlatform):
     def allocated_nodes():
         return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
 
-    def check_file_exists(self, filename, wrapper_failed=False, sleeptime=5, max_retries=3, first=True):
+    def check_file_exists(self, filename, wrapper_failed=False, sleeptime=5, max_retries=3):
         file_exist = False
         retries = 0
-        # Not first is meant for vertical_wrappers. There you have to download STAT_{MAX_LOGS} then STAT_{MAX_LOGS-1} and so on
-        if not first:
-            max_retries = 1
-            sleeptime = 0
         while not file_exist and retries < max_retries:
             try:
-                # This return IOError if path doesn't exist
+                # This return IOError if a path doesn't exist
                 self._ftpChannel.stat(os.path.join(
                     self.get_files_path(), filename))
                 file_exist = True
             except IOError as e:  # File doesn't exist, retry in sleeptime
-                if first:
-                    Log.debug("{2} File does not exist.. waiting {0}s for a new retry (retries left: {1})", sleeptime,
-                              max_retries - retries, os.path.join(self.get_files_path(), filename))
                 if not wrapper_failed:
+                    sleep(sleeptime)
+                    retries = retries + 1
+                else:
+                    sleep(2)
+                    retries = retries + 1
+            except BaseException as e:  # Unrecoverable error
+                if str(e).lower().find("garbage") != -1:
                     sleep(sleeptime)
                     sleeptime = sleeptime + 5
                     retries = retries + 1
                 else:
-                    retries = 9999
-            except BaseException as e:  # Unrecoverable error
-                if str(e).lower().find("garbage") != -1:
-                    if not wrapper_failed:
-                        sleep(sleeptime)
-                        sleeptime = sleeptime + 5
-                        retries = retries + 1
-                else:
-                    Log.printlog("remote logs {0} couldn't be recovered".format(filename), 6001)
                     file_exist = False  # won't exist
                     retries = 999  # no more retries
+        if not file_exist:
+            Log.warning("File {0} couldn't be found".format(filename))
         return file_exist
