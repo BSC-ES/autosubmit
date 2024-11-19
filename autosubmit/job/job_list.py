@@ -417,8 +417,15 @@ class JobList(object):
         else:
             changes = True
             Log.debug("Changes detected, calculating dependencies")
-        sections_gen = (section for section in jobs_data.keys())
-        for job_section in sections_gen:
+        # Generate all graph before adding dependencies.
+        for job_section in (section for section in jobs_data.keys()):
+            for job in (job for job in dic_jobs.get_jobs(job_section, sort_string=True)):
+                if job.name not in self.graph.nodes:
+                    self.graph.add_node(job.name, job=job)
+                elif job.name in self.graph.nodes and self.graph.nodes.get(job.name).get("job", None) is None:  # Old versions of autosubmit needs re-adding the job to the graph
+                    self.graph.nodes.get(job.name)["job"] = job
+
+        for job_section in (section for section in jobs_data.keys()):
             # Changes when all jobs of a section are added
             self.depends_on_previous_chunk = dict()
             self.depends_on_previous_split = dict()
@@ -432,14 +439,8 @@ class JobList(object):
             # call function if dependencies_key is not None
             dependencies = JobList._manage_dependencies(dependencies_keys, dic_jobs) if dependencies_keys else {}
             self.job_names = set()
-
-            jobs_gen = (job for job in dic_jobs.get_jobs(job_section,sort_string=True))
-            for job in jobs_gen:
+            for job in (job for job in dic_jobs.get_jobs(job_section, sort_string=True)):
                 self.actual_job_depends_on_special_chunk = False
-                if job.name not in self.graph.nodes:
-                    self.graph.add_node(job.name, job=job)
-                elif job.name in self.graph.nodes and self.graph.nodes.get(job.name).get("job", None) is None:  # Old versions of autosubmit needs re-adding the job to the graph
-                    self.graph.nodes.get(job.name)["job"] = job
                 if dependencies and changes:
                     job = self.graph.nodes.get(job.name)['job']
                     ## Adds the dependencies to the job, and if not possible, adds the job to the problematic_dependencies

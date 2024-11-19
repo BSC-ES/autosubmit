@@ -4710,6 +4710,9 @@ class Autosubmit:
             except AutosubmitCritical as e:
                 Log.warning(f"{e.message}\nRemote git cloning is disabled")
                 hpcarch = "local"
+            except KeyError:
+                Log.warning(f"Platform {as_conf.get_platform()} not found in configuration file")
+                hpcarch = "local"
             return AutosubmitGit.clone_repository(as_conf, force, hpcarch)
         elif project_type == "svn":
             svn_project_url = as_conf.get_svn_project_url()
@@ -6121,7 +6124,3 @@ class Autosubmit:
                         job.status = Status.KEY_TO_VALUE[status]
                 job_list.save()
             terminate_child_process(expid)
-
-
-
-

@@ -1,17 +1,57 @@
-4.1.11 - Not released
-=====================
+4.1.11 - Enhancements, New Features, Documentation, and Bug Fixes
+=================================================================
 
-- #1408: Updated our Docker image to work with Kubernetes.
-  Included sample helm charts (tested with minikube).
-- #1373: Update installation instructions with `rsync`, and fix
-  our `Dockerfile` adding `rsync` and `subversion`.
-- #1207: Add experiment path in `autosubmit describe`.
+Enhancements and new features:
+
+- #1444: Additional files now support YAML format.
 - #1397: Use `tini` as entrypoint in our Docker image.
-- #1428: Use natural sort order for graph entries (adapted from Cylc),
-  enable doctests to be executed with pytest.
+- #1207: Add experiment path in `autosubmit describe`.
+- #1130: Now `autosubmit refresh` can clone without submodules.
+- #1320: Pytest added to the CI/CD.
 - #945: Fix portalocker releasing the lock when a portalocker exception
   is raised. Now it prints the warnings but only releases the lock when
-  the command finished (successfully or not).
+  the command finishes (successfully or not).
+- #1428: Use natural sort order for graph entries (adapted from Cylc),
+  enable doctests to be executed with pytest.
+- #1408: Updated our Docker image to work with Kubernetes.
+  Included sample helm charts (tested with minikube).
+- #1338: Stats can now be visualized in a PDF format.
+- #1337: Autosubmit inspect, and other commands, are now faster.
+
+Documentation and log improvements:
+- #1274: A traceability section has been added.
+- #1273: Improved AS logs by removing deprecated messages.
+- #1394: Added Easybuild recipes for Autosubmit.
+- #1439: Autosubmitconfigparser and ruamel.yaml updated.
+- #1400: Fixes an issue with monitor and check experiment RTD section.
+- #1382: Improved AS logs, removing paramiko warnings. (Updated paramiko version)
+- #1373: Update installation instructions with `rsync`, and fix
+  our `Dockerfile` by adding `rsync` and `subversion`.
+- #1242: Improved warnings when using extended header/tailer.
+- #1431: Updated the YAML files to use marenostrum5 instead of marenostrum4.
+
+Bug fixes:
+- #1423, #1421, and #1419: Fixes different issues with the split feature.
+- #1407: Solves an issue when using one node.
+- #1406: Autosubmit monitor is now able to monitor non-owned experiments again.
+- #1317: Autosubmit delete now deletes the metadata and database entries.
+- #1105: Autosubmit configure now admits paths that end with "/".
+- #1045: Autosubmit now admits placeholders set in lists.
+- #1417, #1398, #1287, and #1386: Fixes and improves the wrapper deadlock detection.
+- #1436: Dependencies with Status=Running not working properly.
+- (also enhancement) #1426: Fixes an issue with as_checkpoints.
+- #1393: Better support for boolean YAML configurations.
+- #1129: (Custom config) Platforms can now be defined under $expid/conf.
+- #1443: Fixes an issue with additional files under bscearth000.
+
+Others:
+
+- #1427: Readthedocs works again.
+- #1376: Autosubmit 4.1.9 was published to DockerHub.
+- #1327: LSF platform has been removed.
+- #1322: Autosubmit now has a DockerHub organization.
+- #1123: Profiler can now be stopped.
+
 
 4.1.10 - Hotfix
 ===============
