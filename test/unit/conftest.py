@@ -1,7 +1,9 @@
+import os
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from textwrap import dedent
 from typing import Any, Dict, Callable, List, Protocol, Optional, TYPE_CHECKING
 
 import pytest
@@ -11,6 +13,7 @@ from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 from ruamel.yaml import YAML
 
 from autosubmit.autosubmit import Autosubmit
+from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
 
 if TYPE_CHECKING:
@@ -29,6 +32,109 @@ class AutosubmitExperiment:
     aslogs_dir: Path
     status_dir: Path
     platform: ParamikoPlatform
+
+
+class ExperimentFactory(Protocol):
+    def __call__(self, description: str, platform: str) -> AutosubmitExperiment: ...
+
+
+@pytest.fixture
+def create_experiment(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> ExperimentFactory:
+    """Create an Autosubmit experiment. Callers do not control the expid."""
+
+    original_autosubmitrc: str = os.getenv('AUTOSUBMIT_CONFIGURATION', default='')
+    tmp_dir = TemporaryDirectory()
+    tmp_path = Path(tmp_dir.name)
+
+    def _create_experiment(description: str, platform: str = 'local') -> AutosubmitExperiment:
+        autosubmitrc = tmp_path / 'autosubmitrc'
+        autosubmitrc.touch()
+        folder = str(tmp_path)
+        autosubmitrc.write_text(data=dedent(f'''[database]
+               path = {folder}
+               filename = tests.db
+               
+               [local]
+               path = {folder}
+               
+               [globallogs]
+               path = {folder}
+               
+               [structures]
+               path = {folder}
+               
+               [historicdb]
+               path = {folder}
+               
+               [historiclog]
+               path = {folder}
+               
+               [defaultstats]
+               path = {folder}'''))
+
+        os.environ['AUTOSUBMIT_CONFIGURATION'] = str(autosubmitrc)
+
+        BasicConfig.read()
+        Autosubmit.install()
+
+        expid = Autosubmit.expid(
+            description=description,
+            hpc="",
+            copy_id="",
+            dummy=True,
+            minimal_configuration=True,
+            git_repo="",
+            git_branch="",
+            git_as_conf="",
+            operational=False,
+            testcase=True,
+            use_local_minimal=False
+        )
+
+        exp_path = tmp_path / expid
+        aslogs_dir = exp_path / BasicConfig.LOCAL_ASLOG_DIR
+        exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
+        status_dir = exp_path / 'status'
+        aslogs_dir.mkdir(parents=True, exist_ok=True)
+        status_dir.mkdir(parents=True, exist_ok=True)
+
+        platform_config = {
+            "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
+            "LOCAL_TMP_DIR": str(exp_tmp_dir),
+            "LOCAL_ASLOG_DIR": str(aslogs_dir)
+        }
+        if platform == 'local':
+            platform_obj = LocalPlatform(expid=expid, name=platform, config=platform_config)
+        else:
+            platform_obj = SlurmPlatform(expid=expid, name=platform, config=platform_config)
+            platform_obj.job_status = {
+                'COMPLETED': [],
+                'RUNNING': [],
+                'QUEUING': [],
+                'FAILED': []
+            }
+            submit_platform_script = aslogs_dir / 'submit_local.sh'
+            submit_platform_script.touch(exist_ok=True)
+
+        return AutosubmitExperiment(
+            expid=expid,
+            autosubmit=autosubmit,
+            exp_path=exp_path,
+            tmp_dir=exp_tmp_dir,
+            aslogs_dir=aslogs_dir,
+            status_dir=status_dir,
+            platform=platform_obj  # type: ignore # TODO: given a string, get the platform object
+        )
+
+    def finalizer():
+        if original_autosubmitrc:
+            os.environ['AUTOSUBMIT_CONFIGURATION'] = original_autosubmitrc
+        if tmp_path and tmp_path.exists():
+            tmp_dir.cleanup()
+
+    request.addfinalizer(finalizer)
+
+    return _create_experiment
 
 
 class AutosubmitExperimentFactory(Protocol):

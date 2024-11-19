@@ -1,15 +1,16 @@
-import pytest
-from conftest import AutosubmitExperimentFactory
-from autosubmit.autosubmit import Autosubmit
-
 from typing import Callable
+
+import pytest
+
+from autosubmit.autosubmit import Autosubmit
+from .conftest import ExperimentFactory
 
 """Test to check the functionality of the -y flag. It will copy the hpc too."""
 
 _EXPERIMENT_DESCRIPTION = "test descript"
 
 
-def test_create_expid_default_hpc(create_autosubmit_exp: AutosubmitExperimentFactory) -> None:
+def test_create_expid_default_hpc(create_experiment: ExperimentFactory) -> None:
     """Create expid with the default hcp value (no -H flag defined).
 
     .. code-block:: console
@@ -22,7 +23,7 @@ def test_create_expid_default_hpc(create_autosubmit_exp: AutosubmitExperimentFac
     """
     # create default expid
     platform_name = "local"
-    experiment = create_autosubmit_exp(description=_EXPERIMENT_DESCRIPTION, hpc=platform_name)
+    experiment = create_experiment(description=_EXPERIMENT_DESCRIPTION, platform=platform_name)
     expid = experiment.expid
     # capture the platform using the "describe"
     describe = Autosubmit.describe(expid)
@@ -34,7 +35,7 @@ def test_create_expid_default_hpc(create_autosubmit_exp: AutosubmitExperimentFac
 @pytest.mark.parametrize("fake_hpc, expected_hpc", [
     ("mn5", "mn5"),
     ("", "local"), ])
-def test_create_expid_flag_hpc(fake_hpc, expected_hpc, create_autosubmit_exp) -> None:
+def test_create_expid_flag_hpc(fake_hpc, expected_hpc, create_experiment: ExperimentFactory) -> None:
     """Create expid using the flag -H. Defining a value for the flag and not defining any value for that flag.
 
     .. code-block:: console
@@ -46,7 +47,7 @@ def test_create_expid_flag_hpc(fake_hpc, expected_hpc, create_autosubmit_exp) ->
     :param expected_hpc: The value it is expected for the variable hpc
     """
     # create default expid with know hpc
-    experiment = create_autosubmit_exp(description=_EXPERIMENT_DESCRIPTION, hpc=fake_hpc)
+    experiment = create_experiment(description=_EXPERIMENT_DESCRIPTION, platform=fake_hpc)
     expid = experiment.expid
     # capture the platform using the "describe"
     describe = Autosubmit.describe(expid)
@@ -59,7 +60,7 @@ def test_create_expid_flag_hpc(fake_hpc, expected_hpc, create_autosubmit_exp) ->
     ("mn5", "mn5"),
     ("", "local"),
 ])
-def test_copy_expid(fake_hpc, expected_hpc, create_autosubmit_exp: Callable) -> None:
+def test_copy_expid(fake_hpc, expected_hpc, create_experiment: ExperimentFactory) -> None:
     """Copy an experiment without indicating which is the new HPC platform
 
     .. code-block:: console
@@ -70,7 +71,7 @@ def test_copy_expid(fake_hpc, expected_hpc, create_autosubmit_exp: Callable) -> 
     :param expected_hpc: The value it is expected for the variable hpc
     """
     # create default expid with know hpc
-    experiment = create_autosubmit_exp(description=_EXPERIMENT_DESCRIPTION, hpc=fake_hpc)
+    experiment = create_experiment(description=_EXPERIMENT_DESCRIPTION, platform=fake_hpc)
     expid = experiment.expid
     # copy expid
     copy_expid = Autosubmit.expid(_EXPERIMENT_DESCRIPTION, "", expid)
@@ -83,7 +84,7 @@ def test_copy_expid(fake_hpc, expected_hpc, create_autosubmit_exp: Callable) -> 
 
 # copy expid with specific hpc should not change the hpc value
 # autosubmit expid -y a000 -h local -d "experiment is about..."
-def test_copy_expid_no(create_autosubmit_exp: Callable) -> None:
+def test_copy_expid_no(create_experiment: ExperimentFactory) -> None:
     """Copy an experiment with specific HPC platform
 
     .. code-block:: console
@@ -93,7 +94,7 @@ def test_copy_expid_no(create_autosubmit_exp: Callable) -> None:
     # create default expid with know hpc
     fake_hpc = "mn5"
     new_hpc = "local"
-    experiment = create_autosubmit_exp(description=_EXPERIMENT_DESCRIPTION, hpc=fake_hpc)
+    experiment = create_experiment(description=_EXPERIMENT_DESCRIPTION, platform=fake_hpc)
     expid = experiment.expid
     copy_expid = Autosubmit.expid(_EXPERIMENT_DESCRIPTION, new_hpc, expid)
     # capture the platform using the "describe"
