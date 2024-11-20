@@ -118,7 +118,7 @@ exts_list = [
             'git_config': {
                 'url': 'https://earth.bsc.es/gitlab/es',
                 'repo_name': 'autosubmit',
-                'tag': 'v4.1.11',
+                'tag': v%(version)s,
                 'recursive': True,
                 'keep_git_dir': True,
             }
