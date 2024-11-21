@@ -16,6 +16,7 @@ User Guide
    /userguide/expids
    /userguide/provenance
    /userguide/traceability
+   /userguide/user_mapping
    /userguide/templates
 
 Command list
@@ -69,6 +70,3 @@ TODO add ``workflow_validation``.
 * :ref:`archive`
 
 * :ref:`advanced_features`
-
-
-
