@@ -247,7 +247,6 @@ def test_scheduler_job_types(scheduler, job_type, generate_cmds):
     expected_lines = expected_data.split('\n')
     actual = actual.split('\n')[:len(expected_lines)]
     actual = '\n'.join(actual)
-    # Compare line to line
     for i, (line1, line2) in enumerate(zip(expected_data.split('\n'), actual.split('\n'))):
         if "PJM -o" in line1 or "PJM -e" in line1 or "#SBATCH --output" in line1 or "#SBATCH --error" in line1 or "#SBATCH -J" in line1: # output error will be different
             continue
@@ -257,6 +256,3 @@ def test_scheduler_job_types(scheduler, job_type, generate_cmds):
             continue
         else:
             assert line1 == line2
-
-
-
