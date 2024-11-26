@@ -1257,6 +1257,7 @@ class JobList(object):
                 if "auto" in filters_to.get("SPLITS_TO", "").lower():
                     filters_to["SPLITS_TO"] = filters_to["SPLITS_TO"].lower()
                     filters_to["SPLITS_TO"] = filters_to["SPLITS_TO"].replace("auto", auto_splits)
+            job.splits = auto_splits
         return dependency
 
     def _manage_job_dependencies(self, dic_jobs, job, date_list, member_list, chunk_list, dependencies_keys,

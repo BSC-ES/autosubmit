@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from copy import deepcopy
 from datetime import datetime
+
 from mock import patch
 from mock.mock import MagicMock
 
@@ -551,7 +552,7 @@ class TestJobList(unittest.TestCase):
         self.assertEqual(expected_output, result)
 
 
-def test_normalize_auto_keyword(autosubmit_config):
+def test_normalize_auto_keyword(autosubmit_config, mocker):
     as_conf = autosubmit_config('a000', experiment_data={
 
     })
@@ -602,6 +603,7 @@ def test_normalize_auto_keyword(autosubmit_config):
     dependency.section = "minus"
     dependency = job_list._normalize_auto_keyword(job, dependency)
     assert dependency.relationships["SPLITS_FROM"]["key"]["SPLITS_TO"] == "40"
+    assert job.splits == "40"
     dependency.relationships = {
         "SPLITS_FROM": {
             "key": {
@@ -613,7 +615,17 @@ def test_normalize_auto_keyword(autosubmit_config):
     dependency.section = "plus"
     dependency = job_list._normalize_auto_keyword(job, dependency)
     assert dependency.relationships["SPLITS_FROM"]["key"]["SPLITS_TO"] == "50"
+    assert job.splits == "50"  # Test that the param is assigned
 
+    # Test that the param is not being changed after update_job_parameters
+    as_conf.experiment_data["JOBS"] = {}
+    as_conf.experiment_data["JOBS"][job.section] = {}
+    as_conf.experiment_data["JOBS"][job.section]["SPLITS"] = "auto"
+    job.date = None
+    mocker.patch("autosubmit.job.job.Job.calendar_split", side_effect=lambda x, y: y)
+    parameters = job.update_job_parameters(as_conf, {})
+    assert job.splits == "50"
+    assert parameters["SPLITS"] == "50"
 
 
 if __name__ == '__main__':
