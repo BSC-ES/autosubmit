@@ -231,6 +231,27 @@ of how to install Autosubmit with Conda.
       </div>
    </div>
 
+.. raw:: html
+
+   <div class="mt-4">
+      <h4 class="text-center mb-4">More about Autosubmit ecosystem</h4>
+      <div class="row gap-4 mb-4 wrap gap-1">
+         <div class="col pt-3 border rounded" style="min-width: 20rem;">
+             <a class="fs-4 fw-semibold" href="https://autosubmit-api.readthedocs.io/" target="_blank" rel="noreferrer" rel="noopener">
+               Autosubmit API
+             </a>
+             <p class="mt-2">An open-source Python web application that aims to monitor, analyze, and control workflows created and managed with the Autosubmit workflow manager</p>
+         </div>
+         <div class="col pt-3 border rounded" style="min-width: 20rem;">
+             <a class="fs-4 fw-semibold" href="https://autosubmit-gui.readthedocs.io/" target="_blank" rel="noreferrer" rel="noopener">
+               Autosubmit GUI
+             </a>
+             <p class="mt-2">Graphical User Interface that aims to provide users with simplified information from the workflow execution of scientific experiments managed by Autosubmit</p>
+         </div>
+      </div>
+   </div>
+
+
 Contact Us
 ==========
 
