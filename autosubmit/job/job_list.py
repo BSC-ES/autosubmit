@@ -987,6 +987,8 @@ class JobList(object):
             special_conditions = dict()
             special_conditions["STATUS"] = filters_to_apply_by_section[key].pop("STATUS", None)
             special_conditions["FROM_STEP"] = filters_to_apply_by_section[key].pop("FROM_STEP", None)
+            special_conditions["ANY_FINAL_STATUS_IS_VALID"] = filters_to_apply_by_section[key].pop("ANY_FINAL_STATUS_IS_VALID", False)
+
             for parent in list_of_parents:
                 self.add_special_conditions(job, special_conditions, filters_to_apply_by_section[key],
                                             parent)

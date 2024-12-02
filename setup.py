@@ -44,7 +44,7 @@ install_requires = [
     'py3dotplus==1.1.0',
     'numpy<2',
     'rocrate==0.*',
-    'autosubmitconfigparser==1.0.73',
+    'autosubmitconfigparser==1.0.75',
     'configparser',
     'setproctitle',
     'invoke>=2.0',
