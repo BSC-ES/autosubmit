@@ -168,6 +168,7 @@ def autosubmit_config(
         for arg, value in kwargs.items():
             setattr(config, arg, value)
 
+        config.current_loaded_files = [conf_dir / 'dummy-so-it-doesnt-force-reload.yml']
         return config
 
     def finalizer() -> None:

@@ -1352,14 +1352,29 @@ class Job(object):
                 self.status = default_status
             else:
                 return default_status
+
+    def update_current_parameters(self, as_conf: AutosubmitConfig, parameters: dict) -> dict:
+        """
+        Update the %CURRENT_*% parameters with the current platform and jobs.
+
+        :param as_conf: The Autosubmit configuration object.
+        :type as_conf: AutosubmitConfig
+        :param parameters: The dictionary to update with current parameters.
+        :type parameters: dict
+        :return: The updated parameter's dictionary.
+        :rtype: dict
+        """
+        for key, value in as_conf.platforms_data.get(self.platform_name, {}).items():
+            parameters[f"CURRENT_{key.upper()}"] = value
+        for key, value in as_conf.jobs_data[self.section].items():
+            parameters[f"CURRENT_{key.upper()}"] = value
+        return parameters
     def update_platform_parameters(self,as_conf,parameters,job_platform):
         if not job_platform:
             submitter = job_utils._get_submitter(as_conf)
             submitter.load_platforms(as_conf)
             job_platform = submitter.platforms[self.platform_name]
             self.platform = job_platform
-        for key,value in as_conf.platforms_data.get(job_platform.name,{}).items():
-            parameters["CURRENT_"+key.upper()] = value
         parameters['CURRENT_ARCH'] = job_platform.name
         parameters['CURRENT_HOST'] = job_platform.host
         parameters['CURRENT_USER'] = job_platform.user
@@ -1921,8 +1936,6 @@ class Job(object):
         parameters['PROJECT_TYPE'] = as_conf.get_project_type()
         parameters['X11'] = self.x11
         self.wchunkinc = as_conf.get_wchunkinc(self.section)
-        for key,value in as_conf.jobs_data[self.section].items():
-            parameters["CURRENT_"+key.upper()] = value
         return parameters
 
 
@@ -1986,13 +1999,13 @@ class Job(object):
         parameters['PROJDIR'] = as_conf.get_project_dir()
         # Set parameters dictionary
         # Set final value
-        parameters = self.update_job_parameters(as_conf,parameters)
+        parameters = self.update_current_parameters(as_conf, parameters)
+        parameters = self.update_job_parameters(as_conf, parameters)
         parameters = self.update_platform_parameters(as_conf, parameters, self._platform)
         parameters = self.update_platform_associated_parameters(as_conf, parameters, self._platform, parameters['CHUNK'])
         parameters = self.update_wrapper_parameters(as_conf, parameters)
-        parameters = as_conf.normalize_parameters_keys(parameters,default_parameters)
+        parameters = as_conf.deep_read_loops(parameters)
         parameters = as_conf.substitute_dynamic_variables(parameters,80)
-        parameters = as_conf.normalize_parameters_keys(parameters,default_parameters)
         self.update_job_variables_final_values(parameters)
         # For some reason, there is return but the assignee is also necessary
         self.parameters = parameters
