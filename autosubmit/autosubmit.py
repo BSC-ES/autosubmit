@@ -2389,6 +2389,9 @@ class Autosubmit:
                         exp_history.finish_current_experiment_run()
                     except:
                         Log.warning("Database is locked")
+                ### Create rocrate object if requested
+                if "rocrate.yml" in os.listdir(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "conf")):
+                    Autosubmit.provenance(expid, rocrate = TRUE)
         except (portalocker.AlreadyLocked, portalocker.LockException) as e:
             message = "We have detected that there is another Autosubmit instance using the experiment\n. Stop other Autosubmit instances that are using the experiment or delete autosubmit.lock file located on tmp folder"
             terminate_child_process(expid)
