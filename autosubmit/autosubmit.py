@@ -4092,8 +4092,6 @@ class Autosubmit:
                                 Log.info(
                                     "Pkl restore operation stopped. No changes have been made.")
                                 return
-                        result = None
-                        if _stat.st_size > 6:
                             # File not empty: Archive
                             archive_pkl_name = os.path.join(pkl_folder_path, "{0}_job_list_{1}.pkl".format(
                                 datetime.datetime.today().strftime("%d%m%Y%H%M%S"), expid))
