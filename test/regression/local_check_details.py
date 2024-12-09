@@ -48,7 +48,7 @@ def perform_test(expids):
             # put it in a single file
             with open(f"{FILE_NAME}", "a") as myfile:
                 myfile.write(output)
-        except:
+        except Exception:
             to_exclude.append(expid)
     # print to_exclude in format ["a001","a002"]
     print(to_exclude)

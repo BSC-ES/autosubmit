@@ -24,7 +24,7 @@ import traceback
 from contextlib import suppress
 from shutil import move
 from threading import Thread
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from pathlib import Path
 
 import math
@@ -224,7 +224,7 @@ class JobList(object):
                 self.graph = nx.DiGraph()
         except AutosubmitCritical:
             raise
-        except:
+        except Exception:
             self.graph = nx.DiGraph()
         self._dic_jobs = DicJobs(date_list, member_list, chunk_list, date_format, default_retrials, as_conf)
         self._dic_jobs.graph = self.graph
@@ -417,8 +417,15 @@ class JobList(object):
         else:
             changes = True
             Log.debug("Changes detected, calculating dependencies")
-        sections_gen = (section for section in jobs_data.keys())
-        for job_section in sections_gen:
+        # Generate all graph before adding dependencies.
+        for job_section in (section for section in jobs_data.keys()):
+            for job in (job for job in dic_jobs.get_jobs(job_section, sort_string=True)):
+                if job.name not in self.graph.nodes:
+                    self.graph.add_node(job.name, job=job)
+                elif job.name in self.graph.nodes and self.graph.nodes.get(job.name).get("job", None) is None:  # Old versions of autosubmit needs re-adding the job to the graph
+                    self.graph.nodes.get(job.name)["job"] = job
+
+        for job_section in (section for section in jobs_data.keys()):
             # Changes when all jobs of a section are added
             self.depends_on_previous_chunk = dict()
             self.depends_on_previous_split = dict()
@@ -432,14 +439,8 @@ class JobList(object):
             # call function if dependencies_key is not None
             dependencies = JobList._manage_dependencies(dependencies_keys, dic_jobs) if dependencies_keys else {}
             self.job_names = set()
-
-            jobs_gen = (job for job in dic_jobs.get_jobs(job_section,sort_string=True))
-            for job in jobs_gen:
+            for job in (job for job in dic_jobs.get_jobs(job_section, sort_string=True)):
                 self.actual_job_depends_on_special_chunk = False
-                if job.name not in self.graph.nodes:
-                    self.graph.add_node(job.name, job=job)
-                elif job.name in self.graph.nodes and self.graph.nodes.get(job.name).get("job", None) is None:  # Old versions of autosubmit needs re-adding the job to the graph
-                    self.graph.nodes.get(job.name)["job"] = job
                 if dependencies and changes:
                     job = self.graph.nodes.get(job.name)['job']
                     ## Adds the dependencies to the job, and if not possible, adds the job to the problematic_dependencies
@@ -659,11 +660,11 @@ class JobList(object):
         """
         filters = []
         if level_to_check == "DATES_FROM":
-            if type(value_to_check) != str:
+            if type(value_to_check) is not str:
                 value_to_check = date2str(value_to_check, "%Y%m%d")  # need to convert in some cases
             try:
                 values_list = [date2str(date_, "%Y%m%d") for date_ in self._date_list]  # need to convert in some cases
-            except:
+            except Exception:
                 values_list = self._date_list
         elif level_to_check == "MEMBERS_FROM":
             values_list = self._member_list  # Str list
@@ -714,8 +715,8 @@ class JobList(object):
             # Will enter chunks_from, and obtain [{DATES_TO: "20020201", MEMBERS_TO: "fc2", CHUNKS_TO: "ALL", SPLITS_TO: "2"]
             if "CHUNKS_FROM" in filter:
                 filters_to_apply_c = self._check_chunks({"CHUNKS_FROM": (filter.pop("CHUNKS_FROM"))}, current_job)
-                if len(filters_to_apply_c) > 0 and (type(filters_to_apply_c) != list or (
-                        type(filters_to_apply_c) == list and len(filters_to_apply_c[0]) > 0)):
+                if len(filters_to_apply_c) > 0 and (type(filters_to_apply_c) is not list or (
+                        type(filters_to_apply_c) is list and len(filters_to_apply_c[0]) > 0)):
                     filters_to_apply[i].update(filters_to_apply_c)
             # IGNORED
             if "SPLITS_FROM" in filter:
@@ -929,7 +930,7 @@ class JobList(object):
                 filters_to_apply = relationships
         return filters_to_apply
 
-    def _add_edge_info(self, job, special_status):
+    def _add_edges_map_info(self, job, special_status):
         """
         Special relations to be check in the update_list method
         :param job: Current job
@@ -957,7 +958,7 @@ class JobList(object):
             if special_conditions.get("FROM_STEP", None):
                 job.max_checkpoint_step = int(special_conditions.get("FROM_STEP", 0)) if int(
                     special_conditions.get("FROM_STEP", 0)) > job.max_checkpoint_step else job.max_checkpoint_step
-            self._add_edge_info(job, special_conditions["STATUS"])  # job_list map
+            self._add_edges_map_info(job, special_conditions["STATUS"])  # job_list map
             job.add_edge_info(parent, special_conditions)  # this job
 
     def _apply_jobs_edge_info(self, job, dependencies):
@@ -986,6 +987,8 @@ class JobList(object):
             special_conditions = dict()
             special_conditions["STATUS"] = filters_to_apply_by_section[key].pop("STATUS", None)
             special_conditions["FROM_STEP"] = filters_to_apply_by_section[key].pop("FROM_STEP", None)
+            special_conditions["ANY_FINAL_STATUS_IS_VALID"] = filters_to_apply_by_section[key].pop("ANY_FINAL_STATUS_IS_VALID", False)
+
             for parent in list_of_parents:
                 self.add_special_conditions(job, special_conditions, filters_to_apply_by_section[key],
                                             parent)
@@ -1190,7 +1193,9 @@ class JobList(object):
                     edge_added = True
             if parent.section == job.section:
                 self.actual_job_depends_on_special_chunk = True
-            if edge_added:
+
+            # Only fill this if, per example, jobs.A.Dependencies.A or jobs.A.Dependencies.A-N is set.
+            if edge_added and job.section in dependencies_keys_without_special_chars:
                 if job.name not in self.depends_on_previous_special_section:
                     self.depends_on_previous_special_section[job.name] = set()
                 if job.section not in self.depends_on_previous_special_section:
@@ -1206,6 +1211,56 @@ class JobList(object):
                                                        member_list, dependency.section, possible_parents)
 
         return special_dependencies, problematic_dependencies
+
+    def get_filters_to_apply(self, job, dependency):
+        filters_to_apply = self._filter_current_job(job, copy.deepcopy(dependency.relationships))
+        filters_to_apply.pop("STATUS", None)
+        # Don't do perform special filter if only "FROM_STEP" is applied
+        if "FROM_STEP" in filters_to_apply:
+            if filters_to_apply.get("CHUNKS_TO","none") == "none" and filters_to_apply.get("MEMBERS_TO","none") == "none" and filters_to_apply.get("DATES_TO","none") == "none" and filters_to_apply.get("SPLITS_TO","none") == "none":
+                filters_to_apply = {}
+        filters_to_apply.pop("FROM_STEP", None)
+
+        # If the selected filter is "natural" for all filters_to, trigger the natural dependency calculation
+        all_natural = True
+        for f_value in filters_to_apply.values():
+            if f_value.lower() != "natural":
+                all_natural = False
+                break
+        if all_natural:
+            filters_to_apply = {}
+        return filters_to_apply
+
+    def _normalize_auto_keyword(self, job: Job, dependency: Dependency) -> Dependency:
+        """
+        Normalize the 'auto' keyword in the dependency relationships for a job.
+
+        This function adjusts the 'SPLITS_TO' value in the dependency relationships
+        if it contains the 'auto' keyword. The 'auto' keyword is replaced with the
+        actual number of splits for the job.
+
+        :param job: The job object containing job details.
+        :param dependency: The dependency object containing dependency details.
+        :return: The dependency object with the attribute relationships updated with the correct number of splits.
+        """
+        if job.splits and dependency.distance and dependency.relationships and job.running == "chunk":
+            job_name_separated = job.name.split("_")
+            if dependency.sign == "-":
+                auto_chunk = int(job_name_separated[3]) - int(dependency.distance)
+            else:
+                auto_chunk = int(job_name_separated[3]) + int(dependency.distance)
+            if auto_chunk < 1:
+                auto_chunk = int(job_name_separated[3])
+            auto_chunk = str(auto_chunk)
+            # Get first split of the given chunk
+            auto_job_name = "_".join(job_name_separated[:3]) + f"_{auto_chunk}_1_{dependency.section}"
+            auto_splits = str(self.graph.nodes[auto_job_name]['job'].splits)
+            for filters_to_keys, filters_to in dependency.relationships.get("SPLITS_FROM", {}).items():
+                if "auto" in filters_to.get("SPLITS_TO", "").lower():
+                    filters_to["SPLITS_TO"] = filters_to["SPLITS_TO"].lower()
+                    filters_to["SPLITS_TO"] = filters_to["SPLITS_TO"].replace("auto", auto_splits)
+            job.splits = auto_splits
+        return dependency
 
     def _manage_job_dependencies(self, dic_jobs, job, date_list, member_list, chunk_list, dependencies_keys,
                                  dependencies,
@@ -1341,9 +1396,9 @@ class JobList(object):
                                                                                  dependency)
             if skip:
                 continue
-            filters_to_apply = self._filter_current_job(job, copy.deepcopy(dependency.relationships))
-            filters_to_apply.pop("STATUS", None)
-            filters_to_apply.pop("FROM_STEP", None)
+            self._normalize_auto_keyword(job, dependency)
+            filters_to_apply = self.get_filters_to_apply(job, dependency)
+
             if len(filters_to_apply) > 0:
                 dependencies_of_that_section = dic_jobs.as_conf.jobs_data[dependency.section].get("DEPENDENCIES", {})
                 ## Adds the dependencies to the job, and if not possible, adds the job to the problematic_dependencies
@@ -1945,7 +2000,7 @@ class JobList(object):
             jobs_to_check = unparsed_jobs.split("&")
             select_jobs_by_name = jobs_to_check[0]
             unparsed_jobs = jobs_to_check[1]
-        if not ";" in unparsed_jobs:
+        if ";" not in unparsed_jobs:
             if '[' in unparsed_jobs:
                 select_all_jobs_by_section = unparsed_jobs
                 filter_jobs_by_section = ""
@@ -2299,19 +2354,34 @@ class JobList(object):
             if job.name == name:
                 return job
 
-    def get_jobs_by_section(self, section_list):
+    def get_jobs_by_section(self, section_list: list, banned_jobs: list = None,
+                            get_only_non_completed: bool = False) -> list:
         """
-        Returns the job that its name matches parameter section
-        :parameter section_list: list of sections to look for
-        :type section_list: list
-        :return: found job
-        :rtype: job
+        Get jobs by section.
+
+        This method filters jobs based on the provided section list and banned jobs list.
+        It can also filter out completed jobs if specified.
+
+        Parameters:
+        section_list (list): List of sections to filter jobs by.
+        banned_jobs (list, optional): List of jobs names to exclude from the result. Defaults to an empty list.
+        get_only_non_completed (bool, optional): If True, only non-completed jobs are included. Defaults to False.
+
+        Returns:
+        list: List of jobs that match the criteria.
         """
-        jobs_by_section = list()
+        if banned_jobs is None:
+            banned_jobs = []
+
+        jobs = []
         for job in self._job_list:
-            if job.section in section_list:
-                jobs_by_section.append(job)
-        return jobs_by_section
+            if job.section.upper() in section_list and job.name not in banned_jobs:
+                if get_only_non_completed:
+                    if job.status != Status.COMPLETED:
+                        jobs.append(job)
+                else:
+                    jobs.append(job)
+        return jobs
 
     def get_in_queue_grouped_id(self, platform):
         # type: (object) -> Dict[int, List[Job]]
@@ -2492,7 +2562,7 @@ class JobList(object):
             try:
                 Log.status("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job_id, Status(
                 ).VALUE_TO_KEY[job.status], platform_name, queue)
-            except:
+            except Exception:
                 Log.debug("Couldn't print job status for job {0}".format(job.name))
         for job in failed_job_list:
             if len(job.queue) < 1:
@@ -2554,34 +2624,59 @@ class JobList(object):
         """ Check if a checkpoint step exists for this edge"""
         return job.get_checkpoint_files(parent.name)
 
-    def check_special_status(self):
+    def check_special_status(self) -> List[Job]:
         """
-        Check if all parents of a job have the correct status for checkpointing
-        :return: jobs that fullfill the special conditions """
+        Check if all parents of a job have the correct status for checkpointing.
+
+        :returns: jobs_to_check - Jobs that fulfill the special conditions.
+        """
         jobs_to_check = []
-        for status, sorted_job_list in self.jobs_edges.items():
-            if status == "ALL":
+        jobs_to_skip = []
+        for target_status, sorted_job_list in self.jobs_edges.items():
+            if target_status == "ALL":
                 continue
             for job in sorted_job_list:
                 if job.status != Status.WAITING:
                     continue
-                if status in ["RUNNING", "FAILED"]:
-                    # check checkpoint if any
-                    if job.platform and job.platform.connected:  # This will be true only when used under setstatus/run
-                        job.get_checkpoint_files()
-                non_completed_parents_current = 0
-                completed_parents = len([parent for parent in job.parents if parent.status == Status.COMPLETED])
-                for parent in job.edge_info[status].values():
-                    if status in ["RUNNING", "FAILED"] and parent[1] and int(parent[1]) >= job.current_checkpoint_step:
-                        continue
-                    else:
-                        status_str = Status.VALUE_TO_KEY[parent[0].status]
-                        if Status.LOGICAL_ORDER.index(status_str) >= Status.LOGICAL_ORDER.index(status):
-                            non_completed_parents_current += 1
-                if (non_completed_parents_current + completed_parents) == len(job.parents):
-                    jobs_to_check.append(job)
-
+                if target_status in ["RUNNING", "FAILED"]:
+                    self._check_checkpoint(job)
+                non_completed_parents_current, completed_parents = self._count_parents_status(job, target_status)
+                if (len(non_completed_parents_current) + len(completed_parents)) == len(job.parents):
+                    if job not in jobs_to_skip:
+                        jobs_to_check.append(job)
         return jobs_to_check
+
+    @staticmethod
+    def _check_checkpoint(job: Job) -> None:
+        """
+        Check if a job has a checkpoint.
+
+        :param job: The job to check.
+        """
+        if job.platform and job.platform.connected:  # This will be true only when used under setstatus/run
+            job.get_checkpoint_files()
+
+    @staticmethod
+    def _count_parents_status(job: Job, target_status: str) -> Tuple[List[Job], List[Job]]:
+        """
+        Count the number of completed and non-completed parents.
+
+        :param job: The job to check.
+        :param target_status: The target status to compare against.
+        :return: A tuple containing two lists:
+            - non_completed_parents_current: Non-completed parents.
+            - completed_parents: Completed parents.
+        """
+        non_completed_parents_current = []
+        completed_parents = [parent for parent in job.parents if parent.status == Status.COMPLETED]
+        for parent in job.edge_info[target_status].values():
+            if target_status in ["RUNNING", "FAILED"] and parent[1] and int(parent[1]) >= job.current_checkpoint_step:
+                continue
+            current_status = Status.VALUE_TO_KEY[parent[0].status]
+            if Status.LOGICAL_ORDER.index(current_status) >= Status.LOGICAL_ORDER.index(target_status):
+                if parent[0] not in completed_parents:
+                    non_completed_parents_current.append(parent[0])
+        return non_completed_parents_current, completed_parents
 
     def update_log_status(self, job, as_conf):
         """
@@ -3142,7 +3237,7 @@ class JobList(object):
                     results.append(self._recursion_print(root, 0, visited, nocolor=True))
                 else:
                     results.append("Cannot find root.")
-        except:
+        except Exception:
             return f'Job List object'
         return "\n".join(results)
 

@@ -1088,6 +1088,7 @@ CONFIG:
             'WALLCLOCK': wallclock,
             'CUSTOM_DIRECTIVES': custom_directives,
             'SCRATCH_FREE_SPACE': 0,
+            'PLATFORM': 'dummy_platform',
         }
         self.as_conf.jobs_data[section] = options
 
@@ -1108,7 +1109,7 @@ CONFIG:
         self.as_conf.normalize_parameters_keys = MagicMock()
         self.as_conf.normalize_parameters_keys.return_value = default
         self.job._platform = dummy_platform
-        self.as_conf.platforms_data = { "dummy_platform":{ "whatever":"dummy_value", "whatever2":"dummy_value2"} }
+        self.as_conf.platforms_data = { "DUMMY_PLATFORM":{ "whatever":"dummy_value", "whatever2":"dummy_value2"} }
 
         parameters = {}
         # Act
@@ -1440,8 +1441,3 @@ class FakeBasicConfig:
     DEFAULT_PLATFORMS_CONF = ''
     DEFAULT_JOBS_CONF = ''
     STRUCTURES_DIR = '/dummy/structures/dir'
-
-
-
-
-

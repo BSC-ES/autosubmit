@@ -54,7 +54,7 @@ def jobs_in_wrapper_str(as_conf, current_wrapper):
     else:
         jobs_in_wrapper = jobs_in_wrapper.split(" ")
     jobs_in_wrapper = [job.strip(" ,") for job in jobs_in_wrapper]
-    return "_".join(jobs_in_wrapper)
+    return "&".join(jobs_in_wrapper)
 class JobPackageBase(object):
     """
     Class to manage the package of jobs to be submitted by autosubmit
@@ -249,6 +249,7 @@ class JobPackageSimple(JobPackageBase):
         if len(job_scripts) == 0:
             job_scripts = self._job_scripts
         for job in self.jobs:
+            job.update_local_logs()
             #CLEANS PREVIOUS RUN ON LOCAL
             log_completed = os.path.join(self._tmp_path, job.name + '_COMPLETED')
             log_stat = os.path.join(self._tmp_path, job.name + '_STAT')
@@ -256,14 +257,15 @@ class JobPackageSimple(JobPackageBase):
                 os.remove(log_completed)
             if os.path.exists(log_stat):
                 os.remove(log_stat)
-            self.platform.remove_stat_file(job.name)
+            self.platform.remove_stat_file(job)
             self.platform.remove_completed_file(job.name)
             job.id = self.platform.submit_job(job, job_scripts[job.name], hold=hold, export = self.export)
             if job.id is None or not job.id:
                 continue
             Log.info("{0} submitted", job.name)
-            job.status = Status.SUBMITTED            
-            job.write_submit_time(hold=self.hold)
+            job.status = Status.SUBMITTED
+            job.wrapper_name = job.name
+
 
 
 class JobPackageSimpleWrapped(JobPackageSimple):
@@ -343,7 +345,8 @@ class JobPackageArray(JobPackageBase):
 
     def _do_submission(self, job_scripts=None, hold=False):
         for job in self.jobs:
-            self.platform.remove_stat_file(job.name)
+            job.update_local_logs()
+            self.platform.remove_stat_file(job)
             self.platform.remove_completed_file(job.name)
 
         package_id = self.platform.submit_job(None, self._common_script, hold=hold, export = self.export)
@@ -354,9 +357,8 @@ class JobPackageArray(JobPackageBase):
         for i in range(0, len(self.jobs)): # platforms without a submit.cmd
             Log.info("{0} submitted", self.jobs[i].name)
             self.jobs[i].id = str(package_id) + '[{0}]'.format(i)
-            self.jobs[i].status = Status.SUBMITTED            
-            self.jobs[i].write_submit_time(hold=hold,wrapper_submit_time=wrapper_time)
-            wrapper_time = self.jobs[i].write_submit_time
+            self.jobs[i].status = Status.SUBMITTED
+            self.jobs[i].wrapper_name = self.name
 
 
 class JobPackageThread(JobPackageBase):
@@ -573,13 +575,15 @@ class JobPackageThread(JobPackageBase):
         if callable(getattr(self.platform, 'remove_multiple_files')):
             filenames = str()
             for job in self.jobs:
+                job.update_local_logs()
                 filenames += " " + self.platform.remote_log_dir + "/" + job.name + "_STAT " + \
                              self.platform.remote_log_dir + "/" + job.name + "_COMPLETED"
             self.platform.remove_multiple_files(filenames)
 
         else:
             for job in self.jobs:
-                self.platform.remove_stat_file(job.name)
+                job.update_local_logs()
+                self.platform.remove_stat_file(job)
                 self.platform.remove_completed_file(job.name)
                 if hold:
                     job.hold = hold
@@ -589,13 +593,12 @@ class JobPackageThread(JobPackageBase):
 
         if package_id is None or not package_id:
             return
-        wrapper_time = None
         for i in range(0, len(self.jobs)):
             Log.info("{0} submitted", self.jobs[i].name)
             self.jobs[i].id = str(package_id)
             self.jobs[i].status = Status.SUBMITTED
-            self.jobs[i].write_submit_time(hold=hold,wrapper_submit_time=wrapper_time)
-            wrapper_time = self.jobs[i].write_submit_time
+            self.jobs[i].wrapper_name = self.name
+
 
     def _common_script_content(self):
         pass
@@ -659,7 +662,8 @@ class JobPackageThreadWrapped(JobPackageThread):
 
     def _do_submission(self, job_scripts=None, hold=False):
         for job in self.jobs:
-            self.platform.remove_stat_file(job.name)
+            job.update_local_logs()
+            self.platform.remove_stat_file(job)
             self.platform.remove_completed_file(job.name)
             if hold:
                 job.hold = hold
@@ -669,13 +673,13 @@ class JobPackageThreadWrapped(JobPackageThread):
 
         if package_id is None or not package_id:
             raise Exception('Submission failed')
-        wrapper_time = None
         for i in range(0, len(self.jobs)):
             Log.info("{0} submitted", self.jobs[i].name)
             self.jobs[i].id = str(package_id)
             self.jobs[i].status = Status.SUBMITTED
-            self.jobs[i].write_submit_time(hold=hold,wrapper_submit_time=wrapper_time)
-            wrapper_time = self.jobs[i].write_submit_time
+            self.jobs[i].wrapper_name = self.name
+
+
 
 class JobPackageVertical(JobPackageThread):
     """
@@ -753,7 +757,7 @@ class JobPackageVertical(JobPackageThread):
                 self._wallclock = "{0}:{1}".format(hh_str,mm_str)
                 Log.info("Submitting {2} with wallclock {0}:{1}".format(hh_str,mm_str,self._name))
         else:
-            wallclock_by_level = None
+            wallclock_by_level = 0 # command: "timeout 0 sleep 2" == command: "sleep 2"
 
         return self._wrapper_factory.get_wrapper(self._wrapper_factory.vertical_wrapper, name=self._name,
                                                  queue=self._queue, project=self._project, wallclock=self._wallclock,

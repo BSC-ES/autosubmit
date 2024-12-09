@@ -294,7 +294,7 @@ class Migrate:
                     command = f"cd {p.remote_log_dir} ; find {p.root_dir} -type l -lname '/*' -printf 'var=\"$(realpath -s --relative-to=\"%p\" \"$(readlink \"%p\")\")\" && var=${{var:3}} && ln -sf $var \"%p\" \\n' > convertLink.sh"
                     try:
                         p.check_absolute_file_exists(p.temp_dir)
-                    except:
+                    except Exception:
                         exit_with_errors = True
                         Log.printlog(f'{p.temp_dir} does not exist on platform [{p.name}]', 7014)
                         platforms_with_issues.append(p.name)

@@ -215,6 +215,11 @@ class ExperimentHistoryDbManager(DatabaseManager):
     """ Update JobData data class. Returns latest last=1 row from job_data by job_name. """
     self._update_job_data_by_id(job_data_dc)
     return self.get_job_data_dc_unique_latest_by_job_name(job_data_dc.job_name)
+
+  def update_job_data_dc_by_job_id_name(self, job_data_dc):
+    """ Update JobData data class. Returns latest last=1 row from job_data by job_name. """
+    self._update_job_data_by_id(job_data_dc)
+    return self.get_job_data_by_job_id_name(job_data_dc.job_id, job_data_dc.job_name)
   
   def update_list_job_data_dc_by_each_id(self, job_data_dcs):
     """ Return length of updated list. """
@@ -319,11 +324,11 @@ class ExperimentHistoryDbManager(DatabaseManager):
     statement = ''' UPDATE job_data SET last=?, submit=?, start=?, finish=?, modified=?, 
                     job_id=?, status=?, energy=?, extra_data=?, 
                     nnodes=?, ncpus=?, rowstatus=?, out=?, err=?, 
-                    children=?, platform_output=? WHERE id=? '''
-    arguments = (job_data_dc.last, job_data_dc.submit, job_data_dc.start, job_data_dc.finish, HUtils.get_current_datetime(), 
-                job_data_dc.job_id, job_data_dc.status, job_data_dc.energy, job_data_dc.extra_data, 
-                job_data_dc.nnodes, job_data_dc.ncpus, job_data_dc.rowstatus, job_data_dc.out, job_data_dc.err, 
-                job_data_dc.children, job_data_dc.platform_output, job_data_dc._id)
+                    children=?, platform_output=?, id=? WHERE id=?'''
+    arguments = (job_data_dc.last, job_data_dc.submit, job_data_dc.start, job_data_dc.finish, HUtils.get_current_datetime(),
+                job_data_dc.job_id, job_data_dc.status, job_data_dc.energy, job_data_dc.extra_data,
+                job_data_dc.nnodes, job_data_dc.ncpus, job_data_dc.rowstatus, job_data_dc.out, job_data_dc.err,
+                job_data_dc.children, job_data_dc.platform_output, job_data_dc._id, job_data_dc._id)
     self.execute_statement_with_arguments_on_dbfile(self.historicaldb_file_path, statement, arguments)
 
   def _update_experiment_run(self, experiment_run_dc):
@@ -346,13 +351,14 @@ class ExperimentHistoryDbManager(DatabaseManager):
     job_data_rows = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
     return [Models.JobDataRow(*row) for row in job_data_rows]
 
-  def get_job_data_by_name(self, job_name):
-    """ Get List of Models.JobDataRow for job_name """
-    statement = self.get_built_select_statement("job_data", "job_name=? ORDER BY counter DESC")
-    arguments = (job_name,)
+  def get_job_data_by_job_id_name(self, job_id, job_name):
+    """ Get List of Models.JobDataRow for job_id """
+    statement = self.get_built_select_statement("job_data", "job_id=? AND job_name=? ORDER BY counter")
+    arguments = (int(job_id), str(job_name),)
     job_data_rows = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
-    return [Models.JobDataRow(*row) for row in job_data_rows]
-  
+    models = [Models.JobDataRow(*row) for row in job_data_rows][-1]
+    return JobData.from_model(models)
+
   def get_job_data_max_counter(self):
     """ The max counter is the maximum count value for the count column in job_data. """
     statement = "SELECT MAX(counter) as maxcounter FROM job_data"

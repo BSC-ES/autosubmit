@@ -89,7 +89,8 @@ class JobGrouping(object):
 
         out = nestedExpr('[', ']').parseString(text).asList()
 
-        depth = lambda L: isinstance(L, list) and max(list(map(depth, L))) + 1
+        def depth(L):
+            return isinstance(L, list) and max(list(map(depth, L))) + 1
 
         if self.group_by == 'date':
             if depth(out) == 2:

@@ -167,7 +167,7 @@ class EcPlatform(ParamikoPlatform):
                 self.connected = True
             else:
                 self.connected = False
-        except:
+        except Exception:
             self.connected = False
         if not self.log_retrieval_process_active and (
                 as_conf is None or str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS',
@@ -191,7 +191,7 @@ class EcPlatform(ParamikoPlatform):
                 self.connected = True
             else:
                 self.connected = False
-        except:
+        except Exception:
             self.connected = False
 
     def test_connection(self,as_conf):
@@ -218,7 +218,7 @@ class EcPlatform(ParamikoPlatform):
             else:
                 self.connected = False
                 return "Invalid certificate"
-        except:
+        except Exception:
             self.connected = False
             return "Invalid certificate"
 

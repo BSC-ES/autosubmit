@@ -34,23 +34,20 @@ install_requires = [
     'requests<=2.31.0',
     'networkx<=2.6.3',
     'portalocker<=2.7.0',
-    'paramiko<=3.4',
+    'paramiko>=3.5.0',
     'pyparsing==3.1.1',
     'matplotlib<=3.8.3',
     'packaging<=23.2',
-    'ruamel.yaml.clib<=0.2.8',
     'typing_extensions<=4.9.0',
     'typing<=3.7.4.3',
     'psutil<=5.6.1',
-    'networkx<=2.6.3',
     'py3dotplus==1.1.0',
-    'matplotlib<=3.8.3',
     'numpy<2',
-    'ruamel.yaml==0.17.21',
     'rocrate==0.*',
-    'autosubmitconfigparser==1.0.67',
+    'autosubmitconfigparser==1.0.75',
     'configparser',
     'setproctitle',
+    'invoke>=2.0',
     # 'sqlalchemy[mypy]' # TODO: pending Postgres MR
 ]
 
@@ -71,6 +68,7 @@ tests_require = [
     'pytest==8.2.*',
     'pytest-cov',
     'pytest-mock',
+    'ruff==0.6.2',
     # 'testcontainers'  # TODO: pending Postgres MR
 ]
 

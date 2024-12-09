@@ -16,7 +16,7 @@ def fd_table_status():
     for fd in range(1024):
         try:
             s = os.fstat(fd)
-        except:
+        except Exception:
             continue
         for fd_type, func in _fd_types:
             if func(s.st_mode):

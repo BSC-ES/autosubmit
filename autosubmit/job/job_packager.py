@@ -136,20 +136,20 @@ class JobPackager(object):
         wrapper_limits = {'min': 1, 'max': 9999999, 'min_v': 1, 'max_v': 9999999, 'min_h': 1, 'max_h': 9999999, 'max_by_section': dict()}
 
         # Calculate the min and max based in the wrapper_section wrappers: min_wrapped:2, max_wrapped: 2 { wrapper_section: {min_wrapped: 6, max_wrapped: 6} }
-        wrapper_data = self._as_config.experiment_data.get("WRAPPERS",{})
-        current_wrapper_data = wrapper_data.get(self.current_wrapper_section,{})
+        wrapper_data = self._as_config.experiment_data.get("WRAPPERS", {})
+        current_wrapper_data = wrapper_data.get(self.current_wrapper_section, {})
         if len(self._jobs_list.jobs_to_run_first) == 0:
-            wrapper_limits['min'] = int(current_wrapper_data.get("MIN_WRAPPED", wrapper_data.get("MIN_WRAPPED", 2)))
-            wrapper_limits['max']  = int(current_wrapper_data.get("MAX_WRAPPED", wrapper_data.get("MAX_WRAPPED", 9999999)))
-            wrapper_limits['min_v']  = int(current_wrapper_data.get("MIN_WRAPPED_V", wrapper_data.get("MIN_WRAPPED_V", 1)))
-            wrapper_limits['max_v']  = int(current_wrapper_data.get("MAX_WRAPPED_V", wrapper_data.get("MAX_WRAPPED_V", 1)))
-            wrapper_limits['min_h']  = int(current_wrapper_data.get("MIN_WRAPPED_H", wrapper_data.get("MIN_WRAPPED_H", 1)))
-            wrapper_limits['max_h']  = int(current_wrapper_data.get("MAX_WRAPPED_H", wrapper_data.get("MAX_WRAPPED_H", 1)))
+            wrapper_limits['min'] = int(current_wrapper_data.get("MIN_WRAPPED", wrapper_data.get("MIN_WRAPPED", 1)))
+            wrapper_limits['max'] = int(current_wrapper_data.get("MAX_WRAPPED", wrapper_data.get("MAX_WRAPPED", 9999999)))
+            wrapper_limits['min_v'] = int(current_wrapper_data.get("MIN_WRAPPED_V", wrapper_data.get("MIN_WRAPPED_V", 1)))
+            wrapper_limits['max_v'] = int(current_wrapper_data.get("MAX_WRAPPED_V", wrapper_data.get("MAX_WRAPPED_V", 1)))
+            wrapper_limits['min_h'] = int(current_wrapper_data.get("MIN_WRAPPED_H", wrapper_data.get("MIN_WRAPPED_H", 1)))
+            wrapper_limits['max_h'] = int(current_wrapper_data.get("MAX_WRAPPED_H", wrapper_data.get("MAX_WRAPPED_H", 1)))
             # Max and min calculations
             if wrapper_limits['max'] < wrapper_limits['max_v'] * wrapper_limits['max_h']:
                 wrapper_limits['max'] = wrapper_limits['max_v'] * wrapper_limits['max_h']
             if wrapper_limits['min'] < wrapper_limits['min_v'] * wrapper_limits['min_h']:
-                wrapper_limits['min'] = max(wrapper_limits['min_v'],wrapper_limits['min_h'])
+                wrapper_limits['min'] = max(wrapper_limits['min_v'], wrapper_limits['min_h'])
             # if one dimensional wrapper or value is the default
             if wrapper_limits['max_v'] == 1 or current_wrapper_data.get("TYPE", "") == "vertical":
                 wrapper_limits['max_v'] = wrapper_limits['max']
@@ -163,13 +163,12 @@ class JobPackager(object):
             if wrapper_limits['min_h'] == 1 and current_wrapper_data.get("TYPE", "") == "horizontal":
                 wrapper_limits['min_h'] = wrapper_limits['min']
 
-
         # Calculate the max by section by looking at jobs_data[section].max_wrapped
         for section in section_list:
-            wrapper_limits['max_by_section'][section] = self._as_config.jobs_data.get(section,{}).get("MAX_WRAPPED",wrapper_limits['max'])
+            wrapper_limits['max_by_section'][section] = self._as_config.jobs_data.get(section,{}).get("MAX_WRAPPED", wrapper_limits['max'])
 
+        wrapper_limits['real_min'] = max(2, wrapper_limits['min'])
         return wrapper_limits
-
 
     def check_jobs_to_run_first(self, package):
         """
@@ -193,7 +192,7 @@ class JobPackager(object):
                                 package.jobs_lists[seq].remove(job)
         return package, run_first
 
-    def check_real_package_wrapper_limits(self,package):
+    def check_real_package_wrapper_limits(self, package):
         balanced = True
         if self.wrapper_type[self.current_wrapper_section] == 'vertical-horizontal':
             i = 0
@@ -226,7 +225,7 @@ class JobPackager(object):
             min_h = len(package.jobs)
         return min_v, min_h, balanced
 
-    def check_packages_respect_wrapper_policy(self,built_packages_tmp,packages_to_submit,max_jobs_to_submit,wrapper_limits, any_simple_packages = False):
+    def check_packages_respect_wrapper_policy(self, built_packages_tmp, packages_to_submit, max_jobs_to_submit, wrapper_limits, any_simple_packages = False):
         """
         Check if the packages respect the wrapper policy and act in base of it ( submit wrapper, submit sequential, wait for more jobs to form a wrapper)
         :param built_packages_tmp: List of packages to be submitted
@@ -266,69 +265,176 @@ class JobPackager(object):
                     break
             min_v, min_h, balanced = self.check_real_package_wrapper_limits(p)
             # if the quantity is enough, make the wrapper
-            if len(p.jobs) >= wrapper_limits["min"] and min_v >= wrapper_limits["min_v"] and min_h >= wrapper_limits["min_h"] and not failed_innerjobs:
+            if len(p.jobs) >= wrapper_limits["real_min"] and min_v >= wrapper_limits["min_v"] and min_h >= wrapper_limits["min_h"] and not failed_innerjobs:
                 for job in p.jobs:
                     job.packed = True
                 packages_to_submit.append(p)
                 max_jobs_to_submit = max_jobs_to_submit - 1
             else:
+                for job in p.jobs:
+                    job.packed = False
                 not_wrappeable_package_info.append([p, min_v, min_h, balanced])
+
         # It is a deadlock when:
         # 1. There are no more non-wrapped jobs in ready status
         # 2. And there are no more jobs in the queue ( submitted, queuing, running, held )
-        # 3. And all current packages are not wrappable.
-        if not any_simple_packages and len(self._jobs_list.get_in_queue()) == 0 and len(not_wrappeable_package_info) == len(built_packages_tmp):
-            for p, min_v, min_h, balanced in not_wrappeable_package_info:
-                if self.wrapper_policy[self.current_wrapper_section] == "strict":
-                    for job in p.jobs:
-                        job.packed = False
-                    raise AutosubmitCritical(self.error_message_policy(min_h, min_v, wrapper_limits, p.wallclock, balanced), 7014)
-                elif self.wrapper_policy[self.current_wrapper_section] == "mixed":
-                    error = True
-                    for job in p.jobs:
-                        if max_jobs_to_submit == 0:
-                            break
-                        if job.fail_count > 0 and job.status == Status.READY:
-                            job.packed = False
-                            Log.printlog(
-                                "Wrapper policy is set to mixed, there is a failed job that will be sent sequential")
-                            error = False
-                            if job.type == Type.PYTHON and not self._platform.allow_python_jobs:
-                                package = JobPackageSimpleWrapped(
-                                    [job])
-                            else:
-                                package = JobPackageSimple([job])
-                            packages_to_submit.append(package)
-                            max_jobs_to_submit = max_jobs_to_submit - 1
-                    if error:
-                        job_names = [job.name for job in p.jobs]
-                        job_names = ','.join(job_names)
-                        self.wrappers_with_error[job_names] =  self.error_message_policy(min_h, min_v, wrapper_limits, p.wallclock, balanced)
-                else:
-                    Log.info(
-                        "Wrapper policy is set to flexible and there is a deadlock, Autosubmit will submit the jobs sequentially")
-                    for job in p.jobs:
-                        if max_jobs_to_submit == 0:
-                            break
-                        job.packed = False
-                        if job.status == Status.READY:
-                            if job.type == Type.PYTHON and not self._platform.allow_python_jobs:
-                                package = JobPackageSimpleWrapped(
-                                    [job])
-                            else:
-                                package = JobPackageSimple([job])
-                            packages_to_submit.append(package)
-                            max_jobs_to_submit = max_jobs_to_submit - 1
+        # 3. And all current packages are not wrappable but not if there are no more jobs to wrap.
+        if self.is_deadlock(any_simple_packages, not_wrappeable_package_info, built_packages_tmp):
+            max_jobs_to_submit = self.process_not_wrappeable_packages(not_wrappeable_package_info, packages_to_submit,
+                                                                      max_jobs_to_submit, wrapper_limits)
         return packages_to_submit, max_jobs_to_submit
 
-    def error_message_policy(self,min_h,min_v,wrapper_limits,wallclock_sum,balanced):
-        message = f"Wrapper couldn't be formed under {self.wrapper_policy[self.current_wrapper_section]} POLICY due minimum limit not being reached: [wrappable:{wrapper_limits['min']} < defined_min:{min_h*min_v}] [wrappable_h:{min_h} < defined_min_h:{wrapper_limits['min_h']}]|[wrappeable_v:{min_v} < defined_min_v:{wrapper_limits['min_v']}] "
-        if min_v > 1:
-            message += f"\nCheck your configuration: Check if current {wallclock_sum} vertical wallclock has reached the max defined on PLATFORMS definition in YAML."
+    def is_deadlock(self, any_simple_packages: bool, not_wrappeable_package_info: list, built_packages_tmp: list) -> bool:
+        """
+        Check if the current state is a deadlock.
+
+        :param any_simple_packages: Flag indicating if there are any simple packages.
+        :param not_wrappeable_package_info: List of not wrappable package information.
+        :param built_packages_tmp: List of built packages.
+        :return: True if it is a deadlock, False otherwise.
+        """
+        return (
+                not any_simple_packages
+                and len(self._jobs_list.get_in_queue()) == 0
+                and len(not_wrappeable_package_info) == len(built_packages_tmp)
+        )
+
+    def submit_remaining_jobs(self, p: JobPackageBase, packages_to_submit: list, max_jobs_to_submit: int) -> int:
+        """
+        Submit the remaining jobs because there are not enough jobs of this section remaining to form a wrapper.
+
+        :param p: The package to be submitted.
+        :param packages_to_submit: List of packages to be submitted.
+        :param max_jobs_to_submit: Maximum number of jobs to submit.
+        :return: Updated maximum number of jobs to submit.
+        """
+        Log.warning("There are no more jobs of this section to form a wrapper, submitting the remaining jobs")
+        if len(p.jobs) == 1:
+            p.jobs[0].packed = False
+            packages_to_submit.append(JobPackageSimple([p.jobs[0]]))
         else:
-            message += "\nCheck your configuration: Only jobs_in_wrappers are active, check your jobs_in_wrapper dependencies."
+            packages_to_submit.append(p)
+        return max_jobs_to_submit - 1
+
+    def handle_strict_policy(self, p: JobPackageBase,  err_message: str) -> None:
+        """
+        Handle the strict policy case by filling self.wrappers_with_error with the error message.
+        :param p: The package to be processed.
+        :param err_message: The error message to be raised.
+        """
+        job_names = ','.join([job.name for job in p.jobs])
+        self.wrappers_with_error[job_names] = err_message
+
+    def handle_mixed_policy(self, p: JobPackageBase, packages_to_submit: list, max_jobs_to_submit: int, err_message) -> int:
+        """
+        Handle the mixed policy case by submitting failed jobs sequentially or/and filling self.wrappers_with_error with the error message.
+
+        :param p: The package to be processed.
+        :param packages_to_submit: List of packages to be submitted.
+        :param max_jobs_to_submit: Maximum number of jobs to submit.
+        :return: Updated maximum number of jobs to submit.
+        """
+        error = True
+        for job in p.jobs:
+            if max_jobs_to_submit == 0:
+                break
+            if job.fail_count > 0 and job.status == Status.READY:
+                job.packed = False
+                Log.printlog("Wrapper policy is set to mixed, there is a failed job that will be sent sequential")
+                error = False
+                package = JobPackageSimpleWrapped(
+                    [job]) if job.type == Type.PYTHON and not self._platform.allow_python_jobs else JobPackageSimple(
+                    [job])
+                packages_to_submit.append(package)
+                max_jobs_to_submit -= 1
+        if error:
+            job_names = ','.join([job.name for job in p.jobs])
+            self.wrappers_with_error[job_names] = err_message
+        return max_jobs_to_submit
+
+    def handle_flexible_policy(self, p: JobPackageBase, packages_to_submit: list, max_jobs_to_submit: int, err_message: str) -> int:
+        """
+        Handle the flexible policy case by submitting jobs sequentially.
+
+        :param p: The package to be processed.
+        :param packages_to_submit: List of packages to be submitted.
+        :param max_jobs_to_submit: Maximum number of jobs to submit.
+        :param err_message: The error message to be raised.
+        :return: Updated maximum number of jobs to submit.
+        """
+        Log.warning(err_message)
+        Log.warning(
+            "Wrapper policy is set to flexible and there is a deadlock, Autosubmit will submit the jobs sequentially")
+        for job in p.jobs:
+            if max_jobs_to_submit == 0:
+                break
+            job.packed = False
+            if job.status == Status.READY:
+                package = JobPackageSimpleWrapped(
+                    [job]) if job.type == Type.PYTHON and not self._platform.allow_python_jobs else JobPackageSimple(
+                    [job])
+                packages_to_submit.append(package)
+                max_jobs_to_submit -= 1
+        return max_jobs_to_submit
+
+    def process_not_wrappeable_packages(self, not_wrappeable_package_info: list, packages_to_submit: list,
+                                        max_jobs_to_submit: int, wrapper_limits: dict):
+        """
+        Process the not wrappable packages based on the policy.
+
+        :param not_wrappeable_package_info: List of not wrappable package information.
+        :param packages_to_submit: List of packages to be submitted.
+        :param max_jobs_to_submit: Maximum number of jobs to submit.
+        :param wrapper_limits: Dictionary with wrapper limits.
+        :return: Updated maximum number of jobs to submit.
+        """
+        for p, min_v, min_h, balanced in not_wrappeable_package_info:
+            err_message = self.error_message_policy(min_h, min_v, wrapper_limits, balanced, p.jobs)
+            if not self._jobs_list.get_jobs_by_section(self.jobs_in_wrapper[self.current_wrapper_section], [job.name for job in p.jobs],
+                                                       True):
+                max_jobs_to_submit = self.submit_remaining_jobs(p, packages_to_submit, max_jobs_to_submit)
+            else:
+                if self.wrapper_policy[self.current_wrapper_section] == "strict":
+                    self.handle_strict_policy(p, err_message)
+                elif self.wrapper_policy[self.current_wrapper_section] == "mixed":
+                    max_jobs_to_submit = self.handle_mixed_policy(p, packages_to_submit, max_jobs_to_submit, err_message)
+                else:
+                    max_jobs_to_submit = self.handle_flexible_policy(p, packages_to_submit, max_jobs_to_submit, err_message)
+            if self.wrappers_with_error:
+                for job_names, err_message in self.wrappers_with_error.items():
+                    Log.error(f"Wrapped jobs with deadlock issues: [{job_names}].")
+                    Log.error(err_message)
+                raise AutosubmitCritical("Critical error in wrapper policy", 7014)
+        return max_jobs_to_submit
+
+    def error_message_policy(self, min_h: int, min_v: int, wrapper_limits: dict, balanced: bool,
+                             jobs: list) -> str:
+        """
+        Generate an error message for wrapper policy violations.
+
+        Parameters:
+        min_h (int): Minimum horizontal jobs.
+        min_v (int): Minimum vertical jobs.
+        wrapper_limits (dict): Dictionary containing wrapper limits.
+        balanced (bool): Indicates if the packages are balanced.
+        jobs (list): List of jobs with issues.
+
+        Returns:
+        str: Formatted error message.
+        """
+        message = (
+            f"\nWrapper couldn't be formed under {self.wrapper_policy[self.current_wrapper_section]} POLICY due to minimum limit not being reached:"
+            f"\n[package_min_total: {min_h * min_v} < defined: {wrapper_limits['real_min']}]"
+            f"\n[package_min_h: {min_h} < defined: {wrapper_limits['min_h']}]"
+            f"\n[package_min_v: {min_v} < defined: {wrapper_limits['min_v']}]"
+            f"\n[section_wallclock: {max([job.wallclock for job in jobs])}] < [platform_max_wallclock: {self._platform.max_wallclock}]"
+        )
+
         if not balanced:
             message += "\nPackages are not well balanced! (This is not the main cause of the Critical error)"
+        jobs_str = ', '.join([job.name for job in jobs])
+        message += f"\nJobs with issues:[{jobs_str}].\nRevise these jobs dependencies and try again."
+        message += "\nThis message is activated when only jobs_in_wrappers are in active(Ready+) status.\n"
         return message
 
     def check_if_packages_are_ready_to_build(self):
@@ -463,7 +569,7 @@ class JobPackager(object):
         for job in [failed_job for failed_job in jobs_to_submit if failed_job.fail_count > 0]:
             job.packed = False
         jobs_to_wrap = self._divide_list_by_section(jobs_to_submit)
-        non_wrapped_jobs = jobs_to_wrap.pop("SIMPLE",[])
+        non_wrapped_jobs = jobs_to_wrap.pop("SIMPLE", [])
         any_simple_packages = len(non_wrapped_jobs) > 0
         # Prepare packages for wrapped jobs
         for wrapper_name, jobs in jobs_to_wrap.items():
@@ -471,8 +577,8 @@ class JobPackager(object):
             if max_jobs_to_submit == 0:
                 break
             self.current_wrapper_section = wrapper_name
-            section = self._as_config.experiment_data.get("WRAPPERS",{}).get(self.current_wrapper_section,{}).get("JOBS_IN_WRAPPER", "")
-            if not self._platform.allow_wrappers and self.wrapper_type[self.current_wrapper_section] in ['horizontal', 'vertical','vertical-horizontal', 'horizontal-vertical']:
+            section = self._as_config.experiment_data.get("WRAPPERS", {}).get(self.current_wrapper_section, {}).get("JOBS_IN_WRAPPER", "")
+            if not self._platform.allow_wrappers and self.wrapper_type[self.current_wrapper_section] in ['horizontal', 'vertical', 'vertical-horizontal', 'horizontal-vertical']:
                 Log.warning(
                     "Platform {0} does not allow wrappers, submitting jobs individually".format(self._platform.name))
                 for job in jobs:
@@ -492,15 +598,16 @@ class JobPackager(object):
             current_info.append(self._as_config)
 
             if self.wrapper_type[self.current_wrapper_section] == 'vertical':
-                built_packages_tmp = self._build_vertical_packages(jobs, wrapper_limits,wrapper_info=current_info)
+                built_packages_tmp = self._build_vertical_packages(jobs, wrapper_limits, wrapper_info=current_info)
             elif self.wrapper_type[self.current_wrapper_section] == 'horizontal':
-                built_packages_tmp = self._build_horizontal_packages(jobs, wrapper_limits, section,wrapper_info=current_info)
+                built_packages_tmp = self._build_horizontal_packages(jobs, wrapper_limits, section, wrapper_info=current_info)
             elif self.wrapper_type[self.current_wrapper_section] in ['vertical-horizontal', 'horizontal-vertical']:
-                built_packages_tmp.append(self._build_hybrid_package(jobs, wrapper_limits, section,wrapper_info=current_info))
+                built_packages_tmp.append(self._build_hybrid_package(jobs, wrapper_limits, section, wrapper_info=current_info))
             else:
                 built_packages_tmp = self._build_vertical_packages(jobs, wrapper_limits)
-            Log.result(f"Built {len(built_packages_tmp)} wrappers for {wrapper_name}")
-            packages_to_submit,max_jobs_to_submit = self.check_packages_respect_wrapper_policy(built_packages_tmp,packages_to_submit,max_jobs_to_submit,wrapper_limits,any_simple_packages)
+            if len(built_packages_tmp) > 0:
+                Log.result(f"Built {len(built_packages_tmp)} wrappers for {wrapper_name}")
+            packages_to_submit, max_jobs_to_submit = self.check_packages_respect_wrapper_policy(built_packages_tmp, packages_to_submit, max_jobs_to_submit, wrapper_limits, any_simple_packages)
 
         # Now, prepare the packages for non-wrapper jobs
         for job in non_wrapped_jobs:

@@ -1,20 +1,25 @@
 from unittest.mock import Mock
 
-import copy
 import inspect
 import mock
 import tempfile
 import unittest
 from copy import deepcopy
 from datetime import datetime
-from mock import patch
 
+from mock import patch
+from mock.mock import MagicMock
+
+from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistenceDb
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+
+from networkx import DiGraph
+from autosubmit.job.job_utils import Dependency
 
 
 class FakeBasicConfig:
@@ -436,6 +441,84 @@ class TestJobList(unittest.TestCase):
         job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent2)
         self.assertEqual(len(job.edge_info.get("RUNNING", "")), 2)
 
+    def test_add_special_conditions_chunks_to_once(self):
+        # Method from job_list
+        job = Job("child", 1, Status.WAITING, 1)
+        job.section = "child_one"
+        job.date = datetime.strptime("20200128", "%Y%m%d")
+        job.member = "fc0"
+        job.chunk = 1
+        job.split = 1
+        job.splits = 1
+        job.max_checkpoint_step = 0
+
+        job_two = Job("child", 1, Status.WAITING, 1)
+        job_two.section = "child_one"
+        job_two.date = datetime.strptime("20200128", "%Y%m%d")
+        job_two.member = "fc0"
+        job_two.chunk = 2
+        job_two.split = 1
+        job_two.splits = 1
+        job_two.max_checkpoint_step = 0
+
+        special_conditions = {"STATUS": "RUNNING", "FROM_STEP": "1"}
+        special_conditions_two = {"STATUS": "RUNNING", "FROM_STEP": "2"}
+
+        parent = Job("parent", 1, Status.RUNNING, 1)
+        parent.section = "parent_one"
+        parent.date = datetime.strptime("20200128", "%Y%m%d")
+        parent.member = None
+        parent.chunk = None
+        parent.split = None
+        parent.splits = None
+        parent.max_checkpoint_step = 0
+        job.status = Status.WAITING
+        job_two.status = Status.WAITING
+
+        job_list = Mock(wraps=self.JobList)
+        job_list._job_list = [job, job_two, parent]
+
+        dependency = MagicMock()
+        dependency.relationships = {'CHUNKS_FROM': {'1': {'FROM_STEP': '1'}, '2': {'FROM_STEP': '2'}, }, 'STATUS': 'RUNNING'}
+        filters_to_apply = job_list.get_filters_to_apply(job, dependency)
+        filters_to_apply_two = job_list.get_filters_to_apply(job_two, dependency)
+
+        assert filters_to_apply == {}
+        assert filters_to_apply_two == {}
+
+        job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent)
+        job_list.add_special_conditions(job_two, special_conditions_two, filters_to_apply_two, parent)
+
+        dependency = MagicMock()
+        dependency.relationships = {'CHUNKS_FROM': {'1': {'FROM_STEP': '1', 'CHUNKS_TO':'natural'}, '2': {'FROM_STEP': '2', 'CHUNKS_TO':'natural'}, }, 'STATUS': 'RUNNING'}
+        filters_to_apply = job_list.get_filters_to_apply(job, dependency)
+        filters_to_apply_two = job_list.get_filters_to_apply(job_two, dependency)
+
+        assert filters_to_apply == {}
+        assert filters_to_apply_two == {}
+
+        job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent)
+        job_list.add_special_conditions(job_two, special_conditions_two, filters_to_apply_two, parent)
+
+        self.assertEqual(job.max_checkpoint_step, 1)
+        self.assertEqual(job_two.max_checkpoint_step, 2)
+
+        value = job.edge_info.get("RUNNING", "").get("parent", ())
+        self.assertEqual((value[0].name, value[1]), (parent.name, "1"))
+        self.assertEqual(len(job.edge_info.get("RUNNING", "")), 1)
+
+        value_two = job_two.edge_info.get("RUNNING", "").get("parent", ())
+        self.assertEqual((value_two[0].name, value_two[1]), (parent.name, "2"))
+        self.assertEqual(len(job_two.edge_info.get("RUNNING", "")), 1)
+
+        dependency = MagicMock()
+        dependency.relationships = {'CHUNKS_FROM': {'1': {'FROM_STEP': '1', 'CHUNKS_TO':'natural', 'DATES_TO': "dummy"}, '2': {'FROM_STEP': '2', 'CHUNKS_TO':'natural', 'DATES_TO': "dummy"}, }, 'STATUS': 'RUNNING'}
+        filters_to_apply = job_list.get_filters_to_apply(job, dependency)
+        filters_to_apply_two = job_list.get_filters_to_apply(job_two, dependency)
+
+        assert filters_to_apply == {'CHUNKS_TO': 'natural', 'DATES_TO': 'dummy'}
+        assert filters_to_apply_two == {'CHUNKS_TO': 'natural', 'DATES_TO': 'dummy'}
+
     @patch('autosubmit.job.job_dict.date2str')
     def test_jobdict_get_jobs_filtered(self, mock_date2str):
         # Test the get_jobs_filtered function
@@ -468,6 +551,81 @@ class TestJobList(unittest.TestCase):
         expected_output = [self.dictionary._dic["SIM"][0]]
         self.assertEqual(expected_output, result)
 
+
+def test_normalize_auto_keyword(autosubmit_config, mocker):
+    as_conf = autosubmit_config('a000', experiment_data={
+
+    })
+    job_list = JobList(
+        as_conf.expid,
+        FakeBasicConfig,
+        YAMLParserFactory(),
+        Autosubmit._get_job_list_persistence(as_conf.expid, as_conf),
+        as_conf
+    )
+    dependency = Dependency("test")
+
+    job = Job("a000_20001010_fc1_2_1_test", 1, Status.READY, 1)
+    job.running = "chunk"
+    job.section = "test"
+    job.date = "20001010"
+    job.member = "fc1"
+    job.splits = 5
+
+    job_minus = Job("a000_20001010_fc1_1_1_minus", 1, Status.READY, 1)
+    job_minus.running = "chunk"
+    job_minus.section = "minus"
+    job_minus.date = "20001010"
+    job_minus.member = "fc1"
+    job_minus.splits = 40
+
+    job_plus = Job("a000_20001010_fc1_3_1_plus", 1, Status.READY, 1)
+    job_plus.running = "chunk"
+    job_plus.section = "plus"
+    job_plus.date = "20001010"
+    job_plus.member = "fc1"
+    job_plus.splits = 50
+
+    job_list.graph = DiGraph()
+    job_list.graph.add_node(job.name, job=job)
+    job_list.graph.add_node(job_minus.name, job=job_minus)
+    job_list.graph.add_node(job_plus.name, job=job_plus)
+
+    dependency.distance = 1
+    dependency.relationships = {
+        "SPLITS_FROM": {
+            "key": {
+                "SPLITS_TO": "auto"
+            }
+        }
+    }
+    dependency.sign = "-"
+    dependency.section = "minus"
+    dependency = job_list._normalize_auto_keyword(job, dependency)
+    assert dependency.relationships["SPLITS_FROM"]["key"]["SPLITS_TO"] == "40"
+    assert job.splits == "40"
+    dependency.relationships = {
+        "SPLITS_FROM": {
+            "key": {
+                "SPLITS_TO": "auto"
+            }
+        }
+    }
+    dependency.sign = "+"
+    dependency.section = "plus"
+    dependency = job_list._normalize_auto_keyword(job, dependency)
+    assert dependency.relationships["SPLITS_FROM"]["key"]["SPLITS_TO"] == "50"
+    assert job.splits == "50"  # Test that the param is assigned
+
+    # Test that the param is not being changed after update_job_parameters
+    as_conf.experiment_data["JOBS"] = {}
+    as_conf.experiment_data["JOBS"][job.section] = {}
+    as_conf.experiment_data["JOBS"][job.section]["SPLITS"] = "auto"
+    job.date = None
+    mocker.patch("autosubmit.job.job.Job.calendar_split", side_effect=lambda x, y: y)
+    parameters = job.update_job_parameters(as_conf, {})
+    assert job.splits == "50"
+    assert parameters["SPLITS"] == "50"
 
 
 if __name__ == '__main__':

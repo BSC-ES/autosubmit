@@ -212,7 +212,7 @@ class AutosubmitGit:
                 for number in git_version.split("."):
                     version_int += number
                 git_version = int(version_int)
-            except:
+            except Exception:
                 git_version = 2251
             if git_remote_project_path == '':
                 command_0 = "cd {0} ; {1}".format(project_path, command_0)
