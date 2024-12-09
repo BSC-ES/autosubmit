@@ -2219,7 +2219,7 @@ class Autosubmit:
                         job_list.update_list(as_conf, submitter=submitter)
                         job_list.save()
                         # Submit jobs that are ready to run
-                        #Log.debug(f"FD submit: {fd_show.fd_table_status_str()}")
+                        #Log.debug(f"FD submit: {fd_show.fd_table_status_str()}")run_experiment
                         if len(job_list.get_ready()) > 0:
                             Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence, hold=False)
                             job_list.update_list(as_conf, submitter=submitter)
@@ -2389,6 +2389,12 @@ class Autosubmit:
                         exp_history.finish_current_experiment_run()
                     except:
                         Log.warning("Database is locked")
+                # Create rocrate object if requested
+                rocrate_data = as_conf.experiment_data.get("ROCRATE", None)
+                if rocrate_data:
+                    Autosubmit.provenance(expid, rocrate=True)
+                else:
+                    print("rocrate.yml not found in CONFIG. Can't create rocrate object. ")
         except (portalocker.AlreadyLocked, portalocker.LockException) as e:
             message = "We have detected that there is another Autosubmit instance using the experiment\n. Stop other Autosubmit instances that are using the experiment or delete autosubmit.lock file located on tmp folder"
             terminate_child_process(expid)
