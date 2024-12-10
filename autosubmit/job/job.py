@@ -1914,7 +1914,7 @@ class Job(object):
         self.shape = as_conf.jobs_data[self.section].get("SHAPE", "")
         self.script = as_conf.jobs_data[self.section].get("SCRIPT", "")
         self.x11 = False if str(as_conf.jobs_data[self.section].get("X11", False)).lower() == "false" else True
-        self.notify_on = as_conf.jobs_data[self.section].get("NOTIFY_ON", "")
+        self.notify_on = as_conf.jobs_data[self.section].get("NOTIFY_ON", [])
         if self.wrapper_type != "vertical" and self.packed:
             self.stat_file = f"{self.script_name[:-4]}_STAT_{self.fail_count}"
         else:
