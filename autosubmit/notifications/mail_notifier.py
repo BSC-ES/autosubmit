@@ -44,7 +44,7 @@ class MailNotifier:
         message['From'] = email.utils.formataddr(('Autosubmit', self.config.MAIL_FROM))
         message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {str(status)}'
         message['Date'] = email.utils.formatdate(localtime=True)
-        for mail in mail_to:
+        for mail in mail_to: # expects a list
             message['To'] = email.utils.formataddr((mail, mail))
             try:
                 self._send_mail(self.config.MAIL_FROM, mail, message)
