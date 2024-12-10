@@ -568,6 +568,16 @@ class Job(object):
     def splits(self, value):
         self._splits = value
 
+    @property
+    @autosubmit_parameter(name='notify_on')
+    def notify_on(self):
+        """Send mail notification on job status change."""
+        return self._notify_on
+
+    @notify_on.setter
+    def notify_on(self, value):
+        self._notify_on = value
+
     def __getstate__(self):
         return {k: v for k, v in self.__dict__.items() if k not in ["_platform", "_children", "_parents", "submitter"]}
 
@@ -1943,7 +1953,12 @@ class Job(object):
         self.shape = as_conf.jobs_data[self.section].get("SHAPE", "")
         self.script = as_conf.jobs_data[self.section].get("SCRIPT", "")
         self.x11 = False if str(as_conf.jobs_data[self.section].get("X11", False)).lower() == "false" else True
-        self.update_stat_file()
+        self.notify_on = as_conf.jobs_data[self.section].get("NOTIFY_ON", [])
+        if self.wrapper_type != "vertical" and self.packed:
+            self.stat_file = f"{self.script_name[:-4]}_STAT_{self.fail_count}"
+        else:
+            self.stat_file = f"{self.script_name[:-4]}_STAT_0"
+
         if self.checkpoint: # To activate placeholder sustitution per <empty> in the template
             parameters["AS_CHECKPOINT"] = self.checkpoint
         parameters['JOBNAME'] = self.name
