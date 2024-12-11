@@ -232,7 +232,7 @@ Edit ``jobs_cxxx.yml`` in the ``conf`` folder of the experiment.
     defined on the parameter ``NOTIFY_ON``
 
 .. hint::
-    Remember that you can define more than one job status divided by a whitespace.
+Remember that you can define more than one job status separated by a whitespace, a comma (`,`), or using a list.
 
 Example:
 ::
@@ -246,6 +246,16 @@ Example:
             FILE: LOCAL_SETUP.sh
             PLATFORM: LOCAL
             NOTIFY_ON: FAILED COMPLETED
+        EXAMPLE_JOB:
+            FILE: EXAMPLE_JOB.sh
+            PLATFORM: LOCAL
+            NOTIFY_ON: FAILED, COMPLETED
+        EXAMPLE_JOB_2:
+            FILE: EXAMPLE_JOB_2.sh
+            PLATFORM: LOCAL
+            NOTIFY_ON:
+                - FAILED
+                - COMPLETED
 
 How to add a new platform
 -------------------------
