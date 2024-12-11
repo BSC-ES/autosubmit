@@ -2574,7 +2574,6 @@ class Autosubmit:
             raise
         except BaseException as e:
             raise
-            raise AutosubmitCritical("This seems like a bug in the code, please contact AS developers", 7070, str(e))
 
     @staticmethod
     def monitor(expid, file_format, lst, filter_chunks, filter_status, filter_section, hide, txt_only=False,
@@ -3017,13 +3016,8 @@ class Autosubmit:
                     job.status = Status.COMPLETED
                     Log.info(
                         "CHANGED job '{0}' status to COMPLETED".format(job.name))
-                    # Log.status("CHANGED job '{0}' status to COMPLETED".format(job.name))
-
-                    if not no_recover_logs:
-                        try:
-                            job.platform.get_logs_files(expid, job.remote_logs)
-                        except Exception as e:
-                            pass
+                    job.recover_last_ready_date()
+                    job.recover_last_log_name()
                 elif job.status != Status.SUSPENDED:
                     job.status = Status.WAITING
                     job._fail_count = 0
