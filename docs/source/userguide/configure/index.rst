@@ -221,7 +221,10 @@ Example:
         # Default: False
         NOTIFICATIONS: True
         # Mail address where notifications will be received
-        TO:   jsmith@example.com  rlewis@example.com
+        TO:
+            - jsmith@example.com
+            - rlewis@example.com
+
 
 2. Then you have to define for which jobs you want to be notified.
 
