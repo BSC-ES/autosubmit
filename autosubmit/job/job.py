@@ -222,6 +222,7 @@ class Job(object):
         self.parameters = None
         self._tmp_path = os.path.join(
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
+        self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
         self.write_start = False
         self._platform = None
         self.check = 'true'
@@ -2500,6 +2501,51 @@ class Job(object):
         if last and local_logs[0] != "":
             self.local_logs = local_logs
             self.remote_logs = copy.deepcopy(local_logs)
+
+    def _recover_last_log_name_from_filesystem(self) -> bool:
+        """
+        Recovers the log name for the job from the filesystem.
+        :return: True if the log name was already recovered, False otherwise
+        :rtype: bool
+        """
+        log_name = sorted(list(self._log_path.glob(f"{self.name}*")), key=lambda x: x.stat().st_mtime)
+        log_name = log_name[-1] if log_name else None
+        if log_name:
+            file_timestamp = int(datetime.datetime.fromtimestamp(log_name.stat().st_mtime).strftime("%Y%m%d%H%M%S"))
+            if self.ready_date and file_timestamp >= int(self.ready_date):
+                self.local_logs = (log_name.with_suffix(".out").name, log_name.with_suffix(".err").name)
+                self.remote_logs = copy.deepcopy(self.local_logs)
+                return True
+        self.local_logs = (f"{self.name}.out.{self._fail_count}", f"{self.name}.err.{self._fail_count}")
+        self.remote_logs = copy.deepcopy(self.local_logs)
+        return False
+
+    def recover_last_log_name(self):
+        """
+        Recovers the last log name for the job
+        """
+        if not self.updated_log:
+            self.updated_log = self._recover_last_log_name_from_filesystem()
+            # TODO: After PostgreSQL migration, implement _recover_last_log_from_db() to retrieve the last log from the database.
+
+    def recover_last_ready_date(self) -> None:
+        """
+        Recovers the last ready date for this job
+        """
+        if not self.ready_date:
+            stat_file = Path(f"{self._tmp_path}/{self.name}_TOTAL_STATS")
+            if stat_file.exists():
+                output_by_lines = stat_file.read_text().splitlines()
+                if output_by_lines:
+                    line_info = output_by_lines[-1].split(" ")
+                    if line_info and line_info[0].isdigit():
+                        self.ready_date = line_info[0]
+                    else:
+                        self.ready_date = datetime.datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
+                        Log.debug(f"Failed to recover ready date for the job {self.name}")
+                else:  # Default to last mod time
+                    self.ready_date = datetime.datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
+                    Log.debug(f"Failed to recover ready date for the job {self.name}")
 
 
 class WrapperJob(Job):

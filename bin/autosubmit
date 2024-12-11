@@ -40,6 +40,7 @@ def main():
         return_value = exit_from_error(e)
     return return_value
 
+
 if __name__ == "__main__":
     exit_code = main()
     sys.exit(exit_code) # Sys.exit ensures a proper cleanup of the program, while os._exit() does not.
