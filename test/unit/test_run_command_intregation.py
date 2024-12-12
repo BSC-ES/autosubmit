@@ -67,7 +67,7 @@ def prepare_run(run_tmpdir):
     shutil.rmtree(conf_folder)
     os.makedirs(conf_folder)
     platforms_path = Path(f"{run_tmpdir.strpath}/t000/conf/platforms.yml")
-    main_path = Path(f"{run_tmpdir.strpath}/t000/conf/main.yml")
+    main_path = Path(f"{run_tmpdir.strpath}/t000/conf/AAAmain.yml")
     # Add each platform to test
     with platforms_path.open('w') as f:
         f.write(f"""
@@ -222,9 +222,12 @@ def init_run(run_tmpdir, jobs_data):
             """)
     return log_dir
 
+
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status", [
     # Success
     ("""
+    EXPERIMENT:
+        NUMCHUNKS: '3'
     JOBS:
         job:
             SCRIPT: |
@@ -235,6 +238,8 @@ def init_run(run_tmpdir, jobs_data):
     """, 3, "COMPLETED"),  # Number of jobs
     # Success wrapper
     ("""
+    EXPERIMENT:
+        NUMCHUNKS: '40'
     JOBS:
         job:
             SCRIPT: |
@@ -247,7 +252,7 @@ def init_run(run_tmpdir, jobs_data):
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
-    """, 3, "COMPLETED"),  # Number of jobs
+    """, 40, "COMPLETED"),  # Number of jobs
     # Failure
     ("""
     JOBS:
@@ -279,8 +284,7 @@ def init_run(run_tmpdir, jobs_data):
 def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries, final_status, mocker):
     log_dir = init_run(run_tmpdir, jobs_data)
     # Run the experiment
-    with mocker.patch('autosubmit.platforms.platform.max', return_value=20):
-        exit_code = Autosubmit.run_experiment(expid='t000')
+    exit_code = Autosubmit.run_experiment(expid='t000')
     # TODO: pipeline is not returning 0 or 1 for check_exit_code(final_status, exit_code)
     # TODO: Verify job statuses are correct. Consider calling Autosubmit.load_job_list.
     check_db_fields(run_tmpdir, expected_db_entries, final_status)
