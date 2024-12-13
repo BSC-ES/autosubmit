@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - main
+      - master
 
 jobs:
   # lint: # Turn on when linting issues are resolved
