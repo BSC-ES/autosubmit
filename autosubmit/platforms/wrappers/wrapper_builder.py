@@ -544,6 +544,7 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
                 out_path = os.path.join(os.getcwd(), out)
                 err_path = os.path.join(os.getcwd(), err)
                 template_path = os.path.join(os.getcwd(), self.template)
+                os.system(f"chmod +x {{template_path}}")
                 command = f"timeout {0} {{template_path}} > {{out_path}} 2> {{err_path}}"
                 print(command)
                 getstatusoutput(command)
