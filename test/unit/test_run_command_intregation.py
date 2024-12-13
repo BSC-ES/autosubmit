@@ -240,8 +240,7 @@ def assert_exit_code(final_status, exit_code):
     else:
         assert exit_code == 0
 
-
-def check_files_recovered(run_tmpdir, log_dir) -> dict:
+def check_files_recovered(run_tmpdir, log_dir, expected_files) -> dict:
     """
     Check that all files are recovered after a run.
     """
@@ -263,9 +262,20 @@ def check_files_recovered(run_tmpdir, log_dir) -> dict:
             all_ok = False
             print(f"{file} does not exists: {files_check_list[file]}")
     if all_ok:
-        print("All files recovered correctly.")
+        print("All log files downloaded are renamed correctly.")
     else:
-        print("Some files were not recovered correctly.")
+        print("Some log files are not renamed correctly.")
+    files_err_out_found = [f for f in log_dir.glob('*') if (str(f).endswith(".err") or str(f).endswith(".out") or "retrial" in str(f).lower()) and "ASThread" not in str(f)]
+    files_check_list["EXPECTED_FILES"] = len(files_err_out_found) == expected_files
+    if not files_check_list["EXPECTED_FILES"]:
+        print(f"Expected number of log files: {expected_files}. Found: {len(files_err_out_found)}")
+        files_err_out_found_str = ", ".join([f.name for f in files_err_out_found])
+        print(f"Log files found: {files_err_out_found_str}")
+        print("Log files content:")
+        for f in files_err_out_found:
+            print(f"File: {f.name}\n{f.read_text()}")
+    else:
+        print(f"All log files are gathered: {expected_files}")
     return files_check_list
 
 
@@ -273,8 +283,8 @@ def assert_files_recovered(files_check_list):
     """
     Assert that the files are recovered correctly.
     """
-    for file in files_check_list:
-        assert files_check_list[file]
+    for check_name in files_check_list:
+        assert files_check_list[check_name]
 
 
 def init_run(run_tmpdir, jobs_data):
@@ -377,7 +387,7 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
 
     # Check and display results
     db_check_list = check_db_fields(run_tmpdir, expected_db_entries, final_status)
-    files_check_list = check_files_recovered(run_tmpdir, log_dir)
+    files_check_list = check_files_recovered(run_tmpdir, log_dir, expected_files=expected_db_entries*2)
 
     # Assert
     assert_db_fields(db_check_list)
