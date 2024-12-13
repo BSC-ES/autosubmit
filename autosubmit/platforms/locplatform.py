@@ -163,7 +163,7 @@ class LocalPlatform(ParamikoPlatform):
         Returns:
             bool: True if the file was sent successfully.
         """
-        command = f'{self.put_cmd} {os.path.join(self.tmp_path, Path(filename).name)} {os.path.join(self.tmp_path, "LOG_" + self.expid, Path(filename).name)}'
+        command = f'{self.put_cmd} {os.path.join(self.tmp_path, Path(filename).name)} {os.path.join(self.tmp_path, "LOG_" + self.expid, Path(filename).name)}; chmod 770 {os.path.join(self.tmp_path, "LOG_" + self.expid, Path(filename).name)}'
         try:
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError:
