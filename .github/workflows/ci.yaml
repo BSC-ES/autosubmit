@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  # lint: # Turn on when linting issues are resolved
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 2
+
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.9"
+
+  #     - name: Install dependencies
+  #       run: |
+  #         python -m pip install --upgrade pip
+  #         pip install -e .[all]
+
+  #     - name: Lint code
+  #       run: |
+  #         ruff check .
+
+  test:
+    # needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies
+        run: sudo apt-get install -y graphviz rsync curl
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[all]
+
+      - name: Run tests
+        run: |
+          pytest
+
+      - name: Coverage report
+        run: |
+          coverage xml
+          coverage report
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage_${{ matrix.os }}_py-${{ matrix.python-version }}
+          path: coverage.xml
+          retention-days: 7
+
+  coverage:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Codecov upload
+        uses: codecov/codecov-action@v5
+        with:
+          name: ${{ github.workflow }}
+          flags: fast-tests
+          fail_ci_if_error: true
+          verbose: true
+          # Token not required for public repos, but avoids upload failure due
+          # to rate-limiting (but not for PRs opened from forks)
+          token: ${{ secrets.CODECOV_TOKEN }}
