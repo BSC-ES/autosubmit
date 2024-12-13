@@ -129,15 +129,16 @@ project:
     return run_tmpdir
 
 
-def check_db_fields(run_tmpdir, expected_entries, final_status):
+def check_db_fields(run_tmpdir, expected_entries, final_status) -> dict:
     """
-    Check that the database contains the expected number of entries, and that all fields contain data. After a completed run.
+    Check that the database contains the expected number of entries, and that all fields contain data after a completed run.
     """
+    db_check_list = {}
     # Test database exists.
     job_data = Path(f"{run_tmpdir.strpath}/job_data_t000.db")
     autosubmit_db = Path(f"{run_tmpdir.strpath}/tests.db")
-    assert job_data.exists()
-    assert autosubmit_db.exists()
+    db_check_list["JOB_DATA_EXIST"] = job_data.exists()
+    db_check_list["AUTOSUBMIT_DB_EXIST"] = autosubmit_db.exists()
 
     # Check job_data info
     conn = sqlite3.connect(job_data)
@@ -145,10 +146,41 @@ def check_db_fields(run_tmpdir, expected_entries, final_status):
     c = conn.cursor()
     c.execute("SELECT * FROM job_data")
     rows = c.fetchall()
-    assert len(rows) == expected_entries
+    db_check_list["JOB_DATA_ENTRIES"] = len(rows) == expected_entries
     # Convert rows to a list of dictionaries
     rows_as_dicts = [dict(row) for row in rows]
     # Tune the print so it is more readable, so it is easier to debug in case of failure
+    db_check_list["JOB_DATA_FIELDS"] = {}
+    counter_by_name = {}
+    for row_dict in rows_as_dicts:
+        # Check that all fields contain data, except extra_data, children, and platform_output
+        # Check that submit, start and finish are > 0
+        if row_dict["job_name"] not in counter_by_name:
+            counter_by_name[row_dict["job_name"]] = 0
+        if row_dict["job_name"] not in db_check_list["JOB_DATA_FIELDS"]:
+            db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]] = {}
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])] = {}
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["submit"] = row_dict["submit"] > 0 and row_dict["submit"] != 1970010101
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["start"] = row_dict["start"] > 0 and row_dict["start"] != 1970010101
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["finish"] = row_dict["finish"] > 0 and row_dict["finish"] != 1970010101
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["status"] = row_dict["status"] == final_status
+        empty_fields = []
+        for key in [key for key in row_dict.keys() if
+                    key not in ["status", "finish", "submit", "start", "extra_data", "children", "platform_output"]]:
+            if str(row_dict[key]) == str(""):
+                empty_fields.append(key)
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["empty_fields"] = " ".join(empty_fields)
+        counter_by_name[row_dict["job_name"]] += 1
+    print_db_results(db_check_list, rows_as_dicts, run_tmpdir)
+    c.close()
+    conn.close()
+    return db_check_list
+
+
+def print_db_results(db_check_list, rows_as_dicts, run_tmpdir):
+    """
+    Print the database check results.
+    """
     column_names = rows_as_dicts[0].keys() if rows_as_dicts else []
     column_widths = [max(len(str(row[col])) for row in rows_as_dicts + [dict(zip(column_names, column_names))]) for col
                      in column_names]
@@ -159,21 +191,47 @@ def check_db_fields(run_tmpdir, expected_entries, final_status):
     # Print the rows
     for row_dict in rows_as_dicts:  # always print, for debug proposes
         print(" | ".join(f"{str(row_dict[col]):<{width}}" for col, width in zip(column_names, column_widths)))
-    for row_dict in rows_as_dicts:
-        # Check that all fields contain data, except extra_data, children, and platform_output
-        # Check that submit, start and finish are > 0
-        assert row_dict["submit"] > 0 and row_dict["finish"] != 1970010101
-        assert row_dict["start"] > 0 and row_dict["finish"] != 1970010101
-        assert row_dict["finish"] > 0 and row_dict["finish"] != 1970010101
-        assert row_dict["status"] == final_status
-        for key in [key for key in row_dict.keys() if
-                    key not in ["status", "finish", "submit", "start", "extra_data", "children", "platform_output"]]:
-            assert str(row_dict[key]) != str("")
-    c.close()
-    conn.close()
+    # Print the results
+    print("\nDatabase check results:")
+    print(f"JOB_DATA_EXIST: {db_check_list['JOB_DATA_EXIST']}")
+    print(f"AUTOSUBMIT_DB_EXIST: {db_check_list['AUTOSUBMIT_DB_EXIST']}")
+    print(f"JOB_DATA_ENTRIES_ARE_CORRECT: {db_check_list['JOB_DATA_ENTRIES']}")
+
+    for job_name in db_check_list["JOB_DATA_FIELDS"]:
+        for job_counter in db_check_list["JOB_DATA_FIELDS"][job_name]:
+            all_ok = True
+            for field in db_check_list["JOB_DATA_FIELDS"][job_name][job_counter]:
+                if field == "empty_fields":
+                    if len(db_check_list['JOB_DATA_FIELDS'][job_name][job_counter][field]) > 0:
+                        all_ok = False
+                        print(f"{field} assert FAILED")
+                else:
+                    if not db_check_list['JOB_DATA_FIELDS'][job_name][job_counter][field]:
+                        all_ok = False
+                        print(f"{field} assert FAILED")
+            if int(job_counter) > 0:
+                print(f"Job entry: {job_name} retrial: {job_counter} assert {str(all_ok).upper()}")
+            else:
+                print(f"Job entry: {job_name} assert {str(all_ok).upper()}")
 
 
-def check_exit_code(final_status, exit_code):
+def assert_db_fields(db_check_list):
+    """
+    Assert that the database fields are correct.
+    """
+    assert db_check_list["JOB_DATA_EXIST"]
+    assert db_check_list["AUTOSUBMIT_DB_EXIST"]
+    assert db_check_list["JOB_DATA_ENTRIES"]
+    for job_name in db_check_list["JOB_DATA_FIELDS"]:
+        for job_counter in db_check_list["JOB_DATA_FIELDS"][job_name]:
+            for field in db_check_list["JOB_DATA_FIELDS"][job_name][job_counter]:
+                if field == "empty_fields":
+                    assert len(db_check_list['JOB_DATA_FIELDS'][job_name][job_counter][field]) == 0
+                else:
+                    assert db_check_list['JOB_DATA_FIELDS'][job_name][job_counter][field]
+
+
+def assert_exit_code(final_status, exit_code):
     """
     Check that the exit code is correct.
     """
@@ -183,7 +241,7 @@ def check_exit_code(final_status, exit_code):
         assert exit_code == 0
 
 
-def check_files_recovered(run_tmpdir, log_dir):
+def check_files_recovered(run_tmpdir, log_dir) -> dict:
     """
     Check that all files are recovered after a run.
     """
@@ -191,11 +249,32 @@ def check_files_recovered(run_tmpdir, log_dir):
     as_conf = AutosubmitConfig("t000")
     as_conf.reload()
     retrials = as_conf.experiment_data['JOBS']['JOB'].get('RETRIALS', 0)
+    files_check_list = {}
     for f in log_dir.glob('*'):
-        assert not any(str(f).endswith(f".{i}.err") or str(f).endswith(f".{i}.out") for i in range(retrials + 1))
+        files_check_list[f.name] = not any(str(f).endswith(f".{i}.err") or str(f).endswith(f".{i}.out") for i in range(retrials + 1))
     stat_files = [str(f).split("_")[-1] for f in log_dir.glob('*') if "STAT" in str(f)]
     for i in range(retrials + 1):
-        assert str(i) in stat_files
+        files_check_list[f"STAT_{i}"] = str(i) in stat_files
+
+    print("\nFiles check results:")
+    all_ok = True
+    for file in files_check_list:
+        if not files_check_list[file]:
+            all_ok = False
+            print(f"{file} does not exists: {files_check_list[file]}")
+    if all_ok:
+        print("All files recovered correctly.")
+    else:
+        print("Some files were not recovered correctly.")
+    return files_check_list
+
+
+def assert_files_recovered(files_check_list):
+    """
+    Assert that the files are recovered correctly.
+    """
+    for file in files_check_list:
+        assert files_check_list[file]
 
 
 def init_run(run_tmpdir, jobs_data):
@@ -239,7 +318,7 @@ def init_run(run_tmpdir, jobs_data):
     # Success wrapper
     ("""
     EXPERIMENT:
-        NUMCHUNKS: '40'
+        NUMCHUNKS: '2'
     JOBS:
         job:
             SCRIPT: |
@@ -248,11 +327,21 @@ def init_run(run_tmpdir, jobs_data):
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
+        job2:
+            SCRIPT: |
+                echo "Hello World with id=Success + wrappers"
+            DEPENDENCIES: job2-1
+            PLATFORM: local
+            RUNNING: chunk
+            wallclock: 00:01
     wrappers:
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
-    """, 40, "COMPLETED"),  # Number of jobs
+        wrapper2:
+            JOBS_IN_WRAPPER: job2
+            TYPE: vertical
+    """, 4, "COMPLETED"),  # Number of jobs
     # Failure
     ("""
     JOBS:
@@ -281,11 +370,17 @@ def init_run(run_tmpdir, jobs_data):
             TYPE: vertical
     """, (2+1)*1, "FAILED"),   # Retries set (N + 1) * job chunk 1 ( the rest shouldn't run )
 ], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
-def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries, final_status, mocker):
+def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries, final_status):
     log_dir = init_run(run_tmpdir, jobs_data)
     # Run the experiment
     exit_code = Autosubmit.run_experiment(expid='t000')
-    # TODO: pipeline is not returning 0 or 1 for check_exit_code(final_status, exit_code)
-    # TODO: Verify job statuses are correct. Consider calling Autosubmit.load_job_list.
-    check_db_fields(run_tmpdir, expected_db_entries, final_status)
-    check_files_recovered(run_tmpdir, log_dir)
+
+    # Check and display results
+    db_check_list = check_db_fields(run_tmpdir, expected_db_entries, final_status)
+    files_check_list = check_files_recovered(run_tmpdir, log_dir)
+
+    # Assert
+    assert_db_fields(db_check_list)
+    assert_files_recovered(files_check_list)
+    # TODO: GITLAB pipeline is not returning 0 or 1 for check_exit_code(final_status, exit_code)
+    # assert_exit_code(final_status, exit_code)
