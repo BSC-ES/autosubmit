@@ -46,13 +46,15 @@ class PsPlatform(ParamikoPlatform):
         """
         Updates commands for platforms
         """
-        self.root_dir = os.path.join(self.scratch, self.project, self.user, self.expid)
+        self.root_dir = os.path.join(self.scratch, self.project_dir, self.user, self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
         self.cancel_cmd = "kill -SIGINT"
         self._checkhost_cmd = "echo 1"
         self.put_cmd = "scp"
         self.get_cmd = "scp"
         self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
+        self.remove_checker = "rm -rf " + os.path.join(self.scratch, self.project_dir,self.user,"ps_permission_checker_azxbyc")
+        self.mkdir_checker = "mkdir -p " + os.path.join(self.scratch, self.project_dir,self.user,"ps_permission_checker_azxbyc")
 
     def get_checkhost_cmd(self):
         return self._checkhost_cmd
@@ -85,3 +87,19 @@ class PsPlatform(ParamikoPlatform):
 
     def get_checkjob_cmd(self, job_id):
         return self.get_pscall(job_id)
+
+    def check_Alljobs(self, job_list, as_conf, retries=5):
+        for job,prev_status in job_list:
+            self.check_job(job)
+    def check_remote_permissions(self):
+        try:
+            try:
+                self.send_command(self.remove_checker)
+            except Exception as e:
+                pass
+            self.send_command(self.mkdir_checker)
+            pass
+            self.send_command(self.remove_checker)
+            return True
+        except Exception as e:
+            return False

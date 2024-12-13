@@ -181,7 +181,9 @@ class ParamikoSubmitter(Submitter):
                 section, 'EXCLUSIVITY', '').lower()
             remote_platform.user = parser.get_option(section, 'USER', None)
             remote_platform.scratch = parser.get_option(
-                section, 'SCRATCH_DIR', None)
+                section, 'SCRATCH_DIR', "")
+            remote_platform.project_dir = parser.get_option(
+                section, 'SCRATCH_PROJECT_DIR', remote_platform.project)
             remote_platform.temp_dir = parser.get_option(
                 section, 'TEMP_DIR', None)
             remote_platform._default_queue = parser.get_option(

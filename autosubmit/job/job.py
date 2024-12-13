@@ -1179,6 +1179,7 @@ class Job(object):
         parameters['CURRENT_HYPERTHREADING'] = job_platform.hyperthreading
         parameters['CURRENT_TYPE'] = job_platform.type
         parameters['CURRENT_SCRATCH_DIR'] = job_platform.scratch
+        parameters['CURRENT_PROJ_DIR'] = job_platform.project_dir
         parameters['CURRENT_ROOTDIR'] = job_platform.root_dir
         parameters['CURRENT_LOGDIR'] = job_platform.get_files_path()
         parameters['ROOTDIR'] = os.path.join(

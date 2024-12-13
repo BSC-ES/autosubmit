@@ -243,7 +243,7 @@ class PJMPlatform(ParamikoPlatform):
         Updates commands for platforms
         """
         self.root_dir = os.path.join(
-            self.scratch, self.project, self.user, self.expid)
+            self.scratch, self.project_dir, self.user, self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
         self.cancel_cmd = "pjdel "
         self._checkhost_cmd = "echo 1"
@@ -514,3 +514,4 @@ class PJMPlatform(ParamikoPlatform):
                     file_exist = False  # won't exist
                     retries = 999  # no more retries
         return file_exist
+

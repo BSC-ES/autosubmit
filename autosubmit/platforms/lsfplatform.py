@@ -48,7 +48,7 @@ class LsfPlatform(ParamikoPlatform):
         """
         Updates commands for platforms
         """
-        self.root_dir = os.path.join(self.scratch, self.project, self.user, self.expid)
+        self.root_dir = os.path.join(self.scratch, self.project_dir, self.user, self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
         self.cancel_cmd = "bkill"
         self._checkjob_cmd = "bjobs "
