@@ -274,6 +274,12 @@ def check_files_recovered(run_tmpdir, log_dir, expected_files) -> dict:
         print("Log files content:")
         for f in files_err_out_found:
             print(f"File: {f.name}\n{f.read_text()}")
+        print("All files, permissions and owner:")
+        for f in log_dir.glob('*'):
+            file_stat = os.stat(f)
+            file_owner_id = file_stat.st_uid
+            file_owner = pwd.getpwuid(file_owner_id).pw_name
+            print(f"File: {f.name} owner: {file_owner}")
     else:
         print(f"All log files are gathered: {expected_files}")
     return files_check_list
