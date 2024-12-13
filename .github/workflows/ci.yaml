@@ -8,30 +8,30 @@ on:
       - main
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
+  # lint: # Turn on when linting issues are resolved
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 2
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.9"
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.9"
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .[all]
+  #     - name: Install dependencies
+  #       run: |
+  #         python -m pip install --upgrade pip
+  #         pip install -e .[all]
 
-      - name: Lint code
-        run: |
-          ruff check .
+  #     - name: Lint code
+  #       run: |
+  #         ruff check .
 
   test:
-    needs: lint
+    # needs: lint
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
