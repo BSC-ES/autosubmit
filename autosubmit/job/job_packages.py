@@ -31,7 +31,7 @@ Log.get_logger("Autosubmit")
 from autosubmit.job.job import Job
 from bscearth.utils.date import sum_str_hours
 from threading import Thread, Lock
-from typing import List
+from typing import List, Dict
 import multiprocessing
 import tarfile
 import datetime
@@ -219,7 +219,13 @@ class JobPackageBase(object):
     def _do_submission(self,job_scripts=None, hold=False):
         """ Submit package to the platform. """
 
-
+    def process_jobs_to_submit(self, job_id: str, hold: bool = False) -> None:
+        for i, job in enumerate(self.jobs):
+            job.hold = hold
+            job.id = str(job_id)
+            job.status = Status.SUBMITTED
+            if hasattr(self, "name"): # TODO change this check for a property that checks if it is a wrapper or not, the same change has to be done in other parts of the code
+                job.wrapper_name = self.name
 
 class JobPackageSimple(JobPackageBase):
     """
@@ -230,6 +236,7 @@ class JobPackageSimple(JobPackageBase):
         super(JobPackageSimple, self).__init__(jobs)
         self._job_scripts = {}
         self.export = jobs[0].export
+        # self.name = "simple_package" TODO this should be possible, but it crashes accross the code. Add a property that defines what is a package with wrappers
 
     def _create_scripts(self, configuration):
         for job in self.jobs:
@@ -245,12 +252,20 @@ class JobPackageSimple(JobPackageBase):
                     full_path = os.path.join(self._tmp_path,filename ) + "_" + job.name[5:]
                     self.platform.send_file(os.path.join(self._tmp_path, full_path))
 
-    def _do_submission(self, job_scripts="", hold=False):
+    def _do_submission(self, job_scripts: Dict[str, str] = "", hold: bool = False) -> None:
+        """
+        Submits jobs to the platform, cleans previous run logs and stats files and updates job status.
+
+        Args:
+            job_scripts (Dict[str, str]): Dictionary of job scripts, defaults to an empty string.
+            hold (bool): If True, the job won't immediately start, defaults to False.
+        """
         if len(job_scripts) == 0:
             job_scripts = self._job_scripts
         for job in self.jobs:
+            # This sets the log names but also the submission time for non-vertical wrapped jobs.
             job.update_local_logs()
-            #CLEANS PREVIOUS RUN ON LOCAL
+            # Clean previous run logs on local
             log_completed = os.path.join(self._tmp_path, job.name + '_COMPLETED')
             log_stat = os.path.join(self._tmp_path, job.name + '_STAT')
             if os.path.exists(log_completed):
@@ -259,12 +274,15 @@ class JobPackageSimple(JobPackageBase):
                 os.remove(log_stat)
             self.platform.remove_stat_file(job)
             self.platform.remove_completed_file(job.name)
+
+            # Submit job to the platform
             job.id = self.platform.submit_job(job, job_scripts[job.name], hold=hold, export = self.export)
             if job.id is None or not job.id:
                 continue
             Log.info("{0} submitted", job.name)
             job.status = Status.SUBMITTED
             job.wrapper_name = job.name
+            job.id = str(job.id)
 
 
 
@@ -343,7 +361,14 @@ class JobPackageArray(JobPackageBase):
             self.platform.send_file(self._job_inputs[job.name])
         self.platform.send_file(self._common_script)
 
-    def _do_submission(self, job_scripts=None, hold=False):
+    def _do_submission(self, job_scripts: Dict[str, str] = None, hold: bool = False) -> None:
+        """
+        Submits jobs to the platform, cleans previous run logs, and updates job status.
+
+        Args:
+            job_scripts (Optional[Dict[str, str]]): Dictionary of job scripts, defaults to None.
+            hold (bool): If True, holds the job submission, defaults to False.
+        """
         for job in self.jobs:
             job.update_local_logs()
             self.platform.remove_stat_file(job)
@@ -358,6 +383,7 @@ class JobPackageArray(JobPackageBase):
             Log.info("{0} submitted", self.jobs[i].name)
             self.jobs[i].id = str(package_id) + '[{0}]'.format(i)
             self.jobs[i].status = Status.SUBMITTED
+            # Identify to which wrapper this job belongs once it is in the recovery queue
             self.jobs[i].wrapper_name = self.name
 
 
@@ -571,7 +597,14 @@ class JobPackageThread(JobPackageBase):
         self.platform.send_file(self._common_script)
 
 
-    def _do_submission(self, job_scripts=None, hold=False):
+    def _do_submission(self, job_scripts: Dict[str, str] = None, hold: bool = False) -> None:
+        """
+        Submits jobs to the platform, cleans previous run logs, and updates job status.
+
+        Args:
+            job_scripts [Dict[str, str]]: Dictionary of job scripts, defaults to None.
+            hold (bool): If True, the job won't start inmediatly, defaults to False.
+        """
         if callable(getattr(self.platform, 'remove_multiple_files')):
             filenames = str()
             for job in self.jobs:
@@ -660,7 +693,14 @@ class JobPackageThreadWrapped(JobPackageThread):
             self.platform.send_file(self._job_scripts[job.name])
         self.platform.send_file(self._common_script)
 
-    def _do_submission(self, job_scripts=None, hold=False):
+    def _do_submission(self, job_scripts: Dict[str, str] = None, hold: bool = False) -> None:
+        """
+        Submits jobs to the platform, cleans previous run logs, and updates job status.
+
+        Args:
+            job_scripts (Optional[Dict[str, str]]): Dictionary of job scripts, defaults to None.
+            hold (bool): If True, the job won't start immediately, defaults to False.
+        """
         for job in self.jobs:
             job.update_local_logs()
             self.platform.remove_stat_file(job)
@@ -851,4 +891,3 @@ class JobPackageHorizontalVertical(JobPackageHybrid):
                                                  jobs_scripts=self._jobs_scripts, dependency=self._job_dependency,
                                                  jobs_resources=self._jobs_resources, expid=self._expid,
                                                  rootdir=self.platform.root_dir, directives=self._custom_directives,threads=self._threads,method=self.method.lower(),partition=self.partition,wrapper_data=self,num_processors_value=self._num_processors)
-

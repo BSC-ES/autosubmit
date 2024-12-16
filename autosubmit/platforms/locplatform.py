@@ -21,13 +21,10 @@ import os
 from pathlib import Path
 from xml.dom.minidom import parseString
 import subprocess
-
 from matplotlib.patches import PathPatch
-
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.headers.local_header import LocalHeader
 from autosubmit.platforms.wrappers.wrapper_factory import LocalWrapperFactory
-
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from time import sleep
 from log.log import Log, AutosubmitError
@@ -106,17 +103,19 @@ class LocalPlatform(ParamikoPlatform):
         return [int(element.firstChild.nodeValue) for element in jobs_xml]
 
     def get_submit_cmd(self, job_script, job, hold=False, export=""):
-        if job:
+        if job:  # Not intuitive at all, but if it is not a job, it is a wrapper
             wallclock = self.parse_time(job.wallclock)
             seconds = int(wallclock.days * 86400 + wallclock.seconds * 60)
         else:
-            seconds = 24 * 3600
+            # TODO for another branch this, it is to add a timeout to the wrapped jobs even if the wallclock is 0, default to 2 days
+            seconds = 60*60*24*2
         if export == "none" or export == "None" or export is None or export == "":
             export = ""
         else:
             export += " ; "
-        command = self.get_call(job_script, job, export=export,timeout=seconds)
+        command = self.get_call(job_script, job, export=export, timeout=seconds)
         return f"cd {self.remote_log_dir} ; {command}"
+
     def get_checkjob_cmd(self, job_id):
         return self.get_pscall(job_id)
 
@@ -153,8 +152,18 @@ class LocalPlatform(ParamikoPlatform):
 
         return True
 
-    def send_file(self, filename, check=True):
-        command = f'{self.put_cmd} {os.path.join(self.tmp_path, Path(filename).name)} {os.path.join(self.tmp_path, "LOG_" + self.expid, Path(filename).name)}'
+    def send_file(self, filename: str, check: bool = True) -> bool:
+        """
+        Sends a file to a specified location using a command.
+
+        Args:
+            filename (str): The name of the file to send.
+            check (bool): Unused in this platform
+
+        Returns:
+            bool: True if the file was sent successfully.
+        """
+        command = f'{self.put_cmd} {os.path.join(self.tmp_path, Path(filename).name)} {os.path.join(self.tmp_path, "LOG_" + self.expid, Path(filename).name)}; chmod 770 {os.path.join(self.tmp_path, "LOG_" + self.expid, Path(filename).name)}'
         try:
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError:
@@ -164,7 +173,17 @@ class LocalPlatform(ParamikoPlatform):
             raise
         return True
 
-    def remove_multiple_files(self, filenames):
+    def remove_multiple_files(self, filenames: str) -> str:
+        """
+        Creates a shell script to remove multiple files in the remote and sets the appropriate permissions.
+
+        Args:
+            filenames (str): A string containing the filenames to be removed.
+
+        Returns:
+            str: An empty string.
+        """
+        # This function is a copy of the slurm one
         log_dir = os.path.join(self.tmp_path, 'LOG_{0}'.format(self.expid))
         multiple_delete_previous_run = os.path.join(
             log_dir, "multiple_delete_previous_run.sh")
@@ -198,20 +217,20 @@ class LocalPlatform(ParamikoPlatform):
         return True
 
     # Moves .err .out
-    def check_file_exists(self, src, wrapper_failed=False, sleeptime=1, max_retries=1):
+    def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 1, max_retries: int = 1) -> bool:
         """
-        Checks if a file exists in the platform
-        :param src: source name
-        :type src: str
-        :param wrapper_failed: checks inner jobs files
-        :type wrapper_failed: bool
-        :param sleeptime: time to sleep
-        :type sleeptime: int
-        :param max_retries: maximum number of retries
-        :type max_retries: int
-        :return: True if the file exists, False otherwise
-        :rtype: bool
+        Checks if a file exists in the platform.
+
+        Args:
+            src (str): Source name.
+            wrapper_failed (bool): Checks inner jobs files. Defaults to False.
+            sleeptime (int): Time to sleep between retries. Defaults to 1.
+            max_retries (int): Maximum number of retries. Defaults to 1.
+
+        Returns:
+            bool: True if the file exists, False otherwise.
         """
+        # This function has a short sleep as the files are locally
         sleeptime = 1
         for i in range(max_retries):
             if os.path.isfile(os.path.join(self.get_files_path(), src)):
@@ -281,7 +300,18 @@ class LocalPlatform(ParamikoPlatform):
         """
         return
 
-    def check_completed_files(self, sections=None):
+    def check_completed_files(self, sections: str = None) -> str:
+        """
+        Checks for completed files in the remote log directory.
+        This function is used to check inner_jobs of a wrapper.
+
+        Args:
+            sections[str]: Space-separated string of sections to check for completed files. Defaults to None.
+
+        Returns:
+            str: The output if the command is successful, None otherwise.
+        """
+        # Clone of the slurm one.
         command = "find %s " % self.remote_log_dir
         if sections:
             for i, section in enumerate(sections.split()):

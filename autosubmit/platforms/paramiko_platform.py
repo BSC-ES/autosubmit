@@ -95,6 +95,7 @@ class ParamikoPlatform(Platform):
         return self._wrapper
 
     def reset(self):
+        self.closeConnection()
         self.connected = False
         self._ssh = None
         self._ssh_config = None
@@ -527,13 +528,17 @@ class ParamikoPlatform(Platform):
         Log.debug(f"Submitting job with the command: {cmd}")
         if cmd is None:
             return None
-        if self.send_command(cmd,x11=x11):
+        if self.send_command(cmd, x11=x11):
             x11 = False if job is None else job.x11
-            job_id = self.get_submitted_job_id(self.get_ssh_output(),x11=x11)
-            Log.debug("Job ID: {0}", job_id)
+            job_id = self.get_submitted_job_id(self.get_ssh_output(), x11 )
+            if job:
+                Log.result(f"Job: {job.name} submitted with job_id: {job_id}")
+            else:
+                Log.result(f"Job submitted with job_id: {job_id}")
             return int(job_id)
         else:
             return None
+
     def get_job_energy_cmd(self, job_id):
         return self.get_ssh_output()
 
@@ -580,6 +585,7 @@ class ParamikoPlatform(Platform):
         :rtype:
         """
         raise NotImplementedError
+
     def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
         """
         Checks job running status
@@ -597,6 +603,9 @@ class ParamikoPlatform(Platform):
         :rtype: autosubmit.job.job_common.Status
 
         """
+        for event in job.platform.worker_events:  # keep alive log retrieval workers.
+            if not event.is_set():
+                event.set()
         job_id = job.id
         job_status = Status.UNKNOWN
         if type(job_id) is not int and type(job_id) is not str:
@@ -622,11 +631,12 @@ class ParamikoPlatform(Platform):
             # URi: define status list in HPC Queue Class
             if job_status in self.job_status['COMPLETED'] or retries == 0:
                 # The Local platform has only 0 or 1, so it neccesary to look for the completed file.
-                # Not sure why it is called over_wallclock but is the only way to return a value
-                if self.type == "local":  # wrapper has a different check completion
+                if self.type == "local":
                     if not job.is_wrapper:
+                        # Not sure why it is called over_wallclock but is the only way to return a value
                         job_status = job.check_completion(over_wallclock=True)
                     else:
+                        # wrapper has a different file name
                         if Path(f"{self.remote_log_dir}/WRAPPER_FAILED").exists():
                             job_status = Status.FAILED
                         else:
@@ -667,8 +677,8 @@ class ParamikoPlatform(Platform):
 
         if job_status in [Status.FAILED, Status.COMPLETED, Status.UNKNOWN]:
             job.updated_log = False
-            # backup for end time in case that the stat file is not found
-            job.end_time_placeholder = int(time.time())
+            # backup for end time in case that the second row of the stat file is not found due a failure
+            job.end_time_timestamp = int(time.time())
         if job_status in [Status.RUNNING, Status.COMPLETED] and job.new_status in [Status.QUEUING, Status.SUBMITTED]:
             # backup for start time in case that the stat file is not found
             job.start_time_timestamp = int(time.time())
@@ -1237,7 +1247,7 @@ class ParamikoPlatform(Platform):
         :return: command to execute script
         :rtype: str
         """
-        if job: # If job is None, it is a wrapper
+        if job: # If job is None, it is a wrapper. ( 0 clarity there, to be improved in a rework TODO )
             executable = ''
             if job.type == Type.BASH:
                 executable = 'bash'

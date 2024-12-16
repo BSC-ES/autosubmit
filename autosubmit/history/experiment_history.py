@@ -93,9 +93,23 @@ class ExperimentHistory:
 
             return None
 
-    def write_start_time(self, job_name, start=0, status="UNKNOWN", ncpus=0, wallclock="00:00", qos="debug", date="",
-                         member="", section="", chunk=0, platform="NA", job_id=0, wrapper_queue=None, wrapper_code=None,
-                         children=""):
+    def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug", job_id: int = 0, wrapper_queue: str = None, wrapper_code: str = None, children: str = "") -> JobData:
+        """
+            Updates the start time and other details of a job in the database.
+
+            Args:
+                job_name (str): The name of the job.
+                start (int, optional): The start time of the job. Default to 0.
+                status (str, optional): The status of the job. Defaults to "UNKNOWN".
+                qos (str, optional): The quality of service. Default to "debug".
+                job_id (int, optional): The job ID. Default to 0.
+                wrapper_queue (Optional[str], optional): The wrapper queue. Defaults to None.
+                wrapper_code (Optional[str], optional): The wrapper code. Defaults to None.
+                children (str, optional): The children. Default to an empty string.
+
+            Returns:
+                JobData: The result of updating the job data, or None if an exception occurs.
+        """
         try:
             job_data_dc_last = self.manager.get_job_data_by_job_id_name(job_id, job_name)
             if not job_data_dc_last:
@@ -111,9 +125,21 @@ class ExperimentHistory:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
-    def write_finish_time(self, job_name, finish=0, status="UNKNOWN", ncpus=0, wallclock="00:00", qos="debug", date="",
-                          member="", section="", chunk=0, platform="NA", job_id=0, out_file=None, err_file=None,
-                          wrapper_queue=None, wrapper_code=None, children=""):
+    def write_finish_time(self, job_name: str, finish: int = 0, status: str = "UNKNOWN", job_id: int = 0, out_file: str = None, err_file: str = None) -> JobData:
+        """
+        Updates the finish time and other details of a job in the database.
+
+        Args:
+            job_name (str): The name of the job.
+            finish (int, optional): The finish time of the job. Default to 0.
+            status (str, optional): The status of the job. Defaults to "UNKNOWN".
+            job_id (int, optional): The job ID. Default to 0.
+            out_file (Optional[str], optional): The output file path. Defaults to None.
+            err_file (Optional[str], optional): The error file path. Defaults to None.
+
+        Returns:
+            JobData: The result of updating the job data, or None if an exception occurs.
+        """
         try:
             job_data_dc_last = self.manager.get_job_data_by_job_id_name(job_id, job_name)
             if not job_data_dc_last:

@@ -36,10 +36,11 @@ def main():
         return_value = Autosubmit.parse_args()
         delete_lock_file()
         return_value = return_value if type(return_value) is int else 0
-        os._exit(return_value)
     except BaseException as e:
-        exit_from_error(e)
+        return_value = exit_from_error(e)
+    return return_value
 
 
 if __name__ == "__main__":
-    main()
+    exit_code = main()
+    sys.exit(exit_code) # Sys.exit ensures a proper cleanup of the program, while os._exit() does not.

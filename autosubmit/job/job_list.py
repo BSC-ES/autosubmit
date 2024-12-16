@@ -24,7 +24,7 @@ import traceback
 from contextlib import suppress
 from shutil import move
 from threading import Thread
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 from pathlib import Path
 
 import math
@@ -37,7 +37,7 @@ import math
 import networkx as nx
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
-from time import localtime, strftime, mktime, time
+from time import localtime, mktime, time
 
 import autosubmit.database.db_structure as DbStructure
 from autosubmit.helpers.data_transfer import JobRow
@@ -48,6 +48,7 @@ from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency, _get_submitter
 from autosubmit.job.job_utils import transitive_reduction
+from autosubmit.platforms.platform import Platform
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import AutosubmitCritical, AutosubmitError, Log
@@ -1220,6 +1221,7 @@ class JobList(object):
             if filters_to_apply.get("CHUNKS_TO","none") == "none" and filters_to_apply.get("MEMBERS_TO","none") == "none" and filters_to_apply.get("DATES_TO","none") == "none" and filters_to_apply.get("SPLITS_TO","none") == "none":
                 filters_to_apply = {}
         filters_to_apply.pop("FROM_STEP", None)
+        filters_to_apply.pop("ANY_FINAL_STATUS_IS_VALID", None)
 
         # If the selected filter is "natural" for all filters_to, trigger the natural dependency calculation
         all_natural = True
@@ -1780,35 +1782,21 @@ class JobList(object):
         else:
             return completed_jobs
 
-    def get_completed_without_logs(self, platform=None):
+    def get_completed_failed_without_logs(self, platform: Any = None) -> List[Any]:
         """
-        Returns a list of completed jobs without updated logs
+        Returns a list of completed or failed jobs without updated logs.
 
-        :param platform: job platform
-        :type platform: HPCPlatform
-        :return: completed jobs
-        :rtype: list
-        """
+        Args:
+            platform Platform: Job platform, defaults to None.
 
-        completed_jobs = [job for job in self._job_list if (platform is None or job.platform.name == platform.name) and
-                          job.status == Status.COMPLETED and job.updated_log is False ]
-
-        return completed_jobs
-
-    def get_completed_without_logs(self, platform=None):
-        """
-        Returns a list of completed jobs without updated logs
-
-        :param platform: job platform
-        :type platform: HPCPlatform
-        :return: completed jobs
-        :rtype: list
+        Returns:
+            List[Job]: List of completed and failed jobs without updated logs.
         """
 
-        completed_jobs = [job for job in self._job_list if (platform is None or job.platform.name == platform.name) and
-                          job.status == Status.COMPLETED and job.updated_log is False ]
+        completed_failed_jobs = [job for job in self._job_list if (platform is None or job.platform.name == platform.name) and
+                                 (job.status == Status.COMPLETED or job.status == Status.FAILED) and job.updated_log is False ]
 
-        return completed_jobs
+        return completed_failed_jobs
 
     def get_uncompleted(self, platform=None, wrapper=False):
         """
@@ -2678,33 +2666,46 @@ class JobList(object):
                     non_completed_parents_current.append(parent[0])
         return non_completed_parents_current, completed_parents
 
-    def update_log_status(self, job, as_conf):
+    def update_log_status(self, job, as_conf, new_run=False):
         """
         Updates the log err and log out.
         """
-        if not hasattr(job,"updated_log") or not job.updated_log:  # hasattr for backward compatibility (job.updated_logs is only for newer jobs, as the loaded ones may not have this set yet)
-            # order path_to_logs by name and get the two last element
-            log_file = False
-            if hasattr(job, "x11") and job.x11:
-                job.updated_log = True
-                return
-            if job.wrapper_type == "vertical" and job.fail_count > 0:
-                for log_recovered in self.path_to_logs.glob(f"{job.name}.*._{job.fail_count}.out"):
-                    if job.local_logs[0][-4] in log_recovered.name:
-                        log_file = True
-                        break
-            else:
-                for log_recovered in self.path_to_logs.glob(f"{job.name}.*.out"):
-                    if job.local_logs[0] == log_recovered.name:
-                        log_file = True
-                        break
+        if not hasattr(job, "updated_log"): # hasattr for backward compatibility (job.updated_logs is only for newer jobs, as the loaded ones may not have this set yet)
+            job.updated_log = False
+        elif job.updated_log:
+            return
+        if hasattr(job, "x11") and job.x11: # X11 has it log writted in the run.out file. No need to check for log files as there are none
+            job.updated_log = True
+            return
+        log_recovered = self.check_if_log_is_recovered(job)
+        if log_recovered:
+            job.local_logs = (log_recovered.name, log_recovered.name[:-4] + ".err") # we only want the last one
+            job.updated_log = True
+        elif new_run and not job.updated_log and str(as_conf.platforms_data.get(job.platform.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "false":
+            job.platform.add_job_to_log_recover(job)
+        return log_recovered
 
-            if log_file:
-                if not hasattr(job, "ready_start_date") or not job.ready_start_date or job.local_logs[0] >= job.ready_start_date:  # hasattr for backward compatibility
-                    job.local_logs = (log_recovered.name, log_recovered.name[:-4] + ".err")
-                    job.updated_log = True
-            if not job.updated_log and str(as_conf.platforms_data.get(job.platform.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "false":
-                job.platform.add_job_to_log_recover(job)
+    def check_if_log_is_recovered(self, job: Job) -> Path:
+        """
+        Check if the log is recovered.
+
+        Conditions:
+        - File must exist.
+        - File timestamp should be greater than the job ready_date, otherwise it is from a previous run.
+
+        Args:
+            job (Job): The job object to check the log for.
+
+        Returns:
+            Path: The path to the recovered log file if found, otherwise None.
+        """
+
+        if not hasattr(job, "updated_log") or not job.updated_log:
+            for log_recovered in self.path_to_logs.glob(f"{job.name}.*.out"):
+                file_timestamp = int(datetime.datetime.fromtimestamp(log_recovered.stat().st_mtime).strftime("%Y%m%d%H%M%S"))
+                if job.ready_date and file_timestamp >= int(job.ready_date):
+                    return log_recovered
+        return None
 
     def update_list(self, as_conf, store_change=True, fromSetStatus=False, submitter=None, first_time=False):
         # type: (AutosubmitConfig, bool, bool, object, bool) -> bool
@@ -2725,7 +2726,6 @@ class JobList(object):
         if self.update_from_file(store_change):
             save = store_change
         Log.debug('Updating FAILED jobs')
-        write_log_status = False
         if not first_time:
             for job in self.get_failed():
                 job.packed = False
@@ -2790,7 +2790,6 @@ class JobList(object):
         for job in self.check_special_status():
             job.status = Status.READY
             # Run start time in format (YYYYMMDDHH:MM:SS) from current time
-            job.ready_start_date = strftime("%Y%m%d%H%M%S")
             job.id = None
             job.packed = False
             job.wrapper_type = None
@@ -2802,8 +2801,6 @@ class JobList(object):
             # Log name has this format:
                 # a02o_20000101_fc0_2_SIM.20240212115021.err
                 # $jobname.$(YYYYMMDDHHMMSS).err or .out
-            if not first_time:
-                self.update_log_status(job, as_conf)
             if job.synchronize is not None and len(str(job.synchronize)) > 0:
                 tmp = [parent for parent in job.parents if parent.status == Status.COMPLETED]
                 if len(tmp) != len(job.parents):
@@ -2892,7 +2889,6 @@ class JobList(object):
                         job.status = Status.READY
                         job.packed = False
                         # Run start time in format (YYYYMMDDHH:MM:SS) from current time
-                        job.ready_start_date = strftime("%Y%m%d%H%M%S")
                         job.packed = False
                         job.hold = False
                         save = True
@@ -2985,6 +2981,9 @@ class JobList(object):
                                     job.status = Status.SKIPPED
                                     save = True
             # save = True
+        # Needed so the main process can know if the job was downloaded
+        for job in self.get_ready():
+            job.set_ready_date()
         self.update_two_step_jobs()
         Log.debug('Update finished')
         return save

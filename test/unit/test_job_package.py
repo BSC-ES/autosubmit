@@ -1,23 +1,21 @@
 from unittest import TestCase
 
-import os
 from pathlib import Path
 import inspect
 import tempfile
 
-from mock import MagicMock, ANY
+from mock import MagicMock
 from mock import patch
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistenceDb
-from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, jobs_in_wrapper_str
+from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 import pytest
 from autosubmit.job.job_packages import jobs_in_wrapper_str
-
 
 class FakeBasicConfig:
     def __init__(self):
@@ -65,7 +63,6 @@ class TestJobPackage(TestCase):
         self.platform.total_jobs = 100
         self.as_conf.experiment_data["WRAPPERS"]["WRAPPERS"] = options
         self._wrapper_factory.as_conf = self.as_conf
-
         self.jobs[0].wallclock = "00:00"
         self.jobs[0]._threads = "1"
         self.jobs[0].tasks = "1"
@@ -87,9 +84,6 @@ class TestJobPackage(TestCase):
         self.jobs[1].processors = "9"
         self.jobs[1]._processors = "9"
         self.jobs[1]._platform = self.platform
-
-
-
         self.wrapper_type = options.get('TYPE', 'vertical')
         self.wrapper_policy = options.get('POLICY', 'flexible')
         self.wrapper_method = options.get('METHOD', 'ASThread')
@@ -97,9 +91,6 @@ class TestJobPackage(TestCase):
         self.extensible_wallclock = options.get('EXTEND_WALLCLOCK', 0)
         self.job_package_wrapper = JobPackageVertical(self.jobs,configuration=self.as_conf,wrapper_info=[self.wrapper_type,self.wrapper_policy,self.wrapper_method,self.jobs_in_wrapper,self.extensible_wallclock])
         self.job_list._ordered_jobs_by_date_member["WRAPPERS"] = dict()
-
-
-
 
     def setUp(self):
         self.platform = MagicMock()
@@ -154,8 +145,6 @@ class TestJobPackage(TestCase):
         self.assertEqual(self.job_package_wrapper._threads, "30")
         self.assertEqual(self.job_package_wrapper.tasks, "40")
         self.assertEqual(self.job_package_wrapper.custom_directives, ['#SBATCH --mem=1000'])
-
-
 
     def test_job_package_default_init(self):
         with self.assertRaises(Exception):

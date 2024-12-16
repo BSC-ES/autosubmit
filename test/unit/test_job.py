@@ -4,6 +4,9 @@ import os
 import sys
 import tempfile
 from pathlib import Path
+
+import pytest
+
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
 import datetime
 
@@ -1441,3 +1444,21 @@ class FakeBasicConfig:
     DEFAULT_PLATFORMS_CONF = ''
     DEFAULT_JOBS_CONF = ''
     STRUCTURES_DIR = '/dummy/structures/dir'
+
+
+def test_update_stat_file():
+    job = Job("dummyname", 1, Status.WAITING, 0)
+    job.fail_count = 0
+    job.script_name = "dummyname.cmd"
+    job.wrapper_type = None
+    job.update_stat_file()
+    assert job.stat_file == "dummyname_STAT_0"
+    job.fail_count = 1
+    job.update_stat_file()
+    assert job.stat_file == "dummyname_STAT_1"
+    job.wrapper_type = "vertical"
+    job.update_stat_file()
+    assert job.stat_file == "dummyname_STAT_0"
+    job.fail_count = 0
+    job.update_stat_file()
+    assert job.stat_file == "dummyname_STAT_0"

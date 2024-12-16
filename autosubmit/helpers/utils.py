@@ -2,7 +2,6 @@ import locale
 import os
 import pwd
 import re
-import signal
 import subprocess
 from itertools import zip_longest
 
@@ -36,21 +35,6 @@ def check_jobs_file_exists(as_conf, current_section_name=None):
         if missing_files:
             raise AutosubmitCritical(f"Templates not found:\n{missing_files}", 7011)
 
-def terminate_child_process(expid, platform=None):
-    # get pid of the main process
-    pid = os.getpid()
-    # In case someone used 4.1.6 or 4.1.5
-    process_ids = proccess_id(expid, "run", single_instance=False, platform=platform)
-    if process_ids:
-        for process_id in [process_id for process_id in process_ids if process_id != pid]:
-            # force kill
-            os.kill(process_id, signal.SIGKILL)
-    process_ids = proccess_id(expid, "log", single_instance=False, platform=platform)
-    # 4.1.7 +
-    if process_ids:
-        for process_id in [process_id for process_id in process_ids if process_id != pid]:
-            # force kill
-            os.kill(process_id, signal.SIGKILL)
 
 def proccess_id(expid=None, command="run", single_instance=True, platform=None):
     # Retrieve the process id of the autosubmit process
@@ -160,7 +144,6 @@ def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=N
             raise AutosubmitCritical("Private key is encrypted, Autosubmit does not run in interactive mode.\nPlease, add the key to the ssh agent(ssh-add <path_to_key>).\nIt will remain open as long as session is active, for force clean you can prompt ssh-add -D",7073, issues + "\n" + ssh_config_issues)
         else:
             raise AutosubmitCritical("Issues while checking the connectivity of platforms.", 7010, issues + "\n" + ssh_config_issues)
-
 
 # Source: https://github.com/cylc/cylc-flow/blob/a722b265ad0bd68bc5366a8a90b1dbc76b9cd282/cylc/flow/tui/util.py#L226
 class NaturalSort:

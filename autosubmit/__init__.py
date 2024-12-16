@@ -22,7 +22,7 @@ def delete_lock_file(base_path: str = Log.file_path, lock_file: str = 'autosubmi
         Path(base_path, lock_file).unlink(missing_ok=True)
 
 
-def exit_from_error(e: BaseException) -> None:
+def exit_from_error(e: BaseException) -> int:
     """Called by ``Autosubmit`` when an exception is raised during a command execution.
 
     Prints the exception in ``DEBUG`` level.
@@ -40,6 +40,7 @@ def exit_from_error(e: BaseException) -> None:
     :type e: BaseException
     :return: None
     """
+    err_code = 1
     trace = traceback.format_exc()
     try:
         Log.debug(trace)
@@ -60,11 +61,13 @@ def exit_from_error(e: BaseException) -> None:
         if e.trace:
             Log.debug("Trace: {0}", str(e.trace))
         Log.critical("{1} [eCode={0}]", e.code, e.message)
+        err_code = e.code
 
     if not is_portalocker_error and not is_autosubmit_error:
         msg = "Unexpected error: {0}.\n Please report it to Autosubmit Developers through Git"
         args = [str(e)]
         Log.critical(msg.format(*args))
+        err_code = 7000
 
     Log.info("More info at https://autosubmit.readthedocs.io/en/master/troubleshooting/error-codes.html")
-    _exit(1)
+    return err_code

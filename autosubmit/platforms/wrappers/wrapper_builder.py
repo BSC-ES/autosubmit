@@ -21,6 +21,8 @@ import random
 import string
 import textwrap
 
+from typing import List
+
 
 class WrapperDirector:
     """
@@ -443,7 +445,18 @@ for i in range(len(pid_list)):
         return ''.join(padding + line for line in text.splitlines(True))
 class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
 
-    def build_sequential_threads_launcher(self, jobs_list, thread, footer=True): #fastlook
+    def build_sequential_threads_launcher(self, jobs_list: List[str], thread: str, footer: bool = True) -> str:
+        """
+        Builds a part of the vertical wrapper cmd launcher script.
+        This script writes the start and finish time of each inner_job.
+        Args:
+            jobs_list (List[str]): List of job scripts.
+            thread (str): inner_job to be executed.
+            footer (bool): If True, includes the footer in the script. Defaults to True.
+
+        Returns:
+            str: Part of the final vertical wrapper script.
+        """
         sequential_threads_launcher = textwrap.dedent("""
         failed_wrapper = os.path.join(os.getcwd(),wrapper_id)
         retrials = {2}
@@ -462,7 +475,7 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
                 start = int(time.time())
                 current.join({3})
                 total_steps = total_steps + 1
-        """).format(jobs_list, thread,self.retrials,str(self.wallclock_by_level),'\n'.ljust(13))
+        """).format(jobs_list, thread, self.retrials, str(self.wallclock_by_level),'\n'.ljust(13))
 
         if footer:
             sequential_threads_launcher += self._indent(textwrap.dedent("""
@@ -531,7 +544,7 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
                 out_path = os.path.join(os.getcwd(), out)
                 err_path = os.path.join(os.getcwd(), err)
                 template_path = os.path.join(os.getcwd(), self.template)
-                command = f"timeout {0} {{template_path}} > {{out_path}} 2> {{err_path}}"
+                command = f"chmod +x {{template_path}}; timeout {0} {{template_path}} > {{out_path}} 2> {{err_path}}"
                 print(command)
                 getstatusoutput(command)
                 

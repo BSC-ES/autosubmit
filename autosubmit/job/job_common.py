@@ -127,7 +127,7 @@ class StatisticsSnippetBash:
             
             set -xuve
             job_name_ptrn='%CURRENT_LOGDIR%/%JOBNAME%'
-            echo $(date +%s) > ${job_name_ptrn}_STAT
+            echo $(date +%s) > ${job_name_ptrn}_STAT_%FAIL_COUNT%
 
             ################### 
             # AS CHECKPOINT FUNCTION
@@ -154,7 +154,7 @@ class StatisticsSnippetBash:
                 # Autosubmit tailer
                 ###################
                 set -xuve
-                echo $(date +%s) >> ${job_name_ptrn}_STAT
+                echo $(date +%s) >> ${job_name_ptrn}_STAT_%FAIL_COUNT%
                 touch ${job_name_ptrn}_COMPLETED
                 exit 0
 

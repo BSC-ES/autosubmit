@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 # Copyright 2017-2020 Earth Sciences Department, BSC-CNS
 
 # This file is part of Autosubmit.
@@ -18,6 +17,8 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import os
 import subprocess
+from typing import Any
+
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException
 from log.log import Log,AutosubmitError
 from autosubmit.platforms.headers.ec_header import EcHeader
@@ -169,12 +170,8 @@ class EcPlatform(ParamikoPlatform):
                 self.connected = False
         except Exception:
             self.connected = False
-        if not self.log_retrieval_process_active and (
-                as_conf is None or str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS',
-                                                                                 "false")).lower() == "false"):
-            self.log_retrieval_process_active = True
-            if as_conf and as_conf.misc_data.get("AS_COMMAND","").lower() == "run":
-                self.recover_job_logs()
+        self.spawn_log_retrieval_process(as_conf)
+
 
     def restore_connection(self,as_conf):
         """
@@ -194,34 +191,14 @@ class EcPlatform(ParamikoPlatform):
         except Exception:
             self.connected = False
 
-    def test_connection(self,as_conf):
+    def test_connection(self, as_conf: Any) -> None:
         """
-        In this case, it does nothing because connection is established for each command
+        Tests the connection using the provided configuration.
 
-        :return: True
-        :rtype: bool
+        Args:
+            as_conf (AutosubmitConfig): The configuration to use for testing the connection.
         """
-        self.main_process_id = os.getpid()
-        output = subprocess.check_output(self._checkvalidcert_cmd, shell=True).decode(locale.getlocale()[1])
-        if not output:
-            output = ""
-        try:
-            if output.lower().find("yes") != -1:
-                self.connected = True
-                if not self.log_retrieval_process_active and (
-                        as_conf is None or str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS',
-                                                                                             "false")).lower() == "false"):
-                    self.log_retrieval_process_active = True
-                    if as_conf and as_conf.misc_data.get("AS_COMMAND", "").lower() == "run":
-                        self.recover_job_logs()
-                return "OK"
-            else:
-                self.connected = False
-                return "Invalid certificate"
-        except Exception:
-            self.connected = False
-            return "Invalid certificate"
-
+        self.connect(as_conf)
 
     def check_remote_permissions(self):
         try:
