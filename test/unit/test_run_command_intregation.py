@@ -2,8 +2,7 @@ import shutil
 import pytest
 from pathlib import Path
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
-from paramiko.proxy import subprocess
-
+import subprocess
 from autosubmit.autosubmit import Autosubmit
 import os
 import pwd
