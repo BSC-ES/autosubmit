@@ -266,7 +266,7 @@ class Job(object):
         Adjusts job parameters for compatibility with newer added attributes.
         """
         # This function is always called at the start of a new run ( from update_parameters )
-        if not hasattr(self, 'is_wrapper') or not hasattr(self, 'wrapper_name'): # Added in 4.1.12
+        if not hasattr(self, 'is_wrapper'): # Added in 4.1.12
             if not self.packed:
                 self.is_wrapper = False
                 self.wrapper_name = self.name
