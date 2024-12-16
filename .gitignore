@@ -26,3 +26,6 @@ dockerfiles/id_rsa*
 dockerfiles/authorized_keys
 
 venv/
+
+#metadata
+metadata/
