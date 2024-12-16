@@ -275,7 +275,6 @@ class Job(object):
         self._memory_per_task = ''
         self.log_retrieved = False
         self.start_time_timestamp = time.time()
-        self.end_time_placeholder = time.time()
         self.processors_per_node = ""
         self.stat_file = self.script_name[:-4] + "_STAT_0"
 
@@ -2783,8 +2782,7 @@ class WrapperJob(Job):
                 self._platform.send_file(multiple_checker_inner_jobs, False)
                 command = f"cd {self._platform.get_files_path()}; {os.path.join(self._platform.get_files_path(), 'inner_jobs_checker.sh')}"
             else:
-                command = os.path.join(
-                    self._platform.get_files_path(), "inner_jobs_checker.sh")
+                command = f"cd {self._platform.get_files_path()}; ./inner_jobs_checker.sh; cd {os.getcwd()}"
             #
             wait = 2
             retries = 5

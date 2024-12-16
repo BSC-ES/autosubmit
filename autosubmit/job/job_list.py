@@ -2666,7 +2666,7 @@ class JobList(object):
                     non_completed_parents_current.append(parent[0])
         return non_completed_parents_current, completed_parents
 
-    def update_log_status(self, job, as_conf):
+    def update_log_status(self, job, as_conf, new_run=False):
         """
         Updates the log err and log out.
         """
@@ -2681,7 +2681,7 @@ class JobList(object):
         if log_recovered:
             job.local_logs = (log_recovered.name, log_recovered.name[:-4] + ".err") # we only want the last one
             job.updated_log = True
-        elif not job.updated_log and str(as_conf.platforms_data.get(job.platform.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "false":
+        elif new_run and not job.updated_log and str(as_conf.platforms_data.get(job.platform.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "false":
             job.platform.add_job_to_log_recover(job)
         return log_recovered
 
@@ -2726,9 +2726,6 @@ class JobList(object):
         if self.update_from_file(store_change):
             save = store_change
         Log.debug('Updating FAILED jobs')
-        write_log_status = False
-        for job in self.get_completed_failed_without_logs():
-            save = self.update_log_status(job, as_conf) if not save else save
         if not first_time:
             for job in self.get_failed():
                 job.packed = False

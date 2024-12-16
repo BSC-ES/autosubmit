@@ -1,6 +1,7 @@
 import atexit
 import multiprocessing
 import queue  # only for the exception
+from copy import copy
 from os import _exit
 import setproctitle
 import locale
@@ -50,7 +51,7 @@ class UniqueQueue(Queue):
             unique_name = job.name+str(job.fail_count) # We gather retrial per retrial
         if unique_name not in self.all_items:
             self.all_items.add(unique_name)
-            super().put(job, block, timeout)
+            super().put(copy(job), block, timeout)  # Without copy, the process seems to modify the job for other retrials.. My guess is that the object is not serialized until it is get from the queue.
 
 
 class Platform(object):
@@ -850,7 +851,11 @@ class Platform(object):
         raise NotImplementedError
 
     def add_job_to_log_recover(self, job):
-        self.recovery_queue.put(job)
+        if job.id and int(job.id) != 0:
+            self.recovery_queue.put(job)
+        else:
+            Log.warning(f"Job {job.name} and retrial number:{job.fail_count} has no job id. Autosubmit will no record this retrial.")
+            job.updated_log = True
 
     def connect(self, as_conf, reconnect=False):
         raise NotImplementedError
@@ -937,40 +942,46 @@ class Platform(object):
             Set[Any]: Updated set of jobs pending to process.
         """
         job = None
-        try:
-            while not self.recovery_queue.empty():
-                try:
-                    job = self.recovery_queue.get(
-                        timeout=1)  # Should be non-empty, but added a timeout for other possible errors.
-                    job.children = set()  # Children can't be serialized, so we set it to an empty set for this process.
-                    job.platform = self  # Change the original platform to this process platform.
-                    job._log_recovery_retries = 0  # Reset the log recovery retries.
-                    job.retrieve_logfiles(self, raise_error=True)
-                    if job.status == Status.FAILED:
-                        Log.result(f"{identifier} Sucessfully recovered log files for job {job.name} and retrial:{job.fail_count}")
-                except queue.Empty:
-                    pass
 
-            # This second while is to keep retring the failed jobs.
-            # With the unique queue, the main process won't send the job again, so we have to store it here.
-            while len(jobs_pending_to_process) > 0:  # jobs that had any issue during the log retrieval
-                job = jobs_pending_to_process.pop()
-                job._log_recovery_retries += 1
-                Log.debug(
-                    f"{identifier} (Retrial number: {job._log_recovery_retries}) Recovering log files for job {job.name}")
-                job.retrieve_logfiles(self, raise_error=True)
-                Log.result(f"{identifier} (Retrial) Successfully recovered log files for job {job.name}")
-        except Exception as e:
-            Log.info(f"{identifier} Error while recovering logs: {str(e)}")
+        while not self.recovery_queue.empty():
             try:
-                if job and job._log_recovery_retries < 5:  # If log retrieval failed, add it to the pending jobs to process. Avoids to keep trying the same job forever.
+                job = self.recovery_queue.get(
+                    timeout=1)  # Should be non-empty, but added a timeout for other possible errors.
+                job.children = set()  # Children can't be serialized, so we set it to an empty set for this process.
+                job.platform = self  # Change the original platform to this process platform.
+                job._log_recovery_retries = 0  # Reset the log recovery retries.
+                try:
+                    job.retrieve_logfiles(self, raise_error=True)
+                    Log.result(
+                        f"{identifier} Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
+                except:
                     jobs_pending_to_process.add(job)
-                self.connected = False
-                Log.info(f"{identifier} Attempting to restore connection")
-                self.restore_connection(None)  # Always restore the connection on a failure.
-                Log.result(f"{identifier} Sucessfully reconnected.")
-            except:
+                    job._log_recovery_retries += 1
+                    Log.warning(f"{identifier} (Retrial) Failed to recover log for job '{job.name}' and retry:'{job.fail_count}'.")
+            except queue.Empty:
                 pass
+
+        if len(jobs_pending_to_process) > 0: # Restore the connection if there was an issue with one or more jobs.
+            self.restore_connection(None)
+
+        # This second while is to keep retring the failed jobs.
+        # With the unique queue, the main process won't send the job again, so we have to store it here.
+        while len(jobs_pending_to_process) > 0:  # jobs that had any issue during the log retrieval
+            job = jobs_pending_to_process.pop()
+            job._log_recovery_retries += 1
+            try:
+                job.retrieve_logfiles(self, raise_error=True)
+                job._log_recovery_retries += 1
+            except:
+                if job._log_recovery_retries < 5:
+                    jobs_pending_to_process.add(job)
+                Log.warning(
+                    f"{identifier} (Retrial) Failed to recover log for job '{job.name}' and retry '{job.fail_count}'.")
+            Log.result(
+                f"{identifier} (Retrial) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
+        if len(jobs_pending_to_process) > 0:
+            self.restore_connection(None)  # Restore the connection if there was an issue with one or more jobs.
+
         return jobs_pending_to_process
 
     def recover_platform_job_logs(self) -> None:

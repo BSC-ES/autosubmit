@@ -142,7 +142,7 @@ def test_log_recovery_recover_log(prepare_test, local, mocker, as_conf):
     print(prepare_test.strpath)
     mocker.patch('autosubmit.platforms.platform.max', return_value=0)
     local.keep_alive_timeout = 20
-    mocker.patch('autosubmit.job.job.Job.write_stats')  # Tested in test_database_regression.py
+    mocker.patch('autosubmit.job.job.Job.write_stats')  # Tested in test_run_command_intregation.py
     local.spawn_log_retrieval_process(as_conf)
     local.work_event.set()
     job = Job('t000', '0000', Status.COMPLETED, 0)
