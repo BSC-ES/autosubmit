@@ -38,13 +38,14 @@ class MailNotifier:
                 self._send_mail(self.config.MAIL_FROM, mail, message)
             except BaseException as e:
                 Log.printlog('An error has occurred while sending a mail for warn about remote_platform', 6011)
+
     def notify_status_change(self, exp_id, job_name, prev_status, status, mail_to):
         message_text = self._generate_message_text(exp_id, job_name, prev_status, status)
         message = MIMEText(message_text)
         message['From'] = email.utils.formataddr(('Autosubmit', self.config.MAIL_FROM))
         message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {str(status)}'
         message['Date'] = email.utils.formatdate(localtime=True)
-        for mail in mail_to:
+        for mail in mail_to:  # expects a list
             message['To'] = email.utils.formataddr((mail, mail))
             try:
                 self._send_mail(self.config.MAIL_FROM, mail, message)
