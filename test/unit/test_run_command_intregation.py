@@ -563,7 +563,6 @@ def test_run_interrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries
     start_time = time.time()
     elapsed_time = 0
     out_1 = []
-    can_exit = False
     process = subprocess.Popen(["autosubmit", "run", "t000", "-v"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setpgrp)
     hard_limit = 30
     while elapsed_time < hard_limit:
@@ -582,7 +581,6 @@ def test_run_interrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries
         elif signal_to_send == "STOP":
             os.killpg(os.getpgid(process.pid), signal.SIGINT)
         process.wait()
-    # rest of the output
     elapsed_time = 0
     while process.poll() is None and elapsed_time < hard_limit:
         out_1.append(process.stdout.read().decode('utf-8'))
