@@ -35,7 +35,7 @@ install_requires = [
     'networkx<=2.6.3',
     'portalocker<=2.7.0',
     'paramiko>=3.5.0',
-    'pyparsing==3.1.1',
+    'pyparsing==3.2.0',
     'matplotlib<=3.8.3',
     'packaging<=23.2',
     'typing_extensions<=4.9.0',
