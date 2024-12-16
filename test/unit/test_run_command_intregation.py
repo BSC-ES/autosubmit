@@ -2,12 +2,17 @@ import shutil
 import pytest
 from pathlib import Path
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from paramiko.proxy import subprocess
+
 from autosubmit.autosubmit import Autosubmit
 import os
 import pwd
+
+from autosubmit.job.job_common import Status
 from test.unit.utils.common import create_database, init_expid
 import sqlite3
-
+import signal
+import time
 
 def _get_script_files_path() -> Path:
     return Path(__file__).resolve().parent / 'files'
@@ -240,6 +245,22 @@ def assert_exit_code(final_status, exit_code):
     else:
         assert exit_code == 0
 
+def assert_job_list(final_status):
+    """
+    Assert that the job list is correct.
+    """
+    if final_status == "FAILED":
+        expected_status = [Status.FAILED, Status.WAITING, Status.READY]
+    else:
+        expected_status = [Status.COMPLETED]
+    # Check the job list
+    as_conf = AutosubmitConfig("t000")
+    as_conf.reload()
+    job_list = Autosubmit.load_job_list(
+        "t000", as_conf, monitor=True, new=False)
+    for job in job_list.get_job_list():
+        assert job.status in expected_status
+
 def check_files_recovered(run_tmpdir, log_dir, expected_files) -> dict:
     """
     Check that all files are recovered after a run.
@@ -396,7 +417,190 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
     files_check_list = check_files_recovered(run_tmpdir, log_dir, expected_files=expected_db_entries*2)
 
     # Assert
+    assert_job_list(final_status)
     assert_db_fields(db_check_list)
     assert_files_recovered(files_check_list)
     # TODO: GITLAB pipeline is not returning 0 or 1 for check_exit_code(final_status, exit_code)
     # assert_exit_code(final_status, exit_code)
+
+
+@pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, signal_to_send", [
+    # Success
+    ("""
+    EXPERIMENT:
+        NUMCHUNKS: '3'
+    JOBS:
+        job:
+            SCRIPT: |
+                sleep 3
+                echo "Hello World with id=Success"
+            DEPENDENCIES: job-1
+            PLATFORM: local
+            RUNNING: chunk
+            wallclock: 00:01
+    """, 3, "COMPLETED", "KILL"),  # Number of jobs
+    # Success wrapper
+    ("""
+    EXPERIMENT:
+        NUMCHUNKS: '3'
+    JOBS:
+        job:
+            SCRIPT: |
+                sleep 3
+                echo "Hello World with id=Success + wrappers"
+            DEPENDENCIES: job-1
+            PLATFORM: local
+            RUNNING: chunk
+            wallclock: 00:01
+    wrappers:
+        wrapper:
+            JOBS_IN_WRAPPER: job
+            TYPE: vertical
+    """, 3, "COMPLETED", "KILL"),  # Number of jobs
+    # Failure
+    ("""
+    EXPERIMENT:
+        NUMCHUNKS: '1'
+    JOBS:
+        job:
+            SCRIPT: |
+                sleep 5
+                decho "Hello World with id=FAILED"
+            PLATFORM: local
+            RUNNING: chunk
+            wallclock: 00:01
+            retrials: 2  
+    """, (2+1)*1, "FAILED", "KILL"),  # Retries set (N + 1) * number of jobs to run
+    # Failure wrappers
+    ("""
+    EXPERIMENT:
+        NUMCHUNKS: '3'
+    JOBS:
+        job:
+            SCRIPT: |
+                sleep 5
+                decho "Hello World with id=FAILED + wrappers"
+            PLATFORM: local
+            DEPENDENCIES: job-1
+            RUNNING: chunk
+            wallclock: 00:10
+            retrials: 2
+    wrappers:
+        wrapper:
+            JOBS_IN_WRAPPER: job
+            TYPE: vertical
+    """, (2+1)*1, "FAILED", "KILL"),
+    # Success
+    ("""
+EXPERIMENT:
+    NUMCHUNKS: '3'
+JOBS:
+    job:
+        SCRIPT: |
+            sleep 3
+            echo "Hello World with id=Success"
+        DEPENDENCIES: job-1
+        PLATFORM: local
+        RUNNING: chunk
+        wallclock: 00:01
+""", 3, "COMPLETED", "STOP"),  # Number of jobs
+    # Success wrapper
+    ("""
+EXPERIMENT:
+    NUMCHUNKS: '3'
+JOBS:
+    job:
+        SCRIPT: |
+            sleep 3
+            echo "Hello World with id=Success + wrappers"
+        DEPENDENCIES: job-1
+        PLATFORM: local
+        RUNNING: chunk
+        wallclock: 00:01
+wrappers:
+    wrapper:
+        JOBS_IN_WRAPPER: job
+        TYPE: vertical
+""", 3, "COMPLETED", "STOP"),  # Number of jobs
+    # Failure
+    ("""
+EXPERIMENT:
+    NUMCHUNKS: '1'
+JOBS:
+    job:
+        SCRIPT: |
+            sleep 5
+            decho "Hello World with id=FAILED"
+        PLATFORM: local
+        RUNNING: chunk
+        wallclock: 00:01
+        retrials: 2  
+""", (2 + 1) * 1, "FAILED", "STOP"),  # Retries set (N + 1) * number of jobs to run
+    # Failure wrappers
+    ("""
+EXPERIMENT:
+    NUMCHUNKS: '3'
+JOBS:
+    job:
+        SCRIPT: |
+            sleep 5
+            decho "Hello World with id=FAILED + wrappers"
+        PLATFORM: local
+        DEPENDENCIES: job-1
+        RUNNING: chunk
+        wallclock: 00:10
+        retrials: 2
+wrappers:
+    wrapper:
+        JOBS_IN_WRAPPER: job
+        TYPE: vertical
+""", (2 + 1) * 1, "FAILED", "STOP"),
+
+], ids=["Success (SIGKILL)", "Success with wrapper (SIGKILL)", "Failure (SIGKILL)", "Failure with wrapper (SIGKILL)", "Success (SIGINT)", "Success with wrapper (SIGINT)", "Failure (SIGINT)", "Failure with wrapper (SIGINT)"])
+
+def test_run_interrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries, final_status, signal_to_send):
+    log_dir = init_run(run_tmpdir, jobs_data)
+    start_time = time.time()
+    elapsed_time = 0
+    out_1 = []
+    can_exit = False
+    process = subprocess.Popen(["autosubmit", "run", "t000", "-v"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setpgrp)
+    hard_limit = 30
+    while elapsed_time < hard_limit:
+        output_line = process.stdout.readline().decode('utf-8').lower()
+        out_1.append(output_line)
+        if "submitted" in output_line:
+            if signal_to_send == "KILL":
+                os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+            elif signal_to_send == "STOP":
+                os.killpg(os.getpgid(process.pid), signal.SIGINT)
+            break
+        elapsed_time = time.time() - start_time
+    else:
+        if signal_to_send == "KILL":
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+        elif signal_to_send == "STOP":
+            os.killpg(os.getpgid(process.pid), signal.SIGINT)
+        process.wait()
+    # rest of the output
+    elapsed_time = 0
+    while process.poll() is None and elapsed_time < hard_limit:
+        out_1.append(process.stdout.read().decode('utf-8'))
+        elapsed_time = time.time() - start_time
+    out_1 = "".join(out_1)
+    result = subprocess.run(["autosubmit", "run", "t000", "-v"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out_2 = result.stdout.decode('utf-8')
+
+    # Check and display results
+    db_check_list = check_db_fields(run_tmpdir, expected_db_entries, final_status)
+    files_check_list = check_files_recovered(run_tmpdir, log_dir, expected_files=expected_db_entries*2)
+
+    try:
+        # Assert
+        assert_job_list(final_status)
+        assert_db_fields(db_check_list)
+        assert_files_recovered(files_check_list)
+    except AssertionError as e:
+        print(f"First run:\n {out_1}")
+        print(f"Second run:\n {out_2}")
+        raise e
