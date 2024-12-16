@@ -37,7 +37,7 @@ install_requires = [
     'paramiko>=3.5.0',
     'pyparsing==3.1.1',
     'matplotlib<=3.8.3',
-    'packaging<=23.2',
+    'packaging<=24.2',
     'typing_extensions<=4.9.0',
     'typing<=3.7.4.3',
     'psutil<=5.6.1',
