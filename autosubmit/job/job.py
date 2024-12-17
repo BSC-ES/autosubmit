@@ -261,6 +261,19 @@ class Job(object):
         self.wrapper_name = None
         self.is_wrapper = False
 
+    def _adjust_new_parameters(self) -> None:
+        """
+        Adjusts job parameters for compatibility with newer added attributes.
+        """
+        # This function is always called at the start of a new run ( from update_parameters )
+        if not hasattr(self, 'is_wrapper'): # Added in 4.1.12
+            if not self.packed:
+                self.is_wrapper = False
+                self.wrapper_name = self.name
+            else:
+                self.is_wrapper = True
+                self.wrapper_name = "wrapped"
+
     def _init_runtime_parameters(self):
         # hetjobs
         self.het = {'HETSIZE': 0}
@@ -2030,6 +2043,7 @@ class Job(object):
         :type parameters: dict
         """
         as_conf.reload()
+        self._adjust_new_parameters()
         self._init_runtime_parameters()
         if hasattr(self, "start_time"):
             self.start_time = time.time()
