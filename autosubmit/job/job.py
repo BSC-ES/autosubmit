@@ -1267,7 +1267,7 @@ class Job(object):
             except BaseException as e:
                 Log.printlog("Trace {0} \n Failed to write the {1} e=6001".format(str(e), self.name))
 
-    def retrieve_logfiles(self, platform: Any, raise_error: bool = False) -> Dict[str, int]:
+    def retrieve_logfiles(self, platform: Platform, raise_error: bool = False) -> Dict[str, int]:
         """
         Retrieves log files from remote host.
 
@@ -1353,7 +1353,7 @@ class Job(object):
             return True
         return False
 
-    def update_status(self, as_conf, failed_file=False):
+    def update_status(self, as_conf: AutosubmitConfig, failed_file: bool = False) -> Status:
         """
         Updates job status, checking COMPLETED file if needed
 
@@ -1411,6 +1411,9 @@ class Job(object):
                 self.retrieve_logfiles(self.platform)
             else:
                 self.platform.add_job_to_log_recover(self)
+
+            # TODO Read and store metrics here
+
         return self.status
 
     @staticmethod
@@ -2639,7 +2642,19 @@ class WrapperJob(Job):
     :type as_config: AutosubmitConfig object \n
     """
 
-    def __init__(self, name, job_id, status, priority, job_list, total_wallclock, num_processors, platform, as_config, hold):
+    def __init__(
+        self,
+        name: str,
+        job_id: int,
+        status: str,
+        priority: int,
+        job_list: List[Job],
+        total_wallclock: str,
+        num_processors: int,
+        platform: Platform,
+        as_config: AutosubmitConfig,
+        hold: bool,
+    ):
         super(WrapperJob, self).__init__(name, job_id, status, priority)
         self.failed = False
         self.job_list = job_list
@@ -2721,7 +2736,7 @@ class WrapperJob(Job):
             if not still_running:
                 self.cancel_failed_wrapper_job()
 
-    def check_inner_jobs_completed(self, jobs):
+    def check_inner_jobs_completed(self, jobs: List[Job]):
         not_completed_jobs = [
             job for job in jobs if job.status != Status.COMPLETED]
         not_completed_job_names = [job.name for job in not_completed_jobs]
@@ -2807,7 +2822,7 @@ class WrapperJob(Job):
         return False
 
     def _check_running_jobs(self):
-        not_finished_jobs_dict = OrderedDict()
+        not_finished_jobs_dict: OrderedDict[str, Job] = OrderedDict()
         self.inner_jobs_running = list()
         not_finished_jobs = [job for job in self.job_list if job.status not in [
             Status.COMPLETED, Status.FAILED]]
@@ -2892,7 +2907,7 @@ class WrapperJob(Job):
             if retries == 0 or over_wallclock:
                 self.status = Status.FAILED
 
-    def _check_finished_job(self, job, failed_file=False):
+    def _check_finished_job(self, job: Job, failed_file: bool = False):
         job.new_status = Status.FAILED
         if not failed_file:
             wait = 2

@@ -23,7 +23,7 @@ from datetime import datetime
 from time import mktime
 from time import sleep
 from time import time
-from typing import List, Union
+from typing import List, Union, TYPE_CHECKING
 from xml.dom.minidom import parseString
 
 from autosubmit.job.job_common import Status, parse_output_number
@@ -31,6 +31,10 @@ from autosubmit.platforms.headers.slurm_header import SlurmHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.wrappers.wrapper_factory import SlurmWrapperFactory
 from log.log import AutosubmitCritical, AutosubmitError, Log
+
+if TYPE_CHECKING:
+    # Avoid circular imports
+    from autosubmit.job.job import Job
 
 class SlurmPlatform(ParamikoPlatform):
     """
@@ -622,7 +626,7 @@ class SlurmPlatform(ParamikoPlatform):
             return ''.join(reason)
         return reason
 
-    def get_queue_status(self, in_queue_jobs, list_queue_jobid, as_conf):
+    def get_queue_status(self, in_queue_jobs: List['Job'], list_queue_jobid, as_conf):
         if not in_queue_jobs:
             return
         cmd = self.get_queue_status_cmd(list_queue_jobid)
