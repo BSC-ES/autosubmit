@@ -2148,7 +2148,7 @@ class Autosubmit:
                                      7014, str(e))
 
         try:
-            with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
+            with Lock(os.path.join(BasicConfig.expid_tmp_dir(expid), 'autosubmit.lock'), timeout=1):
                 try:
                     Log.debug("Preparing run")
                     # This function is called only once, when the experiment is started. It is used to initialize the experiment and to check the correctness of the configuration files.
