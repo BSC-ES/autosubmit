@@ -39,6 +39,9 @@ from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
+from autosubmit.job.job import Job
+from autosubmit.platforms.submitter import Submitter
+from ruamel.yaml import YAML
 from typing import Dict, Set, Tuple, Union, Any, List, Optional
 
 from autosubmitconfigparser.config.basicconfig import BasicConfig
@@ -1849,8 +1852,14 @@ class Autosubmit:
                                               Status.VALUE_TO_KEY[job.status],
                                               as_conf.experiment_data["MAIL"]["TO"])
         return job_changes_tracker
+
     @staticmethod
-    def check_wrappers(as_conf, job_list, platforms_to_test, expid):
+    def check_wrappers(
+        as_conf: AutosubmitConfig,
+        job_list: JobList,
+        platforms_to_test: Set[Platform],
+        expid: str,
+    ) -> Tuple[Dict[str, List[List[Job]]], Dict[str, Tuple[Status, Status]]]:
         """
         Check wrappers and inner jobs status also order the non-wrapped jobs to be submitted by active platforms
         :param as_conf: a AutosubmitConfig object
@@ -1859,8 +1868,8 @@ class Autosubmit:
         :param expid: a string with the experiment id
         :return: non-wrapped jobs to check and a dictionary with the changes in the jobs status
         """
-        jobs_to_check = dict()
-        job_changes_tracker = dict()
+        jobs_to_check: Dict[str, List[List[Job]]] = dict()
+        job_changes_tracker: Dict[str, Tuple[Status, Status]] = dict()
         for platform in platforms_to_test:
             queuing_jobs = job_list.get_in_queue_grouped_id(platform)
             Log.debug(f'Checking jobs for platform={platform.name}')
@@ -1925,6 +1934,7 @@ class Autosubmit:
                                          None, jobs[0].platform, as_conf, jobs[0].hold)
                 job_list.job_package_map[jobs[0].id] = wrapper_job
         return job_list
+
     @staticmethod
     def get_historical_database(expid, job_list, as_conf):
         """
@@ -1974,9 +1984,27 @@ class Autosubmit:
             exp_history.process_job_list_changes_to_experiment_totals(job_list.get_job_list())
             Autosubmit.database_backup(expid)
         return exp_history
+
     @staticmethod
-    def prepare_run(expid, notransitive=False, start_time=None, start_after=None,
-                       run_only_members=None, recover = False, check_scripts= False, submitter=None):
+    def prepare_run(
+        expid: str,
+        notransitive: bool = False,
+        start_time: str = None,
+        start_after: str = None,
+        run_only_members: str = None,
+        recover: bool = False,
+        check_scripts: bool = False,
+        submitter=None
+    ) -> Tuple[
+        JobList,
+        Submitter,
+        Optional[ExperimentHistory],
+        Optional[str],
+        AutosubmitConfig,
+        Set[Platform],
+        JobPackagePersistence,
+        bool,
+    ]:
         """
         Prepare the run of the experiment.
         :param expid: a string with the experiment id.
@@ -2138,6 +2166,7 @@ class Autosubmit:
             return job_list, submitter , exp_history, host , as_conf, platforms_to_test, packages_persistence, False
         else:
             return job_list, submitter, None, None, as_conf, platforms_to_test, packages_persistence, True
+        
     @staticmethod
     def get_iteration_info(as_conf,job_list):
         """

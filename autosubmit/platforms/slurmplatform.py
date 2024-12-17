@@ -26,7 +26,7 @@ from contextlib import suppress
 import locale
 import os
 from time import sleep
-from typing import List, Union, Any
+from typing import List, Union, Any, TYPE_CHECKING
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 from autosubmit.job.job_common import Status
@@ -34,6 +34,10 @@ from autosubmit.platforms.headers.slurm_header import SlurmHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.wrappers.wrapper_factory import SlurmWrapperFactory
 from log.log import AutosubmitCritical, AutosubmitError, Log
+
+if TYPE_CHECKING:
+    # Avoid circular imports
+    from autosubmit.job.job import Job
 
 class SlurmPlatform(ParamikoPlatform):
     """
@@ -657,7 +661,7 @@ class SlurmPlatform(ParamikoPlatform):
             return ''.join(reason)
         return reason # noqa F501
 
-    def get_queue_status(self, in_queue_jobs, list_queue_jobid: str, as_conf: AutosubmitConfig) -> None:
+    def get_queue_status(self, in_queue_jobs: List['Job'], list_queue_jobid: str, as_conf: AutosubmitConfig) -> None:
         """
         get_queue_status
 

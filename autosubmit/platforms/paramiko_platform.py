@@ -5,8 +5,7 @@ from time import sleep
 import sys
 import socket
 import os
-from typing import TYPE_CHECKING
-
+from typing import List, TYPE_CHECKING
 import paramiko
 import datetime
 import select
@@ -25,7 +24,10 @@ from paramiko.agent import Agent
 import time
 
 if TYPE_CHECKING:
+    # Avoid circular imports
     from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+    from autosubmit.job.job import Job
+
 
 def threaded(fn):
     def wrapper(*args, **kwargs):
@@ -761,7 +763,7 @@ class ParamikoPlatform(Platform):
             if job not in ssh_output:
                 return False
         return True
-    def parse_joblist(self, job_list):
+    def parse_joblist(self, job_list: List[List['Job']]):
         """
         Convert a list of job_list to job_list_cmd
 
@@ -782,7 +784,7 @@ class ParamikoPlatform(Platform):
 
         return job_list_cmd
 
-    def check_Alljobs(self, job_list, as_conf, retries=5):
+    def check_Alljobs(self, job_list: List[List['Job']], as_conf, retries=5):
         """
         Checks jobs running status
 
