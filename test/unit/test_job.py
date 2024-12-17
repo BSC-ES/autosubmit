@@ -4,6 +4,9 @@ import os
 import sys
 import tempfile
 from pathlib import Path
+
+import pytest
+
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
 import datetime
 
@@ -1088,6 +1091,7 @@ CONFIG:
             'WALLCLOCK': wallclock,
             'CUSTOM_DIRECTIVES': custom_directives,
             'SCRATCH_FREE_SPACE': 0,
+            'PLATFORM': 'dummy_platform',
         }
         self.as_conf.jobs_data[section] = options
 
@@ -1108,7 +1112,7 @@ CONFIG:
         self.as_conf.normalize_parameters_keys = MagicMock()
         self.as_conf.normalize_parameters_keys.return_value = default
         self.job._platform = dummy_platform
-        self.as_conf.platforms_data = { "dummy_platform":{ "whatever":"dummy_value", "whatever2":"dummy_value2"} }
+        self.as_conf.platforms_data = { "DUMMY_PLATFORM":{ "whatever":"dummy_value", "whatever2":"dummy_value2"} }
 
         parameters = {}
         # Act
@@ -1442,6 +1446,19 @@ class FakeBasicConfig:
     STRUCTURES_DIR = '/dummy/structures/dir'
 
 
-
-
-
+def test_update_stat_file():
+    job = Job("dummyname", 1, Status.WAITING, 0)
+    job.fail_count = 0
+    job.script_name = "dummyname.cmd"
+    job.wrapper_type = None
+    job.update_stat_file()
+    assert job.stat_file == "dummyname_STAT_0"
+    job.fail_count = 1
+    job.update_stat_file()
+    assert job.stat_file == "dummyname_STAT_1"
+    job.wrapper_type = "vertical"
+    job.update_stat_file()
+    assert job.stat_file == "dummyname_STAT_0"
+    job.fail_count = 0
+    job.update_stat_file()
+    assert job.stat_file == "dummyname_STAT_0"

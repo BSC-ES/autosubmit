@@ -21,7 +21,6 @@ import requests
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import threading
-import traceback
 from bscearth.utils.date import date2str
 from configparser import ConfigParser
 from distutils.util import strtobool
@@ -74,10 +73,11 @@ import random
 import signal
 import datetime
 # import log.fd_show as fd_show
-import portalocker
-from importlib.resources import read_text, files as read_files
+from importlib.resources import files as read_files
 from importlib.metadata import version
 from collections import defaultdict
+from portalocker import Lock
+from portalocker.exceptions import BaseLockException
 from pyparsing import nestedExpr
 from .history.experiment_status import ExperimentStatus
 from .history.experiment_history import ExperimentHistory
@@ -85,7 +85,7 @@ from typing import List
 import autosubmit.history.utils as HUtils
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 import autosubmit.statistics.utils as StatisticsUtils
-from autosubmit.helpers.utils import proccess_id, terminate_child_process, check_jobs_file_exists
+from autosubmit.helpers.utils import proccess_id, check_jobs_file_exists
 
 from contextlib import suppress
 
@@ -191,7 +191,7 @@ class Autosubmit:
                                 default='DEBUG', type=str,
                                 help="sets file's log level.")
             parser.add_argument('-lc', '--logconsole', choices=('NO_LOG', 'INFO', 'WARNING', 'DEBUG'),
-                                default='INFO', type=str,
+                                default='WARNING', type=str,
                                 help="sets console's log level")
 
             subparsers = parser.add_subparsers(dest='command')
@@ -999,95 +999,148 @@ class Autosubmit:
         return owner, eadmin, current_owner
 
     @staticmethod
-    def _delete_expid(expid_delete, force=False):
+    def _delete_expid(expid_delete: str, force: bool = False) -> bool:
         """
-        Removes an experiment from path and database
-        If current user is eadmin and -f has been sent, it deletes regardless
-        of experiment owner
+        Removes an experiment from the path and database.
+        If the current user is eadmin and the -f flag has been sent, it deletes regardless of experiment owner.
 
+        :param expid_delete: Identifier of the experiment to delete.
         :type expid_delete: str
-        :param expid_delete: identifier of the experiment to delete
-        :type force: boolean
-        :param force: True if the force flag has been sent
-        :return: True if successfully deleted, False otherwise
-        :rtype: boolean
+        :param force: If True, does not ask for confirmation.
+        :type force: bool
+
+        :returns: True if successfully deleted, False otherwise.
+        :rtype: bool
+
+        :raises AutosubmitCritical: If the experiment does not exist or if there are insufficient permissions.
         """
-        message = "The {0} experiment was removed from the local disk and from the database.".format(expid_delete)
-        message += " Note that this action does not delete any data written by the experiment.\n"
-        message += "Complete list of files/directories deleted:\n"
-        for root, dirs, files in os.walk(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid_delete)):
-            for dir_ in dirs:
-                message += os.path.join(root, dir_) + "\n"
-        message += os.path.join(BasicConfig.LOCAL_ROOT_DIR, BasicConfig.STRUCTURES_DIR,
-                                "structure_{0}.db".format(expid_delete)) + "\n"
-        message += os.path.join(BasicConfig.LOCAL_ROOT_DIR, BasicConfig.JOBDATA_DIR,
-                                "job_data_{0}.db".format(expid_delete)) + "\n"
-        owner, eadmin, current_owner = Autosubmit._check_ownership(expid_delete)
-        if expid_delete == '' or expid_delete is None and not os.path.exists(
-                os.path.join(str(BasicConfig.LOCAL_ROOT_DIR), str(expid_delete))):
+        experiment_path = Path(f"{BasicConfig.LOCAL_ROOT_DIR}/{expid_delete}")
+        structure_db_path = Path(f"{BasicConfig.STRUCTURES_DIR}/structure_{expid_delete}.db")
+        job_data_db_path = Path(f"{BasicConfig.JOBDATA_DIR}/job_data_{expid_delete}")
+
+        if not experiment_path.exists():
             Log.printlog("Experiment directory does not exist.", Log.WARNING)
+            return False
+
+        owner, eadmin, _ = Autosubmit._check_ownership(expid_delete)
+        if not (owner or (force and eadmin)):
+            Autosubmit._raise_permission_error(eadmin, expid_delete)
+
+        message = Autosubmit._generate_deletion_message(expid_delete, experiment_path, structure_db_path,
+                                                        job_data_db_path)
+        error_message = Autosubmit._perform_deletion(experiment_path, structure_db_path, job_data_db_path, expid_delete)
+
+        if not error_message:
+            Log.printlog(message, Log.RESULT)
         else:
-            # Deletion workflow continues as usual, a disjunction is included for the case when
-            # force is sent, and user is eadmin
-            error_message = ""
-            try:
-                if owner or (force and eadmin):
-                    if force and eadmin:
-                        if current_owner:
-                            Log.info(f"Preparing deletion of experiment {expid_delete} as eadmin. Current owner: {current_owner}")
-                        else:
-                            Log.info(f"Preparing deletion of experiment {expid_delete} as eadmin. Current owner: Unknown")
-                    try:
-                        Log.info("Deleting experiment from database...")
-                        try:
-                            ret = delete_experiment(expid_delete)
-                            if ret:
-                                Log.result("Experiment {0} deleted".format(expid_delete))
-                        except BaseException as e:
-                            error_message += 'Can not delete experiment entry: {0}\n'.format(str(e))
-                        Log.info("Removing experiment directory...")
-                        try:
-                            shutil.rmtree(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid_delete))
-                        except BaseException as e:
-                            error_message += 'Can not delete directory: {0}\n'.format(str(e))
-                        try:
-                            Log.info("Removing Structure db...")
-                            structures_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, BasicConfig.STRUCTURES_DIR,
-                                                           "structure_{0}.db".format(expid_delete))
-                            if os.path.exists(structures_path):
-                                os.remove(structures_path)
-                        except BaseException as e:
-                            error_message += 'Can not delete structure: {0}\n'.format(str(e))
-                        try:
-                            Log.info("Removing job_data db...")
-                            job_data_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, BasicConfig.JOBDATA_DIR,
-                                                         "job_data_{0}.db".format(expid_delete))
-                            if os.path.exists(job_data_path):
-                                os.remove(job_data_path)
-                        except BaseException as e:
-                            error_message += 'Can not delete job_data: {0}\n'.format(str(e))
-                    except OSError as e:
-                        error_message += 'Can not delete directory: {0}\n'.format(str(e))
-                else:
-                    if not eadmin:
-                        raise AutosubmitCritical(
-                            'Detected Eadmin user however, -f flag is not found.  {0} can not be deleted!'.format(
-                                expid_delete), 7012)
-                    else:
-                        raise AutosubmitCritical(
-                            'Current user is not the owner of the experiment. {0} can not be deleted!'.format(
-                                expid_delete), 7012)
-                if error_message == "":
-                    Log.printlog(message, Log.RESULT)
-                else:
-                    Log.printlog(error_message, Log.ERROR)
-            except Exception as e:
-                # Avoid calling Log at this point since it is possible that tmp folder is already deleted.
-                error_message += "Couldn't delete the experiment".format(str(e))
-            if error_message != "":
-                raise AutosubmitError(
-                    "Some experiment files weren't correctly deleted\nPlease if the trace shows DATABASE IS LOCKED, report it to git\nIf there are I/O issues, wait until they're solved and then use this command again.\n",
-                    error_message, 6004)
+            Log.printlog(error_message, Log.ERROR)
+            raise AutosubmitError(
+                "Some experiment files weren't correctly deleted\nPlease if the trace shows DATABASE IS LOCKED, report it to git\nIf there are I/O issues, wait until they're solved and then use this command again.\n",
+                error_message, 6004
+            )
+
+        return not bool(error_message)  # if there is a non-empty error, return False
+
+    @staticmethod
+    def _raise_permission_error(eadmin: bool, expid_delete: str) -> None:
+        """
+        Raise a permission error if the current user is not allowed to delete the experiment.
+
+        :param eadmin: Indicates if the current user is an eadmin.
+        :type eadmin: bool
+        :param expid_delete: Identifier of the experiment to delete.
+        :type expid_delete: str
+
+        :raises AutosubmitCritical: If the user does not have permission to delete the experiment.
+        """
+        if not eadmin:
+            raise AutosubmitCritical(
+                f"Detected Eadmin user however, -f flag is not found. {expid_delete} cannot be deleted!", 7012)
+        else:
+            raise AutosubmitCritical(
+                f"Current user is not the owner of the experiment. {expid_delete} cannot be deleted!", 7012)
+
+    @staticmethod
+    def _generate_deletion_message(expid_delete: str, experiment_path: Path, structure_db_path: Path,
+                                   job_data_db_path: Path) -> str:
+        """
+        Generate a message detailing what is being deleted from an experiment.
+
+        :param expid_delete: Identifier of the experiment to delete.
+        :type expid_delete: str
+        :param experiment_path: Path to the experiment directory.
+        :type experiment_path: Path
+        :param structure_db_path: Path to the structure database file.
+        :type structure_db_path: Path
+        :param job_data_db_path: Path to the job data database file.
+        :type job_data_db_path: Path
+
+        :return: A message detailing the deletion of the experiment.
+        :rtype: str
+        """
+        message_parts = [
+            f"The {expid_delete} experiment was removed from the local disk and from the database.\n",
+            "Note that this action does not delete any data written by the experiment.\n",
+            "Complete list of files/directories deleted:\n"
+        ]
+        message_parts.extend(f"{path}\n" for path in experiment_path.rglob('*'))
+        message_parts.append(f"{structure_db_path}\n")
+        message_parts.append(f"{job_data_db_path}.db\n")
+        message_parts.append(f"{job_data_db_path}.sql\n")
+        message = '\n'.join(message_parts)
+        return message
+
+    @staticmethod
+    def _perform_deletion(experiment_path: Path, structure_db_path: Path, job_data_db_path: Path,
+                          expid_delete: str) -> str:
+        """
+        Perform the deletion of an experiment, including its directory, structure database, and job data database.
+
+        :param experiment_path: Path to the experiment directory.
+        :type experiment_path: Path
+        :param structure_db_path: Path to the structure database file.
+        :type structure_db_path: Path
+        :param job_data_db_path: Path to the job data database file.
+        :type job_data_db_path: Path
+        :param expid_delete: Identifier of the experiment to delete.
+        :type expid_delete: str
+        :return: An error message if any errors occurred during deletion, otherwise an empty string.
+        :rtype: str
+        """
+        error_message = ""
+        Log.info("Deleting experiment from database...")
+        try:
+            ret = delete_experiment(expid_delete)
+            if ret:
+                Log.result(f"Experiment {expid_delete} deleted")
+        except BaseException as e:
+            error_message += f"Cannot delete experiment entry: {e}\n"
+
+        Log.info("Removing experiment directory...")
+        try:
+            shutil.rmtree(experiment_path)
+        except BaseException as e:
+            error_message += f"Cannot delete directory: {e}\n"
+
+        Log.info("Removing Structure db...")
+        try:
+            if structure_db_path.exists():
+                os.remove(structure_db_path)
+        except BaseException as e:
+            error_message += f"Cannot delete structure: {e}\n"
+
+        Log.info("Removing job_data db...")
+        try:
+            db_path = job_data_db_path.with_suffix(".db")
+            sql_path = job_data_db_path.with_suffix(".sql")
+            if db_path.exists():
+                os.remove(db_path)
+            if sql_path.exists():
+                os.remove(sql_path)
+        except BaseException as e:
+            error_message += f"Cannot delete job_data: {e}\n"
+
+        return error_message
 
     @staticmethod
     def copy_as_config(exp_id,copy_id):
@@ -1372,22 +1425,24 @@ class Autosubmit:
         return exp_id
 
     @staticmethod
-    def delete(expid, force):
+    def delete(expid: str, force: bool) -> bool:
         """
-        Deletes and experiment from database and experiment's folder
+        Deletes an experiment from the database, the experiment's folder database entry and all the related metadata files.
 
-        :type force: bool
+        :param expid: Identifier of the experiment to delete.
         :type expid: str
-        :param expid: identifier of the experiment to delete
-        :param force: if True, does not ask for confirmation
+        :param force: If True, does not ask for confirmation.
+        :type force: bool
 
-        :returns: True if successful, False if not
+        :returns: True if successful, False otherwise.
         :rtype: bool
+
+        :raises AutosubmitCritical: If the experiment does not exist or if there are insufficient permissions.
         """
+        experiment_path = Path(f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}")
 
-        if os.path.exists(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)):
-            if force or Autosubmit._user_yes_no_query("Do you want to delete " + expid + " ?"):
-
+        if experiment_path.exists():
+            if force or Autosubmit._user_yes_no_query(f"Do you want to delete {expid} ?"):
                 Log.debug('Enter Autosubmit._delete_expid {0}', expid)
                 try:
                     return Autosubmit._delete_expid(expid, force)
@@ -1584,18 +1639,24 @@ class Autosubmit:
                         jobs_aux.append(job)
                     jobs_cw = jobs_aux
                 del jobs_aux
+            file_paths = ""
+
             if isinstance(jobs, type([])):
                 for job in jobs:
+                    file_paths += f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}/tmp/{job.name}.cmd\n"
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, jobs, packages_persistence, False)
             if len(jobs_cw) > 0:
                 for job in jobs_cw:
+                    file_paths += f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}/tmp/{job.name}.cmd\n"
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, jobs_cw, packages_persistence, False)
 
-            Log.info("no more scripts to generate, now proceed to check them manually")
+            Log.info("No more scripts to generate, you can proceed to check them manually")
+            Log.result(file_paths)
+
         except AutosubmitCritical as e:
             raise
         except AutosubmitError as e:
@@ -1675,46 +1736,6 @@ class Autosubmit:
             job_list.update_list(as_conf, False)
         for job in job_list.get_job_list():
             job.status = Status.WAITING
-
-
-    @staticmethod
-    def terminate_child_process(expid, platform = None):
-        # get pid of the main process
-        pid = os.getpid()
-        # In case some one used 4.1.6 or 4.1.5
-        process_ids = proccess_id(expid,"run", single_instance = False, platform = platform)
-        if process_ids:
-            for process_id in [ process_id for process_id in process_ids if process_id != pid]:
-                # force kill
-                os.kill(process_id, signal.SIGKILL)
-        process_ids = proccess_id(expid,"log", single_instance = False, platform = platform)
-        # 4.1.7 +
-        if process_ids:
-            for process_id in [ process_id for process_id in process_ids if process_id != pid]:
-                # force kill
-                os.kill(process_id, signal.SIGKILL)
-
-
-    @staticmethod
-    def terminate(all_threads):
-        # Closing threads on Ctrl+C
-        Log.info(
-            "Looking for active threads before closing Autosubmit. Ending the program before these threads finish may result in unexpected behavior. This procedure will last until all threads have finished or the program has waited for more than 30 seconds.")
-        timeout = 0
-        active_threads = True
-        while active_threads and timeout <= 60:
-            active_threads = False
-            for thread in all_threads:
-                if "JOB_" in thread.name:
-                    if thread.is_alive():
-                        active_threads = True
-                        Log.info("{0} is still retrieving outputs, time remaining is {1} seconds.".format(
-                            thread.name, 60 - timeout))
-                        break
-            if active_threads:
-                sleep(10)
-                timeout += 10
-
 
     @staticmethod
     def manage_wrapper_job(as_conf, job_list, platform, wrapper_id, save=False):
@@ -1916,7 +1937,7 @@ class Autosubmit:
         return exp_history
     @staticmethod
     def prepare_run(expid, notransitive=False, start_time=None, start_after=None,
-                       run_only_members=None, recover = False, check_scripts= False):
+                       run_only_members=None, recover = False, check_scripts= False, submitter=None):
         """
         Prepare the run of the experiment.
         :param expid: a string with the experiment id.
@@ -1925,6 +1946,7 @@ class Autosubmit:
         :param start_after: a string with the experiment id to start after.
         :param run_only_members: a string with the members to run.
         :param recover: a boolean to indicate if the experiment is recovering from a failure.
+        :param submitter: the actual loaded platforms if any
         :return: a tuple
         """
         host = platform.node()
@@ -1959,8 +1981,9 @@ class Autosubmit:
 
         # Loads the communication lib, always paramiko.
         # Paramiko is the only way to communicate with the remote machines. Previously we had also Saga.
-        submitter = Autosubmit._get_submitter(as_conf)
-        submitter.load_platforms(as_conf)
+        if not submitter:
+            submitter = Autosubmit._get_submitter(as_conf)
+            submitter.load_platforms(as_conf)
         # Tries to load the job_list from disk, discarding any changes in running time ( if recovery ).
         # Could also load a backup from previous iteration.
         # The submit ready functions will cancel all job submitted if one submitted in that iteration had issues, so it should be safe to recover from a backup without losing job ids
@@ -2073,7 +2096,7 @@ class Autosubmit:
             Autosubmit.restore_platforms(platforms_to_test,as_conf=as_conf)
             return job_list, submitter , exp_history, host , as_conf, platforms_to_test, packages_persistence, False
         else:
-            return job_list, submitter , None, None, as_conf , platforms_to_test, packages_persistence, True
+            return job_list, submitter, None, None, as_conf, platforms_to_test, packages_persistence, True
     @staticmethod
     def get_iteration_info(as_conf,job_list):
         """
@@ -2094,7 +2117,12 @@ class Autosubmit:
         Log.debug("Sleep: {0}", safetysleeptime)
         Log.debug("Number of retrials: {0}", default_retrials)
         return total_jobs, safetysleeptime, default_retrials, check_wrapper_jobs_sleeptime
-    
+
+    @staticmethod
+    def check_logs_status(job_list, as_conf, new_run):
+        for job in job_list.get_completed_failed_without_logs():
+            job_list.update_log_status(job, as_conf, new_run)
+
     @staticmethod
     def run_experiment(expid, notransitive=False, start_time=None, start_after=None, run_only_members=None, profile=False):
         """
@@ -2119,10 +2147,8 @@ class Autosubmit:
                 raise AutosubmitCritical("Failure during the loading of the experiment configuration, check file paths",
                                      7014, str(e))
 
-        # checking if there is a lock file to avoid multiple running on the same expid
         try:
-            # Portalocker is used to avoid multiple autosubmit running on the same experiment, we have to change this system in #806
-            with portalocker.Lock(BasicConfig.expid_tmp_dir(expid).joinpath('autosubmit.lock'), timeout=1):
+            with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
                 try:
                     Log.debug("Preparing run")
                     # This function is called only once, when the experiment is started. It is used to initialize the experiment and to check the correctness of the configuration files.
@@ -2153,14 +2179,16 @@ class Autosubmit:
 
                 max_recovery_retrials = as_conf.experiment_data.get("CONFIG",{}).get("RECOVERY_RETRIALS",3650)  # (72h - 122h )
                 recovery_retrials = 0
+                Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
                 while job_list.get_active():
+                    for platform in platforms_to_test:  # Send keep_alive signal
+                        platform.work_event.set()
                     for job in [job for job in job_list.get_job_list() if job.status == Status.READY]:
                         job.update_parameters(as_conf, {})
                     did_run = True
                     try:
                         if Autosubmit.exit:
-                            terminate_child_process(expid)
-                            Autosubmit.terminate(threading.enumerate())
+                            Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             if job_list.get_failed():
                                 return 1
                             return 0
@@ -2230,6 +2258,7 @@ class Autosubmit:
                                     "Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
                         job_changes_tracker = {}
                         if Autosubmit.exit:
+                            Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             job_list.save()
                             as_conf.save()
                         time.sleep(safetysleeptime)
@@ -2265,7 +2294,7 @@ class Autosubmit:
                                                                                                 start_time,
                                                                                                 start_after,
                                                                                                 run_only_members,
-                                                                                                recover=True)
+                                                                                                recover=True, submitter = submitter)
                             except AutosubmitError as e:
                                 recovery = False
                                 Log.result("Recover of job_list has fail {0}".format(e.message))
@@ -2313,39 +2342,30 @@ class Autosubmit:
                                 7051, e.message)
                     except AutosubmitCritical as e:  # Critical errors can't be recovered. Failed configuration or autosubmit error
                         raise AutosubmitCritical(e.message, e.code, e.trace)
-                    except (portalocker.AlreadyLocked, portalocker.LockException) as e:
-                        message = "We have detected that there is another Autosubmit instance using the experiment\n. Stop other Autosubmit instances that are using the experiment or delete autosubmit.lock file located on tmp folder"
-                        raise AutosubmitCritical(message, 7000)
-                    except BaseException as e:
+                    except BaseException:
                         raise # If this happens, there is a bug in the code or an exception not-well caught
                 Log.result("No more jobs to run.")
-                if not did_run and len(job_list.get_completed_without_logs()) > 0:
-                    #connect to platforms
+                # search hint - finished run
+                job_list.save()
+                if not did_run and len(job_list.get_completed_failed_without_logs()) > 0: # Revise if there is any log unrecovered from previous run
                     Log.info(f"Connecting to the platforms, to recover missing logs")
                     submitter = Autosubmit._get_submitter(as_conf)
                     submitter.load_platforms(as_conf)
                     if submitter.platforms is None:
                         raise AutosubmitCritical("No platforms configured!!!", 7014)
-                    platforms = [value for value in submitter.platforms.values()]
-                    Autosubmit.restore_platforms(platforms, as_conf=as_conf, expid=expid)
-                # Wait for all remaining threads of I/O, close remaining connections
-                # search hint - finished run
+                    platforms_to_test = [value for value in submitter.platforms.values()]
+                    Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf, expid=expid)
                 Log.info("Waiting for all logs to be updated")
-                # get all threads
-                threads = threading.enumerate()
-                # print name
-                timeout = as_conf.experiment_data.get("CONFIG",{}).get("LAST_LOGS_TIMEOUT", 180)
-                for remaining in range(timeout, 0, -1):
-                    if len(job_list.get_completed_without_logs()) == 0:
-                        break
-                    for job in job_list.get_completed_without_logs():
-                        job.platform = submitter.platforms[job.platform_name.upper()]
-                        job_list.update_log_status(job, as_conf)
-                    sleep(1)
-                    if remaining % 10 == 0:
-                        Log.info(f"Timeout: {remaining}")
-
-                # Updating job data header with current information when experiment ends
+                for p in platforms_to_test:
+                    if p.log_recovery_process:
+                        p.cleanup_event.set()  # Send cleanup event
+                        p.log_recovery_process.join()
+                Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
+                job_list.save()
+                if len(job_list.get_completed_failed_without_logs()) == 0:
+                    Log.result(f"Autosubmit recovered all job logs.")
+                else:
+                    Log.warning(f"Autosubmit couldn't recover the following job logs: {[job.name for job in job_list.get_completed_failed_without_logs()]}")
                 try:
                     exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                                     historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
@@ -2356,9 +2376,8 @@ class Autosubmit:
                         Autosubmit.database_fix(expid)
                     except Exception as e:
                         pass
-                terminate_child_process(expid)
-                for platform in platforms_to_test:
-                    platform.closeConnection()
+                for p in platforms_to_test:
+                    p.closeConnection()
                 if len(job_list.get_failed()) > 0:
                     Log.info("Some jobs have failed and reached maximum retrials")
                 else:
@@ -2369,15 +2388,11 @@ class Autosubmit:
                         exp_history.finish_current_experiment_run()
                     except Exception:
                         Log.warning("Database is locked")
-        except (portalocker.AlreadyLocked, portalocker.LockException) as e:
-            message = "We have detected that there is another Autosubmit instance using the experiment\n. Stop other Autosubmit instances that are using the experiment or delete autosubmit.lock file located on tmp folder"
-            terminate_child_process(expid)
-            raise AutosubmitCritical(message, 7000)
-        except AutosubmitCritical as e:
-            terminate_child_process(expid)
+        except BaseLockException:
             raise
-        except BaseException as e:
-            terminate_child_process(expid)
+        except AutosubmitCritical:
+            raise
+        except BaseException:
             raise
         finally:
             if profile:
@@ -2515,12 +2530,6 @@ class Autosubmit:
                 if error_message != "":
                     raise AutosubmitCritical("Submission Failed due wrong configuration:{0}".format(error_message),
                                              7014)
-                if not inspect:
-                    for package in valid_packages_to_submit:
-                        wrapper_time = None
-                        for job in package.jobs: # if jobs > 1 == wrapped == same submission time
-                            job.write_submit_time(wrapper_submit_time=wrapper_time)
-                            wrapper_time = job.submit_time_timestamp
 
             if wrapper_errors and not any_job_submitted and len(job_list.get_in_queue()) == 0:
                 # Deadlock situation
@@ -2539,7 +2548,6 @@ class Autosubmit:
             raise
         except BaseException as e:
             raise
-            raise AutosubmitCritical("This seems like a bug in the code, please contact AS developers", 7070, str(e))
 
     @staticmethod
     def monitor(expid, file_format, lst, filter_chunks, filter_status, filter_section, hide, txt_only=False,
@@ -2941,9 +2949,8 @@ class Autosubmit:
                         "Experiment can't be recovered due being {0} active jobs in your experiment, If you want to recover the experiment, please use the flag -f and all active jobs will be cancelled".format(
                             len(current_active_jobs)), 7000)
             Log.debug("Job list restored from {0} files", pkl_dir)
-        except BaseException as e:
-            raise AutosubmitCritical(
-                "Couldn't restore the job_list or packages, check if the filesystem is having issues", 7040, str(e))
+        except Exception:
+            raise
         Log.info('Recovering experiment {0}'.format(expid))
         try:
             for job in job_list.get_job_list():
@@ -2977,13 +2984,8 @@ class Autosubmit:
                     job.status = Status.COMPLETED
                     Log.info(
                         "CHANGED job '{0}' status to COMPLETED".format(job.name))
-                    # Log.status("CHANGED job '{0}' status to COMPLETED".format(job.name))
-
-                    if not no_recover_logs:
-                        try:
-                            job.platform.get_logs_files(expid, job.remote_logs)
-                        except Exception as e:
-                            pass
+                    job.recover_last_ready_date()
+                    job.recover_last_log_name()
                 elif job.status != Status.SUSPENDED:
                     job.status = Status.WAITING
                     job._fail_count = 0
@@ -3993,7 +3995,7 @@ class Autosubmit:
         backup_pkl_path = os.path.join(
             pkl_folder_path, "job_list_{}_backup.pkl".format(expid))
         try:
-            with portalocker.Lock(BasicConfig.expid_tmp_dir(expid).joinpath('autosubmit.lock'), timeout=1):
+            with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
                 # Not locked
                 Log.info("Looking for backup file {}".format(backup_pkl_path))
                 if os.path.exists(backup_pkl_path):
@@ -4021,8 +4023,6 @@ class Autosubmit:
                                 Log.info(
                                     "Pkl restore operation stopped. No changes have been made.")
                                 return
-                        result = None
-                        if _stat.st_size > 6:
                             # File not empty: Archive
                             archive_pkl_name = os.path.join(pkl_folder_path, "{0}_job_list_{1}.pkl".format(
                                 datetime.datetime.today().strftime("%d%m%Y%H%M%S"), expid))
@@ -4049,13 +4049,8 @@ class Autosubmit:
                 else:
                     Log.info(
                         "Backup file not found. Pkl restore operation stopped. No changes have been made.")
-        except (portalocker.AlreadyLocked, portalocker.LockException) as e:
-            message = "Another Autosubmit instance using the experiment\n. Stop other Autosubmit instances that are using the experiment or delete autosubmit.lock file located on the /tmp folder."
-            raise AutosubmitCritical(message, 7000)
         except AutosubmitCritical as e:
             raise AutosubmitCritical(e.message, e.code, e.trace)
-        except BaseException as e:
-            raise
 
     @staticmethod
     def database_backup(expid):
@@ -4413,8 +4408,8 @@ class Autosubmit:
         # checking if there is a lock file to avoid multiple running on the same expid
         try:
             Autosubmit._check_ownership(expid, raise_error=True)
-            # Encapsulating the lock
-            with portalocker.Lock(BasicConfig.expid_tmp_dir(expid).joinpath('autosubmit.lock'), timeout=1) as fh:
+            tmp_path = BasicConfig.expid_tmp_dir(expid)
+            with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1) as fh:
                 try:
                     Log.info(
                         "Preparing .lock file to avoid multiple instances with same expid.")
@@ -4575,23 +4570,14 @@ class Autosubmit:
                         Autosubmit.detail(job_list)
                     return True
                 # catching Exception
-                except KeyboardInterrupt as e:
+                except KeyboardInterrupt:
                     # Setting signal handler to handle subsequent CTRL-C
                     signal.signal(signal.SIGINT, signal_handler_create)
                     fh.flush()
                     os.fsync(fh.fileno())
                     raise AutosubmitCritical("Stopped by user input", 7010)
-                except BaseException as e:
+                except BaseException:
                     raise
-        except (portalocker.AlreadyLocked, portalocker.LockException) as e:
-            message = "We have detected that there is another Autosubmit instance using the experiment\n. Stop other Autosubmit instances that are using the experiment or delete autosubmit.lock file located on tmp folder"
-            raise AutosubmitCritical(message, 7000)
-        except AutosubmitError as e:
-            raise
-        except AutosubmitCritical as e:
-            raise
-        except BaseException as e:
-            raise
         finally:
             if profile:
                 profiler.stop()
@@ -4630,16 +4616,16 @@ class Autosubmit:
                 raise AutosubmitCritical("Autosubmit couldn't identify the project destination.", 7014)
 
         if project_type == "git":
-            submitter = Autosubmit._get_submitter(as_conf)
-            submitter.load_platforms(as_conf)
             try:
-                hpcarch = submitter.platforms.get(as_conf.get_platform(), "local")
-            except BaseException as e:
-                error = str(e)
-                try:
-                    hpcarch = submitter.platforms[as_conf.get_platform()]
-                except Exception as e:
-                    hpcarch = "local"
+                submitter = Autosubmit._get_submitter(as_conf)
+                submitter.load_platforms(as_conf)
+                hpcarch = submitter.platforms[as_conf.get_platform()]
+            except AutosubmitCritical as e:
+                Log.warning(f"{e.message}\nRemote git cloning is disabled")
+                hpcarch = "local"
+            except KeyError:
+                Log.warning(f"Platform {as_conf.get_platform()} not found in configuration file")
+                hpcarch = "local"
             return AutosubmitGit.clone_repository(as_conf, force, hpcarch)
         elif project_type == "svn":
             svn_project_url = as_conf.get_svn_project_url()
@@ -5118,9 +5104,8 @@ class Autosubmit:
         Autosubmit._check_ownership(expid, raise_error=True)
         section_validation_message = " "
         job_validation_message = " "
-        # checking if there is a lock file to avoid multiple running on the same expid
         try:
-            with portalocker.Lock(BasicConfig.expid_tmp_dir(expid).joinpath('autosubmit.lock'), timeout=1):
+            with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
                 Log.info(
                     "Preparing .lock file to avoid multiple instances with same expid.")
 
@@ -5358,11 +5343,6 @@ class Autosubmit:
                                                 groups=groups_dict,
                                                 job_list_object=job_list)
                 return True
-        except (portalocker.AlreadyLocked, portalocker.LockException) as e:
-            message = "We have detected that there is another Autosubmit instance using the experiment\n. Stop other Autosubmit instances that are using the experiment or delete autosubmit.lock file located on tmp folder"
-            raise AutosubmitCritical(message, 7000)
-        except (AutosubmitError, AutosubmitCritical):
-            raise
         except BaseException as e:
             raise AutosubmitCritical(
                 "An Error has occurred while setting some of the workflow jobs, no changes were made", 7040, str(e))
@@ -6037,8 +6017,3 @@ class Autosubmit:
                     if status in Status.VALUE_TO_KEY.values():
                         job.status = Status.KEY_TO_VALUE[status]
                 job_list.save()
-            terminate_child_process(expid)
-
-
-
-

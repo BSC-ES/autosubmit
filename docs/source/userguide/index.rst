@@ -16,6 +16,7 @@ User Guide
    /userguide/expids
    /userguide/provenance
    /userguide/traceability
+   /userguide/templates
 
 Command list
 ============

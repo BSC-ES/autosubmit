@@ -219,9 +219,8 @@ def get_split_size_unit(data, section):
 
 
 def get_split_size(as_conf, section):
-    job_data = as_conf.get('JOBS',{}).get(section,{})
-    exp_data = as_conf.get('EXPERIMENT',{})
-    return int(job_data.get("SPLITSIZE", exp_data.get("SPLITSIZE", exp_data.get('CHUNKSIZE', 1))))
+    job_data = as_conf.get('JOBS', {}).get(section, {})
+    return int(job_data.get("SPLITSIZE", 1))
 
 def transitive_reduction(graph):
     """

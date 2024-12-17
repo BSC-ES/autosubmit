@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import collections
+
+from autosubmit.job.job import Job
 from log.log import Log, AutosubmitCritical
 from autosubmit.job.job_common import Status, Type
 from bscearth.utils.date import sum_str_hours
@@ -27,7 +29,6 @@ from math import ceil
 import operator
 from typing import List
 from contextlib import suppress
-
 
 class JobPackager(object):
     """
@@ -545,6 +546,10 @@ class JobPackager(object):
         section_jobs_to_submit = dict()
 
         for job in [job for job in jobs_ready]:
+            for event in job.platform.worker_events:  # keep alive log retrieval workers.
+                if not event.is_set():
+                    event.set()
+
             if job.section not in section_jobs_to_submit: # This is to fix TOTAL_JOBS when is set at job_level # Only for non-wrapped jobs
                 job.update_parameters(self._as_config,
                                       {})  # Ensure to have the correct processors for the wrapper building code
@@ -604,7 +609,7 @@ class JobPackager(object):
             elif self.wrapper_type[self.current_wrapper_section] in ['vertical-horizontal', 'horizontal-vertical']:
                 built_packages_tmp.append(self._build_hybrid_package(jobs, wrapper_limits, section, wrapper_info=current_info))
             else:
-                built_packages_tmp = self._build_vertical_packages(jobs, wrapper_limits)
+                built_packages_tmp = self._build_vertical_packages(jobs, wrapper_limits, wrapper_info=current_info)
             if len(built_packages_tmp) > 0:
                 Log.result(f"Built {len(built_packages_tmp)} wrappers for {wrapper_name}")
             packages_to_submit, max_jobs_to_submit = self.check_packages_respect_wrapper_policy(built_packages_tmp, packages_to_submit, max_jobs_to_submit, wrapper_limits, any_simple_packages)
@@ -833,8 +838,13 @@ class JobPackagerVertical(object):
         stack = [(job, 1)]
         while stack:
             job, level = stack.pop()
-            if level % 10 == 0 and level > 0:
+            # Less verbose
+            if level % 50 == 0 and level > 0:
                 Log.info(f"Wrapper package creation is still ongoing. So far {level} jobs have been wrapped.")
+                for event in job.platform.worker_events:  # keep alive log retrieval workers.
+                    if not event.is_set():
+                        event.set()
+
             if len(self.jobs_list) >= self.wrapper_limits["max_v"] or len(self.jobs_list) >= \
                     self.wrapper_limits["max_by_section"][job.section] or len(self.jobs_list) >= self.wrapper_limits[
                 "max"]:
@@ -843,7 +853,8 @@ class JobPackagerVertical(object):
             if child is not None and len(str(child)) > 0:
                 child.update_parameters(wrapper_info[-1], {})
                 self.total_wallclock = sum_str_hours(self.total_wallclock, child.wallclock)
-                if self.total_wallclock <= self.max_wallclock:
+                # Local jobs could not have a wallclock defined
+                if self.total_wallclock <= self.max_wallclock or not self.max_wallclock:
                     child.packed = True
                     child.level = level
                     self.jobs_list.append(child)
@@ -945,32 +956,25 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
         self.index = 0
 
 
-    def get_wrappable_child(self, job):
+    def get_wrappable_child(self, job: Job) -> Job:
         """
-        Goes through the jobs with the same date and member than the input job, and return the first that satisfies self._is_wrappable()
+        Goes through the jobs with the same date and member as the input job, and returns the first that satisfies self._is_wrappable().
 
-        :param job: job to be evaluated. \n
-        :type job: Job Object \n
-        :return: job that is wrappable. \n
-        :rtype: Job Object
+        Args:
+            job (Job): Job to be evaluated.
+
+        Returns:
+            Optional[Any]: Job that is wrappable, or None if no such job is found.
         """
         sorted_jobs = self.sorted_jobs
-
+        child = None
         for index in range(self.index, len(sorted_jobs)):
-            child = sorted_jobs[index]
-            if self._is_wrappable(child):
+            child_ = sorted_jobs[index]
+            if child_.name != job.name and self._is_wrappable(child_):
+                child = child_
                 self.index = index + 1
-                return child
-            continue
-        return None
-        # Not passing tests but better wrappers result to check
-        # for child in job.children:
-        #     if child.name != job.name:
-        #         if self._is_wrappable(child):
-        #             self.index = self.index + 1
-        #             return child
-        #     continue
-        # return None
+                break
+        return child
 
     def _is_wrappable(self, job):
         """
@@ -1026,8 +1030,11 @@ class JobPackagerHorizontal(object):
         for section in jobs_by_section:
             current_package_by_section[section] = 0
             for job in jobs_by_section[section]:
-                if jobs_processed % 10 == 0 and jobs_processed > 0:
+                if jobs_processed % 50 == 0 and jobs_processed > 0:
                     Log.info(f"Wrapper package creation is still ongoing. So far {jobs_processed} jobs have been wrapped.")
+                    for event in job.platform.worker_events:  # keep alive log retrieval workers.
+                        if not event.is_set():
+                            event.set()
                 job.update_parameters(wrapper_info[-1], {})
                 if str(job.processors).isdigit() and str(job.nodes).isdigit() and int(job.nodes) > 0 and int(job.processors) <= 1:
                     job.processors = 0

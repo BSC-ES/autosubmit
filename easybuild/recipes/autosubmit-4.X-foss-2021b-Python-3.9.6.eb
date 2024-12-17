@@ -33,8 +33,6 @@ dependencies = [
     ('paramiko', '3.4.0', versionsuffix),
     ('matplotlib', '3.8.2', versionsuffix),
     ('packaging', '21.3', versionsuffix),
-    ('ruamel.yaml', '0.17.21', versionsuffix),
-    ('autosubmitconfigparser', '1.0.67', versionsuffix),
     ('psycopg2', '2.9.9', versionsuffix),
     ('Sphinx','5.3.0', versionsuffix),
     ('Sphinx-RTD-Theme', '2.0.0', versionsuffix),
@@ -49,6 +47,9 @@ sanity_pip_check = True
 download_dep_fail = True
 
 exts_list = [
+    ('autosubmitconfigparser', '1.0.73', {
+        'checksums': ['d22b6dd2a0cb34f32e358a0c4fd48638c1f0fca7b079eaf1aa7aa082d4f077fc'],
+    }),
     ('python-xlib', '0.33', {
         'modulename': 'Xlib',
         'checksums': ['55af7906a2c75ce6cb280a584776080602444f75815a7aff4d287bb2d7018b32'],
@@ -99,6 +100,18 @@ exts_list = [
     ('pytest-mock', '3.14.0', {
         'checksums': ['2719255a1efeceadbc056d6bf3df3d1c5015530fb40cf347c0f9afac88410bd0'],
     }),
+    ('ruamel.yaml', '0.18.6', {
+        'checksums': ['8b27e6a217e786c6fbe5634d8f3f11bc63e0f80f6a5890f28863d9c45aac311b'],
+    }),
+    ('paramiko', '3.5.0', {
+        'checksums': ['ad11e540da4f55cedda52931f1a3f812a8238a7af7f62a60de538cd80bb28124'],
+    }),
+    ('invoke', '2.2.0', {
+        'checksums': ['ee6cbb101af1a859c7fe84f2a264c059020b0cb7fe3535f9424300ab568f6bd5'],
+    }),
+
+
+
     (name, version, {
         'sources': [{
             'filename': '%(name)s-%(version)s.tar.gz',

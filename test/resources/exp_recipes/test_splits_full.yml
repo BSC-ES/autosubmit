@@ -1,0 +1,117 @@
+CONFIG:
+  # Current version of autosubmit.
+  autoSUBMIT_VERSION: "4.1.10"
+  # Maximum number of jobs permitted in the waiting status.
+  MAXWAITINGJOBS: 20
+  # Total number of jobs in the workflow.
+  TOTALJOBS: 20
+  SAFETYSLEEPTIME: 10
+  RETRIALS: 0
+MAIL:
+  NOTIFICATIONS: False
+  TO:
+STORAGE:
+  TYPE: pkl
+  COPY_REMOTE_LOGS: true
+DEFAULT:
+  # Job experiment ID.
+  EXPID: "a00c"
+  # Default HPC platform name.
+  HPCARCH: "local"
+
+EXPERIMENT:
+  DATELIST: 20221101
+  MEMBERS: fc0
+  CHUNKSIZEUNIT: month
+  #SPLITSIZEUNIT: day
+  CHUNKSIZE: 2
+  NUMCHUNKS: 2
+  #SPLITSIZE: 1
+  SPLITPOLICY: flexible
+  CHUNKINI: ''
+  CALENDAR: standard
+PROJECT:
+  PROJECT_TYPE: 'none'
+PLATFORMS:
+  debug:
+    type: ps
+    host: localhost
+
+JOBS:
+  APP:
+    DEPENDENCIES:
+      APP:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+      OPA:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+    SCRIPT: |
+      echo "Hello world"
+    RUNNING: chunk
+    SPLITS: auto
+  DN:
+    DEPENDENCIES:
+      APP-1:
+        SPLITS_FROM:
+          ALL: # You want to set all the DN jobs to depend on the last APP split, otherwise the DN would be need to be tuned one by one.
+            SPLITS_TO: "auto"
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+      REMOTE_SETUP:
+      SIM:
+        STATUS: RUNNING
+    SCRIPT: |
+      echo "Hello world"
+    RUNNING: chunk
+    SPLITS: auto
+
+  DQC_BASIC:
+    DEPENDENCIES:
+      SIM: {}
+    SCRIPT: |
+      echo "Hello world"
+    RUNNING: chunk
+  DQC_FULL:
+    DEPENDENCIES:
+      DQC_BASIC: {}
+    SCRIPT: |
+      echo "Hello world"
+    RUNNING: chunk
+  INI:
+    DEPENDENCIES:
+      REMOTE_SETUP: {}
+    SCRIPT: |
+      echo "Hello world"
+    RUNNING: member
+  OPA:
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+      OPA:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+    SCRIPT: |
+      echo "Hello world"
+    RUNNING: chunk
+    SPLITS: auto
+  REMOTE_SETUP:
+    SCRIPT: |
+      echo "Hello world"
+    RUNNING: once
+  SIM:
+    DEPENDENCIES:
+      DQC_BASIC-10: {}
+      INI: {}
+      SIM-1: {}
+    SCRIPT: |
+      echo "Hello world"
+    RUNNING: chunk
+

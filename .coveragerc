@@ -1,0 +1,53 @@
+# This is the Coverage.py configuration file. This is used by CI when running
+# the tests and collecting coverage
+
+[run]
+branch = True
+cover_pylib = False
+concurrency = thread
+data_file = .coverage
+disable_warnings =
+    trace-changed
+    module-not-python
+    module-not-imported
+    no-data-collected
+    module-not-measured
+omit =
+    tests/*
+parallel = True
+source = ./autosubmit
+timid = False
+
+[report]
+exclude_lines =
+    pragma: no cover
+
+    # Don't complain if tests don't hit defensive assertion code:
+    raise NotImplementedError
+    return NotImplemented
+
+    # Ignore type checking code:
+    if (typing\.)?TYPE_CHECKING:
+    @overload( |$)
+
+    # Don't complain about ellipsis (exception classes, typing overloads etc):
+    \.\.\.
+
+    # Ignore abstract methods
+    @(abc\.)?abstractmethod
+
+fail_under=0
+ignore_errors = False
+omit =
+    tests/*
+precision = 2
+show_missing = False
+skip_covered = False
+sort = Name
+
+[html]
+directory = htmlcov
+
+[xml]
+output = coverage.xml
+package_depth = 99

@@ -1,0 +1,79 @@
+CONFIG:
+  # Current version of Autosubmit.
+  AUTOSUBMIT_VERSION: "4.1.10"
+  # Maximum number of jobs permitted in the waiting status.
+  MAXWAITINGJOBS: 20
+  # Total number of jobs in the workflow.
+  TOTALJOBS: 20
+  SAFETYSLEEPTIME: 10
+  RETRIALS: 0
+MAIL:
+  NOTIFICATIONS: False
+  TO:
+STORAGE:
+  TYPE: pkl
+  COPY_REMOTE_LOGS: true
+DEFAULT:
+  # Job experiment ID.
+  EXPID: "a00c"
+  # Default HPC platform name.
+  HPCARCH: "local"
+
+EXPERIMENT:
+  DATELIST: 20221101
+  MEMBERS: fc0
+  CHUNKSIZEUNIT: month
+  #SPLITSIZEUNIT: day
+  CHUNKSIZE: 2
+  NUMCHUNKS: 1
+  #SPLITSIZE: 1
+  SPLITPOLICY: flexible
+  CHUNKINI: ''
+  CALENDAR: standard
+PROJECT:
+  PROJECT_TYPE: 'none'
+PLATFORMS:
+  debug:
+    type: ps
+    host: localhost
+JOBS:
+  APP:
+    SCRIPT: |
+        echo "Chunk start date: %CHUNK_START_DATE%"
+        echo "Chunk end date: %CHUNK_END_DATE%"
+        echo "Split start date: %SPLIT_START_DATE%"
+        echo "Split end date: %SPLIT_END_DATE%"
+        echo "Split size: %SPLIT_SIZE%"
+        echo "Split number: %SPLIT_NUMBER%"
+        echo "Chunk size: %CHUNK_SIZE%"
+    DEPENDENCIES:
+      APP:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+    running: chunk
+    SPLITS: auto
+  DN:
+    SCRIPT: |
+      echo "Chunk start date: %CHUNK_START_DATE%"
+      echo "Chunk end date: %CHUNK_END_DATE%"
+      echo "Split start date: %SPLIT_START_DATE%"
+      echo "Split end date: %SPLIT_END_DATE%"
+      echo "Split size: %SPLIT_SIZE%"
+      echo "Split number: %SPLIT_NUMBER%"
+      echo "Chunk size: %CHUNK_SIZE%"
+    CHECK: True
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+      APP:
+        SPLITS_FROM:
+          ALL: # You want to set all the DN jobs to depend on the last APP split, otherwise the DN would be need to be tuned one by one.
+            SPLITS_TO: "%JOBS.APP.SPLITS%"
+    SPLITS: auto
+    running: chunk
+
+
+

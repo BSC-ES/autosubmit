@@ -44,9 +44,10 @@ install_requires = [
     'py3dotplus==1.1.0',
     'numpy<2',
     'rocrate==0.*',
-    'autosubmitconfigparser>=1.0.76',
+    'autosubmitconfigparser==1.0.76',
     'configparser',
     'setproctitle',
+    'invoke>=2.0',
     # 'sqlalchemy[mypy]' # TODO: pending Postgres MR
 ]
 

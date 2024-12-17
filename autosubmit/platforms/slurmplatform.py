@@ -98,8 +98,7 @@ class SlurmPlatform(ParamikoPlatform):
         :return:
         """
         try:
-
-            valid_packages_to_submit = [ package for package in valid_packages_to_submit if package.x11 is not True]
+            valid_packages_to_submit = [ package for package in valid_packages_to_submit if package.x11 != True]
             if len(valid_packages_to_submit) > 0:
                 duplicated_jobs_already_checked = False
                 platform = valid_packages_to_submit[0].jobs[0].platform
@@ -120,7 +119,7 @@ class SlurmPlatform(ParamikoPlatform):
                             #cancel bad submitted job if jobid is encountered
                             for id_ in jobid:
                                 self.send_command(self.cancel_job(id_))
-                    except Exception:
+                    except:
                         pass
                     jobs_id = None
                     self.connected = False
@@ -152,21 +151,21 @@ class SlurmPlatform(ParamikoPlatform):
                 if jobs_id is None or len(jobs_id) <= 0:
                     raise AutosubmitError(
                         "Submission failed, this can be due a failure on the platform", 6015,"Jobs_id {0}".format(jobs_id))
-                i = 0
                 if hold:
                     sleep(10)
-
+                jobid_index = 0
                 for package in valid_packages_to_submit:
+                    current_package_id = str(jobs_id[jobid_index])
                     if hold:
                         retries = 5
-                        package.jobs[0].id = str(jobs_id[i])
+                        package.jobs[0].id = current_package_id
                         try:
                             can_continue = True
                             while can_continue and retries > 0:
-                                cmd = package.jobs[0].platform.get_queue_status_cmd(jobs_id[i])
+                                cmd = package.jobs[0].platform.get_queue_status_cmd(current_package_id)
                                 package.jobs[0].platform.send_command(cmd)
                                 queue_status = package.jobs[0].platform._ssh_output
-                                reason = package.jobs[0].platform.parse_queue_reason(queue_status, jobs_id[i])
+                                reason = package.jobs[0].platform.parse_queue_reason(queue_status, current_package_id)
                                 if reason == '(JobHeldAdmin)':
                                     can_continue = False
                                 elif reason == '(JobHeldUser)':
@@ -176,19 +175,16 @@ class SlurmPlatform(ParamikoPlatform):
                                     sleep(5)
                                 retries = retries - 1
                             if not can_continue:
-                                package.jobs[0].platform.send_command(package.jobs[0].platform.cancel_cmd + " {0}".format(jobs_id[i]))
-                                i = i + 1
+                                package.jobs[0].platform.send_command(package.jobs[0].platform.cancel_cmd + " {0}".format(current_package_id))
+                                jobid_index += 1
                                 continue
                             if not self.hold_job(package.jobs[0]):
-                                i = i + 1
+                                jobid_index += 1
                                 continue
                         except Exception as e:
-                            failed_packages.append(jobs_id)
+                            failed_packages.append(current_package_id)
                             continue
-                    for job in package.jobs:
-                        job.hold = hold
-                        job.id = str(jobs_id[i])
-                        job.status = Status.SUBMITTED
+                    package.process_jobs_to_submit(current_package_id, hold)
                     # Check if there are duplicated jobnames
                     if not duplicated_jobs_already_checked:
                         job_name = package.name if hasattr(package, "name") else package.jobs[0].name
@@ -202,7 +198,7 @@ class SlurmPlatform(ParamikoPlatform):
                                 self.send_command(self.cancel_job(id_)) # This can be faster if we cancel all jobs at once but there is no cancel_all_jobs call right now so todo in future
                                 Log.debug(f'Job {id_} with the assigned name: {job_name} has been cancelled')
                             Log.debug(f'Job {package.jobs[0].id} with the assigned name: {job_name} has been submitted')
-                    i += 1
+                    jobid_index += 1
                 if len(failed_packages) > 0:
                     for job_id in failed_packages:
                         platform.send_command(platform.cancel_cmd + " {0}".format(job_id))
@@ -211,6 +207,8 @@ class SlurmPlatform(ParamikoPlatform):
         except AutosubmitError as e:
             raise
         except AutosubmitCritical as e:
+            raise
+        except AttributeError:
             raise
         except Exception as e:
             raise AutosubmitError("{0} submission failed".format(self.name), 6015, str(e))
@@ -254,9 +252,12 @@ class SlurmPlatform(ParamikoPlatform):
             cmd = self.get_submit_cmd(script_name, job, hold=hold, export=export)
             if cmd is None:
                 return None
-            if self.send_command(cmd,x11=x11):
-                job_id = self.get_submitted_job_id(self.get_ssh_output(),x11=x11)
-                Log.debug("Job ID: {0}", job_id)
+            if self.send_command(cmd, x11=x11):
+                job_id = self.get_submitted_job_id(self.get_ssh_output(), x11=x11)
+                if job:
+                    Log.result(f"Job: {job.name} submitted with job_id: {job_id}")
+                else:
+                    Log.result(f"Job submitted with job_id: {job_id}")
                 return int(job_id)
             else:
                 return None
@@ -651,37 +652,42 @@ class SlurmPlatform(ParamikoPlatform):
     def allocated_nodes():
         return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
 
-    def check_file_exists(self, filename, wrapper_failed=False, sleeptime=5, max_retries=3, first=True):
+    def check_file_exists(self, filename: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3) -> bool:
+        """
+        Checks if a file exists on the FTP server.
+
+        Args:
+            filename (str): The name of the file to check.
+            wrapper_failed (bool): Whether the wrapper has failed. Defaults to False.
+            sleeptime (int): Time to sleep between retries in seconds. Defaults to 5.
+            max_retries (int): Maximum number of retries. Defaults to 3.
+
+        Returns:
+            bool: True if the file exists, False otherwise.
+        """
+        # Todo in a future refactor, check the sleeptime retrials of these function, previously it was waiting a lot of time
         file_exist = False
         retries = 0
-        # Not first is meant for vertical_wrappers. There you have to download STAT_{MAX_LOGS} then STAT_{MAX_LOGS-1} and so on
-        if not first:
-            max_retries = 1
-            sleeptime = 0
         while not file_exist and retries < max_retries:
             try:
-                # This return IOError if path doesn't exist
+                # This return IOError if a path doesn't exist
                 self._ftpChannel.stat(os.path.join(
                     self.get_files_path(), filename))
                 file_exist = True
             except IOError as e:  # File doesn't exist, retry in sleeptime
-                if first:
-                    Log.debug("{2} File does not exist.. waiting {0}s for a new retry (retries left: {1})", sleeptime,
-                              max_retries - retries, os.path.join(self.get_files_path(), filename))
                 if not wrapper_failed:
                     sleep(sleeptime)
-                    sleeptime = sleeptime + 5
                     retries = retries + 1
                 else:
-                    retries = 9999
+                    sleep(2)
+                    retries = retries + 1
             except BaseException as e:  # Unrecoverable error
                 if str(e).lower().find("garbage") != -1:
-                    if not wrapper_failed:
-                        sleep(sleeptime)
-                        sleeptime = sleeptime + 5
-                        retries = retries + 1
+                    sleep(2)
+                    retries = retries + 1
                 else:
-                    Log.printlog("remote logs {0} couldn't be recovered".format(filename), 6001)
                     file_exist = False  # won't exist
                     retries = 999  # no more retries
+        if not file_exist:
+            Log.warning("File {0} couldn't be found".format(filename))
         return file_exist

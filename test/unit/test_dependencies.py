@@ -1,21 +1,25 @@
 from unittest.mock import Mock
 
-import copy
 import inspect
 import mock
 import tempfile
 import unittest
 from copy import deepcopy
 from datetime import datetime
+
 from mock import patch
 from mock.mock import MagicMock
 
+from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistenceDb
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+
+from networkx import DiGraph
+from autosubmit.job.job_utils import Dependency
 
 
 class FakeBasicConfig:
@@ -547,6 +551,81 @@ class TestJobList(unittest.TestCase):
         expected_output = [self.dictionary._dic["SIM"][0]]
         self.assertEqual(expected_output, result)
 
+
+def test_normalize_auto_keyword(autosubmit_config, mocker):
+    as_conf = autosubmit_config('a000', experiment_data={
+
+    })
+    job_list = JobList(
+        as_conf.expid,
+        FakeBasicConfig,
+        YAMLParserFactory(),
+        Autosubmit._get_job_list_persistence(as_conf.expid, as_conf),
+        as_conf
+    )
+    dependency = Dependency("test")
+
+    job = Job("a000_20001010_fc1_2_1_test", 1, Status.READY, 1)
+    job.running = "chunk"
+    job.section = "test"
+    job.date = "20001010"
+    job.member = "fc1"
+    job.splits = 5
+
+    job_minus = Job("a000_20001010_fc1_1_1_minus", 1, Status.READY, 1)
+    job_minus.running = "chunk"
+    job_minus.section = "minus"
+    job_minus.date = "20001010"
+    job_minus.member = "fc1"
+    job_minus.splits = 40
+
+    job_plus = Job("a000_20001010_fc1_3_1_plus", 1, Status.READY, 1)
+    job_plus.running = "chunk"
+    job_plus.section = "plus"
+    job_plus.date = "20001010"
+    job_plus.member = "fc1"
+    job_plus.splits = 50
+
+    job_list.graph = DiGraph()
+    job_list.graph.add_node(job.name, job=job)
+    job_list.graph.add_node(job_minus.name, job=job_minus)
+    job_list.graph.add_node(job_plus.name, job=job_plus)
+
+    dependency.distance = 1
+    dependency.relationships = {
+        "SPLITS_FROM": {
+            "key": {
+                "SPLITS_TO": "auto"
+            }
+        }
+    }
+    dependency.sign = "-"
+    dependency.section = "minus"
+    dependency = job_list._normalize_auto_keyword(job, dependency)
+    assert dependency.relationships["SPLITS_FROM"]["key"]["SPLITS_TO"] == "40"
+    assert job.splits == "40"
+    dependency.relationships = {
+        "SPLITS_FROM": {
+            "key": {
+                "SPLITS_TO": "auto"
+            }
+        }
+    }
+    dependency.sign = "+"
+    dependency.section = "plus"
+    dependency = job_list._normalize_auto_keyword(job, dependency)
+    assert dependency.relationships["SPLITS_FROM"]["key"]["SPLITS_TO"] == "50"
+    assert job.splits == "50"  # Test that the param is assigned
+
+    # Test that the param is not being changed after update_job_parameters
+    as_conf.experiment_data["JOBS"] = {}
+    as_conf.experiment_data["JOBS"][job.section] = {}
+    as_conf.experiment_data["JOBS"][job.section]["SPLITS"] = "auto"
+    job.date = None
+    mocker.patch("autosubmit.job.job.Job.calendar_split", side_effect=lambda x, y: y)
+    parameters = job.update_job_parameters(as_conf, {})
+    assert job.splits == "50"
+    assert parameters["SPLITS"] == "50"
 
 
 if __name__ == '__main__':

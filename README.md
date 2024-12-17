@@ -54,7 +54,7 @@ HOW TO DEPLOY/SETUP AUTOSUBMIT FRAMEWORK
 
 - Install Autosubmit
    > pip install autosubmit
-  or download, unpack and "python setup.py install"
+  or download, unpack, move to the folder and "pip install ."
 
 - Create a repository for experiments: Say for example "/cfu/autosubmit" then "autosubmit configure" and follow
   instructions
