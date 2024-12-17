@@ -1263,6 +1263,12 @@ class Job(object):
                 raise AutosubmitCritical("Failed to retrieve logs for job {0}".format(self.name), 6000)
         else:
             self.write_stats(last_retrial)
+            if self.wrapper_type == "vertical":
+                for retrial in range(0, last_retrial + 1):
+                    Log.result(f"{platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{retrial}'.")
+            else:
+                Log.result(f"{platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{self.fail_count}'.")
+
 
     def parse_time(self,wallclock):
         regex = re.compile(r'(((?P<hours>\d+):)((?P<minutes>\d+)))(:(?P<seconds>\d+))?')
