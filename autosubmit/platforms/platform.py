@@ -334,8 +334,7 @@ class Platform(object):
                                                  package._wallclock, package._num_processors,
                                                  package.platform, as_conf, hold)
                         job_list.job_package_map[package.jobs[0].id] = wrapper_job
-                        packages_persistence.save(
-                            package.name, package.jobs, package._expid, inspect)
+                        packages_persistence.save(package, inspect)
                     for innerJob in package._jobs:
                         any_job_submitted = True
                         # Setting status to COMPLETED, so it does not get stuck in the loop that calls this function

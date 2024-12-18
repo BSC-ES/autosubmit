@@ -1837,12 +1837,14 @@ class Autosubmit:
                         else:
                             jobs_to_check[platform.name] = [[job, job_prev_status]]
         return jobs_to_check,job_changes_tracker
+
     @staticmethod
-    def check_wrapper_stored_status(as_conf,job_list):
+    def check_wrapper_stored_status(as_conf, job_list, wrapper_wallclock):
         """
         Check if the wrapper job has been submitted and the inner jobs are in the queue.
         :param as_conf: a BasicConfig object
         :param job_list: a JobList object
+        :param wrapper_wallclock: the wallclock of the wrapper
         :return: JobList object updated
         """
         # if packages_dict attr is in job_list
@@ -1887,7 +1889,7 @@ class Autosubmit:
                     else:
                         wrapper_status = Status.SUBMITTED
                 wrapper_job = WrapperJob(package_name, jobs[0].id, wrapper_status, 0, jobs,
-                                         None,
+                                         wrapper_wallclock,
                                          None, jobs[0].platform, as_conf, jobs[0].hold)
                 job_list.job_package_map[jobs[0].id] = wrapper_job
         return job_list
@@ -2059,12 +2061,17 @@ class Autosubmit:
                     "job_packages not found", 6016, str(e))
             Log.debug("Processing job packages")
             try:
-                for (exp_id, package_name, job_name) in packages:
+                wrapper_wallclock = "48:00" # fallback value, only affects to is_overclock
+                for (exp_id, package_name, job_name, wrapper_wallclock) in packages:
                     if package_name not in job_list.packages_dict:
                         job_list.packages_dict[package_name] = []
                     job_list.packages_dict[package_name].append(job_list.get_job_by_name(job_name))
                 # This function, checks the stored STATUS of jobs inside wrappers. Since "wrapper status" is a memory variable.
-                job_list = Autosubmit.check_wrapper_stored_status(as_conf, job_list)
+                job_list = Autosubmit.check_wrapper_stored_status(as_conf, job_list, wrapper_wallclock)
+            except ValueError as e:  # New field in the db, so not compatible if the wrapper package is not reset ( done in the create function )
+                if "not enough values to unpack" in str(e).lower():
+                    raise AutosubmitCritical("Error while loading the wrappers, this due a AS version change in the middle of the run. Please, run 'autosubmit create -f' again.", 7014, str(e))
+                raise
             except Exception as e:
                 raise AutosubmitCritical(
                     "Autosubmit failed while processing job packages. This might be due to a change in your experiment configuration files after 'autosubmit create' was performed.",

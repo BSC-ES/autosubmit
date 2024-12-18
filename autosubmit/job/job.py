@@ -1336,6 +1336,8 @@ class Job(object):
         :return:
         """
         elapsed = datetime.datetime.now() - self.start_time
+        if not self.wallclock_in_seconds:
+            self.wallclock_in_seconds = self.wallclock
         if int(elapsed.total_seconds()) > self.wallclock_in_seconds:
             Log.warning(f"Job {self.name} is over wallclock time, Autosubmit will check if it is completed")
             return True
@@ -1739,7 +1741,8 @@ class Job(object):
         self.wallclock = job_data.get("WALLCLOCK",
                                                              as_conf.platforms_data.get(self.platform_name, {}).get(
                                                                  "MAX_WALLCLOCK", None))
-        self.wallclock_in_seconds = self.wallclock
+        if self.status in [Status.READY, Status.PREPARED]:
+            self.wallclock_in_seconds = self.wallclock
         self.custom_directives = job_data.get("CUSTOM_DIRECTIVES", "")
 
         self.process_scheduler_parameters(as_conf,parameters,job_platform,chunk)
@@ -2635,7 +2638,7 @@ class WrapperJob(Job):
         self.failed = False
         self.job_list = job_list
         # divide jobs in dictionary by state?
-        self.wallclock = total_wallclock
+        self.wallclock = total_wallclock # Now it is reloaded after a run -> stop -> run
         self.num_processors = num_processors
         self.running_jobs_start = OrderedDict()
         self._platform = platform
@@ -2645,6 +2648,8 @@ class WrapperJob(Job):
         self.hold = hold
         self.inner_jobs_running = list()
         self.is_wrapper = True
+        if not self.wallclock_in_seconds:
+            self.wallclock_in_seconds = self._wallclock
 
 
     def _queuing_reason_cancel(self, reason):
