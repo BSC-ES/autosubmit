@@ -5761,6 +5761,9 @@ class Autosubmit:
         else:
             job_list.remove_rerun_only_jobs(notransitive)
 
+        for job in job_list.get_waiting() + job_list.get_ready(): # Reset packed value on load so the jobs can be wrapped again. Inspect -cw and Create -cw had issues.
+            job.packed = False
+
         return job_list
 
     @staticmethod
