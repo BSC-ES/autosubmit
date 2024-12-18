@@ -741,7 +741,7 @@ class JobPackageVertical(JobPackageThread):
             self._wallclock = sum_str_hours(self._wallclock, job.wallclock)
         self._name = f"{self._expid}_{self.FILE_PREFIX}_{jobs_in_wrapper_str(configuration,self.current_wrapper_section)}_{str(int(time.time())) + str(random.randint(1, 10000))}_{self._num_processors}_{len(self._jobs)}"
 
-    def parse_time(self):
+    def parse_time(self): # TODO: Remove this function and use the one in the Job class or move the one in the job class into utils
         format_ = "minute"
         # noinspection Annotator
         regex = re.compile(r'(((?P<hours>\d+):)((?P<minutes>\d+)))(:(?P<seconds>\d+))?')
@@ -759,7 +759,7 @@ class JobPackageVertical(JobPackageThread):
                 time_params[name] = int(param)
         return timedelta(**time_params),format_
     def _common_script_content(self):
-        if self.jobs[0].wrapper_type == "vertical":
+        if self.jobs[0].wrapper_type == "vertical": # TODO: normalize this logic to be the same as the one in the Job class
             wallclock,format_ = self.parse_time()
             original_wallclock_to_seconds = wallclock.days * 86400.0 + wallclock.seconds
 

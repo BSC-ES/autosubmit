@@ -654,7 +654,7 @@ class ParamikoPlatform(Platform):
                         if job.wallclock == "00:00" or job.wallclock is None:
                             wallclock = job.platform.max_wallclock
                         if wallclock != "00:00" and wallclock != "00:00:00" and wallclock != "":
-                            if job.is_over_wallclock(job.start_time,wallclock):
+                            if job.is_over_wallclock():
                                 try:
                                     job.platform.get_completed_files(job.name)
                                     job_status = job.check_completion(over_wallclock=True)
@@ -786,7 +786,7 @@ class ParamikoPlatform(Platform):
                     if job.wallclock == "00:00":
                         wallclock = job.platform.max_wallclock
                     if wallclock != "00:00" and wallclock != "00:00:00" and wallclock != "":
-                        if job.is_over_wallclock(job.start_time,wallclock):
+                        if job.is_over_wallclock():
                             try:
                                 job.platform.get_completed_files(job.name)
                                 job_status = job.check_completion(over_wallclock=True)
@@ -1381,18 +1381,6 @@ class ParamikoPlatform(Platform):
                 header = header.replace(
                     '%HYPERTHREADING_DIRECTIVE%', self.header.get_hyperthreading_directive(job))
         return header
-    def parse_time(self,wallclock):
-        # noinspection Annotator
-        regex = re.compile(r'(((?P<hours>\d+):)((?P<minutes>\d+)))(:(?P<seconds>\d+))?')
-        parts = regex.match(wallclock)
-        if not parts:
-            return
-        parts = parts.groupdict()
-        time_params = {}
-        for name, param in parts.items():
-            if param:
-                time_params[name] = int(param)
-        return timedelta(**time_params)
 
     def closeConnection(self):
         # Ensure to delete all references to the ssh connection, so that it frees all the file descriptors
