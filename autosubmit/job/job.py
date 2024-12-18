@@ -2084,8 +2084,8 @@ class Job(object):
         as_conf.reload()
         self._adjust_new_parameters()
         self._init_runtime_parameters()
-        if hasattr(self, "start_time"):
-            self.start_time = time.time()
+        if not hasattr(self, "start_time"):
+            self.start_time = datetime.datetime.now()
         # Parameters that affect to all the rest of parameters
         self.update_dict_parameters(as_conf)
         parameters = parameters.copy()
