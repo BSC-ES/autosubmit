@@ -476,7 +476,7 @@ class DicJobs:
                 final_jobs_list_special = []
                 if "*" in one_to_one_splits and not skip_one_to_one:
                     easier_to_filter = "," + one_to_one_splits + ","
-                    matches = re.findall(rf"\\[0-9]+", easier_to_filter)
+                    matches = re.findall(r"\\[0-9]+", easier_to_filter)
                     if len(matches) > 0:  # get *\\
 
                         split_slice = int(matches[0].split("\\")[1])

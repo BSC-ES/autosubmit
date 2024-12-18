@@ -13,7 +13,7 @@ def _get_script_files_path() -> Path:
 
 @pytest.fixture
 def scheduler_tmpdir(tmpdir_factory):
-    folder = tmpdir_factory.mktemp(f'scheduler_tests')
+    folder = tmpdir_factory.mktemp('scheduler_tests')
     os.mkdir(folder.join('scratch'))
     os.mkdir(folder.join('scheduler_tmp_dir'))
     file_stat = os.stat(f"{folder.strpath}")
@@ -107,7 +107,7 @@ PLATFORMS:
         """)
     # add a job of each platform type
     with jobs_path.open('w') as f:
-        f.write(f"""
+        f.write("""
 JOBS:
     nodes:
         SCRIPT: |
