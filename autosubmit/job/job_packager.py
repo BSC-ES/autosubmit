@@ -612,6 +612,7 @@ class JobPackager(object):
                 built_packages_tmp = self._build_vertical_packages(jobs, wrapper_limits, wrapper_info=current_info)
             if len(built_packages_tmp) > 0:
                 Log.result(f"Built {len(built_packages_tmp)} wrappers for {wrapper_name}")
+            self._propagate_inner_jobs_ready_date(built_packages_tmp)
             packages_to_submit, max_jobs_to_submit = self.check_packages_respect_wrapper_policy(built_packages_tmp, packages_to_submit, max_jobs_to_submit, wrapper_limits, any_simple_packages)
 
         # Now, prepare the packages for non-wrapper jobs
@@ -640,6 +641,18 @@ class JobPackager(object):
             package.hold = self.hold
 
         return packages_to_submit
+
+    @staticmethod
+    def _propagate_inner_jobs_ready_date(built_packages_tmp: List[JobPackageBase]) -> None:
+        """
+        Propagate the ready date of the inner jobs to the wrapper job.
+
+        :param built_packages_tmp: List of built packages.
+        """
+        for package in built_packages_tmp:
+            if len(package.jobs) > 1:
+                for job in package.jobs[1:]:
+                    job.ready_date = package.jobs[0].ready_date
 
     def _divide_list_by_section(self, jobs_list):
         """
