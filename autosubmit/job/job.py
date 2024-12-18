@@ -1290,11 +1290,13 @@ class Job(object):
 
 
     def _max_possible_wallclock(self):
-        if self.platform:
+        if self.platform and self.platform.max_wallclock:
             wallclock = self.parse_time(self.platform.max_wallclock)
+            if not wallclock:
+                return None
             return int(wallclock.total_seconds())
         else:
-            return self.wallclock_in_seconds
+            return None
 
     def _time_in_seconds_and_margin(self, wallclock: datetime.timedelta) -> int:
         """
@@ -1311,6 +1313,8 @@ class Job(object):
         """
         total = int(wallclock.total_seconds() * 1.30)
         total_platform = self._max_possible_wallclock()
+        if not total_platform:
+            total_platform = total
         if total > total_platform:
             Log.warning(f"Job {self.name} has a wallclock time '{total} seconds' higher than the maximum allowed by the platform '{total_platform} seconds' "
                         f"Setting wallclock time to the maximum allowed by the platform.")
@@ -1318,11 +1322,12 @@ class Job(object):
         wallclock_delta = datetime.timedelta(seconds=total)
         return int(wallclock_delta.total_seconds())
 
-    def parse_time(self,wallclock):
+    @staticmethod
+    def parse_time(wallclock):
         regex = re.compile(r'(((?P<hours>\d+):)((?P<minutes>\d+)))(:(?P<seconds>\d+))?')
         parts = regex.match(wallclock)
         if not parts:
-            return
+            return None
         parts = parts.groupdict()
         time_params = {}
         for name, param in parts.items():
