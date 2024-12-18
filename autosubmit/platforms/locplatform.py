@@ -104,8 +104,7 @@ class LocalPlatform(ParamikoPlatform):
 
     def get_submit_cmd(self, job_script, job, hold=False, export=""):
         if job:  # Not intuitive at all, but if it is not a job, it is a wrapper
-            wallclock = self.parse_time(job.wallclock)
-            seconds = int(wallclock.days * 86400 + wallclock.seconds * 60)
+            seconds = job.wallclock_in_seconds
         else:
             # TODO for another branch this, it is to add a timeout to the wrapped jobs even if the wallclock is 0, default to 2 days
             seconds = 60*60*24*2

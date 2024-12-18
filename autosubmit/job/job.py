@@ -37,7 +37,7 @@ from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_da
 from functools import reduce
 from threading import Thread
 from time import sleep
-from typing import List, Union, Dict, Any
+from typing import List, Union, Dict, Any, Tuple
 
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
@@ -260,6 +260,7 @@ class Job(object):
         self.ready_date = None
         self.wrapper_name = None
         self.is_wrapper = False
+        self._wallclock_in_seconds = None
 
     def _adjust_new_parameters(self) -> None:
         """
@@ -273,6 +274,9 @@ class Job(object):
             else:
                 self.is_wrapper = True
                 self.wrapper_name = "wrapped"
+        if not hasattr(self, '_wallclock_in_seconds'):  # Added in 4.1.12
+            self._wallclock_in_seconds = None
+            self.wallclock_in_seconds = self.wallclock
 
     def _init_runtime_parameters(self):
         # hetjobs
@@ -293,10 +297,25 @@ class Job(object):
 
 
     @property
+    def wallclock_in_seconds(self):
+        return self._wallclock_in_seconds
+
+    @wallclock_in_seconds.setter
+    def wallclock_in_seconds(self, wallclock):
+        if not self._wallclock_in_seconds or self.status not in [Status.RUNNING, Status.QUEUING, Status.SUBMITTED]:
+            # Should always take the max_wallclock set in the platform, this is set as fallback ( and local platform doesn't have a max_wallclock defined )
+            if not wallclock or wallclock == "00:00":
+                wallclock = "24:00"
+                Log.warning(f"No wallclock is set for this job. Default to {wallclock}")
+            wallclock = self.parse_time(wallclock)
+            self._wallclock_in_seconds = self._time_in_seconds_and_margin(wallclock)
+
+    @property
     @autosubmit_parameter(name='x11')
     def x11(self):
         """Whether to use X11 forwarding"""
         return self._x11
+
     @x11.setter
     def x11(self, value):
         self._x11 = value
@@ -1270,49 +1289,63 @@ class Job(object):
                 Log.result(f"{platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{self.fail_count}'.")
 
 
-    def parse_time(self,wallclock):
+    def _max_possible_wallclock(self):
+        if self.platform and self.platform.max_wallclock:
+            wallclock = self.parse_time(self.platform.max_wallclock)
+            if not wallclock:
+                return None
+            return int(wallclock.total_seconds())
+        else:
+            return None
+
+    def _time_in_seconds_and_margin(self, wallclock: datetime.timedelta) -> int:
+        """
+        Calculate the total wallclock time in seconds and the wallclock time with a margin.
+
+        This method increases the given wallclock time by 30%.
+        It then converts the total wallclock time to seconds and returns both the total
+        wallclock time in seconds and the wallclock time with the margin as a timedelta.
+
+        :param wallclock: The original wallclock time.
+        :type wallclock: datetime.timedelta
+
+        :return int: The total wallclock time in seconds.
+        """
+        total = int(wallclock.total_seconds() * 1.30)
+        total_platform = self._max_possible_wallclock()
+        if not total_platform:
+            total_platform = total
+        if total > total_platform:
+            Log.warning(f"Job {self.name} has a wallclock time '{total} seconds' higher than the maximum allowed by the platform '{total_platform} seconds' "
+                        f"Setting wallclock time to the maximum allowed by the platform.")
+            total = total_platform
+        wallclock_delta = datetime.timedelta(seconds=total)
+        return int(wallclock_delta.total_seconds())
+
+    @staticmethod
+    def parse_time(wallclock):
         regex = re.compile(r'(((?P<hours>\d+):)((?P<minutes>\d+)))(:(?P<seconds>\d+))?')
         parts = regex.match(wallclock)
         if not parts:
-            return
+            return None
         parts = parts.groupdict()
-        if int(parts['hours']) > 0 :
-            format_ = "hour"
-        else:
-            format_ = "minute"
         time_params = {}
         for name, param in parts.items():
             if param:
                 time_params[name] = int(param)
-        return datetime.timedelta(**time_params),format_
+        return datetime.timedelta(**time_params)
 
-    # Duplicated for wrappers and jobs to fix in 4.0.0
-    def is_over_wallclock(self, start_time, wallclock):
+    # TODO Duplicated for wrappers and jobs to fix in 4.1.X but in wrappers is called _is_over_wallclock for unknown reasons
+    def is_over_wallclock(self):
         """
         Check if the job is over the wallclock time, it is an alternative method to avoid platform issues
-        :param start_time:
-        :param wallclock:
         :return:
         """
-        elapsed = datetime.datetime.now() - start_time
-        wallclock,time_format = self.parse_time(wallclock)
-        if time_format == "hour":
-            total = wallclock.days * 24 + wallclock.seconds / 60 / 60
-        else:
-            total = wallclock.days * 24 + wallclock.seconds / 60
-        total = total * 1.30 # in this case we only want to avoid slurm issues so the time is increased by 50%
-        if time_format == "hour":
-            hour = int(total)
-            minute = int((total - int(total)) * 60.0)
-            second = int(((total - int(total)) * 60 -
-                          int((total - int(total)) * 60.0)) * 60.0)
-            wallclock_delta = datetime.timedelta(hours=hour, minutes=minute,
-                                                 seconds=second)
-        else:
-            minute = int(total)
-            second = int((total - int(total)) * 60.0)
-            wallclock_delta = datetime.timedelta(minutes=minute, seconds=second)
-        if elapsed > wallclock_delta:
+        elapsed = datetime.datetime.now() - self.start_time
+        if not self.wallclock_in_seconds:
+            self.wallclock_in_seconds = self.wallclock
+        if int(elapsed.total_seconds()) > self.wallclock_in_seconds:
+            Log.warning(f"Job {self.name} is over wallclock time, Autosubmit will check if it is completed")
             return True
         return False
 
@@ -1714,6 +1747,8 @@ class Job(object):
         self.wallclock = job_data.get("WALLCLOCK",
                                                              as_conf.platforms_data.get(self.platform_name, {}).get(
                                                                  "MAX_WALLCLOCK", None))
+        if self.status in [Status.READY, Status.PREPARED]:
+            self.wallclock_in_seconds = self.wallclock
         self.custom_directives = job_data.get("CUSTOM_DIRECTIVES", "")
 
         self.process_scheduler_parameters(as_conf,parameters,job_platform,chunk)
@@ -2051,8 +2086,8 @@ class Job(object):
         as_conf.reload()
         self._adjust_new_parameters()
         self._init_runtime_parameters()
-        if hasattr(self, "start_time"):
-            self.start_time = time.time()
+        if not hasattr(self, "start_time"):
+            self.start_time = datetime.datetime.now()
         # Parameters that affect to all the rest of parameters
         self.update_dict_parameters(as_conf)
         parameters = parameters.copy()
@@ -2609,7 +2644,7 @@ class WrapperJob(Job):
         self.failed = False
         self.job_list = job_list
         # divide jobs in dictionary by state?
-        self.wallclock = total_wallclock
+        self.wallclock = total_wallclock # Now it is reloaded after a run -> stop -> run
         self.num_processors = num_processors
         self.running_jobs_start = OrderedDict()
         self._platform = platform
@@ -2619,6 +2654,8 @@ class WrapperJob(Job):
         self.hold = hold
         self.inner_jobs_running = list()
         self.is_wrapper = True
+        if not self.wallclock_in_seconds:
+            self.wallclock_in_seconds = self._wallclock
 
 
     def _queuing_reason_cancel(self, reason):

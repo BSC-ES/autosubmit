@@ -1100,6 +1100,7 @@ CONFIG:
         dummy_platform = MagicMock()
         dummy_platform.serial_platform = dummy_serial_platform
         dummy_platform.name = 'dummy_platform'
+        dummy_platform.max_wallclock = '00:55'
 
         self.as_conf.substitute_dynamic_variables = MagicMock()
         default = {'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%',
