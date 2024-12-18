@@ -952,8 +952,6 @@ class Platform(object):
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
                 try:
                     job.retrieve_logfiles(self, raise_error=True)
-                    Log.result(
-                        f"{identifier} Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
                 except:
                     jobs_pending_to_process.add(job)
                     job._log_recovery_retries += 1
