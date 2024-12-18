@@ -96,13 +96,11 @@ class PsPlatform(ParamikoPlatform):
         return [int(element.firstChild.nodeValue) for element in jobs_xml]
 
     def get_submit_cmd(self, job_script, job, hold=False, export=""):
-        wallclock = self.parse_time(job.wallclock)
-        seconds = int(wallclock.days * 86400 + wallclock.seconds * 60)
         if export == "none" or export == "None" or export is None or export == "":
             export = ""
         else:
             export += " ; "
-        return self.get_call(job_script, job, export = export, timeout=seconds)
+        return self.get_call(job_script, job, export=export, timeout=job.wallclock_in_seconds)
 
     def get_checkjob_cmd(self, job_id):
         return self.get_pscall(job_id)
