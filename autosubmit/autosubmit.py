@@ -864,14 +864,17 @@ class Autosubmit:
                         raise AutosubmitCritical(
                             "Experiment {0} has no yml data. Please, if you really wish to use AS 4 prompt:\nautosubmit upgrade {0}".format(
                                 expid), 7012)
-                if not BasicConfig.expid_dir(expid).exists:
+                exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+                tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
+                aslogs_path = os.path.join(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
+                if not os.path.exists(exp_path):
                     raise AutosubmitCritical("Experiment does not exist", 7012)
                 # delete is treated differently
                 owner, eadmin, current_owner = Autosubmit._check_ownership_and_set_last_command(as_conf, expid, args.command)
-            if not BasicConfig.expid_tmp_dir(expid).exists():
-                BasicConfig.expid_tmp_dir(expid).mkdir()
-            if not BasicConfig.expid_aslog_dir(expid).exists():
-                BasicConfig.expid_aslog_dir(expid).mkdir()
+            if not os.path.exists(tmp_path):
+                os.mkdir(tmp_path)
+            if not os.path.exists(aslogs_path):
+                os.mkdir(aslogs_path)
             if args.command == "stop":
                 exp_id = "_".join(expids)
                 Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
@@ -880,25 +883,25 @@ class Autosubmit:
                                           args.command + exp_id + '_err.log'), "err")
             else:
                 if owner:
-                    os.chmod(BasicConfig.expid_tmp_dir(expid), 0o775)
+                    os.chmod(tmp_path, 0o775)
                     with suppress(PermissionError, FileNotFoundError, Exception): # for -txt option
-                        os.chmod(f'{BasicConfig.expid_dir(expid)}/status', 0o775)
+                        os.chmod(f'{exp_path}/status', 0o775)
 
-                    Log.set_file(BasicConfig.expid_aslog_dir(expid).joinpath(args.command + '.log'), "out", log_level)
-                    Log.set_file(BasicConfig.expid_aslog_dir(expid).joinpath(args.command + '_err.log'), "err")
+                    Log.set_file(os.path.join(aslogs_path, args.command + '.log'), "out", log_level)
+                    Log.set_file(os.path.join(aslogs_path, args.command + '_err.log'), "err")
                     if args.command in ["run"]:
-                        if os.path.exists(BasicConfig.expid_aslog_dir(expid).joinpath('jobs_active_status.log')):
-                            os.remove(BasicConfig.expid_aslog_dir(expid).joinpath('jobs_active_status.log'))
-                        if os.path.exists(BasicConfig.expid_aslog_dir(expid).joinpath('jobs_failed_status.log')):
-                            os.remove(BasicConfig.expid_aslog_dir(expid).joinpath('jobs_failed_status.log'))
-                            Log.set_file(BasicConfig.expid_aslog_dir(expid).joinpath('jobs_active_status.log'), "status")
-                            Log.set_file(BasicConfig.expid_aslog_dir(expid).joinpath('jobs_failed_status.log'), "status_failed")
+                        if os.path.exists(os.path.join(aslogs_path, 'jobs_active_status.log')):
+                            os.remove(os.path.join(aslogs_path, 'jobs_active_status.log'))
+                        if os.path.exists(os.path.join(aslogs_path, 'jobs_failed_status.log')):
+                            os.remove(os.path.join(aslogs_path, 'jobs_failed_status.log'))
+                            Log.set_file(os.path.join(aslogs_path, 'jobs_active_status.log'), "status")
+                            Log.set_file(os.path.join(aslogs_path, 'jobs_failed_status.log'), "status_failed")
                 else:
-                    st = os.stat(BasicConfig.expid_tmp_dir(expid))
+                    st = os.stat(tmp_path)
                     oct_perm = str(oct(st.st_mode))[-3:]
                     if int(oct_perm[1]) in [6, 7] or int(oct_perm[2]) in [6, 7]:
-                        Log.set_file(BasicConfig.expid_tmp_dir(expid).joinpath(args.command + '.log'), "out", log_level)
-                        Log.set_file(BasicConfig.expid_tmp_dir(expid).joinpath(args.command + '_err.log'), "err")
+                        Log.set_file(os.path.join(tmp_path, args.command + '.log'), "out", log_level)
+                        Log.set_file(os.path.join(tmp_path, args.command + '_err.log'), "err")
                     else:
                         Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
                                                   args.command + expid + '.log'), "out", log_level)
@@ -906,8 +909,8 @@ class Autosubmit:
                                                   args.command + expid + '_err.log'), "err")
                         Log.printlog(
                             "Permissions of {0} are {1}. The log is being written in the {2} path instead of {1}. Please tell to the owner to fix the permissions".format(
-                                BasicConfig.expid_tmp_dir(expid), oct_perm, BasicConfig.GLOBAL_LOG_DIR))
-            Log.file_path = BasicConfig.expid_tmp_dir(expid)
+                                tmp_path, oct_perm, BasicConfig.GLOBAL_LOG_DIR))
+            Log.file_path = tmp_path
             if owner:
                 if "update_version" in args:
                     force_update_version = args.update_version
@@ -935,7 +938,8 @@ class Autosubmit:
             else:
                 exp_id = "_" + expid
             if args.command not in expid_less:
-                if not BasicConfig.expid_dir(expid).exists():
+                exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+                if not os.path.exists(exp_path):
                     raise AutosubmitCritical("Experiment does not exist", 7012)
             Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
                                       args.command + exp_id + '.log'), "out", log_level)
@@ -1510,7 +1514,9 @@ class Autosubmit:
         try:
             Log.info(f"Inspecting experiment {expid}")
             Autosubmit._check_ownership(expid, raise_error=True)
-            if BasicConfig.expid_tmp_dir(expid).joinpath('autosubmit.lock').exists():
+            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+            tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
+            if os.path.exists(os.path.join(tmp_path, 'autosubmit.lock')):
                 locked = True
             else:
                 locked = False
@@ -2142,13 +2148,15 @@ class Autosubmit:
             profiler.start()
 
         # Initialize common folders
-        if not BasicConfig.expid_tmp_dir(expid).exists():
-            with BaseException as e:
-                raise AutosubmitCritical("Failure during the loading of the experiment configuration, check file paths",
+        try:
+            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+            tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
+        except BaseException as e:
+            raise AutosubmitCritical("Failure during the loading of the experiment configuration, check file paths",
                                      7014, str(e))
 
         try:
-            with Lock(os.path.join(BasicConfig.expid_tmp_dir(expid), 'autosubmit.lock'), timeout=1):
+            with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
                 try:
                     Log.debug("Preparing run")
                     # This function is called only once, when the experiment is started. It is used to initialize the experiment and to check the correctness of the configuration files.
@@ -2598,6 +2606,7 @@ class Autosubmit:
             profiler.start()
 
         try:
+            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
             Log.info("Getting job list...")
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             as_conf.check_conf_files(False)
@@ -2729,7 +2738,8 @@ class Autosubmit:
         monitor_exp = Monitor()
         try:
             if txt_only or txt_logfiles or file_format == "txt":
-                monitor_exp.generate_output_txt(expid, jobs, BasicConfig.expid_log_dir(expid), txt_logfiles, job_list_object=job_list)
+                monitor_exp.generate_output_txt(expid, jobs, os.path.join(
+                    exp_path, "/tmp/LOG_" + expid), txt_logfiles, job_list_object=job_list)
                 if txt_only:
                     current_length = len(job_list.get_job_list())
                     if current_length > 1000:
@@ -2742,7 +2752,8 @@ class Autosubmit:
                 # if file_format is set, use file_format, otherwise use conf value
                 monitor_exp.generate_output(expid,
                                             jobs,
-                                            BasicConfig.expid_log_dir(expid),
+                                            os.path.join(
+                                                exp_path, "/tmp/LOG_", expid),
                                             output_format=file_format if file_format is not None and len(
                                                 str(file_format)) > 0 else output_type,
                                             packages=packages,
@@ -2852,6 +2863,8 @@ class Autosubmit:
         :param stats: set True to delete outdated stats
         """
         try:
+            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+
             if project:
                 autosubmit_config = AutosubmitConfig(
                     expid, BasicConfig, YAMLParserFactory())
@@ -2908,6 +2921,7 @@ class Autosubmit:
         try:
             Autosubmit._check_ownership(expid, raise_error=True)
 
+            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
 
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             as_conf.check_conf_files(True)
@@ -3028,7 +3042,8 @@ class Autosubmit:
                 monitor_exp = Monitor()
                 monitor_exp.generate_output(expid,
                                             job_list.get_job_list(),
-                                            BasicConfig.expid_log_dir(expid),
+                                            os.path.join(
+                                                exp_path, "/tmp/LOG_", expid),
                                             output_format=output_type,
                                             packages=packages,
                                             show=not hide,
@@ -3103,6 +3118,7 @@ class Autosubmit:
         :type experiment_id: str
         """
         try:
+            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, experiment_id)
 
             as_conf = AutosubmitConfig(
                 experiment_id, BasicConfig, YAMLParserFactory())
@@ -3164,6 +3180,8 @@ class Autosubmit:
         try:
             ignore_performance_keys = ["error_message",
                                        "warnings_job_data", "considered"]
+            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+            tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
             if folder_path is not None and len(str(folder_path)) > 0:
                 tmp_path = folder_path
             import platform
@@ -3324,6 +3342,7 @@ class Autosubmit:
         for experiment_id in experiments_ids:
             try:
                 experiment_id = experiment_id.strip(" ")
+                exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, experiment_id)
 
                 as_conf = AutosubmitConfig(
                     experiment_id, BasicConfig, YAMLParserFactory())
@@ -3358,8 +3377,9 @@ class Autosubmit:
                 hpc = as_conf.get_platform()
                 description = get_experiment_descrip(experiment_id)
                 Log.result("Describing {0}", experiment_id)
+
                 Log.result("Owner: {0}", user)
-                Log.result("Location: {0}", BasicConfig.expid_dir(experiment_id))
+                Log.result("Location: {0}", exp_path)
                 Log.result("Created: {0}", created)
                 Log.result("Model: {0}", model)
                 Log.result("Branch: {0}", branch)
@@ -3989,7 +4009,9 @@ class Autosubmit:
         :return:
         :rtype: 
         """
-        pkl_folder_path = BasicConfig.expid_dir(expid).joinpath("pkl")
+        exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+        tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
+        pkl_folder_path = os.path.join(exp_path, "pkl")
         current_pkl_path = os.path.join(
             pkl_folder_path, "job_list_{}.pkl".format(expid))
         backup_pkl_path = os.path.join(
@@ -4206,6 +4228,10 @@ class Autosubmit:
         :rtype: bool
         """
 
+        exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+
+        exp_folder = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+
         if not noclean:
             # Cleaning to reduce file size.
             version = get_autosubmit_version(expid)
@@ -4215,16 +4241,17 @@ class Autosubmit:
 
         # Getting year of last completed. If not, year of expid folder
         year = None
-        if BasicConfig.expid_tmp_dir(expid).is_dir():
-            for filename in os.listdir(BasicConfig.expid_tmp_dir(expid)):
+        tmp_folder = os.path.join(exp_folder, BasicConfig.LOCAL_TMP_DIR)
+        if os.path.isdir(tmp_folder):
+            for filename in os.listdir(tmp_folder):
                 if filename.endswith("COMPLETED"):
                     file_year = time.localtime(os.path.getmtime(
-                        BasicConfig.expid_tmp_dir(expid).joinpath(filename))).tm_year
+                        os.path.join(tmp_folder, filename))).tm_year
                     if year is None or year < file_year:
                         year = file_year
 
         if year is None:
-            year = time.localtime(os.path.getmtime(BasicConfig.expid_dir(expid))).tm_year
+            year = time.localtime(os.path.getmtime(exp_folder)).tm_year
         try:
             year_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, str(year))
             if not os.path.exists(year_path):
@@ -4248,7 +4275,7 @@ class Autosubmit:
                     compress_type = "w"
                     output_filepath = '{0}.tar'.format(expid)
                 with tarfile.open(os.path.join(year_path, output_filepath), compress_type) as tar:
-                    tar.add(BasicConfig.expid_dir(expid), arcname='')
+                    tar.add(exp_folder, arcname='')
                     tar.close()
                     os.chmod(os.path.join(year_path, output_filepath), 0o775)
             except Exception as e:
@@ -4257,16 +4284,18 @@ class Autosubmit:
             Log.info("Tar file created!")
 
         try:
-            shutil.rmtree(BasicConfig.expid_dir(expid))
+            shutil.rmtree(exp_folder)
         except Exception as e:
             Log.warning(
                 "Can not fully remove experiments folder: {0}".format(str(e)))
-            if os.stat(BasicConfig.expid_dir(expid)):
+            if os.stat(exp_folder):
                 try:
-                    tmp_expid = BasicConfig.expid_tmp_dir(expid).joinpath(expid + "_to_delete")
-                    BasicConfig.expid_dir(expid).rename(tmp_expid)
+                    tmp_folder = os.path.join(
+                        BasicConfig.LOCAL_ROOT_DIR, "tmp")
+                    tmp_expid = os.path.join(tmp_folder, expid + "_to_delete")
+                    os.rename(exp_folder, tmp_expid)
                     Log.warning("Experiment folder renamed to: {0}".format(
-                        BasicConfig.expid_dir(expid) + "_to_delete "))
+                        exp_folder + "_to_delete "))
                 except Exception as e:
                     Autosubmit.unarchive(expid, uncompressed=False, rocrate=rocrate)
                     raise AutosubmitCritical(
@@ -4287,6 +4316,7 @@ class Autosubmit:
         :param rocrate: flag to enable RO-Crate
         :type rocrate: bool
         """
+        exp_folder = os.path.join(BasicConfig.LOCAL_ROOT_DIR, experiment_id)
 
         # Searching by year. We will store it on database
         year = datetime.datetime.today().year
@@ -4314,19 +4344,19 @@ class Autosubmit:
 
         # Creating tar file
         Log.info("Unpacking tar file ... ")
-        if not BasicConfig.expid_dir(experiment_id).is_dir():
-            BasicConfig.expid_dir(experiment_id).mkdir()
+        if not os.path.isdir(exp_folder):
+            os.mkdir(exp_folder)
         try:
             if rocrate:
                 import zipfile
                 with zipfile.ZipFile(archive_path, 'r') as zip:
-                    zip.extractall(BasicConfig.expid_dir(experiment_id))
+                    zip.extractall(exp_folder)
             else:
                 with tarfile.open(os.path.join(archive_path), compress_type) as tar:
-                    tar.extractall(BasicConfig.expid_dir(experiment_id))
+                    tar.extractall(exp_folder)
                     tar.close()
         except Exception as e:
-            shutil.rmtree(BasicConfig.exid_dir(experiment_id), ignore_errors=True)
+            shutil.rmtree(exp_folder, ignore_errors=True)
             Log.printlog("Can not extract file: {0}".format(str(e)), 6012)
             return False
 
@@ -4408,7 +4438,8 @@ class Autosubmit:
         # checking if there is a lock file to avoid multiple running on the same expid
         try:
             Autosubmit._check_ownership(expid, raise_error=True)
-            tmp_path = BasicConfig.expid_tmp_dir(expid)
+            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+            tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
             with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1) as fh:
                 try:
                     Log.info(
@@ -4431,14 +4462,14 @@ class Autosubmit:
                         raise AutosubmitCritical(f'Job list is empty\nCheck if there are YML files in {as_conf.experiment_data.get("DEFAULT","").get("CUSTOM_CONFIG","")}', code=7015)
                     output_type = as_conf.get_output_type()
 
-                    if not BasicConfig.expid_dir(expid).joinpath("pkl").exists():
+                    if not os.path.exists(os.path.join(exp_path, "pkl")):
                         raise AutosubmitCritical(
                             "The pkl folder doesn't exists. Make sure that the 'pkl' folder exists in the following path: {}".format(
-                                BasicConfig.expid_dir(expid)), code=6013)
-                    if not BasicConfig.expid_dir(expid).joinpath("plot").exists():
+                                exp_path), code=6013)
+                    if not os.path.exists(os.path.join(exp_path, "plot")):
                         raise AutosubmitCritical(
                             "The plot folder doesn't exists. Make sure that the 'plot' folder exists in the following path: {}".format(
-                                BasicConfig.expid_dir(expid)), code=6013)
+                                exp_path), code=6013)
 
                     update_job = not os.path.exists(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl",
                                                                  "job_list_" + expid + ".pkl"))
@@ -4555,7 +4586,8 @@ class Autosubmit:
                         monitor_exp = Monitor()
                         # if output is set, use output
                         monitor_exp.generate_output(expid, job_list.get_job_list(),
-                                                    BasicConfig.expid_log_dir(expid),
+                                                    os.path.join(
+                                                        exp_path, "/tmp/LOG_", expid),
                                                     output if output is not None else output_type,
                                                     packages,
                                                     not hide,
@@ -5102,6 +5134,8 @@ class Autosubmit:
         :return:
         """
         Autosubmit._check_ownership(expid, raise_error=True)
+        exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+        tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
         section_validation_message = " "
         job_validation_message = " "
         try:
@@ -5336,7 +5370,8 @@ class Autosubmit:
                     monitor_exp = Monitor()
                     monitor_exp.generate_output(expid,
                                                 job_list.get_job_list(),
-                                                BasicConfig.expid_log_dir(expid),
+                                                os.path.join(
+                                                    exp_path, "/tmp/LOG_", expid),
                                                 output_format=output_type,
                                                 packages=packages,
                                                 show=not hide,
@@ -5847,6 +5882,22 @@ class Autosubmit:
 
         expid = exp_or_job_id if is_workflow else exp_or_job_id[:4]
 
+        # Workflow folder.
+        # e.g. ~/autosubmit/a000
+        exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, expid)
+        # Directory with workflow temporary/volatile files. Contains the output of commands such as inspect,
+        # and also STAT/COMPLETED files for each workflow task.
+        # e.g. ~/autosubmit/a000/tmp
+        tmp_path = exp_path / BasicConfig.LOCAL_TMP_DIR
+        # Directory with logs for Autosubmit executed commands (create, run, etc.) and jobs statuses files.
+        # e.g. ~/autosubmit/a000/tmp/ASLOGS
+        aslogs_path = tmp_path / BasicConfig.LOCAL_ASLOG_DIR
+        # Directory with the logs of the workflow run, for each workflow task. Includes the generated
+        # .cmd files, and STAT/COMPLETED files for the run. The files with similar names in the parent
+        # directory are generated with inspect, while these are with the run subcommand.
+        # e.g. ~/autosubmit/a000/tmp/LOG_a000
+        exp_logs_path = tmp_path / f'LOG_{expid}'
+
         if is_workflow:
             if file not in ['o', 'e', 's']:
                 raise AutosubmitCritical(f'Invalid arguments for cat-log: workflow logs only support o(output), '
@@ -5854,30 +5905,30 @@ class Autosubmit:
 
             if file in ['e', 'o']:
                 search_pattern = '*_run_err.log' if file == 'e' else '*_run.log'
-                workflow_log_files = sorted(BasicConfig.expid_aslog_dir(expid).glob(search_pattern))
+                workflow_log_files = sorted(aslogs_path.glob(search_pattern))
             else:
                 search_pattern = f'{expid}_*.txt'
-                status_files_path = os.path.join(BasicConfig.expid_dir(expid), 'status')
-                workflow_log_files = sorted(Path(status_files_path).glob(search_pattern))
+                status_files_path = exp_path / 'status'
+                workflow_log_files = sorted(status_files_path.glob(search_pattern))
 
             if not workflow_log_files:
                 Log.info('No logs found.')
                 return True
 
             workflow_log_file = workflow_log_files[-1]
-            if not os.path.isfile(workflow_log_file):
+            if not workflow_log_file.is_file():
                 raise AutosubmitCritical(f'The workflow log file found is not a file: {workflow_log_file}', 7011)
 
             return view_file(workflow_log_file, mode) == 0
         else:
-            job_logs_path = BasicConfig.expid_tmp_dir(expid) if inspect else BasicConfig.expid_log_dir(expid)
+            job_logs_path = tmp_path if inspect else exp_logs_path
             if file == 'j':
                 workflow_log_file = job_logs_path / f'{exp_or_job_id}.cmd'
             elif file == 's':
                 workflow_log_file = job_logs_path / f'{exp_or_job_id}_TOTAL_STATS'
             else:
                 search_pattern = f'{exp_or_job_id}.*.{"err" if file == "e" else "out"}'
-                workflow_log_files = sorted(Path(job_logs_path).glob(search_pattern))
+                workflow_log_files = sorted(job_logs_path.glob(search_pattern))
                 if not workflow_log_files:
                     Log.info('No logs found.')
                     return True
@@ -5887,7 +5938,7 @@ class Autosubmit:
                 Log.info('No logs found.')
                 return True
 
-            if not os.path.isfile(workflow_log_file):
+            if not workflow_log_file.is_file():
                 raise AutosubmitCritical(f'The job log file {file} found is not a file: {workflow_log_file}', 7011)
 
             return view_file(workflow_log_file, mode) == 0
