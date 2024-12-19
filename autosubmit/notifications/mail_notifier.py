@@ -40,9 +40,9 @@ class MailNotifier:
 
         try:
             files = [f for f in BasicConfig.expid_aslog_dir(exp_id).glob('*_run.log') if Path(f).is_file()]
-            mn._attach_files(message, files)
+            self._attach_files(message, files)
         except BaseException as e:
-            Log.printlog('An error has occurred while sending a mail for warn about remote_platform', 6011)
+            Log.printlog('An error has occurred while attaching log files to a warning email about remote_platforms ', 6011)
         
         for mail in mail_to:
             message['To'] = email.utils.formataddr((mail, mail))
@@ -73,8 +73,8 @@ class MailNotifier:
         for f in files or []:
             with open(f, "rb") as file:
                 part = MIMEApplication(file.read(), Name = Path(f).name)
-        part['Content-Disposition'] = 'attachment; filename="%s"' % Path(f).name
-        message.attach(part)
+                part['Content-Disposition'] = 'attachment; filename="%s"' % Path(f).name
+                message.attach(part)
 
 
     @staticmethod
