@@ -201,6 +201,7 @@ def generate_cmds(prepare_scheduler):
     ('slurm', 'horizontal_vertical'),
     ('slurm', 'vertical_horizontal')
 ])
+
 def test_scheduler_job_types(scheduler, job_type, generate_cmds):
     # Test code that uses scheduler and job_typedef test_default_parameters(scheduler: str, job_type: str, generate_cmds):
     """
