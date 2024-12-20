@@ -39,6 +39,7 @@ from autosubmit.job.job_common import StatisticsSnippetBash, StatisticsSnippetPy
 from autosubmit.job.job_common import StatisticsSnippetR, StatisticsSnippetEmpty
 from autosubmit.job.job_common import Status, Type, increase_wallclock_by_chunk
 from autosubmit.job.job_utils import get_job_package_code, get_split_size_unit, get_split_size
+from autosubmit.job.metrics_processor import UserMetricProcessor
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
@@ -837,7 +838,7 @@ class Job(object):
         return not self.nodes and (not self.processors or str(self.processors) == '1')
 
     @property
-    def platform(self):
+    def platform(self) -> Platform:
         """
         Returns the platform to be used by the job. Chooses between serial and parallel platforms
 
@@ -1499,7 +1500,14 @@ class Job(object):
             else:
                 self.platform.add_job_to_log_recover(self)
 
-            # TODO Read and store metrics here
+            # Read and store metrics here
+            try:
+                metric_procesor = UserMetricProcessor(as_conf, self)
+                metrics_specs = metric_procesor.read_metrics_specs()
+                metric_procesor.process_metrics_specs(metrics_specs)
+            except Exception as exc:
+                # Warn if metrics are not processed
+                Log.warning(f"Error processing metrics for job {self.name}: {exc}")
 
         return self.status
 

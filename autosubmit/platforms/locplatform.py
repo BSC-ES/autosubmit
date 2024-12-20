@@ -18,10 +18,11 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import locale
 import os
-import subprocess
 from pathlib import Path
+import traceback
+from typing import Union, TYPE_CHECKING
+import subprocess
 from time import sleep
-from typing import TYPE_CHECKING
 
 from autosubmit.platforms.headers.local_header import LocalHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
@@ -342,4 +343,28 @@ class LocalPlatform(ParamikoPlatform):
         if self.send_command(command, True):
             return self._ssh_output
         else:
+            return None
+
+    def get_file_size(self, src: str) -> Union[int, None]:
+        """
+        Get file size in bytes
+        :param src: file path
+        """
+        try:
+            return Path(src).stat().st_size
+        except Exception:
+            Log.debug(traceback.format_exc())
+            return None
+
+    def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
+        """
+        Read file content as bytes. If max_size is set, only the first max_size bytes are read.
+        :param src: file path
+        :param max_size: maximum size to read
+        """
+        try:
+            with open(src, "rb") as f:
+                return f.read(max_size)
+        except Exception:
+            Log.debug(traceback.format_exc())
             return None

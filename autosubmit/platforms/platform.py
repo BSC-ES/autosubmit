@@ -1141,3 +1141,18 @@ class Platform(object):
 
     def create_a_new_copy(self):
         raise NotImplementedError
+    
+    def get_file_size(self, src: str) -> Union[int, None]:
+        """
+        Get file size in bytes
+        :param src: file path
+        """
+        raise NotImplementedError
+
+    def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
+        """
+        Read file content as bytes. If max_size is set, only the first max_size bytes are read.
+        :param src: file path
+        :param max_size: maximum size to read
+        """
+        raise NotImplementedError

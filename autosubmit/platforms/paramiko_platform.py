@@ -5,7 +5,8 @@ from time import sleep
 import sys
 import socket
 import os
-from typing import List, TYPE_CHECKING
+import traceback
+from typing import List, TYPE_CHECKING, Union
 import paramiko
 import datetime
 import select
@@ -1493,6 +1494,31 @@ class ParamikoPlatform(Platform):
                 return False
         except:
             return False
+
+    def get_file_size(self, src: str) -> Union[int, None]:
+        """
+        Get file size in bytes
+        :param src: file path
+        """
+        try:
+            return self._ftpChannel.stat(src).st_size
+        except Exception:
+            Log.debug(traceback.format_exc())
+            return None
+
+    def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
+        """
+        Read file content as bytes. If max_size is set, only the first max_size bytes are read.
+        :param src: file path
+        :param max_size: maximum size to read
+        """
+        try:
+            with self._ftpChannel.file(src, "r") as file:
+                return file.read(size=max_size)
+        except Exception:
+            Log.debug(traceback.format_exc())
+            return None
+
 
 class ParamikoPlatformException(Exception):
     """
