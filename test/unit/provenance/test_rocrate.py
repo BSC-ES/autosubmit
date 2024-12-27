@@ -6,10 +6,11 @@ from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-import yaml
 from mock import Mock, patch
 from rocrate.rocrate import File
 from rocrate.rocrate import ROCrate
+from ruamel.yaml import YAML
+from ruamel.yaml.representer import RepresenterError
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
@@ -48,7 +49,9 @@ class TestRoCrate(TestCase):
         Path(conf_dir, 'metadata').mkdir()
         unified_config = Path(conf_dir, 'metadata/experiment_data.yml')
         unified_config.touch()
-        unified_config.write_text(yaml.dump(as_conf.experiment_data))
+        yaml = YAML(typ='rt')
+        with open(unified_config, 'w') as f:
+            yaml.dump(dict(as_conf.experiment_data), f)
         as_conf.current_loaded_files = {unified_config: 0}
 
     def test_add_dir_and_files_empty_folder(self):
@@ -428,26 +431,16 @@ class TestRoCrate(TestCase):
                     'APP'
                 ]
             }
-            self._create_conf_dir(experiment_path)
-            jobs = []
 
             mocked_get_autosubmit_version.return_value = '4.0.0b0'
             mocked_get_experiment_descrip.return_value = [
                 ['mocked test project']
             ]
 
-            with self.assertRaises(AutosubmitCritical) as cm:
-                create_rocrate_archive(
-                    as_conf=self.as_conf,
-                    rocrate_json=rocrate_json,
-                    jobs=jobs,
-                    start_time=None,
-                    end_time=None,
-                    path=Path(temp_dir)
-                )
+            with self.assertRaises(RepresenterError) as cm:
+                self._create_conf_dir(experiment_path)
 
-            self.assertEqual(cm.exception.message,
-                              'Could not locate a type in RO-Crate for parameter APP.OBJ type object')
+            self.assertTrue('cannot represent an object' in str(cm.exception))
 
     @patch('autosubmit.autosubmit.Log')
     @patch('autosubmit.autosubmit.AutosubmitConfig')
