@@ -182,7 +182,7 @@ def test_adjust_new_parameters(test_packed):
     (['test_list', 'test_list2'], "both", ['test_list', 'test_list2']),
     ("test_str", "both", ["test_str"]),
     (['test_list', 'test_list2'], "current_directive", ['test_list', 'test_list2']),
-    (['test_str_list', 'test_str_list2'], "job", ['test_str_list', 'test_str_list2']),
+    ("['test_str_list', 'test_str_list2']", "job", ['test_str_list', 'test_str_list2']),
 ], ids=["Test str - platform", "test_list - platform", "test_list - job", "test_str - job", "test_list - both", "test_str - both", "test_list - job - current_directive", "test_str_list - current_directive"])
 def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines, mocker, autosubmit_config):
     file_stat = os.stat(f"{tmpdir.strpath}")
