@@ -1,3 +1,6 @@
+import os
+import pwd
+import re
 from datetime import datetime, timedelta
 import pytest
 
@@ -5,8 +8,10 @@ from autosubmit.job.job import Job
 from autosubmit.platforms.psplatform import PsPlatform
 from pathlib import Path
 
+from autosubmit.platforms.slurmplatform import SlurmPlatform
 
-def create_job_and_update_parameters(autosubmit_config, experiment_data):
+
+def create_job_and_update_parameters(autosubmit_config, experiment_data, platform_type="ps"):
     as_conf = autosubmit_config("test-expid", experiment_data)
     as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
     as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
@@ -15,11 +20,14 @@ def create_job_and_update_parameters(autosubmit_config, experiment_data):
     as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
     # Create some jobs
     job = Job('A', '1', 0, 1)
-    platform = PsPlatform(expid='a000', name='DUMMY_PLATFORM', config=as_conf.experiment_data)
+    if platform_type == "ps":
+        platform = PsPlatform(expid='test-expid', name='DUMMY_PLATFORM', config=as_conf.experiment_data)
+    else:
+        platform = SlurmPlatform(expid='test-expid', name='DUMMY_PLATFORM', config=as_conf.experiment_data)
     job.section = 'RANDOM-SECTION'
     job.platform = platform
-    job.update_parameters(as_conf, {})
-    return job
+    job.update_parameters(as_conf, as_conf.load_parameters())
+    return job, as_conf
 
 
 @pytest.mark.parametrize('experiment_data, expected_data', [(
@@ -54,7 +62,7 @@ def create_job_and_update_parameters(autosubmit_config, experiment_data):
     }
 )])
 def test_update_parameters_current_variables(autosubmit_config, experiment_data, expected_data):
-    job = create_job_and_update_parameters(autosubmit_config, experiment_data)
+    job,_ = create_job_and_update_parameters(autosubmit_config, experiment_data)
     for key, value in expected_data.items():
         assert job.parameters[key] == value
 
@@ -144,7 +152,7 @@ def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greate
     {'notify_on': ['COMPLETED']}
 )])
 def test_update_parameters_attributes(autosubmit_config, experiment_data, attributes_to_check):
-    job = create_job_and_update_parameters(autosubmit_config, experiment_data)
+    job, _ = create_job_and_update_parameters(autosubmit_config, experiment_data)
     for attr in attributes_to_check:
         assert hasattr(job, attr)
         assert getattr(job, attr) == attributes_to_check[attr]
@@ -164,3 +172,72 @@ def test_adjust_new_parameters(test_packed):
         assert job.wrapper_name == "wrapped"
     else:
         assert job.wrapper_name == "dummy"
+
+
+@pytest.mark.parametrize('custom_directives, test_type, result_by_lines', [
+    ("test_str a", "platform", ["test_str a"]),
+    (['test_list', 'test_list2'], "platform", ['test_list', 'test_list2']),
+    (['test_list', 'test_list2'], "job", ['test_list', 'test_list2']),
+    ("test_str", "job", ["test_str"]),
+    (['test_list', 'test_list2'], "both", ['test_list', 'test_list2']),
+    ("test_str", "both", ["test_str"]),
+    (['test_list', 'test_list2'], "current_directive", ['test_list', 'test_list2']),
+    ("['test_str_list', 'test_str_list2']", "job", ['test_str_list', 'test_str_list2']),
+], ids=["Test str - platform", "test_list - platform", "test_list - job", "test_str - job", "test_list - both", "test_str - both", "test_list - job - current_directive", "test_str_list - current_directive"])
+def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines, mocker, autosubmit_config):
+    file_stat = os.stat(f"{tmpdir.strpath}")
+    file_owner_id = file_stat.st_uid
+    tmpdir.owner = pwd.getpwuid(file_owner_id).pw_name
+    tmpdir_path = Path(tmpdir.strpath)
+    project = "whatever"
+    user = tmpdir.owner
+    scratch_dir = f"{tmpdir.strpath}/scratch"
+    full_path = f"{scratch_dir}/{project}/{user}"
+    experiment_data = {
+        'JOBS': {
+            'RANDOM-SECTION': {
+                'SCRIPT': "echo 'Hello World!'",
+                'PLATFORM': 'DUMMY_PLATFORM',
+            },
+        },
+        'PLATFORMS': {
+            'dummy_platform': {
+                "type": "slurm",
+                "host": "127.0.0.1",
+                "user": f"{user}",
+                "project": f"{project}",
+                "scratch_dir": f"{scratch_dir}",
+                "QUEUE": "gp_debug",
+                "ADD_PROJECT_TO_HOST": False,
+                "MAX_WALLCLOCK": "48:00",
+                "TEMP_DIR": "",
+                "MAX_PROCESSORS": 99999,
+                "PROCESSORS_PER_NODE": 123,
+                "DISABLE_RECOVERY_THREADS": True
+            },
+        },
+        'ROOTDIR': f"{full_path}",
+        'LOCAL_TMP_DIR': f"{full_path}",
+        'LOCAL_ROOT_DIR': f"{full_path}",
+        'LOCAL_ASLOG_DIR': f"{full_path}",
+    }
+    tmpdir_path.joinpath(f"{scratch_dir}/{project}/{user}").mkdir(parents=True)
+    tmpdir_path.joinpath("test-expid").mkdir(parents=True)
+    tmpdir_path.joinpath("test-expid/tmp/LOG_test-expid").mkdir(parents=True)
+
+    if test_type == "platform":
+        experiment_data['PLATFORMS']['dummy_platform']['CUSTOM_DIRECTIVES'] = custom_directives
+    elif test_type == "job":
+        experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = custom_directives
+    elif test_type == "both":
+        experiment_data['PLATFORMS']['dummy_platform']['CUSTOM_DIRECTIVES'] = custom_directives
+        experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = custom_directives
+    elif test_type == "current_directive":
+        experiment_data['PLATFORMS']['dummy_platform']['APP_CUSTOM_DIRECTIVES'] = custom_directives
+        experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = "%CURRENT_APP_CUSTOM_DIRECTIVES%"
+    job, as_conf = create_job_and_update_parameters(autosubmit_config, experiment_data, "slurm")
+    mocker.patch('autosubmitconfigparser.config.configcommon.AutosubmitConfig.reload')
+    template_content, _ = job.update_content(as_conf)
+    for directive in result_by_lines:
+        pattern = r'^\s*' + re.escape(directive) + r'\s*$' # Match Start line, match directive, match end line
+        assert re.search(pattern, template_content, re.MULTILINE) is not None
