@@ -1434,6 +1434,7 @@ class Job(object):
         """
         for key, value in as_conf.platforms_data.get(self.platform_name, {}).items():
             parameters[f"CURRENT_{key.upper()}"] = value
+
         for key, value in as_conf.jobs_data[self.section].items():
             parameters[f"CURRENT_{key.upper()}"] = value
 
