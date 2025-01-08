@@ -18,6 +18,8 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import smtplib
+import zipfile
+import tempfile
 import email.utils
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -38,9 +40,16 @@ class MailNotifier:
         message['Date'] = email.utils.formatdate(localtime=True)
         message.attach(MIMEText(message_text))
 
+        files = []
+        files_compressed = []
         try:
             files = [f for f in BasicConfig.expid_aslog_dir(exp_id).glob('*_run.log') if Path(f).is_file()]
-            self._attach_files(message, files)
+            files_compressed = [self._compress_file(f) for f in files]
+        except BaseException as e:
+            Log.printlog('An error has occurred while compressing log files for a warning email', 6011)
+
+        try:
+            self._attach_files(message, files_compressed, files)
         except BaseException as e:
             Log.printlog('An error has occurred while attaching log files to a warning email about remote_platforms ', 6011)
         
@@ -50,6 +59,11 @@ class MailNotifier:
                 self._send_mail(self.config.MAIL_FROM, mail, message)
             except BaseException as e:
                 Log.printlog('An error has occurred while sending a mail for warn about remote_platform', 6011)
+        # delete compressed files
+        try:
+            for f in files_compressed: Path.unlink(Path(f))
+        except BaseException:
+            Log.printlog('An error has occurred while deleting compressed log files for a warnign email', 6011)
 
     def notify_status_change(self, exp_id, job_name, prev_status, status, mail_to):
         message_text = self._generate_message_text(exp_id, job_name, prev_status, status)
@@ -69,13 +83,19 @@ class MailNotifier:
         server.sendmail(mail_from, mail_to, message.as_string())
         server.quit()
 
-    def _attach_files(self, message, files):
-        for f in files or []:
+    def _attach_files(self, message, files, original_names):
+        for i,f in enumerate(files) or []:
             with open(f, "rb") as file:
                 part = MIMEApplication(file.read(), Name = Path(f).name)
-                part['Content-Disposition'] = 'attachment; filename="%s"' % Path(f).name
+                part['Content-Disposition'] = 'attachment; filename="%s"' % Path(original_names[i]).name
                 message.attach(part)
 
+    def _compress_file(self, file_path):
+        temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix='.zip', dir=Path(file_path).parent)
+        zip_filename = temp_zip.name
+        with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(file_path, Path(file_path).name)
+        return zip_filename 
 
     @staticmethod
     def _generate_message_text(exp_id, job_name, prev_status, status):

@@ -1,5 +1,6 @@
 import pytest
 import tempfile
+import zipfile
 from unittest import mock
 from pathlib import Path
 from autosubmit.notifications.mail_notifier import MailNotifier
@@ -41,7 +42,7 @@ def test_attach_files(mail_notifier):
         
         with mock.patch("builtins.open", mock.mock_open(read_data="file data")):
             message = mock.Mock()
-            mail_notifier._attach_files(message, mock_files)
+            mail_notifier._attach_files(message, mock_files, mock_files)
             
             assert message.attach.call_count == len(mock_files)
 @pytest.mark.parametrize(
@@ -56,7 +57,7 @@ def test_attach_files(mail_notifier):
         
         # Log attachment error: Simulate failure in file listing (glob raises exception)
         (Exception("Failed to list files"), None, 
-         'An error has occurred while attaching log files to a warning email about remote_platforms ', 1)
+         'An error has occurred while compressing log files for a warning email', 1)
     ],
     ids=[
         "Normal case: No errors",
@@ -103,7 +104,7 @@ def test_notify_experiment_status(mail_notifier, mock_glob_side_effect, send_mai
                     mail_notifier._generate_message_experiment_status.assert_called_once_with(exp_id, platform)
                     mock_send_mail.assert_called_once_with(mail_notifier.config.MAIL_FROM, 'recipient@example.com', mock.ANY)
 
-                    if mock_glob_side_effect is None: mock_attach_files.assert_called_once_with(mock.ANY, [file1, file2]) 
+                    if mock_glob_side_effect is None: mock_attach_files.assert_called_once_with(mock.ANY, mock.ANY, [file1, file2]) 
 
                     if expected_log_message:
                         mock_printlog.assert_called_once_with(expected_log_message, 6011)
@@ -114,3 +115,30 @@ def test_notify_experiment_status(mail_notifier, mock_glob_side_effect, send_mai
 
     # Reset the local root dir.
     BasicConfig.LOCAL_ROOT_DIR = original_local_root_dir
+
+def test_compress_file(mail_notifier):
+    with tempfile.TemporaryDirectory() as temp_dir:
+        test_file = Path(temp_dir) / "test_file.log"
+        test_file.write_text("file data 1")
+        
+        assert test_file.exists()
+    
+        compressed_file = mail_notifier._compress_file(test_file)
+
+        # Check that the zip file exists
+        assert Path(compressed_file).exists, f"Compressed file {compressed_file} does not exist."
+
+        # Open the zip file and check its content
+        with zipfile.ZipFile(compressed_file, 'r') as zipf:
+            # Verify that the zip file contains the original file
+            zipf.testzip()  # This ensures the zip file is valid
+            file_list = zipf.namelist()  # Get the list of file names in the zip
+            assert Path(test_file).name in file_list, "The compressed file does not contain the expected file."
+
+            # Check the content of the file inside the zip
+            with zipf.open(Path(test_file).name, 'r') as file:
+                content = file.read().decode('utf-8')
+                assert content == "file data 1", "The content inside the zip file is incorrect."
+
+        # Clean up by removing the compressed file
+        Path(compressed_file).unlink
