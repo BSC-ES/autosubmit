@@ -62,7 +62,7 @@ def create_job_and_update_parameters(autosubmit_config, experiment_data, platfor
     }
 )])
 def test_update_parameters_current_variables(autosubmit_config, experiment_data, expected_data):
-    job = create_job_and_update_parameters(autosubmit_config, experiment_data)
+    job,_ = create_job_and_update_parameters(autosubmit_config, experiment_data)
     for key, value in expected_data.items():
         assert job.parameters[key] == value
 
@@ -152,7 +152,7 @@ def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greate
     {'notify_on': ['COMPLETED']}
 )])
 def test_update_parameters_attributes(autosubmit_config, experiment_data, attributes_to_check):
-    job = create_job_and_update_parameters(autosubmit_config, experiment_data)
+    job, _ = create_job_and_update_parameters(autosubmit_config, experiment_data)
     for attr in attributes_to_check:
         assert hasattr(job, attr)
         assert getattr(job, attr) == attributes_to_check[attr]
