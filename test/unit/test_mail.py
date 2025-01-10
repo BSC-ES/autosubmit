@@ -1,5 +1,7 @@
 import tempfile
 import zipfile
+import email.utils
+from email.mime.text import MIMEText
 from unittest import mock
 from pathlib import Path
 import pytest
@@ -62,14 +64,15 @@ def test_attach_files(mail_notifier):
         # No logs are expected, everything works fine
         (None, None, None, None, None),
 
-        # Normal case: No errors, should not log anything
+        # Log compressed files 
         (None, None, None, Exception('Compressed files were not deleted'),
-         'An error has occurred while deleting compressed log files for a warning email'),  # No logs are expected, everything works fine
+         'An error has occurred while deleting compressed log files for a warning email'),  
 
         # Log connection error: Simulate an error while sending email
         (None, Exception("SMTP server error"), None, None,
          'An error has occurred while sending a mail for warn about remote_platform'),
 
+        # Log attached files
         (None, None, Exception("File attachment error"), None,
          'An error has occurred while attaching log files to a warning email about remote_platforms'),
 
@@ -182,3 +185,65 @@ def test_compress_file(mail_notifier):
 
         # Clean up by removing the compressed file
         Path(compressed_file).unlink
+
+@pytest.fixture
+def mock_notify_status_change():
+    instance = MailNotifier(BasicConfig)
+    
+    instance._generate_message_text = mock.MagicMock(return_value="Generated message")
+    instance._send_mail = mock.MagicMock()
+    
+    with mock.patch.object(Log, 'printlog') as mock_printlog:
+        yield instance, mock_printlog
+
+@pytest.mark.parametrize(
+    "send_mail_side_effect, expected_log_message",
+    [
+        # Normal case: No errors, should not log anything
+        # No logs are expected, everything works fine
+        (None, None),
+
+        # Log connection error: Simulate an error while sending email
+        (Exception("SMTP server error"), 
+         'Trace:SMTP server error\nAn error has occurred while sending a mail for the job SMTP server error')
+    ],
+    ids=[
+        "Normal case: No errors",
+        "Log connection error (SMTP server error)"
+    ]
+)
+def test_notify_status_change(mock_notify_status_change, send_mail_side_effect, expected_log_message):
+    instance, mock_printlog = mock_notify_status_change
+    
+    exp_id = 123
+    job_name = 'Job1'
+    prev_status = 'Running'
+    status = 'Completed'
+    mail_to = ['recipient@example.com']
+   
+    with mock.patch.object(instance, '_send_mail') as mock_send_mail:
+        mock_send_mail.side_effect = send_mail_side_effect
+        instance.notify_status_change(exp_id, job_name, prev_status, status, mail_to)
+    
+        instance._generate_message_text.assert_called_once_with(exp_id, job_name, prev_status, status)
+    
+        message_text = "Generated message"
+        message = MIMEText(message_text)
+        message['From'] = email.utils.formataddr(('Autosubmit', instance.config.MAIL_FROM))
+        message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {str(status)}'
+        message['Date'] = email.utils.formatdate(localtime=True)
+   
+        mock_send_mail.assert_called_once_with(
+            instance.config.MAIL_FROM, mail_to[0], mock.ANY 
+        )
+        assert mock_send_mail.call_args[0][2].get_payload() == message.get_payload()
+
+    if expected_log_message:
+        mock_printlog.assert_called_once_with(
+                expected_log_message, 6011)
+        log_calls = [call[0][0]
+            for call in mock_printlog.call_args_list]
+        assert 'Traceback' not in log_calls
+    else:
+        mock_printlog.assert_not_called()  # No logs should be called for normal execution
+
