@@ -1,249 +1,202 @@
-import tempfile
-import zipfile
 import email.utils
 from email.mime.text import MIMEText
-from unittest import mock
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Optional
+
 import pytest
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+
+from autosubmit.job.job_common import Status
 from autosubmit.notifications.mail_notifier import MailNotifier
+from autosubmitconfigparser.config.basicconfig import BasicConfig
 from log.log import Log
 
 
+# -- fixtures
+
+
 @pytest.fixture
-def mock_basic_config():
-    mock_config = mock.Mock()
+def mock_basic_config(mocker):
+    mock_config = mocker.Mock()
     mock_config.MAIL_FROM = "test@example.com"
     mock_config.SMTP_SERVER = "smtp.example.com"
     return mock_config
 
 
 @pytest.fixture
+def mock_smtp(mocker):
+    return mocker.patch(
+        'autosubmit.notifications.mail_notifier.smtplib.SMTP',
+        autospec=True
+    )
+
+
+@pytest.fixture
+def mock_platform(mocker):
+    mock_platform = mocker.Mock()
+    mock_platform.name = "Test Platform"
+    mock_platform.host = "test.host.com"
+    return mock_platform
+
+
+@pytest.fixture
 def mail_notifier(mock_basic_config):
     return MailNotifier(mock_basic_config)
 
-
-def test_send_mail(mail_notifier):
-    with mock.patch('smtplib.SMTP') as mock_smtp:
-        mock_server = mock.Mock()
-        mock_smtp.return_value = mock_server
-        mock_server.sendmail = mock.Mock()
-
-        mail_notifier._send_mail(
-            'sender@example.com',
-            'recipient@example.com',
-            mock.Mock())
-
-        mock_server.sendmail.assert_called_once_with(
-            'sender@example.com', 'recipient@example.com', mock.ANY)
-
-
-def test_attach_files(mail_notifier):
-    with tempfile.TemporaryDirectory() as temp_dir:
-        file1 = Path(temp_dir) / "file1_run.log"
-        file2 = Path(temp_dir) / "file2_run.log"
-        file1.write_text("file data 1")
-        file2.write_text("file data 2")
-
-        assert file1.exists()
-        assert file2.exists()
-
-        mock_files = [file1, file2]
-
-        with mock.patch("builtins.open", mock.mock_open(read_data="file data")):
-            message = mock.Mock()
-            mail_notifier._attach_files(message, mock_files, mock_files)
-
-            assert message.attach.call_count == len(mock_files)
+# --- tests
 
 
 @pytest.mark.parametrize(
-    "mock_glob_side_effect, send_mail_side_effect, attach_files_side_effect, mock_unlink_side_effect, expected_log_message",
+    "number_of_files, sendmail_error, compress_error, attach_error",
     [
-        # Normal case: No errors, should not log anything
-        # No logs are expected, everything works fine
-        (None, None, None, None, None),
+        # No errors, no log files compressed.
+        (0, None, None, None),
 
-        # Log compressed files 
-        (None, None, None, Exception('Compressed files were not deleted'),
-         'An error has occurred while deleting compressed log files for a warning email'),  
+        # No errors, one log file compressed.
+        (1, None, None, None),
 
-        # Log connection error: Simulate an error while sending email
-        (None, Exception("SMTP server error"), None, None,
-         'An error has occurred while sending a mail for warn about remote_platform'),
+        # No errors, three log files, one file compressed.
+        (3, None, None, None),
 
-        # Log attached files
-        (None, None, Exception("File attachment error"), None,
-         'An error has occurred while attaching log files to a warning email about remote_platforms'),
+        # STMP error.
+        (0, Exception("SMTP server error"), None, None),
 
-        # Log attachment error: Simulate failure in file listing (glob raises
-        # exception)
-        (Exception("Failed to list files"), None, None, None,
-         'An error has occurred while compressing log files for a warning email')
+        # ZIP error.
+        (1, None, ValueError('Zip error'), None),
+
+        # Attach error.
+        (1, None, None, ValueError('Attach error'))
     ],
     ids=[
-        "Normal case: No errors",
-        "Log file deletion error (Compressed files were not deleted)",
-        "Log connection error (SMTP server error)",
-        "Log attachments error (File attachment error)",
-        "Log file listing error (Failed to list files)"
+        "No files. No errors",
+        "One file. Attach a single file. No errors",
+        "Three files. Attach a single file. No errors",
+        "SMTP server error",
+        "Zip error",
+        "Attach error"
     ]
 )
-def test_notify_experiment_status(
+def test_compress_file(
+        mock_basic_config,
+        mock_platform,
+        mock_smtp,
+        mocker,
         mail_notifier,
-        mock_glob_side_effect,
-        send_mail_side_effect,
-        attach_files_side_effect,
-        mock_unlink_side_effect,
-        expected_log_message):
-    original_local_root_dir = BasicConfig.LOCAL_ROOT_DIR
-    with tempfile.TemporaryDirectory() as temp_dir:
-        BasicConfig.LOCAL_ROOT_DIR = temp_dir
-        exp_id = '1234'
-        aslogs_dir = Path(temp_dir) / exp_id / "tmp" / "ASLOGS"
-        aslogs_dir.mkdir(parents=True, exist_ok=True)
+        number_of_files: int,
+        sendmail_error: Optional[Exception],
+        compress_error: Optional[Exception],
+        attach_error: Optional[Exception]
+):
+    with TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
 
-        file1 = aslogs_dir / "1234_run.log"
-        file2 = aslogs_dir / "1235_run.log"
+        if sendmail_error:
+            mock_smtp.side_effect = sendmail_error
 
-        file1.write_text("file data 1")
-        file2.write_text("file data 2")
+        if compress_error:
+            mock_compress = mocker.patch(
+                'autosubmit.notifications.mail_notifier.zipfile.ZipFile')
+            mock_compress.side_effect = compress_error
 
-        assert file1.exists()
-        assert file2.exists()
+        if attach_error:
+            mock_message = mocker.patch(
+                'autosubmit.notifications.mail_notifier.MIMEApplication')
+            mock_message.side_effect = attach_error
 
-        with mock.patch.object(mail_notifier, '_generate_message_experiment_status', return_value="Test message"), \
-                mock.patch.object(mail_notifier, '_send_mail') as mock_send_mail, \
-                mock.patch.object(mail_notifier, '_attach_files') as mock_attach_files, \
-                mock.patch.object(Log, 'printlog') as mock_printlog:
+        mock_printlog = mocker.patch.object(Log, 'printlog')
 
-            mail_to = ['recipient@example.com']
-            platform = mock.Mock()
-            platform.name = "Test Platform"
-            platform.host = "test.host.com"
+        for _ in range(number_of_files):
+            test_file = temp_path / "test_file_run.log"
+            with open(test_file, 'w') as f:
+                f.write("file data 1")
+                f.flush()
 
-            mock_send_mail.side_effect = send_mail_side_effect
-            mock_attach_files.side_effect = attach_files_side_effect
+        mocker.patch.object(
+            BasicConfig,
+            'expid_aslog_dir',
+            return_value=Path(temp_dir))
 
-            if mock_glob_side_effect is not None:
-                # Log attachment error: Simulate failure in file listing (glob
-                # raises exception)
-                with mock.patch.object(Path, 'glob', side_effect=mock_glob_side_effect):
-                    mail_notifier.notify_experiment_status(
-                        exp_id, mail_to, platform)
-            elif mock_unlink_side_effect is not None:
-                with mock.patch.object(Path, 'unlink', side_effect=mock_unlink_side_effect):
-                    mail_notifier.notify_experiment_status(
-                        exp_id, mail_to, platform)
+        mail_notifier.notify_experiment_status(
+            'a000', ['recipient@example.com'], mock_platform)  # type: ignore
+
+        if sendmail_error:
+            mock_printlog.assert_called_once()
+            log_calls = [call[0][0] for call in mock_printlog.call_args_list]
+            assert 'Traceback' not in log_calls
+        elif compress_error:
+            mock_printlog.assert_called_once()
+            exception_raised = mock_printlog.call_args_list[0][1]
+            assert 'error has occurred while compressing' in exception_raised['message']
+            assert 6011 == exception_raised['code']
+        elif attach_error:
+            mock_printlog.assert_called_once()
+            exception_raised = mock_printlog.call_args_list[0][1]
+            assert 'error has occurred while attaching' in exception_raised['message']
+            assert 6011 == exception_raised['code']
+        else:
+            mock_printlog.assert_not_called()
+
+            # First we call sendmail, then we call quit. Thus, the [0].
+            # The first arguments are he sender and recipient. Third
+            # (or [2]) is the MIME message.
+            message_arg = mock_smtp.method_calls[0].args[2]
+
+            if number_of_files > 0:
+                assert '.zip' in message_arg
             else:
-                mail_notifier.notify_experiment_status(
-                    exp_id, mail_to, platform)
+                assert '.zip' not in message_arg
 
-            mail_notifier._generate_message_experiment_status.assert_called_once_with(
-                exp_id, platform)
-            mock_send_mail.assert_called_once_with(
-                mail_notifier.config.MAIL_FROM, 'recipient@example.com', mock.ANY)
-
-            if mock_glob_side_effect is None:
-                mock_attach_files.assert_called_once_with(
-                    mock.ANY, mock.ANY, [file1, file2])
-
-            if expected_log_message:
-                mock_printlog.assert_called_once_with(
-                    expected_log_message, 6011)
-                log_calls = [call[0][0]
-                             for call in mock_printlog.call_args_list]
-                assert 'Traceback' not in log_calls
-            else:
-                mock_printlog.assert_not_called()  # No logs should be called for normal execution
-
-    # Reset the local root dir.
-    BasicConfig.LOCAL_ROOT_DIR = original_local_root_dir
-
-
-def test_compress_file(mail_notifier):
-    with tempfile.TemporaryDirectory() as temp_dir:
-        test_file = Path(temp_dir) / "test_file.log"
-        test_file.write_text("file data 1")
-
-        assert test_file.exists()
-        compressed_file = mail_notifier._compress_file(test_file)
-
-        assert Path(
-            compressed_file).exists, f"Compressed file {compressed_file} does not exist."
-
-        with zipfile.ZipFile(compressed_file, 'r') as zipf:
-            zipf.testzip()  # Ensures the zip file is valid
-            file_list = zipf.namelist()  # Get the list of file names in the zip
-            assert Path(
-                test_file).name in file_list, "The compressed file does not contain the expected file."
-
-            # Check the content of the file inside the zip
-            with zipf.open(Path(test_file).name, 'r') as file:
-                content = file.read().decode('utf-8')
-                assert content == "file data 1", "The content inside the zip file is incorrect."
-
-        # Clean up by removing the compressed file
-        Path(compressed_file).unlink
-
-@pytest.fixture
-def mock_notify_status_change():
-    instance = MailNotifier(BasicConfig)
-    
-    instance._generate_message_text = mock.MagicMock(return_value="Generated message")
-    instance._send_mail = mock.MagicMock()
-    
-    with mock.patch.object(Log, 'printlog') as mock_printlog:
-        yield instance, mock_printlog
 
 @pytest.mark.parametrize(
-    "send_mail_side_effect, expected_log_message",
+    "sendmail_error, expected_log_message",
     [
         # Normal case: No errors, should not log anything
         # No logs are expected, everything works fine
         (None, None),
 
         # Log connection error: Simulate an error while sending email
-        (Exception("SMTP server error"), 
-         'Trace:SMTP server error\nAn error has occurred while sending a mail for the job SMTP server error')
+        (Exception("SMTP server error"),
+         'Trace:SMTP server error\nAn error has occurred while sending a mail for the job Job1')
     ],
     ids=[
         "Normal case: No errors",
         "Log connection error (SMTP server error)"
     ]
 )
-def test_notify_status_change(mock_notify_status_change, send_mail_side_effect, expected_log_message):
-    instance, mock_printlog = mock_notify_status_change
-    
-    exp_id = 123
+def test_notify_status_change(
+        mock_basic_config,
+        mock_smtp,
+        mocker,
+        mail_notifier,
+        sendmail_error: Optional[Exception],
+        expected_log_message):
+    exp_id = 'a123'
     job_name = 'Job1'
-    prev_status = 'Running'
-    status = 'Completed'
+    prev_status = Status.VALUE_TO_KEY[Status.RUNNING]
+    status = Status.VALUE_TO_KEY[Status.COMPLETED]
     mail_to = ['recipient@example.com']
-   
-    with mock.patch.object(instance, '_send_mail') as mock_send_mail:
-        mock_send_mail.side_effect = send_mail_side_effect
-        instance.notify_status_change(exp_id, job_name, prev_status, status, mail_to)
-    
-        instance._generate_message_text.assert_called_once_with(exp_id, job_name, prev_status, status)
-    
-        message_text = "Generated message"
-        message = MIMEText(message_text)
-        message['From'] = email.utils.formataddr(('Autosubmit', instance.config.MAIL_FROM))
-        message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {str(status)}'
-        message['Date'] = email.utils.formatdate(localtime=True)
-   
-        mock_send_mail.assert_called_once_with(
-            instance.config.MAIL_FROM, mail_to[0], mock.ANY 
-        )
-        assert mock_send_mail.call_args[0][2].get_payload() == message.get_payload()
+
+    mock_smtp = mocker.patch(
+        'autosubmit.notifications.mail_notifier.smtplib.SMTP')
+    if sendmail_error:
+        mock_smtp.side_effect = sendmail_error
+    mock_printlog = mocker.patch.object(Log, 'printlog')
+
+    mail_notifier.notify_status_change(
+        exp_id, job_name, prev_status, status, mail_to)
+
+    message_text = "Generated message"
+    message = MIMEText(message_text)
+    message['From'] = email.utils.formataddr(
+        ('Autosubmit', mail_notifier.config.MAIL_FROM))
+    message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {str(status)}'
+    message['Date'] = email.utils.formatdate(localtime=True)
 
     if expected_log_message:
         mock_printlog.assert_called_once_with(
-                expected_log_message, 6011)
+            expected_log_message, 6011)
         log_calls = [call[0][0]
-            for call in mock_printlog.call_args_list]
+                     for call in mock_printlog.call_args_list]
         assert 'Traceback' not in log_calls
     else:
-        mock_printlog.assert_not_called()  # No logs should be called for normal execution
-
+        mock_printlog.assert_not_called()
