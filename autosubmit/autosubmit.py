@@ -2068,10 +2068,6 @@ class Autosubmit:
                     job_list.packages_dict[package_name].append(job_list.get_job_by_name(job_name))
                 # This function, checks the stored STATUS of jobs inside wrappers. Since "wrapper status" is a memory variable.
                 job_list = Autosubmit.check_wrapper_stored_status(as_conf, job_list, wrapper_wallclock)
-            except ValueError as e:  # New field in the db, so not compatible if the wrapper package is not reset ( done in the create function )
-                if "not enough values to unpack" in str(e).lower():
-                    raise AutosubmitCritical("Error while loading the wrappers, this due a AS version change in the middle of the run. Please, run 'autosubmit create -f' again.", 7014, str(e))
-                raise
             except Exception as e:
                 raise AutosubmitCritical(
                     "Autosubmit failed while processing job packages. This might be due to a change in your experiment configuration files after 'autosubmit create' was performed.",

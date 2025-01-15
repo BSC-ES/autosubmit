@@ -18,6 +18,8 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from autosubmit.database.db_manager import DbManager
+from log.log import AutosubmitCritical
+from typing import Any, List
 
 
 class JobPackagePersistence(object):
@@ -41,18 +43,23 @@ class JobPackagePersistence(object):
         self.db_manager = DbManager(persistence_path, persistence_file, self.VERSION)
         self.db_manager.create_table(self.JOB_PACKAGES_TABLE, self.TABLE_FIELDS)
         self.db_manager.create_table(self.WRAPPER_JOB_PACKAGES_TABLE, self.TABLE_FIELDS)
-    def load(self,wrapper=False):
+
+    def load(self, wrapper=False) -> List[Any]:
         """
         Loads package of jobs from a database
         :param: wrapper: boolean
-        :return: dictionary of jobs per package
-
-
+        :return: list of jobs per package
         """
         if not wrapper:
-            return self.db_manager.select_all(self.JOB_PACKAGES_TABLE)
+            results = self.db_manager.select_all(self.JOB_PACKAGES_TABLE)
         else:
-            return self.db_manager.select_all(self.WRAPPER_JOB_PACKAGES_TABLE)
+            results = self.db_manager.select_all(self.WRAPPER_JOB_PACKAGES_TABLE)
+        if len(results) != 3:
+            # New field in the db, so not compatible if the wrapper package is not reset (done in the create function)
+            raise AutosubmitCritical("Error while loading the wrappers, this due a AS version change in the middle"
+                                     "of the run. Please, run 'autosubmit create -f' again.")
+        return results
+
     def reset(self):
         """
         Loads package of jobs from a database
