@@ -2061,7 +2061,8 @@ class Autosubmit:
                     "job_packages not found", 6016, str(e))
             Log.debug("Processing job packages")
             try:
-                wrapper_wallclock = "48:00" # fallback value, only affects to is_overclock
+                # fallback value, only affects to is_overclock
+                wrapper_wallclock = as_conf.experiment_data.get("CONFIG", {}).get("WRAPPERS_WALLCLOCK", "48:00")
                 for (exp_id, package_name, job_name, wrapper_wallclock) in packages:
                     if package_name not in job_list.packages_dict:
                         job_list.packages_dict[package_name] = []

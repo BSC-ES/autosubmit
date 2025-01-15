@@ -305,8 +305,8 @@ class Job(object):
         if not self._wallclock_in_seconds or self.status not in [Status.RUNNING, Status.QUEUING, Status.SUBMITTED]:
             # Should always take the max_wallclock set in the platform, this is set as fallback ( and local platform doesn't have a max_wallclock defined )
             if not wallclock or wallclock == "00:00":
-                wallclock = "24:00"
-                Log.warning(f"No wallclock is set for this job. Default to {wallclock}")
+                wallclock = self.parameters.get("CONFIG.JOB_WALLCLOCK", "24:00")
+                Log.warning(f"No wallclock is set for this job. Default to {wallclock}. You can change this value in CONFIG.WALLCLOCK")
             wallclock = self.parse_time(wallclock)
             self._wallclock_in_seconds = self._time_in_seconds_and_margin(wallclock)
 
@@ -1292,11 +1292,9 @@ class Job(object):
     def _max_possible_wallclock(self):
         if self.platform and self.platform.max_wallclock:
             wallclock = self.parse_time(self.platform.max_wallclock)
-            if not wallclock:
-                return None
-            return int(wallclock.total_seconds())
-        else:
-            return None
+            if wallclock:
+                return int(wallclock.total_seconds())
+        return None
 
     def _time_in_seconds_and_margin(self, wallclock: datetime.timedelta) -> int:
         """

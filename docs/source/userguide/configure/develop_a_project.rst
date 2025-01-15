@@ -137,14 +137,16 @@ Autosubmit configuration
         # This parameter is used to enable the use of threads in autosubmit for the wrappers. # Default False
         ENABLE_WRAPPER_THREADS: False
         OUTPUT:pdf
-        # wrapper definition
-        wrappers:
-            wrapper_1_v_example:
-                TYPE: Vertical
-                JOBS_IN_WRAPPER: sim
-            wrapper_2_h_example:
-                TYPE: Horizontal
-                JOBS_IN_WRAPPER: da
+        WRAPPERS_WALLCLOCK: 48:00  # Default max_wallclock for wrappers before getting killed
+        JOB_WALLCLOCK: 24:00  # Default max_wallclock for jobs before getting killed
+    # wrapper definition
+    wrappers:
+        wrapper_1_v_example:
+            TYPE: Vertical
+            JOBS_IN_WRAPPER: sim
+        wrapper_2_h_example:
+            TYPE: Horizontal
+            JOBS_IN_WRAPPER: da
 
 Jobs configuration
 ==================
