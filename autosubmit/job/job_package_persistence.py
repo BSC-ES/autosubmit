@@ -54,10 +54,11 @@ class JobPackagePersistence(object):
             results = self.db_manager.select_all(self.JOB_PACKAGES_TABLE)
         else:
             results = self.db_manager.select_all(self.WRAPPER_JOB_PACKAGES_TABLE)
-        if len(results) != 3:
-            # New field in the db, so not compatible if the wrapper package is not reset (done in the create function)
-            raise AutosubmitCritical("Error while loading the wrappers, this due a AS version change in the middle"
-                                     "of the run. Please, run 'autosubmit create -f' again.")
+        # ['exp_id', 'package_name', 'job_name', 'wallclock']  wallclock is the new addition
+        if len(results) > 0 and len(results[0]) != 4:
+                # New field in the db, so not compatible if the wrapper package is not reset (done in the create function)
+                raise AutosubmitCritical("Error while loading the wrappers, this due a AS version change in the middle"
+                                         "of the run. Please, run 'autosubmit create -f' again.")
         return results
 
     def reset(self):
