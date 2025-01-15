@@ -5753,11 +5753,13 @@ class Autosubmit:
 
         if str(rerun).lower() == "true":
             rerun_jobs = as_conf.get_rerun_jobs()
-            job_list.rerun(rerun_jobs,as_conf, monitor=monitor)
+            job_list.rerun(rerun_jobs, as_conf, monitor=monitor)
         else:
             job_list.remove_rerun_only_jobs(notransitive)
 
-        for job in job_list.get_waiting() + job_list.get_ready(): # Reset packed value on load so the jobs can be wrapped again. Inspect -cw and Create -cw had issues.
+        # Inspect -cw and Create -cw commands had issues at this point.
+        # Reset packed value on load so the jobs can be wrapped again.
+        for job in job_list.get_waiting() + job_list.get_ready():
             job.packed = False
 
         return job_list
