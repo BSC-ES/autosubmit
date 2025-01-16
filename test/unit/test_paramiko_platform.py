@@ -161,4 +161,5 @@ def test_ps_get_submit_cmd(mocker, ps_platform):
     job.script_name = "echo hello world"
     job.fail_count = 0
     command = platform.get_submit_cmd(job.script_name, job)
-    assert "hello world" in command
+    assert f"{job.script_name}" in command
+    assert f"timeout {job.wallclock_in_seconds}" in command
