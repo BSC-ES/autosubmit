@@ -219,7 +219,7 @@ class Job(object):
         #: (int) Number of failed attempts to run this job. (FAIL_COUNT)
         self._fail_count = 0
         self.expid = name.split('_')[0] # type: str
-        self.parameters = None
+        self.parameters = dict()
         self._tmp_path = os.path.join(
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
         self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
