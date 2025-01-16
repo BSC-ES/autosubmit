@@ -54,7 +54,7 @@ def jobs_in_wrapper_str(as_conf, current_wrapper):
     else:
         jobs_in_wrapper = jobs_in_wrapper.split(" ")
     jobs_in_wrapper = [job.strip(" ,") for job in jobs_in_wrapper]
-    return "&".join(jobs_in_wrapper)
+    return "_".join(jobs_in_wrapper)
 class JobPackageBase(object):
     """
     Class to manage the package of jobs to be submitted by autosubmit

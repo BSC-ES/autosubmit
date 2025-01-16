@@ -215,4 +215,4 @@ def test_jobs_in_wrapper_str(mock_as_conf):
     # Arrange
     current_wrapper = "current_wrapper"
     result = jobs_in_wrapper_str(mock_as_conf, current_wrapper)
-    assert result == "job1&job2&job3"
+    assert result == "job1_job2_job3"
