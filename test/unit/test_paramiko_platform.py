@@ -145,3 +145,20 @@ def test_send_file(mocker, ps_platform, filename, check):
     platform.send_command = mocker.Mock()
     platform.send_file(filename)
     assert check == (remote_dir / filename).exists()
+
+
+def test_ps_get_submit_cmd(mocker, ps_platform):
+    platform, _ = ps_platform
+    job = mocker.Mock()
+    job.id = 'TEST'
+    job.name = 'TEST'
+    job.wallclock = '00:01'
+    job.processors = 1
+    job.section = 'dummysection'
+    job.platform_name = 'pytest-ps'
+    job.platform = platform
+    job.wallclock_in_seconds = 60
+    job.script_name = "echo hello world"
+    job.fail_count = 0
+    command = platform.get_submit_cmd(job.script_name, job)
+    assert "hello world" in command
