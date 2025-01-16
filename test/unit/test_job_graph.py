@@ -381,13 +381,13 @@ class TestJobGraph(TestCase):
         self.assertListEqual(sorted(list(subgraph['edges'].keys())), sorted(edges))
 
     def test_wrapper_package(self):
-        packages = [('expid', 'package_d1_m1_SIM', 'expid_d1_m1_1_SIM'), ('expid', 'package_d1_m1_SIM', 'expid_d1_m1_2_SIM'),
-                    ('expid', 'package_d2_m2_SIM', 'expid_d2_m2_1_SIM'), ('expid', 'package_d2_m2_SIM', 'expid_d2_m2_2_SIM')]
+        packages = [('expid', 'package_d1_m1_SIM', 'expid_d1_m1_1_SIM', "02:00"), ('expid', 'package_d1_m1_SIM', 'expid_d1_m1_2_SIM', "02:00"),
+                    ('expid', 'package_d2_m2_SIM', 'expid_d2_m2_1_SIM', "02:00"), ('expid', 'package_d2_m2_SIM', 'expid_d2_m2_2_SIM', "02:00")]
 
         monitor = Monitor()
         graph = monitor.create_tree_list(self.experiment_id, self.job_list.get_job_list(), packages, dict())
         self.assertFalse(graph.obj_dict['strict'])
-        for (expid, package, job_name) in packages:
+        for (expid, package, job_name, _) in packages:
             self.assertIn('cluster_'+package, graph.obj_dict['subgraphs'])
 
     def test_synchronize_member_group_member(self):
@@ -895,16 +895,16 @@ class TestJobGraph(TestCase):
             ("expid_d2_m2_1_SIM", "d2_m2_2")
         ]
 
-        packages = [('expid', 'package_d1_m1_SIM', 'expid_d1_m1_1_SIM'),
-                    ('expid', 'package_d1_m1_SIM', 'expid_d1_m1_2_SIM'),
-                    ('expid', 'package_d2_m2_SIM', 'expid_d2_m2_1_SIM'),
-                    ('expid', 'package_d2_m2_SIM', 'expid_d2_m2_2_SIM')]
+        packages = [('expid', 'package_d1_m1_SIM', 'expid_d1_m1_1_SIM', "02:00"),
+                    ('expid', 'package_d1_m1_SIM', 'expid_d1_m1_2_SIM', "02:00"),
+                    ('expid', 'package_d2_m2_SIM', 'expid_d2_m2_1_SIM', "02:00"),
+                    ('expid', 'package_d2_m2_SIM', 'expid_d2_m2_2_SIM', "02:00")]
 
         monitor = Monitor()
         graph = monitor.create_tree_list(self.experiment_id, self.job_list.get_job_list(), packages, groups_dict)
         self.assertTrue(graph.obj_dict['strict'])
 
-        for (expid, package, job_name) in packages:
+        for (expid, package, job_name, _) in packages:
             if package != 'package_d2_m2_SIM':
                 self.assertNotIn('cluster_' + package, graph.obj_dict['subgraphs'])
             else:
