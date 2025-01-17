@@ -90,9 +90,9 @@ def test_check_wrapper_stored_status(setup_as_conf, new_job_list, new_platform_m
     new_job_list.packages_dict = packages
 
 
-def test_parse_time(new_platform):
+def test_parse_time(new_platform_mock):
     job = Job("dummy-1", 1, Status.SUBMITTED, 0)
-    setup_jobs([job], new_platform)
+    setup_jobs([job], new_platform_mock)
     assert job.parse_time("0000") is None
     assert job.parse_time("00:01") == timedelta(seconds=60)
 
