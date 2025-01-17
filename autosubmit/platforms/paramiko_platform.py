@@ -586,6 +586,23 @@ class ParamikoPlatform(Platform):
         """
         raise NotImplementedError
 
+    def job_is_over_wallclock(self, job, job_status, cancel=False):
+        if job.is_over_wallclock():
+            try:
+                job.platform.get_completed_files(job.name)
+                job_status = job.check_completion(over_wallclock=True)
+            except Exception as e:
+                job_status = Status.FAILED
+
+            if cancel and job_status is Status.FAILED:
+                try:
+                    if self.cancel_cmd is not None:
+                        Log.warning(f"Job {job.id} is over wallclock, cancelling job")
+                        job.platform.send_command(self.cancel_cmd + " " + str(job.id))
+                except:
+                    pass
+        return job_status
+
     def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
         """
         Checks job running status
@@ -654,12 +671,7 @@ class ParamikoPlatform(Platform):
                         if job.wallclock == "00:00" or job.wallclock is None:
                             wallclock = job.platform.max_wallclock
                         if wallclock != "00:00" and wallclock != "00:00:00" and wallclock != "":
-                            if job.is_over_wallclock():
-                                try:
-                                    job.platform.get_completed_files(job.name)
-                                    job_status = job.check_completion(over_wallclock=True)
-                                except Exception as e:
-                                    job_status = Status.FAILED
+                            self.job_is_over_wallclock(job, job_status, cancel=False)
             elif job_status in self.job_status['QUEUING'] and (not job.hold or job.hold.lower() != "true"):
                 job_status = Status.QUEUING
             elif job_status in self.job_status['QUEUING'] and (job.hold or job.hold.lower() == "true"):
@@ -786,18 +798,7 @@ class ParamikoPlatform(Platform):
                     if job.wallclock == "00:00":
                         wallclock = job.platform.max_wallclock
                     if wallclock != "00:00" and wallclock != "00:00:00" and wallclock != "":
-                        if job.is_over_wallclock():
-                            try:
-                                job.platform.get_completed_files(job.name)
-                                job_status = job.check_completion(over_wallclock=True)
-                                if job_status is Status.FAILED:
-                                    try:
-                                        if self.cancel_cmd is not None:
-                                            job.platform.send_command(self.cancel_cmd + " " + str(job.id))
-                                    except:
-                                        pass
-                            except:
-                                job_status = Status.FAILED
+                        self.job_is_over_wallclock(job, job_status, cancel=True)
                 if job_status in self.job_status['COMPLETED']:
                     job_status = Status.COMPLETED
                 elif job_status in self.job_status['RUNNING']:

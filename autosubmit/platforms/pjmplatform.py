@@ -67,7 +67,6 @@ class PJMPlatform(ParamikoPlatform):
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh")
         self._submit_script_base_name = os.path.join(
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
-        self._submit_script_file = open(self._submit_script_path, 'wb').close()
 
     def generate_new_name_submit_script_file(self):
         self._submit_script_path = self._submit_script_base_name + os.urandom(16).hex() + ".sh"
