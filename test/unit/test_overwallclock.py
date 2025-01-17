@@ -11,31 +11,32 @@ from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
-exp_data = {
-    "WRAPPERS": {
-        "WRAPPERS": {
-            "JOBS_IN_WRAPPER": "dummysection"
-        }
-    },
-    "LOCAL_ROOT_DIR": "blabla",
-    "LOCAL_TMP_DIR": 'tmp',
-    "LOCAL_ASLOG_DIR": 'tmp',
-    "PLATFORMS": {
-        "PYTEST-UNSUPPORTED": {
-            "TYPE": "unknown",
-            "host": "",
-            "user": "",
-            "project": "",
-            "scratch_dir": "",
-            "MAX_WALLCLOCK": "",
-            "DISABLE_RECOVERY_THREADS": True
-        }
-    },
 
-}
 
 @pytest.fixture
 def setup_as_conf(autosubmit_config, tmpdir, prepare_basic_config):
+    exp_data = {
+        "WRAPPERS": {
+            "WRAPPERS": {
+                "JOBS_IN_WRAPPER": "dummysection"
+            }
+        },
+        "LOCAL_ROOT_DIR": f"{tmpdir.strpath}",
+        "LOCAL_TMP_DIR": f'{tmpdir.strpath}',
+        "LOCAL_ASLOG_DIR": f"{tmpdir.strpath}",
+        "PLATFORMS": {
+            "PYTEST-UNSUPPORTED": {
+                "TYPE": "unknown",
+                "host": "",
+                "user": "",
+                "project": "",
+                "scratch_dir": "",
+                "MAX_WALLCLOCK": "",
+                "DISABLE_RECOVERY_THREADS": True
+            }
+        },
+
+    }
     as_conf = autosubmit_config("random-id", exp_data)
     return as_conf
 
@@ -49,7 +50,7 @@ def new_job_list(setup_as_conf, tmpdir, prepare_basic_config):
 
 
 @pytest.fixture
-def new_platform_mock(mocker):
+def new_platform_mock(mocker, tmpdir):
     dummy_platform = mocker.MagicMock(autospec=SlurmPlatform)
     # Add here as many attributes as needed
     dummy_platform.name = 'dummy_platform'
@@ -110,7 +111,7 @@ def test_is_over_wallclock(new_platform_mock):
     [(SlurmPlatform, "Slurm"), (PsPlatform, "PS"), (PsPlatform, "PJM")],
     ids=["SlurmPlatform", "PsPlatform", "PjmPlatform"]
 )
-def test_platform_job_is_over_wallclock(setup_as_conf, new_platform_mock, platform_class, platform_name):
+def test_platform_job_is_over_wallclock(setup_as_conf, new_platform_mock, platform_class, platform_name, mocker):
     platform_instance = platform_class("dummy", f"{platform_name}-dummy", setup_as_conf.experiment_data)
     job = Job("dummy-1", 1, Status.RUNNING, 0)
     setup_jobs([job], platform_instance)
@@ -120,3 +121,9 @@ def test_platform_job_is_over_wallclock(setup_as_conf, new_platform_mock, platfo
     job.start_time = datetime.now() - timedelta(minutes=2)
     job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING)
     assert job_status == Status.FAILED
+    # check platform_instance is called
+    platform_instance.send_command = mocker.MagicMock()
+    job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING, True)
+    assert job_status == Status.FAILED
+
+    platform_instance.send_command.assert_called_once()
