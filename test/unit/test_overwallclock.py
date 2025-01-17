@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
@@ -83,12 +84,25 @@ def setup_jobs(dummy_jobs, new_platform_mock):
         job.start_time = datetime.now() - timedelta(minutes=1)
 
 
-def test_check_wrapper_stored_status(setup_as_conf, new_job_list, new_platform_mock):
-    dummy_jobs = [Job("dummy-1", 1, Status.SUBMITTED, 0), Job("dummy-2", 2, Status.SUBMITTED, 0), Job("dummy-3", 3, Status.SUBMITTED, 0)]
+@pytest.mark.parametrize(
+    "initial_status, expected_status",
+    [
+        (Status.SUBMITTED, Status.SUBMITTED),
+        (Status.QUEUING, Status.QUEUING),
+        (Status.RUNNING, Status.RUNNING),
+        (Status.FAILED, Status.FAILED),
+        (Status.COMPLETED, Status.COMPLETED)
+    ],
+    ids=["Submitted", "Queuing", "Running", "Failed", "Completed"]
+)
+def test_check_wrapper_stored_status(setup_as_conf, new_job_list, new_platform_mock, initial_status, expected_status):
+    dummy_jobs = [Job("dummy-1", 1, initial_status, 0), Job("dummy-2", 2, initial_status, 0), Job("dummy-3", 3, initial_status, 0)]
     setup_jobs(dummy_jobs, new_platform_mock)
     new_job_list.jobs = dummy_jobs
-    packages = new_packages(setup_as_conf, dummy_jobs)
-    new_job_list.packages_dict = packages
+    new_job_list.packages_dict = {"dummy_wrapper": dummy_jobs}
+    new_job_list = Autosubmit.check_wrapper_stored_status(setup_as_conf, new_job_list, "03:30")
+    assert new_job_list.job_package_map[dummy_jobs[0].id].status == expected_status
+
 
 
 def test_parse_time(new_platform_mock):
@@ -125,5 +139,22 @@ def test_platform_job_is_over_wallclock(setup_as_conf, new_platform_mock, platfo
     platform_instance.send_command = mocker.MagicMock()
     job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING, True)
     assert job_status == Status.FAILED
-
     platform_instance.send_command.assert_called_once()
+    platform_instance.cancel_cmd = None
+    platform_instance.send_command = mocker.MagicMock()
+    job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING, True)
+    platform_instance.send_command.assert_not_called()
+
+@pytest.mark.parametrize(
+    "platform_class, platform_name",
+    [(SlurmPlatform, "Slurm"), (PsPlatform, "PS"), (PsPlatform, "PJM")],
+    ids=["SlurmPlatform", "PsPlatform", "PjmPlatform"]
+)
+def test_platform_job_is_over_wallclock_force_failure(setup_as_conf, new_platform_mock, platform_class, platform_name, mocker):
+    platform_instance = platform_class("dummy", f"{platform_name}-dummy", setup_as_conf.experiment_data)
+    job = Job("dummy-1", 1, Status.RUNNING, 0)
+    setup_jobs([job], platform_instance)
+    job.start_time = datetime.now() - timedelta(minutes=2)
+    job.platform.get_completed_files = mocker.MagicMock(side_effect=Exception("Error"))
+    job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING, True)
+    assert job_status == Status.FAILED

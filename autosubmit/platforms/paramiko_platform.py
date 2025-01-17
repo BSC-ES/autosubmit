@@ -595,12 +595,10 @@ class ParamikoPlatform(Platform):
                 job_status = Status.FAILED
 
             if cancel and job_status is Status.FAILED:
-                try:
+                with suppress(Exception):
                     if self.cancel_cmd is not None:
                         Log.warning(f"Job {job.id} is over wallclock, cancelling job")
                         job.platform.send_command(self.cancel_cmd + " " + str(job.id))
-                except:
-                    pass
         return job_status
 
     def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
