@@ -1854,6 +1854,7 @@ class Autosubmit:
         """
         # if packages_dict attr is in job_list
         if hasattr(job_list, "packages_dict"):
+            wrapper_status = Status.SUBMITTED
             for package_name, jobs in job_list.packages_dict.items():
                 from .job.job import WrapperJob
                 # Ordered by higher priority status
@@ -1869,8 +1870,7 @@ class Autosubmit:
                     wrapper_status = Status.HELD
                 elif any(job.status == Status.SUBMITTED for job in jobs):
                     wrapper_status = Status.SUBMITTED
-                else:
-                    wrapper_status = Status.SUBMITTED
+
                 wrapper_job = WrapperJob(package_name, jobs[0].id, wrapper_status, 0, jobs,
                                          wrapper_wallclock,
                                          None, jobs[0].platform, as_conf, jobs[0].hold)

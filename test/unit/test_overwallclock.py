@@ -91,17 +91,23 @@ def setup_jobs(dummy_jobs, new_platform_mock):
         (Status.QUEUING, Status.QUEUING),
         (Status.RUNNING, Status.RUNNING),
         (Status.FAILED, Status.FAILED),
-        (Status.COMPLETED, Status.COMPLETED)
+        (Status.COMPLETED, Status.COMPLETED),
+        (Status.HELD, Status.HELD),
+        (Status.UNKNOWN, Status.UNKNOWN),
     ],
-    ids=["Submitted", "Queuing", "Running", "Failed", "Completed"]
+    ids=["Submitted", "Queuing", "Running", "Failed", "Completed", "Held", "No packages"]
 )
 def test_check_wrapper_stored_status(setup_as_conf, new_job_list, new_platform_mock, initial_status, expected_status):
     dummy_jobs = [Job("dummy-1", 1, initial_status, 0), Job("dummy-2", 2, initial_status, 0), Job("dummy-3", 3, initial_status, 0)]
     setup_jobs(dummy_jobs, new_platform_mock)
     new_job_list.jobs = dummy_jobs
-    new_job_list.packages_dict = {"dummy_wrapper": dummy_jobs}
+    if dummy_jobs[0].status != Status.UNKNOWN:
+        new_job_list.packages_dict = {"dummy_wrapper": dummy_jobs}
     new_job_list = Autosubmit.check_wrapper_stored_status(setup_as_conf, new_job_list, "03:30")
-    assert new_job_list.job_package_map[dummy_jobs[0].id].status == expected_status
+    assert new_job_list is not None
+    if dummy_jobs[0].status != Status.UNKNOWN:
+        assert new_job_list.job_package_map[dummy_jobs[0].id].status == expected_status
+
 
 
 
