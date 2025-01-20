@@ -157,14 +157,17 @@ def test_update_parameters_attributes(autosubmit_config, experiment_data, attrib
         assert hasattr(job, attr)
         assert getattr(job, attr) == attributes_to_check[attr]
 
+
 @pytest.mark.parametrize('test_packed', [
     False,
     True,
 ], ids=["Simple job", "Wrapped job"])
 def test_adjust_new_parameters(test_packed):
     job = Job('dummy', '1', 0, 1)
+    stored_log_path = job._log_path
     del job.is_wrapper
     del job.wrapper_name
+    del job._log_path
     job.packed = test_packed
     job._adjust_new_parameters()
     assert job.is_wrapper == test_packed
@@ -172,6 +175,7 @@ def test_adjust_new_parameters(test_packed):
         assert job.wrapper_name == "wrapped"
     else:
         assert job.wrapper_name == "dummy"
+    assert job._log_path == stored_log_path
 
 
 @pytest.mark.parametrize('custom_directives, test_type, result_by_lines', [
