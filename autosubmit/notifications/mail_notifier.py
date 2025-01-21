@@ -123,7 +123,7 @@ def _generate_message_experiment_status(
 
     :param exp_id: The experiment id.
     :type exp_id: str
-    :param platform: The platform..
+    :param platform: The platform.
     :type platform: Platform
     :return: The email body for the experiment status notification.
     :rtype: str
@@ -218,7 +218,6 @@ class MailNotifier:
                     f'for the job {job_name}', 6011)
 
     def _send_mail(self, mail_from, mail_to, message):
-        server = smtplib.SMTP(self.config.SMTP_SERVER, timeout=60)
         server = smtplib.SMTP(self.config.SMTP_SERVER, timeout=60)
         server.sendmail(mail_from, mail_to, message.as_string())
         server.quit()
