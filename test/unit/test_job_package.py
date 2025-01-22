@@ -97,6 +97,7 @@ class TestJobPackage(TestCase):
         self.platform.queue = "debug"
         self.platform.partition = "debug"
         self.platform.serial_platform = self.platform
+        self.platform.serial_platform.max_wallclock = '24:00'
         self.platform.serial_queue = "debug-serial"
         self.platform.serial_partition = "debug-serial"
         self.jobs = [Job('dummy1', 0, Status.READY, 0),
