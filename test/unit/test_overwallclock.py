@@ -109,8 +109,6 @@ def test_check_wrapper_stored_status(setup_as_conf, new_job_list, new_platform_m
         assert new_job_list.job_package_map[dummy_jobs[0].id].status == expected_status
 
 
-
-
 def test_parse_time(new_platform_mock):
     job = Job("dummy-1", 1, Status.SUBMITTED, 0)
     setup_jobs([job], new_platform_mock)
@@ -125,6 +123,7 @@ def test_is_over_wallclock(new_platform_mock):
     assert job.is_over_wallclock() is False
     job.start_time = datetime.now() - timedelta(minutes=2)
     assert job.is_over_wallclock() is True
+
 
 @pytest.mark.parametrize(
     "platform_class, platform_name",
@@ -150,6 +149,7 @@ def test_platform_job_is_over_wallclock(setup_as_conf, new_platform_mock, platfo
     platform_instance.send_command = mocker.MagicMock()
     job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING, True)
     platform_instance.send_command.assert_not_called()
+
 
 @pytest.mark.parametrize(
     "platform_class, platform_name",
