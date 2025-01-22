@@ -20,9 +20,8 @@ def mock_basic_config(mocker):
     mock_config = mocker.Mock()
     mock_config.MAIL_FROM = "test@example.com"
     mock_config.SMTP_SERVER = "smtp.example.com"
-    def mock_expid_aslog_dir(exp_id):
-        return BasicConfig.expid_aslog_dir(exp_id)
-    mock_config.expid_aslog_dir.side_effect = mock_expid_aslog_dir
+    mock_config.expid_aslog_dir.side_effect = lambda exp_id: BasicConfig.expid_aslog_dir(
+        exp_id)
     return mock_config
 
 
