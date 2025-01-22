@@ -163,6 +163,8 @@ class MailNotifier:
         :param platform: The platform.
         :type platform: Platform
         """
+        if not isinstance(mail_to, list):
+            raise ValueError('mail_to must be a list of emails!')
         message_text = _generate_message_experiment_status(exp_id, platform)
         message = MIMEMultipart()
         message['From'] = email.utils.formataddr(
@@ -171,7 +173,7 @@ class MailNotifier:
         message['Date'] = email.utils.formatdate(localtime=True)
         message.attach(MIMEText(message_text))
 
-        run_log_files = [f for f in BasicConfig.expid_aslog_dir(
+        run_log_files = [f for f in self.config.expid_aslog_dir(
             exp_id).glob('*_run.log') if Path(f).is_file()]
         if run_log_files:
             latest_run_log: Path = max(run_log_files)
@@ -201,6 +203,8 @@ class MailNotifier:
             prev_status: str,
             status: str,
             mail_to: List[str]) -> None:
+        if not isinstance(mail_to, list):
+            raise ValueError('mail_to must be a list of emails!')
         message_text = _generate_message_text(
             exp_id, job_name, prev_status, status)
         message = MIMEText(message_text)
