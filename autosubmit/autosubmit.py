@@ -26,7 +26,7 @@ from configparser import ConfigParser
 from distutils.util import strtobool
 from pathlib import Path
 from ruamel.yaml import YAML
-from typing import Dict, Set, Tuple, Union
+from typing import Dict, Set, Tuple, Union, Any
 
 from autosubmit.database.db_common import update_experiment_descrip_version
 from autosubmit.helpers.parameters import PARAMETERS
@@ -1837,57 +1837,42 @@ class Autosubmit:
                         else:
                             jobs_to_check[platform.name] = [[job, job_prev_status]]
         return jobs_to_check,job_changes_tracker
+
     @staticmethod
-    def check_wrapper_stored_status(as_conf,job_list):
+    def check_wrapper_stored_status(as_conf: Any, job_list: Any, wrapper_wallclock: str) -> Any:
         """
-        Check if the wrapper job has been submitted and the inner jobs are in the queue.
-        :param as_conf: a BasicConfig object
-        :param job_list: a JobList object
-        :return: JobList object updated
+        Check if the wrapper job has been submitted and the inner jobs are in the queue after a load.
+
+        :param as_conf: A BasicConfig object.
+        :type as_conf: BasicConfig
+        :param job_list: A JobList object.
+        :type job_list: JobList
+        :param wrapper_wallclock: The wallclock of the wrapper.
+        :type wrapper_wallclock: str
+        :return: Updated JobList object.
+        :rtype: JobList
         """
         # if packages_dict attr is in job_list
         if hasattr(job_list, "packages_dict"):
+            wrapper_status = Status.SUBMITTED
             for package_name, jobs in job_list.packages_dict.items():
                 from .job.job import WrapperJob
-                wrapper_status = Status.SUBMITTED
-                all_completed = True
-                running = False
-                queuing = False
-                failed = False
-                hold = False
-                submitted = False
-                if jobs[0].status == Status.RUNNING or jobs[0].status == Status.COMPLETED:
-                    running = True
-                for job in jobs:
-                    if job.status == Status.QUEUING:
-                        queuing = True
-                        all_completed = False
-                    elif job.status == Status.FAILED:
-                        failed = True
-                        all_completed = False
-                    elif job.status == Status.HELD:
-                        hold = True
-                        all_completed = False
-                    elif job.status == Status.SUBMITTED:
-                        submitted = True
-                        all_completed = False
-                if all_completed:
+                # Ordered by higher priority status
+                if all(job.status == Status.COMPLETED for job in jobs):
                     wrapper_status = Status.COMPLETED
-                elif hold:
+                elif any(job.status == Status.RUNNING for job in jobs):
+                    wrapper_status = Status.RUNNING
+                elif any(job.status == Status.FAILED for job in jobs): # No more inner jobs running but inner job in failed
+                    wrapper_status = Status.FAILED
+                elif any(job.status == Status.QUEUING for job in jobs):
+                    wrapper_status = Status.QUEUING
+                elif any(job.status == Status.HELD for job in jobs):
                     wrapper_status = Status.HELD
-                else:
-                    if running:
-                        wrapper_status = Status.RUNNING
-                    elif queuing:
-                        wrapper_status = Status.QUEUING
-                    elif submitted:
-                        wrapper_status = Status.SUBMITTED
-                    elif failed:
-                        wrapper_status = Status.FAILED
-                    else:
-                        wrapper_status = Status.SUBMITTED
+                elif any(job.status == Status.SUBMITTED for job in jobs):
+                    wrapper_status = Status.SUBMITTED
+
                 wrapper_job = WrapperJob(package_name, jobs[0].id, wrapper_status, 0, jobs,
-                                         None,
+                                         wrapper_wallclock,
                                          None, jobs[0].platform, as_conf, jobs[0].hold)
                 job_list.job_package_map[jobs[0].id] = wrapper_job
         return job_list
@@ -2059,12 +2044,14 @@ class Autosubmit:
                     "job_packages not found", 6016, str(e))
             Log.debug("Processing job packages")
             try:
-                for (exp_id, package_name, job_name) in packages:
+                # fallback value, only affects to is_overclock
+                wrapper_wallclock = as_conf.experiment_data.get("CONFIG", {}).get("WRAPPERS_WALLCLOCK", "48:00")
+                for (exp_id, package_name, job_name, wrapper_wallclock) in packages:
                     if package_name not in job_list.packages_dict:
                         job_list.packages_dict[package_name] = []
                     job_list.packages_dict[package_name].append(job_list.get_job_by_name(job_name))
                 # This function, checks the stored STATUS of jobs inside wrappers. Since "wrapper status" is a memory variable.
-                job_list = Autosubmit.check_wrapper_stored_status(as_conf, job_list)
+                job_list = Autosubmit.check_wrapper_stored_status(as_conf, job_list, wrapper_wallclock)
             except Exception as e:
                 raise AutosubmitCritical(
                     "Autosubmit failed while processing job packages. This might be due to a change in your experiment configuration files after 'autosubmit create' was performed.",
@@ -5750,9 +5737,14 @@ class Autosubmit:
 
         if str(rerun).lower() == "true":
             rerun_jobs = as_conf.get_rerun_jobs()
-            job_list.rerun(rerun_jobs,as_conf, monitor=monitor)
+            job_list.rerun(rerun_jobs, as_conf, monitor=monitor)
         else:
             job_list.remove_rerun_only_jobs(notransitive)
+
+        # Inspect -cw and Create -cw commands had issues at this point.
+        # Reset packed value on load so the jobs can be wrapped again.
+        for job in job_list.get_waiting() + job_list.get_ready():
+            job.packed = False
 
         return job_list
 

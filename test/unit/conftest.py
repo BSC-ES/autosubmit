@@ -182,3 +182,23 @@ def autosubmit_config(
     request.addfinalizer(finalizer)
 
     return _create_autosubmit_config
+
+
+@pytest.fixture
+def prepare_basic_config(tmpdir):
+    basic_conf = BasicConfig()
+    BasicConfig.DB_DIR = (tmpdir / "exp_root")
+    BasicConfig.DB_FILE = "debug.db"
+    BasicConfig.LOCAL_ROOT_DIR = (tmpdir / "exp_root")
+    BasicConfig.LOCAL_TMP_DIR = "tmp"
+    BasicConfig.LOCAL_ASLOG_DIR = "ASLOGS"
+    BasicConfig.LOCAL_PROJ_DIR = "proj"
+    BasicConfig.DEFAULT_PLATFORMS_CONF = ""
+    BasicConfig.CUSTOM_PLATFORMS_PATH = ""
+    BasicConfig.DEFAULT_JOBS_CONF = ""
+    BasicConfig.SMTP_SERVER = ""
+    BasicConfig.MAIL_FROM = ""
+    BasicConfig.ALLOWED_HOSTS = ""
+    BasicConfig.DENIED_HOSTS = ""
+    BasicConfig.CONFIG_FILE_FOUND = False
+    return basic_conf

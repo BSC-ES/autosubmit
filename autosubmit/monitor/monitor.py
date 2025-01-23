@@ -195,7 +195,7 @@ class Monitor:
 
         jobs_packages_dict = dict()
         if packages is not None and len(str(packages)) > 0:
-            for (exp_id, package_name, job_name) in packages:
+            for (exp_id, package_name, job_name, wallclock) in packages:
                 jobs_packages_dict[job_name] = package_name
 
         packages_subgraphs_dict = dict()

@@ -165,12 +165,15 @@ def test_update_parameters_attributes(autosubmit_config, experiment_data, attrib
 def test_adjust_new_parameters(test_packed):
     job = Job('dummy', '1', 0, 1)
     stored_log_path = job._log_path
+    job.wallclock = "00:01"
     del job.is_wrapper
     del job.wrapper_name
+    del job._wallclock_in_seconds
     del job._log_path
     job.packed = test_packed
     job._adjust_new_parameters()
     assert job.is_wrapper == test_packed
+    assert int(job._wallclock_in_seconds) == int(60*1.3)
     if test_packed:
         assert job.wrapper_name == "wrapped"
     else:
@@ -245,3 +248,35 @@ def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines
     for directive in result_by_lines:
         pattern = r'^\s*' + re.escape(directive) + r'\s*$' # Match Start line, match directive, match end line
         assert re.search(pattern, template_content, re.MULTILINE) is not None
+
+
+@pytest.mark.parametrize('experiment_data', [(
+    {
+        'JOBS': {
+            'RANDOM-SECTION': {
+                'FILE': "test.sh",
+                'PLATFORM': 'DUMMY_PLATFORM',
+                'TEST': "rng",
+            },
+        },
+        'PLATFORMS': {
+            'dummy_platform': {
+                'type': 'ps',
+                'whatever': 'dummy_value',
+                'whatever2': 'dummy_value2',
+                'CUSTOM_DIRECTIVES': ['$SBATCH directive1', '$SBATCH directive2'],
+            },
+        },
+        'ROOTDIR': "asd",
+        'LOCAL_TMP_DIR': "asd",
+        'LOCAL_ROOT_DIR': "asd",
+        'LOCAL_ASLOG_DIR': "asd",
+    }
+)], ids=["Simple job"])
+def test_no_start_time(autosubmit_config, experiment_data):
+    job, as_conf = create_job_and_update_parameters(autosubmit_config, experiment_data)
+    del job.start_time
+    as_conf.force_load = False
+    as_conf.data_changed = False
+    job.update_parameters(as_conf, job.parameters)
+    assert isinstance(job.start_time, datetime)

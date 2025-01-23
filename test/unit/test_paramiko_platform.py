@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 from pathlib import Path
 
 from autosubmit.job.job_common import Status
+from autosubmit.job.job import Job
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.psplatform import PsPlatform
 from log.log import AutosubmitError
@@ -145,3 +146,19 @@ def test_send_file(mocker, ps_platform, filename, check):
     platform.send_command = mocker.Mock()
     platform.send_file(filename)
     assert check == (remote_dir / filename).exists()
+
+
+def test_ps_get_submit_cmd(ps_platform):
+    platform, _ = ps_platform
+    job = Job('TEST', 'TEST', Status.WAITING, 1)
+    job.wallclock = '00:01'
+    job.processors = 1
+    job.section = 'dummysection'
+    job.platform_name = 'pytest-ps'
+    job.platform = platform
+    job.script_name = "echo hello world"
+    job.fail_count = 0
+    command = platform.get_submit_cmd(job.script_name, job)
+    assert job.wallclock_in_seconds == 60 * 1.3
+    assert f"{job.script_name}" in command
+    assert f"timeout {job.wallclock_in_seconds}" in command

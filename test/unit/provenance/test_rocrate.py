@@ -563,7 +563,8 @@ class TestRoCrate(TestCase):
             job2.processors = '1'
 
             mocked_job_list.get_job_list.return_value = [job1, job2]
-
+            mocked_job_list.get_ready.return_value = [] # Mock due the new addition in the job_list.load()
+            mocked_job_list.get_waiting.return_value = [] # Mocked due the new addition in the job_list.load()
             autosubmit = Autosubmit()
             r = autosubmit.rocrate(self.expid, path=Path(temp_dir))
             self.assertTrue(r)
@@ -748,4 +749,3 @@ class TestRoCrate(TestCase):
             self.assertIsNotNone(crate)
             data_entities_ids = [data_entity['@id'] for data_entity in crate.data_entities]
             self.assertEqual(len(data_entities_ids), len(set(data_entities_ids)), f'Duplicate IDs found in the RO-Crate data entities: {str(data_entities_ids)}')
-

@@ -3034,8 +3034,7 @@ class JobList(object):
                     self.job_package_map[package.jobs[0].id] = wrapper_job
                     if isinstance(package, JobPackageThread):
                         # Saving only when it is a real multi job package
-                        packages_persistence.save(
-                            package.name, package.jobs, package._expid, inspect)
+                        packages_persistence.save(package, inspect) # Need to store the wallclock for the is_overwallclock function
 
     def check_scripts(self, as_conf):
         """
