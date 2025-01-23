@@ -669,7 +669,7 @@ class ParamikoPlatform(Platform):
                         if job.wallclock == "00:00" or job.wallclock is None:
                             wallclock = job.platform.max_wallclock
                         if wallclock != "00:00" and wallclock != "00:00:00" and wallclock != "":
-                            self.job_is_over_wallclock(job, job_status, cancel=False)
+                            job_status = self.job_is_over_wallclock(job, job_status, cancel=False)
             elif job_status in self.job_status['QUEUING'] and (not job.hold or job.hold.lower() != "true"):
                 job_status = Status.QUEUING
             elif job_status in self.job_status['QUEUING'] and (job.hold or job.hold.lower() == "true"):
@@ -796,7 +796,7 @@ class ParamikoPlatform(Platform):
                     if job.wallclock == "00:00":
                         wallclock = job.platform.max_wallclock
                     if wallclock != "00:00" and wallclock != "00:00:00" and wallclock != "":
-                        self.job_is_over_wallclock(job, job_status, cancel=True)
+                        job_status = self.job_is_over_wallclock(job, job_status, cancel=True)
                 if job_status in self.job_status['COMPLETED']:
                     job_status = Status.COMPLETED
                 elif job_status in self.job_status['RUNNING']:
