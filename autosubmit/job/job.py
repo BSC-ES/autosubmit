@@ -278,6 +278,10 @@ class Job(object):
         if not hasattr(self, "_log_path"):  # Added in 4.1.12
             self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
 
+        if not hasattr(self, "_wallclock_in_seconds"):  # Added in 4.1.12
+            self._wallclock_in_seconds = None
+            self.wallclock = self.wallclock # also sets the wallclock in seconds
+
     def _init_runtime_parameters(self):
         # hetjobs
         self.het = {'HETSIZE': 0}

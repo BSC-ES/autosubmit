@@ -165,6 +165,7 @@ def test_update_parameters_attributes(autosubmit_config, experiment_data, attrib
 def test_adjust_new_parameters(test_packed):
     job = Job('dummy', '1', 0, 1)
     stored_log_path = job._log_path
+    job.wallclock = "00:01"
     del job.is_wrapper
     del job.wrapper_name
     del job._wallclock_in_seconds
@@ -172,6 +173,7 @@ def test_adjust_new_parameters(test_packed):
     job.packed = test_packed
     job._adjust_new_parameters()
     assert job.is_wrapper == test_packed
+    assert int(job._wallclock_in_seconds) == int(60*1.3)
     if test_packed:
         assert job.wrapper_name == "wrapped"
     else:
