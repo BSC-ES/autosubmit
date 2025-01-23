@@ -55,12 +55,15 @@ class JobPackagePersistence(object):
         else:
             results = self.db_manager.select_all(self.WRAPPER_JOB_PACKAGES_TABLE)
         if len(results) > 0:
-            for wrapper in results:  # ['exp_id', 'package_name', 'job_name', 'wallclock']  wallclock is the new addition
+            # ['exp_id', 'package_name', 'job_name', 'wallclock']  wallclock is the new addition
+            for wrapper in results:
                 if len(wrapper) != 4:
-                    # New field in the db, so not compatible if the wrapper package is not reset (done in the create function)
-                    raise AutosubmitCritical("Error while loading the wrappers, the current wrappers has a different amount of fields than the expected."
-                                             "This due a AS version change without doing autosubmit create -f. "
-                                             "Please, run 'autosubmit create -f' to fix this issue.")
+                    # New field in the db, so not compatible if the wrapper package is not reset
+                    # (done in the create function)
+                    raise AutosubmitCritical("Error while loading the wrappers. The current wrappers have a different "
+                                             "amount of fields than the expected. Possibly due to using different "
+                                             "versions of Autosubmit in the same experiment. Please, run "
+                                             "'autosubmit create -f <EXPID>' to fix this issue.")
         return results
 
     def reset(self):

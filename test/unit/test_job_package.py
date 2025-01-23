@@ -97,6 +97,7 @@ class TestJobPackage(TestCase):
         self.platform.queue = "debug"
         self.platform.partition = "debug"
         self.platform.serial_platform = self.platform
+        self.platform.serial_platform.max_wallclock = '24:00'
         self.platform.serial_queue = "debug-serial"
         self.platform.serial_partition = "debug-serial"
         self.jobs = [Job('dummy1', 0, Status.READY, 0),
@@ -216,4 +217,4 @@ def test_jobs_in_wrapper_str(mock_as_conf):
     # Arrange
     current_wrapper = "current_wrapper"
     result = jobs_in_wrapper_str(mock_as_conf, current_wrapper)
-    assert result == "job1&job2&job3"
+    assert result == "job1_job2_job3"

@@ -16,10 +16,12 @@ def create_packages(mocker, autosubmit_config):
     }
     as_conf = autosubmit_config("a000", exp_data)
     jobs = [Job("dummy-1", 1, Status.SUBMITTED, 0), Job("dummy-2", 2, Status.SUBMITTED, 0), Job("dummy-3", 3, Status.SUBMITTED, 0)]
+    platform = mocker.MagicMock()
+    platform.name = 'dummy'
+    platform.serial_platform = mock.MagicMock()
+    platform.serial_platform.max_wallclock = '24:00'
     for job in jobs:
-        job._platform = mocker.MagicMock()
-        job._platform.name = "dummy"
-        job.platform_name = "dummy"
+        job._platform = platform
         job.processors = 2
         job.section = "dummysection"
         job._init_runtime_parameters()

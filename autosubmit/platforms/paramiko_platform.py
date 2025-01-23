@@ -593,12 +593,15 @@ class ParamikoPlatform(Platform):
                 job_status = job.check_completion(over_wallclock=True)
             except Exception as e:
                 job_status = Status.FAILED
+                Log.debug(f"Unexpected error checking completed files for a job over wallclock: {str(e)}")
 
             if cancel and job_status is Status.FAILED:
-                with suppress(Exception):
+                try:
                     if self.cancel_cmd is not None:
                         Log.warning(f"Job {job.id} is over wallclock, cancelling job")
                         job.platform.send_command(self.cancel_cmd + " " + str(job.id))
+                except Exception as e:
+                    Log.debug(f"Error cancelling job {job.id}: {str(e)}")
         return job_status
 
     def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):

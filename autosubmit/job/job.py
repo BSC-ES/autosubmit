@@ -274,9 +274,9 @@ class Job(object):
             else:
                 self.is_wrapper = True
                 self.wrapper_name = "wrapped"
-        if not hasattr(self, '_wallclock_in_seconds'):  # Added in 4.1.12
-            self._wallclock_in_seconds = None
-            self.wallclock_in_seconds = self.wallclock
+
+        if not hasattr(self, "_log_path"):  # Added in 4.1.12
+            self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
 
     def _init_runtime_parameters(self):
         # hetjobs
@@ -299,16 +299,6 @@ class Job(object):
     @property
     def wallclock_in_seconds(self):
         return self._wallclock_in_seconds
-
-    @wallclock_in_seconds.setter
-    def wallclock_in_seconds(self, wallclock):
-        if not self._wallclock_in_seconds or self.status not in [Status.RUNNING, Status.QUEUING, Status.SUBMITTED]:
-            # Should always take the max_wallclock set in the platform, this is set as fallback ( and local platform doesn't have a max_wallclock defined )
-            if not wallclock or wallclock == "00:00":
-                wallclock = self.parameters.get("CONFIG.JOB_WALLCLOCK", "24:00")
-                Log.warning(f"No wallclock is set for this job. Default to {wallclock}. You can change this value in CONFIG.WALLCLOCK")
-            wallclock = self.parse_time(wallclock)
-            self._wallclock_in_seconds = self._time_in_seconds_and_margin(wallclock)
 
     @property
     @autosubmit_parameter(name='x11')
@@ -451,6 +441,16 @@ class Job(object):
     @wallclock.setter
     def wallclock(self, value):
         self._wallclock = value
+
+        if not self._wallclock_in_seconds or self.status not in [Status.RUNNING, Status.QUEUING, Status.SUBMITTED]:
+            # Should always take the max_wallclock set in the platform, this is set as fallback
+            # (and local platform doesn't have a max_wallclock defined)
+            if not self._wallclock or self._wallclock == "00:00":
+                self._wallclock = self.parameters.get("CONFIG.JOB_WALLCLOCK", "24:00")
+                Log.warning(f"No wallclock is set for this job. Default to {self._wallclock}. "
+                            "You can change this value in CONFIG.WALLCLOCK")
+            wallclock_parsed = self.parse_time(self._wallclock)
+            self._wallclock_in_seconds = self._time_in_seconds_and_margin(wallclock_parsed)
 
     @property
     @autosubmit_parameter(name='hyperthreading')
@@ -734,7 +734,7 @@ class Job(object):
         """
         Returns the platform to be used by the job. Chooses between serial and parallel platforms
 
-        :return HPCPlatform object for the job to use
+        :return: HPCPlatform object for the job to use
         :rtype: HPCPlatform
         """
         if self.is_serial and self._platform:
@@ -1340,8 +1340,6 @@ class Job(object):
         :return:
         """
         elapsed = datetime.datetime.now() - self.start_time
-        if not self.wallclock_in_seconds:
-            self.wallclock_in_seconds = self.wallclock
         if int(elapsed.total_seconds()) > self.wallclock_in_seconds:
             Log.warning(f"Job {self.name} is over wallclock time, Autosubmit will check if it is completed")
             return True
@@ -1744,8 +1742,6 @@ class Job(object):
         self.memory = parameters.get("CURRENT_MEMORY", "")
         self.memory_per_task = parameters.get("CURRENT_MEMORY_PER_TASK", parameters.get("CURRENT_MEMORY_PER_TASK", ""))
         self.wallclock = parameters.get("CURRENT_WALLCLOCK", parameters.get("CURRENT_MAX_WALLCLOCK", None))
-        if self.status in [Status.READY, Status.PREPARED]:
-            self.wallclock_in_seconds = self.wallclock
         self.custom_directives = parameters.get("CURRENT_CUSTOM_DIRECTIVES", "")
         self.process_scheduler_parameters(job_platform, chunk)
         if self.het.get('HETSIZE', 1) > 1:
@@ -2650,8 +2646,6 @@ class WrapperJob(Job):
         self.hold = hold
         self.inner_jobs_running = list()
         self.is_wrapper = True
-        if not self.wallclock_in_seconds:
-            self.wallclock_in_seconds = self._wallclock
 
 
     def _queuing_reason_cancel(self, reason):
