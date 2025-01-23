@@ -37,7 +37,7 @@ from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_da
 from functools import reduce
 from threading import Thread
 from time import sleep
-from typing import List, Union, Dict, Any, Tuple
+from typing import List, Union, Dict, Any
 
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
