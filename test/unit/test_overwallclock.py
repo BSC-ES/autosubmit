@@ -146,7 +146,7 @@ def test_platform_job_is_over_wallclock(setup_as_conf, new_platform_mock, platfo
     platform_instance.send_command.assert_called_once()
     platform_instance.cancel_cmd = None
     platform_instance.send_command = mocker.MagicMock()
-    job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING, True)
+    platform_instance.job_is_over_wallclock(job, Status.RUNNING, True)
     platform_instance.send_command.assert_not_called()
 
 
