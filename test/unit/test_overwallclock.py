@@ -13,7 +13,6 @@ from autosubmit.platforms.slurmplatform import SlurmPlatform
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
 
-
 @pytest.fixture
 def setup_as_conf(autosubmit_config, tmpdir, prepare_basic_config):
     exp_data = {
