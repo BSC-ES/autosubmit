@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+
+# Copyright 2014 Climate Forecasting Unit, IC3
+
+# This file is part of Autosubmit.
+
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autosubmit"
+dynamic = ["version", "readme"]
+description = "Autosubmit is a Python-based workflow manager to create, manage and monitor complex tasks involving different substeps, such as scientific computational experiments. These workflows may involve multiple computing systems for their completion, from HPCs to post-processing clusters or workstations. Autosubmit can orchestrate all the tasks integrating the workflow by managing their dependencies, interfacing with all the platforms involved, and handling eventual errors."
+requires-python = ">=3.8"
+authors = [
+  {name = "Daniel Beltran Mora", email = "daniel.beltran@bsc.es"},
+  {name = "Tzu-Ping Chung", email = "tzu-ping@example.com"},
+  {name = "Another person"},
+  {email = "different.person@example.com"},
+]
+maintainers = [
+  {name = "Brett Cannon", email = "brett@example.com"}
+]
+
+keywords = ["climate", "weather", "workflow", "HPC"]
+license = {text = "GNU GPL v3"} 
+
+classifiers = [
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "License :: OSI Approved :: GNU General Public License (GPL)",
+    "Operating System :: POSIX :: Linux"
+]
+
+dependencies = [
+    "xlib==0.21",
+    "setuptools<=68.2.2",
+    "bscearth.utils<=0.5.2",
+    "requests<=2.31.0",
+    "networkx<=2.6.3",
+    "portalocker<=2.7.0",
+    "paramiko>=3.5.0",
+    "pyparsing==3.1.1",
+    "matplotlib<=3.8.3",
+    "packaging<=23.2",
+    "typing_extensions<=4.9.0",
+    "typing<=3.7.4.3",
+    "psutil<=5.6.1",
+    "py3dotplus==1.1.0",
+    "numpy<2",
+    "rocrate==0.*",
+    "autosubmitconfigparser==1.0.76",
+    "configparser",
+    "setproctitle",
+    "invoke>=2.0"
+]
+
+[project.urls]
+Homepage = "http://www.bsc.es/projects/earthscience/autosubmit/"
+Documentation = "https://readthedocs.org"
+"Download Link" = "https://earth.bsc.es/wiki/doku.php?id=tools:autosubmit"
+
+[tool.setuptools.dynamic]
+version =  {file = "VERSION"}
+readme = {file = "README_PIP.md"}
+
+[tool.setuptool.extras_require]
+postgres = ["psycopg2"]
+tests = [
+    "pytest==8.2.*",
+    "pytest-cov",
+    "pytest-mock",
+    "ruff==0.6.2"
+]
+docs = [
+    "livereload",
+    "pydata-sphinx-theme==0.15.*",
+    "sphinx==5.*",
+    "sphinx-autobuild==2021.3.*",
+    "sphinx_rtd_theme",
+    "sphinx-reredirects==0.1.*"
+]
+all = ["psycopg2", "pytest==8.2.*", "pytest-cov", "pytest-mock", "ruff==0.6.2", "livereload", "pydata-sphinx-theme==0.15.*", "sphinx==5.*", "sphinx-autobuild==2021.3.*", "sphinx_rtd_theme", "sphinx-reredirects==0.1.*"]
