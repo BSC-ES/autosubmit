@@ -1340,7 +1340,7 @@ class Autosubmit:
         local: Gets local minimal instead of git minimal
         """
         if use_local_minimal:
-            if git_repo.lower().find("https") != -1:
+            if re.search("\b(?:https?|git|ssh|ftp|sftp|file):\/\/(?:[a-zA-Z0-9.-]+(?:\:[0-9]+)?\/?[^\s]*)\b", git_repo.lower()) is not None: 
                 git_repo = ""
             git_branch = ""
 
