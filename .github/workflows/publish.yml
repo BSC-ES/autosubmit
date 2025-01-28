@@ -1,0 +1,41 @@
+name: Publish
+
+on:
+  release:
+    types:
+      - created # Trigger on release creation
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install build dependencies
+        run: |
+          pip install --upgrade pip
+          pip install build
+          pip install -e .[all]
+
+      - name: Build distribution
+        run: python -m build
+
+      - name: Test Publish
+        uses: pypa/gh-action-pypi-publish@v1.12.3
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          attestations: false
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@v1.12.3
