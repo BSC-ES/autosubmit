@@ -78,7 +78,7 @@ Documentation = "https://readthedocs.org"
 version =  {file = "VERSION"}
 readme = {file = "README_PIP.md"}
 
-[tool.setuptool.extras_require]
+[project.optional-dependencies]
 postgres = ["psycopg2"]
 tests = [
     "pytest==8.2.*",
