@@ -557,6 +557,7 @@ def create_rocrate_archive(
             crate.add_or_update_jsonld(jsonld_node)
 
     # Write RO-Crate ZIP.
-    crate.write_zip(Path(path, f"{expid}.zip"))
+    date = datetime.datetime.today().strftime('%Y%m%d-%H%M%S')
+    crate.write_zip(Path(path, f"{expid}-{date}.zip"))
     Log.info(f'RO-Crate archive written to {experiment_path}')
     return crate
