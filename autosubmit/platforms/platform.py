@@ -853,7 +853,7 @@ class Platform(object):
         if job.id and int(job.id) != 0:
             self.recovery_queue.put(job)
         else:
-            Log.warning(f"Job {job.name} and retrial number:{job.fail_count} has no job id. Autosubmit will no record this retrial.")
+            Log.warning(f"Job {job.name} and retry number:{job.fail_count} has no job id. Autosubmit will no record this retry.")
             job.updated_log = True
 
     def connect(self, as_conf, reconnect=False):
@@ -954,7 +954,7 @@ class Platform(object):
                 except:
                     jobs_pending_to_process.add(job)
                     job._log_recovery_retries += 1
-                    Log.warning(f"{identifier} (Retrial) Failed to recover log for job '{job.name}' and retry:'{job.fail_count}'.")
+                    Log.warning(f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry:'{job.fail_count}'.")
             except queue.Empty:
                 pass
 
@@ -973,9 +973,9 @@ class Platform(object):
                 if job._log_recovery_retries < 5:
                     jobs_pending_to_process.add(job)
                 Log.warning(
-                    f"{identifier} (Retrial) Failed to recover log for job '{job.name}' and retry '{job.fail_count}'.")
+                    f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry '{job.fail_count}'.")
             Log.result(
-                f"{identifier} (Retrial) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
+                f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
         if len(jobs_pending_to_process) > 0:
             self.restore_connection(None)  # Restore the connection if there was an issue with one or more jobs.
 
