@@ -27,13 +27,10 @@ dynamic = ["version", "readme"]
 description = "Autosubmit is a Python-based workflow manager to create, manage and monitor complex tasks involving different substeps, such as scientific computational experiments. These workflows may involve multiple computing systems for their completion, from HPCs to post-processing clusters or workstations. Autosubmit can orchestrate all the tasks integrating the workflow by managing their dependencies, interfacing with all the platforms involved, and handling eventual errors."
 requires-python = ">=3.8"
 authors = [
-  {name = "Daniel Beltran Mora", email = "daniel.beltran@bsc.es"},
-  {name = "Tzu-Ping Chung", email = "tzu-ping@example.com"},
-  {name = "Another person"},
-  {email = "different.person@example.com"},
+  { name="The Autosubmit Team - Models and Workflows Team (MWT) - Barcelona Supercomputing Center (BSC)", email="support-autosubmit@bsc.es" },
 ]
 maintainers = [
-  {name = "Brett Cannon", email = "brett@example.com"}
+  { name="The Autosubmit Team - Models and Worklows Team (MWT) - Barcelona Supercomputing Center (BSC)", email="support-autosubmit@bsc.es" },
 ]
 
 keywords = ["climate", "weather", "workflow", "HPC"]
@@ -94,4 +91,15 @@ docs = [
     "sphinx_rtd_theme",
     "sphinx-reredirects==0.1.*"
 ]
-all = ["psycopg2", "pytest==8.2.*", "pytest-cov", "pytest-mock", "ruff==0.6.2", "livereload", "pydata-sphinx-theme==0.15.*", "sphinx==5.*", "sphinx-autobuild==2021.3.*", "sphinx_rtd_theme", "sphinx-reredirects==0.1.*"]
+all = ["psycopg2",
+    "pytest==8.2.*",
+    "pytest-cov",
+    "pytest-mock",
+    "ruff==0.6.2",
+    "livereload",
+    "pydata-sphinx-theme==0.15.*",
+    "sphinx==5.*",
+    "sphinx-autobuild==2021.3.*",
+    "sphinx_rtd_theme",
+    "sphinx-reredirects==0.1.*"
+]
