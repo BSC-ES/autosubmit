@@ -25,7 +25,7 @@ build-backend = "setuptools.build_meta"
 name = "autosubmit"
 dynamic = ["version", "readme"]
 description = "Autosubmit is a Python-based workflow manager to create, manage and monitor complex tasks involving different substeps, such as scientific computational experiments. These workflows may involve multiple computing systems for their completion, from HPCs to post-processing clusters or workstations. Autosubmit can orchestrate all the tasks integrating the workflow by managing their dependencies, interfacing with all the platforms involved, and handling eventual errors."
-requires-python = ">=3.9,<=3.12"
+requires-python = ">=3.9,<3.13"
 authors = [
   { name="The Autosubmit Team - Models and Workflows Team (MWT) - Barcelona Supercomputing Center (BSC)", email="support-autosubmit@bsc.es" },
 ]
