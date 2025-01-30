@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2014 Climate Forecasting Unit, IC3
+# Copyright 2014-2025 Barcelona Supercomputing Center (http://www.bsc.es/) 
 
 # This file is part of Autosubmit.
 
@@ -25,7 +25,7 @@ build-backend = "setuptools.build_meta"
 name = "autosubmit"
 dynamic = ["version", "readme"]
 description = "Autosubmit is a Python-based workflow manager to create, manage and monitor complex tasks involving different substeps, such as scientific computational experiments. These workflows may involve multiple computing systems for their completion, from HPCs to post-processing clusters or workstations. Autosubmit can orchestrate all the tasks integrating the workflow by managing their dependencies, interfacing with all the platforms involved, and handling eventual errors."
-requires-python = ">=3.8"
+requires-python = ">=3.9,<=3.12"
 authors = [
   { name="The Autosubmit Team - Models and Workflows Team (MWT) - Barcelona Supercomputing Center (BSC)", email="support-autosubmit@bsc.es" },
 ]
@@ -68,7 +68,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "http://www.bsc.es/projects/earthscience/autosubmit/"
-Documentation = "https://readthedocs.org"
+Documentation = "https://autosubmit.readthedocs.io/"
 "Download Link" = "https://earth.bsc.es/wiki/doku.php?id=tools:autosubmit"
 
 [tool.setuptools.dynamic]
