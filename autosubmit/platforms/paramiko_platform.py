@@ -648,7 +648,7 @@ class ParamikoPlatform(Platform):
                 self.get_ssh_output()).strip("\n")
             # URi: define status list in HPC Queue Class
             if job_status in self.job_status['COMPLETED'] or retries == 0:
-                # The Local platform has only 0 or 1, so it neccesary to look for the completed file.
+                # The Local platform has only 0 or 1, so it necessary to look for the completed file.
                 if self.type == "local":
                     if not job.is_wrapper:
                         # Not sure why it is called over_wallclock but is the only way to return a value

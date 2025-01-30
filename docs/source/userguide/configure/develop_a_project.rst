@@ -163,7 +163,7 @@ Jobs configuration
             # Note: The post-processed additional_files will be sent to %HPCROOT%/LOG_%EXPID%
             ## Path relative to the project directory
             # FILE:
-            ## Platform to execute the job. If not specified, defaults to HPCARCH in expedf file.
+            ## Platform to execute the job. If not specified, defaults to HPCARCH in expdef file.
             ## LOCAL is always defined and refers to current machine
             # PLATFORM:
             ## Queue to add the job to. If not specified, uses PLATFORM default.

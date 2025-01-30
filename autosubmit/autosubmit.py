@@ -640,12 +640,12 @@ class Autosubmit:
                                    help='Produce an RO-Crate file')
             # Unarchive
             subparser = subparsers.add_parser(
-                'unarchive', description='unarchives an experiment')
+                'unarchive', description='unarchive an experiment')
             subparser.add_argument('expid', help='experiment identifier')
             subparser.add_argument('-nclean', '--noclean', default=False, action='store_true',
                                    help='Avoid Cleaning of experiment folder')
             subparser.add_argument('-uc', '--uncompressed', default=False, action='store_true',
-                                   help='Untar an uncompressed tar')
+                                   help='Extract files of the tar file without gzip compression')
             subparser.add_argument('-v', '--update_version', action='store_true',
                                    default=False, help='Update experiment version')
             subparser.add_argument('--rocrate', action='store_true', default=False,
@@ -675,7 +675,7 @@ class Autosubmit:
             subparser = subparsers.add_parser(
                 'stop', description='Completely stops an autosubmit run process')
             group = subparser.add_mutually_exclusive_group(required=True)
-            group.add_argument('expid', help='experiment identifier, stops the listed expids separated by ","', nargs='?')
+            group.add_argument('expid', help='experiment identifier, stops each of the listed expid separated by ","', nargs='?')
             subparser.add_argument('-f', '--force', default=False, action='store_true',
                                    help='Forces to stop autosubmit process, equivalent to kill -9')
             group.add_argument('-a', '--all', default=False, action='store_true',
@@ -978,7 +978,7 @@ class Autosubmit:
     @staticmethod
     def _check_ownership(expid, raise_error=False):
         """
-        Check if the user owns and if it is edamin
+        Check if the user owns and if it is eadmin
         :return: the owner, eadmin and current_owner
         :rtype: boolean, boolean, str
         """
@@ -1995,7 +1995,7 @@ class Autosubmit:
         Log.debug("Length of the jobs list: {0}", len(job_list))
         if recover:
             Log.info("Recovering parameters info")
-        # This function name is not clear after the transformation it recieved across years.
+        # This function name is not clear after the transformation it received across years.
         # What it does, is to load and transform all as_conf.experiment_data into a 1D dict stored in job_list object.
         Autosubmit._load_parameters(
             as_conf, job_list, submitter.platforms)
@@ -2026,14 +2026,14 @@ class Autosubmit:
             raise AutosubmitCritical(
                 "Error while checking job templates", 7014, str(e))
         Log.debug("Loading job packages")
-        # Packages == wrappers and jobs inside wrappers. Name is also missleading.
+        # Packages == wrappers and jobs inside wrappers. Name is also misleading.
         try:
             packages_persistence = JobPackagePersistence(os.path.join(
                 BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"), "job_packages_" + expid)
         except IOError as e:
             raise AutosubmitError(
                 "job_packages not found", 6016, str(e))
-        # Check if the user wants to continue using wrappers and loads the appropiate info.
+        # Check if the user wants to continue using wrappers and loads the appropriate info.
         if as_conf.experiment_data.get("WRAPPERS",None) is not None:
             os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR,
                                   expid, "pkl", "job_packages_" + expid + ".db"), 0o644)
@@ -2076,16 +2076,16 @@ class Autosubmit:
                     str(allowed_members)))
         if not recover:
             # This function, looks at the "TWO_STEP_START" variable in the experiment configuration file.
-            # This may not be neccesary anymore as the same can be achieved by using the new DEPENDENCIES dict.
+            # This may not be necessary anymore as the same can be achieved by using the new DEPENDENCIES dict.
             # I replicated the same functionality in the new DEPENDENCIES dict using crossdate wrappers of auto-monarch da ( documented in rst .)
-            # We can look at it when auto-monarch starts to use AS 4.0, now it is maintened for compatibility.
+            # We can look at it when auto-monarch starts to use AS 4.0, now it is maintained for compatibility.
             unparsed_two_step_start = as_conf.get_parse_two_step_start()
             if unparsed_two_step_start != "":
                 job_list.parse_jobs_by_filter(unparsed_two_step_start)
             Log.debug("Running job data structure")
             exp_history = Autosubmit.get_historical_database(expid, job_list,as_conf)
             # establish the connection to all platforms
-            # Restore is a missleading, it is actually a "connect" function when the recover flag is not set.
+            # Restore is a misleading, it is actually a "connect" function when the recover flag is not set.
             Autosubmit.restore_platforms(platforms_to_test,as_conf=as_conf)
             return job_list, submitter , exp_history, host , as_conf, platforms_to_test, packages_persistence, False
         else:
@@ -2190,7 +2190,7 @@ class Autosubmit:
                         # reload parameters changes
                         Log.debug("Reloading parameters...")
                         try:
-                            # This function name is not clear after the transformation it recieved across years.
+                            # This function name is not clear after the transformation it received across years.
                             # What it does, is to load and transform all as_conf.experiment_data into a 1D dict stored in job_list object.
                             Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
                         except BaseException as e:
@@ -2201,7 +2201,7 @@ class Autosubmit:
                         # End Check Current jobs
                         if save:  # previous iteration
                             job_list.backup_save()
-                        # This function name is totally missleading, yes it check the status of the wrappers, but also orders jobs the jobs that  are not wrapped by platform.
+                        # This function name is totally misleading, yes it check the status of the wrappers, but also orders jobs the jobs that  are not wrapped by platform.
                         jobs_to_check,job_changes_tracker = Autosubmit.check_wrappers(as_conf, job_list, platforms_to_test, expid)
                         # Jobs to check are grouped by platform.
                         # platforms_to_test could be renamed to active_platforms or something like that.
@@ -2230,7 +2230,7 @@ class Autosubmit:
                             as_conf.save()
 
                         # Submit jobs that are prepared to hold (if remote dependencies parameter are enabled)
-                        # This currently is not used as SLURM no longer allows to jobs to adquire priority while in hold state.
+                        # This currently is not used as SLURM no longer allows to jobs to acquire priority while in hold state.
                         # This only works for SLURM. ( Prepare status can not be achieved in other platforms )
                         if as_conf.get_remote_dependencies() == "true" and len(job_list.get_prepared()) > 0:
                             Autosubmit.submit_ready_jobs(
@@ -3323,7 +3323,7 @@ class Autosubmit:
                     if f.is_dir() and f.owner() == get_from_user:
                         experiments_ids.append(f.name)
                 except Exception:
-                    pass # if it reachs there it means that f.owner() doesn't exist anymore( owner is an id) so we just skip it and continue
+                    pass # if it reaches there it means that f.owner() doesn't exist anymore( owner is an id) so we just skip it and continue
         else:
             experiments_ids = experiments_ids.split(' ')
         for experiment_id in experiments_ids:
@@ -5269,7 +5269,7 @@ class Autosubmit:
                             if job.name in jobs:
                                 final_list.append(job)
                 # All filters should be in a function but no have time to do it
-                # filter_Type_chunk_split == filter_type_chunk, but with the split essencially is the same but not sure about of changing the name to the filter itself
+                # filter_Type_chunk_split == filter_type_chunk, but with the split essentially is the same but not sure about of changing the name to the filter itself
                 if filter_type_chunk_split is not None:
                     final_list.extend(Autosubmit._apply_ftc(job_list,filter_type_chunk_split))
                 if filter_type_chunk:

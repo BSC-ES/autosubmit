@@ -75,18 +75,18 @@ CONFIG.AUTOSUBMIT_VERSION=4.1.0b
     else:
         print("ERR: report file does not exist")
         exit(0)
-    sucess=""
+    success=""
     error=""
     for line in Path(report_file).read_text().split("\n"):
         if line.split("=")[0] in list_of_parameters_to_find[1:-1]:
             if line in expected_output:
-                sucess +="OK: " + line + "\n"
+                success +="OK: " + line + "\n"
             else:
                 for error_line in expected_output:
                     if line.split("=")[0] in error_line:
                         error += "ERR: " + line + " EXPECTED: " + error_line + "\n"
                         break
-    print(sucess)
+    print(success)
     print(error)
 
 print("Testing EXPID a01p copy of a009: Config in a external file")
