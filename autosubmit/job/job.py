@@ -1174,15 +1174,16 @@ class Job(object):
         :return: list of values in column index position
         :rtype: list[datetime.datetime]
         """
-        log_name = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
+        log_name = Path(self._tmp_path + self.name + '_TOTAL_STATS')
         lst = []
-        if os.path.exists(log_name):
+        if log_name.exists() and log_name.stat().st_size > 0:
             f = open(log_name)
             lines = f.readlines()
             for line in lines:
                 fields = line.split()
                 if len(fields) >= index + 1:
                     lst.append(parse_date(fields[index]))
+            f.close()
         return lst
 
     def check_end_time(self, fail_count=-1):
