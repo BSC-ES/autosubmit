@@ -1174,7 +1174,7 @@ class Job(object):
         :return: list of values in column index position
         :rtype: list[datetime.datetime]
         """
-        log_name = Path(self._tmp_path + self.name + '_TOTAL_STATS')
+        log_name = Path(f"{self._tmp_path}/{self.name}_TOTAL_STATS")
         lst = []
         if log_name.exists() and log_name.stat().st_size > 0:
             f = open(log_name)
