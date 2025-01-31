@@ -993,7 +993,7 @@ class Platform(object):
         self.connected = False
         self.restore_connection(None)
         Log.get_logger("Autosubmit")  # Log needs to be initialised in the new process
-        Log.result(f"{identifier} Sucessfully connected.")
+        Log.result(f"{identifier} successfully connected.")
         log_recovery_timeout = self.config.get("LOG_RECOVERY_TIMEOUT", 60)
         # Keep alive signal timeout is 5 minutes, but the sleeptime is 60 seconds.
         self.keep_alive_timeout = max(log_recovery_timeout*5, 60*5)

@@ -113,7 +113,7 @@ Options:
     options:
       -h, --help            show this help message and exit
       -nclean, --noclean    Avoid Cleaning of experiment folder
-      -uc, --uncompressed   Untar an uncompressed tar
+      -uc, --uncompressed   Extract files of the tar file without gzip compression
       -v, --update_version  Update experiment version
       --rocrate             Unarchive an RO-Crate file
 

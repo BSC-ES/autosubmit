@@ -1026,7 +1026,7 @@ class JobList(object):
                                       key, dependencies_of_that_section,
                                       chunk_list, date_list, member_list, special_dependencies, max_distance, problematic_dependencies):
         """
-        Calculate natural dependencies and add them to the graph if they're neccesary.
+        Calculate natural dependencies and add them to the graph if they're necessary.
         :param dic_jobs: JobList
         :param job: Current job
         :param dependency: Dependency
@@ -1128,7 +1128,7 @@ class JobList(object):
                                      key, dependencies_of_that_section,
                                      chunk_list, date_list, member_list, special_dependencies, problematic_dependencies):
         """
-        Calculate dependencies that has any kind of filter set and add them to the graph if they're neccesary.
+        Calculate dependencies that has any kind of filter set and add them to the graph if they're necessary.
         :param filters_to_apply: Filters to apply
         :param dic_jobs: JobList
         :param job: Current job
@@ -2674,7 +2674,7 @@ class JobList(object):
             job.updated_log = False
         elif job.updated_log:
             return
-        if hasattr(job, "x11") and job.x11: # X11 has it log writted in the run.out file. No need to check for log files as there are none
+        if hasattr(job, "x11") and job.x11: # X11 has it log written in the run.out file. No need to check for log files as there are none
             job.updated_log = True
             return
         log_recovered = self.check_if_log_is_recovered(job)
@@ -2794,7 +2794,7 @@ class JobList(object):
             job.packed = False
             job.wrapper_type = None
             save = True
-            Log.debug(f"Special condition fullfilled for job {job.name}")
+            Log.debug(f"Special condition fulfilled for job {job.name}")
         # if waiting jobs has all parents completed change its State to READY
         for job in self.get_completed():
             job.packed = False

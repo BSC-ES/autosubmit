@@ -15,13 +15,13 @@ The Autosubumit maintainers take security bugs seriously. Thank you for
 improving the security of Autosubumit. We appreciate your efforts and responsible
 disclosure and will make every effort to acknowledge your contributions.
 
-If you believe you have found a security vulneratibility in Autosubmit,
+If you believe you have found a security vulnerability in Autosubmit,
 please report it by sending an email to
 <a href="mailto:support-autosubmit@bsc.es">support-autosubmit@bsc.es</a>.
 
 ## Preferred Languages
 
-All communications are preffered to be in English, Spanish, or Catalan.
+All communications are preferred to be in English, Spanish, or Catalan.
 
 ## Policy
 
