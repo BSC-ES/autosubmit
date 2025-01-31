@@ -1307,7 +1307,7 @@ class Autosubmit:
                     content = Autosubmit.replace_parameter_inside_section(content, "EXPID", exp_id, "DEFAULT")
                     search = re.search('HPCARCH: .*', content, re.MULTILINE)
                     if search is not None:
-                        content = content.replace(search.group(0),"HPCARCH: \""+hpc+"\"")
+                        content = content.replace("HPCARCH: \""+hpc+"\"", search.group(0))
                     if minimal_configuration:
                         search = re.search('CUSTOM_CONFIG: .*', content, re.MULTILINE)
                         if search is not None:
