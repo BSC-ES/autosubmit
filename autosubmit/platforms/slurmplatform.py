@@ -359,7 +359,7 @@ class SlurmPlatform(ParamikoPlatform):
                 return False
             else:
                 Log.info(
-                    f"The {job.name} will be elegible to run the day {estimated_time.get('date', 'Unknown')} at {estimated_time.get('time', 'Unknown')}\nQueuing reason is: {reason}")
+                    f"The {job.name} will be eligible to run the day {estimated_time.get('date', 'Unknown')} at {estimated_time.get('time', 'Unknown')}\nQueuing reason is: {reason}")
                 return True
         except BaseException as e:
             try:
