@@ -64,10 +64,11 @@ dependencies = [
     "configparser",
     "setproctitle",
     "invoke>=2.0"
+    # 'sqlalchemy[mypy]' # TODO: pending Postgres MR
 ]
 
 [project.urls]
-Homepage = "http://www.bsc.es/projects/earthscience/autosubmit/"
+Homepage = "https://www.bsc.es/projects/earthscience/autosubmit/" 
 Documentation = "https://autosubmit.readthedocs.io/"
 "Download Link" = "https://earth.bsc.es/wiki/doku.php?id=tools:autosubmit"
 
@@ -82,6 +83,7 @@ tests = [
     "pytest-cov",
     "pytest-mock",
     "ruff==0.6.2"
+    # 'testcontainers'  # TODO: pending Postgres MR
 ]
 docs = [
     "livereload",
@@ -103,3 +105,23 @@ all = ["psycopg2",
     "sphinx_rtd_theme",
     "sphinx-reredirects==0.1.*"
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools]
+package-data = { "autosubmit" = [
+    "autosubmit/config/files/autosubmit.conf",
+    "autosubmit/config/files/expdef.conf",
+    "autosubmit/database/data/autosubmit.sql",
+    "README",
+    "CHANGELOG",
+    "VERSION",
+    "LICENSE",
+    "docs/autosubmit.pdf"
+] }
+include-package-data = true
+
+[project.scripts]
+autosubmit = "bin.autosubmit:main"
+
