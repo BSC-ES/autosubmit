@@ -26,7 +26,7 @@ from configparser import ConfigParser
 from distutils.util import strtobool
 from pathlib import Path
 from ruamel.yaml import YAML
-from typing import Dict, Set, Tuple, Union, Any
+from typing import Dict, Set, Tuple, Union, Any, List, Optional
 
 from autosubmit.database.db_common import update_experiment_descrip_version
 from autosubmit.helpers.parameters import PARAMETERS
@@ -81,7 +81,6 @@ from portalocker.exceptions import BaseLockException
 from pyparsing import nestedExpr
 from .history.experiment_status import ExperimentStatus
 from .history.experiment_history import ExperimentHistory
-from typing import List
 import autosubmit.history.utils as HUtils
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 import autosubmit.statistics.utils as StatisticsUtils
@@ -175,10 +174,16 @@ class Autosubmit:
         # Python output buffering delays appearance of stdout and stderr
         # when output is not directed to a terminal
         os.environ['PYTHONUNBUFFERED'] = 'true'
+
     @staticmethod
-    def parse_args():
+    def parse_args() -> Tuple[int, Optional[argparse.Namespace]]:
         """
-        Parse arguments given to an executable and start execution of command given
+        Parse arguments given to an executable and start execution of command given.
+
+        Returns a tuple with the exit code (``status``), and an optional list of
+        arguments for ``argparse``. The list of arguments is only ever returned
+        when the arguments are valid for the execution of a subcommand. Otherwise,
+        they will be ``None``.
         """
         Autosubmit.environ_init()
         try:
@@ -691,16 +696,19 @@ class Autosubmit:
             args, unknown = parser.parse_known_args()
             if args.version:
                 Log.info(Autosubmit.autosubmit_version)
-                return 0
-            if unknown or args.command is None:
+                return 0, None
+            elif unknown or args.command is None:
                 parser.print_help()
-                return 1
-        except SystemExit as e:
-            return 1
-        except BaseException as e:
-            raise AutosubmitCritical(
-                "Incorrect arguments for this command", 7011)
+                return 1, None
 
+            return 0, args
+        except SystemExit:
+            return 1, None
+        except BaseException as e:
+            raise AutosubmitCritical(f"Incorrect arguments for this command: {str(e)}", 7011)
+
+    @staticmethod
+    def run_command(args):
         expid = "None"
         if hasattr(args, 'expid'):
             expid = args.expid
