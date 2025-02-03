@@ -282,6 +282,10 @@ class Job(object):
             self._wallclock_in_seconds = None
             self.wallclock = self.wallclock  # also sets the wallclock in seconds
 
+        if not hasattr(self, "ready_date"):
+            self.ready_date = None
+            self.recover_last_ready_date()
+
     def _init_runtime_parameters(self):
         # hetjobs
         self.het = {'HETSIZE': 0}
