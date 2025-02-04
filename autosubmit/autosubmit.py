@@ -1166,20 +1166,21 @@ class Autosubmit:
         return error_message
 
     @staticmethod
-    def copy_as_config(exp_id,copy_id):
-        for conf_file in os.listdir(os.path.join(BasicConfig.LOCAL_ROOT_DIR, copy_id,"conf")):
+    def copy_as_config(exp_id, copy_id):
+        for conf_file in os.listdir(os.path.join(BasicConfig.LOCAL_ROOT_DIR, copy_id, "conf")):
             # Copy only relevant files
             if conf_file.endswith((".conf", ".yml", ".yaml")):
                 shutil.copy(os.path.join(BasicConfig.LOCAL_ROOT_DIR, copy_id, "conf", conf_file),
-                            os.path.join(BasicConfig.LOCAL_ROOT_DIR, exp_id, "conf", conf_file.replace(copy_id,exp_id)))
+                            os.path.join(BasicConfig.LOCAL_ROOT_DIR, exp_id, "conf",
+                                         conf_file.replace(copy_id, exp_id)))
             # if ends with .conf convert it to AS4 yaml file
             if conf_file.endswith(".conf"):
                 try:
-                    AutosubmitConfig.ini_to_yaml(os.path.join(BasicConfig.LOCAL_ROOT_DIR, exp_id,"conf"),
-                                                 os.path.join(BasicConfig.LOCAL_ROOT_DIR, exp_id,"conf",
-                                                              conf_file.replace(copy_id,exp_id)))
+                    AutosubmitConfig.ini_to_yaml(BasicConfig.LOCAL_ROOT_DIR / Path(exp_id + "/conf"),
+                                                 BasicConfig.LOCAL_ROOT_DIR / Path(exp_id + "/conf/" +
+                                                                                   conf_file.replace(copy_id, exp_id)))
                 except Exception as e:
-                    Log.warning(f"Error converting {conf_file.replace(copy_id,exp_id)} to yml: {str(e)}")
+                    Log.warning(f"Error converting {conf_file.replace(copy_id, exp_id)} to yml: {str(e)}")
 
     @staticmethod
     def generate_as_config(
