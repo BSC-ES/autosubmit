@@ -932,13 +932,13 @@ scripts[{list_index}]="{built_array}"
         run_job = textwrap.dedent("""
 run_job() {
     local template=$1
-    local fail_count=$2
-    local mask=$3
+    local fail_count=0 # TODO change this https://github.com/BSC-ES/autosubmit/issues/2086
+    local mask=$2
     local jobname=${template%.cmd}
     local out="${template}.out.${fail_count}"
     local err="${template}.err.${fail_count}"
     srun --ntasks=1 --cpu-bind=verbose,mask_cpu:${mask} --distribution=block:block $template > $out 2> $err &
-    sleep 1
+    sleep 3
     last_job_step=$(sacct --jobs $SLURM_JOBID --format=JobID --noheader | tail -n 1)
     job_step_suffix=$(echo $last_job_step | sed "s/$SLURM_JOBID//")
     echo $job_step_suffix
@@ -952,7 +952,7 @@ run_job_list() {
     read -r -a jobs_list <<< "$jobs_list_str"
     echo "Starting job list ${jobs_list[@]}"
     for ((i=0; i<${#jobs_list[@]}; i++)); do
-        job_step=$(run_job "${jobs_list[$i]}" $i $mask)
+        job_step=$(run_job "${jobs_list[$i]}" $mask)
         local completed_filename="${jobs_list[$i]%.cmd}_COMPLETED"
         local completed_path=$(pwd)/$completed_filename
         local failed_filename="${jobs_list[$i]%.cmd}_FAILED"
