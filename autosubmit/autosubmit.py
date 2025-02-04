@@ -1156,8 +1156,8 @@ class Autosubmit:
             # if ends with .conf convert it to AS4 yaml file
             if conf_file.endswith(".conf"):
                 try:
-                    AutosubmitConfig.ini_to_yaml(os.path.join(BasicConfig.LOCAL_ROOT_DIR, exp_id,"conf"),
-                                                 os.path.join(BasicConfig.LOCAL_ROOT_DIR, exp_id,"conf",conf_file.replace(copy_id,exp_id)))
+                    AutosubmitConfig.ini_to_yaml(Path(f"{BasicConfig.LOCAL_ROOT_DIR}/{exp_id}/conf"),
+                                                 Path(f"{BasicConfig.LOCAL_ROOT_DIR}/{exp_id}/conf/{conf_file.replace(copy_id,exp_id)}"))
                 except Exception as e:
                     Log.warning("Error converting {0} to yml: {1}".format(conf_file.replace(copy_id,exp_id),str(e)))
 
