@@ -37,10 +37,12 @@ class WrapperFactory(object):
         if wrapper_data.het.get("HETSIZE",0) <= 1:
             if not str(kwargs['num_processors_value']).isdigit():
                 kwargs['num_processors_value'] = 1
+
             if str(wrapper_data.nodes).isdigit() and int(wrapper_data.nodes) > 1 and int(kwargs['num_processors_value']) <= 1:
                 kwargs['num_processors'] = "#"
             else:
                 kwargs['num_processors'] = self.processors(kwargs['num_processors_value'])
+
             kwargs['allocated_nodes'] = self.allocated_nodes(kwargs['method'])
             kwargs['dependency'] = self.dependency(kwargs['dependency'])
             kwargs['partition'] = self.partition(wrapper_data.partition)
