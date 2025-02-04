@@ -145,6 +145,11 @@ class Platform(object):
         # This is visible on all instances simultaneosly. Is to send the keep alive signal.
         cls.worker_events.append(event_worker)
 
+    @classmethod
+    def remove_workers(cls, event_worker):
+        if event_worker in cls.worker_events:
+            cls.worker_events.remove(event_worker)
+
     @property
     @autosubmit_parameter(name='current_arch')
     def name(self):
@@ -862,6 +867,25 @@ class Platform(object):
     def restore_connection(self, as_conf):
         raise NotImplementedError
 
+    def clean_log_recovery_process(self) -> None:
+        """
+        Cleans the log recovery process variables.
+
+        This method sets the cleanup event to signal the log recovery process to finish,
+        waits for the process to join with a timeout, and then resets all related variables.
+        """
+        self.cleanup_event.set()  # Indicates to old child ( if reachable ) to finish.
+        if self.log_recovery_process:
+            self.log_recovery_process.join(timeout=60)  # Waits for old child ( if reachable ) to finish. Timeout in case of it being blocked.
+        # Resets everything related to the log recovery process.
+        self.recovery_queue = UniqueQueue()
+        self.log_retrieval_process_active = False
+        self.remove_workers(self.work_event)
+        self.work_event = Event()
+        self.cleanup_event = Event()
+        self.log_recovery_process = None
+        self.processed_wrapper_logs = set()
+
     def spawn_log_retrieval_process(self, as_conf: Any) -> None:
         """
         Spawns a process to recover the logs of the jobs that have been completed on this platform.
@@ -897,7 +921,7 @@ class Platform(object):
         if self.log_recovery_process and self.log_recovery_process.is_alive():
             self.work_event.clear()
             self.cleanup_event.set()
-            self.log_recovery_process.join()
+            self.log_recovery_process.join(timeout=60)
 
     def wait_for_work(self, sleep_time: int = 60) -> bool:
         """
