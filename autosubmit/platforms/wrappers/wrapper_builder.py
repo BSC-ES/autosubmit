@@ -135,22 +135,29 @@ class WrapperBuilder(object):
 
     @staticmethod
     def check_job_status_bash():
-        return textwrap.dedent("""
-check_job_status() {
-    job_name=$1
-    status=$(sacct --jobs ${SLURM_JOBID} --name=${job_name} --format=State --noheader | head -n 1 | awk '{$1=$1};1')
-    if [ -z "$status" ]; then
-        echo 1
-    else
-        if [ "$status" == "COMPLETED" ]; then
-            echo 0
-        elif [ "$status" == "RUNNING" ]; then
-            echo 2
-        else
-            echo 1
-        fi
+        return textwrap.dedent(f"""
+check_job_status() {{
+    job_steps_max=$1
+    job_steps_min=$job_steps_max-{{self.threads_number}}
+    status=$(sacct --jobs=${{SLURM_JOBID}} --format=JobID,State --noheader | grep -E "${{SLURM_JOBID}}\\.[0-9]+\\s" | awk '{{print $1}}' | sort -n | tail -n $job_steps_max | head -n $job_steps_min | awk '{{print $2}}')
+    if [ -n "$status" ]; then
+        echo 2
+        return
     fi
-}
+    while IFS= read -r line; do
+        job_status=$(echo "$line" | grep -E "${{SLURM_JOBID}}\\.[0-9]+\\s" | awk '{{print $2}}')
+        if [ -n "$job_status" ]; then
+            if [ "$job_status" == "RUNNING" ]; then
+                echo 2
+                return
+            elif [ "$job_status" == "FAILED" ]; then
+                echo 1
+                return
+            fi
+        fi
+    done
+    echo 0
+}}
 """)
 
 
@@ -784,39 +791,39 @@ class SrunWrapperBuilder(WrapperBuilder):
         return textwrap.dedent(""" """)
 
     def build_main(self):
-        check_job_status = self.check_job_status_bash()
-        build = self.build_srun_launcher("scripts_list")
         return self.check_job_status_bash() + self.build_srun_launcher("scripts_list")
 
     def _indent(self, text, amount, ch=' '):
         padding = amount * ch
         return ''.join(padding + line for line in text.splitlines(True))
 
-    def get_mask_general(self, total_threads):
-        n_threads = float(self.threads_number)
-        core = [0x0] * int(n_threads)
+    def get_mask_general(self):
+        return textwrap.dedent("""
+generate_mask() {
+    local start=$1
+    local count=$2
+    local mask=0
+    for ((i=0; i<count; i++)); do
+        mask=$((mask | (1 << (start + i))))
+    done
+    printf "0x%x" $mask
+}
+""")
 
-        core[0] = 0x1
-        horizontal_wrapper_size = int(total_threads)
-        srun_mask_values = []
-
-        for job_id in range(horizontal_wrapper_size):
-            for thread in range(1, int(n_threads)):
-                core[thread] = core[thread - 1] * 2
-            job_mask = 0x0
-            for thr_mask in core:
-                job_mask += thr_mask
-            srun_mask_values.append(str(hex(job_mask)))
-            if job_id > 0:
-                core[0] <<= int(n_threads)
-            else:
-                core[0] = job_mask + 0x1
-
-        mask_array = "("
-        for mask in srun_mask_values:
-            mask_array += f"\"{mask}\" "
-        mask_array = mask_array[:-1] + ")"
-        return mask_array
+    def mask_exports(self):
+        mask = self.get_mask_general()
+        exports = textwrap.dedent(f"""
+export OMP_PROC_BIND=false  # Without this, <sometimes>, we can't assign masks to the srun as they inherit the mask from the parent process.
+export -f generate_mask
+# Total number of CPUs allocated
+cpus_per_task={self.threads_number}
+num_tasks={self.num_procs_value}
+total_cpus=$((cpus_per_task * num_tasks))
+sbatch_cpus=2  # 112 * 2 = 224 allocated... sbatch should require 2 CPUs then
+num_srun={len(self.job_scripts)}
+# Calculate CPUs per srun
+        """)
+        return mask + exports
 
 
 class SrunHorizontalWrapperBuilder(SrunWrapperBuilder):
@@ -828,18 +835,19 @@ class SrunHorizontalWrapperBuilder(SrunWrapperBuilder):
         return textwrap.dedent(f"""
         # Defining scripts to be run
         declare -a scripts_list={scripts_bash}
-        declare -a job_mask={self.get_mask_general(len(self.job_scripts))}
         """).format('\n'.ljust(13))
 
     def build_srun_launcher(self, jobs_list, footer=True):
         srun_launcher = textwrap.dedent(f"""
+            {self.mask_exports()}
             i=0
             suffix=".cmd"
             for template in "${{{jobs_list}[@]}}"; do
                 jobname=${{template%"$suffix"}}
                 out="${{template}}.out.0"
                 err="${{template}}.err.0"
-                srun --ntasks=1 --cpu-bind=verbose,mask_cpu:${{job_mask[i]}} --distribution=block:block $template > $out 2> $err &
+                mask=$(generate_mask $start_cpu $cpus_per_task)
+                srun --ntasks=1 --cpu-bind=verbose,mask_cpu:$mask --distribution=block:block $template > $out 2> $err &
                 ((i=i+1))
             done
             wait
@@ -872,18 +880,19 @@ class SrunVerticalWrapperBuilder(SrunWrapperBuilder):
         return textwrap.dedent(f"""
         # Defining scripts to be run
         declare -a scripts_list={scripts_bash}
-        declare -a job_mask={self.get_mask_general(1)}
         """).format('\n'.ljust(13))
 
     def build_srun_launcher(self, jobs_list, footer=True):
         srun_launcher = textwrap.dedent(f"""
+            {self.mask_exports()}
             i=0
             suffix=".cmd"
             for template in "${{{jobs_list}[@]}}"; do
                 jobname=${{template%"$suffix"}}
                 out="${{template}}.out.0"
                 err="${{template}}.err.0"
-                srun --ntasks=1 --cpu-bind=verbose,mask_cpu:${{job_mask[0]}} --distribution=block:block $template > $out 2> $err &
+                mask=$(generate_mask $start_cpu $cpus_per_srun)
+                srun --ntasks=1 --cpu-bind=verbose,mask_cpu:$mask --distribution=block:block $template > $out 2> $err &
                 ((i=i+1))
                 wait
             done
@@ -921,43 +930,18 @@ class SrunVerticalHorizontalWrapperBuilder(SrunWrapperBuilder):
 scripts[{list_index}]="{built_array}"
 """)
             list_index += 1
-        # mask_array = self.get_mask_general(len(self.job_scripts))
-        # scripts_bash += textwrap.dedent("""
-        # declare -a job_mask_array={0}
-        # """).format(mask_array, '\n'.ljust(13))
         return scripts_bash
 
     def build_srun_launcher(self, jobs_list, footer=True):
 
-        build_mask = textwrap.dedent(f"""
-generate_mask() {{
-    local start=$1
-    local count=$2
-    local mask=0
-    for ((i=0; i<count; i++)); do
-        mask=$((mask | (1 << (start + i))))
-    done
-    printf "0x%x" $mask
-}}
-# Total number of CPUs allocated
-cpus_per_task=$SLURM_CPUS_PER_TASK
-num_tasks=$SLURM_NTASKS
-total_cpus=$((cpus_per_task * num_tasks))
-sbatch_cpus=2  
-num_srun=2 # todo
-
-# Calculate CPUs per srun
-cpus_per_srun=$(( (total_cpus - sbatch_cpus) / num_srun ))
-""")
+        build_mask = self.get_mask_general()
         run_job = textwrap.dedent("""
 run_job() {
     local template=$1
     local fail_count=0 # TODO change this https://github.com/BSC-ES/autosubmit/issues/2086
-    local mask=$2
     local jobname=${template%.cmd}
     local out="${template}.out.${fail_count}"
     local err="${template}.err.${fail_count}"
-    #srun --ntasks=1 --cpus-per-task=${SLURM_CPUS_PER_TASK} --cpu-bind=verbose,mask_cpu:${mask} --distribution=block:block $template > $out 2> $err 
     ./$template > $out 2> $err
 }
 """)
@@ -967,17 +951,12 @@ run_job_list() {{
     local failed_wrapper=$(pwd)/{self.get_random_alphanumeric_string(5, 5)}_FAILED
     read -r -a jobs_list <<< "$jobs_list_str"
     for ((i=0; i<${{#jobs_list[@]}}; i++)); do
-        run_job "${{jobs_list[$i]}}" $mask
+        run_job "${{jobs_list[$i]}}" 
         local completed_filename="${{jobs_list[$i]%.cmd}}_COMPLETED"
         local completed_path=$(pwd)/$completed_filename
         local failed_filename="${{jobs_list[$i]%.cmd}}_FAILED"
         local failed_path=$(pwd)/$failed_filename
-        status=$(check_job_status ${{jobs_list[$i]%.cmd}})
-        status=0
-        # while [ "$status" -eq 2 ] || [ -z "$status" ]; do
-        #     status=$(check_job_status ${{jobs_list[$i]%.cmd}})            
-        # done
-        if [ $status -eq 0 ] && [ -f $completed_path ]; then
+        if [ -f $completed_path ]; then
             echo "$(date) The job ${{jobs_list[$i]}} has been COMPLETED"
         else
             touch "$failed_wrapper"
@@ -995,216 +974,119 @@ run_job_list() {{
 }}
         """)
 
-        main = textwrap.dedent("""
-
-export OMP_PROC_BIND=false
+        main = textwrap.dedent(f"""
+{self.mask_exports()}
 # Export the functions so they can be used by srun
 export -f check_job_status
-export -f generate_mask
 export -f run_job_list
 export -f run_job
+set -x
 pid_list=()
-for ((i=0; i<${#scripts[@]}; i++)); do
+for ((i=0; i<${{#scripts[@]}}; i++)); do
     start_cpu=$((sbatch_cpus + i * cpus_per_srun))
     mask=$(generate_mask $start_cpu $cpus_per_srun)
-    echo "Starting job ${scripts[$i]}"
-    #srun --ntasks=1 --cpus-per-task=$cpus_per_task --cpu-bind=verbose,mask_cpu:${mask} --distribution=block:block bash -c 'run_job_list "${scripts[$i]}" ${mask}' &
-    jobs_list_str="${scripts[$i]}"
+    jobs_list_str="${{scripts[$i]}}"
     export jobs_list_str
-    srun --ntasks=1 --cpus-per-task=$cpus_per_srun bash -c 'run_job_list' &
+    echo "Starting job ${{scripts[$i]}}"
+    srun --ntasks=1 --cpus-per-task=$cpus_per_task --cpu-bind=verbose,mask_cpu:$mask --distribution=block:block bash -c 'run_job_list' &
     pid_list+=($!)
 done
 # Waiting until all scripts finish
-for pid in "${pid_list[@]}"; do
+for pid in "${{pid_list[@]}}"; do
     wait $pid
 done
         """)
 
         return build_mask + run_job_list + run_job + main
 
-    # def build_srun_launcher(self, jobs_list, footer=True):
-    #     srun_launcher = textwrap.dedent(f"""
-    #     suffix=".cmd"
-    #     suffix_completed=".COMPLETED"
-    #     aux_scripts=("${{{jobs_list}[@]}}")
-    #     prev_script="empty"
-    #     as_index=0
-    #     horizontal_size=${{#scripts_index[@]}}
-    #     scripts_size=${{#scripts_0[@]}}
-    #     job_failed=0
-    #     while [ "${{#aux_scripts[@]}}" -gt 0 ]; do
-    #         i_list=0
-    #         for script_list in "${{{jobs_list}[@]}}"; do
-    #             declare -i job_index=${{scripts_index[$i_list]}}
-    #             declare -n scripts=$script_list
-    #
-    #             declare -n prev_horizontal_scripts=$prev_script
-    #             if [ $job_index -ne -1 ]; then
-    #                 for horizontal_job in "${{scripts[@]:$job_index}}"; do
-    #                     template=$horizontal_job
-    #                     jobname=${{template%"$suffix"}}
-    #                     as_index=0
-    #                     multiplication_result=$(($i_list*$scripts_size))
-    #                     as_index=$((multiplication_result+$job_index))
-    #                     out="${{template}}.out"
-    #                     err="${{template}}.err"
-    #                     if [ $job_index -eq 0 ]; then
-    #                         prev_template=$template
-    #                     else
-    #                         prev_template=${{scripts[((job_index-1))]}}
-    #                     fi
-    #                     completed_filename=${{prev_template%"$suffix"}}
-    #                     completed_filename="$completed_filename"_COMPLETED
-    #                     completed_path=${{PWD}}/$completed_filename
-    #                     if [ ! $job_index -eq 0 ] && ( ! lsof "$err" > /dev/null 2>&1 && ! lsof "$out" > /dev/null 2>&1 ) && [ ! -f "$completed_path" ]; then
-    #                         job_failed=1
-    #                         break
-    #                     fi
-    #                     if [ $job_index -eq 0 ] || [ -f "$completed_path" ]; then # If first horizontal wrapper or last wrapper is completed
-    #                         #srun -N1 --ntasks=1 --cpus-per-task=1 --cpu-bind=verbose,mask_cpu:${{job_mask_array[$job_index]}}  --distribution=block:block $template > $out 2> $err &
-    #                         #srun --ntasks=1 --cpu-bind=verbose,mask_cpu:$cpu_mask --distribution=block:block $template > $out 2> $err &
-    #                         job_step=$(srun --ntasks=1 --cpu-bind=verbose,mask_cpu:${{job_mask_array[$job_index]}} --distribution=block:block $template > $out 2> $err & echo $!)
-    #                         job_index=$(($job_index+1))
-    #                     else
-    #                         break
-    #                     fi
-    #                 done
-    #                 if [ "$job_failed" ]; then
-    #                     break
-    #                 fi
-    #                 if [ $job_index -ge "${{#scripts[@]}}" ];  then
-    #                     unset aux_scripts[$i_list]
-    #                     job_index=-1
-    #                 fi
-    #             fi
-    #             if [ "$job_failed" ]; then
-    #                 break
-    #             fi
-    #             prev_script=("${{script_list[@]}}")
-    #             scripts_index[$i_list]=$job_index
-    #             i_list=$((i_list+1)) # check next list ( needed for save list index )
-    #         done
-    #         if [ "$job_failed" ]; then
-    #             echo "`date '+%d/%m/%Y_%H:%M:%S'` $template has been FAILED"
-    #             touch {self.get_random_alphanumeric_string(5, 5)}_FAILED
-    #             touch WRAPPER_FAILED
-    #             break
-    #         else
-    #             echo "`date '+%d/%m/%Y_%H:%M:%S'` $template has COMPLETE"
-    #         fi
-    #     done
-    #     wait
-    #     """)
-    #     return srun_launcher
-
 
 class SrunHorizontalVerticalWrapperbuilder(SrunWrapperBuilder):
 
     def build_imports(self):
-        scripts_bash = textwrap.dedent("""
-        # Defining scripts to be run""")
         list_index = 0
-        scripts_array_vars = "("
-        scripts_array_index = "("
+        scripts_bash = "declare -a scripts\n"
         for scripts in self.job_scripts:
-            built_array = "("
+            built_array = ""
             for script in scripts:
-                built_array += str("\"" + script + "\"") + " "
-            built_array = built_array[:-1] + ")"
-            scripts_bash += textwrap.dedent("""
-            declare -a scripts_{0}={1}
-            """).format(str(list_index), str(built_array), '\n'.ljust(13))
-            scripts_array_vars += "\"scripts_{0}\" ".format(list_index)
-            scripts_array_index += "\"0\" ".format(list_index)
+                built_array += script + " "
+            built_array = built_array[:-1]
+            scripts_bash += textwrap.dedent(f"""
+    scripts[{list_index}]="{built_array}"
+    """)
             list_index += 1
-        scripts_array_vars = scripts_array_vars[:-1] + ")"
-        scripts_array_index = scripts_array_index[:-1] + ")"
-        scripts_bash += textwrap.dedent("""
-                   declare -a scripts_list={0}
-                   declare -a scripts_index={1}
-                   """).format(str(scripts_array_vars), str(scripts_array_index), '\n'.ljust(13))
-        mask_array = self.get_mask_general(len(self.job_scripts))
-        scripts_bash += textwrap.dedent("""
-                declare -a job_mask_array={0}
-                """).format(mask_array, '\n'.ljust(13))
         return scripts_bash
 
     def build_srun_launcher(self, jobs_list, footer=True):
-        srun_launcher = textwrap.dedent(f"""
-        suffix=".cmd"
-        suffix_completed=".COMPLETED"
-        aux_scripts=("${{{jobs_list}[@]}}")
-        prev_script="empty"
-        as_index=0
-        horizontal_size=${{#scripts_index[@]}}
-        scripts_size=${{#scripts_0[@]}}
-        job_failed=0
-        # Initialize step_ids based on horizontal_size
-        for ((i=0; i<horizontal_size; i++)); do
-            step_ids[i]=-1
-        done
-        while [ "${{#aux_scripts[@]}}" -gt 0 ]; do
-            i_list=0
-            for script_list in "${{{jobs_list}[@]}}"; do
-                declare -i job_index=${{scripts_index[$i_list]}}
-                declare -n scripts=$script_list
-                declare -n prev_horizontal_scripts=$prev_script
-                if [ $job_index -ne -1 ]; then
-                    for horizontal_job in "${{scripts[@]:$job_index}}"; do
-                        template=$horizontal_job
-                        jobname=${{template%"$suffix"}}
-                        as_index=0
-                        multiplication_result=$(($i_list*$scripts_size))
-                        as_index=$((multiplication_result+$job_index))
-                        out="${{template}}.out"
-                        err="${{template}}.err"
-                        if [ $job_index -eq 0 ]; then
-                            prev_template=$template
-                        else
-                            prev_template=${{scripts[((job_index-1))]}}
-                        fi
-                        completed_filename=${{prev_template%"$suffix"}}
-                        completed_filename="$completed_filename"_COMPLETED
-                        completed_path=${{PWD}}/$completed_filename
-                        status=check_job_status $step_id # todo
-                        if [ ! $job_index -eq 0 ] && [ $status == "failed" [ ! -f "$completed_path" ]; then
-                            job_failed=1
-                            break
-                        fi
-                        if [ $job_index -eq 0 ] || [ -f "$completed_path" ]; then # If first horizontal wrapper or last wrapper is completed
-                            #srun -N1 --ntasks=1 --cpus-per-task=1 --cpu-bind=verbose,mask_cpu:${{job_mask_array[$job_index]}}  --distribution=block:block $template > $out 2> $err &
-                            #srun --ntasks=1 --cpu-bind=verbose,mask_cpu:$cpu_mask --distribution=block:block $template > $out 2> $err &
-                            srun --ntasks=1 --cpu-bind=verbose,mask_cpu:${{job_mask_array[$job_index]}} --distribution=block:block $template > $out 2> $err &
-                            step_id=$(srun --ntasks=1 --cpu-bind=verbose,mask_cpu:${{job_mask_array[$job_index]}} --distribution=block:block $template > $out 2> $err & echo $!)
-                            job_index=$(($job_index+1))
-                        else
-                            break
-                        fi
-                    done
-                    if [ "$job_failed" ]; then
-                        break
-                    fi
-                    if [ $job_index -ge "${{#scripts[@]}}" ];  then
-                        unset aux_scripts[$i_list]
-                        job_index=-1
-                    fi
-                fi
-                if [ "$job_failed" ]; then
-                    break
-                fi
-                prev_script=("${{script_list[@]}}")
-                scripts_index[$i_list]=$job_index
-                i_list=$((i_list+1)) # check next list ( needed for save list index )
-            done
-            if [ "$job_failed" ]; then
-                echo "`date '+%d/%m/%Y_%H:%M:%S'` $template has been FAILED"
-                touch {self.get_random_alphanumeric_string(5, 5)}_FAILED
-                touch WRAPPER_FAILED
-                break
+
+        build_mask = self.get_mask_general()
+        run_job = textwrap.dedent("""
+    run_job() {
+        local template=$1
+        local fail_count=0 # TODO change this https://github.com/BSC-ES/autosubmit/issues/2086
+        local jobname=${template%.cmd}
+        local out="${template}.out.${fail_count}"
+        local err="${template}.err.${fail_count}"
+        ./$template > $out 2> $err
+    }
+    """)
+        run_job_list = textwrap.dedent(f"""
+    run_job_list() {{
+        set -x
+        local failed_wrapper=$(pwd)/{self.get_random_alphanumeric_string(5, 5)}_FAILED
+        read -r -a jobs_list <<< "$jobs_list_str"
+        job_steps={self.threads_number}
+        for ((i=0; i<${{#jobs_list[@]}}; i++)); do
+            run_job "${{jobs_list[$i]}}" 
+            local completed_filename="${{jobs_list[$i]%.cmd}}_COMPLETED"
+            local completed_path=$(pwd)/$completed_filename
+            local failed_filename="${{jobs_list[$i]%.cmd}}_FAILED"
+            local failed_path=$(pwd)/$failed_filename
+            if [ -f $completed_path ]; then
+                echo "$(date) The job ${{jobs_list[$i]}} has been COMPLETED"
             else
-                echo "`date '+%d/%m/%Y_%H:%M:%S'` $template has COMPLETE"
+                touch "$failed_wrapper"
+                touch "$failed_path"
+                echo "$(date) The job ${{jobs_list[$i]}} has FAILED"
+                exit 1
             fi
+
+            if [ -f "$failed_wrapper" ]; then
+                rm "$failed_wrapper"
+                touch "$(pwd)/WRAPPER_FAILED"
+                exit 1
+            fi
+            # this is a "barrier" to wait for all horizontal list to finish
+            # while check_job_status is not 0
+            status=$(check_job_status $job_steps)
+            while [ $status -ne 0 ]; do
+                status=$(check_job_status)
+            done
+            job_steps=$((job_steps+{self.threads_number}))
         done
-        wait
-        """)
-        return srun_launcher
+
+    }}
+            """)
+
+        main = textwrap.dedent(f"""
+    {self.mask_exports()}
+    # Export the functions so they can be used by srun
+    export -f check_job_status
+    export -f run_job_list
+    export -f run_job
+    pid_list=()
+    for ((i=0; i<${{#scripts[@]}}; i++)); do
+        start_cpu=$((sbatch_cpus + i * cpus_per_srun))
+        mask=$(generate_mask $start_cpu $cpus_per_srun)
+        jobs_list_str="${{scripts[$i]}}"
+        export jobs_list_str
+        echo "Starting job ${{scripts[$i]}}"
+        srun --ntasks=1 --cpus-per-task=$cpus_per_task --cpu-bind=verbose,mask_cpu:$mask --distribution=block:block bash -c 'run_job_list' &
+        pid_list+=($!)
+    done
+    # Waiting until all scripts finish
+    for pid in "${{pid_list[@]}}"; do
+        wait $pid
+    done
+            """)
+
+        return build_mask + run_job_list + run_job + main
