@@ -70,7 +70,7 @@ def prepare_run(run_tmpdir):
     main_path = Path(f"{run_tmpdir.strpath}/t000/conf/AAAmain.yml")
     # Add each platform to test
     with platforms_path.open('w') as f:
-        f.write("""
+        f.write(f"""
 PLATFORMS:
     dummy:
         type: dummy

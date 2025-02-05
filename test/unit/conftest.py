@@ -2,7 +2,6 @@
 from contextlib import suppress
 
 import pytest
-import pytest_mock
 from dataclasses import dataclass
 from pathlib import Path
 from ruamel.yaml import YAML

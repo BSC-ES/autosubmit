@@ -14,7 +14,7 @@ def _get_script_files_path() -> Path:
 
 @pytest.fixture
 def current_tmpdir(tmpdir_factory):
-    folder = tmpdir_factory.mktemp('tests')
+    folder = tmpdir_factory.mktemp(f'tests')
     os.mkdir(folder.join('scratch'))
     file_stat = os.stat(f"{folder.strpath}")
     file_owner_id = file_stat.st_uid
@@ -48,7 +48,7 @@ PLATFORMS:
         """)
     # add a job of each platform type
     with jobs_path.open('w') as f:
-        f.write("""
+        f.write(f"""
 JOBS:
     base:
         SCRIPT: |

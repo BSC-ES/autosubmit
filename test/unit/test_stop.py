@@ -1,5 +1,6 @@
 import inspect
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmitconfigparser.config.basicconfig import BasicConfig

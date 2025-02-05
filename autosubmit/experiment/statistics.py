@@ -129,7 +129,7 @@ class ExperimentStats(object):
                 else:
                     return estimated_nodes * int(processors_per_node)
         elif (str(tasks).isdigit() or str(nodes).isdigit()):
-            Log.warning('Missing PROCESSORS_PER_NODE. Should be set if TASKS or NODES are defined. The PROCESSORS will used instead.')
+            Log.warning(f'Missing PROCESSORS_PER_NODE. Should be set if TASKS or NODES are defined. The PROCESSORS will used instead.')
         return int(processors)
 
 
