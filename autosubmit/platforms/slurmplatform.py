@@ -98,7 +98,7 @@ class SlurmPlatform(ParamikoPlatform):
         :return:
         """
         try:
-            valid_packages_to_submit = [ package for package in valid_packages_to_submit if package.x11 != True]
+            valid_packages_to_submit = [ package for package in valid_packages_to_submit if package.x11 is not True]
             if len(valid_packages_to_submit) > 0:
                 duplicated_jobs_already_checked = False
                 platform = valid_packages_to_submit[0].jobs[0].platform
@@ -119,7 +119,7 @@ class SlurmPlatform(ParamikoPlatform):
                             #cancel bad submitted job if jobid is encountered
                             for id_ in jobid:
                                 self.send_command(self.cancel_job(id_))
-                    except:
+                    except Exception:
                         pass
                     jobs_id = None
                     self.connected = False
@@ -325,11 +325,11 @@ class SlurmPlatform(ParamikoPlatform):
         self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
         self.cancel_cmd = "scancel"
         self._checkhost_cmd = "echo 1"
-        self._submit_cmd = 'sbatch --no-requeue -D {1} {1}/'.format(
-            self.host, self.remote_log_dir)
+        self._submit_cmd = 'sbatch --no-requeue -D {0} {0}/'.format(
+            self.remote_log_dir)
         self._submit_command_name = "sbatch"
-        self._submit_hold_cmd = 'sbatch -H -D {1} {1}/'.format(
-            self.host, self.remote_log_dir)
+        self._submit_hold_cmd = 'sbatch -H -D {0} {0}/'.format(
+            self.remote_log_dir)
         # jobid =$(sbatch WOA_run_mn4.sh 2 > & 1 | grep -o "[0-9]*"); scontrol hold $jobid;
         self.put_cmd = "scp"
         self.get_cmd = "scp"
@@ -587,10 +587,10 @@ class SlurmPlatform(ParamikoPlatform):
                 pass
 
     def get_checkjob_cmd(self, job_id):
-        return 'sacct -n -X --jobs {1} -o "State"'.format(self.host, job_id)
+        return 'sacct -n -X --jobs {0} -o "State"'.format(job_id)
 
     def get_checkAlljobs_cmd(self, jobs_id):
-        return "sacct -n -X --jobs {1} -o jobid,State".format(self.host, jobs_id)
+        return "sacct -n -X --jobs {0} -o jobid,State".format(jobs_id)
     def get_estimated_queue_time_cmd(self, job_id):
         return f"scontrol -o show JobId {job_id} | grep -Po '(?<=EligibleTime=)[0-9-:T]*'"
 

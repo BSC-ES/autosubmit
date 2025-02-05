@@ -131,7 +131,7 @@ class ParamikoPlatform(Platform):
                     try:
                         transport = self._ssh.get_transport()
                         transport.send_ignore()
-                    except:
+                    except Exception:
                         message = "Timeout connection"
                 return message
 
@@ -1139,11 +1139,11 @@ class ParamikoPlatform(Platform):
                 elif errorLine.find("refused") != -1 or errorLine.find("slurm_persist_conn_open_without_init") != -1 or errorLine.find("slurmdbd") != -1 or errorLine.find("submission failed") != -1 or errorLine.find("git clone") != -1 or errorLine.find("sbatch: error: ") != -1 or errorLine.find("not submitted") != -1 or errorLine.find("invalid") != -1 or "[ERR.] PJM".lower() in errorLine:
                     if "salloc: error" in errorLine or "salloc: unrecognized option" in errorLine or "[ERR.] PJM".lower() in errorLine or (self._submit_command_name == "sbatch" and (errorLine.find("policy") != -1 or errorLine.find("invalid") != -1) ) or (self._submit_command_name == "sbatch" and errorLine.find("argument") != -1) or (self._submit_command_name == "bsub" and errorLine.find("job not submitted") != -1) or self._submit_command_name == "ecaccess-job-submit" or self._submit_command_name == "qsub ":
                         raise AutosubmitError(errorLine, 7014, "Bad Parameters.")
-                    raise AutosubmitError('Command {0} in {1} warning: {2}'.format(command, self.host,self._ssh_output_err, 6005))
+                    raise AutosubmitError('Command {0} in {1} warning: {2}'.format(command, self.host,self._ssh_output_err))
 
             if not ignore_log:
                 if len(stderr_readlines) > 0:
-                    Log.printlog('Command {0} in {1} warning: {2}'.format(command, self.host,self._ssh_output_err, 6006))
+                    Log.printlog('Command {0} in {1} warning: {2}'.format(command, self.host,self._ssh_output_err))
                 else:
                     pass
                     #Log.debug('Command {0} in {1} successful with out message: {2}', command, self.host, self._ssh_output)
@@ -1451,7 +1451,7 @@ class ParamikoPlatform(Platform):
                 return True
             else:
                 return False
-        except:
+        except Exception:
             return False
 class ParamikoPlatformException(Exception):
     """

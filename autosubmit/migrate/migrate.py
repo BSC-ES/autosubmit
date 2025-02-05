@@ -4,8 +4,6 @@ import time
 
 import os
 
-from bscearth.utils.date import Log
-
 from autosubmit.helpers.utils import restore_platforms
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
@@ -147,7 +145,7 @@ class Migrate:
                 as_conf.check_conf_files(False)
                 restore_platforms(platforms)
             except BaseException as e:
-                Log.warning(f"Before running, configure your platform settings. Remember that the as_misc pickup platforms aren't load outside the migrate")
+                Log.warning("Before running, configure your platform settings. Remember that the as_misc pickup platforms aren't load outside the migrate")
                 Log.warning(f"The experiment cannot run, check the configuration files:\n{e}")
             return True
 

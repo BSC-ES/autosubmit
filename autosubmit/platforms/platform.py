@@ -122,7 +122,7 @@ class Platform(object):
         if not self.two_factor_auth:
             self.pw = None
         elif auth_password is not None and self.two_factor_auth:
-            if type(auth_password) == list:
+            if isinstance(auth_password, list):
                 self.pw = auth_password[0]
             else:
                 self.pw = auth_password
@@ -497,7 +497,7 @@ class Platform(object):
         """
         if main_hpc:
             prefix = 'HPC'
-            parameters['SCRATCH_DIR'.format(prefix)] = self.scratch
+            parameters['SCRATCH_DIR'] = self.scratch
         else:
             prefix = self.name + '_'
 
@@ -951,7 +951,7 @@ class Platform(object):
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
                 try:
                     job.retrieve_logfiles(self, raise_error=True)
-                except:
+                except Exception:
                     jobs_pending_to_process.add(job)
                     job._log_recovery_retries += 1
                     Log.warning(f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry:'{job.fail_count}'.")
@@ -969,7 +969,7 @@ class Platform(object):
             try:
                 job.retrieve_logfiles(self, raise_error=True)
                 job._log_recovery_retries += 1
-            except:
+            except Exception:
                 if job._log_recovery_retries < 5:
                     jobs_pending_to_process.add(job)
                 Log.warning(

@@ -44,7 +44,7 @@ def exit_from_error(e: BaseException) -> int:
     trace = traceback.format_exc()
     try:
         Log.debug(trace)
-    except:
+    except BaseException:
         print(trace)
 
     is_portalocker_error = isinstance(e, BaseLockException)

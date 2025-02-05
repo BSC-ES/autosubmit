@@ -1812,13 +1812,13 @@ class Autosubmit:
         """
         jobs_to_check = dict()
         job_changes_tracker = dict()
-        for platform in platforms_to_test:
-            queuing_jobs = job_list.get_in_queue_grouped_id(platform)
-            Log.debug('Checking jobs for platform={0}'.format(platform.name))
+        for test_platform in platforms_to_test:
+            queuing_jobs = job_list.get_in_queue_grouped_id(test_platform)
+            Log.debug('Checking jobs for platform={0}'.format(test_platform.name))
             for job_id, job in queuing_jobs.items():
                 # Check Wrappers one-by-one
                 if job_list.job_package_map and job_id in job_list.job_package_map:
-                    wrapper_job, save = Autosubmit.manage_wrapper_job(as_conf, job_list, platform,
+                    wrapper_job, save = Autosubmit.manage_wrapper_job(as_conf, job_list, test_platform,
                                                                       job_id)
                     # Notifications e-mail
                     Autosubmit.wrapper_notify(as_conf, expid, wrapper_job)
@@ -1832,10 +1832,10 @@ class Autosubmit:
                     job_prev_status = job.status
                     # If exist key has been pressed and previous status was running, do not check
                     if not (Autosubmit.exit is True and job_prev_status == Status.RUNNING):
-                        if platform.name in jobs_to_check:
-                            jobs_to_check[platform.name].append([job, job_prev_status])
+                        if test_platform.name in jobs_to_check:
+                            jobs_to_check[test_platform.name].append([job, job_prev_status])
                         else:
-                            jobs_to_check[platform.name] = [[job, job_prev_status]]
+                            jobs_to_check[test_platform.name] = [[job, job_prev_status]]
         return jobs_to_check,job_changes_tracker
 
     @staticmethod
@@ -2343,7 +2343,7 @@ class Autosubmit:
                 # search hint - finished run
                 job_list.save()
                 if not did_run and len(job_list.get_completed_failed_without_logs()) > 0: # Revise if there is any log unrecovered from previous run
-                    Log.info(f"Connecting to the platforms, to recover missing logs")
+                    Log.info("Connecting to the platforms, to recover missing logs")
                     submitter = Autosubmit._get_submitter(as_conf)
                     submitter.load_platforms(as_conf)
                     if submitter.platforms is None:
@@ -2358,7 +2358,7 @@ class Autosubmit:
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                 job_list.save()
                 if len(job_list.get_completed_failed_without_logs()) == 0:
-                    Log.result(f"Autosubmit recovered all job logs.")
+                    Log.result("Autosubmit recovered all job logs.")
                 else:
                     Log.warning(f"Autosubmit couldn't recover the following job logs: {[job.name for job in job_list.get_completed_failed_without_logs()]}")
                 try:
@@ -2406,10 +2406,10 @@ class Autosubmit:
         platform_issues = ""
         ssh_config_issues = ""
         private_key_error = "Please, add your private key to the ssh-agent ( ssh-add <path_to_key> ) or use a non-encrypted key\nIf ssh agent is not initialized, prompt first eval `ssh-agent -s`"
-        for platform in platform_to_test:
+        for test_platform in platform_to_test:
             platform_issues = ""
             try:
-                message = platform.test_connection(as_conf)
+                message = test_platform.test_connection(as_conf)
                 if message is None:
                     message = "OK"
                 if message != "OK":
@@ -2424,36 +2424,36 @@ class Autosubmit:
                         ssh_config_issues += message + ".Please, the eccert expiration date"
                     else:
                         ssh_config_issues += message + " this is an PARAMIKO SSHEXCEPTION: indicates that there is something incompatible in the ssh_config for host:{0}\n maybe you need to contact your sysadmin".format(
-                            platform.host)
+                            test_platform.host)
             except BaseException as e:
                 try:
                     if mail_notify:
                         email = as_conf.get_mails_to()
                         if "@" in email[0]:
-                            Notifier.notify_experiment_status(MailNotifier(BasicConfig), expid, email, platform)
+                            Notifier.notify_experiment_status(MailNotifier(BasicConfig), expid, email, test_platform)
                 except Exception as e:
                     pass
                 platform_issues += "\n[{1}] Connection Unsuccessful to host {0} ".format(
-                    platform.host, platform.name)
+                    test_platform.host, test_platform.name)
                 issues += platform_issues
                 continue
-            if platform.check_remote_permissions():
+            if test_platform.check_remote_permissions():
                 Log.result("[{1}] Correct user privileges for host {0}",
-                           platform.host, platform.name)
+                           test_platform.host, test_platform.name)
             else:
                 platform_issues += "\n[{0}] has configuration issues.\n Check that the connection is passwd-less.(ssh {1}@{4})\n Check the parameters that build the root_path are correct:{{scratch_dir/project/user}} = {{{3}/{2}/{1}}}".format(
-                    platform.name, platform.user, platform.project, platform.scratch, platform.host)
+                    test_platform.name, test_platform.user, test_platform.project, test_platform.scratch, test_platform.host)
                 issues += platform_issues
             if platform_issues == "":
 
-                Log.printlog("[{1}] Connection successful to host {0}".format(platform.host, platform.name), Log.RESULT)
+                Log.printlog("[{1}] Connection successful to host {0}".format(test_platform.host, test_platform.name), Log.RESULT)
             else:
-                if platform.connected:
-                    platform.connected = False
-                    Log.printlog("[{1}] Connection successful to host {0}, however there are issues with %HPCROOT%".format(platform.host, platform.name),
+                if test_platform.connected:
+                    test_platform.connected = False
+                    Log.printlog("[{1}] Connection successful to host {0}, however there are issues with %HPCROOT%".format(test_platform.host, test_platform.name),
                                  Log.WARNING)
                 else:
-                    Log.printlog("[{1}] Connection failed to host {0}".format(platform.host, platform.name), Log.WARNING)
+                    Log.printlog("[{1}] Connection failed to host {0}".format(test_platform.host, test_platform.name), Log.WARNING)
         if issues != "":
             if ssh_config_issues.find(private_key_error[:-2]) != -1:
                 raise AutosubmitCritical("Private key is encrypted, Autosubmit does not run in interactive mode.\nPlease, add the key to the ssh agent(ssh-add <path_to_key>).\nIt will remain open as long as session is active, for force clean you can prompt ssh-add -D",7073, issues + "\n" + ssh_config_issues)
@@ -3075,7 +3075,7 @@ class Autosubmit:
             if not only_remote: # Local migrate
                 try:
                     if not Autosubmit.archive(experiment_id, True, True):
-                        raise AutosubmitCritical(f"Error archiving the experiment", 7014)
+                        raise AutosubmitCritical("Error archiving the experiment", 7014)
                     Log.result("The experiment has been successfully offered.")
                 except Exception as e:
                     # todo put the IO error code
@@ -4088,7 +4088,7 @@ class Autosubmit:
 
         database_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}.db".format(expid))
         database_backup_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}.sql".format(expid))
-        dump_file_name = 'job_data_{0}.sql'.format(expid, current_time)
+        dump_file_name = 'job_data_{0}.sql'.format(expid)
         dump_file_path = os.path.join(BasicConfig.JOBDATA_DIR, dump_file_name)
         bash_command = 'cat {1} | sqlite3 {0}'.format(database_path, dump_file_path)
         try:

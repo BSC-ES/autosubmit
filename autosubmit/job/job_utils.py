@@ -70,7 +70,7 @@ def calendar_unitsize_isgreater(split_unit,chunk_unit):
     try:
         return CALENDAR_UNITSIZE_ENUM[split_unit] > CALENDAR_UNITSIZE_ENUM[chunk_unit]
     except KeyError:
-        raise AutosubmitCritical(f"Invalid calendar unit size")
+        raise AutosubmitCritical("Invalid calendar unit size")
 
 def calendar_unitsize_getlowersize(unitsize):
     """
