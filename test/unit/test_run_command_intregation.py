@@ -265,7 +265,7 @@ def check_files_recovered(run_tmpdir, log_dir, expected_files) -> dict:
         print("All log files downloaded are renamed correctly.")
     else:
         print("Some log files are not renamed correctly.")
-    files_err_out_found = [f for f in log_dir.glob('*') if (str(f).endswith(".err") or str(f).endswith(".out") or "retrial" in str(f).lower()) and ("ASThread" not in str(f) or "SRUN" not in str(f))]
+    files_err_out_found = [f for f in log_dir.glob('*') if (str(f).endswith(".err") or str(f).endswith(".out") or "retrial" in str(f).lower()) and "asthread" not in str(f).lower() and "srun" not in str(f).lower()]
     files_check_list["EXPECTED_FILES"] = len(files_err_out_found) == expected_files
     if not files_check_list["EXPECTED_FILES"]:
         print(f"Expected number of log files: {expected_files}. Found: {len(files_err_out_found)}")

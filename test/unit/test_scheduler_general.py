@@ -237,7 +237,7 @@ def test_scheduler_job_types(scheduler, job_type, generate_cmds):
     elif job_type == "NODES":
         actual = Path(f"{generate_cmds.strpath}/t000/tmp/t000_NODES_{scheduler}.cmd").read_text()
     else:
-        for asthread in Path(f"{generate_cmds.strpath}/t000/tmp").glob(f"*ASThread_WRAP_{job_type}_[0-9]*.cmd"):
+        for asthread in Path(f"{generate_cmds.strpath}/t000/tmp").glob(f"*ASTHREAD_WRAP_{job_type}_[0-9]*.cmd"):
             actual = asthread.read_text()
             break
         else:

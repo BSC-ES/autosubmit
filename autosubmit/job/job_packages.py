@@ -761,7 +761,10 @@ class JobPackageVertical(JobPackageThread):
 
         super(JobPackageVertical, self).__init__(jobs, dependency, configuration=configuration,
                                                  wrapper_section=wrapper_section, wrapper_info=wrapper_info)
-        self.method = wrapper_info[2].upper()
+        if wrapper_info:
+            self.method = wrapper_info[2].upper()
+        else:
+            self.method = "ASThread".upper()
         for job in jobs:
             if int(job.processors) >= int(self._num_processors):
                 self._num_processors = job.processors

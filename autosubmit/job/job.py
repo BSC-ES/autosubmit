@@ -2844,7 +2844,7 @@ class WrapperJob(Job):
                 self._platform.send_file(multiple_checker_inner_jobs, False)
                 command = f"cd {self._platform.get_files_path()}; {os.path.join(self._platform.get_files_path(), 'inner_jobs_checker.sh')}"
             else:
-                command = f"cd {self._platform.get_files_path()}; ./inner_jobs_checker.sh; cd {os.getcwd()}"
+                command = f"cd {self._platform.get_files_path()}; chmod +x inner_jobs_checker.sh; ./inner_jobs.checker.sh ; cd {os.getcwd()}"
             #
             wait = 2
             retries = 5
