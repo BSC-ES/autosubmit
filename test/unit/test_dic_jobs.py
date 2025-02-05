@@ -595,13 +595,6 @@ class TestDicJobs(TestCase):
         self.dictionary._create_jobs_split(5,'fake-section','fake-date', 'fake-member', 'fake-chunk', 0,Type.BASH, section_data)
         self.assertEqual(5, len(section_data))
 
-    @patch('autosubmit.job.job_dict.date2str')
-    def test_create_jobs_split(self,mock_date2str):
-        mock_date2str.side_effect = lambda x, y: str(x)
-        section_data = []
-        self.dictionary._create_jobs_split(5,'fake-section','fake-date', 'fake-member', 'fake-chunk', 0,Type.BASH, section_data)
-        self.assertEqual(5, len(section_data))
-
 
 
 
