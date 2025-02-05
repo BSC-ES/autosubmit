@@ -19,7 +19,7 @@
 
 import sqlite3
 import os
-
+from typing import Dict, Iterable, List, Protocol, Union, cast
 
 class DbManager(object):
     """
@@ -92,6 +92,17 @@ class DbManager(object):
         cursor = self.connection.cursor()
         insert_many_command = self.generate_insert_many_command(table_name, len(data[0]))
         cursor.executemany(insert_many_command, data)
+        self.connection.commit()
+
+    def delete_where(self, table_name: str, where: list[str]):
+        """
+        Deletes the rows of the given table that matches the given where conditions
+        :param table_name: str
+        :param where: [str]
+        """
+        cursor = self.connection.cursor()
+        delete_command = self.generate_delete_command(table_name, where[:])
+        cursor.execute(delete_command)
         self.connection.commit()
 
     def select_first(self, table_name):
@@ -224,3 +235,67 @@ class DbManager(object):
         for condition in where:
             select_command += ' AND ' + condition
         return select_command
+    
+    @staticmethod
+    def generate_delete_command(table_name: str, where: list[str] = []):
+        delete_command = "DELETE FROM " + table_name + " WHERE " + where.pop(0)
+        for condition in where:
+            delete_command += " AND " + condition
+        return delete_command
+
+class DatabaseManager(Protocol):
+    """Common interface for database managers.
+    We used a protocol here to avoid having to modify the existing
+    SQLite code (as we would if we used an abstract/ABC class).
+    And the new database manager will "quack" like the other one does.
+    """
+
+    connection: Union[sqlite3.Connection]
+
+    def backup(self): ...
+    def restore(self): ...
+    def disconnect(self): ...
+    def create_table(self, table_name: str, fields: List[str]): ...
+    def drop_table(self, table_name: str): ...
+    def insert(self, table_name: str, columns: List[str], values: List[str]): ...
+    def insertMany(self, table_name: str, data: List[Union[Iterable, Dict]]): ...
+    def delete_where(self, table_name: str, where: List[str]): ...
+    def select_first(self, table_name: str): ...
+    def select_first_where(self, table_name: str, where: List[str]): ...
+    def select_all(self, table_name: str): ...
+    def select_all_where(self, table_name: str, where: List[str]): ...
+    def count(self, table_name: str): ...
+    def drop(self): ...
+
+
+def create_db_manager(db_engine: str, **options) -> DatabaseManager:
+    """
+    Creates a Postgres or SQLite database manager based on the Autosubmit configuration.
+    Note that you must provide the options even if they are optional, in which case
+    you must provide ``options=None``, or you will get a ``KeyError``.
+    Later we might be able to drop the SQLite database manager. So, for the moment,
+    please call the function providing the database engine type, and the arguments
+    for both SQLite and for SQLAlchemy.
+    This means you do not have to do an ``if/else`` in your code, just give
+    this function the engine type, and all the valid options, and it should
+    handle choosing and building the database manager for you. e.g.
+    ```python
+    from autosubmit.database.db_manager import create_db_manager
+    options = {
+        # these are for sqlite
+        'root_path': '/tmp/',
+        'db_name': 'name.db',
+        'db_version': 1,
+        # and these for sqlalchemy -- not very elegant, but this is
+        # to work-effectively-with-legacy-code (as in that famous book).
+        'schema': 'a001'
+    }
+    db_manager = create_db_manager(db_engine='postgres', **options)
+    ```
+    :param db_engine: The database engine type.
+    :return: A ``DatabaseManager``.
+    :raises ValueError: If the database engine type is not valid.
+    :raises KeyError: If the ``options`` dictionary is missing a required parameter for an engine.
+    """
+    # TODO Create SqlAlchemyDbManager and add it to the if/else
+    return cast(DatabaseManager, DbManager(options['root_path'], options['db_name'], options['db_version']))

@@ -264,8 +264,8 @@ def get_job_package_code(expid: str, job_name: str) -> int:
     try:
         basic_conf = BasicConfig()
         basic_conf.read()
-        packages_wrapper = JobPackagePersistence(os.path.join(basic_conf.LOCAL_ROOT_DIR, expid, "pkl"),"job_packages_" + expid).load(wrapper=True)
-        packages_wrapper_plus = JobPackagePersistence(os.path.join(basic_conf.LOCAL_ROOT_DIR, expid, "pkl"),"job_packages_" + expid).load(wrapper=False)
+        packages_wrapper = JobPackagePersistence(expid).load(wrapper=True)
+        packages_wrapper_plus = JobPackagePersistence(expid).load(wrapper=False)
         if packages_wrapper or packages_wrapper_plus:
             packages = packages_wrapper if len(packages_wrapper) > len(packages_wrapper_plus) else packages_wrapper_plus
             for exp, package_name, _job_name in packages:

@@ -15,10 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from random import randrange
-
 import pytest
 from bscearth.utils.date import parse_date, date2str
+from random import randrange
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
@@ -47,7 +46,7 @@ def job_list(autosubmit_config, tmp_path):
         'JOBS': {},
         'PLATFORMS': {}
     })
-    job_list_persistence = JobListPersistenceDb(str(tmp_path), 'db')
+    job_list_persistence = JobListPersistenceDb('a000')
     job_list = JobList(as_conf.expid, as_conf, YAMLParserFactory(), job_list_persistence)
 
     # Basic workflow with SETUP, INI, SIM, POST, CLEAN

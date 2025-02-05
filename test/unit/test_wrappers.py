@@ -15,17 +15,17 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+from collections import OrderedDict
+
 import copy
 import inspect
-import shutil
-import tempfile
-from collections import OrderedDict
-from pathlib import Path
-from random import randrange
-
 import mock
 import pytest
+import shutil
+import tempfile
 from mock import MagicMock
+from pathlib import Path
+from random import randrange
 
 import log.log
 from autosubmit.job.job import Job
@@ -195,8 +195,13 @@ class TestWrappers:
         self.as_conf.experiment_data["PLATFORMS"] = dict()
         self.as_conf.experiment_data["WRAPPERS"] = dict()
         self.temp_directory = tempfile.mkdtemp()
-        self.job_list = JobList(self.experiment_id, self.as_conf, YAMLParserFactory(),
-                                JobListPersistenceDb(self.temp_directory, 'db'))
+        # TODO: The ``MagicMock`` argument is replacing this old call:
+        #       ``JobListPersistenceDb(self.experiment_id)``. The reason is that we need the pytest
+        #       fixtures to mock the DB_PATH/DB_DIR/etc., but the ones we have are function-scoped.
+        #       Once this code gets ported to function-based, instead of class-based, we can use
+        #       those fixtures, removing that mock (we have plenty of other places testing already
+        #       ``JobList``, but less mocking is always better.
+        self.job_list = JobList(self.experiment_id, self.as_conf, YAMLParserFactory(), MagicMock())
 
         self.parser_mock = MagicMock(spec='SafeConfigParser')
 

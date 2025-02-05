@@ -30,7 +30,7 @@ def test_load(mocker):
     mocker.patch('autosubmit.database.db_manager.DbManager.select_all').return_value = [
         ['random-id"', 'vertical-wrapper', 'dummy-job', '02:00']]
     mocker.patch('sqlite3.connect').return_value = mocker.MagicMock()
-    job_package_persistence = JobPackagePersistence('dummy/path', 'dummy/file')
+    job_package_persistence = JobPackagePersistence('dummy/expid')
     assert job_package_persistence.load(wrapper=True) == [['random-id"', 'vertical-wrapper', 'dummy-job', '02:00']]
     mocker.patch('autosubmit.database.db_manager.DbManager.select_all').return_value = [
         ['random-id"', 'vertical-wrapper', 'dummy-job']]
