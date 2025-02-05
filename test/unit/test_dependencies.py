@@ -8,6 +8,7 @@ from copy import deepcopy
 from datetime import datetime
 
 from mock import patch
+from pathlib import Path
 from mock.mock import MagicMock
 
 from autosubmit.autosubmit import Autosubmit
@@ -41,11 +42,12 @@ class FakeBasicConfig:
     LOCAL_TMP_DIR = '/dummy/local/temp/dir'
     LOCAL_PROJ_DIR = '/dummy/local/proj/dir'
     DEFAULT_PLATFORMS_CONF = ''
-    DEFAULT_JOBS_CONF = ''
+    DATABASE_BACKEND = 'sqlite'
 
 
 class TestJobList(unittest.TestCase):
-    def setUp(self):
+    @patch('autosubmit.job.job_list_persistence.BasicConfig', new_callable=FakeBasicConfig)
+    def setUp(self, patched_basic_config):
         self.experiment_id = 'random-id'
         self.as_conf = mock.Mock()
         self.as_conf.experiment_data = dict()
@@ -53,8 +55,17 @@ class TestJobList(unittest.TestCase):
         self.as_conf.jobs_data = self.as_conf.experiment_data["JOBS"]
         self.as_conf.experiment_data["PLATFORMS"] = dict()
         self.temp_directory = tempfile.mkdtemp()
+        patched_basic_config.DB_DIR = self.temp_directory
+        patched_basic_config.DB_FILE = Path(self.temp_directory, 'test-db.db')
+        patched_basic_config.DB_PATH = patched_basic_config.DB_FILE
+        patched_basic_config.LOCAL_PROJ_DIR = self.temp_directory
+        patched_basic_config.LOCAL_ROOT_DIR = self.temp_directory
+        patched_basic_config.LOCAL_TMP_DIR = self.temp_directory
+
+        Path(patched_basic_config.DB_FILE).touch()
+        Path(patched_basic_config.LOCAL_ROOT_DIR, self.experiment_id, 'pkl').mkdir(parents=True, exist_ok=True)
         self.JobList = JobList(self.experiment_id, FakeBasicConfig, YAMLParserFactory(),
-                               JobListPersistenceDb(self.temp_directory, 'db'), self.as_conf)
+                               JobListPersistenceDb(self.experiment_id), self.as_conf)
         self.date_list = ["20020201", "20020202", "20020203", "20020204", "20020205", "20020206", "20020207",
                           "20020208", "20020209", "20020210"]
         self.member_list = ["fc1", "fc2", "fc3", "fc4", "fc5", "fc6", "fc7", "fc8", "fc9", "fc10"]

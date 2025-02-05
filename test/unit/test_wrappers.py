@@ -3,10 +3,11 @@ from operator import attrgetter
 
 import shutil
 import tempfile
+from pathlib import Path
 import inspect
 
 from unittest import TestCase
-from mock import MagicMock
+from mock import MagicMock, patch
 
 import log.log
 from autosubmit.job.job_packager import JobPackager
@@ -20,6 +21,27 @@ from autosubmit.job.job_list_persistence import JobListPersistenceDb
 from autosubmit.job.job_common import Status
 from random import randrange
 from collections import OrderedDict
+
+
+class FakeBasicConfig:
+    def __init__(self):
+        pass
+    def props(self):
+        pr = {}
+        for name in dir(self):
+            value = getattr(self, name)
+            if not name.startswith('__') and not inspect.ismethod(value) and not inspect.isfunction(value):
+                pr[name] = value
+        return pr
+    DB_DIR = '/dummy/db/dir'
+    DB_FILE = '/dummy/db/file'
+    DB_PATH = '/dummy/db/path'
+    LOCAL_ROOT_DIR = '/dummy/local/root/dir'
+    LOCAL_TMP_DIR = '/dummy/local/temp/dir'
+    LOCAL_PROJ_DIR = '/dummy/local/proj/dir'
+    DEFAULT_PLATFORMS_CONF = ''
+    DEFAULT_JOBS_CONF = ''
+    DATABASE_BACKEND = 'sqlite'
 
 
 class TestWrappers(TestCase):
@@ -157,7 +179,8 @@ class TestWrappers(TestCase):
         cls.workflows['running_once']['sections']["s5"]["WALLCLOCK"] = '00:30'
         cls.workflows['running_once']['sections']["s5"]["DEPENDENCIES"] = "s2"
 
-    def setUp(self):
+    @patch('autosubmit.job.job_list_persistence.BasicConfig', new_callable=FakeBasicConfig)
+    def setUp(self, patched_basic_config):
         self.experiment_id = 'random-id'
         self._wrapper_factory = MagicMock()
 
@@ -171,8 +194,19 @@ class TestWrappers(TestCase):
         self.as_conf.experiment_data["PLATFORMS"] = dict()
         self.as_conf.experiment_data["WRAPPERS"] = dict()
         self.temp_directory = tempfile.mkdtemp()
+
+        patched_basic_config.DB_DIR = self.temp_directory
+        patched_basic_config.DB_FILE = Path(self.temp_directory, 'test-db.db')
+        patched_basic_config.DB_PATH = patched_basic_config.DB_FILE
+        patched_basic_config.LOCAL_PROJ_DIR = self.temp_directory
+        patched_basic_config.LOCAL_ROOT_DIR = self.temp_directory
+        patched_basic_config.LOCAL_TMP_DIR = self.temp_directory
+
+        Path(patched_basic_config.DB_FILE).touch()
+        Path(patched_basic_config.LOCAL_ROOT_DIR, self.experiment_id, 'pkl').mkdir(parents=True, exist_ok=True)
+
         self.job_list = JobList(self.experiment_id, self.config, YAMLParserFactory(),
-                                JobListPersistenceDb(self.temp_directory, 'db'),self.as_conf)
+                                JobListPersistenceDb(self.experiment_id),self.as_conf)
 
         self.parser_mock = MagicMock(spec='SafeConfigParser')
 
@@ -1958,23 +1992,3 @@ class TestWrappers(TestCase):
         job.section = section
 
         return job
-
-
-class FakeBasicConfig:
-    def __init__(self):
-        pass
-    def props(self):
-        pr = {}
-        for name in dir(self):
-            value = getattr(self, name)
-            if not name.startswith('__') and not inspect.ismethod(value) and not inspect.isfunction(value):
-                pr[name] = value
-        return pr
-    DB_DIR = '/dummy/db/dir'
-    DB_FILE = '/dummy/db/file'
-    DB_PATH = '/dummy/db/path'
-    LOCAL_ROOT_DIR = '/dummy/local/root/dir'
-    LOCAL_TMP_DIR = '/dummy/local/temp/dir'
-    LOCAL_PROJ_DIR = '/dummy/local/proj/dir'
-    DEFAULT_PLATFORMS_CONF = ''
-    DEFAULT_JOBS_CONF = ''

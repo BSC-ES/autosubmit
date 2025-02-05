@@ -35,10 +35,12 @@ class FakeBasicConfig:
     LOCAL_PROJ_DIR = '/dummy/local/proj/dir'
     DEFAULT_PLATFORMS_CONF = ''
     DEFAULT_JOBS_CONF = ''
+    DATABASE_BACKEND = 'sqlite'
 
 class TestJobPackage(TestCase):
 
-    def setUpWrappers(self,options):
+    @patch('autosubmit.job.job_list_persistence.BasicConfig', new_callable=FakeBasicConfig)
+    def setUpWrappers(self,options,patched_basic_config):
         # reset
         self.as_conf = None
         self.job_package_wrapper = None
@@ -54,8 +56,19 @@ class TestJobPackage(TestCase):
         self.as_conf.experiment_data["PLATFORMS"] = dict()
         self.as_conf.experiment_data["WRAPPERS"] = dict()
         self.temp_directory = tempfile.mkdtemp()
+
+        patched_basic_config.DB_DIR = self.temp_directory
+        patched_basic_config.DB_FILE = Path(self.temp_directory, 'test-db.db')
+        patched_basic_config.DB_PATH = patched_basic_config.DB_FILE
+        patched_basic_config.LOCAL_PROJ_DIR = self.temp_directory
+        patched_basic_config.LOCAL_ROOT_DIR = self.temp_directory
+        patched_basic_config.LOCAL_TMP_DIR = self.temp_directory
+
+        Path(patched_basic_config.DB_FILE).touch()
+        Path(patched_basic_config.LOCAL_ROOT_DIR, self.experiment_id, 'pkl').mkdir(parents=True, exist_ok=True)
+
         self.job_list = JobList(self.experiment_id, self.config, YAMLParserFactory(),
-                                JobListPersistenceDb(self.temp_directory, 'db'), self.as_conf)
+                                JobListPersistenceDb(self.experiment_id), self.as_conf)
         self.parser_mock = MagicMock(spec='SafeConfigParser')
         for job in self.jobs:
             job._init_runtime_parameters()
