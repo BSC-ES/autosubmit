@@ -20,8 +20,9 @@
 from autosubmit.platforms.wrappers.wrapper_builder import WrapperDirector, PythonVerticalWrapperBuilder, \
     PythonHorizontalWrapperBuilder, PythonHorizontalVerticalWrapperBuilder, PythonVerticalHorizontalWrapperBuilder, \
     BashHorizontalWrapperBuilder, BashVerticalWrapperBuilder, SrunHorizontalWrapperBuilder, \
-    SrunVerticalHorizontalWrapperBuilder, SrunVerticalWrapperBuilder, SrunHorizontalVerticalWrapperbuilder
+    SrunVerticalHorizontalWrapperBuilder, SrunVerticalWrapperBuilder, SrunHorizontalVerticalWrapperBuilder
 import re
+
 
 class WrapperFactory(object):
 
@@ -165,7 +166,7 @@ class LocalWrapperFactory(WrapperFactory):
 
     def hybrid_wrapper_horizontal_vertical(self, **kwargs):
         if kwargs["method"].upper() == 'SRUN':
-            return SrunHorizontalVerticalWrapperbuilder(**kwargs)
+            return SrunHorizontalVerticalWrapperBuilder(**kwargs)
         else:
             return PythonHorizontalVerticalWrapperBuilder(**kwargs)
 
@@ -275,7 +276,7 @@ class SlurmWrapperFactory(WrapperFactory):
 
     def hybrid_wrapper_horizontal_vertical(self, **kwargs):
         if kwargs["method"].upper() == 'SRUN':
-            return SrunHorizontalVerticalWrapperbuilder(**kwargs)
+            return SrunHorizontalVerticalWrapperBuilder(**kwargs)
         else:
             return PythonHorizontalVerticalWrapperBuilder(**kwargs)
 
