@@ -125,4 +125,4 @@ package-data = { "autosubmit" = [
 include-package-data = true
 
 [project.entry-points.console_scripts]
-autosubmit = "autosubmit.scripts.autosubmit:main"
+autosubmit = "autosubmit.scripts.bin_autosubmit:main"
