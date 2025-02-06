@@ -31,13 +31,7 @@ import math
 import networkx as nx
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
-from time import localtime, strftime, mktime
-
-import math
-import networkx as nx
-from bscearth.utils.date import date2str, parse_date
-from networkx import DiGraph
-from time import localtime, mktime, time
+from time import localtime, mktime, strftime, time
 
 import autosubmit.database.db_structure as DbStructure
 from autosubmit.helpers.data_transfer import JobRow
@@ -3236,7 +3230,7 @@ class JobList(object):
                 else:
                     results.append("Cannot find root.")
         except Exception:
-            return f'Job List object'
+            return 'Job List object'
         return "\n".join(results)
 
     def _recursion_print(self, job, level, visited=[], statusChange=None, nocolor=False):

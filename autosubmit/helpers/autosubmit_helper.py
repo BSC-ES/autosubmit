@@ -68,7 +68,7 @@ def handle_start_time(start_time):
             sleep(1)
 
 
-def handle_start_after(start_after, expid, BasicConfig):
+def handle_start_after(start_after, expid, basic_config):
     # type: (str, str, BasicConfig) -> None
     """ Wait until the start_after experiment has finished."""
     if start_after:
@@ -81,8 +81,8 @@ def handle_start_after(start_after, expid, BasicConfig):
         if not check_experiment_exists(start_after):
             return None
         # Historical Database: We use the historical database to retrieve the current progress data of the supplied expid (start_after)
-        exp_history = ExperimentHistory(start_after, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                        historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
+        exp_history = ExperimentHistory(start_after, jobdata_dir_path=basic_config.JOBDATA_DIR,
+                                        historiclog_dir_path=basic_config.HISTORICAL_LOG_DIR)
         if exp_history.is_header_ready() is False:
             Log.critical(
                 "Experiment {0} is running a database version which is not supported by the completion trigger function. An updated DB version is needed.".format(
@@ -117,8 +117,8 @@ def get_allowed_members(run_members, as_conf):
         rmember = [rmember for rmember in allowed_members if rmember not in as_conf.get_member_list()]
         if len(rmember) > 0:
             raise AutosubmitCritical(
-                "Some of the members ({0}) in the list of allowed members you supplied do not exist in the current list " +
-                "of members specified in the conf files.\nCurrent list of members: {1}".format(str(rmember),
+                ("Some of the members ({0}) in the list of allowed members you supplied do not exist in the current list " +
+                "of members specified in the conf files.\nCurrent list of members: {1}").format(str(rmember),
                                                                                                str(as_conf.get_member_list())))
         if len(allowed_members) == 0:
             raise AutosubmitCritical("Not a valid -rom --run_only_members input: {0}".format(str(run_members)))

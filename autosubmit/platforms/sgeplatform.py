@@ -99,7 +99,7 @@ class SgePlatform(ParamikoPlatform):
         return output.split(' ')[2]
 
     def jobs_in_queue(self):
-        output = subprocess.check_output('qstat -xml'.format(self.host), shell=True)
+        output = subprocess.check_output('qstat -xml', shell=True)
         dom = parseString(output)
         jobs_xml = dom.getElementsByTagName("JB_job_number")
         return [int(element.firstChild.nodeValue) for element in jobs_xml]

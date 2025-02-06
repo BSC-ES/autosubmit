@@ -228,8 +228,7 @@ class AutosubmitGit:
                         os.chmod(os.path.join(root_dir, f_dir), 0o750)
                     for f_file in files:
                         os.chmod(os.path.join(root_dir, f_file), 0o750)
-                command_githook += " git config core.hooksPath ./.githooks ; ".format(
-                    git_path)
+                command_githook += " git config core.hooksPath ./.githooks ; "
             if git_project_commit:
                 command_1 += "git checkout {0}; ".format(git_project_commit)
             else:
@@ -243,7 +242,7 @@ class AutosubmitGit:
                     else:
                         command_1 += " git submodule update --init --recursive; "
                 else:
-                    command_1 += " git submodule init; ".format(project_destination)
+                    command_1 += " git submodule init; "
                     index_submodule = 0
                     for submodule in git_project_submodules:
                         if max_depth > 0:
