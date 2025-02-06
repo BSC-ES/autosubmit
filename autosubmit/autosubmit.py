@@ -2105,6 +2105,15 @@ class Autosubmit:
             job_list.update_log_status(job, as_conf, new_run)
 
     @staticmethod
+    def refresh_log_recovery_process(platforms: List[Platform], as_conf: AutosubmitConfig) -> None:
+        """Relaunch the log recovery processes for each platform if necessary."""
+        for p in platforms:  # Send keep_alive signal
+            if not p.log_recovery_process or not p.log_recovery_process.is_alive():
+                p.clean_log_recovery_process()
+                p.spawn_log_retrieval_process(as_conf)
+            p.work_event.set()
+
+    @staticmethod
     def run_experiment(expid, notransitive=False, start_time=None, start_after=None, run_only_members=None, profile=False):
         """
         Runs and experiment (submitting all the jobs properly and repeating its execution in case of failure).
@@ -2164,8 +2173,7 @@ class Autosubmit:
                 recovery_retrials = 0
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
                 while job_list.get_active():
-                    for platform in platforms_to_test:  # Send keep_alive signal
-                        platform.work_event.set()
+                    Autosubmit.refresh_log_recovery_process(platforms_to_test, as_conf)
                     for job in [job for job in job_list.get_job_list() if job.status == Status.READY]:
                         job.update_parameters(as_conf, {})
                     did_run = True

@@ -3,6 +3,8 @@ import pytest
 from pathlib import Path
 import os
 import pwd
+
+from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job_common import Status
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmit.job.job import Job
@@ -158,3 +160,19 @@ def test_log_recovery_recover_log(prepare_test, local, mocker, as_conf):
     assert local.log_recovery_process.is_alive() is False
     assert Path(f"{prepare_test.strpath}/scratch/LOG_t000/t000.cmd.out.moved").exists()
     assert Path(f"{prepare_test.strpath}/scratch/LOG_t000/t000.cmd.err.moved").exists()
+
+
+def test_refresh_log_retry_process(prepare_test, local, as_conf, mocker):
+    mocker.patch('autosubmit.platforms.platform.max', return_value=0)
+    local.keep_alive_timeout = 20
+    platforms = [local]
+    Autosubmit.refresh_log_recovery_process(platforms, as_conf)
+    assert local.log_recovery_process.is_alive()
+    assert local.work_event.is_set()
+    local.cleanup_event.set()
+    local.log_recovery_process.join(30)
+    assert local.log_recovery_process.is_alive() is False
+    Autosubmit.refresh_log_recovery_process(platforms, as_conf)
+    assert local.log_recovery_process.is_alive()
+    local.send_cleanup_signal()  # this is called by atexit function
+    assert local.log_recovery_process.is_alive() is False
