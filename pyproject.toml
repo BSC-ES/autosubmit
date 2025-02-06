@@ -30,15 +30,17 @@ authors = [
   { name="The Autosubmit Team - Models and Workflows Team (MWT) - Barcelona Supercomputing Center (BSC)", email="support-autosubmit@bsc.es" },
 ]
 maintainers = [
-  { name="The Autosubmit Team - Models and Worklows Team (MWT) - Barcelona Supercomputing Center (BSC)", email="support-autosubmit@bsc.es" },
+  { name="The Autosubmit Team - Models and Workflows Team (MWT) - Barcelona Supercomputing Center (BSC)", email="support-autosubmit@bsc.es" },
 ]
 
 keywords = ["climate", "weather", "workflow", "HPC"]
-license = {text = "GNU GPL v3"} 
+license = {text = "GNU GPLv3"} 
 
 classifiers = [
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: GNU General Public License (GPL)",
     "Operating System :: POSIX :: Linux"
 ]
@@ -122,6 +124,5 @@ package-data = { "autosubmit" = [
 ] }
 include-package-data = true
 
-[project.scripts]
-autosubmit = "bin.autosubmit:main"
-
+[project.entry-points.console_scripts]
+autosubmit = "autosubmit.scripts.autosubmit:main"

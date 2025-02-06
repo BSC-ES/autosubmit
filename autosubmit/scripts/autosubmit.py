@@ -18,12 +18,8 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Script for handling experiment monitoring"""
-import os
 import sys
 
-script_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
-sys.path.append(script_dir)
-sys.path.append(os.path.normpath(os.path.join(script_dir, os.pardir)))
 # noinspection PyUnresolvedReferences
 from log.log import Log, AutosubmitCritical, AutosubmitError
 from autosubmit import delete_lock_file, exit_from_error
