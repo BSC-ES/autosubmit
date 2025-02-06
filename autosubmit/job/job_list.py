@@ -31,7 +31,7 @@ import math
 import networkx as nx
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
-from time import localtime, mktime, strftime, time
+from time import localtime, mktime, strftime
 
 import autosubmit.database.db_structure as DbStructure
 from autosubmit.helpers.data_transfer import JobRow
@@ -42,7 +42,6 @@ from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency, _get_submitter
 from autosubmit.job.job_utils import transitive_reduction
-from autosubmit.platforms.platform import Platform
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import AutosubmitCritical, AutosubmitError, Log
@@ -165,7 +164,7 @@ class JobList(object):
                 return True
         return False
 
-    def generate(self, as_conf, date_list, member_list, num_chunks, chunk_ini, parameters, date_format,
+    def generate(self, as_conf: AutosubmitConfig, date_list, member_list, num_chunks, chunk_ini, parameters, date_format,
                  default_retrials,
                  default_job_type, wrapper_jobs=dict(), new=True, run_only_members=[], show_log=True, monitor=False,
                  force=False, create = False):
@@ -2660,7 +2659,7 @@ class JobList(object):
                     non_completed_parents_current.append(parent[0])
         return non_completed_parents_current, completed_parents
 
-    def update_log_status(self, job, as_conf, new_run=False):
+    def update_log_status(self, job, as_conf: AutosubmitConfig, new_run=False):
         """
         Updates the log err and log out.
         """
@@ -2701,7 +2700,7 @@ class JobList(object):
                     return log_recovered
         return None
 
-    def update_list(self, as_conf, store_change=True, fromSetStatus=False, submitter=None, first_time=False):
+    def update_list(self, as_conf: AutosubmitConfig, store_change=True, fromSetStatus=False, submitter=None, first_time=False):
         # type: (AutosubmitConfig, bool, bool, object, bool) -> bool
         """
         Updates job list, resetting failed jobs and changing to READY all WAITING jobs with all parents COMPLETED
@@ -2998,7 +2997,7 @@ class JobList(object):
             Log.warning(str(exp))
 
     @threaded
-    def check_scripts_threaded(self, as_conf):
+    def check_scripts_threaded(self, as_conf: AutosubmitConfig):
         """
         When we have created the scripts, all parameters should have been substituted.
         %PARAMETER% handlers not allowed (thread test)

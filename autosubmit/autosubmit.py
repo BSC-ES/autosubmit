@@ -20,13 +20,12 @@ import platform
 import requests
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-import threading
 from bscearth.utils.date import date2str
 from configparser import ConfigParser
 from distutils.util import strtobool
 from pathlib import Path
 from ruamel.yaml import YAML
-from typing import Dict, Set, Tuple, Union, Any
+from typing import Dict, Tuple, Union, Any
 
 from autosubmit.database.db_common import update_experiment_descrip_version
 from autosubmit.helpers.parameters import PARAMETERS
@@ -54,7 +53,6 @@ from .monitor.monitor import Monitor
 from .notifications.mail_notifier import MailNotifier
 from .notifications.notifier import Notifier
 from .platforms.paramiko_submitter import ParamikoSubmitter
-from .platforms.platform import Platform
 from .migrate.migrate import Migrate
 
 from time import sleep
@@ -3171,7 +3169,6 @@ class Autosubmit:
             tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
             if folder_path is not None and len(str(folder_path)) > 0:
                 tmp_path = folder_path
-            import platform
             # Gather experiment info
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             try:

@@ -33,7 +33,7 @@ import os
 import re
 import textwrap
 import time
-from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, subs_dates, add_time
+from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, subs_dates
 from functools import reduce
 from threading import Thread
 from time import sleep

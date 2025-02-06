@@ -1,6 +1,3 @@
-import os
-
-
 def generate_experiment_cmd(hpc, description):
     return 'autosubmit expid -H ' + hpc + ' -d ' + description
 

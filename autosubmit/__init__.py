@@ -1,6 +1,5 @@
 import traceback
 from contextlib import suppress
-from os import _exit  # type: ignore
 from pathlib import Path
 from typing import Union
 
@@ -32,9 +31,6 @@ def exit_from_error(e: BaseException) -> int:
 
     Exceptions raised by ``porta-locker` library print a message informing the user
     about the locked experiment. Other exceptions raised cause the lock to be deleted.
-
-    After printing the exception, this function calls ``os._exit(1)``, which will
-    forcefully exit the executable running.
 
     :param e: The exception being raised.
     :type e: BaseException

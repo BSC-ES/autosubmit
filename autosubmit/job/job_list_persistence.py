@@ -21,7 +21,7 @@ import pickle
 from sys import setrecursionlimit
 import shutil
 from autosubmit.database.db_manager import DbManager
-from log.log import AutosubmitCritical, Log
+from log.log import Log
 from contextlib import suppress
 
 

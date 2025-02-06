@@ -43,10 +43,10 @@ class ParamikoSubmitter(Submitter):
     def __init__(self):
         self.platforms = None
 
-    def load_platforms_migrate(self, asconf, retries=5):
+    def load_platforms_migrate(self, asconf: AutosubmitConfig, retries=5):
         pass  # Add all info related to migrate
 
-    def load_local_platform(self, asconf):
+    def load_local_platform(self, asconf: AutosubmitConfig):
         platforms = dict()
         # Build Local Platform Object
         local_platform = LocalPlatform(asconf.expid, 'local', BasicConfig().props())
@@ -67,7 +67,7 @@ class ParamikoSubmitter(Submitter):
         self.platforms = platforms
 
 
-    def load_platforms(self, asconf, retries=5, auth_password = None, local_auth_password = None):
+    def load_platforms(self, asconf: AutosubmitConfig, retries=5, auth_password = None, local_auth_password = None):
         """
         Create all the platforms object that will be used by the experiment
 

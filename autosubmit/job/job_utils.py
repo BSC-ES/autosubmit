@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-import copy
-
 import math
 
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from log.log import Log, AutosubmitCritical
-from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates, add_hours
+from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates
 
 # Copyright 2017-2020 Earth Sciences Department, BSC-CNS
 

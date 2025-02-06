@@ -1,8 +1,4 @@
 from unittest import TestCase
-
-import os
-from mock import Mock
-from mock import patch
 from autosubmit.database.db_manager import DbManager
 
 

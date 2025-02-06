@@ -25,7 +25,7 @@ class Submitter:
     """
     Class to manage the experiments platform
     """
-    def load_platforms(self, asconf, retries=5, auth_password=None):
+    def load_platforms(self, asconf: AutosubmitConfig, retries=5, auth_password=None):
         """
         Create all the platforms object that will be used by the experiment
 
