@@ -165,7 +165,6 @@ def test_log_recovery_recover_log(prepare_test, local, mocker, as_conf):
 def test_refresh_log_retry_process(prepare_test, local, as_conf, mocker):
     mocker.patch('autosubmit.platforms.platform.max', return_value=0)
     local.keep_alive_timeout = 20
-    mocker.patch('autosubmit.job.job.Job.write_stats')
     platforms = [local]
     Autosubmit.refresh_log_recovery_process(platforms, as_conf)
     assert local.log_recovery_process.is_alive()

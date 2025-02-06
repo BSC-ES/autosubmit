@@ -146,7 +146,8 @@ class Platform(object):
         cls.worker_events.append(event_worker)
 
     @classmethod
-    def remove_workers(cls, event_worker):
+    def remove_workers(cls, event_worker: Event) -> None:
+        """Remove the given even worker from the list of workers in this class."""
         if event_worker in cls.worker_events:
             cls.worker_events.remove(event_worker)
 
@@ -876,7 +877,8 @@ class Platform(object):
         """
         self.cleanup_event.set()  # Indicates to old child ( if reachable ) to finish.
         if self.log_recovery_process:
-            self.log_recovery_process.join(timeout=60)  # Waits for old child ( if reachable ) to finish. Timeout in case of it being blocked.
+            # Waits for old child ( if reachable ) to finish. Timeout in case of it being blocked.
+            self.log_recovery_process.join(timeout=60)
         # Resets everything related to the log recovery process.
         self.recovery_queue = UniqueQueue()
         self.log_retrieval_process_active = False

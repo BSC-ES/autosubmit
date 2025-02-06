@@ -2117,7 +2117,8 @@ class Autosubmit:
             job_list.update_log_status(job, as_conf, new_run)
 
     @staticmethod
-    def refresh_log_recovery_process(platforms, as_conf):
+    def refresh_log_recovery_process(platforms: List[Platform], as_conf: AutosubmitConfig) -> None:
+        """Relaunch the log recovery processes for each platform if necessary."""
         for p in platforms:  # Send keep_alive signal
             if not p.log_recovery_process or not p.log_recovery_process.is_alive():
                 p.clean_log_recovery_process()
