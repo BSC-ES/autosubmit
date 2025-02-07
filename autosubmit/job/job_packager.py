@@ -781,7 +781,7 @@ class JobPackager(object):
                 for job in current_package[level]:
                     job.level = level
         return JobPackageHorizontalVertical(current_package, max_procs, total_wallclock,
-                                            jobs_resources=jobs_resources, configuration=self._as_config, wrapper_section=self.current_wrapper_section)
+                                            jobs_resources=jobs_resources, configuration=self._as_config, wrapper_section=self.current_wrapper_section, method=wrapper_info[2])
 
     def _build_vertical_horizontal_package(self, horizontal_packager, jobs_resources, wrapper_info):
         total_wallclock = '00:00'
