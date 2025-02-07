@@ -5,7 +5,6 @@ from time import sleep
 import sys
 import socket
 import os
-import traceback
 from typing import List, TYPE_CHECKING, Union
 import paramiko
 import datetime
@@ -1503,7 +1502,7 @@ class ParamikoPlatform(Platform):
         try:
             return self._ftpChannel.stat(src).st_size
         except Exception:
-            Log.debug(traceback.format_exc())
+            Log.debug(f"Error getting file size for {src}")
             return None
 
     def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
@@ -1516,7 +1515,7 @@ class ParamikoPlatform(Platform):
             with self._ftpChannel.file(src, "r") as file:
                 return file.read(size=max_size)
         except Exception:
-            Log.debug(traceback.format_exc())
+            Log.debug(f"Error reading file {src}")
             return None
 
 
