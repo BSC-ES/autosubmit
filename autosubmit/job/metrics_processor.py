@@ -3,9 +3,9 @@ from datetime import datetime, timezone
 from enum import Enum
 import json
 import copy
+import locale
 from pathlib import Path
 import sqlite3
-import traceback
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.basicconfig import BasicConfig
@@ -152,7 +152,6 @@ class UserMetricProcessor:
                 self.as_conf.normalize_parameters_keys(metric) for metric in raw_metrics
             ]
         except Exception:
-            Log.debug(traceback.format_exc())
             raise ValueError("Invalid or missing metrics section")
 
         metrics_specs: List[MetricSpec] = []
@@ -224,9 +223,10 @@ class UserMetricProcessor:
             try:
                 content = self.job.platform.read_file(path, max_size=MAX_FILE_SIZE)
                 Log.debug(f"Read file {path}")
-                content = content.decode(errors="replace").strip()
+                content = content.decode(
+                    encoding=locale.getlocale()[1], errors="replace"
+                ).strip()
             except Exception as exc:
-                Log.debug(traceback.format_exc())
                 Log.warning(f"Error reading metric file at {path}: {str(exc)}")
                 continue
 
