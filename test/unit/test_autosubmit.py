@@ -14,8 +14,6 @@ def test_as_conf_default_values(tmp_path, autosubmit_config):
     ini_file.mkdir(parents=True, exist_ok=True)
     ini_file = ini_file / 'jobs_a000.yml'
 
-    print(f'BasicConfig: {BasicConfig.LOCAL_ROOT_DIR}')
-    print(f'ini_file: {ini_file}')
     with open(ini_file, 'w+') as f:
         f.write(dedent('''\
                 DEFAULT:
