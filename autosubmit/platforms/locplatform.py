@@ -19,7 +19,6 @@
 import locale
 import os
 from pathlib import Path
-import traceback
 from typing import Union
 from xml.dom.minidom import parseString
 import subprocess
@@ -337,7 +336,7 @@ class LocalPlatform(ParamikoPlatform):
         try:
             return Path(src).stat().st_size
         except Exception:
-            Log.debug(traceback.format_exc())
+            Log.debug(f"Error getting file size for {src}")
             return None
 
     def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
@@ -350,5 +349,5 @@ class LocalPlatform(ParamikoPlatform):
             with open(src, "rb") as f:
                 return f.read(max_size)
         except Exception:
-            Log.debug(traceback.format_exc())
+            Log.debug(f"Error reading file {src}")
             return None
