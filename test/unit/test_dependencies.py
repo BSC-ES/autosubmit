@@ -403,7 +403,6 @@ class TestJobList(unittest.TestCase):
         job.splits = 1
         job.max_checkpoint_step = 0
         special_conditions = {"STATUS": "RUNNING", "FROM_STEP": "2"}
-        only_marked_status = False
         filters_to_apply = {"DATES_TO": "all", "MEMBERS_TO": "all", "CHUNKS_TO": "all", "SPLITS_TO": "all"}
         parent = Job("parent", 1, Status.READY, 1)
         parent.section = "parent_one"
@@ -426,7 +425,7 @@ class TestJobList(unittest.TestCase):
         self.assertEqual(len(job.edge_info.get("RUNNING", "")), 1)
 
         self.assertEqual(str(job_list.jobs_edges.get("RUNNING", ())), str({job}))
-        only_marked_status = False
+        # only_marked_status = False
         parent2 = Job("parent2", 1, Status.READY, 1)
         parent2.section = "parent_two"
         parent2.date = datetime.strptime("20200128", "%Y%m%d")

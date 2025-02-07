@@ -133,7 +133,7 @@ class TestDicJobs(TestCase):
         priority = 999
         frequency = 123
         splits = 0
-        excluded_list_m = []
+        # excluded_list_m = []
         running = "member"
         options = {
             'FREQUENCY': frequency,
@@ -256,8 +256,6 @@ class TestDicJobs(TestCase):
         # arrange
         mock_section = Mock()
         mock_section.name = 'fake-section'
-        priority = 999
-        frequency = 1
         self.dictionary.build_job = Mock(return_value=mock_section)
 
     def test_dic_creates_right_jobs_by_chunk_with_frequency_3(self):
@@ -301,7 +299,6 @@ class TestDicJobs(TestCase):
         mock_section.name = 'fake-section'
         priority = 999
         frequency = 1
-        created_job = 'created_job'
         self.dictionary.build_job = Mock(wraps=self.dictionary.build_job)
 
         # act

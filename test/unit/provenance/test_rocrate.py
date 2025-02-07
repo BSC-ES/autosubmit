@@ -426,11 +426,11 @@ class TestRoCrate(TestCase):
                     'OBJ': object()
                 }
             }
-            rocrate_json = {
-                'INPUTS': [
-                    'APP'
-                ]
-            }
+            # rocrate_json = {
+            #     'INPUTS': [
+            #         'APP'
+            #     ]
+            # }
 
             mocked_get_autosubmit_version.return_value = '4.0.0b0'
             mocked_get_experiment_descrip.return_value = [

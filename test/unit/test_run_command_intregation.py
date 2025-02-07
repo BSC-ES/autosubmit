@@ -389,7 +389,7 @@ def init_run(run_tmpdir, jobs_data):
 def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries, final_status):
     log_dir = init_run(run_tmpdir, jobs_data)
     # Run the experiment
-    exit_code = Autosubmit.run_experiment(expid='t000')
+    Autosubmit.run_experiment(expid='t000')
 
     # Check and display results
     db_check_list = check_db_fields(run_tmpdir, expected_db_entries, final_status)
