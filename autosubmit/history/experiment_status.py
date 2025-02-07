@@ -30,7 +30,7 @@ class ExperimentStatus:
     BasicConfig.read()
     try:
       self.manager = ExperimentStatusDbManager(self.expid, BasicConfig.DB_DIR, BasicConfig.DB_FILE, local_root_dir_path=BasicConfig.LOCAL_ROOT_DIR)
-    except Exception as exp:
+    except Exception:
       message = "Error while trying to update {0} in experiment_status.".format(str(self.expid))      
       Logging(self.expid, BasicConfig.HISTORICAL_LOG_DIR).log(message, traceback.format_exc())
       self.manager = None

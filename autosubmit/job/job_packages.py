@@ -197,7 +197,7 @@ class JobPackageBase(object):
                 self._common_script = self._create_common_script()
         except AutosubmitCritical:
             raise
-        except BaseException as e:
+        except BaseException:
             raise
         try:
             if not only_generate:
@@ -539,7 +539,7 @@ class JobPackageThread(JobPackageBase):
                 self._jobs_resources[job.section]['TASKS'] = job.tasks
             try:
                 jobs_scripts.append(self._job_scripts[job.name])
-            except BaseException as e:
+            except BaseException:
                 pass
         return jobs_scripts
     @property

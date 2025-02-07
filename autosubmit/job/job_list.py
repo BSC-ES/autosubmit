@@ -1998,7 +1998,7 @@ class JobList(object):
                 self.jobs_to_run_first = self.get_job_related(select_jobs_by_name=select_jobs_by_name,
                                                               select_all_jobs_by_section=select_all_jobs_by_section,
                                                               filter_jobs_by_section=filter_jobs_by_section)
-            except Exception as e:
+            except Exception:
                 raise AutosubmitCritical(
                     "Check the {0} format.\nFirst filter is optional ends with '&'.\nSecond filter ends with ';'.\nThird filter must contain '['. ".format(
                         unparsed_jobs))
@@ -2008,7 +2008,7 @@ class JobList(object):
                                                            select_all_jobs_by_section=select_all_jobs_by_section,
                                                            filter_jobs_by_section=filter_jobs_by_section,
                                                            two_step_start=two_step_start)
-            except Exception as e:
+            except Exception:
                 raise AutosubmitCritical(
                     "Check the {0} format.\nFirst filter is optional ends with '&'.\nSecond filter ends with ';'.\nThird filter must contain '['. ".format(
                         unparsed_jobs))
@@ -2502,7 +2502,7 @@ class JobList(object):
                                        self.graph)
             except BaseException as e:
                 raise AutosubmitError(str(e), 6040, "Failure while saving the job_list")
-        except AutosubmitError as e:
+        except AutosubmitError:
             raise
         except BaseException as e:
             raise AutosubmitError(str(e), 6040, "Unknown failure while saving the job_list")
@@ -2956,7 +2956,7 @@ class JobList(object):
                                         if job.status == Status.QUEUING:
                                             job.platform.send_command(job.platform.cancel_cmd + " " + str(job.id),
                                                                       ignore_log=True)
-                                    except Exception as e:
+                                    except Exception:
                                         pass  # jobid finished already
                                     job.status = Status.SKIPPED
                                     save = True
@@ -2970,7 +2970,7 @@ class JobList(object):
                                         if job.status == Status.QUEUING:
                                             job.platform.send_command(job.platform.cancel_cmd + " " + str(job.id),
                                                                       ignore_log=True)
-                                    except Exception as e:
+                                    except Exception:
                                         pass  # job_id finished already
                                     job.status = Status.SKIPPED
                                     save = True
@@ -3306,13 +3306,13 @@ class JobList(object):
         try:
             packages = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
                                              "job_packages_" + expid).load(wrapper=False)
-        except Exception as ex:
+        except Exception:
             print("Wrapper table not found, trying packages.")
             packages = None
             try:
                 packages = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
                                                  "job_packages_" + expid).load(wrapper=True)
-            except Exception as exp2:
+            except Exception:
                 packages = None
                 pass
             pass
@@ -3345,7 +3345,7 @@ class JobList(object):
                         package_to_symbol[list_packages[i]] = 'square'
                     else:
                         package_to_symbol[list_packages[i]] = 'hexagon'
-            except Exception as ex:
+            except Exception:
                 print((traceback.format_exc()))
 
         return job_to_package, package_to_jobs, package_to_package_id, package_to_symbol
@@ -3461,7 +3461,7 @@ class JobList(object):
                     start_time = 0
                     finish_time = 0
 
-        except Exception as exp:
+        except Exception:
             print((traceback.format_exc()))
             return
 
@@ -3547,7 +3547,7 @@ class JobList(object):
                         values) > 1 else submit_time
                     finish_time = parse_date(values[2]) if len(
                         values) > 2 else start_time
-            except Exception as exp:
+            except Exception:
                 start_time = now
                 finish_time = now
                 # NA if reading fails

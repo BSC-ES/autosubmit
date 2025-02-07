@@ -571,7 +571,7 @@ class DicJobs:
             try:
                 jobs_flattened = [job for jobs_to_flatten in jobs for job in jobs_to_flatten]
                 jobs = jobs_flattened
-            except TypeError as e:
+            except TypeError:
                 pass
         if sort_string:
             # I want to have first chunks then member then date to easily filter later on

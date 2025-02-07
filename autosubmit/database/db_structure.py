@@ -76,7 +76,7 @@ def create_connection(db_file):
     try:
         conn = sqlite3.connect(db_file)
         return conn
-    except Exception as e:
+    except Exception:
         return None
 
 

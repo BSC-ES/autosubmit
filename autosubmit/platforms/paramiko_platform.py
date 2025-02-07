@@ -165,7 +165,7 @@ class ParamikoPlatform(Platform):
             while self.connected is False and retry < retries:
                 try:
                     self.connect(as_conf,True)
-                except Exception as e:
+                except Exception:
                     pass
                 retry += 1
             if not self.connected:
@@ -174,9 +174,9 @@ class ParamikoPlatform(Platform):
                 raise AutosubmitCritical(
                     'Experiment cant no continue without unexpected behaviour, Stopping Autosubmit', 7050, trace)
 
-        except AutosubmitCritical as e:
+        except AutosubmitCritical:
             raise
-        except SSHException as e:
+        except SSHException:
             raise
         except Exception as e:
             raise AutosubmitCritical(
@@ -266,7 +266,7 @@ class ParamikoPlatform(Platform):
                         try:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, sock=self._proxy, timeout=60 , banner_timeout=60)
-                        except Exception as e:
+                        except Exception:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, sock=self._proxy, timeout=60,
                                               banner_timeout=60, disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
@@ -274,7 +274,7 @@ class ParamikoPlatform(Platform):
                         try:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, timeout=60 , banner_timeout=60)
-                        except Exception as e:
+                        except Exception:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, timeout=60 , banner_timeout=60,disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
                 self.transport = self._ssh.get_transport()
@@ -291,7 +291,7 @@ class ParamikoPlatform(Platform):
                 self.transport.start_client()
                 try:
                     self.transport.auth_interactive(self.user, self.interactive_auth_handler)
-                except Exception as e:
+                except Exception:
                     Log.printlog("2FA authentication failed",7000)
                     raise
                 if self.transport.is_authenticated():
@@ -385,7 +385,7 @@ class ParamikoPlatform(Platform):
         except IOError as e:
             raise AutosubmitError('Can not send file {0} to {1}'.format(os.path.join(
                 self.tmp_path, filename), os.path.join(self.get_files_path(), filename)), 6004, str(e))
-        except BaseException as e:
+        except BaseException:
             raise AutosubmitError(
                 'Send file failed. Connection seems to no be active', 6004)
 
@@ -455,7 +455,7 @@ class ParamikoPlatform(Platform):
             self._ftpChannel.remove(os.path.join(
                 self.get_files_path(), filename))
             return True
-        except IOError as e:
+        except IOError:
             return False
         except BaseException as e:
             Log.error('Could not remove file {0} due a wrong configuration'.format(
@@ -958,7 +958,7 @@ class ParamikoPlatform(Platform):
                             channel.close()
                             counterpart.close()
                             del self.channels[fd]
-            except Exception as e:
+            except Exception:
                 pass
 
 
@@ -1151,9 +1151,9 @@ class ParamikoPlatform(Platform):
         except AttributeError as e:
             raise AutosubmitError(
                 'Session not active: {0}'.format(str(e)), 6005)
-        except AutosubmitCritical as e:
+        except AutosubmitCritical:
             raise
-        except AutosubmitError as e:
+        except AutosubmitError:
             raise
         except IOError as e:
             raise AutosubmitError(str(e),6016)
@@ -1413,7 +1413,7 @@ class ParamikoPlatform(Platform):
                     return True
             else:
                 return False
-        except Exception as e:
+        except Exception:
             return False
     
     def check_remote_permissions(self):
@@ -1422,12 +1422,12 @@ class ParamikoPlatform(Platform):
             try:
                 self._ftpChannel.mkdir(path)
                 self._ftpChannel.rmdir(path)
-            except IOError as e:
+            except IOError:
                 self._ftpChannel.rmdir(path)
                 self._ftpChannel.mkdir(path)
                 self._ftpChannel.rmdir(path)
             return True
-        except Exception as e:
+        except Exception:
             return False
     
     def check_remote_log_dir(self):
