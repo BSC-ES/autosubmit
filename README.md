@@ -28,7 +28,7 @@ How to cite Autosubmit:
 AUTOSUBMIT IS MAINTENED BY US IN THE FOLLOWING MACHINES
 =======================================================
 
-- bscesautosubmit{01/02}.bsc.es (Autosubmit 3)
+- bscesautosubmit{01/02}.bsc.es (Autosubmit 3, BSC machine)
 - bsceshub02.bsc.es (Autosubmit 3 and Autosubmit 4, BSC machine)
 - climate-dt (Autosubmit 4, CSC machine)
 
