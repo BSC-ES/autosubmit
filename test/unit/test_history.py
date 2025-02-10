@@ -298,7 +298,7 @@ class TestLogging(unittest.TestCase):
     message = "No Message"
     try:
       raise Exception("Setup test exception")
-    except Exception as e:
+    except Exception:
       message = traceback.format_exc()
     self.log = Logging("tt00")
     self.exp_message = "Exception message"

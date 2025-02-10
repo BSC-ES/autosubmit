@@ -358,7 +358,7 @@ def parse_output_number(string_number):
             number = string_number
         try:
             number = float(number) * multiplier
-        except Exception as exp:
+        except Exception:
             number = 0.0
             pass
     return number
@@ -396,6 +396,5 @@ def increase_wallclock_by_chunk(current, increase, chunk):
                 minutes = 0
             return "%02d:%02d" % (hours, minutes)
         return current
-    except Exception as exp:
-        # print(exp)
+    except Exception:
         return current

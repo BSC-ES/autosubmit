@@ -60,7 +60,7 @@ class JobData(object):
       try:
           if extra_data != "":
             self.extra_data_parsed = loads(extra_data)
-      except Exception as exp:
+      except Exception:
           self.extra_data_parsed = {} # Fail fast
       self.extra_data = extra_data
       self.nnodes = nnodes

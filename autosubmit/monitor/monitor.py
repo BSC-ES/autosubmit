@@ -443,15 +443,15 @@ class Monitor:
                     if sys.platform != "linux":
                         try:
                             subprocess.check_output(["open", output_file])
-                        except Exception as e:
+                        except Exception:
                             try:
                                 subprocess.check_output(["xdg-open", output_file])
-                            except Exception as e:
+                            except Exception:
                                 subprocess.check_output(["mimeopen", output_file])
                     else:
                         try:
                             subprocess.check_output(["xdg-open", output_file])
-                        except Exception as e:
+                        except Exception:
                             subprocess.check_output(["mimeopen", output_file])
 
                 except subprocess.CalledProcessError:
@@ -662,6 +662,6 @@ class Monitor:
                     Log.critical("General Stats {}: The value for the key \"{}\" is too long ({} characters) and won't be added to the general_stats plot. Maximum length allowed: {} characters.".format(general_stats_path, key, len(value), GENERAL_STATS_OPTION_MAX_LENGTH))
                     continue
                 result.append(stat_item)
-            except Exception as e:
+            except Exception:
                 Log.error("Error while processing general_stats of {}".format(expid))
         return result

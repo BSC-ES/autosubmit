@@ -87,7 +87,7 @@ class DatabaseManager(metaclass=ABCMeta):
     for statement in statements:
       try:                   
           self.execute_statement_on_dbfile(path, statement)
-      except Exception as exp:      
+      except Exception:
           pass
 
   def get_from_statement(self, path, statement):

@@ -42,11 +42,11 @@ def handle_start_time(start_time):
             parsed_time = datetime.datetime.strptime(start_time, "%H:%M:%S")
             target_date = datetime.datetime(datetime_now.year, datetime_now.month,
                                             datetime_now.day, parsed_time.hour, parsed_time.minute, parsed_time.second)
-        except Exception as e:
+        except Exception:
             try:
                 # Trying second parse y-m-d H:M:S
                 target_date = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-            except Exception as e:
+            except Exception:
                 target_date = None
                 Log.critical(
                     "The string input provided as the starting time of your experiment must have the format 'H:M:S' or 'yyyy-mm-dd H:M:S'. Your input was '{0}'.".format(

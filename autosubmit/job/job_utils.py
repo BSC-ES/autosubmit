@@ -45,7 +45,7 @@ def _get_submitter(as_conf):
     """
     try:
         communications_library = as_conf.get_communications_library()
-    except Exception as e:
+    except Exception:
         communications_library = 'paramiko'
     if communications_library == 'paramiko':
         return ParamikoSubmitter()
@@ -265,7 +265,7 @@ def get_job_package_code(expid, job_name):
                 if job_name == _job_name:
                     code = int(package_name.split("_")[-3])
                     return code
-    except Exception as e:
+    except Exception:
         pass
     return 0
 

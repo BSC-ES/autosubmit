@@ -50,6 +50,6 @@ def parse_number_processors(processors_str):
       else:
         processors = int(processors_str)
         return processors
-    except Exception as e:
+    except Exception:
       return 1
   

@@ -2165,7 +2165,7 @@ class Job(object):
                         template = 'Sys.sleep(5)'
                     else:
                         template = ''
-            except Exception as e:
+            except Exception:
                 template = ''
 
         if self.type == Type.BASH:
@@ -2220,7 +2220,7 @@ class Job(object):
                                                      'QOSTimeLimit','QOSResourceLimit','QOSJobLimit','InvalidQOS','InvalidAccount']:
                     return True
             return False
-        except Exception as e:
+        except Exception:
             return False
 
     @staticmethod
@@ -2667,7 +2667,7 @@ class WrapperJob(Job):
                                                      'QOSTimeLimit','QOSResourceLimit','QOSJobLimit','InvalidQOS','InvalidAccount']:
                     return True
             return False
-        except Exception as e:
+        except Exception:
             return False
 
     def check_status(self, status):

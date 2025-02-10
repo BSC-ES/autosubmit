@@ -88,8 +88,8 @@ class TestStop(TestCase):
         fake_running_process = MagicMock()# process id of the experiment, to mock the process id of the experiment
         fake_running_process.communicate.return_value = (b'bla 0001 bla bla bla', b'')
         fake_running_expid = 'a000,a001' # experiment id of the experiment, to mock the experiment id of the experiment
-        with patch('subprocess.Popen', return_value=fake_running_process) as mock_popen:
-            with patch('os.kill') as mock_kill:
+        with patch('subprocess.Popen', return_value=fake_running_process):
+            with patch('os.kill'):
                 mock_job_list = MagicMock()
                 mock_job_list.return_value = self.job_list
                 with patch('autosubmit.autosubmit.Autosubmit.load_job_list', return_value=mock_job_list):

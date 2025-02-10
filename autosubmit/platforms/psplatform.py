@@ -113,10 +113,10 @@ class PsPlatform(ParamikoPlatform):
         try:
             try:
                 self.send_command(self.remove_checker)
-            except Exception as e:
+            except Exception:
                 pass
             self.send_command(self.mkdir_checker)
             self.send_command(self.remove_checker)
             return True
-        except Exception as e:
+        except Exception:
             return False

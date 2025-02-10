@@ -69,7 +69,7 @@ def check_experiment_ownership(expid, basic_config, raise_error=False, logger=No
     try:
         current_owner_ID = os.stat(os.path.join(basic_config.LOCAL_ROOT_DIR, expid)).st_uid
         current_owner_name = pwd.getpwuid(os.stat(os.path.join(basic_config.LOCAL_ROOT_DIR, expid)).st_uid).pw_name
-    except Exception as e:
+    except Exception:
         if logger:
             logger.info("Error while trying to get the experiment's owner information.")
     finally:
@@ -110,13 +110,13 @@ def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=N
                 else:
                     ssh_config_issues += message + " this is an PARAMIKO SSHEXCEPTION: indicates that there is something incompatible in the ssh_config for host:{0}\n maybe you need to contact your sysadmin".format(
                         platform.host)
-        except BaseException as e:
+        except BaseException:
             try:
                 if mail_notify:
                     email = as_conf.get_mails_to()
                     if "@" in email[0]:
                         Notifier.notify_experiment_status(MailNotifier(BasicConfig), expid, email, platform)
-            except Exception as e:
+            except Exception:
                 pass
             platform_issues += "\n[{1}] Connection Unsuccessful to host {0} ".format(
                 platform.host, platform.name)

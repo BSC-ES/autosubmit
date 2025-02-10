@@ -181,7 +181,7 @@ class SlurmPlatform(ParamikoPlatform):
                             if not self.hold_job(package.jobs[0]):
                                 jobid_index += 1
                                 continue
-                        except Exception as e:
+                        except Exception:
                             failed_packages.append(current_package_id)
                             continue
                     package.process_jobs_to_submit(current_package_id, hold)
@@ -204,9 +204,9 @@ class SlurmPlatform(ParamikoPlatform):
                         platform.send_command(platform.cancel_cmd + " {0}".format(job_id))
                     raise AutosubmitError("{0} submission failed, some hold jobs failed to be held".format(self.name), 6015)
             save = True
-        except AutosubmitError as e:
+        except AutosubmitError:
             raise
-        except AutosubmitCritical as e:
+        except AutosubmitCritical:
             raise
         except AttributeError:
             raise
@@ -280,19 +280,19 @@ class SlurmPlatform(ParamikoPlatform):
             cmd = f"{cmd} ; rm {cmd}"
             try:
                 self.send_command(cmd)
-            except AutosubmitError as e:
+            except AutosubmitError:
                 raise
-            except AutosubmitCritical as e:
+            except AutosubmitCritical:
                 raise
-            except Exception as e:
+            except Exception:
                 raise
             jobs_id = self.get_submitted_job_id(self.get_ssh_output())
             return jobs_id
         except IOError as e:
             raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e))
-        except AutosubmitError as e:
+        except AutosubmitError:
             raise
-        except AutosubmitCritical as e:
+        except AutosubmitCritical:
             raise
         except Exception as e:
             raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e))
@@ -304,7 +304,7 @@ class SlurmPlatform(ParamikoPlatform):
         try:
             # Test if remote_path exists
             self._ftpChannel.chdir(self.remote_log_dir)
-        except IOError as e:
+        except IOError:
             try:
                 if self.send_command(self.get_mkdir_cmd()):
                     Log.debug('{0} has been created on {1} .',
@@ -369,7 +369,7 @@ class SlurmPlatform(ParamikoPlatform):
             except BaseException as e:
                 raise AutosubmitError(
                     "Can't cancel the jobid: {0}".format(job.id), 6000, str(e))
-            except AutosubmitError as e:
+            except AutosubmitError:
                 raise
 
     def get_checkhost_cmd(self):
@@ -511,7 +511,7 @@ class SlurmPlatform(ParamikoPlatform):
                                             energy = 0
                                     else:
                                         energy = 0
-                    except Exception as exp:
+                    except Exception:
                         # print(line)
                         # Log.info(traceback.format_exc())
                         Log.info(
@@ -533,7 +533,7 @@ class SlurmPlatform(ParamikoPlatform):
         try:
             status = [x.split()[1] for x in output.splitlines()
                       if x.split()[0][:len(str(job_id))] == str(job_id)]
-        except BaseException as e:
+        except BaseException:
             pass
         if len(status) == 0:
             return status
@@ -583,7 +583,7 @@ class SlurmPlatform(ParamikoPlatform):
                     self._submit_script_file.write((export + self._submit_cmd + job_script + "\n").encode(lang))
                 else:
                     self._submit_script_file.write((export + self._submit_hold_cmd + job_script + "\n").encode(lang))
-            except BaseException as e:
+            except BaseException:
                 pass
 
     def get_checkjob_cmd(self, job_id):
@@ -674,7 +674,7 @@ class SlurmPlatform(ParamikoPlatform):
                 self._ftpChannel.stat(os.path.join(
                     self.get_files_path(), filename))
                 file_exist = True
-            except IOError as e:  # File doesn't exist, retry in sleeptime
+            except IOError:  # File doesn't exist, retry in sleeptime
                 if not wrapper_failed:
                     sleep(sleeptime)
                     retries = retries + 1
