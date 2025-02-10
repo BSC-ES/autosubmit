@@ -25,12 +25,13 @@ How to cite Autosubmit:
     2016 International Conference on High Performance Computing & Simulation (HPCS), 
     Innsbruck, 2016, pp. 895-900. doi: 10.1109/HPCSim.2016.7568429
 
-AUTOSUBMIT IS MAINTENED BY US IN THE FOLLOWING MACHINES
-=======================================================
+AUTOSUBMIT IS MAINTENED IN THE FOLLOWING MACHINES
+=================================================
 
 - bscesautosubmit{01/02}.bsc.es (Autosubmit 3, BSC machine)
 - bsceshub02.bsc.es (Autosubmit 3 and Autosubmit 4, BSC machine)
 - climate-dt (Autosubmit 4, CSC machine)
+- EDITO-infra ( Autosubmit 4, MOI & VLIZ infrastructure)
 
 HOW TO DEPLOY/SETUP AUTOSUBMIT FRAMEWORK
 ========================================
