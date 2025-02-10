@@ -1526,7 +1526,7 @@ class Autosubmit:
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             as_conf.check_conf_files(True)
 
-            project_type = as_conf.get_project_type()
+            # project_type = as_conf.get_project_type()
             safetysleeptime = as_conf.get_safetysleeptime()
             Log.debug("The Experiment name is: {0}", expid)
             Log.debug("Sleep: {0}", safetysleeptime)
@@ -1536,8 +1536,8 @@ class Autosubmit:
                                   "pkl", "job_packages_" + expid + ".db"), 0o644)
 
             packages_persistence.reset_table(True)
-            job_list_original = Autosubmit.load_job_list(
-                expid, as_conf, notransitive=notransitive)
+            # job_list_original = Autosubmit.load_job_list(
+            #     expid, as_conf, notransitive=notransitive)
             job_list = Autosubmit.load_job_list(
                 expid, as_conf, notransitive=notransitive)
             job_list.packages_dict = {}
@@ -1690,7 +1690,7 @@ class Autosubmit:
         Log.warning("Generating the auxiliary job_list used for the -CW flag.")
         job_list._job_list = jobs_filtered
         job_list._persistence_file = job_list._persistence_file + "_cw_flag"
-        parameters = as_conf.load_parameters()
+        # parameters = as_conf.load_parameters()
         date_list = as_conf.get_date_list()
         if len(date_list) != len(set(date_list)):
             raise AutosubmitCritical(
@@ -1698,7 +1698,7 @@ class Autosubmit:
         num_chunks = as_conf.get_num_chunks()
         chunk_ini = as_conf.get_chunk_ini()
         member_list = as_conf.get_member_list()
-        run_only_members = as_conf.get_member_list(run_only=True)
+        # run_only_members = as_conf.get_member_list(run_only=True)
         date_format = ''
         if as_conf.get_chunk_size_unit() == 'hour':
             date_format = 'H'
@@ -2850,7 +2850,7 @@ class Autosubmit:
         :param stats: set True to delete outdated stats
         """
         try:
-            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+            # exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
 
             if project:
                 autosubmit_config = AutosubmitConfig(
@@ -3105,13 +3105,13 @@ class Autosubmit:
         :type experiment_id: str
         """
         try:
-            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, experiment_id)
+            # exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, experiment_id)
 
             as_conf = AutosubmitConfig(
                 experiment_id, BasicConfig, YAMLParserFactory())
             as_conf.check_conf_files(False)
 
-            project_type = as_conf.get_project_type()
+            # project_type = as_conf.get_project_type()
 
             submitter = Autosubmit._get_submitter(as_conf)
             submitter.load_platforms(as_conf)
@@ -3345,7 +3345,7 @@ class Autosubmit:
                 created = datetime.datetime.fromtimestamp(
                     os.path.getmtime(as_conf.conf_folder_yaml))
 
-                project_type = as_conf.get_project_type()
+                # project_type = as_conf.get_project_type()
                 if as_conf.get_svn_project_url():
                     model = as_conf.get_svn_project_url()
                     branch = as_conf.get_svn_project_url()
@@ -3539,8 +3539,8 @@ class Autosubmit:
         precedes system configuration.
         """
 
-        not_enough_screen_size_msg = 'The size of your terminal is not enough to draw the configuration wizard,\n' \
-                                     'so we\'ve closed it to prevent errors. Resize it and then try it again.'
+        # not_enough_screen_size_msg = 'The size of your terminal is not enough to draw the configuration wizard,\n' \
+        #                              'so we\'ve closed it to prevent errors. Resize it and then try it again.'
 
         home_path = Path("~").expanduser().resolve()
 
@@ -3936,7 +3936,7 @@ class Autosubmit:
             # Load current variables
             as_conf.check_conf_files()
             # Load current parameters ( this doesn't read job parameters)
-            parameters = as_conf.load_parameters()
+            # parameters = as_conf.load_parameters()
 
         except (AutosubmitError, AutosubmitCritical):
             raise
@@ -4068,7 +4068,7 @@ class Autosubmit:
             backup_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}.sql".format(expid))
             command = "sqlite3 {0} .dump > {1} ".format(database_path, backup_path)
             Log.debug("Backing up jobs_data...")
-            out = subprocess.call(command, shell=True)
+            subprocess.call(command, shell=True)
             Log.debug("Jobs_data database backup completed.")
         except BaseException as e:
             Log.debug("Jobs_data database backup failed.")
@@ -4083,11 +4083,11 @@ class Autosubmit:
         :rtype:        
         """
         os.umask(0) # Overrides user permissions
-        current_time = int(time.time())
+        # current_time = int(time.time())
         corrupted_db_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}_corrupted.db".format(expid))
 
         database_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}.db".format(expid))
-        database_backup_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}.sql".format(expid))
+        # database_backup_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}.sql".format(expid))
         dump_file_name = 'job_data_{0}.sql'.format(expid)
         dump_file_path = os.path.join(BasicConfig.JOBDATA_DIR, dump_file_name)
         bash_command = 'cat {1} | sqlite3 {0}'.format(database_path, dump_file_path)
@@ -4105,7 +4105,7 @@ class Autosubmit:
 
             except Exception:
                 Log.warning("It was not possible to restore the jobs_data.db file... , a new blank db will be created")
-                result = os.popen("rm {0}".format(database_path)).read()
+                # result = os.popen("rm {0}".format(database_path)).read()
 
                 exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                                 historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
@@ -4215,7 +4215,7 @@ class Autosubmit:
         :rtype: bool
         """
 
-        exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+        # exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
 
         exp_folder = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
 
@@ -4927,7 +4927,7 @@ class Autosubmit:
         filter_is_correct = True
         selected_sections = filter_type_chunk.split(",")[1:]
         selected_formula = filter_type_chunk.split(",")[0]
-        deserialized_json = object()
+        # deserialized_json = object()
         # Starting Validation
         if len(str(selected_sections).strip()) == 0:
             filter_is_correct = False
@@ -5123,8 +5123,8 @@ class Autosubmit:
         Autosubmit._check_ownership(expid, raise_error=True)
         exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
         tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
-        section_validation_message = " "
-        job_validation_message = " "
+        # section_validation_message = " "
+        # job_validation_message = " "
         try:
             with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
                 Log.info(
@@ -5181,7 +5181,7 @@ class Autosubmit:
                 #### Starts the filtering process ####
                 final_list = []
                 jobs_filtered = []
-                jobs_left_to_be_filtered = True
+                # jobs_left_to_be_filtered = True
                 final_status = Autosubmit._get_status(final)
                 # I have the impression that whoever did this function thought about the possibility of having multiple filters at the same time
                 # But, as it was, it is not possible to have multiple filters at the same time due to the way the code is written
@@ -5792,7 +5792,7 @@ class Autosubmit:
             i for i in job_list.get_job_list() if i.name not in rerun_names]
 
         Log.info("Looking for COMPLETED files")
-        start = datetime.datetime.now()
+        # start = datetime.datetime.now()
         for job in jobs_to_recover:
             if job.platform_name is None:
                 job.platform_name = hpcarch
@@ -6003,7 +6003,7 @@ class Autosubmit:
 
         expids = [x.strip() for x in expids]
         # Obtain the proccess id
-        errors = ""
+        # errors = ""
         valid_expids = []
         for expid in expids:
             process_id_ = proccess_id(expid)
