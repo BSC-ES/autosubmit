@@ -389,7 +389,7 @@ def init_run(run_tmpdir, jobs_data):
 def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries, final_status):
     log_dir = init_run(run_tmpdir, jobs_data)
     # Run the experiment
-    Autosubmit.run_experiment(expid='t000')
+    exit_code = Autosubmit.run_experiment(expid='t000')
 
     # Check and display results
     db_check_list = check_db_fields(run_tmpdir, expected_db_entries, final_status)
@@ -399,4 +399,4 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
     assert_db_fields(db_check_list)
     assert_files_recovered(files_check_list)
     # TODO: GITLAB pipeline is not returning 0 or 1 for check_exit_code(final_status, exit_code)
-    # assert_exit_code(final_status, exit_code)
+    assert_exit_code(final_status, exit_code)

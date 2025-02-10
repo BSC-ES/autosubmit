@@ -785,16 +785,12 @@ class JobList(object):
             unified_filter[filter_type] += ","
         if filter_type == "DATES_TO":
             value_list = self._date_list
-            # level_to_check = "DATES_FROM"
         elif filter_type == "MEMBERS_TO":
             value_list = self._member_list
-            # level_to_check = "MEMBERS_FROM"
         elif filter_type == "CHUNKS_TO":
             value_list = self._chunk_list
-            # level_to_check = "CHUNKS_FROM"
         elif filter_type == "SPLITS_TO":
             value_list = []
-            # level_to_check = "SPLITS_FROM"
         if "all".casefold() not in unified_filter[filter_type].casefold():
             aux = str(filter_to.pop(filter_type, None))
             if aux:
@@ -1274,7 +1270,6 @@ class JobList(object):
         :return: problematic_dependencies
         """
         # Initialize variables
-        # depends_on_previous_section = set()
         distances_of_current_section = {}
         distances_of_current_section_member = {}
         problematic_dependencies = set()
@@ -1284,10 +1279,6 @@ class JobList(object):
         dependencies_keys_aux = []
         dependencies_keys_without_special_chars = []
         depends_on_itself = None
-        # if not job.splits:
-        #     child_splits = 0
-        # elif job.splits != "auto":
-        #     child_splits = int(job.splits)
         parsed_date_list = []
         for dat in date_list:
             parsed_date_list.append(date2str(dat))
@@ -1344,13 +1335,10 @@ class JobList(object):
                 for key in dependencies_of_that_section.keys():
                     if "-" in key:
                         stripped_key = key.split("-")[0]
-                        # distance_ = int(key.split("-")[1])
                     elif "+" in key:
                         stripped_key = key.split("+")[0]
-                        # distance_ = int(key.split("+")[1])
                     else:
                         stripped_key = key
-                        # distance_ = 0
                     if stripped_key in dependencies_keys_without_special_chars and stripped_key != job.section:
                         # Fix delay
                         if job.running == "chunk" and dic_jobs.as_conf.jobs_data[aux_key].get("DELAY", None):
@@ -1958,7 +1946,6 @@ class JobList(object):
         return all_jobs
 
     def update_two_step_jobs(self):
-        # prev_jobs_to_run_first = self.jobs_to_run_first
         if len(self.jobs_to_run_first) > 0:
             self.jobs_to_run_first = [job for job in self.jobs_to_run_first if job.status != Status.COMPLETED]
             keep_running = False
@@ -1973,7 +1960,6 @@ class JobList(object):
                     7014)
 
     def parse_jobs_by_filter(self, unparsed_jobs, two_step_start=True):
-        # jobs_to_run_first = list()
         select_jobs_by_name = ""  # job_name
         select_all_jobs_by_section = ""  # all
         filter_jobs_by_section = ""  # Select, chunk / member

@@ -425,7 +425,6 @@ class TestJobList(unittest.TestCase):
         self.assertEqual(len(job.edge_info.get("RUNNING", "")), 1)
 
         self.assertEqual(str(job_list.jobs_edges.get("RUNNING", ())), str({job}))
-        # only_marked_status = False
         parent2 = Job("parent2", 1, Status.READY, 1)
         parent2.section = "parent_two"
         parent2.date = datetime.strptime("20200128", "%Y%m%d")

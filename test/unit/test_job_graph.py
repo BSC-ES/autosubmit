@@ -694,30 +694,10 @@ class TestJobGraph(TestCase):
             'expid_1_ASIM' : ['d1_m1_1', 'd1_m2_1', 'd2_m1_1', 'd2_m2_1'], 'expid_2_ASIM' : ['d1_m1_2', 'd1_m2_2', 'd2_m1_2', 'd2_m2_2'],
         }
 
-        # nodes = [
-        #     "expid_SETUP", "expid_d1_m1_INI", "expid_d1_m2_INI", "expid_d2_m1_INI", "expid_d2_m2_INI",
-        #     'd1_m1_1', 'd1_m2_1', 'd2_m1_1', 'd2_m2_1', 'd1_m1_2', 'd1_m2_2', 'd2_m1_2', 'd2_m2_2'
-        # ]
-        # edges = [
-        #     ("expid_SETUP", "expid_d1_m1_INI"), ("expid_SETUP", "expid_d1_m2_INI"), ("expid_SETUP", "expid_d2_m1_INI"),
-        #     ("expid_SETUP", "expid_d2_m2_INI"), ("expid_d1_m1_INI", "d1_m1_1"), ("expid_d1_m2_INI", "d1_m2_1"),
-        #     ("expid_d2_m1_INI", "d2_m1_1"), ("expid_d2_m2_INI", "d2_m2_1"),
-        #     ("d1_m1_1", "d1_m1_2"), ("d1_m2_1", "d1_m2_2"), ("d2_m1_1", "d2_m1_2"), ("d2_m2_1", "d2_m2_2"),
-        #
-        #     ("d1_m1_1", "d1_m1_1"), ("d1_m1_2", "d1_m1_2"), ("d1_m2_1", "d1_m2_1"), ("d1_m2_2", "d1_m2_2"),
-        #     ("d2_m1_1", "d2_m1_1"), ("d2_m1_2", "d2_m1_2"), ("d2_m2_1", "d2_m2_1"), ("d2_m2_2", "d2_m2_2")
-        # ]
-
         monitor = Monitor()
         graph = monitor.create_tree_list(self.experiment_id, self.job_list.get_job_list(), None, groups_dict)
 
         self.assertTrue(graph.obj_dict['strict'])
-
-        # subgraphs = graph.obj_dict['subgraphs']
-        # experiment_subgraph = subgraphs['Experiment'][0]
-
-        #self.assertListEqual(sorted(list(experiment_subgraph['nodes'].keys())), sorted(nodes))
-        #self.assertListEqual(sorted(list(experiment_subgraph['edges'].keys())), sorted(edges))
 
         subgraph_synchronize_1 = graph.obj_dict['subgraphs']['cluster_d1_m1_1_d1_m2_1_d2_m1_1_d2_m2_1'][0]
         self.assertListEqual(sorted(list(subgraph_synchronize_1['nodes'].keys())), sorted(['d1_m1_1', 'd1_m2_1', 'd2_m1_1', 'd2_m2_1']))

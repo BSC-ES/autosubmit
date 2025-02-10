@@ -502,7 +502,6 @@ class TestJobList(TestCase):
         date_list = ['fake-date1', 'fake-date2']
         member_list = ['fake-member1', 'fake-member2']
         num_chunks = 999
-        # chunk_list = list(range(1, num_chunks + 1))
         parameters = {'fake-key': 'fake-value',
                       'fake-key2': 'fake-value2'}
         with tempfile.TemporaryDirectory() as temp_dir:

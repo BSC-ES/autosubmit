@@ -133,7 +133,6 @@ class TestDicJobs(TestCase):
         priority = 999
         frequency = 123
         splits = 0
-        # excluded_list_m = []
         running = "member"
         options = {
             'FREQUENCY': frequency,

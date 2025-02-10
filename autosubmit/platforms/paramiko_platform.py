@@ -742,7 +742,6 @@ class ParamikoPlatform(Platform):
         :rtype: autosubmit.job.job_common.Status
         """
         job_status = Status.UNKNOWN
-        # remote_logs = as_conf.get_copy_remote_logs()
         job_list_cmd = self.parse_joblist(job_list)
         cmd = self.get_checkAlljobs_cmd(job_list_cmd)
         sleep_time = 5
@@ -1074,7 +1073,6 @@ class ParamikoPlatform(Platform):
                 stdout_chunks.append(stdout.channel.recv(len(stdout.channel.in_buffer)))
 
             aux_stderr = []
-            # i = 0
             x11_exit = False
 
             while (not channel.closed or channel.recv_ready() or channel.recv_stderr_ready() ) and not x11_exit:

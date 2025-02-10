@@ -143,7 +143,6 @@ class JobPackageBase(object):
         """
         for job in self.jobs:
             if only_generate and not os.path.exists(os.path.join(configuration.get_project_dir(), job.file)):
-                # exit_ = True
                 break
             if not os.path.exists(os.path.join(configuration.get_project_dir(), job.file)):
                 if configuration.get_project_type().lower() != "none" and len(configuration.get_project_type()) > 0:
@@ -380,7 +379,6 @@ class JobPackageArray(JobPackageBase):
 
         if package_id is None or not package_id: # platforms with a submit.cmd
             return
-        # wrapper_time = None
         for i in range(0, len(self.jobs)): # platforms without a submit.cmd
             Log.info("{0} submitted", self.jobs[i].name)
             self.jobs[i].id = str(package_id) + '[{0}]'.format(i)

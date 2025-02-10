@@ -279,7 +279,6 @@ class TestExperimentHistory(unittest.TestCase):
     NCPUS = 128
     PLATFORM_NAME = "marenostrum4"
     JOB_ID = 101
-    # inserted_job_data_dc_submit = exp_history.write_submit_time(JOB_NAME, time.time(), "SUBMITTED", NCPUS, "00:30", "debug", "20000101", "fc2", "SIM", 1, PLATFORM_NAME, JOB_ID, "bsc_es", 1, "")
     inserted_job_data_dc = exp_history.write_start_time(JOB_NAME, time.time(), "RUNNING", NCPUS, "00:30", "debug", "20000101", "fc2", "SIM", 1, PLATFORM_NAME, JOB_ID, "bsc_es", 1, "")
     self.assertTrue(inserted_job_data_dc.job_name == JOB_NAME)
     self.assertTrue(inserted_job_data_dc.ncpus == NCPUS)
