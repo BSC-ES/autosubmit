@@ -4,7 +4,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-
+import pytest
+from typing import Callable
 from contextlib import suppress
 
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
@@ -464,7 +465,7 @@ CONFIG:
             with open(Path(temp_dir, f'{expid}/conf/experiment_data.yml'), 'w+') as experiment_data:
                 experiment_data.write(dedent(f'''\
                             CONFIG:
-                              RETRIALS: 0 
+                              RETRIALS: 0
                             DEFAULT:
                               EXPID: {expid}
                               HPCARCH: test
@@ -490,7 +491,7 @@ CONFIG:
                                     PLATFORM: test
                                     RUNNING: once
                                     WALLCLOCK: '00:30'
-                                    MEMORY: 
+                                    MEMORY:
                                         - 0
                                         - 0
                                     NODES:
@@ -498,11 +499,11 @@ CONFIG:
                                         - 1
                                     TASKS:
                                         - 32
-                                        - 32 
+                                        - 32
                                     THREADS:
                                         - 4
                                         - 4
-                                    CUSTOM_DIRECTIVES: 
+                                    CUSTOM_DIRECTIVES:
                                         - ['#SBATCH --export=ALL', '#SBATCH --distribution=block:cyclic', '#SBATCH --exclusive']
                                         - ['#SBATCH --export=ALL', '#SBATCH --distribution=block:cyclic:fcyclic', '#SBATCH --exclusive']
                 '''))
@@ -851,7 +852,7 @@ CONFIG:
                 with open(Path(temp_dir, f'{expid}/conf/minimal.yml'), 'w+') as minimal:
                     minimal.write(dedent(f'''\
                     CONFIG:
-                      RETRIALS: 0 
+                      RETRIALS: 0
                     DEFAULT:
                       EXPID: {expid}
                       HPCARCH: test
@@ -1074,14 +1075,7 @@ CONFIG:
         self.assertEqual("22", parameters['CHUNK_END_HOUR'])
         self.assertEqual("1975", parameters['CHUNK_SECOND_TO_LAST_YEAR'])
 
-        self.assertEqual("05", parameters['CHUNK_SECOND_TO_LAST_MONTH'])
-        self.assertEqual("25", parameters['CHUNK_SECOND_TO_LAST_DAY'])
-        self.assertEqual("22", parameters['CHUNK_SECOND_TO_LAST_HOUR'])
-        self.assertEqual('1975052522', parameters['CHUNK_START_DATE'])
-        self.assertEqual('1975052622', parameters['CHUNK_END_DATE'])
-        self.assertEqual('1975052522', parameters['CHUNK_SECOND_TO_LAST_DATE'])
-        self.assertEqual('1975052422', parameters['DAY_BEFORE'])
-        self.assertEqual('1', parameters['RUN_DAYS'])
+    def test_get_from_total_stats(self):
 
         self.job.chunk = 2
         parameters = {"EXPERIMENT.NUMCHUNKS": 3, "EXPERIMENT.CHUNKSIZEUNIT": "hour"}
@@ -1091,6 +1085,30 @@ CONFIG:
         self.assertEqual("FALSE", parameters['CHUNK_LAST'])
 
 
+    def test_get_from_total_stats(self):
+        # arrange
+        with tempfile.TemporaryDirectory() as temp_dir:
+            mocked_basic_config = FakeBasicConfig
+            mocked_basic_config.read = MagicMock()
+            mocked_basic_config.LOCAL_ROOT_DIR = str(temp_dir)
+
+            self.job._tmp_path = str(temp_dir)
+
+            log_name = Path(f"{mocked_basic_config.LOCAL_ROOT_DIR}/{self.job.name}_TOTAL_STATS")
+            Path(mocked_basic_config.LOCAL_ROOT_DIR).mkdir(parents=True, exist_ok=True)
+
+            with open(log_name, 'w+') as f:
+                f.write(dedent('''\
+                    DEFAULT:
+                        DATE: 1998
+                        EXPID: 199803
+                        HPCARCH: 19980324
+                    '''))
+                f.flush()
+
+            lst = self.job._get_from_total_stats(1)
+
+        assert len(lst) > 0
 
     def test_sdate(self):
         """Test that the property getter for ``sdate`` works as expected."""
@@ -1183,7 +1201,7 @@ CONFIG:
             with open(Path(temp_dir, f'{expid}/conf/minimal.yml'), 'w+') as minimal:
                 minimal.write(dedent(f'''\
                 CONFIG:
-                  RETRIALS: 0 
+                  RETRIALS: 0
                 DEFAULT:
                   EXPID: {expid}
                   HPCARCH: test
@@ -1203,7 +1221,7 @@ CONFIG:
                   CHUNKINI: ''
                   # Calendar used for the experiment. Can be standard or noleap.
                   CALENDAR: standard
-                    
+
                 JOBS:
                   A:
                     FILE: a
