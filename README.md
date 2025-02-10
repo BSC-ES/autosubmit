@@ -32,7 +32,7 @@ AUTOSUBMIT IS MAINTAINED ON THE FOLLOWING MACHINES
 - bsceshub02.bsc.es (Autosubmit 3 and Autosubmit 4, BSC machine)
 - Cirrus (Autosubmit 3 and Autosubmit 4, BSC machine)
 - climate-dt (Autosubmit 4, CSC machine)
-- EDITO-infra ( Autosubmit 4, MOI and VLIZ infrastructure)
+- EDITO-infra (Autosubmit 4, MOI and VLIZ infrastructure)
 
 HOW TO DEPLOY/SETUP AUTOSUBMIT FRAMEWORK
 ========================================
