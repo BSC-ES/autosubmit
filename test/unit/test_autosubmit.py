@@ -1,14 +1,19 @@
-from textwrap import dedent
 from pathlib import Path
+from textwrap import dedent
+from typing import Callable, Dict
+
+
 from autosubmit.autosubmit import Autosubmit
-from test.unit.conftest import autosubmit_config
 from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from test.unit.conftest import autosubmit_config
 
-import re
 
-def test_as_conf_default_values(tmp_path, autosubmit_config):
+def test_as_conf_default_values(autosubmit_config: Callable[[str,Dict], BasicConfig]) -> None:
 
-    autosubmit_config('a000', {})
+    expid = 'a000'
+    arch = 'MN5'
+    autosubmit_config(expid, {})
 
     ini_file = Path(f'{BasicConfig.LOCAL_ROOT_DIR}/a000/conf')
     ini_file.mkdir(parents=True, exist_ok=True)
@@ -23,12 +28,14 @@ def test_as_conf_default_values(tmp_path, autosubmit_config):
         '''))
         f.flush()
 
-    Autosubmit().as_conf_default_values('a000')
+    Autosubmit().as_conf_default_values(exp_id=expid)
+
+    factory = YAMLParserFactory()
+    parser = factory.create_parser()
 
     with open(ini_file) as f:
         content = f.read()
-        hpc = re.search('HPCARCH: \"MN5\"', content, re.MULTILINE)
-        expid = re.search('EXPID: \"a000\"', content, re.MULTILINE)
+        yaml_contents = parser.load(content)
 
-        assert hpc
-        assert expid
+    assert yaml_contents['DEFAULT']['EXPID'] == expid
+    assert yaml_contents['DEFAULT']['HPCARCH'] == arch
