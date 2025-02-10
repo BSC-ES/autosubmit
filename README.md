@@ -33,17 +33,28 @@ HOW TO DEPLOY/SETUP AUTOSUBMIT FRAMEWORK
   with the following Operating Systems:
    * Linux Debian
    * Linux OpenSUSE
+   * Ubuntu
+   * WSL (Windows Subsystem for Linux)
+   * MacOS* Not directly by Autosubmit team, but by users
 
   on the following HPC platforms:
    * Ithaca (IC3 machine)
    * Stargate (IC3 machine)
    * MareNostrum (BSC machine)
    * MareNostrum3 (BSC machine)
+   * MareNostrum4 (BSC machine)
+   * MareNostrum5 (BSC machine)
+   * Cirrus (BSC machine)
    * HECToR (EPCC machine)
    * Lindgren (PDC machine)
    * C2A (ECMWF machine)
    * CCA (ECMWF machine)
    * ARCHER (EPCC machine)
+   * Levante (DKRZ machine)
+   * Lumi (CSC machine)
+   * Juwels (Jülich machine)
+   * ATOS (ECMWF machine)
+   * Fugaku (RIKEN machine)
 
 - Pre-requisites: These packages (bash, python2, sqlite3, git-scm > 1.8.2, subversion, pip >= 24.0, dialog*) must be available at local
   machine. These packages (argparse, dateutil, pyparsing, numpy, pydotplus, matplotlib, paramiko,
