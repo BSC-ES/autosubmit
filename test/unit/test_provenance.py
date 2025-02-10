@@ -7,6 +7,7 @@ import pytest
 from autosubmit.autosubmit import Autosubmit
 from log.log import AutosubmitCritical
 
+
 @pytest.fixture
 def mock_paths(tmp_path):
     """

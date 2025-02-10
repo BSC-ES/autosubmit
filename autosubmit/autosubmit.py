@@ -787,7 +787,6 @@ class Autosubmit:
             return Autosubmit.archive(args.expid, noclean=args.noclean, uncompress=args.uncompress, rocrate=args.rocrate)
         elif args.command == 'unarchive':
             return Autosubmit.unarchive(args.expid, uncompressed=args.uncompressed, rocrate=args.rocrate)
-        
         elif args.command == 'readme':
             if os.path.isfile(Autosubmit.readme_path):
                 with open(Autosubmit.readme_path) as f:
@@ -2407,12 +2406,11 @@ class Autosubmit:
                         exp_history.finish_current_experiment_run()
                     except Exception:
                         Log.warning("Database is locked")
-                # Create rocrate object if requested
                 rocrate_data = as_conf.experiment_data.get("ROCRATE", None)
                 if rocrate_data:
                     Autosubmit.provenance(expid, rocrate=True)
                 else:
-                    print("rocrate.yml not found in CONFIG. Can't create rocrate object. ")
+                    Log.info("ROCRATE not present in experiment YAML configuration. No RO-Crate archive created.")
         except BaseLockException:
             raise
         except AutosubmitCritical:
@@ -4230,6 +4228,8 @@ class Autosubmit:
     @staticmethod
     def provenance(expid: str, rocrate: bool = False) -> None:
         """
+        Create the experiment provenance archive.
+
         :param expid: experiment identifier
         :type expid: str
         :param rocrate: flag to enable RO-Crate
