@@ -785,16 +785,16 @@ class JobList(object):
             unified_filter[filter_type] += ","
         if filter_type == "DATES_TO":
             value_list = self._date_list
-            level_to_check = "DATES_FROM"
+            # level_to_check = "DATES_FROM"
         elif filter_type == "MEMBERS_TO":
             value_list = self._member_list
-            level_to_check = "MEMBERS_FROM"
+            # level_to_check = "MEMBERS_FROM"
         elif filter_type == "CHUNKS_TO":
             value_list = self._chunk_list
-            level_to_check = "CHUNKS_FROM"
+            # level_to_check = "CHUNKS_FROM"
         elif filter_type == "SPLITS_TO":
             value_list = []
-            level_to_check = "SPLITS_FROM"
+            # level_to_check = "SPLITS_FROM"
         if "all".casefold() not in unified_filter[filter_type].casefold():
             aux = str(filter_to.pop(filter_type, None))
             if aux:
