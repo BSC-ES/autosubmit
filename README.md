@@ -25,6 +25,15 @@ How to cite Autosubmit:
     2016 International Conference on High Performance Computing & Simulation (HPCS), 
     Innsbruck, 2016, pp. 895-900. doi: 10.1109/HPCSim.2016.7568429
 
+AUTOSUBMIT IS MAINTAINED ON THE FOLLOWING MACHINES
+==================================================
+
+- bscesautosubmit{01/02}.bsc.es (Autosubmit 3, BSC machine)
+- bsceshub02.bsc.es (Autosubmit 3 and Autosubmit 4, BSC machine)
+- Cirrus (Autosubmit 3 and Autosubmit 4, BSC machine)
+- climate-dt (Autosubmit 4, CSC machine)
+- EDITO-infra (Autosubmit 4, MOI and VLIZ infrastructure)
+
 HOW TO DEPLOY/SETUP AUTOSUBMIT FRAMEWORK
 ========================================
 
@@ -33,17 +42,28 @@ HOW TO DEPLOY/SETUP AUTOSUBMIT FRAMEWORK
   with the following Operating Systems:
    * Linux Debian
    * Linux OpenSUSE
+   * Ubuntu
+   * WSL (Windows Subsystem for Linux)
+   * MacOS* Not directly by Autosubmit team, but by users
 
   on the following HPC platforms:
    * Ithaca (IC3 machine)
    * Stargate (IC3 machine)
    * MareNostrum (BSC machine)
    * MareNostrum3 (BSC machine)
+   * MareNostrum4 (BSC machine)
+   * MareNostrum5 (BSC machine)
    * HECToR (EPCC machine)
    * Lindgren (PDC machine)
    * C2A (ECMWF machine)
    * CCA (ECMWF machine)
+   * ATOS (ECMWF machine)
    * ARCHER (EPCC machine)
+   * Levante (DKRZ machine)
+   * Lumi (CSC machine)
+   * Juwels (Jülich machine)
+   * Fugaku (RIKEN machine)
+   * MeluXina (LXP machine)
 
 - Pre-requisites: These packages (bash, python2, sqlite3, git-scm > 1.8.2, subversion, dialog*) must be available at local
   machine. These packages (argparse, dateutil, pyparsing, numpy, pydotplus, matplotlib, paramiko,
@@ -84,7 +104,7 @@ First character is a letter, the other three alfa-numeric characters allow to id
 
 Cautions: 
 - Before launching autosubmit check the following stuff:
-> ssh ithaca # (for example) check other HPC platforms where password-less ssh is feasible.
+> ssh marenostrum5 # (for example) check other HPC platforms where password-less ssh is feasible.
 - After launching autosubmit, one must be aware of login expiry limit and policy (if applicable for any HPC)
 and renew the login access accordingly (by using token/key etc) before expiry.
 
