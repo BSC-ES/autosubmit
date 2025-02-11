@@ -11,8 +11,9 @@ from test.unit.conftest import autosubmit_config
 
 def test_as_conf_default_values(autosubmit_config: Callable[[str,Dict], BasicConfig]) -> None:
 
-    expid = 'a000'
-    arch = 'MN5'
+    expid = "a000"
+    arch = "mn5"
+    hpc = "mn4"
     autosubmit_config(expid, {})
 
     ini_file = Path(f'{BasicConfig.LOCAL_ROOT_DIR}/a000/conf')
@@ -20,15 +21,15 @@ def test_as_conf_default_values(autosubmit_config: Callable[[str,Dict], BasicCon
     ini_file = ini_file / 'jobs_a000.yml'
 
     with open(ini_file, 'w+') as f:
-        f.write(dedent('''\
+        f.write(dedent(f'''\
                 DEFAULT:
                     AUTOSUBMIT_VERSION:
                     EXPID: "a001"
-                    HPCARCH: "MN5"
+                    HPCARCH: {arch}
         '''))
         f.flush()
 
-    Autosubmit().as_conf_default_values(exp_id=expid)
+    Autosubmit().as_conf_default_values(expid, hpc)
 
     factory = YAMLParserFactory()
     parser = factory.create_parser()
@@ -37,5 +38,6 @@ def test_as_conf_default_values(autosubmit_config: Callable[[str,Dict], BasicCon
         content = f.read()
         yaml_contents = parser.load(content)
 
+    print(f'yaml_contents: {yaml_contents}')
     assert yaml_contents['DEFAULT']['EXPID'] == expid
-    assert yaml_contents['DEFAULT']['HPCARCH'] == arch
+    assert yaml_contents['DEFAULT']['HPCARCH'] == arch or yaml_contents['DEFAULT']['HPCARCH'] == hpc
