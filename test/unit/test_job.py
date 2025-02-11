@@ -1153,6 +1153,24 @@ CONFIG:
         self.assertEqual("1975", parameters['CHUNK_END_YEAR'])
         self.assertEqual("05", parameters['CHUNK_END_MONTH'])
         self.assertEqual("26", parameters['CHUNK_END_DAY'])
+        self.assertEqual("22", parameters['CHUNK_END_HOUR'])
+        self.assertEqual("1975", parameters['CHUNK_SECOND_TO_LAST_YEAR'])
+
+        self.assertEqual("05", parameters['CHUNK_SECOND_TO_LAST_MONTH'])
+        self.assertEqual("25", parameters['CHUNK_SECOND_TO_LAST_DAY'])
+        self.assertEqual("22", parameters['CHUNK_SECOND_TO_LAST_HOUR'])
+        self.assertEqual('1975052522', parameters['CHUNK_START_DATE'])
+        self.assertEqual('1975052622', parameters['CHUNK_END_DATE'])
+        self.assertEqual('1975052522', parameters['CHUNK_SECOND_TO_LAST_DATE'])
+        self.assertEqual('1975052422', parameters['DAY_BEFORE'])
+        self.assertEqual('1', parameters['RUN_DAYS'])
+
+        self.job.chunk = 2
+        parameters = {"EXPERIMENT.NUMCHUNKS": 3, "EXPERIMENT.CHUNKSIZEUNIT": "hour"}
+        parameters = self.job.update_parameters(self.as_conf, parameters)
+        self.assertEqual(2, parameters['CHUNK'])
+        self.assertEqual("FALSE", parameters['CHUNK_FIRST'])
+        self.assertEqual("FALSE", parameters['CHUNK_LAST'])
 
 
     def test_get_from_total_stats(self):
