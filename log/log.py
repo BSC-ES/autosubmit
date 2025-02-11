@@ -203,7 +203,6 @@ class Log:
         timeout = 5
 
         while not os.path.exists(file_path) and retries < max_retries:
-            sleep(timeout*retries)
             try:
                 directory, filename = os.path.split(file_path)
                 if not os.path.exists(directory):
@@ -243,7 +242,7 @@ class Log:
                     Log.log.addHandler(status_file_handler)
                 os.chmod(file_path, 509)
             except Exception: # retry again
-                pass
+                sleep(timeout * retries)
 
     @staticmethod
     def reset_status_file(file_path,type='status', level=WARNING):

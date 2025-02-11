@@ -1,22 +1,23 @@
 # Fixtures available to multiple test files must be created in this file.
+import os
 import pwd
-from contextlib import suppress
-
 import pytest
 from dataclasses import dataclass
 from pathlib import Path
 from ruamel.yaml import YAML
 from shutil import rmtree
 from tempfile import TemporaryDirectory
-from typing import Any, Dict, Callable, List, Protocol, Optional
-import os
+from time import time
+from typing import Any, Dict, Callable, List, Protocol, Optional, TYPE_CHECKING
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
-from time import time
+
+if TYPE_CHECKING:
+    import pytest_mock
 
 
 @dataclass
@@ -46,7 +47,7 @@ def autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> Ca
 
         # directories used when searching for logs to cat
         exp_tmp_dir = BasicConfig.expid_tmp_dir(expid)
-        aslogs_dir = BasicConfig.expid_aslog_dir(expid)
+        aslogs_dir = BasicConfig.expid_aslog_dir(expid) 
         status_dir = exp_path / 'status'
         if not os.path.exists(aslogs_dir):
             os.makedirs(aslogs_dir)
@@ -124,8 +125,7 @@ def create_as_conf() -> Callable:  # May need to be changed to use the autosubmi
     return _create_as_conf
 
 
-class AutosubmitConfigFactory(
-    Protocol):  # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
+class AutosubmitConfigFactory(Protocol):  # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
 
     def __call__(self, expid: str, experiment_data: Optional[Dict], *args: Any, **kwargs: Any) -> AutosubmitConfig: ...
 
@@ -133,7 +133,8 @@ class AutosubmitConfigFactory(
 @pytest.fixture(scope="function")
 def autosubmit_config(
         request: pytest.FixtureRequest,
-        mocker: "pytest_mock.MockerFixture") -> AutosubmitConfigFactory:
+        mocker: "pytest_mock.MockerFixture",
+        prepare_basic_config: BasicConfig) -> AutosubmitConfigFactory:
     """Return a factory for ``AutosubmitConfig`` objects.
 
     Abstracts the necessary mocking in ``AutosubmitConfig`` and related objects,
@@ -146,22 +147,24 @@ def autosubmit_config(
     """
 
     original_root_dir = BasicConfig.LOCAL_ROOT_DIR
-    tmp_dir = TemporaryDirectory()
-    tmp_path = Path(tmp_dir.name)
 
     # Mock this as otherwise BasicConfig.read resets our other mocked values above.
     mocker.patch.object(BasicConfig, "read", autospec=True)
 
     def _create_autosubmit_config(expid: str, experiment_data: Dict = None, *_, **kwargs) -> AutosubmitConfig:
         """Create an instance of ``AutosubmitConfig``."""
-        root_dir = tmp_path
-        BasicConfig.LOCAL_ROOT_DIR = str(root_dir)
-        exp_path = root_dir / expid
+        for k, v in prepare_basic_config.__dict__.items():
+            setattr(BasicConfig, k, v)
+        exp_path = BasicConfig.LOCAL_ROOT_DIR / expid
         exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
         aslogs_dir = exp_tmp_dir / BasicConfig.LOCAL_ASLOG_DIR
         conf_dir = exp_path / "conf"
-        aslogs_dir.mkdir(parents=True)
+        Path(aslogs_dir).mkdir(parents=True, exist_ok=True)
         conf_dir.mkdir()
+        db_path = Path(BasicConfig.DB_PATH)
+        db_path.touch()
+        global_logs = Path(BasicConfig.GLOBAL_LOG_DIR)
+        global_logs.mkdir(parents=True, exist_ok=True)
 
         if not expid:
             raise ValueError("No value provided for expid")
@@ -179,8 +182,6 @@ def autosubmit_config(
 
     def finalizer() -> None:
         BasicConfig.LOCAL_ROOT_DIR = original_root_dir
-        with suppress(FileNotFoundError):
-            rmtree(tmp_path)
 
     request.addfinalizer(finalizer)
 
@@ -190,9 +191,10 @@ def autosubmit_config(
 @pytest.fixture
 def prepare_basic_config(tmpdir):
     basic_conf = BasicConfig()
-    BasicConfig.DB_DIR = (tmpdir / "exp_root")
+    BasicConfig.DB_DIR = tmpdir / "exp_root"
     BasicConfig.DB_FILE = "debug.db"
-    BasicConfig.LOCAL_ROOT_DIR = (tmpdir / "exp_root")
+    BasicConfig.DB_PATH = BasicConfig.DB_DIR / BasicConfig.DB_FILE
+    BasicConfig.LOCAL_ROOT_DIR = tmpdir / "exp_root"
     BasicConfig.LOCAL_TMP_DIR = "tmp"
     BasicConfig.LOCAL_ASLOG_DIR = "ASLOGS"
     BasicConfig.LOCAL_PROJ_DIR = "proj"
@@ -203,7 +205,8 @@ def prepare_basic_config(tmpdir):
     BasicConfig.MAIL_FROM = ""
     BasicConfig.ALLOWED_HOSTS = ""
     BasicConfig.DENIED_HOSTS = ""
-    BasicConfig.CONFIG_FILE_FOUND = False
+    BasicConfig.CONFIG_FILE_FOUND = True
+    BasicConfig.GLOBAL_LOG_DIR = tmpdir / "global_logs"
     return basic_conf
 
 
