@@ -1,35 +1,36 @@
-#!/usr/bin/env python3
-import copy
-
-import math
-
-from networkx.classes import DiGraph
-
-from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
-from log.log import Log, AutosubmitCritical
-from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates, add_hours
-
 # Copyright 2017-2020 Earth Sciences Department, BSC-CNS
-
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import math
 import os
+from typing import Dict, Optional, TYPE_CHECKING
+
+from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates
+from networkx.classes import DiGraph
+
+from autosubmit.job.job_common import Status
 from autosubmit.job.job_package_persistence import JobPackagePersistence
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmitconfigparser.config.basicconfig import BasicConfig
-from typing import Dict
+from log.log import Log, AutosubmitCritical
+
+if TYPE_CHECKING:
+    from autosubmit.job.job_list import JobList
+
 
 CALENDAR_UNITSIZE_ENUM = {
     "hour": 0,
@@ -466,3 +467,58 @@ class SubJobManager(object):
         """
         """
         return self.subjobfixes
+
+
+def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status=Optional[str]) -> None:
+    """Cancel jobs on platforms.
+
+    It receives a list ``active_jobs_filter`` of statuses to filter jobs for their statuses,
+    and the ones that pass the filter are treated as "ACTIVE".
+
+    It also receives a target status, ``target_status``, which is used to change the jobs
+    that were found (with the filter above) to this new status.
+
+    It raises ``ValueError`` if the target status is invalid, and returns immediately if the
+    filter does not find any "ACTIVE" jobs.
+
+    It will iterate the list of active jobs, sending commands to cancel them (varies per platform).
+    After the command was issued, regardless whether successful or not, it finishes by changing
+    the status of the jobs.
+
+    It finishes saving the job list, to persist the jobs with their updated target statuses.
+
+    NOTE: For consistency, an experiment must be stopped before its jobs are cancelled.
+
+    :param job_list: Autosubmit job list object.
+    :type job_list: JobList
+    :param active_jobs_filter: Filter used to identify jobs considered active.
+    :type active_jobs_filter: List[str]
+    :param target_status: Final status of the jobs cancelled.
+    :type target_status: str|None
+    """
+    if not target_status or target_status not in Status.VALUE_TO_KEY.values():
+        raise AutosubmitCritical(f'Cancellation target status of jobs is not valid: {target_status}')
+
+    target_status = target_status.upper()
+
+    if active_jobs_filter is None:
+        active_jobs_filter = []
+
+    active_jobs = [job for job in job_list.get_job_list() if job.status in active_jobs_filter]
+
+    if not active_jobs:
+        Log.info(f"No active jobs found for expid {job_list.expid}")
+        return
+
+    for job in active_jobs:
+        # Cancel from the remote platform
+        Log.info(f'Cancelling job {job.name} on platform {job.platform.name}')
+        try:
+            job.platform.send_command(f'{job.platform.cancel_cmd} {str(job.id)}', ignore_log=True)
+        except Exception as e:
+            Log.warning(f"Failed to cancel job {job.name} on platform {job.platform.name}: {str(e)}")
+
+        Log.info(f"Changing status of job {job.name} to {target_status}")
+        job.status = Status.KEY_TO_VALUE[target_status]
+
+    job_list.save()
