@@ -58,7 +58,7 @@ Defaults to: None
 
 (Personal user action): The user must set the environment variable "AS_ENV_SSH_CONFIG_PATH" to point to a file that contains the personal ~/.ssh/config file.
 
-Defaults to: "~/.ssh/config" or "~/.ssh/config_${SUDO_USER}" if the env variable: "AS_ENV_PLATFORMS_PATH" is set.
+Defaults to: "~/.ssh/config" or "~/.ssh/config_${SUDO_USER}" if the env variable: "AS_ENV_SSH_CONFIG_PATH" is set.
 
 
 How to activate it with examples
