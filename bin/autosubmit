@@ -63,5 +63,9 @@ def main():
 
 
 if __name__ == "__main__":
+    # TODO: we need to define whether the function called here will return an int or bool
     exit_code = main()
-    sys.exit(exit_code)  # Sys.exit ensures a proper cleanup of the program, while os._exit() does not.
+    if type(exit_code) is int:
+        sys.exit(exit_code)  # Sys.exit ensures a proper cleanup of the program, while os._exit() does not.
+    else:
+        sys.exit(0 if exit_code else 1)
