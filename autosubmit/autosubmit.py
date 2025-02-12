@@ -2158,7 +2158,7 @@ class Autosubmit:
             profiler = Profiler(expid)
             profiler.start()
 
-        # Initialize common folders
+        # Initialize common folders'
         try:
             exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
             tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -2175,7 +2175,7 @@ class Autosubmit:
                     job_list, submitter , exp_history, host , as_conf, platforms_to_test, packages_persistence, _ = Autosubmit.prepare_run(expid, notransitive, start_time, start_after, run_only_members)
                 except AutosubmitCritical as e:
                     #e.message += " HINT: check the CUSTOM_DIRECTIVE syntax in your jobs configuration files."
-                    raise AutosubmitCritical(e.message, 7014, e.trace)
+                    raise
                 except Exception as e:
                     raise AutosubmitCritical("Error in run initialization", 7014, str(e))  # Changing default to 7014
                 Log.debug("Running main running loop")
