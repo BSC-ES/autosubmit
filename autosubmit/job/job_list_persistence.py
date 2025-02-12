@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import gc
 # Copyright 2017-2020 Earth Sciences Department, BSC-CNS
 
 # This file is part of Autosubmit.
@@ -18,7 +18,7 @@
 
 import os
 import pickle
-from sys import setrecursionlimit
+from sys import setrecursionlimit, getrecursionlimit
 import shutil
 from autosubmit.database.db_manager import DbManager
 from log.log import AutosubmitCritical, Log
@@ -82,18 +82,14 @@ class JobListPersistencePkl(JobListPersistence):
             try:
                 shutil.copy(path, path_tmp)
                 with open(path_tmp, 'rb') as fd:
-                    graph = pickle.load(fd)
+                    current_limit = getrecursionlimit()
+                    setrecursionlimit(100000)
+                    job_list = pickle.load(fd)
+                    setrecursionlimit(current_limit)
             finally:
                 os.remove(path_tmp)
-            for u in ( node for node in graph ):
-                # Set after the dependencies are set
-                graph.nodes[u]["job"].children = set()
-                graph.nodes[u]["job"].parents = set()
-                # Set in recovery/run
-                graph.nodes[u]["job"]._platform = None
-                graph.nodes[u]["job"]._serial_platform = None
-                graph.nodes[u]["job"].submitter = None
-            return graph
+
+            return job_list
 
     def save(self, persistence_path, persistence_file, job_list, graph):
         """
@@ -107,13 +103,16 @@ class JobListPersistencePkl(JobListPersistence):
         path = os.path.join(persistence_path, persistence_file + '.pkl' + '.tmp')
         with suppress(FileNotFoundError, PermissionError):
             os.remove(path)
-
-        setrecursionlimit(500000000)
         Log.debug("Saving JobList: " + path)
         with open(path, 'wb') as fd:
-            pickle.dump(graph, fd, pickle.HIGHEST_PROTOCOL)
+            current_limit = getrecursionlimit()
+            setrecursionlimit(100000)
+            pickle.dump({job.name: job.__getstate__() for job in job_list}, fd, pickle.HIGHEST_PROTOCOL)
+            setrecursionlimit(current_limit)
+            gc.collect()  # Tracemalloc show leaks without this
         os.replace(path, path[:-4])
         Log.debug(f'JobList saved in {path[:-4]}')
+
 
 
 class JobListPersistenceDb(JobListPersistence):

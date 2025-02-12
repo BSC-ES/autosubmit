@@ -400,3 +400,90 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
     assert_files_recovered(files_check_list)
     # TODO: GITLAB pipeline is not returning 0 or 1 for check_exit_code(final_status, exit_code)
     # assert_exit_code(final_status, exit_code)
+
+@pytest.mark.parametrize("jobs_data, expected_db_entries, final_status", [
+    # Success
+    ("""
+    EXPERIMENT:
+        NUMCHUNKS: '3'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World with id=Success"
+            PLATFORM: local
+            RUNNING: chunk
+            wallclock: 00:01
+    """, 3, "COMPLETED"),  # Number of jobs
+    # Success wrapper
+    ("""
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World with id=Success + wrappers"
+            DEPENDENCIES: job-1
+            PLATFORM: local
+            RUNNING: chunk
+            wallclock: 00:01
+        job2:
+            SCRIPT: |
+                echo "Hello World with id=Success + wrappers"
+            DEPENDENCIES: job2-1
+            PLATFORM: local
+            RUNNING: chunk
+            wallclock: 00:01
+    wrappers:
+        wrapper:
+            JOBS_IN_WRAPPER: job
+            TYPE: vertical
+        wrapper2:
+            JOBS_IN_WRAPPER: job2
+            TYPE: vertical
+    """, 4, "COMPLETED"),  # Number of jobs
+    # Failure
+    ("""
+    JOBS:
+        job:
+            SCRIPT: |
+                decho "Hello World with id=FAILED"
+            PLATFORM: local
+            RUNNING: chunk
+            wallclock: 00:01
+            retrials: 2  # In local, it started to fail at 18 retrials.
+    """, (2+1)*3, "FAILED"),  # Retries set (N + 1) * number of jobs to run
+    # Failure wrappers
+    ("""
+    JOBS:
+        job:
+            SCRIPT: |
+                decho "Hello World with id=FAILED + wrappers"
+            PLATFORM: local
+            DEPENDENCIES: job-1
+            RUNNING: chunk
+            wallclock: 00:10
+            retrials: 2
+    wrappers:
+        wrapper:
+            JOBS_IN_WRAPPER: job
+            TYPE: vertical
+    """, (2+1)*1, "FAILED"),   # Retries set (N + 1) * job chunk 1 ( the rest shouldn't run )
+], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
+def test_run_interrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries, final_status):
+    from time import sleep
+    log_dir = init_run(run_tmpdir, jobs_data)
+    # Run the experiment
+    exit_code = Autosubmit.run_experiment(expid='t000')
+    sleep(2)
+    Autosubmit.stop(all=False, cancel=False, current_status='SUBMITTED, QUEUING, RUNNING', expids='t000', force=True,
+                    force_all=False, status='FAILED')
+    Autosubmit.run_experiment(expid='t000')
+    # Check and display results
+    db_check_list = check_db_fields(run_tmpdir, expected_db_entries, final_status)
+    files_check_list = check_files_recovered(run_tmpdir, log_dir, expected_files=expected_db_entries*2)
+
+    # Assert
+    assert_db_fields(db_check_list)
+    assert_files_recovered(files_check_list)
+    # TODO: GITLAB pipeline is not returning 0 or 1 for check_exit_code(final_status, exit_code)
+    # assert_exit_code(final_status, exit_code)

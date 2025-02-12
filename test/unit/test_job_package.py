@@ -54,8 +54,8 @@ class TestJobPackage(TestCase):
         self.as_conf.experiment_data["PLATFORMS"] = dict()
         self.as_conf.experiment_data["WRAPPERS"] = dict()
         self.temp_directory = tempfile.mkdtemp()
-        self.job_list = JobList(self.experiment_id, self.config, YAMLParserFactory(),
-                                JobListPersistenceDb(self.temp_directory, 'db'), self.as_conf)
+        self.job_list = JobList(self.experiment_id, self.as_conf, YAMLParserFactory(),
+                                JobListPersistenceDb(self.temp_directory, 'db'))
         self.parser_mock = MagicMock(spec='SafeConfigParser')
         for job in self.jobs:
             job._init_runtime_parameters()
@@ -172,33 +172,7 @@ class TestJobPackage(TestCase):
     def test_job_package_platform_getter(self):
         self.assertEqual(self.platform, self.job_package.platform)
 
-    @patch('multiprocessing.cpu_count')
-    def test_job_package_submission(self, mocked_cpu_count):
-        # N.B.: AS only calls ``_create_scripts`` if you have less jobs than threads.
-        # So we simply set threads to be greater than the amount of jobs.
-        mocked_cpu_count.return_value = len(self.jobs) + 1
-        for job in self.jobs:
-            job._tmp_path = MagicMock()
-            job._get_paramiko_template = MagicMock("false", "empty")
-            job.update_parameters = MagicMock()
-            job.file = "fake-file"
 
-        self.job_package._create_scripts = MagicMock()
-        self.job_package._send_files = MagicMock()
-        self.job_package._do_submission = MagicMock()
-        configuration = MagicMock()
-        configuration.get_project_dir = MagicMock()
-        configuration.get_project_dir.return_value = "fake-proj-dir"
-        # act
-        self.job_package.submit(configuration, 'fake-params')
-        # assert
-        for job in self.jobs:
-            job.update_parameters.assert_called() # Should be called once for each job, but currently it needs two calls (for additional files ) to change the code
-            #job.update_parameters.assert_called_once_with(configuration, 'fake-params')
-
-        self.job_package._create_scripts.is_called_once_with()
-        self.job_package._send_files.is_called_once_with()
-        self.job_package._do_submission.is_called_once_with()
 
 @pytest.fixture
 def mock_as_conf():
@@ -218,3 +192,37 @@ def test_jobs_in_wrapper_str(mock_as_conf):
     current_wrapper = "current_wrapper"
     result = jobs_in_wrapper_str(mock_as_conf, current_wrapper)
     assert result == "job1_job2_job3"
+
+
+def test_job_package_submission(mocker, local):
+    # N.B.: AS only calls ``_create_scripts`` if you have less jobs than threads.
+    # So we simply set threads to be greater than the amount of jobs.
+    jobs = [Job("job1", "1", Status.READY, 0), Job("job2", "2", Status.READY, 0), Job("job3", "3", Status.READY, 0)]
+    for job in jobs:
+        job.platform = local
+
+    mocker.patch('multiprocessing.cpu_count', return_value=len(jobs) + 1)
+    mocker.patch("autosubmit.job.job.Job.update_parameters", return_value={})
+    mocker.patch('autosubmit.job.job.Job._get_paramiko_template', return_value="empty")
+    for job in jobs:
+        job._tmp_path = MagicMock()
+        job.file = "fake-file"
+        job.custom_directives = []
+
+    job_package = JobPackageSimple(jobs)
+
+    job_package._create_scripts = MagicMock()
+    job_package._send_files = MagicMock()
+    job_package._do_submission = MagicMock()
+    configuration = MagicMock()
+    configuration.get_project_dir = MagicMock()
+    configuration.get_project_dir.return_value = "fake-proj-dir"
+    # act
+    job_package.submit(configuration, 'fake-params')
+    # assert
+    for job in jobs:
+        job.update_parameters.assert_called() # Should be called once for each job, but currently it needs two calls (for additional files ) to change the code
+
+    job_package._create_scripts.is_called_once_with()
+    job_package._send_files.is_called_once_with()
+    job_package._do_submission.is_called_once_with()

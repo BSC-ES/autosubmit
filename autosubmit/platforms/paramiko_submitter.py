@@ -151,7 +151,6 @@ class ParamikoSubmitter(Submitter):
                 else:
                     platform_type_value = platform_type or "<not defined>"
                     raise AutosubmitCritical(f"PLATFORMS.{section.upper()}.TYPE: {platform_type_value} for {section.upper()} is not supported", 7012)
-                remote_platform.main_process_id = os.getpid()
             except ParamikoPlatformException as e:
                 Log.error("Queue exception: {0}".format(str(e)))
                 return None

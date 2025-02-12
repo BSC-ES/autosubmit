@@ -72,8 +72,11 @@ class ParamikoPlatform(Platform):
         display = os.getenv('DISPLAY')
         if display is None:
             display = "localhost:0"
-        self.local_x11_display = xlib_connect.get_display(display)
-
+        try:
+            self.local_x11_display = xlib_connect.get_display(display)
+        except Exception as e:
+            Log.warning(f"X11 display not found: {e}")
+            self.local_x11_display = None
     @property
     def header(self):
         """
@@ -113,7 +116,11 @@ class ParamikoPlatform(Platform):
         display = os.getenv('DISPLAY')
         if display is None:
             display = "localhost:0"
-        self.local_x11_display = xlib_connect.get_display(display)
+        try:
+            self.local_x11_display = xlib_connect.get_display(display)
+        except Exception as e:
+            Log.warning(f"X11 display not found: {e}")
+            self.local_x11_display = None
     def test_connection(self,as_conf):
         """
         Test if the connection is still alive, reconnect if not.
@@ -268,12 +275,20 @@ class ParamikoPlatform(Platform):
             display = os.getenv('DISPLAY')
             if display is None:
                 display = "localhost:0"
-            self.local_x11_display = xlib_connect.get_display(display)
+            try:
+                self.local_x11_display = xlib_connect.get_display(display)
+            except Exception as e:
+                Log.warning(f"X11 display not found: {e}")
+                self.local_x11_display = None
             self._ssh = paramiko.SSHClient()
             self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self._ssh_config = paramiko.SSHConfig()
-            if as_conf is not None:
+            if as_conf:
                 self.map_user_config_file(as_conf)
+            else:
+                with open(os.path.expanduser("~/.ssh/config"), "r") as fd:
+                    self._ssh_config.parse(fd)
+
             self._host_config = self._ssh_config.lookup(self.host)
             if "," in self._host_config['hostname']:
                 if reconnect:
@@ -1017,7 +1032,11 @@ class ParamikoPlatform(Platform):
                     display = os.getenv('DISPLAY')
                     if display is None or not display:
                         display = "localhost:0"
-                    self.local_x11_display = xlib_connect.get_display(display)
+                    try:
+                        self.local_x11_display = xlib_connect.get_display(display)
+                    except Exception as e:
+                        Log.warning(f"X11 display not found: {e}")
+                        self.local_x11_display = None
                     chan = self.transport.open_session()
                     chan.request_x11(single_connection=False,handler=self.x11_handler)
                 else:
@@ -1212,7 +1231,7 @@ class ParamikoPlatform(Platform):
         """
         raise NotImplementedError
 
-    def open_submit_script(self):
+    def generate_submit_script(self):
         pass
 
     def get_submit_script(self):
@@ -1332,7 +1351,7 @@ class ParamikoPlatform(Platform):
         """
         raise NotImplementedError
 
-    def get_header(self, job):
+    def get_header(self, job, parameters):
         """
         Gets header to be used by the job
 
@@ -1341,7 +1360,7 @@ class ParamikoPlatform(Platform):
         :return: header to use
         :rtype: str
         """
-        if str(job.wrapper_type).lower() != "vertical":
+        if not job.packed or str(job.wrapper_type).lower() != "vertical":
             out_filename = "{0}.cmd.out.{1}".format(job.name,job.fail_count)
             err_filename = "{0}.cmd.err.{1}".format(job.name,job.fail_count)
         else:
@@ -1349,7 +1368,7 @@ class ParamikoPlatform(Platform):
             err_filename = "{0}.cmd.err".format(job.name)
 
         if len(job.het) > 0:
-            header = self.header.calculate_het_header(job)
+            header = self.header.calculate_het_header(job, parameters)
         elif str(job.processors) == '1':
             header = self.header.SERIAL
         else:
@@ -1360,19 +1379,19 @@ class ParamikoPlatform(Platform):
         if job.het.get("HETSIZE",0) <= 1:
             if hasattr(self.header, 'get_queue_directive'):
                 header = header.replace(
-                    '%QUEUE_DIRECTIVE%', self.header.get_queue_directive(job))
+                    '%QUEUE_DIRECTIVE%', self.header.get_queue_directive(job, parameters))
             if hasattr(self.header, 'get_proccesors_directive'):
                 header = header.replace(
-                    '%NUMPROC_DIRECTIVE%', self.header.get_proccesors_directive(job))
+                    '%NUMPROC_DIRECTIVE%', self.header.get_proccesors_directive(job, parameters))
             if hasattr(self.header, 'get_partition_directive'):
                 header = header.replace(
-                    '%PARTITION_DIRECTIVE%', self.header.get_partition_directive(job))
+                    '%PARTITION_DIRECTIVE%', self.header.get_partition_directive(job, parameters))
             if hasattr(self.header, 'get_tasks_per_node'):
                 header = header.replace(
-                    '%TASKS_PER_NODE_DIRECTIVE%', self.header.get_tasks_per_node(job))
+                    '%TASKS_PER_NODE_DIRECTIVE%', self.header.get_tasks_per_node(job, parameters))
             if hasattr(self.header, 'get_threads_per_task'):
                 header = header.replace(
-                    '%THREADS_PER_TASK_DIRECTIVE%', self.header.get_threads_per_task(job))
+                    '%THREADS_PER_TASK_DIRECTIVE%', self.header.get_threads_per_task(job, parameters))
             if job.x11:
                 header = header.replace(
                     '%X11%', "SBATCH --x11=batch")
@@ -1381,34 +1400,34 @@ class ParamikoPlatform(Platform):
                     '%X11%', "")
             if hasattr(self.header, 'get_scratch_free_space'):
                 header = header.replace(
-                    '%SCRATCH_FREE_SPACE_DIRECTIVE%', self.header.get_scratch_free_space(job))
+                    '%SCRATCH_FREE_SPACE_DIRECTIVE%', self.header.get_scratch_free_space(job, parameters))
             if hasattr(self.header, 'get_custom_directives'):
                 header = header.replace(
-                    '%CUSTOM_DIRECTIVES%', self.header.get_custom_directives(job))
+                    '%CUSTOM_DIRECTIVES%', self.header.get_custom_directives(job, parameters))
             if hasattr(self.header, 'get_exclusive_directive'):
                 header = header.replace(
-                    '%EXCLUSIVE_DIRECTIVE%', self.header.get_exclusive_directive(job))
+                    '%EXCLUSIVE_DIRECTIVE%', self.header.get_exclusive_directive(job, parameters))
             if hasattr(self.header, 'get_account_directive'):
                 header = header.replace(
-                    '%ACCOUNT_DIRECTIVE%', self.header.get_account_directive(job))
+                    '%ACCOUNT_DIRECTIVE%', self.header.get_account_directive(job, parameters))
             if hasattr(self.header, 'get_shape_directive'):
                 header = header.replace(
-                    '%SHAPE_DIRECTIVE%', self.header.get_shape_directive(job))
+                    '%SHAPE_DIRECTIVE%', self.header.get_shape_directive(job, parameters))
             if hasattr(self.header, 'get_nodes_directive'):
                 header = header.replace(
-                    '%NODES_DIRECTIVE%', self.header.get_nodes_directive(job))
+                    '%NODES_DIRECTIVE%', self.header.get_nodes_directive(job, parameters))
             if hasattr(self.header, 'get_reservation_directive'):
                 header = header.replace(
-                    '%RESERVATION_DIRECTIVE%', self.header.get_reservation_directive(job))
+                    '%RESERVATION_DIRECTIVE%', self.header.get_reservation_directive(job, parameters))
             if hasattr(self.header, 'get_memory_directive'):
                 header = header.replace(
-                    '%MEMORY_DIRECTIVE%', self.header.get_memory_directive(job))
+                    '%MEMORY_DIRECTIVE%', self.header.get_memory_directive(job, parameters))
             if hasattr(self.header, 'get_memory_per_task_directive'):
                 header = header.replace(
-                    '%MEMORY_PER_TASK_DIRECTIVE%', self.header.get_memory_per_task_directive(job))
+                    '%MEMORY_PER_TASK_DIRECTIVE%', self.header.get_memory_per_task_directive(job, parameters))
             if hasattr(self.header, 'get_hyperthreading_directive'):
                 header = header.replace(
-                    '%HYPERTHREADING_DIRECTIVE%', self.header.get_hyperthreading_directive(job))
+                    '%HYPERTHREADING_DIRECTIVE%', self.header.get_hyperthreading_directive(job, parameters))
         return header
 
     def closeConnection(self):
