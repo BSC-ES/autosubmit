@@ -104,7 +104,7 @@ exts_list = [
         'sources': [{
             'filename': '%(name)s-%(version)s.tar.gz',
             'git_config': {
-                'url': 'https://earth.bsc.es/gitlab/es',
+                'url': 'https://github.com/BSC-ES/',
                 'repo_name': 'autosubmit',
                 'commit': '%(branch)s',
                 'recursive': True,

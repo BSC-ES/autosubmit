@@ -2,7 +2,7 @@
 
 **Documentation:** http://autosubmit.readthedocs.io/en/latest/
 
-**GitLab:** https://earth.bsc.es/gitlab/es/autosubmit
+**GitHub:** https://github.com/BSC-ES/autosubmit
 
 **Mailing list:** autosubmit@bsc.es
 
