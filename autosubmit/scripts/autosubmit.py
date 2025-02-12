@@ -29,6 +29,8 @@ sys.path.append(script_dir)
 sys.path.append(os.path.normpath(os.path.join(script_dir, os.pardir)))
 # noinspection PyUnresolvedReferences
 from log.log import Log, AutosubmitCritical, AutosubmitError  # noqa: E402
+import sys
+import os
 
 from autosubmit import delete_lock_file, exit_from_error  # noqa: E402
 from autosubmit.autosubmit import Autosubmit  # noqa: E402
