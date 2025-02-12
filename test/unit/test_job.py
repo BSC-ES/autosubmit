@@ -6,7 +6,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from typing import Callable
 
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
 import datetime
