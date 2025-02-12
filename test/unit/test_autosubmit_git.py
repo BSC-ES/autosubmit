@@ -16,8 +16,13 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Tests for ``AutosubmitGit``."""
+from getpass import getuser
+from pathlib import Path
+from typing import Callable
 
 import pytest
+from pytest_mock import MockerFixture
+from ruamel.yaml import YAML
 
 from autosubmit.git.autosubmit_git import AutosubmitGit
 from log.log import AutosubmitCritical
@@ -88,8 +93,8 @@ def test_submodules_list_not_empty(mocker, autosubmit_config):
     assert clone_me_a_in_any_call
 
 
-def test_submodules_falsey_disables_submodules(mocker, autosubmit_config):
-    """Verifies that submodules are not used when users pass a Falsey bool value."""
+def test_submodules_false_disables_submodules(mocker, autosubmit_config):
+    """Verifies that submodules are not used when users pass a False bool value."""
     as_conf = autosubmit_config(_EXPID, {
         'GIT': {
             'PROJECT_ORIGIN': 'https://earth.bsc.es/gitlab/es/autosubmit.git',
@@ -174,3 +179,80 @@ def test_copy_code(autosubmit_config, config, mocker, autosubmit):
     as_conf = autosubmit_config(expid, config)
     mocker.patch('autosubmit.git.autosubmit_git.AutosubmitGit.clone_repository', return_value=True)
     assert autosubmit._copy_code(as_conf, expid, "git", True)
+
+
+@pytest.mark.parametrize(
+    "git_repo, expected",
+    [
+        ("https://github.com/user/repo.git", True),         # valid GH link
+        ("file:///home/user/project", True),                # valid file link
+        ("not-a-repo-link", False),                         # invalid
+        ("git@github.com:user/repo.git", True),             # SSH format
+        ("user@gitserver.com:user/repo.git", True),         # SSH format
+        ("http://bitbucket.org/user/repo.git", True),       # valid git host
+        ("ftp://invalid/protocol/repo.git", False),         # invalid protocol
+        ("", False),                                        # empty string
+        ("file://", False),                                 # incomplete file URL
+        ("https://github.com/user/repo", False),            # missing .git
+    ]
+)
+def test_valid_git_repo_check(git_repo: str, expected: str) -> None:
+    assert AutosubmitGit.is_git_repo(git_repo) == expected
+
+
+def _get_experiment_data(tmp_path):
+    _user = getuser()
+
+    return {
+        'PLATFORMS': {
+            'pytest-ps': {
+                'type': 'ps',
+                'host': '127.0.0.1',
+                'user': _user,
+                'project': 'whatever',
+                'scratch': str(tmp_path / 'scratch'),
+                'DISABLE_RECOVERY_THREADS': 'True'
+            }
+        },
+        'JOBS': {
+            'debug': {
+                'SCRIPT': 'echo "Hello world"',
+                'RUNNING': 'once'
+            },
+        }
+    }
+
+
+@pytest.mark.parametrize(
+    "project_type,expid",
+    [
+        ('git', 'o001'),
+        ('git', 'a001'),
+        ('git', 't001'),
+        ('git', 'e001'),
+    ]
+)
+def test_remote_repo_operational(project_type: str, expid: str, tmp_path: Path, autosubmit_exp: Callable,
+                                 autosubmit, mocker: MockerFixture) -> None:
+    """
+    Tests the check_unpushed_changed function from AutosubmitGit.
+
+    Ensures no operational test with unpushed changes in their Git repository is run.
+    """
+    as_exp = autosubmit_exp(expid, _get_experiment_data(tmp_path))
+    run_dir = Path(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR)
+    temp_path = run_dir / expid / "conf" / f"expdef_{expid}.yml"
+
+    with open(temp_path, 'r') as f:
+        yaml = YAML(typ='rt')
+        data = yaml.load(f)
+    data["PROJECT"]["PROJECT_TYPE"] = project_type
+    with open(temp_path, 'w') as f:
+        yaml.dump(data, f)
+
+    mocker.patch('subprocess.check_output', return_value=b'M\n')
+    if expid[0] != 'o':
+        AutosubmitGit.check_unpushed_changes(expid)
+    else:
+        with pytest.raises(AutosubmitCritical):
+            AutosubmitGit.check_unpushed_changes(expid)
