@@ -5,7 +5,7 @@ Installation
 How to install
 ==============
 
-The Autosubmit code is hosted in Git, at the BSC GitLab public repository. The Autosubmit Python package is available through PyPI, the primary source for Python packages.
+The Autosubmit code is hosted in GitHub. The Autosubmit Python package is available through PyPI, the primary source for Python packages.
 
 - Pre-requisites: bash, python3, sqlite3, git-scm > 1.8.2, subversion, dialog, curl, python-tk(tkinter in centOS), graphviz >= 2.41, pip3, rsync
 
@@ -116,7 +116,7 @@ If you don't have conda installed yet, we recommend following `Installing Minico
     # Download git
     apt install git -y -q
     # Download autosubmit
-    git clone https://earth.bsc.es/gitlab/es/autosubmit.git -b v4.0.0b
+    git clone https://github.com/BSC-ES/autosubmit.git -b v4.0.0b
     cd autosubmit
     # Create a Conda environment from YAML with autosubmit dependencies
     conda env create -f environment.yml -n autosubmitenv

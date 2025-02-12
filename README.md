@@ -15,7 +15,7 @@ Concretely, it is currently used at Barcelona Supercomputing Centre (BSC) to run
 
 Get involved or contact us:
 
-    Autosubmit GitLab:	        https://earth.bsc.es/gitlab/es/autosubmit
+    Autosubmit GitHub:	        https://github.com/BSC-ES/autosubmit
     Autosubmit Support:	        support-autosubmit@bsc.es
     
 How to cite Autosubmit:
