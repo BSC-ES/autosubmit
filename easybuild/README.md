@@ -2,9 +2,9 @@ Files to build an EasyBuild installation for Autosubmit.
 
 Refs:
 
-- https://earth.bsc.es/gitlab/es/autosubmit/-/issues/1257
-- https://earth.bsc.es/gitlab/es/autosubmit/-/merge_requests/499
-- https://earth.bsc.es/gitlab/es/autosubmit/-/merge_requests/474
+- https://github.com/BSC-ES/autosubmit/issues/1257
+- https://github.com/BSC-ES/autosubmit/issues/1987
+- https://github.com/BSC-ES/autosubmit/issues/1962
 
 ## Testing with Docker (WIP)
 
