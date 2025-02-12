@@ -38,6 +38,5 @@ def test_as_conf_default_values(autosubmit_config: Callable[[str,Dict], BasicCon
         content = f.read()
         yaml_contents = parser.load(content)
 
-    print(f'yaml_contents: {yaml_contents}')
     assert yaml_contents['DEFAULT']['EXPID'] == expid
     assert yaml_contents['DEFAULT']['HPCARCH'] == arch or yaml_contents['DEFAULT']['HPCARCH'] == hpc
