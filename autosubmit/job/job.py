@@ -1177,13 +1177,13 @@ class Job(object):
         log_name = Path(f"{self._tmp_path}/{self.name}_TOTAL_STATS")
         lst = []
         if log_name.exists() and log_name.stat().st_size > 0:
-            f = open(log_name)
-            lines = f.readlines()
-            for line in lines:
-                fields = line.split()
-                if len(fields) >= index + 1:
-                    lst.append(parse_date(fields[index]))
-            f.close()
+            with open(log_name) as f:
+                lines = f.readlines()
+                for line in lines:
+                    fields = line.split()
+                    if len(fields) >= index + 1:
+                        lst.append(parse_date(fields[index]))
+
         return lst
 
     def check_end_time(self, fail_count=-1):
