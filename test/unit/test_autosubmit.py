@@ -8,7 +8,7 @@ from typing import Callable, Dict
 
 
 @pytest.mark.parametrize("fake_dir, real_dir", [
-    ("a000", "a000"), # test meant to FAIL
+    pytest.param("a000", "a000", marks=pytest.mark.xfail(reason="Meant to fail since it can't create a folder if one already exists")), # test meant to FAIL
     ("","a000"), # test meant to PASS
     ("",""), ]) # test meant to PASS with a generated expid
 def test_expid(autosubmit_config: Callable[[str,Dict], BasicConfig], fake_dir, real_dir) -> None:
