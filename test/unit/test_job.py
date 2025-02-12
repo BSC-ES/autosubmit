@@ -1111,7 +1111,7 @@ CONFIG:
             else:
                 assert lst == []
                 assert not log_name.exists()
-                
+
 
     def test_sdate(self):
         """Test that the property getter for ``sdate`` works as expected."""
