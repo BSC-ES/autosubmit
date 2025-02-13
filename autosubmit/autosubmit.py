@@ -72,7 +72,7 @@ import re
 import random
 import signal
 import datetime
-# import log.fd_show as fd_show
+import log.fd_show as fd_show
 from importlib.resources import files as read_files
 from importlib.metadata import version
 from collections import defaultdict
@@ -2157,6 +2157,7 @@ class Autosubmit:
         if profile:
             profiler = Profiler(expid)
             profiler.start()
+        from pympler import muppy, summary, tracker
 
         # Initialize common folders'
         try:
@@ -2199,7 +2200,9 @@ class Autosubmit:
                 max_recovery_retrials = as_conf.experiment_data.get("CONFIG",{}).get("RECOVERY_RETRIALS",3650)  # (72h - 122h )
                 recovery_retrials = 0
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
+                tr = tracker.SummaryTracker()
                 while job_list.get_active():
+                    tr.print_diff()
                     Autosubmit.refresh_log_recovery_process(platforms_to_test, as_conf)
                     for job in [job for job in job_list.get_job_list() if job.status == Status.READY]:
                         job.update_parameters(as_conf, {})
@@ -2245,7 +2248,7 @@ class Autosubmit:
                         job_list.update_list(as_conf, submitter=submitter)
                         job_list.save()
                         # Submit jobs that are ready to run
-                        #Log.debug(f"FD submit: {fd_show.fd_table_status_str()}")
+                        Log.info(f"FD submit: {fd_show.fd_table_status_str()}")
                         if len(job_list.get_ready()) > 0:
                             Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence, hold=False)
                             job_list.update_list(as_conf, submitter=submitter)
@@ -2280,13 +2283,13 @@ class Autosubmit:
                             job_list.save()
                             as_conf.save()
                         time.sleep(safetysleeptime)
-                        #Log.debug(f"FD endsubmit: {fd_show.fd_table_status_str()}")
+                        Log.info(f"FD endsubmit: {fd_show.fd_table_status_str()}")
 
 
                     except AutosubmitError as e:  # If an error is detected, restore all connections and job_list
                         Log.error("Trace: {0}", e.trace)
                         Log.error("{1} [eCode={0}]", e.code, e.message)
-                        # Log.debug("FD recovery: {0}".format(log.fd_show.fd_table_status_str()))
+                        Log.info("FD recovery: {0}".format(fd_show.fd_table_status_str()))
                         # No need to wait until the remote platform reconnection
                         recovery = False
                         as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())

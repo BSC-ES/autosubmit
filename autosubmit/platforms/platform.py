@@ -1012,6 +1012,8 @@ class Platform(object):
         Recovers the logs of the jobs that have been submitted.
         When this is executed as a process, the exit is controlled by the work_event and cleanup_events of the main process.
         """
+        from pympler import muppy, summary, tracker
+        tr = tracker.SummaryTracker()
         setproctitle.setproctitle(f"autosubmit log {self.expid} recovery {self.name.lower()}")
         identifier = f"{self.name.lower()}(log_recovery):"
         Log.info(f"{identifier} Starting...")
@@ -1028,6 +1030,9 @@ class Platform(object):
             if self.cleanup_event.is_set():  # Check if the main process is waiting for this child to end.
                 self.recover_job_log(identifier, jobs_pending_to_process)
                 break
+            tr.print_diff()
+
         self.closeConnection()
         Log.info(f"{identifier} Exiting.")
+
         _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
