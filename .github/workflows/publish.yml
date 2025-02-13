@@ -31,11 +31,11 @@ jobs:
       - name: Build distribution
         run: python -m build
 
-      - name: Test Publish
-        uses: pypa/gh-action-pypi-publish@v1.12.3
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          attestations: false
+      # - name: Test Publish
+      #   uses: pypa/gh-action-pypi-publish@v1.12.3
+      #   with:
+      #     repository-url: https://test.pypi.org/legacy/
+      #     attestations: false
 
       - name: Publish
         uses: pypa/gh-action-pypi-publish@v1.12.3
