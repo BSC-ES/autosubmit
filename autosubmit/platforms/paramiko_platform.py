@@ -1500,7 +1500,7 @@ class ParamikoPlatform(Platform):
         :param src: file path
         """
         try:
-            return self._ftpChannel.stat(src).st_size
+            return self._ftpChannel.stat(str(src)).st_size
         except Exception:
             Log.debug(f"Error getting file size for {src}")
             return None
@@ -1512,7 +1512,7 @@ class ParamikoPlatform(Platform):
         :param max_size: maximum size to read
         """
         try:
-            with self._ftpChannel.file(src, "r") as file:
+            with self._ftpChannel.file(str(src), "r") as file:
                 return file.read(size=max_size)
         except Exception:
             Log.debug(f"Error reading file {src}")
