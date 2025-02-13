@@ -118,6 +118,34 @@ Options:
       --rocrate             Unarchive an RO-Crate file
 
 
+How to generate an RO-Crate file
+--------------------------------
+
+To create the RO-Crate including the provenance metadata of an experiment, use the command:
+
+.. code-block::
+
+    autosubmit provenance --rocrate EXPID
+
+Options:
+::
+
+   usage: autosubmit provenance --rocrate EXPID
+
+    Create the experiment provenance archive.
+
+    positional arguments:
+      EXPID                 experiment identifier
+
+    options:
+      -h, --help            show this help message and exit
+      --rocrate             Produce an RO-Crate file
+
+Note that to generate the RO-Crate an ROCRATE configuration value needs to be provided previously. 
+Additionally, the RO-Crate can be :ref:`Using RO-Crate when running experiments
+<automatically generated while running an experiment>` if the ROCRATE value is included before the run. 
+
+
 How to delete the experiment
 ----------------------------
 
