@@ -479,6 +479,8 @@ To stop immediately experiment cxxx:
 .. important:: In case you want to restart the experiment, you must follow the
     :ref:`workflow_recovery` procedure, explained below, in order to properly resynchronize all completed jobs.
 
+.. _run_rocrate:
+
 Using RO-Crate when running experiments 
 ---------------------------------------
 

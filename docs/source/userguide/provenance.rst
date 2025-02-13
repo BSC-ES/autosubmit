@@ -18,7 +18,7 @@ Users can :ref:`archive Autosubmit experiments <archive>`. These archives contai
 logs and other files in the experiment directory, and can be later unarchived
 and executed again. Supported archival formats are ZIP and **RO-Crate**.
 
-Users can generate an :ref:`Using RO-Crate when running experiments <RO-Crate when 
+Users can generate an :ref:`_run_rocrate <RO-Crate when 
 running an experiment>` by providing an ROCRATE configuration value, creating a structured metadata 
 file that documents the experiment. Once set up, Autosubmit automatically generates a .zip file 
 with all the provenance metadata, requiring no extra arguments when running `autosubmit run expid`.
