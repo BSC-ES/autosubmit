@@ -33,7 +33,6 @@ import autosubmit.history.utils as HUtils
 import autosubmit.helpers.utils as HelperUtils
 
 from autosubmit.job.job_common import Status
-from autosubmit.job.job import Job
 from autosubmit.helpers.utils import NaturalSort
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig

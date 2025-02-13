@@ -1,19 +1,12 @@
 from unittest import TestCase
-from unittest.mock import Mock,MagicMock, patch
+from unittest.mock import MagicMock, patch
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 from autosubmit.autosubmit import Autosubmit
-import autosubmit.platforms.pjmplatform
-import pytest
-
 from pathlib import Path
-from autosubmit.platforms.platform import Platform
-from autosubmit.platforms.pjmplatform import PJMPlatform
-import autosubmit.platforms.headers.pjm_header
-from tempfile import TemporaryDirectory
-from datetime import datetime
-from autosubmit.job.job import Job, Status
+
 import inspect
+
 class FakeBasicConfig:
     def props(self):
         pr = {}

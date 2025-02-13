@@ -7,7 +7,6 @@ from copy import copy
 import networkx
 from networkx import DiGraph
 #import patch
-from textwrap import dedent
 import shutil
 import tempfile
 from mock import Mock, patch
@@ -19,7 +18,6 @@ from autosubmit.job.job_common import Type
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
-from log.log import AutosubmitCritical
 
 
 class TestJobList(TestCase):

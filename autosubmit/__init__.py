@@ -1,9 +1,8 @@
 import traceback
 from contextlib import suppress
-from os import _exit  # type: ignore
 from pathlib import Path
 from typing import Union
-
+from os import _exit # type: ignore
 from portalocker.exceptions import BaseLockException
 
 from log.log import Log, AutosubmitCritical, AutosubmitError

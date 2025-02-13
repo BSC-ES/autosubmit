@@ -8,7 +8,7 @@ import locale
 import os
 import traceback
 from autosubmit.job.job_common import Status
-from typing import List, Union, Callable, Set, Any
+from typing import List, Union, Set, Any
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import AutosubmitCritical, AutosubmitError, Log
@@ -283,7 +283,7 @@ class Platform(object):
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
 
-    def submit_ready_jobs(self, as_conf, job_list, platforms_to_test, packages_persistence, packages_to_submit,
+    def submit_ready_jobs(self, as_conf: AutosubmitConfig, job_list, platforms_to_test, packages_persistence, packages_to_submit,
                           inspect=False, only_wrappers=False, hold=False):
 
         """
@@ -862,7 +862,7 @@ class Platform(object):
     def restore_connection(self, as_conf):
         raise NotImplementedError
 
-    def spawn_log_retrieval_process(self, as_conf: Any) -> None:
+    def spawn_log_retrieval_process(self, as_conf: AutosubmitConfig) -> None:
         """
         Spawns a process to recover the logs of the jobs that have been completed on this platform.
 

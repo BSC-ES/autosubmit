@@ -1,9 +1,4 @@
 from unittest import TestCase
-
-import os
-import sys
-from mock import MagicMock
-from mock import patch
 from autosubmit.database.db_manager import DbManager
 
 

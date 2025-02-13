@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import copy
-
 # Copyright 2017-2020 Earth Sciences Department, BSC-CNS
 
 # This file is part of Autosubmit.
@@ -22,7 +20,7 @@ import copy
 from bscearth.utils.date import date2str
 
 from autosubmit.job.job import Job
-from autosubmit.job.job_utils import get_split_size_unit, get_split_size, calendar_chunk_section
+from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.job.job_common import Status
 import datetime
 

@@ -6,7 +6,6 @@ Just to be sure that the autosubmitconfigparser work as expected if there are ch
 """
 import os
 import subprocess
-from pathlib import Path
 BIN_PATH = '../../bin'
 
 

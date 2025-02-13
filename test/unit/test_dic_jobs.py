@@ -1,5 +1,3 @@
-from bscearth.utils.date import date2str
-
 from datetime import datetime
 from unittest import TestCase
 

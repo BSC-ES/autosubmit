@@ -2,11 +2,9 @@ from unittest import TestCase
 
 import io
 import sys
-from contextlib import suppress, redirect_stdout
-from pathlib import Path
+from contextlib import redirect_stdout
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
-import pytest
 
 from autosubmit.autosubmit import Autosubmit, AutosubmitCritical
 from autosubmitconfigparser.config.basicconfig import BasicConfig

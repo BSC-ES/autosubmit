@@ -4,8 +4,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
 import datetime
 
@@ -20,7 +18,6 @@ from autosubmitconfigparser.config.configcommon import BasicConfig, YAMLParserFa
 from mock import Mock, MagicMock
 from mock import patch
 
-import log.log
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status

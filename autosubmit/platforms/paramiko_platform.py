@@ -9,7 +9,6 @@ import paramiko
 import datetime
 import select
 import re
-from datetime import timedelta
 import random
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_common import Type

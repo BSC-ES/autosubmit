@@ -1,6 +1,5 @@
 import pytest
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job_package_persistence import JobPackagePersistence
 from log.log import AutosubmitCritical
 
