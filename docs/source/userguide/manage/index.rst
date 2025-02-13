@@ -142,8 +142,8 @@ Options:
       --rocrate             Produce an RO-Crate file
 
 Note that to generate the RO-Crate an ROCRATE configuration value needs to be provided previously. 
-Additionally, the RO-Crate can be :ref:`_run_rocrate
-<automatically generated while running an experiment>` if the ROCRATE value is included before the run. 
+Additionally, the RO-Crate can be :ref:`automatically generated while running an experiment
+<_run_rocrate>` if the ROCRATE value is included before the run. 
 
 
 How to delete the experiment
