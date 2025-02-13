@@ -315,7 +315,7 @@ class Platform(object):
         if not hold:
             Log.debug("\nJobs ready for {1}: {0}", len(
                 job_list.get_ready(self, hold=hold)), self.name)
-            ready_jobs = job_list.get_ready(self, hold=hold)
+            job_list.get_ready(self, hold=hold)
         else:
             Log.debug("\nJobs prepared for {1}: {0}", len(
                 job_list.get_prepared(self)), self.name)

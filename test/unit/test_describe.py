@@ -89,6 +89,5 @@ def test_describe(
         log_result_output = [
             line_tuple.args[0].format(line_tuple.args[1]) for line_tuple in Log.result.mock_calls
         ]
-        root_dir = exp.exp_path.parent
         for expid in expids:
             assert f'Location: {exp.exp_path}' in log_result_output

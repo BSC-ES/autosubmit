@@ -399,4 +399,4 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
     assert_db_fields(db_check_list)
     assert_files_recovered(files_check_list)
     # TODO: GITLAB pipeline is not returning 0 or 1 for check_exit_code(final_status, exit_code)
-    # assert_exit_code(final_status, exit_code)
+    assert_exit_code(final_status, exit_code)

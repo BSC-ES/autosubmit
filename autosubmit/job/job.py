@@ -1366,9 +1366,6 @@ class Job(object):
         if new_status == Status.COMPLETED:
             Log.debug(
                 "{0} job seems to have completed: checking...".format(self.name))
-            if not self._platform.get_completed_files(self.name, wrapper_failed=self.packed):
-                log_name = os.path.join(
-                    self._tmp_path, self.name + '_COMPLETED')
 
             self.check_completion()
         else:
@@ -2479,7 +2476,6 @@ class Job(object):
         else:
             f.write('\n' + date2str(datetime.datetime.fromtimestamp(total_stats[0]), 'S') + ' ' + date2str(datetime.datetime.fromtimestamp(total_stats[0]), 'S') + ' ' + date2str(datetime.datetime.fromtimestamp(total_stats[1]), 'S') + ' ' + total_stats[2])
         out, err = self.local_logs
-        path_out = os.path.join(self._tmp_path, 'LOG_' + str(self.expid), out)
         # Launch first as simple non-threaded function
 
         exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
