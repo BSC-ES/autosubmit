@@ -283,7 +283,7 @@ class ParamikoPlatform(Platform):
                     self._host_config['hostname'] = self._host_config['hostname'].split(',')[0]
             if 'identityfile' in self._host_config:
                 self._host_config_id = self._host_config['identityfile']
-            port = int(self._host_config.get('port', 22) )
+            port = int(self._host_config.get('port', 22))
             if not self.two_factor_auth:
                 # Agent Auth
                 if not self.agent_auth(port):

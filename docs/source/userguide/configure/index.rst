@@ -235,7 +235,7 @@ Edit ``jobs_cxxx.yml`` in the ``conf`` folder of the experiment.
     defined on the parameter ``NOTIFY_ON``
 
 .. hint::
-Remember that you can define more than one job status separated by a whitespace, a comma (`,`), or using a list.
+    Remember that you can define more than one job status separated by a whitespace, a comma (`,`), or using a list.
 
 Example:
 ::
