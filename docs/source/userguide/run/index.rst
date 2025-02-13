@@ -478,3 +478,65 @@ To stop immediately experiment cxxx:
 
 .. important:: In case you want to restart the experiment, you must follow the
     :ref:`workflow_recovery` procedure, explained below, in order to properly resynchronize all completed jobs.
+
+Using RO-Crate when running experiments 
+---------------------------------------
+
+Starting from Autosubmit 4.1.13, you can automatically generate an **RO-Crate** that describes the entire execution of your workflow. 
+This requires specifying an ROCRATE configuration value.
+
+You should use this configuration to define your JSON-LD schema, including ``@id``, ``@type``, and other schema.org attributes. 
+These attributes will be merged with the values retrieved from the workflow configuration.
+
+Some metadata, such as license information, is not included by default in Autosubmit. 
+If you want to include such values in your RO-Crate, you must provide them manually. 
+This can be done by creating a configuration file such:
+
+::
+
+    $expid/conf/rocrate.yml
+
+(or by using an existing one).
+
+Your file should include a top-level ROCRATE key containing your JSON-LD data. Below is an example structure:
+
+.. code-block:: yaml
+
+    ROCRATE:
+      INPUTS:
+        # Add extra keys to be exported
+        - "MHM"
+      OUTPUTS:
+        # Paths are relative to the Autosubmit project folder
+        - "*/*.gif"
+      PATCH: |
+        {
+          "@graph": [
+            {
+              "@id": "./",
+              "license": "Apache-2.0",
+              "creator": {
+                "@id": "https://orcid.org/0000-0001-8250-4074"
+              }
+            },
+            {
+              "@id": "https://orcid.org/0000-0001-8250-4074",
+              "@type": "Person",
+              "affiliation": {
+                  "@id": "https://ror.org/05sd8tv96"
+              }
+            },
+            ...
+          ]
+        }
+
+Once Autosubmit detects the ROCRATE configuration value, it will generate a ``.zip`` file containing all provenance metadata
+at the end of the experiment run.
+This file will be located at:
+
+::
+
+    $expid/tmp/ASLOGS
+
+You do not need to specify any additional keys when running an experiment. This feature ensures that the RO-Crate metadata is
+generated automatically if the proper configuration value is present.
