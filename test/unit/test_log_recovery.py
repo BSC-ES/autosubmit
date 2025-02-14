@@ -132,11 +132,11 @@ def test_log_recovery_keep_alive_cleanup(prepare_test, local, mocker, as_conf):
     local.spawn_log_retrieval_process(as_conf)
     assert local.log_recovery_process.is_alive()
     local.work_event.set()
-    time.sleep(1)
+    time.sleep(0.9)
     assert local.log_recovery_process.is_alive()
     local.work_event.set()
     local.cleanup_event.set()
-    time.sleep(1.5)  # added .5 because the code could take a bit more time to exit
+    time.sleep(1.1)  # added .1 because the code could take a bit more time to exit
     assert local.log_recovery_process.is_alive() is False
     local.cleanup_event.set()
 
