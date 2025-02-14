@@ -1,6 +1,7 @@
 import atexit
 import multiprocessing
 import queue  # only for the exception
+from collections import deque
 from copy import copy
 from os import _exit
 import setproctitle
@@ -22,7 +23,7 @@ class UniqueQueue(Queue):
     A queue that avoids retrieves the same job and retrial during the same run.
     """
 
-    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None):
+    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, max_items: int = 10):
         """
         Initializes the UniqueQueue.
 
@@ -30,10 +31,13 @@ class UniqueQueue(Queue):
             maxsize (int): Maximum size of the queue. Defaults to -1 (infinite size).
             block (bool): Whether to block when the queue is full. Defaults to True.
             timeout (float): Timeout for blocking operations. Defaults to None.
+            max_items (int): Maximum number of unique items to track. Defaults to 1000.
+
         """
         self.block = block
         self.timeout = timeout
         self.all_items = set()  # Won't be popped, so even if it is being processed by the log retrieval process, it won't be added again.
+        self.recent_items = deque(maxlen=max_items)  # Deque to maintain order and limit size
         super().__init__(maxsize, ctx=multiprocessing.get_context())
 
     def put(self, job: Any, block: bool = True, timeout: float = None) -> None:
@@ -51,7 +55,15 @@ class UniqueQueue(Queue):
             unique_name = job.name+str(job.fail_count) # We gather retrial per retrial
         if unique_name not in self.all_items:
             self.all_items.add(unique_name)
-            super().put(copy(job), block, timeout)  # Without copy, the process seems to modify the job for other retrials.. My guess is that the object is not serialized until it is get from the queue.
+            self.recent_items.append(unique_name)
+            # Without copy, the process seems to modify the job for other retrials.. My guess is that the object is not serialized until it is get from the queue.
+            super().put(copy(job), block, timeout)
+
+        # Remove the oldest item from the set if the deque is full
+        if len(self.recent_items) == self.recent_items.maxlen:
+            oldest_item = self.recent_items.popleft()
+            self.all_items.remove(oldest_item)
+
 
 
 class Platform(object):
@@ -947,7 +959,8 @@ class Platform(object):
         if not process_log: # If still no work, active wait until the keep_alive_timeout is reached or any signal is set to end the process.
             timeout = self.keep_alive_timeout - sleep_time
             while timeout > 0:
-                if self.recovery_queue.empty() or self.cleanup_event.is_set() or self.work_event.is_set():
+                if not self.recovery_queue.empty() or self.cleanup_event.is_set() or self.work_event.is_set():
+                    process_log = True
                     break
                 time.sleep(1)
                 timeout -= 1
