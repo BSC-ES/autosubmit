@@ -65,7 +65,7 @@ docs_require = [
 ]
 
 tests_require = [
-    'pytest==8.2.*',
+    'pytest>=8.2,<8.4',
     'pytest-cov',
     'pytest-mock',
     'ruff==0.6.2',
