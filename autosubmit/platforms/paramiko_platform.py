@@ -1314,7 +1314,7 @@ class ParamikoPlatform(Platform):
         :return: header to use
         :rtype: str
         """
-        if str(job.wrapper_type).lower() != "vertical":
+        if not job.packed or str(job.wrapper_type).lower() != "vertical":
             out_filename = "{0}.cmd.out.{1}".format(job.name,job.fail_count)
             err_filename = "{0}.cmd.err.{1}".format(job.name,job.fail_count)
         else:
