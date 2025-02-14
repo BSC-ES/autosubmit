@@ -192,7 +192,7 @@ def test_refresh_log_retry_process(prepare_test, local, as_conf, mocker):
 def test_wait_until_timeout(prepare_test, local, as_conf, mocker, cleanup_event, work_event, recovery_queue_full,
                             result):
     mocker.patch('autosubmit.platforms.platform.max', return_value=2)
-    local.keep_alive_timeout = 1
+    local.keep_alive_timeout = 2
     max_items = 1
     local.recovery_queue = UniqueQueue(max_items=max_items)
     local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
@@ -200,7 +200,7 @@ def test_wait_until_timeout(prepare_test, local, as_conf, mocker, cleanup_event,
     if recovery_queue_full:
         for i in range(max_items):
             local.recovery_queue.put(Job('t000', f'000{i}', Status.COMPLETED, 0))
-    process_log = local.wait_until_timeout(1)
+    process_log = local.wait_until_timeout(2)
     assert process_log == result
 
 
@@ -216,8 +216,8 @@ def test_wait_until_timeout(prepare_test, local, as_conf, mocker, cleanup_event,
         "w(F)|c(F)|rq(F)", "w(T)|c(T)|rq(T)"])
 def test_wait_for_work(prepare_test, local, as_conf, mocker, cleanup_event, work_event, recovery_queue_full,
                        result):
-    mocker.patch('autosubmit.platforms.platform.max', return_value=1)
-    local.keep_alive_timeout = 1
+    mocker.patch('autosubmit.platforms.platform.max', return_value=2)
+    local.keep_alive_timeout = 2
     max_items = 1
     local.recovery_queue = UniqueQueue(max_items=max_items)
     local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
@@ -225,7 +225,7 @@ def test_wait_for_work(prepare_test, local, as_conf, mocker, cleanup_event, work
     if recovery_queue_full:
         for i in range(max_items):
             local.recovery_queue.put(Job('t000', f'000{i}', Status.COMPLETED, 0))
-    process_log = local.wait_for_work(1)
+    process_log = local.wait_for_work(2)
     assert process_log == result
 
 
@@ -241,8 +241,8 @@ def test_wait_for_work(prepare_test, local, as_conf, mocker, cleanup_event, work
         "w(F)|c(F)|rq(F)", "w(T)|c(T)|rq(T)"])
 def test_wait_mandatory_time(prepare_test, local, as_conf, mocker, cleanup_event, work_event, recovery_queue_full,
                              result):
-    mocker.patch('autosubmit.platforms.platform.max', return_value=1)
-    local.keep_alive_timeout = 1
+    mocker.patch('autosubmit.platforms.platform.max', return_value=2)
+    local.keep_alive_timeout = 2
     max_items = 1
     local.recovery_queue = UniqueQueue(max_items=max_items)
     local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
@@ -250,7 +250,7 @@ def test_wait_mandatory_time(prepare_test, local, as_conf, mocker, cleanup_event
     if recovery_queue_full:
         for i in range(max_items):
             local.recovery_queue.put(Job('rng', f'000{i}', Status.COMPLETED, 0))
-    process_log = local.wait_mandatory_time(1)
+    process_log = local.wait_mandatory_time(2)
     assert process_log == result
 
 
