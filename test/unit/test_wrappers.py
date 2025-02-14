@@ -181,7 +181,7 @@ class TestWrappers(TestCase):
         self.config.get_wrapper_type = MagicMock(return_value='vertical')
         self.config.get_wrapper_export = MagicMock(return_value='')
         self.config.get_wrapper_jobs = MagicMock(return_value='None')
-        self.config.get_wrapper_method = MagicMock(return_value='ASThread')
+        self.config.get_wrapper_method = MagicMock(return_value='ASTHREAD')
         self.config.get_wrapper_queue = MagicMock(return_value='debug')
         self.config.get_wrapper_policy = MagicMock(return_value='flexible')
         self.config.get_extensible_wallclock = MagicMock(return_value=0)
@@ -190,7 +190,7 @@ class TestWrappers(TestCase):
             'TYPE': "vertical",
             'JOBS_IN_WRAPPER': "None",
             'EXPORT': "none",
-            'METHOD': "ASThread",
+            'METHOD': "ASTHREAD",
             'QUEUE': "debug",
             'POLICY': "flexible",
             'RETRIALS': 0,
@@ -202,7 +202,7 @@ class TestWrappers(TestCase):
         self.job_packager = JobPackager(
             self.as_conf, self._platform, self.job_list)
         self.job_list._ordered_jobs_by_date_member["WRAPPERS"] = dict()
-        self.wrapper_info = ['vertical', 'flexible', 'asthread', ['SIM'], 0,self.as_conf]
+        self.wrapper_info = ['vertical', 'flexible', 'ASTHREAD', ['SIM'], 0, self.as_conf]
 
 
     def tearDown(self) -> None:

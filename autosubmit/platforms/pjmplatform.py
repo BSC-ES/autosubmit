@@ -463,7 +463,7 @@ class PJMPlatform(ParamikoPlatform):
         """).ljust(13)
         else:
             wr_header = self.calculate_wrapper_het_header(kwargs["wrapper_data"])
-        if kwargs["method"] == 'srun':
+        if kwargs["method"].upper() == "SRUN":
             language = kwargs["executable"]
             if language is None or len(language) == 0:
                 language = "#!/bin/bash"
@@ -476,9 +476,9 @@ class PJMPlatform(ParamikoPlatform):
 
 
     @staticmethod
-    def allocated_nodes():
-        return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
-
+    def allocated_nodes(method="ASTHREAD"):
+        if method.upper() != "SRUN":
+            return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
     def check_file_exists(self, filename, wrapper_failed=False, sleeptime=5, max_retries=3):
         file_exist = False
         retries = 0
