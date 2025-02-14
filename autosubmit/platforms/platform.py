@@ -12,6 +12,7 @@ from autosubmit.job.job_common import Status
 from typing import List, Union, Callable, Set, Any
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from log import fd_show
 from log.log import AutosubmitCritical, AutosubmitError, Log
 from multiprocessing import Process, Event
 from multiprocessing.queues import Queue
@@ -989,6 +990,7 @@ class Platform(object):
             bool: True if there is work to process, False otherwise.
         """
         process_log = False
+        sleep_time = 0  # debug
         for remaining in range(sleep_time, 0, -1):
             time.sleep(1)
             if self.work_event.is_set() or not self.recovery_queue.empty():
@@ -1055,9 +1057,10 @@ class Platform(object):
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
                 try:
                     job.retrieve_logfiles(self, raise_error=True)
-                except:
+                    Log.result(
+                        f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
+                except Exception:
                     jobs_pending_to_process.add(job)
-                    job._log_recovery_retries += 1
                     Log.warning(f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry:'{job.fail_count}'.")
             except queue.Empty:
                 pass
@@ -1072,14 +1075,14 @@ class Platform(object):
             job._log_recovery_retries += 1
             try:
                 job.retrieve_logfiles(self, raise_error=True)
-                job._log_recovery_retries += 1
-            except:
+                Log.result(
+                    f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
+            except Exception:
                 if job._log_recovery_retries < 5:
                     jobs_pending_to_process.add(job)
                 Log.warning(
                     f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry '{job.fail_count}'.")
-            Log.result(
-                f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
+
         if len(jobs_pending_to_process) > 0:
             self.restore_connection(None)  # Restore the connection if there was an issue with one or more jobs.
 
@@ -1107,5 +1110,6 @@ class Platform(object):
                 self.recover_job_log(identifier, jobs_pending_to_process)
                 break
         self.closeConnection()
+
         Log.info(f"{identifier} Exiting.")
         _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.

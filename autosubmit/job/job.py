@@ -50,6 +50,7 @@ from autosubmit.platforms.platform import Platform
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import Log, AutosubmitCritical
+from log import fd_show
 
 Log.get_logger("Autosubmit")
 
