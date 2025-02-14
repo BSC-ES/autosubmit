@@ -32,7 +32,7 @@ install_requires = [
     'setuptools<=68.2.2',
     'bscearth.utils<=0.5.2',
     'requests<=2.31.0',
-    'networkx<=2.6.3',
+    'networkx<=3.4.2',
     'portalocker<=2.7.0',
     'paramiko>=3.5.0',
     'pyparsing==3.1.1',
