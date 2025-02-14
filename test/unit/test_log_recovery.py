@@ -6,6 +6,7 @@ import pwd
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job_common import Status
+from autosubmit.platforms.platform import UniqueQueue
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmit.job.job import Job
 
@@ -115,12 +116,12 @@ def test_log_recovery_keep_alive(prepare_test, local, mocker, as_conf):
     local.spawn_log_retrieval_process(as_conf)
     assert local.log_recovery_process.is_alive()
     local.work_event.set()
-    time.sleep(1)
+    time.sleep(0.9)
     assert local.log_recovery_process.is_alive()
     local.work_event.set()
-    time.sleep(1)
+    time.sleep(0.9)
     assert local.log_recovery_process.is_alive()
-    time.sleep(1)
+    time.sleep(1.1)  # added .1 because the code could take a bit more time to exit
     assert local.log_recovery_process.is_alive() is False
     local.cleanup_event.set()
 
@@ -135,7 +136,7 @@ def test_log_recovery_keep_alive_cleanup(prepare_test, local, mocker, as_conf):
     assert local.log_recovery_process.is_alive()
     local.work_event.set()
     local.cleanup_event.set()
-    time.sleep(1)
+    time.sleep(1.5)  # added .5 because the code could take a bit more time to exit
     assert local.log_recovery_process.is_alive() is False
     local.cleanup_event.set()
 
@@ -176,3 +177,89 @@ def test_refresh_log_retry_process(prepare_test, local, as_conf, mocker):
     assert local.log_recovery_process.is_alive()
     local.send_cleanup_signal()  # this is called by atexit function
     assert local.log_recovery_process.is_alive() is False
+
+
+@pytest.mark.parametrize("work_event, cleanup_event, recovery_queue_full, result", [
+    (True, False, True, True),
+    (True, False, False, True),
+    (False, True, True, True),
+    (False, True, False, True),
+    (False, False, True, True),
+    (False, False, False, False),
+    (True, True, True, True),
+], ids=["w(T)|c(F)|rq(T)", "w(T)|c(F)|rq(F)", "w(F)|c(T)|rq(T)", "w(F)|c(T)|rq(F)", "w(F)|c(F)|rq(T)",
+        "w(F)|c(F)|rq(F)", "w(T)|c(T)|rq(T)"])
+def test_wait_until_timeout(prepare_test, local, as_conf, mocker, cleanup_event, work_event, recovery_queue_full,
+                            result):
+    mocker.patch('autosubmit.platforms.platform.max', return_value=2)
+    local.keep_alive_timeout = 1
+    max_items = 1
+    local.recovery_queue = UniqueQueue(max_items=max_items)
+    local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
+    local.work_event.set() if work_event else local.work_event.clear()
+    if recovery_queue_full:
+        for i in range(max_items):
+            local.recovery_queue.put(Job('t000', f'000{i}', Status.COMPLETED, 0))
+    process_log = local.wait_until_timeout(1)
+    assert process_log == result
+
+
+@pytest.mark.parametrize("work_event, cleanup_event, recovery_queue_full, result", [
+    (True, False, True, True),
+    (True, False, False, True),
+    (False, True, True, True),
+    (False, True, False, True),
+    (False, False, True, True),
+    (False, False, False, False),
+    (True, True, True, True),
+], ids=["w(T)|c(F)|rq(T)", "w(T)|c(F)|rq(F)", "w(F)|c(T)|rq(T)", "w(F)|c(T)|rq(F)", "w(F)|c(F)|rq(T)",
+        "w(F)|c(F)|rq(F)", "w(T)|c(T)|rq(T)"])
+def test_wait_for_work(prepare_test, local, as_conf, mocker, cleanup_event, work_event, recovery_queue_full,
+                       result):
+    mocker.patch('autosubmit.platforms.platform.max', return_value=1)
+    local.keep_alive_timeout = 1
+    max_items = 1
+    local.recovery_queue = UniqueQueue(max_items=max_items)
+    local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
+    local.work_event.set() if work_event else local.work_event.clear()
+    if recovery_queue_full:
+        for i in range(max_items):
+            local.recovery_queue.put(Job('t000', f'000{i}', Status.COMPLETED, 0))
+    process_log = local.wait_for_work(1)
+    assert process_log == result
+
+
+@pytest.mark.parametrize("work_event, cleanup_event, recovery_queue_full, result", [
+    (True, False, True, True),
+    (True, False, False, True),
+    (False, True, True, True),
+    (False, True, False, True),
+    (False, False, True, True),
+    (False, False, False, False),
+    (True, True, True, True),
+], ids=["w(T)|c(F)|rq(T)", "w(T)|c(F)|rq(F)", "w(F)|c(T)|rq(T)", "w(F)|c(T)|rq(F)", "w(F)|c(F)|rq(T)",
+        "w(F)|c(F)|rq(F)", "w(T)|c(T)|rq(T)"])
+def test_wait_mandatory_time(prepare_test, local, as_conf, mocker, cleanup_event, work_event, recovery_queue_full,
+                             result):
+    mocker.patch('autosubmit.platforms.platform.max', return_value=1)
+    local.keep_alive_timeout = 1
+    max_items = 1
+    local.recovery_queue = UniqueQueue(max_items=max_items)
+    local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
+    local.work_event.set() if work_event else local.work_event.clear()
+    if recovery_queue_full:
+        for i in range(max_items):
+            local.recovery_queue.put(Job('rng', f'000{i}', Status.COMPLETED, 0))
+    process_log = local.wait_mandatory_time(1)
+    assert process_log == result
+
+
+def test_unique_elements(local):
+    max_items = 3
+    local.recovery_queue = UniqueQueue(max_items=max_items)
+    for i in range(max_items):
+        local.recovery_queue.put(Job(f'rng{i}', f'000{i}', Status.COMPLETED, 0))
+    assert len(local.recovery_queue.all_items) == max_items
+    for i in range(max_items):
+        local.recovery_queue.put(Job(f'rng2{i}', f'000{i}', Status.COMPLETED, 0))
+    assert len(local.recovery_queue.all_items) == max_items
