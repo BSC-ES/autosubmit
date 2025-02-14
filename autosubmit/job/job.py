@@ -1239,7 +1239,7 @@ class Job(object):
 
         """
         # Write stats for vertical wrappers
-        if self.wrapper_type == "vertical":  # Disable AS retrials for vertical wrappers to use internal ones
+        if self.packed and self.wrapper_type == "vertical":  # Disable AS retrials for vertical wrappers to use internal ones
             for i in range(0, int(last_retrial + 1)):
                 self.platform.get_stat_file(self, count=i)
                 self.write_vertical_time(i)
@@ -1279,7 +1279,7 @@ class Job(object):
             Dict[str, int]: Dictionary with finish timestamps per job.
         """
         backup_logname = copy.copy(self.local_logs)
-        if self.wrapper_type == "vertical":
+        if self.packed and self.wrapper_type == "vertical":
             last_retrial = self.retrieve_internal_retrials_logfiles(platform)
         else:
             self.retrieve_external_retrials_logfiles(platform)
@@ -1290,7 +1290,7 @@ class Job(object):
                 raise AutosubmitCritical("Failed to retrieve logs for job {0}".format(self.name), 6000)
         else:
             self.write_stats(last_retrial)
-            if self.wrapper_type == "vertical":
+            if self.packed and self.wrapper_type == "vertical":
                 for retrial in range(0, last_retrial + 1):
                     Log.result(f"{platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{retrial}'.")
             else:
