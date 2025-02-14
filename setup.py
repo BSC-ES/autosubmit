@@ -40,7 +40,7 @@ install_requires = [
     'packaging<=23.2',
     'typing_extensions<=4.9.0',
     'typing<=3.7.4.3',
-    'psutil<=5.6.1',
+    'psutil<=7.0.0',
     'py3dotplus==1.1.0',
     'numpy<2',
     'rocrate==0.*',
