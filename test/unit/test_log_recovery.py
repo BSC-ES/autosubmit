@@ -305,3 +305,6 @@ def test_unique_deque():
 
     # Test contain
     assert -3 in unique_deque
+
+    # test repr
+    assert repr(unique_deque) == "UniqueDeque([-3, 3, 4, 5, 6])"
