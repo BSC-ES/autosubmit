@@ -20,16 +20,21 @@ import time
 
 class UniqueDeque:
     def __init__(self, maxlen=None):
+        self.maxlen = maxlen
         self.deque = deque(maxlen=maxlen)
         self.set = set()
 
     def append(self, item):
         if item not in self.set:
+            if len(self.set) >= self.maxlen:
+                self.set.remove(self.deque.popleft())
             self.deque.append(item)
             self.set.add(item)
 
     def appendleft(self, item):
         if item not in self.set:
+            if len(self.set) >= self.maxlen:
+                self.set.remove(self.deque.popleft())
             self.deque.appendleft(item)
             self.set.add(item)
 
@@ -74,7 +79,6 @@ class UniqueQueue(Queue):
         """
         self.block = block
         self.timeout = timeout
-        self.maxlen = max_items
         self.all_items = UniqueDeque(maxlen=max_items)  # Won't be popped, so even if it is being processed by the log retrieval process, it won't be added again.
         super().__init__(maxsize, ctx=multiprocessing.get_context())
 
@@ -97,9 +101,6 @@ class UniqueQueue(Queue):
             self.all_items.append(unique_name)
             # Without copy, the process seems to modify the job for other retrials.. My guess is that the object is not serialized until it is get from the queue.
             super().put(copy(job), block, timeout)
-
-        if len(self.all_items) > self.maxlen:
-            self.all_items.popleft()
 
 
 class Platform(object):
