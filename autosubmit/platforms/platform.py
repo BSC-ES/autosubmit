@@ -26,7 +26,7 @@ class UniqueQueue(Queue):
     A queue that avoids retrieves the same job and retrial during the same run.
     """
 
-    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, max_items: int = 10):
+    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, max_items: int = 200):
         """
         Initializes the UniqueQueue.
 
@@ -34,7 +34,7 @@ class UniqueQueue(Queue):
             maxsize (int): Maximum size of the queue. Defaults to -1 (infinite size).
             block (bool): Whether to block when the queue is full. Defaults to True.
             timeout (float): Timeout for blocking operations. Defaults to None.
-            max_items (int): Maximum number of unique items to track. Defaults to 1000.
+            max_items (int): Maximum number of unique items to track. Defaults to 200.
 
         """
         self.block = block
