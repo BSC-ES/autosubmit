@@ -45,7 +45,7 @@ class UniqueQueue(Queue):
             block (bool): Whether to block when the queue is full. Defaults to True.
             timeout (float): Timeout for blocking operations. Defaults to None.
         """
-        if job.wrapper_type == "vertical": # We gather all retrials at once
+        if job.packed and job.wrapper_type == "vertical": # We gather all retrials at once
             unique_name = job.name
         else:
             unique_name = job.name+str(job.fail_count) # We gather retrial per retrial
