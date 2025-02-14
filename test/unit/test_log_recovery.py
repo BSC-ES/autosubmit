@@ -6,7 +6,7 @@ import pwd
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job_common import Status
-from autosubmit.platforms.platform import UniqueQueue
+from autosubmit.platforms.platform import UniqueQueue, UniqueDeque
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmit.job.job import Job
 
@@ -263,3 +263,45 @@ def test_unique_elements(local):
     for i in range(max_items):
         local.recovery_queue.put(Job(f'rng2{i}', f'000{i}', Status.COMPLETED, 0))
     assert len(local.recovery_queue.all_items) == max_items
+
+
+def test_unique_deque():
+    unique_deque = UniqueDeque(maxlen=5)
+
+    # Test append and uniqueness
+    unique_deque.append(1)
+    unique_deque.append(2)
+    unique_deque.append(1)
+    assert list(unique_deque) == [1, 2]
+
+    # Test appendleft and uniqueness
+    unique_deque.appendleft(0)
+    unique_deque.appendleft(2)  # Duplicated
+    assert list(unique_deque) == [0, 1, 2]
+
+    # Test pop
+    assert unique_deque.pop() == 2
+    assert list(unique_deque) == [0, 1]
+
+    # Test popleft
+    assert unique_deque.popleft() == 0
+    assert list(unique_deque) == [1]
+
+    # Test maxlen
+    unique_deque.append(2)
+    unique_deque.append(3)
+    unique_deque.append(4)
+    unique_deque.append(5)
+    unique_deque.append(6)
+    assert list(unique_deque) == [2, 3, 4, 5, 6]
+
+    # test maxlen appendleft
+    unique_deque.appendleft(1)
+    unique_deque.appendleft(0)
+    unique_deque.appendleft(-1)
+    unique_deque.appendleft(-2)
+    unique_deque.appendleft(-3)
+    assert list(unique_deque) == [-3, 3, 4, 5, 6]
+
+    # Test contain
+    assert -3 in unique_deque
