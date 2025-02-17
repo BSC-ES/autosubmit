@@ -11,5 +11,5 @@ def test_autosubmit_version():
     assert out.strip().endswith(Autosubmit.autosubmit_version)
 
 def test_autosubmit_version_broken():
-    exit_code, _ = subprocess.getstatusoutput('autosubmit -v')
+    exit_code, _ = subprocess.getstatusoutput('autosubmit -abcdefg')
     assert exit_code == 1
