@@ -19,16 +19,15 @@
 
 """Script for handling experiment monitoring"""
 import argparse
-import os
 import sys
 from typing import Optional
-
 from contextlib import suppress
-script_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
-sys.path.append(script_dir)
-sys.path.append(os.path.normpath(os.path.join(script_dir, os.pardir)))
+
 # noinspection PyUnresolvedReferences
 from log.log import Log, AutosubmitCritical, AutosubmitError  # noqa: E402
+import sys
+import os
+
 from autosubmit import delete_lock_file, exit_from_error  # noqa: E402
 from autosubmit.autosubmit import Autosubmit  # noqa: E402
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig  # noqa: E402
