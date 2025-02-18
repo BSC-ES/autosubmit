@@ -171,7 +171,6 @@ def test_adjust_new_parameters(test_packed):
     del job._wallclock_in_seconds
     del job._log_path
     del job.ready_date
-    job.packed = test_packed
     job._adjust_new_parameters()
     assert job.ready_date is None
     assert job.is_wrapper == test_packed

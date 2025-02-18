@@ -306,7 +306,6 @@ class JobList(object):
                 job.parameters = parameters
                 if not job.has_parents():
                     job.status = Status.READY
-                    job.packed = False
                 else:
                     job.status = Status.WAITING
 
@@ -2728,7 +2727,6 @@ class JobList(object):
         Log.debug('Updating FAILED jobs')
         if not first_time:
             for job in self.get_failed():
-                job.packed = False
                 if self.jobs_data[job.section].get("RETRIALS", None) is None:
                     retrials = int(as_conf.get_retrials())
                 else:
@@ -2765,39 +2763,32 @@ class JobList(object):
                                 "Resetting job: {0} status to: DELAYED for retrial...".format(job.name))
                         else:
                             job.status = Status.READY
-                            job.packed = False
                             Log.debug(
                                 "Resetting job: {0} status to: READY for retrial...".format(job.name))
                         job.id = None
-                        job.packed = False
                         save = True
 
                     else:
                         job.status = Status.WAITING
                         save = True
-                        job.packed = False
                         Log.debug(
                             "Resetting job: {0} status to: WAITING for parents completion...".format(job.name))
                 else:
                     job.status = Status.FAILED
-                    job.packed = False
                     save = True
         else:
             for job in [ job for job in self._job_list if job.status in [ Status.WAITING, Status.READY, Status.DELAYED, Status.PREPARED ] ]:
                 job.fail_count = 0
-                job.packed = False
         # Check checkpoint jobs, the status can be Any
         for job in self.check_special_status():
             job.status = Status.READY
             # Run start time in format (YYYYMMDDHH:MM:SS) from current time
             job.id = None
-            job.packed = False
             job.wrapper_type = None
             save = True
             Log.debug(f"Special condition fulfilled for job {job.name}")
         # if waiting jobs has all parents completed change its State to READY
         for job in self.get_completed():
-            job.packed = False
             # Log name has this format:
                 # a02o_20000101_fc0_2_SIM.20240212115021.err
                 # $jobname.$(YYYYMMDDHHMMSS).err or .out
@@ -2827,7 +2818,6 @@ class JobList(object):
             for job in self.get_delayed():
                 if datetime.datetime.now() >= job.delay_end:
                     job.status = Status.READY
-                    job.packed = False
             for job in self.get_waiting():
                 tmp = [parent for parent in job.parents if
                        parent.status == Status.COMPLETED or parent.status == Status.SKIPPED]
@@ -2838,7 +2828,6 @@ class JobList(object):
                 failed_ones = [parent for parent in job.parents if parent.status == Status.FAILED]
                 if job.parents is None or len(tmp) == len(job.parents):
                     job.status = Status.READY
-                    job.packed = False
                     job.hold = False
                     Log.debug(
                         "Setting job: {0} status to: READY (all parents completed)...".format(job.name))
@@ -2858,7 +2847,6 @@ class JobList(object):
                                     break
                             if not strong_dependencies_failure and weak_dependencies_failure:
                                 job.status = Status.READY
-                                job.packed = False
                                 job.hold = False
                                 Log.debug(
                                     "Setting job: {0} status to: READY (conditional jobs are completed/failed)...".format(
@@ -2871,7 +2859,6 @@ class JobList(object):
                             for parent in job.parents:
                                 if parent.name in job.edge_info and job.edge_info[parent.name].get('optional', False):
                                     job.status = Status.READY
-                                    job.packed = False
                                     job.hold = False
                                     Log.debug(
                                         "Setting job: {0} status to: READY (conditional jobs are completed/failed)...".format(
@@ -2887,9 +2874,7 @@ class JobList(object):
                             parent.status == Status.SKIPPED or parent.status == Status.FAILED]
                     if len(tmp2) == len(job.parents) and len(tmp3) != len(job.parents):
                         job.status = Status.READY
-                        job.packed = False
                         # Run start time in format (YYYYMMDDHH:MM:SS) from current time
-                        job.packed = False
                         job.hold = False
                         save = True
                         Log.debug(

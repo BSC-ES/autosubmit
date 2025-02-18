@@ -581,6 +581,15 @@ class Job(object):
         self._packed = value
 
     @property
+    def packed_status(self):
+        if self.status in [Status.WAITING, Status.READY, Status.PREPARED, Status.DELAYED] and self.fail_count == 0:
+            self.packed = True
+        else:
+            self.packed = False
+
+        return self._packed
+
+    @property
     @autosubmit_parameter(name='export')
     def export(self):
         """TODO."""
@@ -2793,9 +2802,6 @@ class WrapperJob(Job):
             for job in self.job_list:
                 job.hold = self.hold
                 job.status = self.status
-            if self.status == Status.WAITING:
-                for job in self.job_list:
-                    job.packed = False
 
     def _check_inner_job_wallclock(self, job):
         start_time = self.running_jobs_start[job]
@@ -2941,7 +2947,6 @@ class WrapperJob(Job):
         for job in self.inner_jobs_running:
             job.status = Status.FAILED
         for job in self.job_list:
-            job.packed = False
             if job.status not in [Status.COMPLETED, Status.FAILED]:
                 job.status = Status.WAITING
             else:
