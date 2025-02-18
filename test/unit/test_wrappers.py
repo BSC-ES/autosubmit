@@ -1947,7 +1947,6 @@ class TestWrappers(TestCase):
         job_id = randrange(1, 999)
         job = Job(name, job_id, Status.WAITING, 0)
         job.type = randrange(0, 2)
-        job.packed = False
         job.hold = False
         job.wallclock = total_wallclock
         job.platform = self._platform
