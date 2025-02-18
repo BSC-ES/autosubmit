@@ -1791,8 +1791,6 @@ class Autosubmit:
                 wrapper_job.new_status)
             # Erase from packages if the wrapper failed to be queued ( Hold Admin bug )
             if wrapper_job.status == Status.WAITING:
-                for inner_job in wrapper_job.job_list:
-                    inner_job.packed = False
                 job_list.job_package_map.pop(
                     wrapper_id, None)
                 job_list.packages_dict.pop(
@@ -5339,7 +5337,6 @@ class Autosubmit:
                 performed_changes = {}
                 for job in final_list:
                     if final_status in [Status.WAITING, Status.PREPARED, Status.DELAYED, Status.READY]:
-                        job.packed = False
                         job.fail_count = 0
                     if job.status in [Status.QUEUING, Status.RUNNING,
                                       Status.SUBMITTED] and job.platform.name not in definitive_platforms:
@@ -5800,11 +5797,6 @@ class Autosubmit:
             job_list.rerun(rerun_jobs, as_conf, monitor=monitor)
         else:
             job_list.remove_rerun_only_jobs(notransitive)
-
-        # Inspect -cw and Create -cw commands had issues at this point.
-        # Reset packed value on load so the jobs can be wrapped again.
-        for job in job_list.get_waiting() + job_list.get_ready():
-            job.packed = False
 
         return job_list
 
