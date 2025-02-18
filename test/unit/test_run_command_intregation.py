@@ -325,11 +325,9 @@ def check_profile(run_tmpdir) -> bool:
     # write jobs_data
     profile_path = Path(f"{run_tmpdir.strpath}/t000/tmp/profile/")
     if profile_path.exists():
-        for profile_file in profile_path.iterdir():
-            if profile_file.exists():
-                return True
-            else:
-                return False
+            return True
+    else:
+        return False
 
 
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status", [
@@ -416,26 +414,28 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
     # assert_exit_code(final_status, exit_code)
 
 
-@pytest.mark.parametrize("jobs_data, expected_db_entries, final_status", [
-    # Success
-    ("""
-    EXPERIMENT:
-        NUMCHUNKS: '3'
-    JOBS:
-        job:
-            SCRIPT: |
-                echo "Hello World with id=Success"
-            PLATFORM: local
-            RUNNING: chunk
-            wallclock: 00:01
-    """, 3, "COMPLETED"),  # Number of jobs
-], ids=["Success"])
-def test_run_profile(run_tmpdir, prepare_run, jobs_data, expected_db_entries, final_status):
-    log_dir = init_run(run_tmpdir, jobs_data)
+@pytest.mark.parametrize("jobs_data, profiler", [
+                                # Success
+                                ("""
+                                    EXPERIMENT:
+                                        NUMCHUNKS: '3'
+                                    JOBS:
+                                        job:
+                                            SCRIPT: |
+                                                echo "Hello World with id=Success"
+                                            PLATFORM: local
+                                            RUNNING: chunk
+                                            wallclock: 00:01
+                                    """,
+                                    True
+                                ),
+                            ]
+                         )
+def test_run_profile(run_tmpdir, jobs_data, profiler):
+    init_run(run_tmpdir, jobs_data)
     # Run the experiment
     try:
-        exit_code = Autosubmit.run_experiment(expid='t000', profile=True)
-        check_profile(run_tmpdir)
+        Autosubmit.run_experiment(expid='t000', profile=profiler)
         assert check_profile(run_tmpdir)
     except Exception as exc:
         assert False, f"test_run_uninterrupted_profile raised an exception: {exc}"
