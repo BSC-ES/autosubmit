@@ -74,6 +74,8 @@ class SlurmPlatform(ParamikoPlatform):
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
         self._submit_script_file = open(self._submit_script_path, 'wb').close()
 
+    def create_a_new_copy(self):
+        return SlurmPlatform(self.expid, self.name, self.config)
 
     def get_submit_cmd_x11(self, args, script_name, job):
         """
