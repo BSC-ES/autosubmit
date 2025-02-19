@@ -986,6 +986,20 @@ class Platform(object):
             if key in ["PLATFORMS", "EXPERIMENT", "DEFAULT", "CONFIG", "LOG_RECOVERY_TIMEOUT"]:
                 platform.config[key] = self.config[key]
 
+    def prepare_process(self):
+        ctx = multiprocessing.get_context('spawn')
+        new_platform = self.create_a_new_copy()
+        self.work_event = ctx.Event()
+        self.cleanup_event = ctx.Event()
+        Platform.update_workers(self.work_event)
+        self.load_process_info(new_platform)
+        if self.recovery_queue:
+            del self.recovery_queue
+        # Retrieval log process variables
+        self.recovery_queue = UniqueQueue(max_items=self.log_queue_size, ctx=ctx)
+        return ctx, new_platform
+
+
     def spawn_log_retrieval_process(self, as_conf: Any) -> None:
         """
         Spawns a process to recover the logs of the jobs that have been completed on this platform.
@@ -1001,17 +1015,7 @@ class Platform(object):
 
                 # Adds the keep_alive signal here to be accessible by all the classes
                 try:
-                    ctx = multiprocessing.get_context('spawn')
-                    new_platform = self.create_a_new_copy()
-                    self.work_event = ctx.Event()
-                    self.cleanup_event = ctx.Event()
-                    Platform.update_workers(self.work_event)
-                    self.load_process_info(new_platform)
-                    if self.recovery_queue:
-                        del self.recovery_queue
-                    # Retrieval log process variables
-                    self.recovery_queue = UniqueQueue(max_items=self.log_queue_size, ctx=ctx)
-
+                    new_platform, ctx = self.prepare_process()
                     self.log_recovery_process = ctx.Process(
                         target=recover_platform_job_logs_wrapper,
                         args=(new_platform, self.recovery_queue, self.work_event, self.cleanup_event),
