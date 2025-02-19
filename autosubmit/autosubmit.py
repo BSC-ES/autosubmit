@@ -2128,7 +2128,10 @@ class Autosubmit:
 
     @staticmethod
     def check_logs_status(job_list, as_conf, new_run):
+        track_unused_platforms = []
         for job in job_list.get_completed_failed_without_logs():
+            if job.platform not in track_unused_platforms and new_run:
+                job.platform.spawn_log_retrieval_process(as_conf)
             job_list.update_log_status(job, as_conf, new_run)
 
     @staticmethod
@@ -2434,6 +2437,7 @@ class Autosubmit:
         platform_issues = ""
         ssh_config_issues = ""
         private_key_error = "Please, add your private key to the ssh-agent ( ssh-add <path_to_key> ) or use a non-encrypted key\nIf ssh agent is not initialized, prompt first eval `ssh-agent -s`"
+
         for platform in platform_to_test:
             platform_issues = ""
             try:
