@@ -33,7 +33,7 @@ import os
 import re
 import textwrap
 import time
-from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, Log, subs_dates, add_time
+from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, Log, subs_dates
 from functools import reduce
 from threading import Thread
 from time import sleep
@@ -138,6 +138,42 @@ class Job(object):
     Inversely Job1 is a parent of Job2
     """
 
+    __slots__ = (
+        'rerun_only', 'script_name_wrapper',
+        'delay_end', 'wrapper_type', '_wrapper_queue',
+        '_platform', '_queue', '_partition', 'retry_delay', '_section',
+        '_wallclock', 'wchunkinc', '_tasks', '_nodes', 'default_parameters',
+        '_threads', '_processors', '_memory', '_memory_per_task', '_chunk',
+        '_member', 'date', 'date_split', '_splits', '_split', '_delay',
+        '_frequency', '_synchronize', 'skippable', 'repacked', '_long_name',
+        'date_format', 'type', '_name',
+        'undefined_variables', 'log_retries', 'id',
+        'file', 'additional_files', 'executable', '_local_logs',
+        '_remote_logs', 'script_name', 'stat_file', 'status', 'prev_status', 'old_status',
+        'new_status', 'priority', '_parents', '_children', '_fail_count', 'expid',
+        'parameters', '_tmp_path', '_log_path', 'write_start', '_platform', 'check',
+        'check_warnings', '_packed', 'hold', 'distance_weight', 'level', '_export',
+        '_dependencies', 'running', 'start_time', 'ext_header_path', 'ext_tailer_path',
+        'edge_info', 'total_jobs', 'max_waiting_jobs', 'exclusive', '_retrials',
+        'current_checkpoint_step', 'max_checkpoint_step', 'reservation',
+        'delete_when_edgeless', 'het', 'updated_log', 'log_retrieved',
+        'submit_time_timestamp', 'start_time_timestamp', 'finish_time_timestamp',
+        '_script', '_log_recovery_retries', 'ready_date', 'wrapper_name',
+        'is_wrapper', '_wallclock_in_seconds', '_notify_on', '_processors_per_node',
+        'log_avaliable', 'ec_queue', 'platform_name', '_serial_platform',
+        'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
+        '_scratch_free_space', '_delay_retrials', '_custom_directives',
+        'end_time_timestamp'
+    )
+
+    def __getstate__(self):
+        excluded = ["_platform", "_children", "_parents", "submitter"]
+        return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in excluded])
+
+    def __setstate__(self, state):
+        for slot, value in state.items():
+            setattr(self, slot, value)
+
     CHECK_ON_SUBMISSION = 'on_submission'
 
     # TODO
@@ -156,12 +192,9 @@ class Job(object):
         return "{0} STATUS: {1}".format(self.name, self.status)
 
     def __init__(self, name, job_id, status, priority):
-        self.splits = None
         self.rerun_only = False
         self.script_name_wrapper = None
-        self.retrials = None
         self.delay_end = None
-        self.delay_retrials = None
         self.wrapper_type = None
         self._wrapper_queue = None
         self._platform = None
@@ -183,28 +216,23 @@ class Job(object):
         self._member = None
         self.date = None
         self.date_split = None
-        self.name = name
+        self._splits = None
         self._split = None
         self._delay = None
         self._frequency = None
         self._synchronize = None
         self.skippable = False
         self.repacked = 0
+        self._name = name
         self._long_name = None
-        self.long_name = name
         self.date_format = ''
         self.type = Type.BASH
-        self.hyperthreading = None
-        self.scratch_free_space = None
-        self.custom_directives = []
         self.undefined_variables = set()
         self.log_retries = 5
         self.id = job_id
         self.file = None
         self.additional_files = []
         self.executable = None
-        self.x11 = None
-        self.x11_options = None
         self._local_logs = ('', '')
         self._remote_logs = ('', '')
         self.script_name = self.name + ".cmd"
@@ -247,7 +275,6 @@ class Job(object):
         self.max_checkpoint_step = 0
         self.reservation = ""
         self.delete_when_edgeless = False
-        self.shape = ""
         # hetjobs
         self.het = None
         self.updated_log = False
@@ -261,6 +288,21 @@ class Job(object):
         self.wrapper_name = None
         self.is_wrapper = False
         self._wallclock_in_seconds = None
+        self._notify_on = None
+        self._processors_per_node = None
+        self.log_avaliable = None
+        self.ec_queue = None
+        self.platform_name = None
+        self._serial_platform = None
+        self.submitter = None
+        self._shape = None
+        self._x11 = None
+        self._x11_options = None
+        self._hyperthreading = None
+        self._scratch_free_space = None
+        self._delay_retrials = None
+        self._custom_directives = None
+        self.end_time_timestamp = None
 
     def _adjust_new_parameters(self) -> None:
         """
@@ -617,10 +659,6 @@ class Job(object):
     @notify_on.setter
     def notify_on(self, value):
         self._notify_on = value
-
-    def __getstate__(self):
-        return {k: v for k, v in self.__dict__.items() if k not in ["_platform", "_children", "_parents", "submitter"]}
-
 
     def read_header_tailer_script(self, script_path: str, as_conf: AutosubmitConfig, is_header: bool):
         """
