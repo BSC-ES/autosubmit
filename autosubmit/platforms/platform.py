@@ -73,7 +73,7 @@ class UniqueQueue(Queue):
     A queue that avoids retrieves the same job and retrial during the same run.
     """
 
-    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, max_items: int = 200):
+    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, max_items: int = 200, ctx=None):
         """
         Initializes the UniqueQueue.
 
@@ -84,10 +84,12 @@ class UniqueQueue(Queue):
             max_items (int): Maximum number of unique items to track. Defaults to 200.
 
         """
+        if not ctx:
+            multiprocessing.get_context()
         self.block = block
         self.timeout = timeout
         self.all_items = UniqueDeque(maxlen=max_items)  # Won't be popped, so even if it is being processed by the log retrieval process, it won't be added again.
-        super().__init__(maxsize, ctx=multiprocessing.get_context())
+        super().__init__(maxsize, ctx=ctx)
 
     def put(self, job: Any, block: bool = True, timeout: float = None) -> None:
         """
@@ -909,11 +911,7 @@ class Platform(object):
         raise NotImplementedError
 
     def add_job_to_log_recover(self, job):
-        track_unused_platforms = []
         if job.id and int(job.id) != 0:
-            if not job.platform.connected and not job.platform not in track_unused_platforms:
-                track_unused_platforms.append(job.platform.name)
-                job.platform.spawn_log_retrieval_process(job.platform.config)
             self.recovery_queue.put(job)
         else:
             Log.warning(f"Job {job.name} and retry number:{job.fail_count} has no job id. Autosubmit will no record this retry.")
@@ -1011,7 +1009,7 @@ class Platform(object):
                                                                                                             {}).get(
                                                                                                 "LOG_RECOVERY_QUEUE_SIZE",
                                                                                                 total_jobs)))
-                    self.recovery_queue = UniqueQueue(max_items=log_queue_size)
+                    self.recovery_queue = UniqueQueue(max_items=log_queue_size, ctx=ctx)
 
                     self.log_recovery_process = ctx.Process(
                         target=recover_platform_job_logs_wrapper,
