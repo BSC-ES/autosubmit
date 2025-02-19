@@ -18,6 +18,13 @@ from multiprocessing.queues import Queue
 import time
 
 
+def recover_platform_job_logs_wrapper(platform, recovery_queue, worker_event, cleanup_event):
+    platform.recovery_queue = recovery_queue
+    platform.work_event = worker_event
+    platform.cleanup_event = cleanup_event
+    platform.recover_platform_job_logs()
+
+
 class UniqueDeque:
     def __init__(self, maxlen=None):
         self.maxlen = maxlen
@@ -186,8 +193,8 @@ class Platform(object):
             total_jobs = min(int(config.get("PLATFORMS", {}).get('TOTAL_JOBS', config.get("PLATFORMS", {}).get('TOTALJOBS', self.config.get("CONFIG", {}).get("TOTAL_JOBS", 100)))), 100) * 2
             log_queue_size = int(config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("LOG_RECOVERY_QUEUE_SIZE", config.get("CONFIG", {}).get("LOG_RECOVERY_QUEUE_SIZE", total_jobs)))
         self.recovery_queue = UniqueQueue(max_items=log_queue_size)
-        self.work_event = Event()
-        self.cleanup_event = Event()
+        self.work_event = None
+        self.cleanup_event = None
         self.log_retrieval_process_active = False
         self.log_recovery_process = None
         self.keep_alive_timeout = 60 * 5  # Useful in case of kill -9
@@ -941,6 +948,35 @@ class Platform(object):
         self.log_recovery_process = None
         self.processed_wrapper_logs = set()
 
+    def load_process_info(self, platform):
+
+        platform.host = self.host
+        # Retrieve more configurations settings and save them in the object
+        platform.project = self.project
+        platform.budget = self.budget
+        platform.reservation = self.reservation
+        platform.exclusivity = self.exclusivity
+        platform.user = self.user
+        platform.scratch = self.scratch
+        platform.project_dir = self.project_dir
+        platform.temp_dir = self.temp_dir
+        platform._default_queue = self.queue
+        platform._partition = self.partition
+        platform._serial_queue = self.serial_queue
+        platform._serial_partition = self.serial_partition
+        platform.ec_queue = self.ec_queue
+        platform.processors_per_node = self.processors_per_node
+        platform.custom_directives = self.custom_directives
+        platform.scratch_free_space = self.scratch_free_space
+        platform.root_dir = self.root_dir
+        platform.update_cmds()
+        del platform.poller
+        platform.config = {}
+        for key in [conf_param for conf_param in self.config]:
+            if key in ["PLATFORMS", "EXPERIMENT", "DEFAULT", "CONFIG"]:
+                platform.config[key] = self.config[key]
+        pass
+
     def spawn_log_retrieval_process(self, as_conf: Any) -> None:
         """
         Spawns a process to recover the logs of the jobs that have been completed on this platform.
@@ -956,11 +992,21 @@ class Platform(object):
 
                 # Adds the keep_alive signal here to be accessible by all the classes
                 Platform.update_workers(self.work_event)
-                self.log_recovery_process = Process(target=self.recover_platform_job_logs, args=(),
-                                                    name=f"{self.name}_log_recovery")
-                self.log_recovery_process.daemon = True
-                self.log_recovery_process.start()
-
+                try:
+                    ctx = multiprocessing.get_context('spawn')
+                    self.work_event = ctx.Event()
+                    self.cleanup_event = ctx.Event()
+                    new_platform = self.create_a_new_copy()
+                    self.load_process_info(new_platform)
+                    self.log_recovery_process = ctx.Process(
+                        target=recover_platform_job_logs_wrapper,
+                        args=(new_platform, self.recovery_queue, self.work_event, self.cleanup_event),
+                        name=f"{self.name}_log_recovery")
+                    self.log_recovery_process.daemon = True
+                    self.log_recovery_process.start()
+                except BaseException as e:
+                    Log.error(f"Process {self.log_recovery_process.name} could not be started.\n{e}")
+                    raise
                 # Prevents zombies
                 os.waitpid(self.log_recovery_process.pid, os.WNOHANG)
                 Log.result(f"Process {self.log_recovery_process.name} started with pid {self.log_recovery_process.pid}")
@@ -1092,20 +1138,30 @@ class Platform(object):
         """
         setproctitle.setproctitle(f"autosubmit log {self.expid} recovery {self.name.lower()}")
         identifier = f"{self.name.lower()}(log_recovery):"
-        Log.info(f"{identifier} Starting...")
-        jobs_pending_to_process = set()
-        self.connected = False
-        self.restore_connection(None)
-        Log.get_logger("Autosubmit")  # Log needs to be initialised in the new process
-        Log.result(f"{identifier} successfully connected.")
-        log_recovery_timeout = self.config.get("LOG_RECOVERY_TIMEOUT", 60)
-        # Keep alive signal timeout is 5 minutes, but the sleeptime is 60 seconds.
-        self.keep_alive_timeout = max(log_recovery_timeout*5, 60*5)
-        while self.wait_for_work(sleep_time=max(log_recovery_timeout, 60)):
-            jobs_pending_to_process = self.recover_job_log(identifier, jobs_pending_to_process)
-            if self.cleanup_event.is_set():  # Check if the main process is waiting for this child to end.
-                self.recover_job_log(identifier, jobs_pending_to_process)
-                break
+        try:
+            Log.info(f"{identifier} Starting...")
+            jobs_pending_to_process = set()
+            self.connected = False
+            self.restore_connection(None)
+            Log.get_logger("Autosubmit")  # Log needs to be initialised in the new process
+            Log.result(f"{identifier} successfully connected.")
+            log_recovery_timeout = self.config.get("LOG_RECOVERY_TIMEOUT", 60)
+            # Keep alive signal timeout is 5 minutes, but the sleeptime is 60 seconds.
+            self.keep_alive_timeout = max(log_recovery_timeout*5, 60*5)
+            while self.wait_for_work(sleep_time=max(log_recovery_timeout, 60)):
+                jobs_pending_to_process = self.recover_job_log(identifier, jobs_pending_to_process)
+                if self.cleanup_event.is_set():  # Check if the main process is waiting for this child to end.
+                    self.recover_job_log(identifier, jobs_pending_to_process)
+                    break
+        except Exception as e:
+            print(f"{identifier} {e}")
+            print(traceback.format_exc())
+            # Log.error(f"{identifier} {e}")
+            # Log.debug(traceback.format_exc())
+
         self.closeConnection()
         Log.info(f"{identifier} Exiting.")
         _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
+
+    def create_a_new_copy(self):
+        raise NotImplementedError

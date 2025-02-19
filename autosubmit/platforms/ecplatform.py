@@ -172,6 +172,8 @@ class EcPlatform(ParamikoPlatform):
             self.connected = False
         self.spawn_log_retrieval_process(as_conf)
 
+    def create_a_new_copy(self):
+        return EcPlatform(self.expid, self.name, self.config, self._version)
 
     def restore_connection(self,as_conf):
         """

@@ -75,6 +75,9 @@ class PBSPlatform(ParamikoPlatform):
         self.job_status['FAILED'] = ['Failed', 'Node_fail', 'Timeout']
         self.update_cmds()
 
+    def create_a_new_copy(self):
+        return PBSPlatform(self.expid, self.name, self.config, self.config[self.name.upper()].get('VERSION', ''))
+
     def parse_queue_reason(self, output, job_id):
         pass
 
@@ -129,4 +132,3 @@ class PBSPlatform(ParamikoPlatform):
             return self._checkjob_cmd + str(job_id)
         else:
             return "ssh " + self.host + " " + self.get_qstatjob(job_id)
-
