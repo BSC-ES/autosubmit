@@ -456,7 +456,7 @@ class JobList(object):
             self.find_and_delete_redundant_relations(problematic_jobs)
         self._add_all_jobs_edge_info(dic_jobs, option)
 
-    def find_and_delete_redundant_relations(self, problematic_jobs):
+    def find_and_delete_redundant_relations(self, problematic_jobs: {}) -> None:
         '''
         Jobs with intrisic rules than can't be safelty not added without messing other workflows.
         The graph will have the least amount of edges added as much as safely possible before this function.
