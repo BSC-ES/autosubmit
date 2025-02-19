@@ -23,7 +23,7 @@ def recover_platform_job_logs_wrapper(platform, recovery_queue, worker_event, cl
     platform.work_event = worker_event
     platform.cleanup_event = cleanup_event
     platform.recover_platform_job_logs()
-
+    _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
 
 class UniqueQueue(Queue):
     """
@@ -41,6 +41,8 @@ class UniqueQueue(Queue):
             max_items (int): Maximum number of unique items to track. Defaults to 200.
             ctx (Context): Context for the queue. Defaults to None.
         """
+        if not ctx:
+            multiprocessing.get_context()
         self.block = block
         self.timeout = timeout
         self.all_items = deque(maxlen=max_items)  # Won't be popped, so even if it is being processed by the log retrieval process, it won't be added again.
