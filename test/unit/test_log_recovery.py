@@ -99,13 +99,16 @@ def as_conf(prepare_test, mocker):
                                                        Path(prepare_test.join('platforms_t000.yml')))
     as_conf.misc_data = {"AS_COMMAND": "run"}
     return as_conf
+import multiprocessing
 
+multiprocessing.set_start_method('fork', force=True)
 
 def test_log_recovery_no_keep_alive(prepare_test, local, mocker, as_conf):
     mocker.patch('autosubmit.platforms.platform.max', return_value=1)
     local.spawn_log_retrieval_process(as_conf)
     assert local.log_recovery_process.is_alive()
     time.sleep(2)
+    local.log_recovery_process.join(2)
     assert local.log_recovery_process.is_alive() is False
     local.cleanup_event.set()
 

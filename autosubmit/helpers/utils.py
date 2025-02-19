@@ -228,4 +228,3 @@ class NaturalSort:
             if this_isstr and that_isint:
                 return False
         return False
-
