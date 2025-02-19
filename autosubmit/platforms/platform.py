@@ -23,7 +23,7 @@ def recover_platform_job_logs_wrapper(platform, recovery_queue, worker_event, cl
     platform.work_event = worker_event
     platform.cleanup_event = cleanup_event
     platform.recover_platform_job_logs()
-
+    _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
 
 class UniqueDeque:
     def __init__(self, maxlen=None):
@@ -73,7 +73,7 @@ class UniqueQueue(Queue):
     A queue that avoids retrieves the same job and retrial during the same run.
     """
 
-    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, max_items: int = 200):
+    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, max_items: int = 200, ctx=None):
         """
         Initializes the UniqueQueue.
 
@@ -84,10 +84,12 @@ class UniqueQueue(Queue):
             max_items (int): Maximum number of unique items to track. Defaults to 200.
 
         """
+        if not ctx:
+            multiprocessing.get_context()
         self.block = block
         self.timeout = timeout
         self.all_items = UniqueDeque(maxlen=max_items)  # Won't be popped, so even if it is being processed by the log retrieval process, it won't be added again.
-        super().__init__(maxsize, ctx=multiprocessing.get_context())
+        super().__init__(maxsize, ctx=ctx)
 
     def put(self, job: Any, block: bool = True, timeout: float = None) -> None:
         """
@@ -185,20 +187,29 @@ class Platform(object):
         else:
             self.pw = None
         self.max_waiting_jobs = 20
-
-        # Retrieval log process variables
-        log_queue_size = 200
-        if config:
-            # We still support TOTALJOBS and TOTAL_JOBS for backwards compatibility... # TODO change in 4.2, I think
-            total_jobs = min(int(config.get("PLATFORMS", {}).get('TOTAL_JOBS', config.get("PLATFORMS", {}).get('TOTALJOBS', self.config.get("CONFIG", {}).get("TOTAL_JOBS", 100)))), 100) * 2
-            log_queue_size = int(config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("LOG_RECOVERY_QUEUE_SIZE", config.get("CONFIG", {}).get("LOG_RECOVERY_QUEUE_SIZE", total_jobs)))
-        self.recovery_queue = UniqueQueue(max_items=log_queue_size)
+        self.recovery_queue = None
         self.work_event = None
         self.cleanup_event = None
         self.log_retrieval_process_active = False
         self.log_recovery_process = None
         self.keep_alive_timeout = 60 * 5  # Useful in case of kill -9
         self.processed_wrapper_logs = set()
+        log_queue_size = 200
+        if self.config:
+            # We still support TOTALJOBS and TOTAL_JOBS for backwards compatibility... # TODO change in 4.2, I think
+            total_jobs = min(int(self.config.get("PLATFORMS", {}).get('TOTAL_JOBS',
+                                                                      self.config.get("PLATFORMS", {}).get(
+                                                                          'TOTALJOBS',
+                                                                          self.config.get("CONFIG", {}).get(
+                                                                              "TOTAL_JOBS", 100)))),
+                             100) * 2
+            log_queue_size = int(
+                self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("LOG_RECOVERY_QUEUE_SIZE",
+                                                                                self.config.get("CONFIG",
+                                                                                                {}).get(
+                                                                                    "LOG_RECOVERY_QUEUE_SIZE",
+                                                                                    total_jobs)))
+        self.log_queue_size = log_queue_size
 
     @classmethod
     def update_workers(cls, event_worker):
@@ -940,11 +951,11 @@ class Platform(object):
             # Waits for old child ( if reachable ) to finish. Timeout in case of it being blocked.
             self.log_recovery_process.join(timeout=60)
         # Resets everything related to the log recovery process.
-        self.recovery_queue = UniqueQueue()
+        self.recovery_queue = None
         self.log_retrieval_process_active = False
         self.remove_workers(self.work_event)
-        self.work_event = Event()
-        self.cleanup_event = Event()
+        self.work_event = None
+        self.cleanup_event = None
         self.log_recovery_process = None
         self.processed_wrapper_logs = set()
 
@@ -965,7 +976,6 @@ class Platform(object):
         platform._serial_queue = self.serial_queue
         platform._serial_partition = self.serial_partition
         platform.ec_queue = self.ec_queue
-        platform.processors_per_node = self.processors_per_node
         platform.custom_directives = self.custom_directives
         platform.scratch_free_space = self.scratch_free_space
         platform.root_dir = self.root_dir
@@ -973,9 +983,8 @@ class Platform(object):
         del platform.poller
         platform.config = {}
         for key in [conf_param for conf_param in self.config]:
-            if key in ["PLATFORMS", "EXPERIMENT", "DEFAULT", "CONFIG"]:
+            if key in ["PLATFORMS", "EXPERIMENT", "DEFAULT", "CONFIG", "LOG_RECOVERY_TIMEOUT"]:
                 platform.config[key] = self.config[key]
-        pass
 
     def spawn_log_retrieval_process(self, as_conf: Any) -> None:
         """
@@ -991,13 +1000,18 @@ class Platform(object):
                 self.log_retrieval_process_active = True
 
                 # Adds the keep_alive signal here to be accessible by all the classes
-                Platform.update_workers(self.work_event)
                 try:
                     ctx = multiprocessing.get_context('spawn')
+                    new_platform = self.create_a_new_copy()
                     self.work_event = ctx.Event()
                     self.cleanup_event = ctx.Event()
-                    new_platform = self.create_a_new_copy()
+                    Platform.update_workers(self.work_event)
                     self.load_process_info(new_platform)
+                    if self.recovery_queue:
+                        del self.recovery_queue
+                    # Retrieval log process variables
+                    self.recovery_queue = UniqueQueue(max_items=self.log_queue_size, ctx=ctx)
+
                     self.log_recovery_process = ctx.Process(
                         target=recover_platform_job_logs_wrapper,
                         args=(new_platform, self.recovery_queue, self.work_event, self.cleanup_event),
@@ -1136,6 +1150,7 @@ class Platform(object):
         Recovers the logs of the jobs that have been submitted.
         When this is executed as a process, the exit is controlled by the work_event and cleanup_events of the main process.
         """
+        Log.get_logger("Autosubmit")  # Log needs to be initialised in the new process
         setproctitle.setproctitle(f"autosubmit log {self.expid} recovery {self.name.lower()}")
         identifier = f"{self.name.lower()}(log_recovery):"
         try:
@@ -1143,7 +1158,6 @@ class Platform(object):
             jobs_pending_to_process = set()
             self.connected = False
             self.restore_connection(None)
-            Log.get_logger("Autosubmit")  # Log needs to be initialised in the new process
             Log.result(f"{identifier} successfully connected.")
             log_recovery_timeout = self.config.get("LOG_RECOVERY_TIMEOUT", 60)
             # Keep alive signal timeout is 5 minutes, but the sleeptime is 60 seconds.
