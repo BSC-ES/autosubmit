@@ -7,6 +7,7 @@ from mock import Mock
 import math
 import shutil
 import tempfile
+from pathlib import Path
 import inspect
 
 from autosubmit.job.job import Job
@@ -19,8 +20,30 @@ from autosubmit.job.job_list_persistence import JobListPersistenceDb
 from unittest.mock import patch
 
 
+class FakeBasicConfig:
+    def __init__(self):
+        pass
+    def props(self):
+        pr = {}
+        for name in dir(self):
+            value = getattr(self, name)
+            if not name.startswith('__') and not inspect.ismethod(value) and not inspect.isfunction(value):
+                pr[name] = value
+        return pr
+    DB_DIR = '/dummy/db/dir'
+    DB_FILE = '/dummy/db/file'
+    DB_PATH = '/dummy/db/path'
+    LOCAL_ROOT_DIR = '/dummy/local/root/dir'
+    LOCAL_TMP_DIR = '/dummy/local/temp/dir'
+    LOCAL_PROJ_DIR = '/dummy/local/proj/dir'
+    DEFAULT_PLATFORMS_CONF = ''
+    DEFAULT_JOBS_CONF = ''
+    DATABASE_BACKEND = 'sqlite'
+
+
 class TestDicJobs(TestCase):
-    def setUp(self):
+    @patch('autosubmit.job.job_list_persistence.BasicConfig', new_callable=FakeBasicConfig)
+    def setUp(self, patched_basic_config):
         self.experiment_id = 'random-id'
         self.as_conf = Mock()
 
@@ -31,8 +54,20 @@ class TestDicJobs(TestCase):
         self.as_conf.jobs_data = self.as_conf.experiment_data["JOBS"]
         self.as_conf.experiment_data["PLATFORMS"] = dict()
         self.temp_directory = tempfile.mkdtemp()
+
+        patched_basic_config.DB_DIR = self.temp_directory
+        patched_basic_config.DB_FILE = Path(self.temp_directory, 'test-db.db')
+        patched_basic_config.DB_PATH = patched_basic_config.DB_FILE
+        patched_basic_config.LOCAL_PROJ_DIR = self.temp_directory
+        patched_basic_config.LOCAL_ROOT_DIR = self.temp_directory
+        patched_basic_config.LOCAL_TMP_DIR = self.temp_directory
+
+        Path(patched_basic_config.DB_FILE).touch()
+        Path(patched_basic_config.LOCAL_ROOT_DIR, self.experiment_id, 'pkl').mkdir(parents=True, exist_ok=True)
+
         self.job_list = JobList(self.experiment_id, FakeBasicConfig, YAMLParserFactory(),
-                                JobListPersistenceDb(self.temp_directory, 'db'),self.as_conf)
+                                JobListPersistenceDb(self.experiment_id),self.as_conf)
+        
         self.parser_mock = Mock(spec='SafeConfigParser')
         self.date_list = ['fake-date1', 'fake-date2']
         self.member_list = ["fc1", "fc2", "fc3", "fc4", "fc5", "fc6", "fc7", "fc8", "fc9", "fc10"]
@@ -601,25 +636,3 @@ class TestDicJobs(TestCase):
         section_data = []
         self.dictionary._create_jobs_split(5,'fake-section','fake-date', 'fake-member', 'fake-chunk', 0,Type.BASH, section_data)
         self.assertEqual(5, len(section_data))
-
-
-
-
-class FakeBasicConfig:
-    def __init__(self):
-        pass
-    def props(self):
-        pr = {}
-        for name in dir(self):
-            value = getattr(self, name)
-            if not name.startswith('__') and not inspect.ismethod(value) and not inspect.isfunction(value):
-                pr[name] = value
-        return pr
-    DB_DIR = '/dummy/db/dir'
-    DB_FILE = '/dummy/db/file'
-    DB_PATH = '/dummy/db/path'
-    LOCAL_ROOT_DIR = '/dummy/local/root/dir'
-    LOCAL_TMP_DIR = '/dummy/local/temp/dir'
-    LOCAL_PROJ_DIR = '/dummy/local/proj/dir'
-    DEFAULT_PLATFORMS_CONF = ''
-    DEFAULT_JOBS_CONF = ''
