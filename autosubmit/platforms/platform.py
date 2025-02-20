@@ -13,9 +13,11 @@ from typing import List, Union, Set, Any
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import AutosubmitCritical, AutosubmitError, Log
-from multiprocessing import Process, Event
+from multiprocessing import Event
 from multiprocessing.queues import Queue
 import time
+
+
 
 def recover_platform_job_logs_wrapper(platform, recovery_queue, worker_event, cleanup_event):
     platform.recovery_queue = recovery_queue
@@ -942,8 +944,7 @@ class Platform(object):
             if key in ["PLATFORMS", "EXPERIMENT", "DEFAULT", "CONFIG", "LOG_RECOVERY_TIMEOUT"]:
                 platform.config[key] = self.config[key]
 
-    def prepare_process(self):
-        ctx = multiprocessing.get_context('spawn')
+    def prepare_process(self, ctx):
         new_platform = self.create_a_new_copy()
         self.work_event = ctx.Event()
         self.cleanup_event = ctx.Event()
@@ -953,8 +954,31 @@ class Platform(object):
             del self.recovery_queue
         # Retrieval log process variables
         self.recovery_queue = UniqueQueue(max_items=self.log_queue_size, ctx=ctx)
-        return ctx, new_platform
+        return new_platform
 
+    def create_new_process(self, ctx, new_platform) -> None:
+        try:
+            self.log_recovery_process = ctx.Process(
+                target=recover_platform_job_logs_wrapper,
+                args=(new_platform, self.recovery_queue, self.work_event, self.cleanup_event),
+                name=f"{self.name}_log_recovery")
+            self.log_recovery_process.daemon = True
+            self.log_recovery_process.start()
+        except BaseException as e:
+            Log.error(f"Recovery process for {self.name} could not be started.\n{e}")
+            raise
+
+    @staticmethod
+    def get_mp_context():
+        return multiprocessing.get_context('spawn')
+
+    def join_new_process(self):
+        # Prevents zombies
+        os.waitpid(self.log_recovery_process.pid, os.WNOHANG)
+        Log.result(f"Process {self.log_recovery_process.name} started with pid {self.log_recovery_process.pid}")
+        # Cleanup will be automatically prompt on control + c or a normal exit
+        atexit.register(self.send_cleanup_signal)
+        atexit.register(self.closeConnection)
 
     def spawn_log_retrieval_process(self, as_conf: Any) -> None:
         """
@@ -968,25 +992,10 @@ class Platform(object):
                                                                                      "false")).lower() == "false"):
             if as_conf and as_conf.misc_data.get("AS_COMMAND", "").lower() == "run":
                 self.log_retrieval_process_active = True
-
-                # Adds the keep_alive signal here to be accessible by all the classes
-                try:
-                    ctx, new_platform = self.prepare_process()
-                    self.log_recovery_process = ctx.Process(
-                        target=recover_platform_job_logs_wrapper,
-                        args=(new_platform, self.recovery_queue, self.work_event, self.cleanup_event),
-                        name=f"{self.name}_log_recovery")
-                    self.log_recovery_process.daemon = True
-                    self.log_recovery_process.start()
-                except BaseException as e:
-                    Log.error(f"Recovery process for {self.name} could not be started.\n{e}")
-                    raise
-                # Prevents zombies
-                os.waitpid(self.log_recovery_process.pid, os.WNOHANG)
-                Log.result(f"Process {self.log_recovery_process.name} started with pid {self.log_recovery_process.pid}")
-                # Cleanup will be automatically prompt on control + c or a normal exit
-                atexit.register(self.send_cleanup_signal)
-                atexit.register(self.closeConnection)
+                ctx = self.get_mp_context()
+                new_platform = self.prepare_process(ctx)
+                self.create_new_process(ctx, new_platform)
+                self.join_new_process()
 
     def send_cleanup_signal(self) -> None:
         """
