@@ -2986,6 +2986,11 @@ class JobList(object):
             job.set_ready_date()
         self.update_two_step_jobs()
         Log.debug('Update finished')
+
+        #dirty test
+        for job in self.get_waiting() + self.get_completed() + self.get_failed():
+            job.parameters = {}
+
         return save
 
     def update_genealogy(self):
