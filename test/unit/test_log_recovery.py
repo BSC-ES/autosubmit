@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 
 import pytest
+import multiprocessing as mp
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
@@ -104,6 +105,7 @@ def as_conf(prepare_test, mocker):
 
 def test_log_recovery_no_keep_alive(prepare_test, local, mocker, as_conf):
     mocker.patch('autosubmit.platforms.platform.max', return_value=1)
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     local.spawn_log_retrieval_process(as_conf)
     assert local.log_recovery_process.is_alive()
     time.sleep(2)
@@ -113,6 +115,7 @@ def test_log_recovery_no_keep_alive(prepare_test, local, mocker, as_conf):
 
 def test_log_recovery_keep_alive(prepare_test, local, mocker, as_conf):
     mocker.patch('autosubmit.platforms.platform.max', return_value=1)
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     local.keep_alive_timeout = 0
     local.spawn_log_retrieval_process(as_conf)
     assert local.log_recovery_process.is_alive()
@@ -129,6 +132,7 @@ def test_log_recovery_keep_alive(prepare_test, local, mocker, as_conf):
 
 def test_log_recovery_keep_alive_cleanup(prepare_test, local, mocker, as_conf):
     mocker.patch('autosubmit.platforms.platform.max', return_value=1)
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     local.keep_alive_timeout = 0
     local.spawn_log_retrieval_process(as_conf)
     assert local.log_recovery_process.is_alive()
@@ -145,6 +149,7 @@ def test_log_recovery_keep_alive_cleanup(prepare_test, local, mocker, as_conf):
 def test_log_recovery_recover_log(prepare_test, local, mocker, as_conf):
     print(prepare_test.strpath)
     mocker.patch('autosubmit.platforms.platform.max', return_value=0)
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     local.keep_alive_timeout = 20
     mocker.patch('autosubmit.job.job.Job.write_stats')  # Tested in test_run_command_intregation.py
     local.spawn_log_retrieval_process(as_conf)
@@ -166,14 +171,17 @@ def test_log_recovery_recover_log(prepare_test, local, mocker, as_conf):
 
 def test_refresh_log_retry_process(prepare_test, local, as_conf, mocker):
     mocker.patch('autosubmit.platforms.platform.max', return_value=0)
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     local.keep_alive_timeout = 20
     platforms = [local]
+    local.spawn_log_retrieval_process(as_conf)
     Autosubmit.refresh_log_recovery_process(platforms, as_conf)
     assert local.log_recovery_process.is_alive()
     assert local.work_event.is_set()
     local.cleanup_event.set()
     local.log_recovery_process.join(30)
     assert local.log_recovery_process.is_alive() is False
+    local.spawn_log_retrieval_process(as_conf)
     Autosubmit.refresh_log_recovery_process(platforms, as_conf)
     assert local.log_recovery_process.is_alive()
     local.send_cleanup_signal()  # this is called by atexit function
@@ -193,9 +201,12 @@ def test_refresh_log_retry_process(prepare_test, local, as_conf, mocker):
 def test_wait_until_timeout(prepare_test, local, as_conf, mocker, cleanup_event, work_event, recovery_queue_full,
                             result):
     mocker.patch('autosubmit.platforms.platform.max', return_value=2)
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     local.keep_alive_timeout = 2
     max_items = 1
-    local.recovery_queue = UniqueQueue(max_items=max_items)
+    ctx = local.get_mp_context()
+    local.prepare_process(ctx)
+    local.recovery_queue = UniqueQueue(max_items=max_items, ctx=ctx)
     local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
     local.work_event.set() if work_event else local.work_event.clear()
     if recovery_queue_full:
@@ -218,9 +229,12 @@ def test_wait_until_timeout(prepare_test, local, as_conf, mocker, cleanup_event,
 def test_wait_for_work(prepare_test, local, as_conf, mocker, cleanup_event, work_event, recovery_queue_full,
                        result):
     mocker.patch('autosubmit.platforms.platform.max', return_value=2)
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     local.keep_alive_timeout = 2
     max_items = 1
-    local.recovery_queue = UniqueQueue(max_items=max_items)
+    ctx = local.get_mp_context()
+    local.prepare_process(ctx)
+    local.recovery_queue = UniqueQueue(max_items=max_items, ctx=ctx)
     local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
     local.work_event.set() if work_event else local.work_event.clear()
     if recovery_queue_full:
@@ -243,9 +257,12 @@ def test_wait_for_work(prepare_test, local, as_conf, mocker, cleanup_event, work
 def test_wait_mandatory_time(prepare_test, local, as_conf, mocker, cleanup_event, work_event, recovery_queue_full,
                              result):
     mocker.patch('autosubmit.platforms.platform.max', return_value=2)
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     local.keep_alive_timeout = 2
     max_items = 1
-    local.recovery_queue = UniqueQueue(max_items=max_items)
+    ctx = local.get_mp_context()
+    local.prepare_process(ctx)
+    local.recovery_queue = UniqueQueue(max_items=max_items, ctx=ctx)
     local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
     local.work_event.set() if work_event else local.work_event.clear()
     if recovery_queue_full:
@@ -255,9 +272,12 @@ def test_wait_mandatory_time(prepare_test, local, as_conf, mocker, cleanup_event
     assert process_log == result
 
 
-def test_unique_elements(local):
+def test_unique_elements(local, mocker):
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     max_items = 3
-    local.recovery_queue = UniqueQueue(max_items=max_items)
+    ctx = local.get_mp_context()
+    local.prepare_process(ctx)
+    local.recovery_queue = UniqueQueue(max_items=max_items, ctx=ctx)
     for i in range(max_items):
         local.recovery_queue.put(Job(f'rng{i}', f'000{i}', Status.COMPLETED, 0))
     assert len(local.recovery_queue.all_items) == max_items
