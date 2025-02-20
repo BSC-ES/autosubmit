@@ -31,7 +31,7 @@ class UniqueQueue(Queue):
     A queue that avoids retrieves the same job and retrial during the same run.
     """
 
-    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, max_items: int = 200, ctx=None):
+    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, max_items: int = 200, ctx: Any = None) -> None:
         """
         Initializes the UniqueQueue.
 
@@ -40,10 +40,8 @@ class UniqueQueue(Queue):
             block (bool): Whether to block when the queue is full. Defaults to True.
             timeout (float): Timeout for blocking operations. Defaults to None.
             max_items (int): Maximum number of unique items to track. Defaults to 200.
-
+            ctx (Context): Context for the queue. Defaults to None.
         """
-        if not ctx:
-            multiprocessing.get_context()
         self.block = block
         self.timeout = timeout
         self.all_items = deque(maxlen=max_items)  # Won't be popped, so even if it is being processed by the log retrieval process, it won't be added again.
@@ -958,16 +956,13 @@ class Platform(object):
         return new_platform
 
     def create_new_process(self, ctx, new_platform) -> None:
-        try:
-            self.log_recovery_process = ctx.Process(
-                target=recover_platform_job_logs_wrapper,
-                args=(new_platform, self.recovery_queue, self.work_event, self.cleanup_event),
-                name=f"{self.name}_log_recovery")
-            self.log_recovery_process.daemon = True
-            self.log_recovery_process.start()
-        except BaseException as e:
-            Log.error(f"Recovery process for {self.name} could not be started.\n{e}")
-            raise
+        self.log_recovery_process = ctx.Process(
+            target=recover_platform_job_logs_wrapper,
+            args=(new_platform, self.recovery_queue, self.work_event, self.cleanup_event),
+            name=f"{self.name}_log_recovery")
+        self.log_recovery_process.daemon = True
+        self.log_recovery_process.start()
+
 
     @staticmethod
     def get_mp_context():
