@@ -964,7 +964,6 @@ class Platform(object):
         self.log_recovery_process.daemon = True
         self.log_recovery_process.start()
 
-
     @staticmethod
     def get_mp_context():
         return multiprocessing.get_context('spawn')
