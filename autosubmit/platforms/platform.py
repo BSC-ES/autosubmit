@@ -1,6 +1,7 @@
 import atexit
 import multiprocessing
 import queue  # only for the exception
+from collections import deque
 from copy import copy
 from os import _exit
 import setproctitle
@@ -8,7 +9,7 @@ import locale
 import os
 import traceback
 from autosubmit.job.job_common import Status
-from typing import List, Union, Callable, Set, Any
+from typing import List, Union, Set, Any
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import AutosubmitCritical, AutosubmitError, Log
@@ -22,7 +23,7 @@ class UniqueQueue(Queue):
     A queue that avoids retrieves the same job and retrial during the same run.
     """
 
-    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None):
+    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, max_items: int = 200):
         """
         Initializes the UniqueQueue.
 
@@ -30,10 +31,12 @@ class UniqueQueue(Queue):
             maxsize (int): Maximum size of the queue. Defaults to -1 (infinite size).
             block (bool): Whether to block when the queue is full. Defaults to True.
             timeout (float): Timeout for blocking operations. Defaults to None.
+            max_items (int): Maximum number of unique items to track. Defaults to 200.
+
         """
         self.block = block
         self.timeout = timeout
-        self.all_items = set()  # Won't be popped, so even if it is being processed by the log retrieval process, it won't be added again.
+        self.all_items = deque(maxlen=max_items)
         super().__init__(maxsize, ctx=multiprocessing.get_context())
 
     def put(self, job: Any, block: bool = True, timeout: float = None) -> None:
@@ -45,13 +48,16 @@ class UniqueQueue(Queue):
             block (bool): Whether to block when the queue is full. Defaults to True.
             timeout (float): Timeout for blocking operations. Defaults to None.
         """
-        if job.wrapper_type == "vertical": # We gather all retrials at once
+
+        if job.wrapper_type == "vertical":  # We gather all retrials at once
             unique_name = job.name
         else:
-            unique_name = job.name+str(job.fail_count) # We gather retrial per retrial
+            unique_name = job.name+str(job.fail_count)  # We gather retrial per retrial
+
         if unique_name not in self.all_items:
-            self.all_items.add(unique_name)
-            super().put(copy(job), block, timeout)  # Without copy, the process seems to modify the job for other retrials.. My guess is that the object is not serialized until it is get from the queue.
+            self.all_items.append(unique_name)
+            # Without copy, the process seems to modify the job for other retrials.. My guess is that the object is not serialized until it is get from the queue.
+            super().put(copy(job), block, timeout)
 
 
 class Platform(object):
@@ -128,17 +134,21 @@ class Platform(object):
                 self.pw = auth_password
         else:
             self.pw = None
+        self.max_waiting_jobs = 20
 
         # Retrieval log process variables
-        self.recovery_queue = UniqueQueue()
-        self.log_retrieval_process_active = False
-        self.main_process_id = None
+        log_queue_size = 200
+        if config:
+            # We still support TOTALJOBS and TOTAL_JOBS for backwards compatibility... # TODO change in 4.2, I think
+            total_jobs = min(int(config.get("PLATFORMS", {}).get('TOTAL_JOBS', config.get("PLATFORMS", {}).get('TOTALJOBS', self.config.get("CONFIG", {}).get("TOTAL_JOBS", 100)))), 100) * 2
+            log_queue_size = int(config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("LOG_RECOVERY_QUEUE_SIZE", config.get("CONFIG", {}).get("LOG_RECOVERY_QUEUE_SIZE", total_jobs)))
+        self.recovery_queue = UniqueQueue(max_items=log_queue_size)
         self.work_event = Event()
         self.cleanup_event = Event()
+        self.log_retrieval_process_active = False
         self.log_recovery_process = None
-        self.keep_alive_timeout = 60 * 5 # Useful in case of kill -9
+        self.keep_alive_timeout = 60 * 5  # Useful in case of kill -9
         self.processed_wrapper_logs = set()
-        self.max_waiting_jobs = 20
 
     @classmethod
     def update_workers(cls, event_worker):
@@ -925,9 +935,9 @@ class Platform(object):
             self.cleanup_event.set()
             self.log_recovery_process.join(timeout=60)
 
-    def wait_for_work(self, sleep_time: int = 60) -> bool:
+    def wait_mandatory_time(self, sleep_time: int = 60) -> bool:
         """
-        Waits for the work_event to be set or the cleanup_event to be set.
+        Waits for the work_event to be set or the cleanup_event to be set for a mandatory time.
 
         Args:
             sleep_time (int): Minimum time to wait in seconds. Defaults to 60.
@@ -936,22 +946,47 @@ class Platform(object):
             bool: True if there is work to process, False otherwise.
         """
         process_log = False
-        for remaining in range(sleep_time, 0, -1):  # Min time to wait unless clean-up signal is set
+        for remaining in range(sleep_time, 0, -1):
             time.sleep(1)
             if self.work_event.is_set() or not self.recovery_queue.empty():
                 process_log = True
-            if self.cleanup_event.is_set():  # Since is the last stuff to process, do it asap.
+            if self.cleanup_event.is_set():
                 process_log = True
                 break
+        return process_log
 
-        if not process_log: # If still no work, active wait until the keep_alive_timeout is reached or any signal is set to end the process.
-            timeout = self.keep_alive_timeout - sleep_time
-            while timeout > 0:
-                if self.recovery_queue.empty() or self.cleanup_event.is_set() or self.work_event.is_set():
-                    break
-                time.sleep(1)
-                timeout -= 1
+    def wait_until_timeout(self, timeout: int = 60) -> bool:
+        """
+        Waits until the timeout is reached or any signal is set to process logs.
 
+        Args:
+            timeout (int): Maximum time to wait in seconds. Defaults to 60.
+
+        Returns:
+            bool: True if there is work to process, False otherwise.
+        """
+        process_log = False
+        while timeout > 0:
+            if not self.recovery_queue.empty() or self.cleanup_event.is_set() or self.work_event.is_set():
+                process_log = True
+                break
+            time.sleep(1)
+            timeout -= 1
+        return process_log
+
+    def wait_for_work(self, sleep_time: int = 60) -> bool:
+        """
+        Waits for work to process, first for a mandatory time and then until the keep_alive_timeout is reached.
+
+        Args:
+            sleep_time (int): Minimum time to wait in seconds. Defaults to 60.
+
+        Returns:
+            bool: True if there is work to process, False otherwise.
+        """
+        process_log = self.wait_mandatory_time(sleep_time)
+        if not process_log:
+            process_log = self.wait_until_timeout(self.keep_alive_timeout - sleep_time)
         self.work_event.clear()
         return process_log
 
