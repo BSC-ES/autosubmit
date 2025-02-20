@@ -5,6 +5,7 @@ import os
 from unittest import TestCase
 from copy import copy
 import networkx
+import pytest
 from networkx import DiGraph
 #import patch
 from textwrap import dedent
@@ -689,3 +690,27 @@ class FakeBasicConfig:
     DEFAULT_PLATFORMS_CONF = ''
     DEFAULT_JOBS_CONF = ''
     STRUCTURES_DIR = '/dummy/structure/dir'
+
+@pytest.mark.parametrize(
+    "section, max_split, result",
+    [
+        ('dummy_test_to check if this works [1,2,3,4,5,3,6] as intended' , 4, [1, 2, 3, 4, 3]), #returning a list of all elements up to 4
+        ('dummy_test_to check if this works [1,2,1:6,5,6] as intended' , 5, [1, 2, 1, 2, 3, 4, 5, 5]), #repeats all number from 1 to 6 because of the (":")
+        ('dummy_test_to check if this works [1,2,6:3,4,5,6] as intended', 5, [1, 2]), # ignores everything after the (":")
+    ]
+)
+def test_calculate_splits_dependencies(section, max_split, result):
+
+    experiment_id = 'random-id'
+
+    as_conf = Mock()
+    as_conf.experiment_data = dict()
+    as_conf.experiment_data["JOBS"] = dict()
+    as_conf.jobs_data = as_conf.experiment_data["JOBS"]
+    as_conf.experiment_data["PLATFORMS"] = dict()
+
+    joblist_persistence = JobListPersistencePkl()
+
+    job_list = JobList(experiment_id, FakeBasicConfig, YAMLParserFactory(), joblist_persistence, as_conf)
+
+    assert job_list._calculate_splits_dependencies(section, max_split) == result

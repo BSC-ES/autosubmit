@@ -515,7 +515,7 @@ class JobList(object):
         return dependencies
 
     @staticmethod
-    def _calculate_splits_dependencies(section, max_splits):
+    def _calculate_splits_dependencies(section, max_splits) -> list[int]:
         splits_list = section[section.find("[") + 1:section.find("]")]
         splits = []
         for str_split in splits_list.split(","):
