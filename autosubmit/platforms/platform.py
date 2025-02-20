@@ -942,7 +942,8 @@ class Platform(object):
         del platform.poller
         platform.config = {}
         for key in [conf_param for conf_param in self.config]:
-            if key in ["PLATFORMS", "EXPERIMENT", "DEFAULT", "CONFIG", "LOG_RECOVERY_TIMEOUT"]:
+            # Basic configuration settings
+            if not isinstance(self.config[key], dict) or key in ["PLATFORMS", "EXPERIMENT", "DEFAULT", "CONFIG"]:
                 platform.config[key] = self.config[key]
 
     def prepare_process(self, ctx):
