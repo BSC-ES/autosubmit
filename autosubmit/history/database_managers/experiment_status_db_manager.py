@@ -24,6 +24,8 @@ from .database_manager import DatabaseManager, DEFAULT_LOCAL_ROOT_DIR
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 import autosubmit.history.utils as HUtils
 from . import database_models as Models
+from typing import Protocol, cast
+
 
 BasicConfig.read()
 
@@ -144,3 +146,40 @@ class ExperimentStatusDbManager(DatabaseManager):
     statement = ''' DELETE FROM experiment_status where name = ? '''
     arguments = (expid,)
     self.execute_statement_with_arguments_on_dbfile(self._as_times_file_path, statement, arguments)
+
+
+class ExperimentStatusDatabaseManager(Protocol):
+    def print_current_table(self): ...
+    def is_running(self, time_condition=600): ...
+    def set_existing_experiment_status_as_running(self, expid): ...
+    def create_experiment_status_as_running(self, experiment): ...
+    def get_experiment_status_row_by_expid(self, expid): ...
+    def get_experiment_row_by_expid(self, expid): ...
+    def get_experiment_status_row_by_exp_id(self, exp_id): ...
+    def create_exp_status(self, exp_id, expid, status): ...
+    def update_exp_status(self, expid, status="RUNNING"): ...
+    def delete_exp_status(self, expid): ...
+
+
+def create_experiment_status_db_manager(
+    db_engine: str, **options
+) -> ExperimentStatusDatabaseManager:
+    """
+    Creates a Postgres or SQLite database manager based on the Autosubmit configuration.
+    Note that you must provide the options even if they are optional, in which case
+    you must provide ``options=None``, or you will get a ``KeyError``.
+    TODO: better example and/or link to DbManager.
+    :param db_engine: The database engine type.
+    :return: An ``ExperimentStatusDatabaseManager``.
+    :raises ValueError: If the database engine type is not valid.
+    :raises KeyError: If the ``options`` dictionary is missing a required parameter for an engine.
+    """
+    return cast(
+        ExperimentStatusDatabaseManager,
+        ExperimentStatusDbManager(
+            expid=options["expid"],
+            db_dir_path=options["db_dir_path"],
+            main_db_name=options["main_db_name"],
+            local_root_dir_path=options["local_root_dir_path"],
+        ),
+    )
