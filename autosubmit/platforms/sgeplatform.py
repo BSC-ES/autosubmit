@@ -62,8 +62,6 @@ class SgePlatform(ParamikoPlatform):
         self._pathdir = "\$HOME/LOG_" + self.expid
         self.update_cmds()
 
-    def create_a_new_copy(self):
-        return SgePlatform(self.expid, self.name, self.config)
 
     def submit_Script(self, hold=False):
         pass

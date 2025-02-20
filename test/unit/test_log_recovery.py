@@ -1,6 +1,7 @@
 import os
 import pwd
 import time
+from distutils.command.config import config
 from pathlib import Path
 import pytest
 import multiprocessing as mp
