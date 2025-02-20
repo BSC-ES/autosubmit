@@ -42,8 +42,6 @@ class UniqueQueue(Queue):
             max_items (int): Maximum number of unique items to track. Defaults to 200.
             ctx (Context): Context for the queue. Defaults to None.
         """
-        if not ctx:
-            multiprocessing.get_context()
         self.block = block
         self.timeout = timeout
         self.all_items = deque(maxlen=max_items)  # Won't be popped, so even if it is being processed by the log retrieval process, it won't be added again.
