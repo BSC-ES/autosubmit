@@ -23,8 +23,7 @@ def recover_platform_job_logs_wrapper(platform, recovery_queue, worker_event, cl
     platform.cleanup_event = cleanup_event
     platform.recover_platform_job_logs()
     _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
-
-
+    
 class UniqueQueue(Queue):
     """
     A queue that avoids retrieves the same job and retrial during the same run.
