@@ -1,6 +1,7 @@
 import os
 import pwd
 import time
+from distutils.command.config import config
 from pathlib import Path
 
 import pytest
@@ -284,3 +285,100 @@ def test_unique_elements(local, mocker):
     for i in range(max_items):
         local.recovery_queue.put(Job(f'rng2{i}', f'000{i}', Status.COMPLETED, 0))
     assert len(local.recovery_queue.all_items) == max_items
+
+
+@pytest.fixture()
+def conf_dict(tmpdir_factory):
+    temp = tmpdir_factory.mktemp('scheduler_tests')
+    os.mkdir(temp.join('scratch'))
+    os.mkdir(temp.join('scheduler_tmp_dir'))
+    file_stat = os.stat(f"{temp.strpath}")
+    file_owner_id = file_stat.st_uid
+    file_owner = pwd.getpwuid(file_owner_id).pw_name
+    temp.owner = file_owner
+    return {
+        "pytest-pjm": {
+            "type": "pjm",
+            "host": "127.0.0.1",
+            "user": temp.owner,
+            "project": "whatever",
+            "scratch_dir": f"{temp}/scratch",
+            "MAX_WALLCLOCK": "48:00",
+            "TEMP_DIR": "",
+            "MAX_PROCESSORS": 99999,
+            "queue": "dummy",
+            "DISABLE_RECOVERY_THREADS": True
+        },
+        "pytest-slurm": {
+            "type": "slurm",
+            "host": "127.0.0.1",
+            "user": temp.owner,
+            "project": "whatever",
+            "scratch_dir": f"{temp}/scratch",
+            "QUEUE": "gp_debug",
+            "ADD_PROJECT_TO_HOST": False,
+            "MAX_WALLCLOCK": "48:00",
+            "TEMP_DIR": "",
+            "MAX_PROCESSORS": 99999,
+            "PROCESSORS_PER_NODE": 123,
+            "DISABLE_RECOVERY_THREADS": True
+        },
+        "pytest-ecaccess": {
+            "type": "ecaccess",
+            "version": "slurm",
+            "host": "127.0.0.1",
+            "QUEUE": "nf",
+            "EC_QUEUE": "hpc",
+            "user": temp.owner,
+            "project": "whatever",
+            "scratch_dir": f"{temp}/scratch",
+            "DISABLE_RECOVERY_THREADS": True
+        },
+        "pytest-ps": {
+            "type": "ps",
+            "host": "127.0.0.1",
+            "user": temp.owner,
+            "project": "whatever",
+            "scratch_dir": f"{temp}/scratch",
+            "DISABLE_RECOVERY_THREADS": True
+        },
+        'LOCAL_ROOT_DIR': f"{temp}/scratch",
+        'LOCAL_TMP_DIR': f"{temp}/scratch",
+        'LOCAL_ASLOG_DIR': f"{temp}/scratch",
+    }
+
+
+@pytest.fixture
+def pjm(prepare_test, conf_dict):
+    from autosubmit.platforms.pjmplatform import PJMPlatform
+    pjm = PJMPlatform(expid='t000', name='pytest-pjm', config=conf_dict)
+    return pjm
+
+
+@pytest.fixture
+def slurm(prepare_test, conf_dict):
+    from autosubmit.platforms.slurmplatform import SlurmPlatform
+    slurm = SlurmPlatform(expid='t000', name='pytest-slurm', config=conf_dict)
+    return slurm
+
+
+@pytest.fixture
+def ecaccess(prepare_test, conf_dict):
+    from autosubmit.platforms.ecplatform import EcPlatform
+    ecaccess = EcPlatform(expid='t000', name='pytest-ecaccess', config=conf_dict, scheduler='slurm')
+    return ecaccess
+
+
+@pytest.fixture
+def ps(prepare_test, conf_dict):
+    from autosubmit.platforms.psplatform import PsPlatform
+    ps = PsPlatform(expid='t000', name='pytest-ps', config=conf_dict)
+    return ps
+
+
+def test_create_a_new_copy(local, pjm, slurm, ps, ecaccess):
+    assert local.create_a_new_copy().name == local.name
+    assert pjm.create_a_new_copy().name == pjm.name
+    assert slurm.create_a_new_copy().name == slurm.name
+    assert ps.create_a_new_copy().name == ps.name
+    assert ecaccess.create_a_new_copy().name == ecaccess.name
