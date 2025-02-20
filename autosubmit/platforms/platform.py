@@ -1128,10 +1128,8 @@ class Platform(object):
                     self.recover_job_log(identifier, jobs_pending_to_process)
                     break
         except Exception as e:
-            print(f"{identifier} {e}")
-            print(traceback.format_exc())
-            # Log.error(f"{identifier} {e}")
-            # Log.debug(traceback.format_exc())
+            Log.error(f"{identifier} {e}")
+            Log.debug(traceback.format_exc())
 
         self.closeConnection()
         Log.info(f"{identifier} Exiting.")
