@@ -305,4 +305,3 @@ def test_create_a_new_copy(local, pjm, slurm, ps, ecaccess):
     assert slurm.create_a_new_copy().name == slurm.name
     assert ps.create_a_new_copy().name == ps.name
     assert ecaccess.create_a_new_copy().name == ecaccess.name
-

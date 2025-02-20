@@ -17,7 +17,6 @@ from multiprocessing import Event
 from multiprocessing.queues import Queue
 import time
 
-
 def recover_platform_job_logs_wrapper(platform, recovery_queue, worker_event, cleanup_event):
     platform.recovery_queue = recovery_queue
     platform.work_event = worker_event
