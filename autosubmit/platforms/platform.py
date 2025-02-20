@@ -973,7 +973,7 @@ class Platform(object):
 
                 # Adds the keep_alive signal here to be accessible by all the classes
                 try:
-                    new_platform, ctx = self.prepare_process()
+                    ctx, new_platform = self.prepare_process()
                     self.log_recovery_process = ctx.Process(
                         target=recover_platform_job_logs_wrapper,
                         args=(new_platform, self.recovery_queue, self.work_event, self.cleanup_event),
@@ -981,7 +981,7 @@ class Platform(object):
                     self.log_recovery_process.daemon = True
                     self.log_recovery_process.start()
                 except BaseException as e:
-                    Log.error(f"Process {self.log_recovery_process.name} could not be started.\n{e}")
+                    Log.error(f"Recovery process for {self.name} could not be started.\n{e}")
                     raise
                 # Prevents zombies
                 os.waitpid(self.log_recovery_process.pid, os.WNOHANG)
