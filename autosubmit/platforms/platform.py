@@ -9,56 +9,13 @@ import locale
 import os
 import traceback
 from autosubmit.job.job_common import Status
-from typing import List, Union, Callable, Set, Any
+from typing import List, Union, Set, Any
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import AutosubmitCritical, AutosubmitError, Log
 from multiprocessing import Process, Event
 from multiprocessing.queues import Queue
 import time
-
-
-class UniqueDeque:
-    def __init__(self, maxlen=None):
-        self.maxlen = maxlen
-        self.deque = deque(maxlen=maxlen)
-        self.set = set()
-
-    def append(self, item):
-        if item not in self.set:
-            if len(self.set) >= self.maxlen:
-                self.set.remove(self.deque.popleft())
-            self.deque.append(item)
-            self.set.add(item)
-
-    def appendleft(self, item):
-        if item not in self.set:
-            if len(self.set) >= self.maxlen:
-                self.set.remove(self.deque.popleft())
-            self.deque.appendleft(item)
-            self.set.add(item)
-
-    def pop(self):
-        item = self.deque.pop()
-        self.set.remove(item)
-        return item
-
-    def popleft(self):
-        item = self.deque.popleft()
-        self.set.remove(item)
-        return item
-
-    def __contains__(self, item):
-        return item in self.set
-
-    def __len__(self):
-        return len(self.deque)
-
-    def __iter__(self):
-        return iter(self.deque)
-
-    def __repr__(self):
-        return f"UniqueDeque({list(self.deque)})"
 
 
 class UniqueQueue(Queue):
@@ -79,7 +36,7 @@ class UniqueQueue(Queue):
         """
         self.block = block
         self.timeout = timeout
-        self.all_items = UniqueDeque(maxlen=max_items)  # Won't be popped, so even if it is being processed by the log retrieval process, it won't be added again.
+        self.all_items = deque(maxlen=max_items)
         super().__init__(maxsize, ctx=multiprocessing.get_context())
 
     def put(self, job: Any, block: bool = True, timeout: float = None) -> None:
