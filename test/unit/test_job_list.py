@@ -5,6 +5,7 @@ import os
 from unittest import TestCase
 from copy import copy
 import networkx
+import pytest
 from networkx import DiGraph
 #import patch
 from textwrap import dedent
@@ -16,9 +17,12 @@ from pathlib import Path
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_common import Type
+from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+
+from autosubmit.job.job_utils import SimpleJob
 from log.log import AutosubmitCritical
 
 
@@ -689,3 +693,33 @@ class FakeBasicConfig:
     DEFAULT_PLATFORMS_CONF = ''
     DEFAULT_JOBS_CONF = ''
     STRUCTURES_DIR = '/dummy/structure/dir'
+
+
+def test_apply_jobs_edge_info(tmp_path):
+
+    job = SimpleJob("dummy", tmp_path, 100)
+
+    experiment_id = 'random-id'
+
+    as_conf = Mock()
+    as_conf.experiment_data = dict()
+    as_conf.experiment_data["JOBS"] = dict()
+    as_conf.jobs_data = as_conf.experiment_data["JOBS"]
+    as_conf.experiment_data["PLATFORMS"] = dict()
+
+    joblist_persistence = JobListPersistencePkl()
+    job_list = JobList(experiment_id, FakeBasicConfig, YAMLParserFactory(), joblist_persistence, as_conf)
+
+    relationship = MagicMock(relationships = 'test')
+
+    dependencies = {
+        'dummy+1':relationship,
+        'dummy-2':relationship
+    }
+
+    with patch ('autosubmit.job.job_list.JobList._filter_current_job') as mock_job_list:
+        mock_job_list.return_value = {"STATUS":["+","-"]}
+        # mock_job_list.return_value = {"DUMMY":["+","-"]}
+        test = job_list._apply_jobs_edge_info(job, dependencies)
+        print(f'test: {test}')
+        assert False
