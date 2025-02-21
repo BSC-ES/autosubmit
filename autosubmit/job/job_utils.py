@@ -3,6 +3,8 @@ import copy
 
 import math
 
+from networkx.classes import DiGraph
+
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from log.log import Log, AutosubmitCritical
 from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates, add_hours
@@ -36,7 +38,8 @@ CALENDAR_UNITSIZE_ENUM = {
     "year": 3
 }
 
-def _get_submitter(as_conf):
+
+def _get_submitter(as_conf) -> ParamikoSubmitter:
     """
     Returns the submitter corresponding to the communication defined on autosubmit's config file
 
@@ -53,17 +56,18 @@ def _get_submitter(as_conf):
         # only paramiko is available right now.
         return ParamikoSubmitter()
 
-def is_leap_year(year):
+
+def is_leap_year(year) -> bool:
     """Determine whether a year is a leap year."""
     return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
 
-def calendar_unitsize_isgreater(split_unit,chunk_unit):
+def calendar_unitsize_isgreater(split_unit,chunk_unit) -> bool:
     """
     Check if the split unit is greater than the chunk unit
     :param split_unit:
     :param chunk_unit:
-    :return:
+    :return: boolean
     """
     split_unit = split_unit.lower()
     chunk_unit = chunk_unit.lower()
@@ -72,10 +76,11 @@ def calendar_unitsize_isgreater(split_unit,chunk_unit):
     except KeyError:
         raise AutosubmitCritical(f"Invalid calendar unit size")
 
-def calendar_unitsize_getlowersize(unitsize):
+
+def calendar_unitsize_getlowersize(unitsize) -> str:
     """
     Get the lower size of a calendar unit
-    :return:
+    :return: String
     """
     unit_size = unitsize.lower()
     unit_value = CALENDAR_UNITSIZE_ENUM[unit_size]
@@ -84,11 +89,12 @@ def calendar_unitsize_getlowersize(unitsize):
     else:
         return list(CALENDAR_UNITSIZE_ENUM.keys())[unit_value - 1]
 
-def calendar_get_month_days(date_str):
+
+def calendar_get_month_days(date_str) -> int:
     """
     Get the number of days in a month
     :param date_str: Date in string format (YYYYMMDD)
-    :return:
+    :return: Integer
     """
     year = int(date_str[0:4])
     month = int(date_str[4:6])
@@ -102,7 +108,8 @@ def calendar_get_month_days(date_str):
     else:
         return 31
 
-def get_chunksize_in_hours(date_str,chunk_unit,chunk_length):
+
+def get_chunksize_in_hours(date_str,chunk_unit,chunk_length) -> int:
 
     if is_leap_year(int(date_str[0:4])):
         num_days_in_a_year = 366
@@ -117,14 +124,15 @@ def get_chunksize_in_hours(date_str,chunk_unit,chunk_length):
     else:
         chunk_size_in_hours = chunk_length
     return chunk_size_in_hours
-def calendar_split_size_isvalid(date_str, split_size, split_unit, chunk_unit, chunk_length, chunk_size_in_hours):
+
+
+def calendar_split_size_isvalid(date_str, split_size, split_unit,
+                                chunk_size_in_hours) -> bool:
     """
     Check if the split size is valid for the calendar
     :param date_str: Date in string format (YYYYMMDD)
     :param split_size: Size of the split
     :param split_unit: Unit of the split
-    :param chunk_unit: Unit of the chunk
-    :param chunk_length: Size of the chunk
     :param chunk_size_in_hours: chunk size in hours
     :return: Boolean
     """
@@ -149,15 +157,12 @@ def calendar_split_size_isvalid(date_str, split_size, split_unit, chunk_unit, ch
     return split_size_in_hours <= chunk_size_in_hours
 
 
-
-
-
-def calendar_chunk_section(exp_data, section, date, chunk):
+def calendar_chunk_section(exp_data, section, date, chunk) -> int:
     """
     Calendar for chunks
     :param section:
     :param parameters:
-    :return:
+    :return: Integer
     """
     #next_auto_date = date
     splits = 0
@@ -203,7 +208,8 @@ def calendar_chunk_section(exp_data, section, date, chunk):
         Log.info(f"For the section {section} with date:{date2str(chunk_start)} the number of splits is {splits}.")
     return splits
 
-def get_split_size_unit(data, section):
+
+def get_split_size_unit(data, section) -> str:
     split_unit = str(data.get('JOBS',{}).get(section,{}).get('SPLITSIZEUNIT', "none")).lower()
     if split_unit == "none":
         split_unit = str(data.get('EXPERIMENT',{}).get("CHUNKSIZEUNIT", "day")).lower()
@@ -218,11 +224,12 @@ def get_split_size_unit(data, section):
     return split_unit
 
 
-def get_split_size(as_conf, section):
+def get_split_size(as_conf, section) -> int:
     job_data = as_conf.get('JOBS', {}).get(section, {})
     return int(job_data.get("SPLITSIZE", 1))
 
-def transitive_reduction(graph):
+
+def transitive_reduction(graph) -> DiGraph:
     """
 
     Returns transitive reduction of a directed graph
@@ -275,7 +282,8 @@ class Dependency(object):
 
     """
 
-    def __init__(self, section, distance=None, running=None, sign=None, delay=-1, splits=None,relationships=None) -> None:
+    def __init__(self, section, distance=None, running=None, sign=None,
+                 delay=-1, splits=None,relationships=None) -> None:
         self.section = section
         self.distance = distance
         self.running = running
@@ -301,7 +309,8 @@ class SubJob(object):
     Class to manage package times
     """
 
-    def __init__(self, name, package=None, queue=0, run=0, total=0, status="UNKNOWN") -> None:
+    def __init__(self, name, package=None, queue=0, run=0, total=0,
+                 status="UNKNOWN") -> None:
         self.name = name
         self.package = package
         self.queue = queue
@@ -318,7 +327,8 @@ class SubJobManager(object):
     Class to manage list of SubJobs
     """
 
-    def __init__(self, subjoblist, job_to_package=None, package_to_jobs=None, current_structure=None) -> None:
+    def __init__(self, subjoblist, job_to_package=None, package_to_jobs=None,
+                 current_structure=None) -> None:
         self.subjobList = subjoblist
         # print("Number of jobs in SubManager : {}".format(len(self.subjobList)))
         self.job_to_package = job_to_package
