@@ -1165,7 +1165,7 @@ class Job(object):
         else:
             return 0
 
-    def _get_from_total_stats(self, index):
+    def _get_from_total_stats(self, index) -> list[datetime]:
         """
         Returns list of values from given column index position in TOTAL_STATS file associated to job
 
