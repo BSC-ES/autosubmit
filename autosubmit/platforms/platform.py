@@ -153,18 +153,11 @@ class Platform(object):
         log_queue_size = 200
         if self.config:
             # We still support TOTALJOBS and TOTAL_JOBS for backwards compatibility... # TODO change in 4.2, I think
-            total_jobs = min(int(self.config.get("PLATFORMS", {}).get('TOTAL_JOBS',
-                                                                      self.config.get("PLATFORMS", {}).get(
-                                                                          'TOTALJOBS',
-                                                                          self.config.get("CONFIG", {}).get(
-                                                                              "TOTAL_JOBS", 100)))),
-                             100) * 2
-            log_queue_size = int(
-                self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("LOG_RECOVERY_QUEUE_SIZE",
-                                                                                self.config.get("CONFIG",
-                                                                                                {}).get(
-                                                                                    "LOG_RECOVERY_QUEUE_SIZE",
-                                                                                    total_jobs)))
+            default_queue_size = self.config.get("CONFIG", {}).get("LOG_RECOVERY_QUEUE_SIZE", 100)
+            platform_default_queue_size = self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("LOG_RECOVERY_QUEUE_SIZE", default_queue_size)
+            config_total_jobs = self.config.get("CONFIG", {}).get("TOTAL_JOBS", platform_default_queue_size)
+            platform_total_jobs = self.config.get("PLATFORMS", {}).get('TOTAL_JOBS', config_total_jobs)
+            log_queue_size = int(platform_total_jobs) * 2
         self.log_queue_size = log_queue_size
 
     @classmethod
