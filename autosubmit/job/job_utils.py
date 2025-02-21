@@ -197,7 +197,7 @@ def calendar_chunk_section(exp_data, section, date, chunk) -> int:
             num_max_splits = run_days
         split_size = get_split_size(exp_data, section)
         chunk_size_in_hours = get_chunksize_in_hours(date2str(chunk_start),chunk_unit,chunk_length)
-        if not calendar_split_size_isvalid(date2str(chunk_start), split_size, split_unit, chunk_unit, chunk_length, chunk_size_in_hours):
+        if not calendar_split_size_isvalid(date2str(chunk_start), split_size, split_unit, chunk_size_in_hours):
             raise AutosubmitCritical(f"Invalid split size for the calendar. The split size is {split_size} and the unit is {split_unit}.")
         splits = num_max_splits / split_size
         if not splits.is_integer() and split_policy == "flexible":
