@@ -1278,7 +1278,7 @@ class Autosubmit:
         return content
 
     @staticmethod
-    def as_conf_default_values(exp_id, hpc = "local", minimal_configuration=False, git_repo="", git_branch="main", git_as_conf=""):
+    def as_conf_default_values(exp_id, hpc = "local", minimal_configuration=False, git_repo="", git_branch="main", git_as_conf="") -> None:
         """
         Replace default values in as_conf files
         :param exp_id: experiment id
