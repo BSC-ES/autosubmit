@@ -2128,10 +2128,10 @@ class Autosubmit:
 
     @staticmethod
     def check_logs_status(job_list, as_conf, new_run):
-        track_unused_platforms = []
         for job in job_list.get_completed_failed_without_logs():
-            if job.platform not in track_unused_platforms and new_run:
+            if new_run:
                 job.platform.spawn_log_retrieval_process(as_conf)
+
             job_list.update_log_status(job, as_conf, new_run)
 
     @staticmethod
