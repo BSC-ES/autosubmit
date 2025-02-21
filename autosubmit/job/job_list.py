@@ -514,21 +514,6 @@ class JobList(object):
                 dependencies_keys.pop(key)
         return dependencies
 
-    @staticmethod
-    def _calculate_splits_dependencies(section, max_splits):
-        splits_list = section[section.find("[") + 1:section.find("]")]
-        splits = []
-        for str_split in splits_list.split(","):
-            if str_split.find(":") != -1:
-                numbers = str_split.split(":")
-                # change this to be checked in job_common.py
-                max_splits = min(int(numbers[1]), max_splits)
-                for count in range(int(numbers[0]), max_splits + 1):
-                    splits.append(int(str(count).zfill(len(numbers[0]))))
-            else:
-                if int(str_split) <= max_splits:
-                    splits.append(int(str_split))
-        return splits
 
     @staticmethod
     def _parse_filters_to_check(list_of_values_to_check, value_list=[], level_to_check="DATES_FROM"):
