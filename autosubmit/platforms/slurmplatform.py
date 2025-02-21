@@ -1,36 +1,37 @@
-#!/usr/bin/env python3
-from contextlib import suppress
-
 # Copyright 2017-2020 Earth Sciences Department, BSC-CNS
-
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import locale
 import os
+from contextlib import suppress
 from datetime import datetime
 from time import mktime
 from time import sleep
 from time import time
 from typing import List, Union
 from xml.dom.minidom import parseString
+from pathlib import Path
 
 from autosubmit.job.job_common import Status, parse_output_number
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.wrappers.wrapper_factory import SlurmWrapperFactory
 from log.log import AutosubmitCritical, AutosubmitError, Log
+
 
 class SlurmPlatform(ParamikoPlatform):
     """
@@ -39,7 +40,6 @@ class SlurmPlatform(ParamikoPlatform):
     :param expid: experiment's identifier
     :type expid: str
     """
-
 
     def __init__(self, expid, name, config, auth_password=None):
         ParamikoPlatform.__init__(self, expid, name, config, auth_password = auth_password)
@@ -61,32 +61,27 @@ class SlurmPlatform(ParamikoPlatform):
         self.job_status['QUEUING'] = ['PENDING', 'CONFIGURING', 'RESIZING']
         self.job_status['FAILED'] = ['FAILED', 'CANCELLED', 'CANCELLED+', 'NODE_FAIL',
                                      'PREEMPTED', 'SUSPENDED', 'TIMEOUT', 'OUT_OF_MEMORY', 'OUT_OF_ME+', 'OUT_OF_ME']
-        self._pathdir = "\$HOME/LOG_" + self.expid
+        self._pathdir = "\\$HOME/LOG_" + self.expid
         self._allow_arrays = False
         self._allow_wrappers = True
         self.update_cmds()
         self.config = config
-        exp_id_path = os.path.join(self.config.get("LOCAL_ROOT_DIR"), self.expid)
-        tmp_path = os.path.join(exp_id_path, "tmp")
-        self._submit_script_path = os.path.join(
-            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh")
-        self._submit_script_base_name = os.path.join(
-            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
-        self._submit_script_file = open(self._submit_script_path, 'wb').close()
-
+        exp_id_path = Path(self.config.get("LOCAL_ROOT_DIR"), self.expid)
+        tmp_path = exp_id_path / "tmp"
+        self._submit_script_path: Path = tmp_path / f'{self.config.get("LOCAL_ASLOG_DIR")}/submit_{self.name}.sh'
+        self._submit_script_base_name = str(Path(tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_"))
+        self._submit_script_file = None
 
     def get_submit_cmd_x11(self, args, script_name, job):
         """
         Returns the submit command for the platform
         """
-
         cmd = f'salloc {args} {self._submit_cmd_x11}/{script_name}'
         Log.debug(f"Salloc command: {cmd}")
         return cmd
 
     def generate_new_name_submit_script_file(self):
-        self._submit_script_path = self._submit_script_base_name + os.urandom(16).hex() + ".sh"
-        self._submit_script_file = open(self._submit_script_path, 'wb').close()
+        self._submit_script_path = Path(f'{self._submit_script_base_name}{os.urandom(16).hex()}.sh')
 
     def process_batch_ready_jobs(self,valid_packages_to_submit,failed_packages,error_message="",hold=False):
         """
@@ -98,7 +93,7 @@ class SlurmPlatform(ParamikoPlatform):
         :return:
         """
         try:
-            valid_packages_to_submit = [ package for package in valid_packages_to_submit if package.x11 != True]
+            valid_packages_to_submit = [package for package in valid_packages_to_submit if package.x11 is not True]
             if len(valid_packages_to_submit) > 0:
                 duplicated_jobs_already_checked = False
                 platform = valid_packages_to_submit[0].jobs[0].platform
@@ -109,14 +104,14 @@ class SlurmPlatform(ParamikoPlatform):
                     duplicated_jobs_already_checked = True
                     try:
                         for package_ in valid_packages_to_submit:
-                            if hasattr(package_,"name"):
-                                jobnames.append(package_.name) # wrapper_name
+                            if hasattr(package_, "name"):
+                                jobnames.append(package_.name)  # wrapper_name
                             else:
-                                jobnames.append(package_.jobs[0].name) # job_name
+                                jobnames.append(package_.jobs[0].name)  # job_name
                         Log.error(f'TRACE:{e.trace}\n{e.message} JOBS:{jobnames}')
                         for jobname in jobnames:
                             jobid = self.get_jobid_by_jobname(jobname)
-                            #cancel bad submitted job if jobid is encountered
+                            # cancel bad submitted job if jobid is encountered
                             for id_ in jobid:
                                 self.send_command(self.cancel_job(id_))
                     except:
@@ -215,16 +210,15 @@ class SlurmPlatform(ParamikoPlatform):
         return save,valid_packages_to_submit
 
     def open_submit_script(self):
-        self._submit_script_file = open(self._submit_script_path, 'wb').close()
         # remove file
         with suppress(FileNotFoundError):
-            os.remove(self._submit_script_path)
+            self._submit_script_path.unlink()
         self.generate_new_name_submit_script_file()
         self._submit_script_file = open(self._submit_script_path, 'ab')
 
     def get_submit_script(self):
         self._submit_script_file.close()
-        os.chmod(self._submit_script_path, 0o750)
+        self._submit_script_path.chmod(0o755)
         return os.path.join(self.config.get("LOCAL_ASLOG_DIR"), os.path.basename(self._submit_script_path))
 
     def submit_job(self, job, script_name, hold=False, export="none"):
@@ -262,8 +256,7 @@ class SlurmPlatform(ParamikoPlatform):
             else:
                 return None
 
-    def submit_Script(self, hold=False):
-        # type: (bool) -> Union[List[str], str]
+    def submit_Script(self, hold=False) -> Union[List[str], str]:
         """
         Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once.
 
@@ -276,7 +269,7 @@ class SlurmPlatform(ParamikoPlatform):
             self.send_file(self.get_submit_script(), False)
             cmd = os.path.join(self.get_files_path(),
                                os.path.basename(self._submit_script_path))
-            # remove file after submisison
+            # remove file after submission
             cmd = f"{cmd} ; rm {cmd}"
             try:
                 self.send_command(cmd)
@@ -286,35 +279,34 @@ class SlurmPlatform(ParamikoPlatform):
                 raise
             except Exception as e:
                 raise
-            jobs_id = self.get_submitted_job_id(self.get_ssh_output())
-            return jobs_id
+            return self.get_submitted_job_id(self.get_ssh_output())
         except IOError as e:
-            raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e))
+            raise AutosubmitError(
+                "Submit script is not found, retry again in next AS iteration", 6008, str(e))
         except AutosubmitError as e:
             raise
         except AutosubmitCritical as e:
             raise
         except Exception as e:
-            raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e))
+            raise AutosubmitError(
+                "Submit script is not found, retry again in next AS iteration", 6008, str(e))
+
     def check_remote_log_dir(self):
         """
         Creates log dir on remote host
         """
-
         try:
             # Test if remote_path exists
             self._ftpChannel.chdir(self.remote_log_dir)
         except IOError as e:
             try:
                 if self.send_command(self.get_mkdir_cmd()):
-                    Log.debug('{0} has been created on {1} .',
-                              self.remote_log_dir, self.host)
+                    Log.debug('{0} has been created on {1} .', self.remote_log_dir, self.host)
                 else:
                     raise AutosubmitError("SFTP session not active ", 6007, "Could not create the DIR {0} on HPC {1}'.format(self.remote_log_dir, self.host)".format(
                         self.remote_log_dir, self.host))
             except BaseException as e:
-                raise AutosubmitError(
-                    "SFTP session not active ", 6007, str(e))
+                raise AutosubmitError("SFTP session not active ", 6007, str(e))
 
     def update_cmds(self):
         """
@@ -336,14 +328,13 @@ class SlurmPlatform(ParamikoPlatform):
         self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
         self._submit_cmd_x11 = f'{self.remote_log_dir}'
 
-
     def hold_job(self, job):
         try:
             cmd = "scontrol release {0} ; sleep 2 ; scontrol hold {0} ".format(job.id)
             self.send_command(cmd)
             job_status = self.check_job(job, submit_hold_check=True)
             if job_status == Status.RUNNING:
-                self.send_command("scancel {0}".format(job.id))
+                self.send_command(f"scancel {job.id}")
                 return False
             elif job_status == Status.FAILED:
                 return False
@@ -355,7 +346,7 @@ class SlurmPlatform(ParamikoPlatform):
             self.send_command(self.get_estimated_queue_time_cmd(job.id))
             estimated_time = self.parse_estimated_time(self._ssh_output)
             if reason == '(JobHeldAdmin)':  # Job is held by the system
-                self.send_command("scancel {0}".format(job.id))
+                self.send_command(f"scancel {job.id}")
                 return False
             else:
                 Log.info(
@@ -363,12 +354,10 @@ class SlurmPlatform(ParamikoPlatform):
                 return True
         except BaseException as e:
             try:
-                self.send_command("scancel {0}".format(job.id))
-                raise AutosubmitError(
-                    "Can't hold jobid:{0}, canceling job".format(job.id), 6000, str(e))
+                self.send_command(f"scancel {job.id}")
+                raise AutosubmitError(f"Can't hold jobid: {job.id}, canceling job", 6000, str(e))
             except BaseException as e:
-                raise AutosubmitError(
-                    "Can't cancel the jobid: {0}".format(job.id), 6000, str(e))
+                raise AutosubmitError(f"Can't cancel the jobid: {job.id}", 6000, str(e))
             except AutosubmitError as e:
                 raise
 

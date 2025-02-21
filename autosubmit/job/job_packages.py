@@ -18,26 +18,32 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import datetime
 import json
+import locale
+import multiprocessing
 import os
 import random
+import re
+import tarfile
 import time
 from datetime import timedelta
+from pathlib import Path
+from threading import Thread, Lock
+from typing import List, Dict
 
+from bscearth.utils.date import sum_str_hours
+
+from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from log.log import Log, AutosubmitCritical
 
 Log.get_logger("Autosubmit")
-from autosubmit.job.job import Job
-from bscearth.utils.date import sum_str_hours
-from threading import Thread, Lock
-from typing import List, Dict
-import multiprocessing
-import tarfile
-import datetime
-import re
-import locale
+
+
 lock = Lock()
+
+
 def threaded(fn):
     def wrapper(*args, **kwargs):
         thread = Thread(target=fn, args=args, kwargs=kwargs)
@@ -45,6 +51,8 @@ def threaded(fn):
         thread.start()
         return thread
     return wrapper
+
+
 def jobs_in_wrapper_str(as_conf, current_wrapper):
     jobs_in_wrapper = as_conf.experiment_data["WRAPPERS"].get(current_wrapper, {}).get("JOBS_IN_WRAPPER", "")
     if "," in jobs_in_wrapper:
@@ -55,6 +63,8 @@ def jobs_in_wrapper_str(as_conf, current_wrapper):
         jobs_in_wrapper = jobs_in_wrapper.split(" ")
     jobs_in_wrapper = [job.strip(" ,") for job in jobs_in_wrapper]
     return "_".join(jobs_in_wrapper)
+
+
 class JobPackageBase(object):
     """
     Class to manage the package of jobs to be submitted by autosubmit
@@ -128,7 +138,6 @@ class JobPackageBase(object):
     def _create_common_script(self,filename=""):
         pass
 
-
     def submit_unthreaded(self, configuration, parameters,only_generate=False,hold=False):
         """
         :param hold:
@@ -155,6 +164,7 @@ class JobPackageBase(object):
             # looking for directives on jobs
             self._custom_directives = self._custom_directives | set(job.custom_directives)
         self._create_scripts(configuration)
+
     def submit(self, configuration, parameters,only_generate=False,hold=False):
         """
         :param hold:
@@ -207,8 +217,6 @@ class JobPackageBase(object):
             raise
         except BaseException as e:
             raise AutosubmitCritical("Error while submitting jobs: {0}".format(e), 7013)
-
-
 
     def _create_scripts(self, configuration):
         raise Exception('Not implemented')
@@ -298,7 +306,7 @@ class JobPackageSimpleWrapped(JobPackageSimple):
     def _create_scripts(self, configuration):
         super(JobPackageSimpleWrapped, self)._create_scripts(configuration)
         for job in self.jobs:
-            self._job_wrapped_scripts[job.name] = job.create_wrapped_script(configuration)
+            self._job_wrapped_scripts[job.name] = job.create_wrapped_script()
 
     def _send_files(self):
         super(JobPackageSimpleWrapped, self)._send_files()
@@ -340,19 +348,23 @@ class JobPackageArray(JobPackageBase):
         self._common_script = self._create_common_script(timestamp)
 
     def _create_i_input(self, filename, index):
-        filename += '.{0}'.format(index)
         input_content = self._job_scripts[self.jobs[index].name]
-        open(os.path.join(self._tmp_path, filename), 'wb').write(input_content)
-        os.chmod(os.path.join(self._tmp_path, filename), 0o755)
+        filename = f'{filename}.{index}'
+        file_path = Path(self._tmp_path, filename)
+        with open(file_path, 'wb') as f:
+            f.write(input_content)
+        file_path.chmod(0o755)
         return filename
 
     def _create_common_script(self, filename =""):
         script_content = self.platform.header.array_header(filename, self._array_size_id, self._wallclock,
                                                            self._num_processors,
                                                            directives=self.platform.custom_directives)
-        filename += '.cmd'
-        open(os.path.join(self._tmp_path, filename), 'wb').write(script_content)
-        os.chmod(os.path.join(self._tmp_path, filename), 0o755)
+        filename = f'{filename}.cmd'
+        file_path = Path(self._tmp_path, filename)
+        with open(file_path, 'wb') as f:
+            f.write(script_content)
+        file_path.chmod(0o755)
         return filename
 
     def _send_files(self):
@@ -396,7 +408,8 @@ class JobPackageThread(JobPackageBase):
     """
     FILE_PREFIX = 'ASThread'
 
-    def __init__(self, jobs, dependency=None, jobs_resources=dict(),method='ASThread',configuration=None,wrapper_section="WRAPPERS", wrapper_info= {}):
+    def __init__(self, jobs, dependency=None, jobs_resources=None, method='ASThread', configuration=None,
+                 wrapper_section="WRAPPERS", wrapper_info=None):
         super(JobPackageThread, self).__init__(jobs)
         """
         :param dependency: Dependency
@@ -414,6 +427,10 @@ class JobPackageThread(JobPackageBase):
         # It is in charge of merging ( switch ) the wrapper info by checking if the value is defined by the user in the wrapper section, current wrapper section, job or platform in that order.
         # Some variables are calculated in further functions, like num_processors and wallclock.
         # These variables can only be present in the wrapper itself
+        if not jobs_resources:
+            jobs_resources = {}
+        if not wrapper_info:
+            wrapper_info = []
         if len(wrapper_info) > 0:
             self.wrapper_type = wrapper_info[0]
             self.wrapper_policy = wrapper_info[1]
@@ -522,10 +539,10 @@ class JobPackageThread(JobPackageBase):
         self.parameters["EXECUTABLE"] = self.executable # have to look
         self.method = method
 
-
     @property
     def name(self):
         return self._name
+
     @property
     def _jobs_scripts(self):
         self._jobs_resources['PROCESSORS_PER_NODE'] = self.platform.processors_per_node
@@ -540,24 +557,27 @@ class JobPackageThread(JobPackageBase):
             except BaseException as e:
                 pass
         return jobs_scripts
+
     @property
     def queue(self):
         if (not str(self.nodes).isdigit() or (str(self.nodes).isdigit() and int(self.nodes) < 1)) and (not str(self._num_processors).isdigit() or (str(self._num_processors).isdigit() and int(self._num_processors) <= 1)):
             return self.platform.serial_platform.serial_queue
         else:
             return self._queue
+
     @queue.setter
     def queue(self,value):
         self._queue = value
+
     @property
     def _project(self):
         return self._platform.project
-    def set_job_dependency(self, dependency):
-        self._job_dependency = dependency
+
     def _create_scripts(self, configuration):
         for i in range(0, len(self.jobs)):
             self._job_scripts[self.jobs[i].name] = self.jobs[i].create_script(configuration)
         self._common_script = self._create_common_script()
+
     def _create_common_script(self,filename=""):
         lang = locale.getlocale()[1]
         if lang is None:
@@ -566,7 +586,9 @@ class JobPackageThread(JobPackageBase):
                 lang = 'UTF-8'
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
-        open(os.path.join(self._tmp_path, script_file), 'wb').write(script_content.encode(lang))
+        script_path = Path(self._tmp_path, script_file)
+        with open(script_path, 'wb') as f:
+            f.write(script_content.encode(lang))
         os.chmod(os.path.join(self._tmp_path, script_file), 0o755)
         return script_file
 
@@ -574,28 +596,26 @@ class JobPackageThread(JobPackageBase):
         Log.debug("Check remote dir")
         self.platform.check_remote_log_dir()
         compress_type = "w"
-        output_filepath = '{0}.tar'.format("wrapper_scripts")
+        output_filepath = 'wrapper_scripts.tar'
         if callable(getattr(self.platform, 'remove_multiple_files')):
             filenames = str()
             for job in self.jobs:
                 filenames += " " + self.platform.remote_log_dir + "/" + job.name + ".cmd"
             self.platform.remove_multiple_files(filenames)
-        tar_path = os.path.join(self._tmp_path, output_filepath)
+        tar_path = Path(self._tmp_path, output_filepath)
         Log.debug("Compressing multiple_files")
         with tarfile.open(tar_path, compress_type) as tar:
             for job in self.jobs:
-                jfile = os.path.join(self._tmp_path,self._job_scripts[job.name])
-                with open(jfile, 'rb') as f:
-                    info = tar.gettarinfo(jfile,self._job_scripts[job.name])
+                job_file = os.path.join(self._tmp_path,self._job_scripts[job.name])
+                with open(job_file, 'rb') as f:
+                    info = tar.gettarinfo(job_file,self._job_scripts[job.name])
                     tar.addfile(info, f)
-        tar.close()
-        os.chmod(tar_path, 0o755)
-        self.platform.send_file(tar_path, check=False)
+        tar_path.chmod(0o755)
+        self.platform.send_file(str(tar_path), check=False)
         Log.debug("Uncompress - send_command")
-        self.platform.send_command("cd {0}; tar -xvf {1}".format(self.platform.get_files_path(),output_filepath))
+        self.platform.send_command("cd {0}; tar -xvf {1}".format(self.platform.get_files_path(), output_filepath))
         Log.debug("Send_file: common_script")
         self.platform.send_file(self._common_script)
-
 
     def _do_submission(self, job_scripts: Dict[str, str] = None, hold: bool = False) -> None:
         """
@@ -621,7 +641,6 @@ class JobPackageThread(JobPackageBase):
                 if hold:
                     job.hold = hold
 
-
         package_id = self.platform.submit_job(None, self._common_script, hold=hold, export = self.export)
 
         if package_id is None or not package_id:
@@ -632,9 +651,9 @@ class JobPackageThread(JobPackageBase):
             self.jobs[i].status = Status.SUBMITTED
             self.jobs[i].wrapper_name = self.name
 
-
     def _common_script_content(self):
-        pass
+        return ''
+
 class JobPackageThreadWrapped(JobPackageThread):
     """
     Class to manage a thread-based package of jobs to be submitted by autosubmit
@@ -684,8 +703,10 @@ class JobPackageThreadWrapped(JobPackageThread):
     def _create_common_script(self,filename=""):
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
-        open(os.path.join(self._tmp_path, script_file), 'wb').write(script_content)
-        os.chmod(os.path.join(self._tmp_path, script_file), 0o755)
+        script_path = Path(self._tmp_path, script_file)
+        with open(script_path, 'w') as f:
+            f.write(script_content)
+        script_path.chmod(0o755)
         return script_file
 
     def _send_files(self):
@@ -708,7 +729,6 @@ class JobPackageThreadWrapped(JobPackageThread):
             if hold:
                 job.hold = hold
 
-
         package_id = self.platform.submit_job(None, self._common_script, hold=hold, export = self.export)
 
         if package_id is None or not package_id:
@@ -720,7 +740,6 @@ class JobPackageThreadWrapped(JobPackageThread):
             self.jobs[i].wrapper_name = self.name
 
 
-
 class JobPackageVertical(JobPackageThread):
     """
     Class to manage a vertical thread-based package of jobs to be submitted by autosubmit
@@ -728,9 +747,9 @@ class JobPackageVertical(JobPackageThread):
     :type jobs:
     :param: dependency:
     """
-    def __init__(self, jobs, dependency=None,configuration=None,wrapper_section="WRAPPERS", wrapper_info = []):
-
-        super(JobPackageVertical, self).__init__(jobs, dependency,configuration=configuration,wrapper_section=wrapper_section, wrapper_info = wrapper_info)
+    def __init__(self, jobs, dependency=None,configuration=None,wrapper_section="WRAPPERS", wrapper_info=None):
+        super(JobPackageVertical, self).__init__(
+            jobs, dependency, configuration=configuration, wrapper_section=wrapper_section, wrapper_info=wrapper_info)
         for job in jobs:
             if int(job.processors) >= int(self._num_processors):
                 self._num_processors = job.processors

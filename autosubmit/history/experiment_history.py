@@ -15,8 +15,10 @@
 
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import traceback
 from time import time, sleep
+from typing import Optional
 
 import autosubmit.history.database_managers.database_models as Models
 import autosubmit.history.utils as HUtils
@@ -93,7 +95,9 @@ class ExperimentHistory:
 
             return None
 
-    def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug", job_id: int = 0, wrapper_queue: str = None, wrapper_code: str = None, children: str = "") -> JobData:
+    def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug",
+                         job_id: int = 0, wrapper_queue: str = None, wrapper_code: int = 0,
+                         children: str = "") -> None:
         """
             Updates the start time and other details of a job in the database.
 
@@ -120,7 +124,7 @@ class ExperimentHistory:
             job_data_dc_last.rowtype = self._get_defined_rowtype(wrapper_code)
             job_data_dc_last.job_id = job_id
             job_data_dc_last.children = children
-            return self.manager.update_job_data_dc_by_job_id_name(job_data_dc_last)
+            self.manager.update_job_data_dc_by_job_id_name(job_data_dc_last)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')

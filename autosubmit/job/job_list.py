@@ -17,27 +17,21 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import copy
 import datetime
+import math
 import os
-import pickle
 import re
 import traceback
 from contextlib import suppress
+from pathlib import Path
 from shutil import move
 from threading import Thread
+from time import localtime, mktime
+from time import strftime
 from typing import List, Dict, Tuple, Any
-from pathlib import Path
 
-import math
 import networkx as nx
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
-from time import localtime, strftime, mktime
-
-import math
-import networkx as nx
-from bscearth.utils.date import date2str, parse_date
-from networkx import DiGraph
-from time import localtime, mktime, time
 
 import autosubmit.database.db_structure as DbStructure
 from autosubmit.helpers.data_transfer import JobRow
@@ -46,13 +40,11 @@ from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packages import JobPackageThread
-from autosubmit.job.job_utils import Dependency, _get_submitter
+from autosubmit.job.job_utils import Dependency, get_submitter
 from autosubmit.job.job_utils import transitive_reduction
-from autosubmit.platforms.platform import Platform
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import AutosubmitCritical, AutosubmitError, Log
-
 
 
 def threaded(fn):
@@ -330,7 +322,7 @@ class JobList(object):
                 job_platform = None
                 if first:
                     if not job.platform and hasattr(job, "platform_name") and job.platform_name:
-                        submitter = _get_submitter(as_conf)
+                        submitter = get_submitter(as_conf)
                         submitter.load_platforms(as_conf)
                         if job.platform_name not in submitter.platforms:
                             job.update_parameters(as_conf,{})
@@ -513,22 +505,6 @@ class JobList(object):
             else:
                 dependencies_keys.pop(key)
         return dependencies
-
-    @staticmethod
-    def _calculate_splits_dependencies(section, max_splits):
-        splits_list = section[section.find("[") + 1:section.find("]")]
-        splits = []
-        for str_split in splits_list.split(","):
-            if str_split.find(":") != -1:
-                numbers = str_split.split(":")
-                # change this to be checked in job_common.py
-                max_splits = min(int(numbers[1]), max_splits)
-                for count in range(int(numbers[0]), max_splits + 1):
-                    splits.append(int(str(count).zfill(len(numbers[0]))))
-            else:
-                if int(str_split) <= max_splits:
-                    splits.append(int(str_split))
-        return splits
 
     @staticmethod
     def _parse_filters_to_check(list_of_values_to_check, value_list=[], level_to_check="DATES_FROM"):
@@ -2165,19 +2141,6 @@ class JobList(object):
                    job.status == Status.DELAYED]
         return delayed
 
-    def get_skipped(self, platform=None):
-        """
-        Returns a list of skipped jobs
-
-        :param platform: job platform
-        :type platform: HPCPlatform
-        :return: skipped jobs
-        :rtype: list
-        """
-        skipped = [job for job in self._job_list if (platform is None or job.platform.name == platform.name) and
-                   job.status == Status.SKIPPED]
-        return skipped
-
     def get_waiting(self, platform=None, wrapper=False):
         """
         Returns a list of jobs waiting
@@ -2237,23 +2200,6 @@ class JobList(object):
         else:
             return submitted
 
-    def get_suspended(self, platform=None, wrapper=False):
-        """
-        Returns a list of jobs on unknown state
-
-        :param wrapper:
-        :param platform: job platform
-        :type platform: HPCPlatform
-        :return: unknown state jobs
-        :rtype: list
-        """
-        suspended = [job for job in self._job_list if (platform is None or job.platform.name == platform.name) and
-                     job.status == Status.SUSPENDED]
-        if wrapper:
-            return [job for job in suspended if job.packed is False]
-        else:
-            return suspended
-
     def get_in_queue(self, platform=None, wrapper=False):
         """
         Returns a list of jobs in the platforms (Submitted, Running, Queuing, Unknown,Held)
@@ -2272,60 +2218,36 @@ class JobList(object):
         else:
             return in_queue
 
-    def get_not_in_queue(self, platform=None, wrapper=False):
-        """
-        Returns a list of jobs NOT in the platforms (Ready, Waiting)
+    def get_active(self, platform=None):
+        """Returns a list of active jobs (In platforms queue + Ready)
 
-        :param wrapper:
-        :param platform: job platform
-        :type platform: HPCPlatform
-        :return: jobs not in platforms
-        :rtype: list
-        """
-        not_queued = self.get_ready(platform) + self.get_waiting(platform)
-        if wrapper:
-            return [job for job in not_queued if job.packed is False]
-        else:
-            return not_queued
-
-    def get_finished(self, platform=None, wrapper=False):
-        """
-        Returns a list of jobs finished (Completed, Failed)
-
-
-        :param wrapper:
-        :param platform: job platform
-        :type platform: HPCPlatform
-        :return: finished jobs
-        :rtype: list
-        """
-        finished = self.get_completed(platform) + self.get_failed(platform)
-        if wrapper:
-            return [job for job in finished if job.packed is False]
-        else:
-            return finished
-
-    def get_active(self, platform=None, wrapper=False):
-        """
-        Returns a list of active jobs (In platforms queue + Ready)
-
-        :param wrapper:
         :param platform: job platform
         :type platform: HPCPlatform
         :return: active jobs
         :rtype: list
         """
+        queued = self.get_in_queue(platform)
+        ready_but_held = self.get_ready(platform=platform, hold=True)
+        ready_not_held = self.get_ready(platform=platform, hold=False)
+        delayed = self.get_delayed(platform=platform)
 
-        active = self.get_in_queue(platform) + self.get_ready(
-            platform=platform, hold=True) + self.get_ready(platform=platform, hold=False) + self.get_delayed(
-            platform=platform)
-        tmp = [job for job in active if job.hold and not (job.status ==
-                                                          Status.SUBMITTED or job.status == Status.READY or job.status == Status.DELAYED)]
-        if len(tmp) == len(active):  # IF only held jobs left without dependencies satisfied
-            if len(tmp) != 0 and len(active) != 0:
-                raise AutosubmitCritical(
-                    "Only Held Jobs active. Exiting Autosubmit (TIP: This can happen if suspended or/and Failed jobs are found on the workflow)",
-                    7066)
+        active = queued + ready_but_held + ready_not_held + delayed
+
+        tmp = [
+            job
+            for job in active
+            if job.hold
+            and not (job.status == Status.SUBMITTED or job.status == Status.READY or job.status == Status.DELAYED)
+        ]
+        count_tmp = len(tmp)
+        count_active = len(active)
+
+        # IF only held jobs left without dependencies satisfied
+        if count_tmp == count_active:
+            if count_tmp != 0 and count_active != 0:
+                msg = ("Only Held Jobs active. This can happen if SUSPENDED or/and FAILED jobs are found on "
+                       "the workflow. Autosubmit will exit.)")
+                raise AutosubmitCritical(msg, 7066)
             active = []
         return active
 
@@ -2335,7 +2257,7 @@ class JobList(object):
 
         :parameter name: name to look for
         :type name: str
-        :return: found job
+        :return: found job.
         :rtype: job
         """
         for job in self._job_list:
@@ -2383,75 +2305,6 @@ class JobList(object):
             if len(jobs_by_id[job_id]) == 1:
                 jobs_by_id[job_id] = jobs_by_id[job_id][0]
         return jobs_by_id
-
-    def get_in_ready_grouped_id(self, platform):
-        jobs = []
-        [jobs.append(job) for job in jobs if (
-                platform is None or job.platform.name is platform.name)]
-
-        jobs_by_id = dict()
-        for job in jobs:
-            if job.id not in jobs_by_id:
-                jobs_by_id[job.id] = list()
-            jobs_by_id[job.id].append(job)
-        return jobs_by_id
-
-    def sort_by_name(self):
-        """
-        Returns a list of jobs sorted by name
-
-        :return: jobs sorted by name
-        :rtype: list
-        """
-        return sorted(self._job_list, key=lambda k: k.name)
-
-    def sort_by_id(self):
-        """
-        Returns a list of jobs sorted by id
-
-        :return: jobs sorted by ID
-        :rtype: list
-        """
-        return sorted(self._job_list, key=lambda k: k.id)
-
-    def sort_by_type(self):
-        """
-        Returns a list of jobs sorted by type
-
-        :return: job sorted by type
-        :rtype: list
-        """
-        return sorted(self._job_list, key=lambda k: k.type)
-
-    def sort_by_status(self):
-        """
-        Returns a list of jobs sorted by status
-
-        :return: job sorted by status
-        :rtype: list
-        """
-        return sorted(self._job_list, key=lambda k: k.status)
-
-    @staticmethod
-    def load_file(filename):
-        """
-        Recreates a stored joblist from the pickle file
-
-        :param filename: pickle file to load
-        :type filename: str
-        :return: loaded joblist object
-        :rtype: JobList
-        """
-        try:
-            if os.path.exists(filename):
-                fd = open(filename, 'rb')
-                return pickle.load(fd)
-            else:
-                return list()
-        except IOError:
-            Log.printlog(
-                "Autosubmit will use a backup for recover the job_list", 6010)
-            return list()
 
     def load(self, create=False, backup=False):
         """
@@ -2548,8 +2401,8 @@ class JobList(object):
             else:
                 job_id = job.id
             try:
-                Log.status("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job_id, Status(
-                ).VALUE_TO_KEY[job.status], platform_name, queue)
+                Log.status("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job_id,
+                           Status.VALUE_TO_KEY[job.status], platform_name, queue)
             except Exception:
                 Log.debug("Couldn't print job status for job {0}".format(job.name))
         for job in failed_job_list:
@@ -2557,30 +2410,30 @@ class JobList(object):
                 queue = "no-scheduler"
             else:
                 queue = job.queue
-            Log.status_failed("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job.id, Status(
-            ).VALUE_TO_KEY[job.status], job.platform.name, queue)
+            Log.status_failed("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job.id,
+                              Status.VALUE_TO_KEY[job.status], job.platform.name, queue)
 
     def update_from_file(self, store_change=True):
         """
         Updates jobs list on the fly from and update file
         :param store_change: if True, renames the update file to avoid reloading it at the next iteration
         """
-        if os.path.exists(os.path.join(self._persistence_path, self._update_file)):
-            Log.info("Loading updated list: {0}".format(
-                os.path.join(self._persistence_path, self._update_file)))
-            for line in open(os.path.join(self._persistence_path, self._update_file)):
-                if line.strip() == '':
-                    continue
-                job = self.get_job_by_name(line.split()[0])
-                if job:
-                    job.status = self._stat_val.retval(line.split()[1])
-                    job._fail_count = 0
+        update_path = Path(self._persistence_path, self._update_file)
+        if update_path.exists():
+            Log.info(f"Loading updated list: {str(update_path)}")
+            with open(update_path) as f:
+                for line in f.readlines():
+                    if line.strip() == '':
+                        continue
+                    job = self.get_job_by_name(line.split()[0])
+                    if job:
+                        job.status = self._stat_val.retval(line.split()[1])
+                        job._fail_count = 0
             now = localtime()
             output_date = strftime("%Y%m%d_%H%M", now)
             if store_change:
-                move(os.path.join(self._persistence_path, self._update_file),
-                     os.path.join(self._persistence_path, self._update_file +
-                                  "_" + output_date))
+                new_file = Path(f'{str(update_path)}_{output_date}')
+                move(update_path, new_file)
 
     def get_skippable_jobs(self, jobs_in_wrapper):
         job_list_skip = [job for job in self.get_job_list() if

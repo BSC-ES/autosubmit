@@ -214,29 +214,6 @@ class TestJobList(TestCase):
         self.assertTrue(self.submitted_job3 in in_queue)
         self.assertTrue(self.unknown_job in in_queue)
 
-    def test_get_not_in_queue_returns_only_which_are_waiting_and_ready(self):
-        not_in_queue = self.job_list.get_not_in_queue()
-
-        self.assertEqual(5, len(not_in_queue))
-        self.assertTrue(self.waiting_job in not_in_queue)
-        self.assertTrue(self.waiting_job2 in not_in_queue)
-        self.assertTrue(self.ready_job in not_in_queue)
-        self.assertTrue(self.ready_job2 in not_in_queue)
-        self.assertTrue(self.ready_job3 in not_in_queue)
-
-    def test_get_finished_returns_only_which_are_completed_and_failed(self):
-        finished = self.job_list.get_finished()
-
-        self.assertEqual(8, len(finished))
-        self.assertTrue(self.completed_job in finished)
-        self.assertTrue(self.completed_job2 in finished)
-        self.assertTrue(self.completed_job3 in finished)
-        self.assertTrue(self.completed_job4 in finished)
-        self.assertTrue(self.failed_job in finished)
-        self.assertTrue(self.failed_job2 in finished)
-        self.assertTrue(self.failed_job3 in finished)
-        self.assertTrue(self.failed_job4 in finished)
-
     def test_get_active_returns_only_which_are_in_queue_ready_and_unknown(self):
         active = self.job_list.get_active()
 
@@ -256,33 +233,6 @@ class TestJobList(TestCase):
         job = self.job_list.get_job_by_name(self.completed_job.name)
 
         self.assertEqual(self.completed_job, job)
-
-    def test_sort_by_name_returns_the_list_of_jobs_well_sorted(self):
-        sorted_by_name = self.job_list.sort_by_name()
-
-        for i in range(len(sorted_by_name) - 1):
-            self.assertTrue(
-                sorted_by_name[i].name <= sorted_by_name[i + 1].name)
-
-    def test_sort_by_id_returns_the_list_of_jobs_well_sorted(self):
-        sorted_by_id = self.job_list.sort_by_id()
-
-        for i in range(len(sorted_by_id) - 1):
-            self.assertTrue(sorted_by_id[i].id <= sorted_by_id[i + 1].id)
-
-    def test_sort_by_type_returns_the_list_of_jobs_well_sorted(self):
-        sorted_by_type = self.job_list.sort_by_type()
-
-        for i in range(len(sorted_by_type) - 1):
-            self.assertTrue(
-                sorted_by_type[i].type <= sorted_by_type[i + 1].type)
-
-    def test_sort_by_status_returns_the_list_of_jobs_well_sorted(self):
-        sorted_by_status = self.job_list.sort_by_status()
-
-        for i in range(len(sorted_by_status) - 1):
-            self.assertTrue(
-                sorted_by_status[i].status <= sorted_by_status[i + 1].status)
 
     def test_that_create_method_makes_the_correct_calls(self):
         parser_mock = Mock()

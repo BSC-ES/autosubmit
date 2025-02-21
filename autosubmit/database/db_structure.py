@@ -18,13 +18,13 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-
+import sqlite3
 import textwrap
 import traceback
-import sqlite3
-
+from pathlib import Path
 from typing import Dict, List
-from log.log import Log
+
+from log.log import Log, AutosubmitError
 
 
 def get_structure(exp_id, structures_path):
@@ -35,13 +35,12 @@ def get_structure(exp_id, structures_path):
     :return: Map from experiment name source to name destination  
     :rtype: Dictionary Key: String, Value: List(of String)
     """
-    try:        
-        if os.path.exists(structures_path):
-            db_structure_path = os.path.join(
-                structures_path, "structure_" + exp_id + ".db")
-            if not os.path.exists(db_structure_path):
-                open(db_structure_path, "w")
-            # print(db_structure_path)
+    try:
+        structures_path = Path(structures_path)
+        if structures_path.exists():
+            db_structure_path = structures_path / f"structure_{exp_id}.db"
+            if not db_structure_path.exists():
+                db_structure_path.touch()
             conn = create_connection(db_structure_path)
             create_table_query = textwrap.dedent(
                 '''CREATE TABLE
@@ -59,9 +58,8 @@ def get_structure(exp_id, structures_path):
                 current_table_structure.setdefault(_to, [])
             return current_table_structure            
         else:            
-            raise Exception("Structures folder not found " +
-                            str(structures_path))
-    except Exception as exp:
+            raise AutosubmitError("Structures folder not found " + str(structures_path))
+    except AutosubmitError as exp:
         Log.printlog("Get structure error: {0}".format(str(exp)), 6014)
         Log.debug(traceback.format_exc())
         

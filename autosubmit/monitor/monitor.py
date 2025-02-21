@@ -491,33 +491,32 @@ class Monitor:
         if not os.path.exists(os.path.dirname(file_path)):
             os.makedirs(os.path.dirname(file_path))
 
-        output_file = open(file_path, 'w+')
-        if classictxt:
-            for job in joblist:
-                log_out = ""
-                log_err = ""
-                if job.status in [Status.FAILED, Status.COMPLETED]:
-                    if type(job.local_logs) is not tuple:
-                        job.local_logs = ("","")
-                    log_out = path + "/" + job.local_logs[0]
-                    log_err = path + "/" + job.local_logs[1]
+        with open(file_path, 'w+') as output_file:
+            if classictxt:
+                for job in joblist:
+                    log_out = ""
+                    log_err = ""
+                    if job.status in [Status.FAILED, Status.COMPLETED]:
+                        if type(job.local_logs) is not tuple:
+                            job.local_logs = ("","")
+                        log_out = path + "/" + job.local_logs[0]
+                        log_err = path + "/" + job.local_logs[1]
 
-                output = job.name + " " + \
-                    Status().VALUE_TO_KEY[job.status] + \
-                    " " + log_out + " " + log_err + "\n"
-                output_file.write(output)
-        else:
-            # Replaced call to function for a call to the function of the object that
-            # was previously implemented, nocolor is set to True because we don't want
-            # strange ANSI codes in our plain text file
-            if job_list_object is not None:
-                output_file.write(job_list_object.print_with_status(statusChange=None, nocolor=True, existingList=joblist))
+                    output = job.name + " " + \
+                        Status().VALUE_TO_KEY[job.status] + \
+                        " " + log_out + " " + log_err + "\n"
+                    output_file.write(output)
             else:
-                output_file.write(
-                    "Writing jobs, they're grouped by [FC and DATE] \n")
-                self.write_output_txt_recursive(
-                    joblist[0], output_file, "", file_path)
-            output_file.close()
+                # Replaced call to function for a call to the function of the object that
+                # was previously implemented, nocolor is set to True because we don't want
+                # strange ANSI codes in our plain text file
+                if job_list_object is not None:
+                    output_file.write(job_list_object.print_with_status(statusChange=None, nocolor=True, existingList=joblist))
+                else:
+                    output_file.write(
+                        "Writing jobs, they're grouped by [FC and DATE] \n")
+                    self.write_output_txt_recursive(
+                        joblist[0], output_file, "", file_path)
         Log.result('Status txt created at {0}', output_file)
 
     def write_output_txt_recursive(self, job, output_file, level, path):

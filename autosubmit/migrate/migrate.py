@@ -11,7 +11,7 @@ from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 from log.log import Log, AutosubmitCritical, AutosubmitError
-from autosubmit.job.job_utils import _get_submitter
+from autosubmit.job.job_utils import get_submitter
 
 class Migrate:
 
@@ -210,7 +210,7 @@ class Migrate:
 
     def load_platforms_in_use(self, as_conf):
         platforms_to_test = set()
-        submitter = _get_submitter(as_conf)
+        submitter = get_submitter(as_conf)
         submitter.load_platforms(as_conf)
         if submitter.platforms is None:
             raise AutosubmitCritical("No platforms configured!!!", 7014)

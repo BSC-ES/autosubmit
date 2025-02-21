@@ -18,11 +18,13 @@
 
 import os
 import pickle
-from sys import setrecursionlimit
 import shutil
-from autosubmit.database.db_manager import DbManager
-from log.log import AutosubmitCritical, Log
 from contextlib import suppress
+from pathlib import Path
+from sys import setrecursionlimit
+
+from autosubmit.database.db_manager import DbManager
+from log.log import Log
 
 
 class JobListPersistence(object):
@@ -62,15 +64,16 @@ class JobListPersistencePkl(JobListPersistence):
     def load(self, persistence_path, persistence_file):
         """
         Loads a job list from a pkl file
-        :param persistence_file: str
-        :param persistence_path: str
+        :param persistence_file: the path to the persistence files
+        :param persistence_path: a persistence file name
 
         """
-        path = os.path.join(persistence_path, persistence_file + '.pkl')
-        path_tmp = os.path.join(persistence_path[:-3]+"tmp", persistence_file + f'.pkl.tmp_{os.urandom(8).hex()}')
+        path = Path(persistence_path, f'{persistence_file}.pkl')
+        path_tmp = Path(f'{persistence_path[:-3]}tmp', f'{persistence_file}.pkl.tmp_{os.urandom(8).hex()}')
 
         try:
-            open(path).close()
+            with open(path, 'r'):
+                pass
         except PermissionError:
             Log.warning(f'Permission denied to read {path}')
             raise
@@ -78,7 +81,7 @@ class JobListPersistencePkl(JobListPersistence):
             Log.warning(f'File {path} does not exist. ')
             raise
         else:
-            # copy the path to a tmp file randomseed to avoid corruption
+            # copy the path to a tmp file random seed to avoid corruption
             try:
                 shutil.copy(path, path_tmp)
                 with open(path_tmp, 'rb') as fd:
@@ -103,17 +106,19 @@ class JobListPersistencePkl(JobListPersistence):
         :param persistence_path: str
 
         """
-
-        path = os.path.join(persistence_path, persistence_file + '.pkl' + '.tmp')
+        path = Path(persistence_path, f'{persistence_file}.pkl.tmp')
         with suppress(FileNotFoundError, PermissionError):
-            os.remove(path)
+            path.unlink()
 
         setrecursionlimit(500000000)
-        Log.debug("Saving JobList: " + path)
+        Log.debug(f"Saving JobList: {path}")
         with open(path, 'wb') as fd:
             pickle.dump(graph, fd, pickle.HIGHEST_PROTOCOL)
-        os.replace(path, path[:-4])
-        Log.debug(f'JobList saved in {path[:-4]}')
+        current_location = str(path)
+        # TODO: use Path functions/attributes instead?
+        new_location = current_location[:-4]
+        os.replace(current_location, new_location)
+        Log.debug(f'JobList saved in {new_location}')
 
 
 class JobListPersistenceDb(JobListPersistence):

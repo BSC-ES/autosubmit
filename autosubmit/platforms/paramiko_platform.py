@@ -114,6 +114,7 @@ class ParamikoPlatform(Platform):
         if display is None:
             display = "localhost:0"
         self.local_x11_display = xlib_connect.get_display(display)
+
     def test_connection(self,as_conf):
         """
         Test if the connection is still alive, reconnect if not.
@@ -147,7 +148,6 @@ class ParamikoPlatform(Platform):
             raise AutosubmitCritical(str(e),7051)
             #raise AutosubmitError("[{0}] connection failed for host: {1}".format(self.name, self.host), 6002, e.message)
 
-
     def restore_connection(self, as_conf):
         try:
             self.connected = False
@@ -160,13 +160,14 @@ class ParamikoPlatform(Platform):
                     Log.printlog("Connection Failed to {0}, will test another host".format(
                         self.host.split(',')[0]), 6002)
                 else:
-                    raise AutosubmitCritical(
-                        "First connection to {0} is failed, check host configuration or try another login node ".format(self.host), 7050,str(e))
+                    msg = (f"First connection to {self.host} failed. Check host configuration or "
+                           f"try another login node: {str(e)}")
+                    raise AutosubmitCritical(msg, 7050, str(e))
             while self.connected is False and retry < retries:
                 try:
-                    self.connect(as_conf,True)
+                    self.connect(as_conf, True)
                 except Exception as e:
-                    pass
+                    Log.warning(f'Failed to reconnect to host {self.host}: {str(e)}', 6002)
                 retry += 1
             if not self.connected:
                 trace = 'Can not create ssh or sftp connection to {0}: Connection could not be established to platform {1}\n Please, check your expid on the PLATFORMS definition in YAML to see if there are mistakes in the configuration\n Also Ensure that the login node listed on HOST parameter is available(try to connect via ssh on a terminal)\n Also you can put more than one host using a comma as separator'.format(
@@ -331,8 +332,6 @@ class ParamikoPlatform(Platform):
             self._ftpChannel.get_channel().settimeout(120)
             self.connected = True
             self.spawn_log_retrieval_process(as_conf)
-
-
         except SSHException:
             raise
         except IOError as e:
@@ -370,25 +369,21 @@ class ParamikoPlatform(Platform):
             return None
 
     def remove_multiple_files(self, filenames):
-        #command = "rm"
         log_dir = os.path.join(self.tmp_path, 'LOG_{0}'.format(self.expid))
-        multiple_delete_previous_run = os.path.join(
-            log_dir, "multiple_delete_previous_run.sh")
-        if os.path.exists(log_dir):
+        multiple_delete_previous_run = Path(log_dir, "multiple_delete_previous_run.sh")
+        if multiple_delete_previous_run.exists():
             lang = locale.getlocale()[1]
             if lang is None:
                 lang = locale.getdefaultlocale()[1]
                 if lang is None:
                     lang = 'UTF-8'
-            open(multiple_delete_previous_run, 'wb+').write( ("rm -f" + filenames).encode(lang))
+            with open(multiple_delete_previous_run, 'wb+') as f:
+                f.write(f"rm -f {filenames}".encode(lang))
             os.chmod(multiple_delete_previous_run, 0o770)
-            self.send_file(multiple_delete_previous_run, False)
-            command = os.path.join(self.get_files_path(),
-                                   "multiple_delete_previous_run.sh")
-            if self.send_command(command, ignore_log=True):
+            self.send_file(str(multiple_delete_previous_run), False)
+            command = Path(self.get_files_path(), "multiple_delete_previous_run.sh")
+            if self.send_command(str(command), ignore_log=True):
                 return self._ssh_output
-            else:
-                return ""
         return ""
 
     def send_file(self, filename, check=True):
@@ -616,7 +611,8 @@ class ParamikoPlatform(Platform):
     def job_is_over_wallclock(self, job, job_status, cancel=False):
         if job.is_over_wallclock():
             try:
-                job.platform.get_completed_files(job.name)
+                # TODO: get retries from config
+                job.platform.get_completed_files(job.name, retries=5)
                 job_status = job.check_completion(over_wallclock=True)
             except Exception as e:
                 job_status = Status.FAILED
@@ -1253,9 +1249,7 @@ class ParamikoPlatform(Platform):
         :return: output from last command
         :rtype: str
         """
-        #Log.debug('Output {0}', self._ssh_output)
-
-        #Log.debug('Output {0}', self._ssh_output)
+        # Log.debug('Output {0}', self._ssh_output)
         if self._ssh_output is None or not self._ssh_output:
             self._ssh_output = ""
         return self._ssh_output

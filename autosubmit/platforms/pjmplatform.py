@@ -67,11 +67,10 @@ class PJMPlatform(ParamikoPlatform):
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh")
         self._submit_script_base_name = os.path.join(
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
-        self._submit_script_file = open(self._submit_script_path, 'wb').close()
+        self._submit_script_file = None
 
     def generate_new_name_submit_script_file(self):
         self._submit_script_path = self._submit_script_base_name + os.urandom(16).hex() + ".sh"
-        self._submit_script_file = open(self._submit_script_path, 'wb').close()
 
     def submit_error(self,output):
         """
@@ -80,8 +79,6 @@ class PJMPlatform(ParamikoPlatform):
         :return: boolean
         """
         return not all(part.lower() in output.lower() for part in ["pjsub", "[INFO] PJM 0000"])
-
-
 
     def process_batch_ready_jobs(self,valid_packages_to_submit,failed_packages,error_message="",hold=False):
         """
@@ -159,8 +156,6 @@ class PJMPlatform(ParamikoPlatform):
         return save,valid_packages_to_submit
 
     def open_submit_script(self):
-        self._submit_script_file = open(self._submit_script_path, 'wb').close()
-        # remove file
         with suppress(FileNotFoundError):
             os.remove(self._submit_script_path)
         self.generate_new_name_submit_script_file()

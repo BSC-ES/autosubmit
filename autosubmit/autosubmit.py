@@ -31,7 +31,7 @@ from typing import Dict, Set, Tuple, Union, Any, List, Optional
 from autosubmit.database.db_common import update_experiment_descrip_version
 from autosubmit.helpers.parameters import PARAMETERS
 from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from autosubmitconfigparser.config.configcommon import AutosubmitConfig, ini_to_yaml
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 from log.log import Log, AutosubmitError, AutosubmitCritical
 from .database.db_common import create_db
@@ -1171,7 +1171,7 @@ class Autosubmit:
             # if ends with .conf convert it to AS4 yaml file
             if conf_file.endswith(".conf"):
                 try:
-                    AutosubmitConfig.ini_to_yaml(os.path.join(BasicConfig.LOCAL_ROOT_DIR, exp_id,"conf"),
+                    ini_to_yaml(os.path.join(BasicConfig.LOCAL_ROOT_DIR, exp_id,"conf"),
                                                  os.path.join(BasicConfig.LOCAL_ROOT_DIR, exp_id,"conf",conf_file.replace(copy_id,exp_id)))
                 except Exception as e:
                     Log.warning("Error converting {0} to yml: {1}".format(conf_file.replace(copy_id,exp_id),str(e)))
@@ -2199,6 +2199,14 @@ class Autosubmit:
                 max_recovery_retrials = as_conf.experiment_data.get("CONFIG",{}).get("RECOVERY_RETRIALS",3650)  # (72h - 122h )
                 recovery_retrials = 0
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
+
+                import gc
+                import tracemalloc
+                import autosubmit.traceprofiler as traceprofiler
+
+                #tracemalloc.start(10)
+                #traceprofiler_start = datetime.datetime.now()
+
                 while job_list.get_active():
                     Autosubmit.refresh_log_recovery_process(platforms_to_test, as_conf)
                     for job in [job for job in job_list.get_job_list() if job.status == Status.READY]:
@@ -2279,6 +2287,14 @@ class Autosubmit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             job_list.save()
                             as_conf.save()
+
+                        # gc.collect()
+                        # traceprofiler.snapshot()
+                        #
+                        # now = datetime.datetime.now()
+                        # if (now - traceprofiler_start).seconds > 240:
+                        #     break
+
                         time.sleep(safetysleeptime)
                         #Log.debug(f"FD endsubmit: {fd_show.fd_table_status_str()}")
 
@@ -2362,6 +2378,11 @@ class Autosubmit:
                         raise AutosubmitCritical(e.message, e.code, e.trace)
                     except BaseException:
                         raise # If this happens, there is a bug in the code or an exception not-well caught
+
+                # traceprofiler.display_stats()
+                # traceprofiler.compare()
+                # traceprofiler.print_trace()
+
                 Log.result("No more jobs to run.")
                 # search hint - finished run
                 job_list.save()
@@ -2489,12 +2510,10 @@ class Autosubmit:
                 raise AutosubmitCritical("Issues while checking the connectivity of platforms.", 7010, issues + "\n" + ssh_config_issues)
 
     @staticmethod
-    def submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence, inspect=False,
-                          only_wrappers=False, hold=False):
-
-        # type: (AutosubmitConfig, JobList, Set[Platform], JobPackagePersistence, bool, bool, bool) -> bool
-        """
-        Gets READY jobs and send them to the platforms if there is available space on the queues
+    def submit_ready_jobs(as_conf: AutosubmitConfig, job_list: JobList, platforms_to_test: Set[Platform],
+                          packages_persistence: JobPackagePersistence, inspect=False,
+                          only_wrappers=False, hold=False) -> bool:
+        """Gets READY jobs and send them to the platforms if there is available space on the queues.
 
         :param hold:
         :param as_conf: autosubmit config object \n
@@ -3009,7 +3028,7 @@ class Autosubmit:
                     job.platform_name = hpcarch
                 # noinspection PyTypeChecker
                 job.platform = platforms[job.platform_name]
-                if job.platform.get_completed_files(job.name, 0, recovery=True):
+                if job.platform.get_completed_files(job.name, retries=0, recovery=True):
                     job.status = Status.COMPLETED
                     Log.info(
                         "CHANGED job '{0}' status to COMPLETED".format(job.name))
@@ -3190,8 +3209,6 @@ class Autosubmit:
         :param placeholders: show placeholders
         :type placeholders: bool
         """
-        # todo
-
         try:
             ignore_performance_keys = ["error_message",
                                        "warnings_job_data", "considered"]
@@ -3206,8 +3223,8 @@ class Autosubmit:
                 as_conf.reload(True)
                 parameters = as_conf.load_parameters()
             except Exception as e:
-                raise AutosubmitCritical(
-                    "Unable to gather the parameters from config files, check permissions.", 7012)
+                msg = f"Unable to gather the parameters from config files, check permissions: {str(e)}"
+                raise AutosubmitCritical(msg, 7012)
             # Performance Metrics call
             try:
                 BasicConfig.read()
@@ -3221,15 +3238,15 @@ class Autosubmit:
                     for key in ignore_performance_keys:
                         performance_metrics.pop(key, None)
             except Exception as e:
-                Log.printlog("Autosubmit couldn't retrieve performance metrics.")
+                Log.printlog(f"Autosubmit couldn't retrieve performance metrics: {str(e)}")
                 performance_metrics = None
             # Preparation for section parameters
             try:
                 submitter = Autosubmit._get_submitter(as_conf)
                 submitter.load_platforms(as_conf)
                 hpcarch = submitter.platforms[as_conf.get_platform()]
-
             except Exception as e:
+                Log.printlog(f"Autosubmit couldn't prepare the platform submitter: {str(e)}")
                 submitter = Autosubmit._get_submitter(as_conf)
                 submitter.load_local_platform(as_conf)
                 hpcarch = submitter.platforms[as_conf.get_platform()]
@@ -3241,93 +3258,86 @@ class Autosubmit:
                     job.platform_name = hpcarch.name
                 job.platform = submitter.platforms[job.platform_name]
 
+            now = datetime.datetime.today().strftime('%Y%m%d-%H%M%S')
 
             if show_all_parameters:
                 Log.info("Gathering all parameters (all keys are on upper_case)")
-                parameter_output = '{0}_parameter_list_{1}.txt'.format(expid,
-                                                                       datetime.datetime.today().strftime(
-                                                                           '%Y%m%d-%H%M%S'))
-                parameter_file = open(os.path.join(
-                    tmp_path, parameter_output), 'w')
-                # Common parameters
-                jobs_parameters = {}
-                try:
-                    for job in job_list.get_job_list():
-                        job_parameters = job.update_parameters(as_conf, {})
-                        for key, value in job_parameters.items():
-                            jobs_parameters["JOBS"+"."+job.section+"."+key] = value
-                except Exception:
-                    pass
-                if len(jobs_parameters) > 0:
-                    del as_conf.experiment_data["JOBS"]
-                parameters = as_conf.load_parameters()
-                parameters.update(jobs_parameters)
-                for key, value in parameters.items():
-                    if value is not None and len(str(value)) > 0:
-                        full_value = key + "=" + str(value) + "\n"
-                        parameter_file.write(full_value)
-                    else:
-                        if placeholders:
-                            parameter_file.write(
-                                key + "=" + "%" + key + "%" + "\n")
-                        else:
-                            parameter_file.write(key + "=" + "-" + "\n")
-
-                if performance_metrics is not None and len(str(performance_metrics)) > 0:
-                    for key in performance_metrics:
-                        parameter_file.write("{0} = {1}\n".format(
-                            key, performance_metrics.get(key, "-")))
-                parameter_file.close()
-
-                os.chmod(os.path.join(tmp_path, parameter_output), 0o755)
-                Log.result("A list of all parameters has been written on {0}".format(
-                    os.path.join(tmp_path, parameter_output)))
-
-            if template_file_path is not None:
-                if os.path.exists(template_file_path):
-                    Log.info(
-                        "Gathering the selected parameters (all keys are on upper_case)")
-                    template_file = open(template_file_path, 'r')
-                    template_content = template_file.read()
+                parameter_output = f'{expid}_parameter_list_{now}.txt'
+                parameter_output_path = Path(tmp_path, parameter_output)
+                with open(parameter_output_path, 'w') as parameter_file:
+                    # Common parameters
+                    jobs_parameters = {}
+                    with suppress(KeyError):
+                        for job in job_list.get_job_list():
+                            job_parameters = job.update_parameters(as_conf, {})
+                            for key, value in job_parameters.items():
+                                jobs_parameters[f"JOBS.{job.section}.{key}"] = value
+                    if len(jobs_parameters) > 0:
+                        del as_conf.experiment_data["JOBS"]
+                    parameters = as_conf.load_parameters()
+                    parameters.update(jobs_parameters)
                     for key, value in parameters.items():
-                        template_content = re.sub(
-                            '%(?<!%%)' + key + '%(?!%%)', str(parameters[key]), template_content, flags=re.I)
-                    # Performance metrics
+                        if value is not None and len(str(value)) > 0:
+                            full_value = key + "=" + str(value) + "\n"
+                            parameter_file.write(full_value)
+                        else:
+                            if placeholders:
+                                parameter_file.write(
+                                    key + "=" + "%" + key + "%" + "\n")
+                            else:
+                                parameter_file.write(key + "=" + "-" + "\n")
+
                     if performance_metrics is not None and len(str(performance_metrics)) > 0:
                         for key in performance_metrics:
+                            parameter_file.write("{0} = {1}\n".format(
+                                key, performance_metrics.get(key, "-")))
+
+                parameter_output_path.chmod(0o755)
+                Log.result(f"A list of all parameters has been written on {str(parameter_output_path)}")
+
+            if template_file_path is not None:
+                template_file_path = Path(template_file_path)
+                if template_file_path.exists():
+                    Log.info("Gathering the selected parameters (all keys are on upper_case)")
+                    with open(template_file_path, 'r') as template_file:
+                        template_content = template_file.read()
+                        for key, value in parameters.items():
                             template_content = re.sub(
-                                '%(?<!%%)' + key + '%(?!%%)', str(performance_metrics[key]), template_content,
-                                flags=re.I)
-                    template_content = template_content.replace("%%", "%")
-                    if not placeholders:
-                        template_content = re.sub(
-                            r"%[^% \n\t]+%", "-", template_content, flags=re.I)
-                    report = '{0}_report_{1}.txt'.format(
-                        expid, datetime.datetime.today().strftime('%Y%m%d-%H%M%S'))
-                    open(os.path.join(tmp_path, report),
-                         'w').write(template_content)
-                    os.chmod(os.path.join(tmp_path, report), 0o755)
-                    template_file.close()
-                    Log.result("Report {0} has been created on {1}".format(
-                        report, os.path.join(tmp_path, report)))
+                                '%(?<!%%)' + key + '%(?!%%)', str(parameters[key]), template_content, flags=re.I)
+                        # Performance metrics
+                        if performance_metrics is not None and len(str(performance_metrics)) > 0:
+                            for key in performance_metrics:
+                                template_content = re.sub(
+                                    '%(?<!%%)' + key + '%(?!%%)', str(performance_metrics[key]), template_content,
+                                    flags=re.I)
+                        template_content = template_content.replace("%%", "%")
+                        if not placeholders:
+                            template_content = re.sub(
+                                r"%[^% \n\t]+%", "-", template_content, flags=re.I)
+
+                    report_path = Path(tmp_path, f'{expid}_report_{now}.txt')
+                    with open(report_path) as f:
+                        f.write(template_content)
+                    report_path.chmod(0o755)
+
+                    Log.result(f"Report {report_path.name} has been created on {str(report_path)}")
                 else:
-                    raise AutosubmitCritical(
-                        f"Template {template_file_path} doesn't exists ", 7014)
-        except AutosubmitError as e:
+                    raise AutosubmitCritical(f"Template {template_file_path} doesn't exists ", 7014)
+        except AutosubmitError:
             raise
-        except AutosubmitCritical as e:
+        except AutosubmitCritical:
             raise
         except BaseException as e:
-            raise AutosubmitCritical("Unknown error while reporting the parameters list, likely it is due IO issues",
-                                     7040, str(e))
+            msg = f"Unknown error while reporting the parameters list, likely it is due IO issues: {str(e)}"
+            raise AutosubmitCritical(msg, 7040, str(e))
 
     @staticmethod
-    def describe(input_experiment_list="*",get_from_user=""):
+    def describe(input_experiment_list="*", get_from_user=""):
         """
         Show details for specified experiment
 
-        :param experiments_id: experiments identifier:
-        :type experiments_id: str
+        :param input_experiment_list: experiments identifiers
+        :type input_experiment_list: str
         :param get_from_user: user to get the experiments from
         :type get_from_user: str
         :return: str,str,str,str
@@ -3500,7 +3510,6 @@ class Autosubmit:
                 rc_path = home_path
             rc_path = rc_path.joinpath('.autosubmitrc')
 
-            config_file = open(rc_path, 'w')
             Log.info("Writing configuration file...")
             try:
                 parser = ConfigParser()
@@ -3533,8 +3542,8 @@ class Autosubmit:
                 parser.set("autosubmitapi", "url", autosubmitapi_url)
                 # parser.add_section("hosts")
                 # parser.set("hosts", "whitelist", " localhost # Add your machine names")
-                parser.write(config_file)
-                config_file.close()
+                with open(rc_path, 'w') as config_file:
+                    parser.write(config_file)
                 Log.result("Configuration file written successfully: \n\t{0}".format(rc_path))
                 HUtils.create_path_if_not_exists(local_root_path)
                 HUtils.create_path_if_not_exists(global_logs_path)
@@ -3741,7 +3750,6 @@ class Autosubmit:
                 break
                 # TODO: Check that is a valid config?
 
-        config_file = open(path, 'w')
         d.infobox("Writing configuration file...", width=50, height=5)
         try:
             parser = ConfigParser()
@@ -3760,8 +3768,8 @@ class Autosubmit:
             parser.add_section('mail')
             parser.set('mail', 'smtp_server', smtp_hostname)
             parser.set('mail', 'mail_from', mail_from)
-            parser.write(config_file)
-            config_file.close()
+            with open(path, 'w') as config_file:
+                parser.write(config_file)
             d.msgbox("Configuration file written successfully",
                      width=50, height=5)
             os.system('clear')
@@ -3878,7 +3886,8 @@ class Autosubmit:
             if not backup_path.exists():
                 Log.info("Backup stored at {0}".format(backup_path))
                 shutil.copyfile(template_path, backup_path)
-            template_content = open(template_path, 'r', encoding=locale.getlocale()[1]).read()
+            with open(template_path, 'r', encoding=locale.getlocale()[1]) as f:
+                template_content = f.read()
             # Look for %_%
             variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content,flags=re.IGNORECASE)
             variables = [variable[1:-1].upper() for variable in variables]
@@ -3908,7 +3917,8 @@ class Autosubmit:
             if template_path.name.lower().find("autosubmit") > -1:
                 template_content = re.sub('(?m)^( )*(EXPID:)( )*[a-zA-Z0-9._-]*(\n)*', "", template_content, flags=re.I)
             # Write final result
-            open(template_path, "w").write(template_content)
+            with open(template_path, "w") as f:
+                f.write(template_content)
 
         if warn == "" and substituted == "":
             Log.result("Completed check for {0}.\nNo %_% variables found.".format(template_path))
@@ -3947,7 +3957,7 @@ class Autosubmit:
                     parser.load(Path(f))
                 except BaseException as e:
                     try:
-                        AutosubmitConfig.ini_to_yaml(f.parent, Path(f))
+                        ini_to_yaml(f.parent, Path(f))
                     except BaseException:
                         Log.warning("Couldn't convert conf file to yml: {0}", f.parent)
 
@@ -3956,7 +3966,7 @@ class Autosubmit:
             for f in folder.rglob("*.conf"):
                 if not Path(f.stem + ".yml").exists():
                     try:
-                        AutosubmitConfig.ini_to_yaml(Path(f).parent, Path(f))
+                        ini_to_yaml(Path(f).parent, Path(f))
                     except Exception as e:
                         Log.warning("Couldn't convert conf file to yml: {0}", Path(f).parent)
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
@@ -5699,14 +5709,15 @@ class Autosubmit:
 
     @staticmethod
     def _change_conf(testid, hpc, start_date, member, chunks, branch, random_select=False):
-        #TODO
+        # TODO ``experiment_file`` and ``platforms_file`` of ASConf are gone!
         as_conf = AutosubmitConfig(testid, BasicConfig, YAMLParserFactory())
 
         if as_conf.experiment_data.get("RERUN", False):
             if str(as_conf.experiment_data["RERUN"].get("RERUN", "False")).lower() != "true":
                 raise AutosubmitCritical('Can not test a RERUN experiment', 7014)
 
-        content = open(as_conf.experiment_file).read()
+        with open(as_conf.experiment_file) as f:
+            content = f.read()
         if random_select:
             if hpc is None:
                 platforms_parser = as_conf.get_parser(
@@ -5749,7 +5760,8 @@ class Autosubmit:
             content = content.replace(re.search('PROJECT_REVISION:.*', content, re.MULTILINE).group(0),
                                       "PROJECT_REVISION: " + branch)
 
-        open(as_conf.experiment_file, 'wb').write(content)
+        with open(as_conf.experiment_file, 'wb') as f:
+            f.write(content)
 
     @staticmethod
     def load_logs_from_previous_run(expid,as_conf):
@@ -5855,7 +5867,7 @@ class Autosubmit:
             # noinspection PyTypeChecker
             job.platform = platforms[job.platform_name.upper()]
 
-            if job.platform.get_completed_files(job.name, 0):
+            if job.platform.get_completed_files(job.name, retries=0):
                 job.status = Status.COMPLETED
                 Log.info(
                     "CHANGED job '{0}' status to COMPLETED".format(job.name))

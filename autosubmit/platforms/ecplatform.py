@@ -227,8 +227,6 @@ class EcPlatform(ParamikoPlatform):
             raise AutosubmitError(f'Could not execute command {command} on {self.host}', 7500, str(err_message))
         return True
 
-
-
     def send_file(self, filename, check=True):
         self.check_remote_log_dir()
         self.delete_file(filename)
@@ -245,18 +243,18 @@ class EcPlatform(ParamikoPlatform):
             retries = 0
             sleeptime = 5
             process_ok = False
-            FNULL = open(os.devnull, 'w')
-            while not process_ok and retries < 5:
-                process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE,stderr=FNULL)
-                out, _ = process.communicate()
-                out=out.decode(locale.getlocale()[1])
-                if 'No such file' in out or process.returncode != 0:
-                    retries = retries + 1
-                    process_ok = False
-                    sleeptime = sleeptime + 5
-                    sleep(sleeptime)
-                else:
-                    process_ok = True
+            with open(os.devnull, 'w') as FNULL:
+                while not process_ok and retries < 5:
+                    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=FNULL)
+                    out, _ = process.communicate()
+                    out=out.decode(locale.getlocale()[1])
+                    if 'No such file' in out or process.returncode != 0:
+                        retries = retries + 1
+                        process_ok = False
+                        sleeptime = sleeptime + 5
+                        sleep(sleeptime)
+                    else:
+                        process_ok = True
         except Exception as e:
             process_ok = False
         if not process_ok:
@@ -278,18 +276,18 @@ class EcPlatform(ParamikoPlatform):
             retries = 0
             sleeptime = 5
             process_ok = False
-            FNULL = open(os.devnull, 'w')
-            while not process_ok and retries < 5:
-                process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE,stderr=FNULL)
-                out, _ = process.communicate()
-                out = out.decode(locale.getlocale()[1])
-                if 'No such file' in out or process.returncode != 0:
-                    retries = retries + 1
-                    process_ok = False
-                    sleeptime = sleeptime + 5
-                    sleep(sleeptime)
-                else:
-                    process_ok = True
+            with open(os.devnull, 'w') as FNULL:
+                while not process_ok and retries < 5:
+                    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE,stderr=FNULL)
+                    out, _ = process.communicate()
+                    out = out.decode(locale.getlocale()[1])
+                    if 'No such file' in out or process.returncode != 0:
+                        retries = retries + 1
+                        process_ok = False
+                        sleeptime = sleeptime + 5
+                        sleep(sleeptime)
+                    else:
+                        process_ok = True
         except Exception as e:
             process_ok = False
         if not process_ok and must_exist:
@@ -301,8 +299,8 @@ class EcPlatform(ParamikoPlatform):
     def delete_file(self, filename):
         command = '{0} {1}:{2}'.format(self.del_cmd, self.host, os.path.join(self.get_files_path(), filename))
         try:
-            FNULL = open(os.devnull, 'w')
-            subprocess.check_call(command, stdout=FNULL,stderr=FNULL, shell=True)
+            with open(os.devnull, 'w') as FNULL:
+                subprocess.check_call(command, stdout=FNULL,stderr=FNULL, shell=True)
         except subprocess.CalledProcessError:
             Log.debug('Could not remove file {0}',os.path.join(self.get_files_path(), filename) )
             return False

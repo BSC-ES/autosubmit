@@ -184,14 +184,14 @@ class LocalPlatform(ParamikoPlatform):
         """
         # This function is a copy of the slurm one
         log_dir = os.path.join(self.tmp_path, 'LOG_{0}'.format(self.expid))
-        multiple_delete_previous_run = os.path.join(
-            log_dir, "multiple_delete_previous_run.sh")
-        if os.path.exists(log_dir):
+        multiple_delete_previous_run = Path(log_dir, "multiple_delete_previous_run.sh")
+        if multiple_delete_previous_run.exists():
             lang = locale.getlocale()[1]
             if lang is None:
                 lang = 'UTF-8'
-            open(multiple_delete_previous_run, 'wb+').write(("rm -f" + filenames).encode(lang))
-            os.chmod(multiple_delete_previous_run, 0o770)
+            with open(multiple_delete_previous_run, 'wb+') as f:
+                f.write(f"rm -f {filenames}".encode(lang))
+            multiple_delete_previous_run.chmod(0o770)
         return ""
 
     def get_file(self, filename, must_exist=True, relative_path='',ignore_log = False,wrapper_failed=False):

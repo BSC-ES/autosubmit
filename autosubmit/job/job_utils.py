@@ -1,33 +1,30 @@
-#!/usr/bin/env python3
-import copy
-
-import math
-
-from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
-from log.log import Log, AutosubmitCritical
-from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates, add_hours
-
 # Copyright 2017-2020 Earth Sciences Department, BSC-CNS
-
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import math
 import os
-from autosubmit.job.job_package_persistence import JobPackagePersistence
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from contextlib import suppress
 from typing import Dict
+
+from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates
+
+from autosubmit.job.job_package_persistence import JobPackagePersistence
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
+from autosubmitconfigparser.config.basicconfig import BasicConfig
+from log.log import Log, AutosubmitCritical
 
 CALENDAR_UNITSIZE_ENUM = {
     "hour": 0,
@@ -36,11 +33,12 @@ CALENDAR_UNITSIZE_ENUM = {
     "year": 3
 }
 
-def _get_submitter(as_conf):
+
+def get_submitter(as_conf):
     """
     Returns the submitter corresponding to the communication defined on autosubmit's config file
 
-    :return: submitter
+    :return: the submitter.
     :rtype: Submitter
     """
     try:
@@ -53,12 +51,13 @@ def _get_submitter(as_conf):
         # only paramiko is available right now.
         return ParamikoSubmitter()
 
+
 def is_leap_year(year):
     """Determine whether a year is a leap year."""
     return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
 
-def calendar_unitsize_isgreater(split_unit,chunk_unit):
+def calendar_unitsize_is_greater(split_unit, chunk_unit):
     """
     Check if the split unit is greater than the chunk unit
     :param split_unit:
@@ -72,7 +71,8 @@ def calendar_unitsize_isgreater(split_unit,chunk_unit):
     except KeyError:
         raise AutosubmitCritical(f"Invalid calendar unit size")
 
-def calendar_unitsize_getlowersize(unitsize):
+
+def calendar_unitsize_get_lower_size(unitsize):
     """
     Get the lower size of a calendar unit
     :return:
@@ -83,6 +83,7 @@ def calendar_unitsize_getlowersize(unitsize):
         return "hour"
     else:
         return list(CALENDAR_UNITSIZE_ENUM.keys())[unit_value - 1]
+
 
 def calendar_get_month_days(date_str):
     """
@@ -102,6 +103,7 @@ def calendar_get_month_days(date_str):
     else:
         return 31
 
+
 def get_chunksize_in_hours(date_str,chunk_unit,chunk_length):
 
     if is_leap_year(int(date_str[0:4])):
@@ -117,6 +119,8 @@ def get_chunksize_in_hours(date_str,chunk_unit,chunk_length):
     else:
         chunk_size_in_hours = chunk_length
     return chunk_size_in_hours
+
+
 def calendar_split_size_isvalid(date_str, split_size, split_unit, chunk_unit, chunk_length, chunk_size_in_hours):
     """
     Check if the split size is valid for the calendar
@@ -149,9 +153,6 @@ def calendar_split_size_isvalid(date_str, split_size, split_unit, chunk_unit, ch
     return split_size_in_hours <= chunk_size_in_hours
 
 
-
-
-
 def calendar_chunk_section(exp_data, section, date, chunk):
     """
     Calendar for chunks
@@ -176,8 +177,8 @@ def calendar_chunk_section(exp_data, section, date, chunk):
             chunk_start, chunk_length, chunk_unit, cal)
         run_days = subs_dates(chunk_start, chunk_end, cal)
         if split_unit == "none":
-            split_unit = calendar_unitsize_getlowersize(chunk_unit)
-        if calendar_unitsize_isgreater(split_unit,chunk_unit):
+            split_unit = calendar_unitsize_get_lower_size(chunk_unit)
+        if calendar_unitsize_is_greater(split_unit, chunk_unit):
             raise AutosubmitCritical("Split unit is greater than chunk unit. Autosubmit doesn't support this configuration. Please change the split unit to day or lower. Or don't use calendar splits.")
         if split_unit == "hour":
             num_max_splits = run_days * 24
@@ -203,6 +204,7 @@ def calendar_chunk_section(exp_data, section, date, chunk):
         Log.info(f"For the section {section} with date:{date2str(chunk_start)} the number of splits is {splits}.")
     return splits
 
+
 def get_split_size_unit(data, section):
     split_unit = str(data.get('JOBS',{}).get(section,{}).get('SPLITSIZEUNIT', "none")).lower()
     if split_unit == "none":
@@ -221,6 +223,7 @@ def get_split_size_unit(data, section):
 def get_split_size(as_conf, section):
     job_data = as_conf.get('JOBS', {}).get(section, {})
     return int(job_data.get("SPLITSIZE", 1))
+
 
 def transitive_reduction(graph):
     """
@@ -242,19 +245,19 @@ def transitive_reduction(graph):
         graph.nodes[u]["job"].add_children([graph.nodes[v]["job"] for v in graph[u]])
     return graph
 
-def get_job_package_code(expid, job_name):
-    # type: (str, str) -> int
+
+def get_job_package_code(expid: str, job_name: str) -> int:
     """
-    Finds the package code and retrieves it. None if no package.
+    Finds the package code and retrieves it. Zero (0) if no package.
 
     :param job_name:
     :param expid: Experiment ID
     :type expid: String
 
-    :return: package code, None if not found
-    :rtype: int or None
+    :return: package code, 0 if not found
+    :rtype: int
     """
-    try:
+    with suppress(Exception):
         basic_conf = BasicConfig()
         basic_conf.read()
         packages_wrapper = JobPackagePersistence(os.path.join(basic_conf.LOCAL_ROOT_DIR, expid, "pkl"),"job_packages_" + expid).load(wrapper=True)
@@ -263,17 +266,13 @@ def get_job_package_code(expid, job_name):
             packages = packages_wrapper if len(packages_wrapper) > len(packages_wrapper_plus) else packages_wrapper_plus
             for exp, package_name, _job_name in packages:
                 if job_name == _job_name:
-                    code = int(package_name.split("_")[-3])
-                    return code
-    except Exception as e:
-        pass
+                    return int(package_name.split("_")[-3])
     return 0
 
 
 class Dependency(object):
     """
     Class to manage the metadata related with a dependency
-
     """
 
     def __init__(self, section, distance=None, running=None, sign=None, delay=-1, splits=None,relationships=None):
@@ -284,17 +283,6 @@ class Dependency(object):
         self.delay = delay
         self.splits = splits
         self.relationships = relationships
-
-
-class SimpleJob(object):
-    """
-    A simple replacement for jobs
-    """
-
-    def __init__(self, name, tmppath, statuscode):
-        self.name = name
-        self._tmp_path = tmppath
-        self.status = statuscode
 
 
 class SubJob(object):
@@ -360,8 +348,9 @@ class SubJobManager(object):
                     for sub_job in local_jobs_in_package:
                         # If job in current_structure, store children names in dictionary
                         # local_structure: Job Name -> Children (if present in the Job package)
-                        local_structure[sub_job.name] = [v for v in self.current_structure[sub_job.name]
-                                                         if v in self.package_to_jobs[package]] if sub_job.name in self.current_structure else list()
+                        local_structure[sub_job.name] = [
+                            v for v in self.current_structure[sub_job.name] if v in self.package_to_jobs[package]
+                        ] if sub_job.name in self.current_structure else []
                         # Assign children to SubJob in local_jobs_in_package
                         sub_job.children = local_structure[sub_job.name]
                         # Assign sub_job Name as a parent of each of its children
@@ -383,21 +372,17 @@ class SubJobManager(object):
                                         local_index[sub_children_name])
                                     fix_size = max(self.subjobindex[sub.name].queue +
                                                    self.subjobindex[sub.name].run, 0)
-                                    # fixes_applied.setdefault(sub_children_name, []).append(fix_size) # If we care about repetition
                                     # Retain the greater fix size
                                     if fix_size > fixes_applied.get(sub_children_name, 0):
                                         fixes_applied[sub_children_name] = fix_size
                                     fixed_queue_time = max(
                                         self.subjobindex[sub_children_name].queue - fix_size, 0)
                                     new_queues[sub_children_name] = fixed_queue_time
-                                    # print(new_queues[sub_name])
 
                 for key, value in new_queues.items():
                     self.subjobindex[key].queue = value
-                    # print("{} : {}".format(key, value))
                 for name in fixes_applied:
                     self.subjobfixes[name] = fixes_applied[name]
-
             else:
                 # There is no structure
                 for package in self.package_to_jobs:
@@ -420,12 +405,10 @@ class SubJobManager(object):
                             # total time of the previous (next because of reversed for) job by default
                             # Confusing? It is.
                             # Assign to transit the adjusted queue time
-                            filtered[i].transit = max(filtered[i].queue -
-                                                      filtered[i - 1].total, 0)
+                            filtered[i].transit = max(filtered[i].queue - filtered[i - 1].total, 0)
 
                         # Positive or zero transit time
-                        positive = len(
-                            [job for job in filtered if job.transit >= 0])
+                        positive = len([job for job in filtered if job.transit >= 0])
 
                         if positive > 1:
                             for i in range(0, len(filtered)):
@@ -447,13 +430,6 @@ class SubJobManager(object):
                         # print("{} : {}".format(sub.name, sub.queue))
                     for name in fixes_applied:
                         self.subjobfixes[name] = fixes_applied[name]
-
-    def get_subjoblist(self):
-        """
-        Returns the list of SubJob objects with their corrected queue times
-        in the case of jobs that belong to a wrapper.
-        """
-        return self.subjobList
 
     def get_collection_of_fixes_applied(self):
         # type: () -> Dict[str, int]

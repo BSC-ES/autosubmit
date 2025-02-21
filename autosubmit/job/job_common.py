@@ -199,9 +199,8 @@ class StatisticsSnippetPython:
             except Exception as e:
                 locale.setlocale(locale.LC_ALL, 'C')
             job_name_ptrn = '%CURRENT_LOGDIR%/%JOBNAME%'
-            stat_file = open(job_name_ptrn + '_STAT', 'w')
-            stat_file.write(f'{int(time.time())}\\n')
-            stat_file.close()
+            with open(job_name_ptrn + '_STAT', 'w') as stat_file:
+                stat_file.write(f'{int(time.time())}\\n')
             ###################
             # Autosubmit Checkpoint
             ###################
@@ -228,9 +227,8 @@ class StatisticsSnippetPython:
                 # Autosubmit tailer
                 ###################
 
-                stat_file = open(job_name_ptrn + '_STAT', 'a')
-                stat_file.write(f'{int(time.time())}\\n')
-                stat_file.close()
+                with open(job_name_ptrn + '_STAT', 'a') as stat_file:
+                    stat_file.write(f'{int(time.time())}\\n')
                 open(job_name_ptrn + '_COMPLETED', 'a').close()
                 exit(0)
                 """)
