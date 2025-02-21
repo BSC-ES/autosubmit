@@ -963,6 +963,7 @@ class JobList(object):
             job.add_edge_info(parent, special_conditions)  # this job
 
     def _apply_jobs_edge_info(self, job, dependencies):
+
         # prune first
         job.edge_info = {}
         # get dependency that has special conditions set
@@ -980,10 +981,6 @@ class JobList(object):
         # divide edge per section name
 
         parents_by_section = dict()
-        print(f'job.name: {job.name}')
-        print(f'in_edges: {self.graph.in_edges(job.name)}')
-        print(f'parents_by_section.items(): {parents_by_section.items()}')
-        print(f'in_edges: {self.graph.in_edges(job.name)}')
         for parent, _ in self.graph.in_edges(job.name):
             if self.graph.nodes[parent]['job'].section in filters_to_apply_by_section.keys():
                 if self.graph.nodes[parent]['job'].section not in parents_by_section:

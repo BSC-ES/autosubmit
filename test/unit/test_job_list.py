@@ -695,7 +695,26 @@ class FakeBasicConfig:
     STRUCTURES_DIR = '/dummy/structure/dir'
 
 
-def test_apply_jobs_edge_info(tmp_path):
+#TODO test failure and look fro data to test behaviour properly ex. of failure ({"STATUS":["+","-"]}, {"DUMMY":["+","-"]})
+@patch('autosubmit.job.job_list.DiGraph.in_edges')
+@patch('autosubmit.job.job_list.DiGraph.nodes')
+@patch('autosubmit.job.job_list.JobList._filter_current_job')
+@patch('autosubmit.job.job_list.JobList.add_special_conditions')
+@pytest.mark.parametrize("mock_job_list_value, mock_graph_edges_value, mock_graph_nodes_value",
+                            [
+                                (
+                                    {"STATUS": ["+", "-"]},
+                                    [
+                                        ['teste', 'teste1'], ['teste1', 'teste2']
+                                    ],
+                                    {
+                                        'teste': {'job': 'teste1'},
+                                        'teste1': {'job': 'teste2'}
+                                    },
+                                ),
+                            ],
+                         )
+def test_apply_jobs_edge_info(mock_add_special_conditions, mock_job_list, mock_graph_nodes, mock_graph_edges, tmp_path, mock_job_list_value, mock_graph_edges_value, mock_graph_nodes_value):
 
     job = SimpleJob("dummy", tmp_path, 100)
 
@@ -717,9 +736,20 @@ def test_apply_jobs_edge_info(tmp_path):
         'dummy-2':relationship
     }
 
-    with patch ('autosubmit.job.job_list.JobList._filter_current_job') as mock_job_list:
-        mock_job_list.return_value = {"STATUS":["+","-"]}
-        # mock_job_list.return_value = {"DUMMY":["+","-"]}
-        test = job_list._apply_jobs_edge_info(job, dependencies)
-        print(f'test: {test}')
-        assert False
+    mock_job_list.return_value = mock_job_list_value
+
+    mock_graph_edges.return_value = mock_graph_edges_value
+
+    mock_graph_nodes.return_value = mock_graph_nodes_value
+    mock_graph_nodes[mock_graph_nodes.key(0)]['job'].section = 'dummy'
+    mock_graph_nodes[mock_graph_nodes.key(1)]['job'].section = 'dummy'
+
+    mock_add_special_conditions.return_value = {}
+
+
+    try:
+        raise job_list._apply_jobs_edge_info(job, dependencies)
+    except Exception as e:
+        assert f'function failed to execute exception Raised: {e}'
+
+
