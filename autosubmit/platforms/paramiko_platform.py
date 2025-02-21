@@ -275,7 +275,7 @@ class ParamikoPlatform(Platform):
             if as_conf:
                 self.map_user_config_file(as_conf)
             else:
-                self._ssh_config.parse(open(os.path.expanduser("~/.ssh/config")))
+                self._ssh_config.parse(open(os.path.expanduser("~/.ssh/config")).close())
             self._host_config = self._ssh_config.lookup(self.host)
             if "," in self._host_config['hostname']:
                 if reconnect:
