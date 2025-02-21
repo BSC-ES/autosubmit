@@ -17,27 +17,24 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import copy
 import datetime
+import math
 import os
 import pickle
 import re
 import traceback
 from contextlib import suppress
+from pathlib import Path
 from shutil import move
 from threading import Thread
+from time import localtime, mktime
+from time import strftime
 from typing import List, Dict, Tuple, Any
-from pathlib import Path
 
-import math
 import networkx as nx
+from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
-from time import localtime, strftime, mktime
-
-import math
-import networkx as nx
-from bscearth.utils.date import date2str, parse_date
-from networkx import DiGraph
-from time import localtime, mktime, time
 
 import autosubmit.database.db_structure as DbStructure
 from autosubmit.helpers.data_transfer import JobRow
@@ -48,11 +45,7 @@ from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency, _get_submitter
 from autosubmit.job.job_utils import transitive_reduction
-from autosubmit.platforms.platform import Platform
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import AutosubmitCritical, AutosubmitError, Log
-
 
 
 def threaded(fn):

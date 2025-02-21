@@ -1,29 +1,26 @@
 import inspect
-from unittest.mock import MagicMock
-
 import os
-from unittest import TestCase
-from copy import copy
-import networkx
-import pytest
-from networkx import DiGraph
-#import patch
-from textwrap import dedent
+# import patch
 import shutil
 import tempfile
-from mock import Mock, patch
-from random import randrange
+from copy import copy
 from pathlib import Path
+from random import randrange
+from unittest import TestCase
+from unittest.mock import MagicMock
+
+import networkx
+import pytest
+from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from mock import Mock, patch
+from networkx import DiGraph
+
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_common import Type
-from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
-
 from autosubmit.job.job_utils import SimpleJob
-from log.log import AutosubmitCritical
 
 
 class TestJobList(TestCase):
