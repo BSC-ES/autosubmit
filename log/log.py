@@ -198,12 +198,12 @@ class Log:
 
         level = levels.get(str(level).upper(),"DEBUG")
 
-        max_retrials = 3
-        retrials = 0
+        max_retries = 3
+        retries = 1
         timeout = 5
 
-        while not os.path.exists(file_path) and retrials < max_retrials:
-            sleep(timeout*retrials)
+        while not os.path.exists(file_path) and retries < max_retries:
+            sleep(timeout*retries)
             try:
                 directory, filename = os.path.split(file_path)
                 if not os.path.exists(directory):
