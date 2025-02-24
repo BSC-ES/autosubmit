@@ -241,12 +241,12 @@ class JobList(object):
 
         self.graph = DiGraph()
 
-        # This generates the job object and also finds if dic_jobs has modified from previous 
+        # This generates the job object and also finds if dic_jobs has modified from previous
         # iteration in order to expand the workflow
         if show_log:
             Log.info("Creating jobs...")
         self._create_jobs(self._dic_jobs, 0, default_job_type)
-        # This dic_job is key to the dependencies management as they're ordered 
+        # This dic_job is key to the dependencies management as they're ordered
         # by date[member[chunk]]
         if show_log:
             Log.info("Adding dependencies to the graph..")
@@ -545,7 +545,7 @@ class JobList(object):
         return final_values
 
     @staticmethod
-    def _parse_filter_to_check(value_to_check, value_list=[], level_to_check="DATES_FROM", 
+    def _parse_filter_to_check(value_to_check, value_list=[], level_to_check="DATES_FROM",
                                splits=None) -> list:
         """
         Parse the filter to check and return the value to check.
@@ -794,7 +794,7 @@ class JobList(object):
         filters_to_apply = self._unify_to_filters(filters_to_apply, current_job.splits)
         return filters_to_apply
 
-    def _unify_to_filter(self, unified_filter, filter_to, filter_type, splits=None) -> {}:
+    def _unify_to_filter(self, unified_filter, filter_to, filter_type, splits = None) -> {}:
         """
         Unify filter_to filters into a single dictionary
         :param unified_filter: Single dictionary with all filters_to
@@ -2764,10 +2764,10 @@ class JobList(object):
         log_recovered = self.check_if_log_is_recovered(job)
         if log_recovered:
             job.updated_log = True
-            # TODO in pickle -> db/yaml migration(I): 
+            # TODO in pickle -> db/yaml migration(I):
             #  Do the save of the job here then clean attributes from mem ( or even the full job )
             job.clean_attributes()
-            # TODO in pickle -> db/yaml migration(II): 
+            # TODO in pickle -> db/yaml migration(II):
             #  And remove these two lines
             # we only want the last one
             job.local_logs = (log_recovered.name, log_recovered.name[:-4] + ".err")
@@ -2843,7 +2843,7 @@ class JobList(object):
                             else:
                                 aux_job_delay = int(job.delay_retrials)
 
-                        if (as_conf.jobs_data[job.section].get("DELAY_RETRY_TIME", None) or 
+                        if (as_conf.jobs_data[job.section].get("DELAY_RETRY_TIME", None) or
                                 aux_job_delay <= 0):
                             delay_retry_time = str(as_conf.get_delay_retry_time())
                         else:
