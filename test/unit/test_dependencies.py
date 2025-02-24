@@ -298,15 +298,6 @@ class TestJobList(unittest.TestCase):
         }
         self.assertEqual(result, expected_output)
 
-        self.mock_job.member = "fc3"
-        result = self.JobList._check_members(self.relationships_members, self.mock_job)
-        self.assertEqual(result, {})
-
-        # FAILURE
-        self.mock_job.member = "fc99"
-        result = self.JobList._check_members(self.relationships_members, self.mock_job)
-        self.assertEqual(result, {})
-
         self.relationships_members["MEMBERS_FROM"]["fc2"].update(self.relationships_chunks)
 
         result = self.JobList._check_members(self.relationships_members, self.mock_job)
@@ -329,6 +320,15 @@ class TestJobList(unittest.TestCase):
             "SPLITS_TO": "none"
         }
         self.assertEqual(result, expected_output)
+
+        self.mock_job.member = "fc3"
+        result = self.JobList._check_members(self.relationships_members, self.mock_job)
+        self.assertEqual(result, {})
+
+        # FAILURE
+        self.mock_job.member = "fc99"
+        result = self.JobList._check_members(self.relationships_members, self.mock_job)
+        self.assertEqual(result, {})
 
     def test_check_splits(self):
         # Call the function to get the result
