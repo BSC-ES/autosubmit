@@ -17,7 +17,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import traceback
-from .database_managers.experiment_status_db_manager import ExperimentStatusDbManager
+from .database_managers.experiment_status_db_manager import create_experiment_status_db_manager
 from .database_managers.database_manager import DEFAULT_LOCAL_ROOT_DIR, DEFAULT_HISTORICAL_LOGS_DIR
 from .internal_logging import Logging
 from autosubmitconfigparser.config.basicconfig import BasicConfig
@@ -29,7 +29,13 @@ class ExperimentStatus:
     self.expid = expid # type : str
     BasicConfig.read()
     try:
-      self.manager = ExperimentStatusDbManager(self.expid, BasicConfig.DB_DIR, BasicConfig.DB_FILE, local_root_dir_path=BasicConfig.LOCAL_ROOT_DIR)
+      options = {
+        'expid': self.expid,
+        'db_dir_path': BasicConfig.DB_DIR,
+        'main_db_name': BasicConfig.DB_FILE,
+        'local_root_dir_path': BasicConfig.LOCAL_ROOT_DIR,
+      }
+      self.manager = create_experiment_status_db_manager(BasicConfig.DATABASE_BACKEND, **options)
     except Exception as exp:
       message = "Error while trying to update {0} in experiment_status.".format(str(self.expid))      
       Logging(self.expid, BasicConfig.HISTORICAL_LOG_DIR).log(message, traceback.format_exc())
