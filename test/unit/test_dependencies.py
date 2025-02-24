@@ -297,13 +297,38 @@ class TestJobList(unittest.TestCase):
             "SPLITS_TO": "1"
         }
         self.assertEqual(result, expected_output)
+
         self.mock_job.member = "fc3"
         result = self.JobList._check_members(self.relationships_members, self.mock_job)
         self.assertEqual(result, {})
+
         # FAILURE
         self.mock_job.member = "fc99"
         result = self.JobList._check_members(self.relationships_members, self.mock_job)
         self.assertEqual(result, {})
+
+        self.relationships_members["MEMBERS_FROM"]["fc2"].update(self.relationships_chunks)
+
+        result = self.JobList._check_members(self.relationships_members, self.mock_job)
+        expected_output = {
+            "DATES_TO": "20020201",
+            "MEMBERS_TO": "fc2",
+            "CHUNKS_TO": "all",
+            "SPLITS_TO": "1"
+        }
+        self.assertEqual(result, expected_output)
+
+        self.relationships_members["MEMBERS_FROM"]["fc2"]["CHUNKS_FROM"] = {}
+        self.relationships_members["MEMBERS_FROM"]["fc2"]["SPLITS_FROM"] = {}
+
+        result = self.JobList._check_members(self.relationships_members, self.mock_job)
+        expected_output = {
+            "DATES_TO": "none",
+            "MEMBERS_TO": "none",
+            "CHUNKS_TO": "none",
+            "SPLITS_TO": "none"
+        }
+        self.assertEqual(result, expected_output)
 
     def test_check_splits(self):
         # Call the function to get the result
