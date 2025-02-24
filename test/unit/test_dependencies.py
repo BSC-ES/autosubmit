@@ -391,6 +391,14 @@ class TestJobList(unittest.TestCase):
         expected_output = [
             {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None, 'MEMBERS_TO': 'None', 'STATUS': None}]
         self.assertEqual(result, expected_output)
+        relationships = {'DATES_FROM': {
+            '20000101, 20000102, 20000103 ': {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None,
+                                                         'MEMBERS_TO': 'None', 'STATUS': True}}}
+        value_to_check = datetime(2000, 1, 1)
+        result = self.JobList._check_relationship(relationships, "DATES_FROM", value_to_check)
+        expected_output = [
+            {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None, 'MEMBERS_TO': 'None', 'STATUS': True}]
+        self.assertEqual(result, expected_output)
 
     def test_add_special_conditions(self):
         # Method from job_list
