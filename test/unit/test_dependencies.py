@@ -329,17 +329,33 @@ class TestJobList(unittest.TestCase):
         # Call the function to get the result
 
         self.mock_job.chunk = 1
-        result = self.JobList._check_chunks(self.relationships_chunks, self.mock_job)
-        expected_output = {
-            "DATES_TO": "20020201",
-            "MEMBERS_TO": "fc2",
-            "CHUNKS_TO": "all",
-            "SPLITS_TO": "1"
+
+        chunks = {
+            "CHUNKS_FROM": {
+                "1": {
+                    "SPLITS_FROM": { "5": {"SPLITS_TO": "4"} }
+                }
+            }
         }
+
+        result = self.JobList._check_chunks(chunks, self.mock_job)
+        expected_output = {'SPLITS_TO': '4'}
+
         self.assertEqual(result, expected_output)
+        chunks = {
+            "CHUNKS_FROM": {
+                "1": { "SPLITS_FROM": { } }
+            }
+        }
+
+        result = self.JobList._check_chunks(chunks, self.mock_job)
+        expected_output = {'DATES_TO': 'none', 'MEMBERS_TO': 'none', 'CHUNKS_TO': 'none', 'SPLITS_TO': 'none'}
+        self.assertEqual(result, expected_output)
+
         self.mock_job.chunk = 2
         result = self.JobList._check_chunks(self.relationships_chunks, self.mock_job)
         self.assertEqual(result, {})
+
         # failure
         self.mock_job.chunk = 99
         result = self.JobList._check_chunks(self.relationships_chunks, self.mock_job)
