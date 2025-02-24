@@ -283,13 +283,23 @@ class TestJobList(unittest.TestCase):
         }
         self.assertEqual(result, expected_output)
 
+        result = self.JobList._check_dates(self.relationships_dates, self.mock_job)
+        expected_output = {
+            "DATES_TO": "none",
+            "MEMBERS_TO": "none",
+            "CHUNKS_TO": "none",
+            "SPLITS_TO": "none"
+        }
+        self.assertEqual(result, expected_output)
+
         # failure
         self.mock_job.date = datetime.strptime("20020301", "%Y%m%d")
         result = self.JobList._check_dates(self.relationships_dates, self.mock_job)
         self.assertEqual(result, {})
 
-        self.relationships_dates["DATES_FROM"]["20020201"].update(self.relationships_chunks)
-
+        self.relationships_dates["DATES_FROM"]["20020201"]["MEMBERS_FROM"] = {}
+        self.relationships_dates["DATES_FROM"]["20020201"]["CHUNKS_FROM"] = {}
+        self.relationships_dates["DATES_FROM"]["20020201"]["SPLITS_FROM"] = {}
 
 
     def test_check_members(self):
