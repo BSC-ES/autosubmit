@@ -197,6 +197,120 @@ class TestJobList(unittest.TestCase):
             }
         self.assertEqual(result, expected_output)
 
+
+        unified_filter = \
+            {
+                "DATES_TO": "20020201",
+                "MEMBERS_TO": "fc2",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": "all"
+            }
+
+        filter_to = \
+            {
+                "DATES_TO": "20020205",
+                "MEMBERS_TO": "fc2,fc3",
+                "CHUNKS_TO": "all"
+            }
+
+        filter_type = "SPLITS_TO"
+        result = self.JobList._unify_to_filter(unified_filter, filter_to, filter_type)
+        expected_output = \
+            {
+                "DATES_TO": "20020201",
+                "MEMBERS_TO": "fc2",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": "all,"
+            }
+        self.assertEqual(result, expected_output)
+
+
+        unified_filter = \
+            {
+                "DATES_TO": "20020201",
+                "MEMBERS_TO": "fc2",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": "1,2,3"
+            }
+
+        filter_to = \
+            {
+                "DATES_TO": "20020205",
+                "MEMBERS_TO": "fc2,fc3",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": ""
+            }
+
+        filter_type = "SPLITS_TO"
+        result = self.JobList._unify_to_filter(unified_filter, filter_to, filter_type)
+        expected_output = \
+            {
+                "DATES_TO": "20020201",
+                "MEMBERS_TO": "fc2",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": "1,2,3,"
+            }
+        self.assertEqual(result, expected_output)
+
+
+        unified_filter = \
+            {
+                "DATES_TO": "20020201",
+                "MEMBERS_TO": "fc2",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": "1,2,natural"
+            }
+
+        filter_to = \
+            {
+                "DATES_TO": "20020205",
+                "MEMBERS_TO": "fc2,fc3",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": "1,2,natural"
+            }
+
+        filter_type = "SPLITS_TO"
+        result = self.JobList._unify_to_filter(unified_filter, filter_to, filter_type)
+        expected_output = \
+            {
+                "DATES_TO": "20020201",
+                "MEMBERS_TO": "fc2",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": "1,2,natural,"
+            }
+        self.assertEqual(result, expected_output)
+
+
+        unified_filter = \
+            {
+                "DATES_TO": "20020201",
+                "MEMBERS_TO": "fc2",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": ""
+            }
+
+        filter_to = \
+            {
+                "DATES_TO": "20020205",
+                "MEMBERS_TO": "fc2,fc3",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": {
+                    1: ["test", "ok"]
+                }
+            }
+
+        filter_type = "SPLITS_TO"
+        result = self.JobList._unify_to_filter(unified_filter, filter_to, filter_type)
+        expected_output = \
+            {
+                "DATES_TO": "20020201",
+                "MEMBERS_TO": "fc2",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": "okok']},"
+            }
+        self.assertEqual(result, expected_output)
+
+
     def test_simple_dependency(self):
         result_d = self.JobList._check_dates({}, self.mock_job)
         result_m = self.JobList._check_members({}, self.mock_job)
