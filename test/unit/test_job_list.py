@@ -663,7 +663,8 @@ class TestJobList(TestCase):
         filter_to = [
             {"DATES_TO": ""},
             {"DATES_TO": "all"},
-            {"DATES_TO": ",20020205,[20020207:20020208],"}
+            {"DATES_TO": "20020205,[20020207:20020208],"},
+            {"DATES_TO": ",20020205,[20020207:20020208]"}
             # ,{"DATES_TO": 123} # Error Case
         ]
         filter_type = "DATES_TO"
