@@ -306,7 +306,7 @@ class Job(object):
         self.end_time_timestamp = None
         self.packed_during_building = False
 
-    def _adjust_new_parameters(self) -> None:
+    def adjust_new_parameters(self) -> None:
         """
         Adjusts job parameters for compatibility with newer added attributes.
         """
@@ -332,6 +332,7 @@ class Job(object):
 
         if not hasattr(self, 'packed_during_building'):  # Added in 4.1.12
             self.packed_during_building = False
+
     def clean_attributes(self):
         self.rerun_only = False
         self.script_name_wrapper = None
@@ -2195,7 +2196,6 @@ class Job(object):
         :type parameters: dict
         """
         as_conf.reload()
-        self._adjust_new_parameters()
         self._init_runtime_parameters()
         if not hasattr(self, "start_time"):
             self.start_time = datetime.datetime.now()
