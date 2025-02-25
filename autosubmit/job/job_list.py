@@ -699,7 +699,7 @@ class JobList(object):
             filters = [{}]
         return filters
 
-    def _check_dates(self, relationships, current_job):
+    def _check_dates(self, relationships: Dict, current_job: Job) -> {}:
         """
         Check if the current_job_value is included in the filter_from and retrieve filter_to value
         :param relationships: Remaining filters to apply.

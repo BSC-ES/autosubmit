@@ -380,23 +380,43 @@ class TestJobList(unittest.TestCase):
         self.assertEqual(result, expected_output)
 
     def test_check_dates(self):
-        # Call the function to get the result
+        """
+        Call the function to get the result
+        """
         self.mock_job.date = datetime.strptime("20020201", "%Y%m%d")
         self.mock_job.member = "fc2"
         self.mock_job.chunk = 1
         self.mock_job.split = 1
+
+        self.relationships_dates["DATES_FROM"]["20020201"].update(self.relationships_chunks)
+
         result = self.JobList._check_dates(self.relationships_dates, self.mock_job)
         expected_output = {
-            "DATES_TO": "20020201*,20020202*,20020203",
+            "DATES_TO": "20020201",
             "MEMBERS_TO": "fc2",
             "CHUNKS_TO": "all",
             "SPLITS_TO": "1"
         }
         self.assertEqual(result, expected_output)
+
+        self.relationships_dates["DATES_FROM"]["20020201"]["MEMBERS_FROM"] = {}
+        self.relationships_dates["DATES_FROM"]["20020201"]["CHUNKS_FROM"] = {}
+        self.relationships_dates["DATES_FROM"]["20020201"]["SPLITS_FROM"] = {}
+
+        result = self.JobList._check_dates(self.relationships_dates, self.mock_job)
+        expected_output = {
+            "DATES_TO": "none",
+            "MEMBERS_TO": "none",
+            "CHUNKS_TO": "none",
+            "SPLITS_TO": "none"
+        }
+        self.assertEqual(result, expected_output)
+
         # failure
         self.mock_job.date = datetime.strptime("20020301", "%Y%m%d")
         result = self.JobList._check_dates(self.relationships_dates, self.mock_job)
         self.assertEqual(result, {})
+
 
     def test_check_members(self):
         # Call the function to get the result
