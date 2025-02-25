@@ -37,7 +37,7 @@ from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_da
 from functools import reduce
 from threading import Thread
 from time import sleep
-from typing import List, Union, Dict, Any
+from typing import List, Union, Dict, Any, Tuple
 
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
@@ -163,7 +163,7 @@ class Job(object):
         'log_avaliable', 'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        'end_time_timestamp', '_log_recovered'
+        'end_time_timestamp', '_log_recovered', 'packed_during_building'
     )
 
     def __getstate__(self):
@@ -255,7 +255,7 @@ class Job(object):
         self._platform = None
         self.check = 'true'
         self.check_warnings = False
-        self._packed = False
+        self.packed = False
         self.hold = False # type: bool
         self.distance_weight = 0
         self.level = 0
@@ -304,6 +304,7 @@ class Job(object):
         self._delay_retrials = None
         self._custom_directives = None
         self.end_time_timestamp = None
+        self.packed_during_building = False
 
     def _adjust_new_parameters(self) -> None:
         """
@@ -329,7 +330,7 @@ class Job(object):
             self.ready_date = None
             self.recover_last_ready_date()
 
-    def _clean_attributes(self):
+    def clean_attributes(self):
         self.rerun_only = False
         self.script_name_wrapper = None
         self.delay_end = None
@@ -349,7 +350,7 @@ class Job(object):
         self._memory_per_task = None
         self.undefined_variables = set()
         self.executable = None
-        self._packed = False
+        self.packed = False
         self.hold = False
         self._export = "none"
         self.start_time = None
@@ -375,10 +376,13 @@ class Job(object):
         self._scratch_free_space = None
         self._delay_retrials = None
         self._custom_directives = None
+        if hasattr(self, 'packed_during_building'):
+            self.packed_during_building = False
         # Tentative
         self._platform = None
         self._parents = set()
         self.children = set()
+
 
     def _init_runtime_parameters(self):
         # hetjobs
@@ -395,6 +399,7 @@ class Job(object):
         self.start_time_timestamp = time.time()
         self.processors_per_node = ""
         self.stat_file = self.script_name[:-4] + "_STAT_0"
+        self.packed_during_building = False
 
     @property
     def wallclock_in_seconds(self):
@@ -669,15 +674,6 @@ class Job(object):
         self._packed = value
 
     @property
-    def packed_status(self):
-        if self.status in [Status.WAITING, Status.READY, Status.PREPARED, Status.DELAYED] and self.fail_count == 0:
-            self.packed = True
-        else:
-            self.packed = False
-
-        return self._packed
-
-    @property
     @autosubmit_parameter(name='export')
     def export(self):
         """TODO."""
@@ -835,8 +831,7 @@ class Job(object):
         Sets the log_recovered
         """
         self._log_recovered = log_recovered
-        if (self._status == Status.FAILED and self.fail_count >= self.log_retries) or self._status in [Status.FAILED, Status.COMPLETED, Status.SKIPPED]:
-            self._clean_attributes()
+
 
     @property
     def status_str(self):
@@ -1270,36 +1265,36 @@ class Job(object):
             Log.printlog(f"Trace {e} \n Failed to retrieve log file for job {self.name}", 6000)
         return remote_logs
 
-    def check_remote_log_exists(self, platform):
+    def check_remote_log_exists(self):
         try:
-            out_exist = platform.check_file_exists(self.remote_logs[0], False, sleeptime=0, max_retries=1)
+            out_exist = self.platform.check_file_exists(self.remote_logs[0], False, sleeptime=0, max_retries=1)
         except IOError:
             Log.debug(f'Output log {self.remote_logs[0]} still does not exist')
             out_exist = False
         try:
-            err_exist = platform.check_file_exists(self.remote_logs[1], False, sleeptime=0, max_retries=1)
+            err_exist = self.platform.check_file_exists(self.remote_logs[1], False, sleeptime=0, max_retries=1)
         except IOError:
             Log.debug(f'Error log {self.remote_logs[1]} still does not exist')
             err_exist = False
         return out_exist or err_exist
 
-    def retrieve_external_retrials_logfiles(self, platform):
-        log_retrieved = False
+    def retrieve_external_retrials_logfiles(self):
+        log_recovered = False
         self.remote_logs = self.get_new_remotelog_name()
         if not self.remote_logs:
             self.log_recovered = False
         else:
-            if self.check_remote_log_exists(platform):
+            if self.check_remote_log_exists():
                 try:
-                    self.synchronize_logs(platform, self.remote_logs, self.local_logs)
+                    self.synchronize_logs(self.platform, self.remote_logs, self.local_logs)
                     remote_logs = copy.deepcopy(self.local_logs)
-                    platform.get_logs_files(self.expid, remote_logs)
-                    log_retrieved = True
+                    self.platform.get_logs_files(self.expid, remote_logs)
+                    log_recovered = True
                 except BaseException:
-                    log_retrieved = False
-        self.log_recovered = log_retrieved
+                    log_recovered = False
+        return log_recovered
 
-    def retrieve_internal_retrials_logfiles(self, platform: Platform) -> int:
+    def retrieve_internal_retrials_logfiles(self) -> Tuple[int, bool]:
         """
         Retrieves internal retrials log files for the given platform.
         This function is used when the job is inside a vertical wrapper.
@@ -1310,7 +1305,7 @@ class Job(object):
         Returns:
             int: The last retrial index where logs were successfully retrieved.
         """
-        log_retrieved = False
+        log_recovered = False
         last_retrial = 0
         try:
             for i in range(0, int(self.retrials + 1)):
@@ -1320,11 +1315,11 @@ class Job(object):
                 # Backup the remote log name in case that the log couldn't be recovered.
                 backup_log = copy.copy(self.remote_logs)
                 self.remote_logs = self.get_new_remotelog_name(i)
-                if self.check_remote_log_exists(platform):
-                    self.synchronize_logs(platform, self.remote_logs, self.local_logs)
+                if self.check_remote_log_exists():
+                    self.synchronize_logs(self.platform, self.remote_logs, self.local_logs)
                     remote_logs = copy.deepcopy(self.local_logs)
-                    platform.get_logs_files(self.expid, remote_logs)
-                    log_retrieved = True
+                    self.platform.get_logs_files(self.expid, remote_logs)
+                    log_recovered = True
                     last_retrial = i
                 else:
                     self.remote_logs = backup_log
@@ -1332,11 +1327,10 @@ class Job(object):
         except:
             pass
 
-        self.log_recovered = log_retrieved
-        if self.log_recovered:
+        if log_recovered:
             self.platform.processed_wrapper_logs.add(self.wrapper_name)
 
-        return last_retrial
+        return last_retrial, log_recovered
 
     def update_stat_file(self):
         if self.wrapper_type != "vertical":
@@ -1358,7 +1352,7 @@ class Job(object):
 
         """
         # Write stats for vertical wrappers
-        if self.packed and self.wrapper_type == "vertical":  # Disable AS retrials for vertical wrappers to use internal ones
+        if self.wrapper_type == "vertical":  # Disable AS retrials for vertical wrappers to use internal ones
             for i in range(0, int(last_retrial + 1)):
                 self.platform.get_stat_file(self, count=i)
                 self.write_vertical_time(i)
@@ -1386,35 +1380,34 @@ class Job(object):
             except BaseException as e:
                 Log.printlog("Trace {0} \n Failed to write the {1} e=6001".format(str(e), self.name))
 
-    def retrieve_logfiles(self, platform: Any, raise_error: bool = False) -> Dict[str, int]:
+    def retrieve_logfiles(self, raise_error: bool = False) -> Dict[str, int]:
         """
         Retrieves log files from remote host.
 
         Args:
-            platform (Platform): HPCPlatform object.
             raise_error (bool): If True, raises an error if the log files are not retrieved.
 
         Returns:
             Dict[str, int]: Dictionary with finish timestamps per job.
         """
         backup_logname = copy.copy(self.local_logs)
-        if self.packed and self.wrapper_type == "vertical":
-            last_retrial = self.retrieve_internal_retrials_logfiles(platform)
+        if self.wrapper_type == "vertical":
+            last_retrial, log_recovered = self.retrieve_internal_retrials_logfiles()
         else:
-            self.retrieve_external_retrials_logfiles(platform)
+            log_recovered = self.retrieve_external_retrials_logfiles()
             last_retrial = 0
-        if not self.log_recovered:
+        if not log_recovered:
             self.local_logs = backup_logname
             if raise_error and self.wrapper_name not in self.platform.processed_wrapper_logs:
                 raise AutosubmitCritical("Failed to retrieve logs for job {0}".format(self.name), 6000)
         else:
             self.write_stats(last_retrial)
-            if self.packed and self.wrapper_type == "vertical":
+            if self.wrapper_type == "vertical":
                 for retrial in range(0, last_retrial + 1):
-                    Log.result(f"{platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{retrial}'.")
+                    Log.result(f"{self.platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{retrial}'.")
             else:
-                Log.result(f"{platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{self.fail_count}'.")
-
+                Log.result(f"{self.platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{self.fail_count}'.")
+        self.log_recovered = log_recovered
 
     def _max_possible_wallclock(self):
         if self.platform and self.platform.max_wallclock:
@@ -2853,13 +2846,7 @@ class WrapperJob(Job):
                         job.new_status = Status.COMPLETED
                         job.updated_log = False
                         job.update_status(self.as_config)
-            # for job in self.job_list:
-            #     if job not in completed_jobs and job in self.inner_jobs_running:
-            #         job.new_status = Status.FAILED
-            #         job.packed = False
-            #     else:
-            #         job.new_status = Status.WAITING
-            #         job.packed = False
+
             for job in completed_jobs:
                 self.running_jobs_start.pop(job, None)
 
