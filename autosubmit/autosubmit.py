@@ -1293,7 +1293,7 @@ class Autosubmit:
         return content
 
     @staticmethod
-    def as_conf_default_values(exp_id,hpc="local",minimal_configuration=False,git_repo="",git_branch="main",git_as_conf=""):
+    def as_conf_default_values(exp_id, hpc = "local", minimal_configuration=False, git_repo="", git_branch="main", git_as_conf="") -> None:
         """
         Replace default values in as_conf files
         :param exp_id: experiment id
@@ -1304,15 +1304,17 @@ class Autosubmit:
         :param git_as_conf: path to as_conf file in git repository
         :return: None
         """
+        # the var hpc was hardcoded in the header of the function
+
         # open and replace values
-        for as_conf_file in os.listdir(os.path.join(BasicConfig.LOCAL_ROOT_DIR, exp_id,"conf")):
-            if as_conf_file.endswith(".yml") or as_conf_file.endswith(".yaml"):
-                with open(os.path.join(BasicConfig.LOCAL_ROOT_DIR, exp_id,"conf", as_conf_file), 'r') as f:
+        for as_conf_file in Path(BasicConfig.LOCAL_ROOT_DIR, f"{exp_id}/conf").iterdir():
+            if as_conf_file.name.endswith(".yml") or as_conf_file.name.endswith(".yaml"):
+                with open(as_conf_file, 'r+') as f:
                     # Copied files could not have default names.
                     content = f.read()
                     search = re.search('AUTOSUBMIT_VERSION: .*', content, re.MULTILINE)
                     if search is not None:
-                        content = content.replace(search.group(0), "AUTOSUBMIT_VERSION: \""+Autosubmit.autosubmit_version+"\"")
+                        content = content.replace(search.group(0), f"AUTOSUBMIT_VERSION: \"{Autosubmit.autosubmit_version}\"")
                     search = re.search('NOTIFICATIONS: .*', content, re.MULTILINE)
                     if search is not None:
                         content = content.replace(search.group(0),"NOTIFICATIONS: False")
@@ -1322,22 +1324,26 @@ class Autosubmit:
                     content = Autosubmit.replace_parameter_inside_section(content, "EXPID", exp_id, "DEFAULT")
                     search = re.search('HPCARCH: .*', content, re.MULTILINE)
                     if search is not None:
-                        content = content.replace(search.group(0),"HPCARCH: \""+hpc+"\"")
+                        content = content.replace("HPCARCH: \""+hpc+"\"", search.group(0))
+                        if search.group(0).split(":")[1] == ' ':
+                            content = content.replace(search.group(0), "HPCARCH: \""+hpc+"\"")
                     if minimal_configuration:
                         search = re.search('CUSTOM_CONFIG: .*', content, re.MULTILINE)
                         if search is not None:
                             content = content.replace(search.group(0), "CUSTOM_CONFIG: \"%PROJDIR%/"+git_as_conf+"\"")
                         search = re.search('PROJECT_ORIGIN: .*', content, re.MULTILINE)
                         if search is not None:
-                            content = content.replace(search.group(0), "PROJECT_ORIGIN: \""+git_repo+"\"")
+                            content = content.replace(search.group(0), f"PROJECT_ORIGIN: \"{git_repo}\"")
                         search = re.search('PROJECT_PATH: .*', content, re.MULTILINE)
                         if search is not None:
-                            content = content.replace(search.group(0), "PROJECT_PATH: \""+git_repo+"\"")
+                            content = content.replace(search.group(0), f"PROJECT_PATH: \"{git_repo}\"")
                         search = re.search('PROJECT_BRANCH: .*', content, re.MULTILINE)
                         if search is not None:
-                            content = content.replace(search.group(0), "PROJECT_BRANCH: \""+git_branch+"\"")
-                with open(os.path.join(BasicConfig.LOCAL_ROOT_DIR, exp_id,"conf", as_conf_file), 'w') as f:
+                            content = content.replace(search.group(0), f"PROJECT_BRANCH: \"{git_branch}\"")
+
+                    f.seek(0)
                     f.write(content)
+                    f.truncate()
 
     @staticmethod
     def expid(description, hpc="", copy_id='', dummy=False, minimal_configuration=False, git_repo="", git_branch="", git_as_conf="", operational=False,  testcase = False,use_local_minimal=False):
@@ -3493,9 +3499,9 @@ class Autosubmit:
                     return False
 
             if machine:
-                rc_path = '/etc'
+                rc_path = Path('/etc')
             elif local:
-                rc_path = '.'
+                rc_path = Path('.')
             else:
                 rc_path = home_path
             rc_path = rc_path.joinpath('.autosubmitrc')
