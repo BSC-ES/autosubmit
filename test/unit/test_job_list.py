@@ -693,38 +693,37 @@ class FakeBasicConfig:
 
 
 def test_manage_dependencies():
-
+    """
+    testing function _manage_dependencies from job_list
+    """
     dependencies_keys = {'dummy=1':
-                             {
-                                 'bla', 'bla'
-                             }
+                             { 'test', 'test2' }
                         ,'dummy-2':
-                             {
-                                 'bla', 'bla'
-                             },
-                        'dummy+3': "", 'dummy*4': "", 'dummy?5': ""}
+                             { 'test', 'test2' },
+                        'dummy+3': "", 'dummy*4': "", 'dummy?5': ""
+                    }
 
     experiment_id = 'random-id'
 
     as_conf = Mock()
     as_conf.experiment_data = dict()
-    as_conf.experiment_data["JOBS"] = dict()
+    as_conf.experiment_data["JOBS"] = {}
     as_conf.jobs_data = as_conf.experiment_data["JOBS"]
-    as_conf.experiment_data["PLATFORMS"] = dict()
+    as_conf.experiment_data["PLATFORMS"] = {}
 
     joblist_persistence = JobListPersistencePkl()
     job_list = JobList(experiment_id, FakeBasicConfig, YAMLParserFactory(),joblist_persistence, as_conf)
 
     job = {'dummy':
-               {
-                   'dummy': 'SIM.sh',
-                   'RUNNING': 'once'
-               },
+               {'dummy': 'SIM.sh',
+                   'RUNNING': 'once'},
             'RUNNING': 'once',
             'dummy*4':{}
     }
 
-    dic_jobs_fake = DicJobs(['fake-date1', 'fake-date2'], ['fake-member1', 'fake-member2'], list(range(2, 10 + 1)), 'H', 1, as_conf)
+    dic_jobs_fake = DicJobs(['fake-date1', 'fake-date2'],
+                            ['fake-member1', 'fake-member2'], list(range(2, 10 + 1)),
+                            'H', 1, as_conf)
     dic_jobs_fake.experiment_data["JOBS"] = job
     dependency = job_list._manage_dependencies(dependencies_keys, dic_jobs_fake)
     assert len(dependency) == 3

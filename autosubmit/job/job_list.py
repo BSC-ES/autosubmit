@@ -481,7 +481,7 @@ class JobList(object):
 
 
     @staticmethod
-    def _manage_dependencies(dependencies_keys, dic_jobs) -> dict[str]:
+    def _manage_dependencies(dependencies_keys: dict, dic_jobs: DicJobs) -> dict[Any, Dependency]:
         parameters = dic_jobs.experiment_data["JOBS"]
         dependencies = dict()
         for key in list(dependencies_keys):
