@@ -285,7 +285,9 @@ class TestJobList(unittest.TestCase):
         self.assertEqual(result, {})
 
     def test_check_members(self):
-        # Call the function to get the result
+        """
+        Call the function to get the result
+        """
         self.mock_job.date = datetime.strptime("20020201", "%Y%m%d")
         self.mock_job.member = "fc2"
 
