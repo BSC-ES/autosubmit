@@ -327,7 +327,7 @@ def test_sub_job_instantiation(tmp_path, autosubmit_config):
                                  (
                                          {
                                              'dummy2':
-                                                 {'dummy','dummy','dummy'},
+                                                 {'dummy','dummy1','dummy4'},
                                              'dummy3':
                                                  'dummy'
                                          }
@@ -352,11 +352,11 @@ def test_sub_job_manager(current_structure):
 
     package_to_job = {
         'test':
-            {'dummy', 'dummy'},
+            {'dummy', 'dummy2'},
         'test2':
-            {'dummy', 'dummy'},
+            {'dummy', 'dummy2'},
         'test3':
-            {'dummy', 'dummy'}
+            {'dummy', 'dummy2'}
     }
 
     job_manager = SubJobManager(jobs, job_to_package, package_to_job, current_structure)
