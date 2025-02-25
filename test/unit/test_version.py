@@ -6,12 +6,10 @@ from autosubmit.autosubmit import Autosubmit
 
 
 def test_autosubmit_version():
-    bin_path = Path(__file__, '../../../bin/autosubmit').resolve()
-    exit_code, out = subprocess.getstatusoutput(' '.join([sys.executable, str(bin_path), '-v']))
+    exit_code, out = subprocess.getstatusoutput('autosubmit -v')
     assert exit_code == 0
     assert out.strip().endswith(Autosubmit.autosubmit_version)
 
 def test_autosubmit_version_broken():
-    bin_path = Path(__file__, '../../../bin/autosubmit').resolve()
-    exit_code, _ = subprocess.getstatusoutput(' '.join([sys.executable, str(bin_path), '-abcdefg']))
+    exit_code, _ = subprocess.getstatusoutput('autosubmit -abcdefg')
     assert exit_code == 1
