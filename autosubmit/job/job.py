@@ -149,7 +149,7 @@ class Job(object):
         'date_format', 'type', '_name',
         'undefined_variables', 'log_retries', 'id',
         'file', 'additional_files', 'executable', '_local_logs',
-        '_remote_logs', 'script_name', 'stat_file', 'status', 'prev_status', 'old_status',
+        '_remote_logs', 'script_name', 'stat_file', '_status', 'prev_status', 'old_status',
         'new_status', 'priority', '_parents', '_children', '_fail_count', 'expid',
         'parameters', '_tmp_path', '_log_path', 'write_start', '_platform', 'check',
         'check_warnings', '_packed', 'hold', 'distance_weight', 'level', '_export',
@@ -163,7 +163,7 @@ class Job(object):
         'log_avaliable', 'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        'end_time_timestamp'
+        'end_time_timestamp', '_log_recovered'
     )
 
     def __getstate__(self):
@@ -237,6 +237,7 @@ class Job(object):
         self._remote_logs = ('', '')
         self.script_name = self.name + ".cmd"
         self.stat_file = self.script_name[:-4] + "_STAT_0"
+        self._status = None
         self.status = status
         self.prev_status = status
         self.old_status = self.status
@@ -247,7 +248,6 @@ class Job(object):
         #: (int) Number of failed attempts to run this job. (FAIL_COUNT)
         self._fail_count = 0
         self.expid = name.split('_')[0] # type: str
-        self.parameters = dict()
         self._tmp_path = os.path.join(
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
         self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
@@ -278,7 +278,8 @@ class Job(object):
         # hetjobs
         self.het = None
         self.updated_log = False
-        self.log_retrieved = False
+        self._log_recovered = False
+        self.log_recovered = False
         self.submit_time_timestamp = None # for wrappers, all jobs inside a wrapper are submitted at the same time
         self.start_time_timestamp = None
         self.finish_time_timestamp = None # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
@@ -328,10 +329,60 @@ class Job(object):
             self.ready_date = None
             self.recover_last_ready_date()
 
+    def _clean_attributes(self):
+        self.rerun_only = False
+        self.script_name_wrapper = None
+        self.delay_end = None
+        self.wrapper_type = None
+        self._wrapper_queue = None
+        self._queue = None
+        self._partition = None
+        self.retry_delay = None
+        self._wallclock = None
+        self.wchunkinc = None
+        self._tasks = None
+        self._nodes = None
+        self.default_parameters = None
+        self._threads = None
+        self._processors = None
+        self._memory = None
+        self._memory_per_task = None
+        self.undefined_variables = set()
+        self.executable = None
+        self._packed = False
+        self.hold = False
+        self._export = "none"
+        self.start_time = None
+        self.total_jobs = None
+        self.max_waiting_jobs = None
+        self.exclusive = ""
+        self.current_checkpoint_step = 0
+        self.max_checkpoint_step = 0
+        self.reservation = ""
+        self.het = {}
+        self.updated_log = False
+        self._script = None
+        self._log_recovery_retries = None
+        self.wrapper_name = None
+        self.is_wrapper = False
+        self._wallclock_in_seconds = None
+        self._notify_on = None
+        self._processors_per_node = None
+        self._shape = None
+        self._x11 = False
+        self._x11_options = None
+        self._hyperthreading = None
+        self._scratch_free_space = None
+        self._delay_retrials = None
+        self._custom_directives = None
+        # Tentative
+        self._platform = None
+        self._parents = set()
+        self.children = set()
+
     def _init_runtime_parameters(self):
         # hetjobs
         self.het = {'HETSIZE': 0}
-        self.parameters = dict()
         self._tasks = '0'
         self._nodes = ""
         self.default_parameters = {'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%',
@@ -340,11 +391,10 @@ class Job(object):
         self._processors = '1'
         self._memory = ''
         self._memory_per_task = ''
-        self.log_retrieved = False
+        self.log_recovered = False
         self.start_time_timestamp = time.time()
         self.processors_per_node = ""
         self.stat_file = self.script_name[:-4] + "_STAT_0"
-
 
     @property
     def wallclock_in_seconds(self):
@@ -490,17 +540,13 @@ class Job(object):
 
     @wallclock.setter
     def wallclock(self, value):
-        self._wallclock = value
-
-        if not self._wallclock_in_seconds or self.status not in [Status.RUNNING, Status.QUEUING, Status.SUBMITTED]:
-            # Should always take the max_wallclock set in the platform, this is set as fallback
-            # (and local platform doesn't have a max_wallclock defined)
-            if not self._wallclock or self._wallclock == "00:00":
-                self._wallclock = self.parameters.get("CONFIG.JOB_WALLCLOCK", "24:00")
-                Log.warning(f"No wallclock is set for this job. Default to {self._wallclock}. "
-                            "You can change this value in CONFIG.WALLCLOCK")
-            wallclock_parsed = self.parse_time(self._wallclock)
-            self._wallclock_in_seconds = self._time_in_seconds_and_margin(wallclock_parsed)
+        if value:
+            self._wallclock = value
+            if not self._wallclock_in_seconds or self.status not in [Status.RUNNING, Status.QUEUING, Status.SUBMITTED]:
+                # Should always take the max_wallclock set in the platform, this is set as fallback
+                # (and local platform doesn't have a max_wallclock defined)
+                wallclock_parsed = self.parse_time(self._wallclock)
+                self._wallclock_in_seconds = self._time_in_seconds_and_margin(wallclock_parsed)
 
     @property
     @autosubmit_parameter(name='hyperthreading')
@@ -756,6 +802,32 @@ class Job(object):
         Sets the parents job list
         """
         self._parents = parents
+
+    @property
+    @autosubmit_parameter(name='status')
+    def status(self):
+        return self._status
+
+    @status.setter
+    def status(self, status):
+        """
+        Sets the status of the job
+        """
+        self._status = status
+
+    @property
+    @autosubmit_parameter(name='log_recovered')
+    def log_recovered(self):
+        return self._log_recovered
+
+    @log_recovered.setter
+    def log_recovered(self, log_recovered):
+        """
+        Sets the log_recovered
+        """
+        self._log_recovered = log_recovered
+        if (self._status == Status.FAILED and self.fail_count >= self.log_retries) or self._status in [Status.FAILED, Status.COMPLETED, Status.SKIPPED]:
+            self._clean_attributes()
 
     @property
     def status_str(self):
@@ -1206,7 +1278,7 @@ class Job(object):
         log_retrieved = False
         self.remote_logs = self.get_new_remotelog_name()
         if not self.remote_logs:
-            self.log_retrieved = False
+            self.log_recovered = False
         else:
             if self.check_remote_log_exists(platform):
                 try:
@@ -1216,7 +1288,7 @@ class Job(object):
                     log_retrieved = True
                 except BaseException:
                     log_retrieved = False
-        self.log_retrieved = log_retrieved
+        self.log_recovered = log_retrieved
 
     def retrieve_internal_retrials_logfiles(self, platform: Platform) -> int:
         """
@@ -1251,8 +1323,8 @@ class Job(object):
         except:
             pass
 
-        self.log_retrieved = log_retrieved
-        if self.log_retrieved:
+        self.log_recovered = log_retrieved
+        if self.log_recovered:
             self.platform.processed_wrapper_logs.add(self.wrapper_name)
 
         return last_retrial
@@ -1322,7 +1394,7 @@ class Job(object):
         else:
             self.retrieve_external_retrials_logfiles(platform)
             last_retrial = 0
-        if not self.log_retrieved:
+        if not self.log_recovered:
             self.local_logs = backup_logname
             if raise_error and self.wrapper_name not in self.platform.processed_wrapper_logs:
                 raise AutosubmitCritical("Failed to retrieve logs for job {0}".format(self.name), 6000)
@@ -1787,7 +1859,7 @@ class Job(object):
         self.scratch_free_space = int(parameters.get("CURRENT_SCRATCH_FREE_SPACE", 0))
         self.memory = parameters.get("CURRENT_MEMORY", "")
         self.memory_per_task = parameters.get("CURRENT_MEMORY_PER_TASK", parameters.get("CURRENT_MEMORY_PER_TASK", ""))
-        self.wallclock = parameters.get("CURRENT_WALLCLOCK", parameters.get("CURRENT_MAX_WALLCLOCK", None))
+        self.wallclock = parameters.get("CURRENT_WALLCLOCK", parameters.get("CURRENT_MAX_WALLCLOCK", parameters.get("CONFIG.JOB_WALLCLOCK", "24:00")))
         self.custom_directives = parameters.get("CURRENT_CUSTOM_DIRECTIVES", "")
         self.process_scheduler_parameters(job_platform, chunk)
         if self.het.get('HETSIZE', 1) > 1:
@@ -2146,13 +2218,12 @@ class Job(object):
         parameters = self.update_platform_associated_parameters(as_conf, parameters, self._platform, parameters['CHUNK'])
         parameters = self.update_wrapper_parameters(as_conf, parameters)
         self.update_job_variables_final_values(parameters)
-        # For some reason, there is return but the assignee is also necessary
-        self.parameters = parameters
         # This return is only being used by the mock , to change the mock
         for event in self.platform.worker_events:  # keep alive log retrieval workers.
             if not event.is_set():
                 event.set()
         return parameters
+
 
     def update_content_extra(self,as_conf,files):
         additional_templates = []
@@ -2164,7 +2235,7 @@ class Job(object):
             additional_templates += [template]
         return additional_templates
 
-    def update_content(self, as_conf):
+    def update_content(self, as_conf, parameters):
         """
         Create the script content to be run for the job
 
@@ -2173,7 +2244,6 @@ class Job(object):
         :return: script code
         :rtype: str
         """
-        self.update_parameters(as_conf, self.parameters)
         if self.script:
             if self.file:
                 Log.warning(f"Custom script for job {self.name} is being used, file contents are ignored.")
@@ -2218,31 +2288,31 @@ class Job(object):
             snippet = StatisticsSnippetR
         else:
             raise Exception('Job type {0} not supported'.format(self.type))
-        template_content = self._get_template_content(as_conf, snippet, template)
-        additional_content = self.update_content_extra(as_conf,self.additional_files)
+        template_content = self._get_template_content(as_conf, snippet, template, parameters)
+        additional_content = self.update_content_extra(as_conf, self.additional_files)
         return template_content,additional_content
 
-    def get_wrapped_content(self, as_conf):
+    def get_wrapped_content(self, as_conf, parameters):
         snippet = StatisticsSnippetEmpty
         template = 'python $SCRATCH/{1}/LOG_{1}/{0}.cmd'.format(
             self.name, self.expid)
         template_content = self._get_template_content(
-            as_conf, snippet, template)
+            as_conf, snippet, template, parameters)
         return template_content
 
-    def _get_template_content(self, as_conf, snippet, template):
+    def _get_template_content(self, as_conf, snippet, template, parameters):
         #communications_library = as_conf.get_communications_library()
         # if communications_library == 'paramiko':
-        return self._get_paramiko_template(snippet, template)
+        return self._get_paramiko_template(snippet, template, parameters)
         # else:
         #    raise AutosubmitCritical(
         #        "Job {0} does not have a correct template// template not found".format(self.name), 7014)
 
-    def _get_paramiko_template(self, snippet, template):
+    def _get_paramiko_template(self, snippet, template, parameters):
         current_platform = self._platform
         return ''.join([
             snippet.as_header(
-                current_platform.get_header(self), self.executable),
+                current_platform.get_header(self, parameters), self.executable),
             template,
             snippet.as_tailer()
         ])
@@ -2288,8 +2358,8 @@ class Job(object):
             lang = locale.getdefaultlocale()[1]
             if lang is None:
                 lang = 'UTF-8'
-        parameters = self.parameters
-        template_content,additional_templates = self.update_content(as_conf)
+        parameters = self.update_parameters(as_conf, {})
+        template_content,additional_templates = self.update_content(as_conf, parameters)
         #enumerate and get value
         #TODO regresion test
         for additional_file, additional_template_content in zip(self.additional_files, additional_templates):
@@ -2337,8 +2407,8 @@ class Job(object):
         return script_name
 
     def create_wrapped_script(self, as_conf, wrapper_tag='wrapped'):
-        parameters = self.parameters
-        template_content = self.get_wrapped_content(as_conf)
+        parameters = self.update_parameters(as_conf, {})
+        template_content = self.get_wrapped_content(as_conf, parameters)
         for key, value in parameters.items():
             template_content = re.sub(
                 '%(?<!%%)' + key + '%(?!%%)', str(parameters[key]), template_content,flags=re.I)
@@ -2369,7 +2439,7 @@ class Job(object):
 
         out = False
         parameters = self.update_parameters(as_conf, parameters)
-        template_content,additional_templates = self.update_content(as_conf)
+        template_content, additional_templates = self.update_content(as_conf, parameters)
         if template_content is not False:
             variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content,flags=re.IGNORECASE)
             variables = [variable[1:-1] for variable in variables]

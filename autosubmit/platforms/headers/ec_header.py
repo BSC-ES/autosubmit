@@ -24,7 +24,7 @@ class EcHeader(object):
     """Class to handle the ECMWF headers of a job"""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_queue_directive(self, job):
+    def get_queue_directive(self, job, parameters):
         """
         Returns queue directive for the specified job
 
@@ -37,7 +37,7 @@ class EcHeader(object):
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_custom_directives(self, job):
+    def get_custom_directives(self, job, parameters):
         """
         Returns custom directives for the specified job
 
@@ -47,8 +47,8 @@ class EcHeader(object):
         :rtype: str
         """
         # There is no custom directives, so directive is empty
-        if job.parameters['CUSTOM_DIRECTIVES'] != '':
-            return '\n'.join(str(s) for s in job.parameters['CUSTOM_DIRECTIVES'])
+        if parameters['CUSTOM_DIRECTIVES'] != '':
+            return '\n'.join(str(s) for s in parameters['CUSTOM_DIRECTIVES'])
         return ""
 
     # noinspection PyPep8
