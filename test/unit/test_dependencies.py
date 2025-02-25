@@ -197,6 +197,120 @@ class TestJobList(unittest.TestCase):
             }
         self.assertEqual(result, expected_output)
 
+
+        unified_filter = \
+            {
+                "DATES_TO": "20020201",
+                "MEMBERS_TO": "fc2",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": "all"
+            }
+
+        filter_to = \
+            {
+                "DATES_TO": "20020205",
+                "MEMBERS_TO": "fc2,fc3",
+                "CHUNKS_TO": "all"
+            }
+
+        filter_type = "SPLITS_TO"
+        result = self.JobList._unify_to_filter(unified_filter, filter_to, filter_type)
+        expected_output = \
+            {
+                "DATES_TO": "20020201",
+                "MEMBERS_TO": "fc2",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": "all,"
+            }
+        self.assertEqual(result, expected_output)
+
+
+        unified_filter = \
+            {
+                "DATES_TO": "20020201",
+                "MEMBERS_TO": "fc2",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": "1,2,3"
+            }
+
+        filter_to = \
+            {
+                "DATES_TO": "20020205",
+                "MEMBERS_TO": "fc2,fc3",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": ""
+            }
+
+        filter_type = "SPLITS_TO"
+        result = self.JobList._unify_to_filter(unified_filter, filter_to, filter_type)
+        expected_output = \
+            {
+                "DATES_TO": "20020201",
+                "MEMBERS_TO": "fc2",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": "1,2,3,"
+            }
+        self.assertEqual(result, expected_output)
+
+
+        unified_filter = \
+            {
+                "DATES_TO": "20020201",
+                "MEMBERS_TO": "fc2",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": "1,2,natural"
+            }
+
+        filter_to = \
+            {
+                "DATES_TO": "20020205",
+                "MEMBERS_TO": "fc2,fc3",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": "1,2,natural"
+            }
+
+        filter_type = "SPLITS_TO"
+        result = self.JobList._unify_to_filter(unified_filter, filter_to, filter_type)
+        expected_output = \
+            {
+                "DATES_TO": "20020201",
+                "MEMBERS_TO": "fc2",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": "1,2,natural,"
+            }
+        self.assertEqual(result, expected_output)
+
+
+        unified_filter = \
+            {
+                "DATES_TO": "20020201",
+                "MEMBERS_TO": "fc2",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": ""
+            }
+
+        filter_to = \
+            {
+                "DATES_TO": "20020205",
+                "MEMBERS_TO": "fc2,fc3",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": {
+                    1: ["test", "ok"]
+                }
+            }
+
+        filter_type = "SPLITS_TO"
+        result = self.JobList._unify_to_filter(unified_filter, filter_to, filter_type)
+        expected_output = \
+            {
+                "DATES_TO": "20020201",
+                "MEMBERS_TO": "fc2",
+                "CHUNKS_TO": "all",
+                "SPLITS_TO": "okok']},"
+            }
+        self.assertEqual(result, expected_output)
+
+
     def test_simple_dependency(self):
         result_d = self.JobList._check_dates({}, self.mock_job)
         result_m = self.JobList._check_members({}, self.mock_job)
@@ -326,20 +440,38 @@ class TestJobList(unittest.TestCase):
         self.assertEqual(result, {})
 
     def test_check_chunks(self):
-        # Call the function to get the result
+        """
+        Call the function to get the result
+        """
 
         self.mock_job.chunk = 1
-        result = self.JobList._check_chunks(self.relationships_chunks, self.mock_job)
-        expected_output = {
-            "DATES_TO": "20020201",
-            "MEMBERS_TO": "fc2",
-            "CHUNKS_TO": "all",
-            "SPLITS_TO": "1"
+
+        chunks = {
+            "CHUNKS_FROM": {
+                "1": {
+                    "SPLITS_FROM": { "5": {"SPLITS_TO": "4"} }
+                }
+            }
         }
+
+        result = self.JobList._check_chunks(chunks, self.mock_job)
+        expected_output = {'SPLITS_TO': '4'}
+
         self.assertEqual(result, expected_output)
+        chunks = {
+            "CHUNKS_FROM": {
+                "1": { "SPLITS_FROM": { } }
+            }
+        }
+
+        result = self.JobList._check_chunks(chunks, self.mock_job)
+        expected_output = {'DATES_TO': 'none', 'MEMBERS_TO': 'none', 'CHUNKS_TO': 'none', 'SPLITS_TO': 'none'}
+        self.assertEqual(result, expected_output)
+
         self.mock_job.chunk = 2
         result = self.JobList._check_chunks(self.relationships_chunks, self.mock_job)
         self.assertEqual(result, {})
+
         # failure
         self.mock_job.chunk = 99
         result = self.JobList._check_chunks(self.relationships_chunks, self.mock_job)

@@ -550,7 +550,7 @@ class JobList(object):
         return final_values
 
     @staticmethod
-    def _parse_filter_to_check(value_to_check, value_list=[], level_to_check="DATES_FROM", splits=None):
+    def _parse_filter_to_check(value_to_check, value_list=[], level_to_check="DATES_FROM", splits=None) -> []:
         """
         Parse the filter to check and return the value to check.
         Selection process:
@@ -749,7 +749,7 @@ class JobList(object):
         filters_to_apply = self._unify_to_filters(filters_to_apply)
         return filters_to_apply
 
-    def _check_chunks(self, relationships, current_job):
+    def _check_chunks(self, relationships: Dict, current_job: Job) -> {}:
         """
         Check if the current_job_value is included in the filter_from and retrieve filter_to value
         :param relationships: Remaining filters to apply.
@@ -779,7 +779,7 @@ class JobList(object):
         filters_to_apply = self._unify_to_filters(filters_to_apply, current_job.splits)
         return filters_to_apply
 
-    def _unify_to_filter(self, unified_filter, filter_to, filter_type, splits = None):
+    def _unify_to_filter(self, unified_filter, filter_to, filter_type, splits = None) -> {}:
         """
         Unify filter_to filters into a single dictionary
         :param unified_filter: Single dictionary with all filters_to
@@ -818,13 +818,9 @@ class JobList(object):
                                                                     level_to_check=filter_type, splits=splits)
                     # convert list to str
                     skip = False
-                    if isinstance(parsed_element, list):
-                        # check if any element is natural or none
-                        for ele in parsed_element:
-                            if type(ele) is str and ele.lower() in ["natural", "none"]:
-                                skip = True
-                    else:
-                        if type(parsed_element) is str and parsed_element.lower() in ["natural", "none"]:
+                    # check if any element is natural or none
+                    for ele in parsed_element:
+                        if type(ele) is str and ele.lower() in ["natural", "none"]:
                             skip = True
                     if skip and len(unified_filter[filter_type]) > 0:
                         continue
