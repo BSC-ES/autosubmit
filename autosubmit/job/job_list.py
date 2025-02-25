@@ -456,15 +456,15 @@ class JobList(object):
             self.find_and_delete_redundant_relations(problematic_jobs)
         self._add_all_jobs_edge_info(dic_jobs, option)
 
-    def find_and_delete_redundant_relations(self, problematic_jobs):
-        '''
+    def find_and_delete_redundant_relations(self, problematic_jobs: dict) -> None:
+        """
         Jobs with intrisic rules than can't be safelty not added without messing other workflows.
         The graph will have the least amount of edges added as much as safely possible before this function.
         Structure:
         problematic_jobs structure is {section: {child_name: [parent_names]}}
 
         :return:
-        '''
+        """
         delete_relations = set()
         for section, jobs in problematic_jobs.items():
             for child_name, parents in jobs.items():
