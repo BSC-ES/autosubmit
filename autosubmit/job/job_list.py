@@ -839,7 +839,7 @@ class JobList(object):
         return unified_filter
 
     @staticmethod
-    def _normalize_to_filters(filter_to, filter_type):
+    def _normalize_to_filters(filter_to: dict, filter_type: str) -> None:
         """
         Normalize filter_to filters to a single string or "all"
         :param filter_to: Unified filter_to dictionary

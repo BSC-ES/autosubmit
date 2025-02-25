@@ -13,6 +13,8 @@ import tempfile
 from mock import Mock, patch
 from random import randrange
 from pathlib import Path
+
+
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_common import Type
@@ -657,8 +659,25 @@ class TestJobList(TestCase):
                 if node in [job.name for job in job_list3._job_list]:
                     self.assertTrue(job_list3.graph.nodes[node]["job"] in job_list3._job_list)
 
+    def test_normalize_to_filters(self):
+        """
+        validating behaviour of _normalize_to_filters
+        """
+        dict_filter = [
+            {"DATES_TO": ""},
+            {"DATES_TO": "all"},
+            {"DATES_TO": "20020205,[20020207:20020208],"},
+            {"DATES_TO": ",20020205,[20020207:20020208]"}
+            # ,{"DATES_TO": 123} # Error Case
+        ]
+        filter_type = "DATES_TO"
 
-
+        for filter_to in dict_filter:
+            try:
+                self.job_list._normalize_to_filters(filter_to, filter_type)
+            except Exception as e:
+                print(f'Unexpected exception raised: {e}')
+                assert not bool(e)
 
 
 
