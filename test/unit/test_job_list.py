@@ -660,7 +660,7 @@ class TestJobList(TestCase):
                 assert self.job_list.find_and_delete_redundant_relations(problematic_jobs) is None
 
             except Exception as e:
-                assert f'function failed to execute exception Raised: {e}'
+                assert f'Find and delete redundant relations ran into an Error deleting the relationship between parent and child: {e}'
 
     def _createDummyJobWithStatus(self, status):
         job_name = str(randrange(999999, 999999999))
