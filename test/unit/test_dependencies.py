@@ -440,7 +440,9 @@ class TestJobList(unittest.TestCase):
         self.assertEqual(result, {})
 
     def test_check_chunks(self):
-        # Call the function to get the result
+        """
+        Call the function to get the result
+        """
 
         self.mock_job.chunk = 1
 

@@ -749,7 +749,7 @@ class JobList(object):
         filters_to_apply = self._unify_to_filters(filters_to_apply)
         return filters_to_apply
 
-    def _check_chunks(self, relationships, current_job) -> {}:
+    def _check_chunks(self, relationships: Dict, current_job: Job) -> {}:
         """
         Check if the current_job_value is included in the filter_from and retrieve filter_to value
         :param relationships: Remaining filters to apply.
