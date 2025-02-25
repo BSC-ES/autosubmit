@@ -729,7 +729,7 @@ class JobList(object):
         # {DATES_TO: "20020201", MEMBERS_TO: "fc2", CHUNKS_TO: "ALL", SPLITS_TO: "2"}
         return filters_to_apply
 
-    def _check_members(self, relationships, current_job):
+    def _check_members(self, relationships: Dict, current_job: Job) -> Dict:
         """
         Check if the current_job_value is included in the filter_from and retrieve filter_to value
         :param relationships: Remaining filters to apply.
