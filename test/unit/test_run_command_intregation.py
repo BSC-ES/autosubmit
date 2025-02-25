@@ -414,19 +414,22 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
     # assert_exit_code(final_status, exit_code)
 
 
-@pytest.mark.parametrize("jobs_data, profiler",
-                        [
-                            ("""EXPERIMENT:
-                                NUMCHUNKS: '3'
-                            JOBS:
-                                job:
-                            SCRIPT: |
-                                echo "Hello World with id=Success"
-                            PLATFORM: local
-                            RUNNING: chunk
-                            wallclock: 00:01
-                            """,True),
-                        ])
+@pytest.mark.parametrize("jobs_data, profiler", [
+        ("""
+            EXPERIMENT:
+                NUMCHUNKS: '3'
+            JOBS:
+                job:
+                    SCRIPT: |
+                        echo "Hello World with id=Success"
+                    PLATFORM: local
+                    RUNNING: chunk
+                    wallclock: 00:01
+            """,
+            True
+        ),
+    ]
+ )
 def test_run_profile(run_tmpdir, jobs_data, profiler):
     """
     tester function of the run_profile function
