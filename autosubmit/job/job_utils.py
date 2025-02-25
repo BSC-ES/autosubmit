@@ -242,11 +242,11 @@ def transitive_reduction(graph):
         graph.nodes[u]["job"].add_children([graph.nodes[v]["job"] for v in graph[u]])
     return graph
 
-def get_job_package_code(expid, job_name) -> int:
+def get_job_package_code(expid: str, job_name: str) -> int:
     """
     Finds the package code and retrieves it. None if no package.
 
-    :param job_name:
+    :param job_name: String
     :param expid: Experiment ID
     :type expid: String
 

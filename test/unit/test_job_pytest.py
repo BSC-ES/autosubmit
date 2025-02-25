@@ -322,24 +322,10 @@ def test_sub_job_instantiation(tmp_path, autosubmit_config):
 
 
 #TODO this test is mostly a smoke test, which can be improved to expect specific results and specifics inputs
-@pytest.mark.parametrize("jobs, job_to_package, package_to_job, current_structure",
+@pytest.mark.parametrize("current_structure",
                              [
                                  (
                                          {
-                                             SubJob("dummy",package="test2",queue=0, run=1, total=30, status="UNKNOWN"),
-                                             SubJob("dummy",package=["test4","test1","test2","test3"],queue=1, run=2, total=10, status="UNKNOWN"),
-                                             SubJob("dummy2",package="test2",queue=2, run=3, total=100, status="UNKNOWN"),
-                                             SubJob("dummy",package="test3",queue=3, run=4, total=1000, status="UNKNOWN"),
-                                         },{
-                                             'dummy test'
-                                         },{
-                                             'test':
-                                                 {'dummy','dummy'},
-                                             'test2':
-                                                 {'dummy','dummy'},
-                                             'test3':
-                                                 {'dummy','dummy'}
-                                         },{
                                              'dummy2':
                                                  {'dummy','dummy','dummy'},
                                              'dummy3':
@@ -347,25 +333,31 @@ def test_sub_job_instantiation(tmp_path, autosubmit_config):
                                          }
                                  ),
                                  (
-                                         {
-                                             SubJob("dummy",package="test2",queue=0, run=1, total=30, status="UNKNOWN"),
-                                             SubJob("dummy",package=["test4","test1","test2","test3"],queue=1, run=2, total=10, status="UNKNOWN"),
-                                             SubJob("dummy2",package="test2",queue=2, run=3, total=100, status="UNKNOWN"),
-                                             SubJob("dummy",package="test3",queue=3, run=4, total=1000, status="UNKNOWN"),
-                                         },{
-                                             'dummy test'
-                                         },{
-                                             'test':
-                                                 {'dummy','dummy'},
-                                             'test2':
-                                                 {'dummy','dummy'},
-                                             'test3':
-                                                 {'dummy','dummy'}
-                                         },{}
+                                         {}
                                  ),
-                             ]
+                             ],
+                         ids=["Current structure of the Job Manager with multiple values", "Current structure of the Job Manager without values"]
                          )
-def test_sub_job_manager(jobs, job_to_package, package_to_job, current_structure):
+def test_sub_job_manager(current_structure):
+    jobs = {
+        SubJob("dummy",package="test2",queue=0, run=1, total=30, status="UNKNOWN"),
+        SubJob("dummy",package=["test4","test1","test2","test3"],queue=1, run=2, total=10, status="UNKNOWN"),
+        SubJob("dummy2",package="test2",queue=2, run=3, total=100, status="UNKNOWN"),
+        SubJob("dummy",package="test3",queue=3, run=4, total=1000, status="UNKNOWN"),
+    }
+
+    job_to_package = {
+        'dummy test'
+    }
+
+    package_to_job = {
+        'test':
+            {'dummy', 'dummy'},
+        'test2':
+            {'dummy', 'dummy'},
+        'test3':
+            {'dummy', 'dummy'}
+    }
 
     job_manager = SubJobManager(jobs, job_to_package, package_to_job, current_structure)
     job_manager.process_index()
