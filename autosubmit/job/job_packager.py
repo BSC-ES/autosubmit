@@ -256,14 +256,16 @@ class JobPackager(object):
                             max_jobs_to_submit = max_jobs_to_submit - 1
                 continue
             for job in p.jobs:
-                job.wrapper_type = p.wrapper_type
-
                 if job.fail_count > 0:
                     failed_innerjobs = True
                     break
+
             min_v, min_h, balanced = self.check_real_package_wrapper_limits(p)
             # if the quantity is enough, make the wrapper
             if len(p.jobs) >= wrapper_limits["real_min"] and min_v >= wrapper_limits["min_v"] and min_h >= wrapper_limits["min_h"] and not failed_innerjobs:
+                for job in p.jobs:
+                    job.wrapper_type = p.wrapper_type
+                    job.packed = True
                 packages_to_submit.append(p)
                 max_jobs_to_submit = max_jobs_to_submit - 1
             else:
@@ -304,6 +306,7 @@ class JobPackager(object):
         """
         Log.warning("There are no more jobs of this section to form a wrapper, submitting the remaining jobs")
         if len(p.jobs) == 1:
+            p.jobs[0].wrapper_type = "Simple"
             packages_to_submit.append(JobPackageSimple([p.jobs[0]]))
         else:
             packages_to_submit.append(p)
@@ -596,13 +599,19 @@ class JobPackager(object):
                 built_packages_tmp.append(self._build_hybrid_package(jobs, wrapper_limits, section, wrapper_info=current_info))
             else:
                 built_packages_tmp = self._build_vertical_packages(jobs, wrapper_limits, wrapper_info=current_info)
+            self._propagate_inner_jobs_ready_date(built_packages_tmp)
+            # Reset packed_during_building
+            for p in built_packages_tmp:
+                for job in p.jobs:
+                    job.packed_during_building = False
+            packages_to_submit, max_jobs_to_submit = self.check_packages_respect_wrapper_policy(built_packages_tmp, packages_to_submit, max_jobs_to_submit, wrapper_limits, any_simple_packages)
             if len(built_packages_tmp) > 0:
                 Log.result(f"Built {len(built_packages_tmp)} wrappers for {wrapper_name}")
-            self._propagate_inner_jobs_ready_date(built_packages_tmp)
-            packages_to_submit, max_jobs_to_submit = self.check_packages_respect_wrapper_policy(built_packages_tmp, packages_to_submit, max_jobs_to_submit, wrapper_limits, any_simple_packages)
 
         # Now, prepare the packages for non-wrapper jobs
         for job in non_wrapped_jobs:
+            job.wrapper_type = "Simple"
+            job.packed = False
             if job.section in section_jobs_to_submit:
                 if section_jobs_to_submit[job.section] == 0:
                     continue
@@ -712,12 +721,11 @@ class JobPackager(object):
         packages = []
         for job in section_list:
             if wrapper_limits["max"] > 0:
-                if job.packed_status:
+                if not job.packed_during_building:
                     dict_jobs = self._jobs_list.get_ordered_jobs_by_date_member(self.current_wrapper_section)
                     job_vertical_packager = JobPackagerVerticalMixed(dict_jobs, job, [job], job.wallclock, wrapper_limits["max"], wrapper_limits, self._platform.max_wallclock,wrapper_info=wrapper_info)
                     jobs_list = job_vertical_packager.build_vertical_package(job, wrapper_info)
                     packages.append(JobPackageVertical(jobs_list, configuration=self._as_config,wrapper_section=self.current_wrapper_section,wrapper_info=wrapper_info))
-
             else:
                 break
         return packages
@@ -852,44 +860,11 @@ class JobPackagerVertical(object):
                 self.total_wallclock = sum_str_hours(self.total_wallclock, child.wallclock)
                 # Local jobs could not have a wallclock defined
                 if self.total_wallclock <= self.max_wallclock or not self.max_wallclock:
+                    child.packed_during_building = True
                     child.level = level
                     self.jobs_list.append(child)
                     stack.append((child, level + 1))
         return self.jobs_list
-    # def build_vertical_package(self, job, level=1):
-    #     """
-    #     Goes through the job and all the related jobs (children, or part of the same date member ordered group), finds those suitable
-    #     and groups them together into a wrapper.
-    #
-    #     :param level:
-    #     :param job: Job to be wrapped. \n
-    #     :type job: Job Object \n
-    #     :return: List of jobs that are wrapped together. \n
-    #     :rtype: List() of Job Object \n
-    #     """
-    #     # print log each 100 jobs
-    #     if level % 100 == 0:
-    #         Log.info(f"Wrapper package creation is still ongoing. So far {level} jobs have been wrapped.")
-    #     # self.jobs_list starts as only 1 member, but wrapped jobs are added in the recursion
-    #     if len(self.jobs_list) >= self.wrapper_limits["max_v"] or len(self.jobs_list) >= self.wrapper_limits["max_by_section"][job.section] or len(self.jobs_list) >= self.wrapper_limits["max"]:
-    #         return self.jobs_list
-    #     child = self.get_wrappable_child(job)
-    #     # If not None, it is wrappable
-    #     if child is not None and len(str(child)) > 0:
-    #         child.update_parameters(self.wrapper_info[-1],{})
-    #         # Calculate total wallclock per possible wrapper
-    #         self.total_wallclock = sum_str_hours(
-    #             self.total_wallclock, child.wallclock)
-    #         # Testing against max from platform
-    #         if self.total_wallclock <= self.max_wallclock:
-    #             # Marking, this is later tested in the main loop
-    #             child.packed = True
-    #             child.level = level
-    #             self.jobs_list.append(child)
-    #             # Recursive call
-    #             return self.build_vertical_package(child, level=level + 1)
-    #     # Wrapped jobs are accumulated and returned in this list
-    #     return self.jobs_list
 
     def get_wrappable_child(self, job):
         pass
@@ -904,7 +879,7 @@ class JobPackagerVertical(object):
         :return: True if wrappable, False otherwise. \n
         :rtype: Boolean
         """
-        if job.packed_status:
+        if not job.packed_during_building and job.status in [Status.WAITING, Status.READY, Status.PREPARED, Status.DELAYED]:
             for parent in job.parents:
                 # First part of this conditional is true only if the parent is already on the wrapper package ( job_lists == current_wrapped jobs there )
                 # Second part is actually relevant, parents of a wrapper should be COMPLETED
@@ -982,7 +957,7 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
         :return: True if wrappable, False otherwise. \n
         :rtype: Boolean
         """
-        if job.packed_status:
+        if not job.packed_during_building and job.status in [Status.WAITING, Status.READY, Status.PREPARED, Status.DELAYED]:
             for parent in job.parents:
                 # First part of this conditional is true only if the parent is already on the wrapper package ( job_lists == current_wrapped jobs there )
                 # Second part is actually relevant, parents of a wrapper should be COMPLETED
@@ -1047,6 +1022,7 @@ class JobPackagerHorizontal(object):
                     else:
                         total_processors = job_total_processors
                     if (self._current_processors + total_processors) <= int(self.max_processors):
+                        job.packed_during_building = True
                         current_package.append(job)
                         self._current_processors += total_processors
                         current_package_by_section[section] += 1
@@ -1099,13 +1075,13 @@ class JobPackagerHorizontal(object):
                             if other_parent.status != Status.COMPLETED and other_parent not in self.job_list:
                                 wrappable = False
                         if wrappable and child not in next_section_list:
-                            child.update_parameters(self.wrapper_info[-1],{})
+                            child.update_parameters(self.wrapper_info[-1], {})
                             next_section_list.append(child)
 
             next_section_list.sort(
                 key=lambda job: self.sort_by_expression(job.section))
             self.job_list = next_section_list
-            package_jobs = self.build_horizontal_package(horizontal_vertical,wrapper_info=self.wrapper_info)
+            package_jobs = self.build_horizontal_package(horizontal_vertical, wrapper_info=self.wrapper_info)
 
             if package_jobs:
                 sections_aux = set()

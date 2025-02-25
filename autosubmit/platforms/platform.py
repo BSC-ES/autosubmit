@@ -1068,11 +1068,13 @@ class Platform(object):
                 job = self.recovery_queue.get(
                     timeout=1)  # Should be non-empty, but added a timeout for other possible errors.
                 job.children = set()  # Children can't be serialized, so we set it to an empty set for this process.
-                job.platform = self  # Change the original platform to this process platform.
+                job.platform_name = job.platform_name # Change the original platform to this process platform.
+                job.platform = self
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
                 try:
-                    job.retrieve_logfiles(self, raise_error=True)
-                except:
+                    job.retrieve_logfiles(raise_error=True)
+                except Exception as e:
+                    Log.debug(e)
                     jobs_pending_to_process.add(job)
                     job._log_recovery_retries += 1
                     Log.warning(f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry:'{job.fail_count}'.")
@@ -1088,7 +1090,7 @@ class Platform(object):
             job = jobs_pending_to_process.pop()
             job._log_recovery_retries += 1
             try:
-                job.retrieve_logfiles(self, raise_error=True)
+                job.retrieve_logfiles(raise_error=True)
                 job._log_recovery_retries += 1
             except:
                 if job._log_recovery_retries < 5:
