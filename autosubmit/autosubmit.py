@@ -1551,8 +1551,6 @@ class Autosubmit:
                                   "pkl", "job_packages_" + expid + ".db"), 0o644)
 
             packages_persistence.reset_table(True)
-            job_list_original = Autosubmit.load_job_list(
-                expid, as_conf, notransitive=notransitive)
             job_list = Autosubmit.load_job_list(
                 expid, as_conf, notransitive=notransitive)
             job_list.packages_dict = {}
