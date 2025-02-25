@@ -330,6 +330,8 @@ class Job(object):
             self.ready_date = None
             self.recover_last_ready_date()
 
+        if not hasattr(self, 'packed_during_building'):  # Added in 4.1.12
+            self.packed_during_building = False
     def clean_attributes(self):
         self.rerun_only = False
         self.script_name_wrapper = None
@@ -1298,9 +1300,6 @@ class Job(object):
         """
         Retrieves internal retrials log files for the given platform.
         This function is used when the job is inside a vertical wrapper.
-
-        Args:
-            platform (Platform): The platform object to interact with.
 
         Returns:
             int: The last retrial index where logs were successfully retrieved.
