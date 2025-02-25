@@ -18,6 +18,7 @@ from pathlib import Path
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_common import Type
+from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
@@ -708,3 +709,43 @@ class FakeBasicConfig:
     DEFAULT_PLATFORMS_CONF = ''
     DEFAULT_JOBS_CONF = ''
     STRUCTURES_DIR = '/dummy/structure/dir'
+
+
+def test_manage_dependencies():
+    """
+    testing function _manage_dependencies from job_list
+    """
+    dependencies_keys = {'dummy=1':
+                             { 'test', 'test2' }
+                        ,'dummy-2':
+                             { 'test', 'test2' },
+                        'dummy+3': "", 'dummy*4': "", 'dummy?5': ""
+                    }
+
+    experiment_id = 'random-id'
+
+    as_conf = Mock()
+    as_conf.experiment_data = dict()
+    as_conf.experiment_data["JOBS"] = {}
+    as_conf.jobs_data = as_conf.experiment_data["JOBS"]
+    as_conf.experiment_data["PLATFORMS"] = {}
+
+    joblist_persistence = JobListPersistencePkl()
+    job_list = JobList(experiment_id, FakeBasicConfig, YAMLParserFactory(),joblist_persistence, as_conf)
+
+    job = {'dummy':
+               {'dummy': 'SIM.sh',
+                   'RUNNING': 'once'},
+            'RUNNING': 'once',
+            'dummy*4':{}
+    }
+
+    dic_jobs_fake = DicJobs(['fake-date1', 'fake-date2'],
+                            ['fake-member1', 'fake-member2'], list(range(2, 10 + 1)),
+                            'H', 1, as_conf)
+    dic_jobs_fake.experiment_data["JOBS"] = job
+    dependency = job_list._manage_dependencies(dependencies_keys, dic_jobs_fake)
+    assert len(dependency) == 3
+    for job in dependency:
+        assert job in dependencies_keys
+
