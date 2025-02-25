@@ -321,27 +321,27 @@ def test_sub_job_instantiation(tmp_path, autosubmit_config):
     assert job.status == "UNKNOWN"
 
 
-#TODO this test is mostly a smoke test, which can be improved to expect specific results and specifics inputs
 @pytest.mark.parametrize("current_structure",
                              [
-                                 (
-                                         {
-                                             'dummy2':
-                                                 {'dummy','dummy1','dummy4'},
-                                             'dummy3':
-                                                 'dummy'
-                                         }
-                                 ),
-                                 (
-                                         {}
-                                 ),
+                                 ({
+                                         'dummy2':
+                                             {'dummy','dummy1','dummy4'},
+                                         'dummy3':
+                                             'dummy'
+                                     }),
+                                 ({}),
                              ],
-                         ids=["Current structure of the Job Manager with multiple values", "Current structure of the Job Manager without values"]
+                         ids=["Current structure of the Job Manager with multiple values",
+                              "Current structure of the Job Manager without values"]
                          )
 def test_sub_job_manager(current_structure):
+    """
+    tester of the function _sub_job_manager
+    """
     jobs = {
         SubJob("dummy",package="test2",queue=0, run=1, total=30, status="UNKNOWN"),
-        SubJob("dummy",package=["test4","test1","test2","test3"],queue=1, run=2, total=10, status="UNKNOWN"),
+        SubJob("dummy",package=["test4","test1","test2","test3"],queue=1,
+               run=2, total=10, status="UNKNOWN"),
         SubJob("dummy2",package="test2",queue=2, run=3, total=100, status="UNKNOWN"),
         SubJob("dummy",package="test3",queue=3, run=4, total=1000, status="UNKNOWN"),
     }
@@ -369,4 +369,5 @@ def test_sub_job_manager(current_structure):
     assert job_manager.get_subjoblist() is not None and type(job_manager.get_subjoblist()) is set
     assert job_manager.subjobindex is not None and type(job_manager.subjobindex) is dict
     assert job_manager.subjobfixes is not None and type(job_manager.subjobfixes) is dict
-    assert job_manager.get_collection_of_fixes_applied() is not None and type(job_manager.get_collection_of_fixes_applied()) is dict
+    assert (job_manager.get_collection_of_fixes_applied() is not None
+            and type(job_manager.get_collection_of_fixes_applied()) is dict)
