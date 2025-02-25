@@ -17,7 +17,7 @@ MAX_NUM_RETRIALS_PER_JOB = 20  # modify this value to test with different retria
 
 
 @pytest.fixture()
-def job_with_different_retrials():
+def job_with_different_retrials(mocker):
     job_aux = Job(name="example_name", job_id="example_id", status="COMPLETED", priority=0)
     job_aux.processors = "1"
     job_aux.wallclock = '00:05'
@@ -70,7 +70,7 @@ def job_with_different_retrials():
             "FAILED"
         ]
     ]
-    job_aux.get_last_retrials = lambda: retrials
+    mocker.patch("autosubmit.job.job.Job.get_last_retrials", return_value=retrials)
 
     job_stat_aux = JobStat("example_name", 1, float(5) / 60, "example_section",
                            "example_date", "example_member", "example_chunk", "1",
@@ -91,7 +91,7 @@ def job_with_different_retrials():
 
 
 @pytest.fixture()
-def jobs() -> List[Job]:
+def jobs(mocker) -> List[Job]:
     """
     :return: Jobs with random attributes and retrials.
     """
@@ -148,7 +148,7 @@ def jobs() -> List[Job]:
                     else:
                         retrial[3] = job_aux.status
             retrials.append(retrial)
-        job_aux.get_last_retrials = lambda: retrials
+        mocker.patch("autosubmit.job.job.Job.get_last_retrials", return_value=retrials)
         jobs.append(job_aux)
 
     return jobs
