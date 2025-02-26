@@ -166,22 +166,27 @@ class Job(object):
         'end_time_timestamp', '_log_recovered', 'packed_during_building'
     )
 
-    def __getstate__(self):
-        self.getstate()
-
-    def __setstate__(self, state):
-        self.setstate(state)
-
     def setstate(self, state):
         for slot, value in state.items():
             setattr(self, slot, value)
 
-    def getstate(self):
-        included = ["id", "name", "_name", "status", "_status", "priority", "section", "date", "member", "chunk", "split", "splits", "log_recovered", "end_time_timestamp", "finish_time_timestamp", "fail_count", "local_logs", "remote_logs", "log_recovered", "packed", "stat_file"]
-        return dict([(k, getattr(self, k, None)) for k in included])
+    def __setstate__(self, state):  # for queue logs, can't use function
+        for slot, value in state.items():
+            setattr(self, slot, value)
 
-        # excluded = ["_platform", "_children", "_parents", "submitter"]
-        # return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in excluded])
+    def __getstate__(self):  # for queue logs, can't use function
+        # included = ["id", "name", "_name", "status", "_status", "priority", "section", "date", "member", "chunk", "split", "splits", "log_recovered", "end_time_timestamp", "finish_time_timestamp", "fail_count", "local_logs", "remote_logs", "log_recovered", "packed", "stat_file"]
+        # return dict([(k, getattr(self, k, None)) for k in included])
+
+        excluded = ["_platform", "_children", "_parents", "submitter"]
+        return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in excluded])
+
+    def getstate(self):
+        # included = ["id", "name", "_name", "status", "_status", "priority", "section", "date", "member", "chunk", "split", "splits", "log_recovered", "end_time_timestamp", "finish_time_timestamp", "fail_count", "local_logs", "remote_logs", "log_recovered", "packed", "stat_file"]
+        # return dict([(k, getattr(self, k, None)) for k in included])
+
+        excluded = ["_platform", "_children", "_parents", "submitter"]
+        return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in excluded])
 
     CHECK_ON_SUBMISSION = 'on_submission'
 
