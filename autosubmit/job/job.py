@@ -156,7 +156,7 @@ class Job(object):
         '_dependencies', 'running', 'start_time', 'ext_header_path', 'ext_tailer_path',
         'edge_info', 'total_jobs', 'max_waiting_jobs', 'exclusive', '_retrials',
         'current_checkpoint_step', 'max_checkpoint_step', 'reservation',
-        'delete_when_edgeless', 'het', 'updated_log', 'log_retrieved',
+        'delete_when_edgeless', 'het', 'updated_log',
         'submit_time_timestamp', 'start_time_timestamp', 'finish_time_timestamp',
         '_script', '_log_recovery_retries', 'ready_date', 'wrapper_name',
         'is_wrapper', '_wallclock_in_seconds', '_notify_on', '_processors_per_node',
@@ -166,24 +166,27 @@ class Job(object):
         'end_time_timestamp', '_log_recovered', 'packed_during_building'
     )
 
-    def __getstate__(self):
-        excluded = ["_platform", "_children", "_parents", "submitter"]
-        return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in excluded])
-
-    def __setstate__(self, state):
-        for slot, value in state.items():
-            setattr(self, slot, value)
-
-
     def setstate(self, state):
         for slot, value in state.items():
             setattr(self, slot, value)
-        pass
 
-    def getstate(self):
-        excluded = ["_platform", "_children", "_parents", "submitter", "_log_path"]
+    def __setstate__(self, state):  # for queue logs, can't use function
+        for slot, value in state.items():
+            setattr(self, slot, value)
+
+    def __getstate__(self):  # for queue logs, can't use function
+        # included = ["id", "name", "_name", "status", "_status", "priority", "section", "date", "member", "chunk", "split", "splits", "log_recovered", "end_time_timestamp", "finish_time_timestamp", "fail_count", "local_logs", "remote_logs", "log_recovered", "packed", "stat_file"]
+        # return dict([(k, getattr(self, k, None)) for k in included])
+
+        excluded = ["_platform", "_children", "_parents", "submitter"]
         return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in excluded])
 
+    def getstate(self):  # In another branch, I'm selecting less attributes
+        # included = ["id", "name", "_name", "status", "_status", "priority", "section", "date", "member", "chunk", "split", "splits", "log_recovered", "end_time_timestamp", "finish_time_timestamp", "fail_count", "local_logs", "remote_logs", "log_recovered", "packed", "stat_file"]
+        # return dict([(k, getattr(self, k, None)) for k in included])
+
+        excluded = ["_platform", "_children", "_parents", "submitter"]
+        return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in excluded])
 
     CHECK_ON_SUBMISSION = 'on_submission'
 
@@ -202,7 +205,14 @@ class Job(object):
     def __repr__(self):
         return "{0} STATUS: {1}".format(self.name, self.status)
 
-    def __init__(self, name, job_id, status, priority):
+    def __init__(self, name=None, job_id=None, status=None, priority=None, loaded_data=None):
+
+        if loaded_data:
+            name = loaded_data['_name']
+            job_id = loaded_data['id']
+            status = loaded_data['_status']
+            priority = loaded_data['priority']
+
         self.rerun_only = False
         self.script_name_wrapper = None
         self.delay_end = None
@@ -316,6 +326,12 @@ class Job(object):
         self._custom_directives = None
         self.end_time_timestamp = None
         self.packed_during_building = False
+        if loaded_data:
+            self.setstate(loaded_data)
+            self.status = Status.WAITING if self.status in [Status.DELAYED,
+                                                            Status.PREPARED,
+                                                            Status.READY] else \
+                self.status
 
     def adjust_loaded_parameters(self) -> None:
         """

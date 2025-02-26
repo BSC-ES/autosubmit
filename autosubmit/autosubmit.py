@@ -2002,6 +2002,7 @@ class Autosubmit:
             raise AutosubmitCritical(
                 "Corrupted job_list, backup couldn't be restored", 7040, e.message)
         except BaseException as e:
+            Log.debug(f"Error while loading job_list: {str(e)}")
             raise AutosubmitCritical(
                 "Corrupted job_list, backup couldn't be restored", 7040, str(e))
         Log.debug("Length of the jobs list: {0}", len(job_list))
@@ -6041,7 +6042,7 @@ class Autosubmit:
             current_status = current_status.upper().split(" ")
         try:
             current_status = [Status.KEY_TO_VALUE[x.strip()] for x in current_status]
-        except Exception:
+        except Exception as e:
             raise AutosubmitCritical("Invalid status -fs. All values must match one of {0}".format(Status.VALUE_TO_KEY.keys()), 7011)
 
 

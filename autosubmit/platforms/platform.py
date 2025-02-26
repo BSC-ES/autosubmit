@@ -1027,24 +1027,6 @@ class Platform(object):
             bool: True if there is work to process, False otherwise.
         """
         process_log = False
-        while timeout > 0:
-            if not self.recovery_queue.empty() or self.cleanup_event.is_set() or self.work_event.is_set():
-                process_log = True
-                break
-            time.sleep(1)
-            timeout -= 1
-        return process_log
-
-    def wait_for_work(self, sleep_time: int = 60) -> bool:
-        """
-        Waits for work to process, first for a mandatory time and then until the keep_alive_timeout is reached.
-
-        Args:
-            sleep_time (int): Minimum time to wait in seconds. Defaults to 60.
-
-        Returns:
-            bool: True if there is work to process, False otherwise.
-        """
         process_log = self.wait_mandatory_time(sleep_time)
         if not process_log:
             process_log = self.wait_until_timeout(self.keep_alive_timeout - sleep_time)
@@ -1069,7 +1051,7 @@ class Platform(object):
                 job = self.recovery_queue.get(
                     timeout=1)  # Should be non-empty, but added a timeout for other possible errors.
                 job.children = set()  # Children can't be serialized, so we set it to an empty set for this process.
-                job.platform_name = job.platform_name # Change the original platform to this process platform.
+                job.platform_name = self.name # Change the original platform to this process platform.
                 job.platform = self
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
                 try:
