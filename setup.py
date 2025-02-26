@@ -29,7 +29,7 @@ with open(path.join(here, 'VERSION')) as f:
 
 install_requires = [
     'xlib==0.21',
-    'setuptools<=68.2.2',
+    'setuptools<=75.8.1',
     'bscearth.utils<=0.5.2',
     'requests<=2.31.0',
     'networkx<=2.6.3',
