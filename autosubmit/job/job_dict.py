@@ -644,5 +644,6 @@ class DicJobs:
             job = Job(loaded_data=self._job_list[name])
 
         self.changes["NEWJOBS"] = True
+        # job.adjust_loaded_parameters()
         job.update_dict_parameters(self.as_conf)
         section_data.append(job)

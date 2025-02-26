@@ -313,7 +313,6 @@ class JobList(object):
                         job_platform = submitter.platforms[job.platform_name]
                     first = False
                 job.platform = job_platform
-        pass
 
     def clear_generate(self):
         self.dependency_map = {}

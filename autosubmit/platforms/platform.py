@@ -335,6 +335,8 @@ class Platform(object):
         save = False
         failed_packages = list()
         error_message = ""
+        if not inspect:
+            job_list.save()
         if not hold:
             Log.debug("\nJobs ready for {1}: {0}", len(
                 job_list.get_ready(self, hold=hold)), self.name)
