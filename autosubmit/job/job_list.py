@@ -17,6 +17,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import copy
 import datetime
+import gc
 import os
 import pickle
 import re
@@ -219,61 +220,41 @@ class JobList(object):
         self._member_list = member_list
         chunk_list = list(range(chunk_ini, num_chunks + 1))
         self._chunk_list = chunk_list
-        try:
-            self.graph = self.load(create)
-            if type(self.graph) is not DiGraph:
-                self.graph = nx.DiGraph()
-        except AutosubmitCritical:
-            raise
-        except Exception:
-            self.graph = nx.DiGraph()
         self._dic_jobs = DicJobs(date_list, member_list, chunk_list, date_format, default_retrials, as_conf)
-        self._dic_jobs.graph = self.graph
-        if len(self.graph.nodes) > 0:
-            if show_log:
-                Log.info("Load finished")
-            if monitor:
-                self._dic_jobs.changes = {}
-            else:
-                self._dic_jobs.compare_backbone_sections()
-            if not self._dic_jobs.changes:
-                self._dic_jobs._job_list = {job["job"].name: job["job"] for _, job in self.graph.nodes.data() if
-                                            job.get("job", None)}
-            else:
-                # fast-look if graph existed, skips some steps
-                # If VERSION in CONFIG or HPCARCH in DEFAULT it will exist, if not it won't.
-                if not new and not self._dic_jobs.changes.get("EXPERIMENT", {}) and not self._dic_jobs.changes.get(
-                        "CONFIG", {}) and not self._dic_jobs.changes.get("DEFAULT", {}):
-                    self._dic_jobs._job_list = {job["job"].name: job["job"] for _, job in self.graph.nodes.data() if
-                                                job.get("job", None)}
-        else:
-            if not create:
-                raise AutosubmitCritical("Autosubmit couldn't load the workflow graph. Please run autosubmit create first. If the pkl file exists and was generated with Autosubmit v4.1+, try again.",7013)
-            # Remove the previous pkl, if it exists.
-            if not new:
-                Log.info(
-                    "Removing previous pkl file due to empty graph, likely due using an Autosubmit 4.0.XXX version")
+
+        try:
+            loaded_job_list = self.load(create)
+            Log.result("Load finished")
+        except:
+            Log.warning("Couldn't load the old job_list")
+            loaded_job_list = None
+
+
+        if (not loaded_job_list and not create) or (loaded_job_list and len(loaded_job_list) == 0 and not create):
+            raise AutosubmitCritical(
+                "Autosubmit couldn't load the workflow graph. Please run autosubmit create first. If the pkl file exists and was generated with Autosubmit v4.1+, try again.",
+                7013)
+        elif loaded_job_list and len(loaded_job_list) == 0 and create:
+            new = True
+            Log.info(
+                "Removing previous pkl file due to empty graph, likely due using an Autosubmit 4.0.XXX version")
             with suppress(FileNotFoundError):
                 os.remove(os.path.join(self._persistence_path, self._persistence_file + ".pkl"))
             with suppress(FileNotFoundError):
                 os.remove(os.path.join(self._persistence_path, self._persistence_file + "_backup.pkl"))
-            new = True
+        if loaded_job_list:
+            self._dic_jobs._job_list = loaded_job_list
+
+        self.graph = nx.DiGraph()
+        self._dic_jobs.graph = self.graph
+
         # This generates the job object and also finds if dic_jobs has modified from previous iteration in order to expand the workflow
         if show_log:
             Log.info("Creating jobs...")
         self._create_jobs(self._dic_jobs, 0, default_job_type)
-        # not needed anymore all data is inside their correspondent sections in dic_jobs
         # This dic_job is key to the dependencies management as they're ordered by date[member[chunk]]
-        del self._dic_jobs._job_list
         if show_log:
             Log.info("Adding dependencies to the graph..")
-        # del all nodes that are only in the current graph
-        if len(self.graph.nodes) > 0:
-            gen = (name for name in set(self.graph.nodes).symmetric_difference(set(self._dic_jobs.workflow_jobs)) if
-                   name in self.graph.nodes)
-            for name in gen:
-                self.graph.remove_node(name)
-        # This actually, also adds the node to the graph if it isn't already there
         self._add_dependencies(date_list, member_list, chunk_list, self._dic_jobs)
 
         if show_log:
@@ -299,7 +280,8 @@ class JobList(object):
                         job.children.add(jobc)
         if show_log:
             Log.info("Looking for edgeless jobs...")
-        self._delete_edgeless_jobs()
+        if len(self.graph.edges) > 0:
+            self._delete_edgeless_jobs()
         if new:
             for job in self._job_list:
                 job._fail_count = 0
@@ -336,6 +318,8 @@ class JobList(object):
                         job_platform = submitter.platforms[job.platform_name]
                     first = False
                 job.platform = job_platform
+            # clean
+            pass
 
     def split_by_platform(self):
         """
@@ -345,10 +329,11 @@ class JobList(object):
         """
         job_list_per_platform = dict()
         for job in self._job_list:
-            if job.platform not in job_list_per_platform:
-                job_list_per_platform[job.platform] = []
-            job_list_per_platform[job.platform].append(job)
+            if job.platform_name not in job_list_per_platform:
+                job_list_per_platform[job.platform_name] = []
+            job_list_per_platform[job.platform_name].append(job)
         return job_list_per_platform
+
     def _add_all_jobs_edge_info(self, dic_jobs, option="DEPENDENCIES"):
         jobs_data = dic_jobs.experiment_data.get("JOBS", {})
         sections_gen = (section for section in jobs_data.keys())

@@ -645,7 +645,7 @@ class DicJobs:
             section_data.append(job)
             self.changes["NEWJOBS"] = True
         else:
-            self._job_list[name].adjust_new_parameters()
+            self._job_list[name].adjust_loaded_parameters()
             self._job_list[name].update_dict_parameters(self.as_conf)
             self._job_list[name].status = Status.WAITING if self._job_list[name].status in [Status.DELAYED,
                                                                                             Status.PREPARED,

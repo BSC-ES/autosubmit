@@ -4535,7 +4535,8 @@ class Autosubmit:
                     Log.info("\nCreating the jobs list...")
                     job_list = JobList(expid, BasicConfig, YAMLParserFactory(),Autosubmit._get_job_list_persistence(expid, as_conf), as_conf)
                     try:
-                         prev_job_list_logs = Autosubmit.load_logs_from_previous_run(expid, as_conf)
+                        #prev_job_list_logs = Autosubmit.load_logs_from_previous_run(expid, as_conf)
+                        prev_job_list_logs = None
                     except Exception:
                         prev_job_list_logs = None
                     date_format = ''
@@ -4563,9 +4564,12 @@ class Autosubmit:
                         job_list.rerun(as_conf.get_rerun_jobs(),as_conf)
                     else:
                         job_list.remove_rerun_only_jobs(notransitive)
-                    Log.info("\nSaving the jobs list...")
+                    Log.info("\nRestoring the logs...")
+
                     if prev_job_list_logs:
                         job_list.add_logs(prev_job_list_logs)
+                    Log.info("\nSaving the jobs list...")
+                    prev_job_list_logs = None
                     job_list.save()
                     as_conf.save()
                     try:
