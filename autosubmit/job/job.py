@@ -180,8 +180,11 @@ class Job(object):
             setattr(self, slot, value)
 
     def getstate(self):
-        included = ["id", "name", "status", "priority", "section", "date", "member", "chunk", "split", "splits", "log_recovered", "end_time_timestamp", "finish_time_timestamp", "fail_count", "local_logs", "remote_logs", "log_recovered", "packed", "stat_file"]
-        return dict([(k, getattr(self, k, None)) for k in included])
+        # included = ["id", "name", "status", "priority", "section", "date", "member", "chunk", "split", "splits", "log_recovered", "end_time_timestamp", "finish_time_timestamp", "fail_count", "local_logs", "remote_logs", "log_recovered", "packed", "stat_file"]
+        # return dict([(k, getattr(self, k, None)) for k in included])
+
+        excluded = ["_platform", "_children", "_parents", "submitter"]
+        return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in excluded])
 
     CHECK_ON_SUBMISSION = 'on_submission'
 
@@ -203,9 +206,9 @@ class Job(object):
     def __init__(self, name=None, job_id=None, status=None, priority=None, loaded_data=None):
 
         if loaded_data:
-            name = loaded_data['name']
+            name = loaded_data['_name']
             job_id = loaded_data['id']
-            status = loaded_data['status']
+            status = loaded_data['_status']
             priority = loaded_data['priority']
 
         self.rerun_only = False
