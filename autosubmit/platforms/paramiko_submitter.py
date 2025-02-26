@@ -100,8 +100,6 @@ class ParamikoSubmitter(Submitter):
                     platforms_used.append(hpc)
 
         platform_data = exp_data.get('PLATFORMS', {})
-        # Declare platforms dictionary, key: Platform Name, Value: Platform Object
-        platforms = dict()
 
         # Build Local Platform Object
         local_platform = LocalPlatform(asconf.expid, 'local', config, auth_password = local_auth_password)
@@ -117,7 +115,7 @@ class ParamikoSubmitter(Submitter):
             BasicConfig.LOCAL_ROOT_DIR, local_platform.expid)
         local_platform.host = 'localhost'
         # Add object to entry in dictionary
-        platforms['LOCAL'] = local_platform
+        self.platforms['LOCAL'] = local_platform
 
         # parser is the platform's parser that represents platforms_.conf
         # Traverse sections []
@@ -209,7 +207,7 @@ class ParamikoSubmitter(Submitter):
                 remote_platform.root_dir = os.path.join(remote_platform.scratch, remote_platform.project,remote_platform.user, remote_platform.expid)
                 remote_platform.update_cmds()
 
-                platforms[section] = remote_platform
+                self.platforms[section] = remote_platform
             except Exception as e:
                 raise_message = "Error in the definition of PLATFORM in YAML: SCRATCH_DIR, PROJECT, USER, EXPID must be defined for platform {0}".format(section)
             # Executes update_cmds() from corresponding Platform Object
@@ -217,9 +215,7 @@ class ParamikoSubmitter(Submitter):
 
         for serial,platforms_with_serial_options in platforms_serial_in_paralell.items():
             for section in platforms_with_serial_options:
-                platforms[section].serial_platform = platforms[serial]
+                self.platforms[section].serial_platform = self.platforms[serial]
 
-
-        self.platforms = platforms
         if raise_message != "":
             raise AutosubmitError(raise_message)

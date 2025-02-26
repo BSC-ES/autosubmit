@@ -1477,7 +1477,7 @@ class Job(object):
 
         return parameters
 
-    def update_platform_parameters(self,as_conf,parameters,job_platform):
+    def update_platform_parameters(self, as_conf, parameters, job_platform) -> None:
         if not job_platform:
             submitter = job_utils._get_submitter(as_conf)
             submitter.load_platforms(as_conf)
@@ -1496,7 +1496,6 @@ class Job(object):
         parameters['CURRENT_PROJ_DIR'] = job_platform.project_dir
         parameters['CURRENT_ROOTDIR'] = job_platform.root_dir
         parameters['CURRENT_LOGDIR'] = job_platform.get_files_path()
-        return parameters
 
     def process_scheduler_parameters(self, job_platform, chunk):
         """
@@ -2070,9 +2069,7 @@ class Job(object):
         self.retrials = parameters["RETRIALS"]
         self.reservation = parameters["RESERVATION"]
 
-    def update_parameters(self, as_conf, parameters,
-                          default_parameters={'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%',
-                                              'M': '%M%', 'M_': '%M_%', 'm': '%m%', 'm_': '%m_%'}):
+    def update_parameters(self, as_conf, parameters, default_parameters=None) -> None:
         """
         Refresh parameters value
 
@@ -2083,6 +2080,10 @@ class Job(object):
         :param parameters:
         :type parameters: dict
         """
+        if default_parameters is None:
+            default_parameters = {'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%',
+                                              'M': '%M%', 'M_': '%M_%', 'm': '%m%', 'm_': '%m_%'}
+
         as_conf.reload()
         self._adjust_new_parameters()
         self._init_runtime_parameters()
@@ -2090,31 +2091,27 @@ class Job(object):
             self.start_time = datetime.datetime.now()
         # Parameters that affect to all the rest of parameters
         self.update_dict_parameters(as_conf)
-        parameters = parameters.copy()
         if hasattr(as_conf,"parameters"):
-            parameters.update(as_conf.parameters)
-        parameters.update(default_parameters)
-        parameters = as_conf.substitute_dynamic_variables(parameters,25)
-        parameters['ROOTDIR'] = os.path.join(
+            self.parameters.update(as_conf.parameters)
+        self.parameters.update(default_parameters)
+        self.parameters = as_conf.substitute_dynamic_variables(parameters,25)
+        self.parameters['ROOTDIR'] = os.path.join(
             BasicConfig.LOCAL_ROOT_DIR, self.expid)
-        parameters['PROJDIR'] = as_conf.get_project_dir()
+        self.parameters['PROJDIR'] = as_conf.get_project_dir()
         # Set parameters dictionary
         # Set final value
-        parameters = self.update_platform_parameters(as_conf, parameters, self._platform)
-        parameters = self.update_current_parameters(as_conf, parameters)
-        parameters = as_conf.deep_read_loops(parameters)
+        self.update_platform_parameters(as_conf, self.parameters, self._platform)
+        self.update_current_parameters(as_conf, self.parameters)
+        as_conf.deep_read_loops(self.parameters)
         parameters = as_conf.substitute_dynamic_variables(parameters,80)
         parameters = self.update_job_parameters(as_conf, parameters)
         parameters = self.update_platform_associated_parameters(as_conf, parameters, self._platform, parameters['CHUNK'])
         parameters = self.update_wrapper_parameters(as_conf, parameters)
         self.update_job_variables_final_values(parameters)
-        # For some reason, there is return but the assignee is also necessary
-        self.parameters = parameters
         # This return is only being used by the mock , to change the mock
         for event in self.platform.worker_events:  # keep alive log retrieval workers.
             if not event.is_set():
                 event.set()
-        return parameters
 
     def update_content_extra(self,as_conf,files):
         additional_templates = []
@@ -2330,7 +2327,7 @@ class Job(object):
         """
 
         out = False
-        parameters = self.update_parameters(as_conf, parameters)
+        self.update_parameters(as_conf, parameters)
         template_content,additional_templates = self.update_content(as_conf)
         if template_content is not False:
             variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content,flags=re.IGNORECASE)

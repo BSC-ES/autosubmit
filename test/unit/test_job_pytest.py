@@ -12,10 +12,12 @@ from pathlib import Path
 
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
+from autosubmitconfigparser.config.configcommon import deep_normalize
+
 
 def create_job_and_update_parameters(autosubmit_config, experiment_data, platform_type="ps"):
     as_conf = autosubmit_config("test-expid", experiment_data)
-    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
+    deep_normalize(as_conf.experiment_data)
     as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
     as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
     as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)

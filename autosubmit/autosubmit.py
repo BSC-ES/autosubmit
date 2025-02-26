@@ -17,6 +17,8 @@
 import collections
 import locale
 import platform
+import traceback
+
 import requests
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
@@ -2199,6 +2201,13 @@ class Autosubmit:
                 max_recovery_retrials = as_conf.experiment_data.get("CONFIG",{}).get("RECOVERY_RETRIALS",3650)  # (72h - 122h )
                 recovery_retrials = 0
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
+
+                import gc
+                import tracemalloc
+                import autosubmit.traceprofiler as traceprofiler
+                tracemalloc.start(10)
+                traceprofiler_start = datetime.datetime.now()
+
                 while job_list.get_active():
                     Autosubmit.refresh_log_recovery_process(platforms_to_test, as_conf)
                     for job in [job for job in job_list.get_job_list() if job.status == Status.READY]:
@@ -2274,11 +2283,18 @@ class Autosubmit:
                             except Exception as e:
                                 Log.warning(
                                     "Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
-                        job_changes_tracker = {}
+                        del job_changes_tracker
                         if Autosubmit.exit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             job_list.save()
                             as_conf.save()
+
+                        gc.collect()
+                        traceprofiler.snapshot()
+                        now = datetime.datetime.now()
+                        if (now - traceprofiler_start).seconds > 240:
+                            break
+
                         time.sleep(safetysleeptime)
                         #Log.debug(f"FD endsubmit: {fd_show.fd_table_status_str()}")
 
@@ -2362,6 +2378,11 @@ class Autosubmit:
                         raise AutosubmitCritical(e.message, e.code, e.trace)
                     except BaseException:
                         raise # If this happens, there is a bug in the code or an exception not-well caught
+
+                traceprofiler.display_stats()
+                traceprofiler.compare()
+                traceprofiler.print_trace()
+
                 Log.result("No more jobs to run.")
                 # search hint - finished run
                 job_list.save()
@@ -3322,25 +3343,26 @@ class Autosubmit:
                                      7040, str(e))
 
     @staticmethod
-    def describe(input_experiment_list="*",get_from_user=""):
+    def describe(input_experiment_list="*", get_from_user=""):
         """
         Show details for specified experiment
 
-        :param experiments_id: experiments identifier:
-        :type experiments_id: str
+        :param input_experiment_list: experiments identifier:
+        :type input_experiment_list: str
         :param get_from_user: user to get the experiments from
         :type get_from_user: str
-        :return: str,str,str,str
+        :return: Tuple[str, str, str, str]
         """
         experiments_ids = input_experiment_list
         not_described_experiments = []
         if get_from_user == "*" or get_from_user == "":
             get_from_user = pwd.getpwuid(os.getuid())[0]
-        user =""
-        created=""
-        model=""
-        branch=""
-        hpc=""
+        user = ""
+        created = ""
+        model = ""
+        branch = ""
+        hpc = ""
+
         if ',' in experiments_ids:
             experiments_ids = experiments_ids.split(',')
         elif '*' in experiments_ids:
@@ -3350,30 +3372,29 @@ class Autosubmit:
                 try:
                     if f.is_dir() and f.owner() == get_from_user:
                         experiments_ids.append(f.name)
-                except Exception:
-                    pass # if it reaches there it means that f.owner() doesn't exist anymore( owner is an id) so we just skip it and continue
+                except Exception as e:
+                    # if it reaches there it means that f.owner() doesn't exist anymore( owner is an id) so we just skip it and continue
+                    Log.warning(f'Failed to read experiment folder {str(f)}: {str(e)}')
         else:
             experiments_ids = experiments_ids.split(' ')
+
         for experiment_id in experiments_ids:
             try:
                 experiment_id = experiment_id.strip(" ")
                 exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, experiment_id)
 
-                as_conf = AutosubmitConfig(
-                    experiment_id, BasicConfig, YAMLParserFactory())
-                as_conf.check_conf_files(False,no_log=True)
+                as_conf = AutosubmitConfig(experiment_id, BasicConfig, YAMLParserFactory())
+                as_conf.check_conf_files(False, no_log=True)
                 user = os.stat(as_conf.conf_folder_yaml).st_uid
                 try:
                     user = pwd.getpwuid(user).pw_name
                 except Exception as e:
-                    Log.warning(
-                        "The user does not exist anymore in the system, using id instead")
+                    Log.warning(f"The user does not exist anymore in the system, using id instead: {str(e)}")
                     continue
 
                 created = datetime.datetime.fromtimestamp(
                     os.path.getmtime(as_conf.conf_folder_yaml))
 
-                project_type = as_conf.get_project_type()
                 if as_conf.get_svn_project_url():
                     model = as_conf.get_svn_project_url()
                     branch = as_conf.get_svn_project_url()
@@ -3400,7 +3421,9 @@ class Autosubmit:
                 Log.result("Branch: {0}", branch)
                 Log.result("HPC: {0}", hpc)
                 Log.result("Description: {0}", description[0][0])
-            except BaseException as e:
+            except Exception as e:
+                Log.warning(f"Failed to describe experiment [{experiment_id}]: {str(e)}")
+                traceback.print_exc()
                 not_described_experiments.append(experiment_id)
         if len(not_described_experiments) > 0:
             Log.printlog("Could not describe the following experiments:\n{0}".format(not_described_experiments),Log.WARNING)

@@ -34,7 +34,7 @@ class AutosubmitError(Exception):
         return self.message if not self.trace else f'{self.trace} {self.message}'
 
     def __str__(self):
-        return " "
+        return self.error_message
 
 
 class AutosubmitCritical(Exception):
@@ -49,8 +49,21 @@ class AutosubmitCritical(Exception):
         self.message = message
         self.trace = trace
 
+    @property
+    def error_message(self) -> str:
+        """
+        Return the error message ready to be logged, with both trace
+        (when present) and the message separated by a space. Or just
+        the message if no trace is available.
+
+        :return: ``trace`` and ``message`` separated by a space, or just the
+                 ``message`` if no ``trace`` is available.
+        :rtype: str
+        """
+        return self.message if not self.trace else f'{self.trace} {self.message}'
+
     def __str__(self):
-        return " "
+        return self.error_message
 
 
 class LogFormatter:

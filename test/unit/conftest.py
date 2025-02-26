@@ -1,14 +1,15 @@
 # Fixtures available to multiple test files must be created in this file.
+import os
 from contextlib import suppress
-
-import pytest
 from dataclasses import dataclass
 from pathlib import Path
-from ruamel.yaml import YAML
 from shutil import rmtree
 from tempfile import TemporaryDirectory
 from typing import Any, Dict, Callable, List, Protocol, Optional
-import os
+
+import pytest
+from pytest_mock.plugin import MockerFixture
+from ruamel.yaml import YAML
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
@@ -28,6 +29,7 @@ class AutosubmitExperiment:
     status_dir: Path
     platform: ParamikoPlatform
 
+
 @pytest.fixture(scope='function')
 def autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> Callable:
     """Create an instance of ``Autosubmit`` with an experiment."""
@@ -35,7 +37,6 @@ def autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> Ca
     original_root_dir = BasicConfig.LOCAL_ROOT_DIR
     tmp_dir = TemporaryDirectory()
     tmp_path = Path(tmp_dir.name)
-
 
     def _create_autosubmit_exp(expid: str):
         root_dir = tmp_path
@@ -45,7 +46,7 @@ def autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> Ca
         # directories used when searching for logs to cat
         exp_tmp_dir = BasicConfig.expid_tmp_dir(expid) 
         aslogs_dir = BasicConfig.expid_aslog_dir(expid) 
-        status_dir =exp_path / 'status'
+        status_dir = exp_path / 'status'
         if not os.path.exists(aslogs_dir):
             os.makedirs(aslogs_dir)
         if not os.path.exists(status_dir):
@@ -96,7 +97,7 @@ def autosubmit() -> Autosubmit:
 
 
 @pytest.fixture(scope='function')
-def create_as_conf() -> Callable:  # May need to be changed to use the autosubmit_config one
+def create_as_conf() -> Callable[[AutosubmitExperiment, List[Path], Dict[str, Any]], AutosubmitConfig]:
     def _create_as_conf(autosubmit_exp: AutosubmitExperiment, yaml_files: List[Path], experiment_data: Dict[str, Any]):
         conf_dir = autosubmit_exp.exp_path.joinpath('conf')
         conf_dir.mkdir(parents=False, exist_ok=False)
@@ -108,11 +109,13 @@ def create_as_conf() -> Callable:  # May need to be changed to use the autosubmi
             parser_factory=parser_factory
         )
         for yaml_file in yaml_files:
+            as_conf.current_loaded_files[yaml_file.name] = 'dummy-so-it-doesnt-force-reload.yml'
             with open(conf_dir / yaml_file.name, 'w+') as f:
                 f.write(yaml_file.read_text())
                 f.flush()
         # add user-provided experiment data
         with open(conf_dir / 'conftest_as.yml', 'w+') as f:
+            as_conf.current_loaded_files[f.name] = 'dummy-so-it-doesnt-force-reload.yml'
             yaml = YAML()
             yaml.indent(sequence=4, offset=2)
             yaml.dump(experiment_data, f)
@@ -120,6 +123,7 @@ def create_as_conf() -> Callable:  # May need to be changed to use the autosubmi
         return as_conf
 
     return _create_as_conf
+
 
 class AutosubmitConfigFactory(Protocol):  # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
 
@@ -129,7 +133,7 @@ class AutosubmitConfigFactory(Protocol):  # Copied from the autosubmit config pa
 @pytest.fixture(scope="function")
 def autosubmit_config(
         request: pytest.FixtureRequest,
-        mocker: "pytest_mock.MockerFixture") -> AutosubmitConfigFactory:
+        mocker: MockerFixture) -> AutosubmitConfigFactory:
     """Return a factory for ``AutosubmitConfig`` objects.
 
     Abstracts the necessary mocking in ``AutosubmitConfig`` and related objects,

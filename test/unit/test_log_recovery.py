@@ -94,8 +94,7 @@ def local(prepare_test):
 def as_conf(prepare_test, mocker):
     mocker.patch('pathlib.Path.exists', return_value=True)
     as_conf = AutosubmitConfig("test")
-    as_conf.experiment_data = as_conf.load_config_file(as_conf.experiment_data,
-                                                       Path(prepare_test.join('platforms_t000.yml')))
+    as_conf.load_config_file(as_conf.experiment_data, Path(prepare_test.join('platforms_t000.yml')))
     as_conf.misc_data = {"AS_COMMAND": "run"}
     return as_conf
 
