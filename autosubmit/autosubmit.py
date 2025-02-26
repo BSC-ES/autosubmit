@@ -2075,8 +2075,6 @@ class Autosubmit:
         Log.debug("Checking job_list current status")
         job_list.update_list(as_conf, first_time=True)
         job_list.clear_generate()
-        job_list.save()
-        as_conf.save()
         if not recover:
             Log.info("Autosubmit is running with v{0}", Autosubmit.autosubmit_version)
             # Before starting main loop, setup historical database tables and main information
@@ -2245,14 +2243,11 @@ class Autosubmit:
                                     Autosubmit.job_notify(as_conf,expid,job,job_prev_status,job_changes_tracker)
                         # Updates all workflow status with the new information.
                         job_list.update_list(as_conf, submitter=submitter)
-                        job_list.save()
                         # Submit jobs that are ready to run
                         #Log.debug(f"FD submit: {fd_show.fd_table_status_str()}")
                         if len(job_list.get_ready()) > 0:
                             Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence, hold=False)
                             job_list.update_list(as_conf, submitter=submitter)
-                            job_list.save()
-                            as_conf.save()
 
                         # Submit jobs that are prepared to hold (if remote dependencies parameter are enabled)
                         # This currently is not used as SLURM no longer allows to jobs to acquire priority while in hold state.
@@ -2261,8 +2256,6 @@ class Autosubmit:
                             Autosubmit.submit_ready_jobs(
                                 as_conf, job_list, platforms_to_test, packages_persistence, hold=True)
                             job_list.update_list(as_conf, submitter=submitter)
-                            job_list.save()
-                            as_conf.save()
                         # Safe spot to store changes
                         try:
                             exp_history = Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker, expid)
@@ -2280,8 +2273,8 @@ class Autosubmit:
                         if Autosubmit.exit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             job_list.save()
-                            as_conf.save()
-                        time.sleep(safetysleeptime)
+                        if not Autosubmit.exit:
+                            time.sleep(safetysleeptime)
                         #Log.debug(f"FD endsubmit: {fd_show.fd_table_status_str()}")
 
 
@@ -4579,7 +4572,6 @@ class Autosubmit:
                     prev_job_list_logs = None
                     job_list.clear_generate()
                     job_list.save()
-                    as_conf.save()
                     try:
                         packages_persistence = JobPackagePersistence(
                             os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"), "job_packages_" + expid)

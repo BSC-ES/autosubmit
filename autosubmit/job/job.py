@@ -190,7 +190,13 @@ class Job(object):
 
     CHECK_ON_SUBMISSION = 'on_submission'
 
-    # TODO
+    SAVE_SLOTS = ["id", "name", "_name", "status", "_status", "priority", "section", "date", "member", "chunk",
+                  "wallclock", "_wallclock_in_seconds", "wallclock",
+                  "split", "splits", "log_recovered", "end_time_timestamp", "finish_time_timestamp",
+                  "fail_count",
+                  "local_logs", "remote_logs", "log_recovered", "packed", "stat_file", "platform_name", "_local_logs",
+                  "_remote_logs"]
+
     # This is crashing the code
     # I added it for the assertions of unit testing... since job obj != job obj when it was saved & load
     # since it points to another section of the memory.
@@ -204,6 +210,8 @@ class Job(object):
 
     def __repr__(self):
         return "{0} STATUS: {1}".format(self.name, self.status)
+
+
 
     def __init__(self, name=None, job_id=None, status=None, priority=None, loaded_data=None):
 
@@ -363,58 +371,58 @@ class Job(object):
         if not hasattr(self, '_platform'):
             self._platform = None
 
-    def clean_attributes(self):
-        self.rerun_only = False
-        self.script_name_wrapper = None
-        self.delay_end = None
-        self.wrapper_type = None
-        self._wrapper_queue = None
-        self._queue = None
-        self._partition = None
-        self.retry_delay = None
-        self._wallclock = None
-        self.wchunkinc = None
-        self._tasks = None
-        self._nodes = None
-        self.default_parameters = None
-        self._threads = None
-        self._processors = None
-        self._memory = None
-        self._memory_per_task = None
-        self.undefined_variables = set()
-        self.executable = None
-        self.packed = False
-        self.hold = False
-        self._export = "none"
-        self.start_time = None
-        self.total_jobs = None
-        self.max_waiting_jobs = None
-        self.exclusive = ""
-        self.current_checkpoint_step = 0
-        self.max_checkpoint_step = 0
-        self.reservation = ""
-        self.het = {}
-        self.updated_log = False
-        self._script = None
-        self._log_recovery_retries = None
-        self.wrapper_name = None
-        self.is_wrapper = False
-        self._wallclock_in_seconds = None
-        self._notify_on = None
-        self._processors_per_node = None
-        self._shape = None
-        self._x11 = False
-        self._x11_options = None
-        self._hyperthreading = None
-        self._scratch_free_space = None
-        self._delay_retrials = None
-        self._custom_directives = None
-        if hasattr(self, 'packed_during_building'):
-            self.packed_during_building = False
-        # Tentative
-        self._platform = None
-        self._parents = set()
-        self.children = set()
+    # def clean_attributes(self):
+    #     self.rerun_only = False
+    #     self.script_name_wrapper = None
+    #     self.delay_end = None
+    #     self.wrapper_type = None
+    #     self._wrapper_queue = None
+    #     self._queue = None
+    #     self._partition = None
+    #     self.retry_delay = None
+    #     self._wallclock = None
+    #     self.wchunkinc = None
+    #     self._tasks = None
+    #     self._nodes = None
+    #     self.default_parameters = None
+    #     self._threads = None
+    #     self._processors = None
+    #     self._memory = None
+    #     self._memory_per_task = None
+    #     self.undefined_variables = set()
+    #     self.executable = None
+    #     self.packed = False
+    #     self.hold = False
+    #     self._export = "none"
+    #     self.start_time = None
+    #     self.total_jobs = None
+    #     self.max_waiting_jobs = None
+    #     self.exclusive = ""
+    #     self.current_checkpoint_step = 0
+    #     self.max_checkpoint_step = 0
+    #     self.reservation = ""
+    #     self.het = {}
+    #     self.updated_log = False
+    #     self._script = None
+    #     self._log_recovery_retries = None
+    #     self.wrapper_name = None
+    #     self.is_wrapper = False
+    #     self._wallclock_in_seconds = None
+    #     self._notify_on = None
+    #     self._processors_per_node = None
+    #     self._shape = None
+    #     self._x11 = False
+    #     self._x11_options = None
+    #     self._hyperthreading = None
+    #     self._scratch_free_space = None
+    #     self._delay_retrials = None
+    #     self._custom_directives = None
+    #     if hasattr(self, 'packed_during_building'):
+    #         self.packed_during_building = False
+    #     # Tentative
+    #     self._platform = None
+    #     self._parents = set()
+    #     self.children = set()
 
 
     def _init_runtime_parameters(self):
@@ -580,7 +588,7 @@ class Job(object):
     def wallclock(self, value):
         if value:
             self._wallclock = value
-            if not self._wallclock_in_seconds or self.status not in [Status.RUNNING, Status.QUEUING, Status.SUBMITTED]:
+            if self._wallclock and (not self._wallclock_in_seconds or self.status not in [Status.RUNNING, Status.QUEUING, Status.SUBMITTED]):
                 # Should always take the max_wallclock set in the platform, this is set as fallback
                 # (and local platform doesn't have a max_wallclock defined)
                 wallclock_parsed = self.parse_time(self._wallclock)
@@ -1965,9 +1973,12 @@ class Job(object):
                 as_conf.get_extensible_wallclock(as_conf.experiment_data["WRAPPERS"].get(wrapper_section)))
         return parameters
 
-    def update_dict_parameters(self,as_conf):
-        self.retrials = as_conf.jobs_data.get(self.section,{}).get("RETRIALS", as_conf.experiment_data.get("CONFIG",{}).get("RETRIALS", 0))
-        for wrapper_data in ( wrapper for wrapper in as_conf.experiment_data.get("WRAPPERS",{}).values() if type(wrapper) is dict):
+    def update_dict_parameters(self, as_conf):
+        self.retrials = as_conf.jobs_data.get(self.section, {}).get("RETRIALS",
+                                                                    as_conf.experiment_data.get("CONFIG", {}).get(
+                                                                        "RETRIALS", 0))
+        for wrapper_data in (wrapper for wrapper in as_conf.experiment_data.get("WRAPPERS", {}).values() if
+                             type(wrapper) is dict):
             jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", "").upper()
             if "," in jobs_in_wrapper:
                 jobs_in_wrapper = jobs_in_wrapper.split(",")
@@ -1976,15 +1987,19 @@ class Job(object):
             if self.section.upper() in jobs_in_wrapper:
                 self.retrials = wrapper_data.get("RETRIALS", self.retrials)
         if not self.splits:
-            self.splits = as_conf.jobs_data.get(self.section,{}).get("SPLITS", None)
-        self.delete_when_edgeless = as_conf.jobs_data.get(self.section,{}).get("DELETE_WHEN_EDGELESS", True)
-        self.dependencies = str(as_conf.jobs_data.get(self.section,{}).get("DEPENDENCIES",""))
-        self.running = as_conf.jobs_data.get(self.section,{}).get("RUNNING", "once")
-        self.platform_name = as_conf.jobs_data.get(self.section,{}).get("PLATFORM", as_conf.experiment_data.get("DEFAULT",{}).get("HPCARCH", None))
-        self.file = as_conf.jobs_data.get(self.section,{}).get("FILE", None)
-        self.additional_files = as_conf.jobs_data.get(self.section,{}).get("ADDITIONAL_FILES", [])
-
-        type_ = str(as_conf.jobs_data.get(self.section,{}).get("TYPE", "bash")).lower()
+            self.splits = as_conf.jobs_data.get(self.section, {}).get("SPLITS", None)
+        self.delete_when_edgeless = as_conf.jobs_data.get(self.section, {}).get("DELETE_WHEN_EDGELESS", True)
+        self.dependencies = str(as_conf.jobs_data.get(self.section, {}).get("DEPENDENCIES", ""))
+        self.running = as_conf.jobs_data.get(self.section, {}).get("RUNNING", "once")
+        self.platform_name = as_conf.jobs_data.get(self.section, {}).get("PLATFORM",
+                                                                         as_conf.experiment_data.get("DEFAULT", {}).get(
+                                                                             "HPCARCH", None))
+        self.file = as_conf.jobs_data.get(self.section, {}).get("FILE", None)
+        self.additional_files = as_conf.jobs_data.get(self.section, {}).get("ADDITIONAL_FILES", [])
+        global_wallclock = as_conf.experiment_data.get("CONFIG", {}).get("JOB_WALLCLOCK", "24:00")
+        platform_wallclock = as_conf.platforms_data.get(self.platform_name, {}).get("WALLCLOCK", as_conf.platforms_data.get(self.platform_name, {}).get("WALLCLOCK", global_wallclock))
+        self.wallclock = as_conf.jobs_data.get(self.section, {}).get("WALLCLOCK", platform_wallclock)
+        type_ = str(as_conf.jobs_data.get(self.section, {}).get("TYPE", "bash")).lower()
         if type_ == "bash":
             self.type = Type.BASH
         elif type_ == "python" or type_ == "python3":
@@ -1995,8 +2010,8 @@ class Job(object):
             self.type = Type.PYTHON2
         else:
             self.type = Type.BASH
-        self.ext_header_path = as_conf.jobs_data.get(self.section,{}).get('EXTENDED_HEADER_PATH', None)
-        self.ext_tailer_path = as_conf.jobs_data.get(self.section,{}).get('EXTENDED_TAILER_PATH', None)
+        self.ext_header_path = as_conf.jobs_data.get(self.section, {}).get('EXTENDED_HEADER_PATH', None)
+        self.ext_tailer_path = as_conf.jobs_data.get(self.section, {}).get('EXTENDED_TAILER_PATH', None)
         if self.platform_name:
             self.platform_name = self.platform_name.upper()
 
