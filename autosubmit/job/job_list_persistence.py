@@ -82,18 +82,18 @@ class JobListPersistencePkl(JobListPersistence):
             try:
                 shutil.copy(path, path_tmp)
                 with open(path_tmp, 'rb') as fd:
-                    graph = pickle.load(fd)
+                    job_list = pickle.load(fd)
             finally:
                 os.remove(path_tmp)
-            for u in ( node for node in graph ):
-                # Set after the dependencies are set
-                graph.nodes[u]["job"].children = set()
-                graph.nodes[u]["job"].parents = set()
-                # Set in recovery/run
-                graph.nodes[u]["job"]._platform = None
-                graph.nodes[u]["job"]._serial_platform = None
-                graph.nodes[u]["job"].submitter = None
-            return graph
+            # for u in ( node for node in graph ):
+            #     # Set after the dependencies are set
+            #     graph.nodes[u]["job"].children = set()
+            #     graph.nodes[u]["job"].parents = set()
+            #     # Set in recovery/run
+            #     graph.nodes[u]["job"]._platform = None
+            #     graph.nodes[u]["job"]._serial_platform = None
+            #     graph.nodes[u]["job"].submitter = None
+            return job_list
 
     def save(self, persistence_path, persistence_file, job_list, graph):
         """
@@ -111,7 +111,7 @@ class JobListPersistencePkl(JobListPersistence):
         setrecursionlimit(500000000)
         Log.debug("Saving JobList: " + path)
         with open(path, 'wb') as fd:
-            pickle.dump(graph, fd, pickle.HIGHEST_PROTOCOL)
+            pickle.dump({job.name: job for job in job_list}, fd, pickle.HIGHEST_PROTOCOL)
         os.replace(path, path[:-4])
         Log.debug(f'JobList saved in {path[:-4]}')
 

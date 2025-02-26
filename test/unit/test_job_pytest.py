@@ -164,7 +164,7 @@ def test_update_parameters_attributes(autosubmit_config, experiment_data, attrib
     False,
     True,
 ], ids=["Simple job", "Wrapped job"])
-def test_adjust_new_parameters(test_packed):
+def test_adjust_loaded_parameters(test_packed):
     job = Job('dummy', '1', 0, 1)
     stored_log_path = job._log_path
     job.wallclock = "00:01"
@@ -174,7 +174,7 @@ def test_adjust_new_parameters(test_packed):
     del job._log_path
     del job.ready_date
     job.packed = test_packed
-    job._adjust_new_parameters()
+    job.adjust_loaded_parameters()
     assert job.ready_date is None
     assert job.is_wrapper == test_packed
     assert int(job._wallclock_in_seconds) == int(60*1.3)

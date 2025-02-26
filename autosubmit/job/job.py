@@ -171,8 +171,11 @@ class Job(object):
         return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in excluded])
 
     def __setstate__(self, state):
+        slot = None
+        value = None
         for slot, value in state.items():
             setattr(self, slot, value)
+        pass
 
     CHECK_ON_SUBMISSION = 'on_submission'
 
@@ -306,7 +309,7 @@ class Job(object):
         self.end_time_timestamp = None
         self.packed_during_building = False
 
-    def adjust_new_parameters(self) -> None:
+    def adjust_loaded_parameters(self) -> None:
         """
         Adjusts job parameters for compatibility with newer added attributes.
         """
@@ -332,6 +335,9 @@ class Job(object):
 
         if not hasattr(self, 'packed_during_building'):  # Added in 4.1.12
             self.packed_during_building = False
+
+        if not hasattr(self, '_platform'):
+            self._platform = None
 
     def clean_attributes(self):
         self.rerun_only = False
@@ -852,7 +858,7 @@ class Job(object):
 
     @property
     def is_serial(self):
-        return str(self.processors) == '1' or str(self.processors) == ''
+        return not self.nodes and (not self.processors or str(self.processors) == '1')
 
     @property
     def platform(self):
