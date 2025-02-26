@@ -456,15 +456,15 @@ class JobList(object):
             self.find_and_delete_redundant_relations(problematic_jobs)
         self._add_all_jobs_edge_info(dic_jobs, option)
 
-    def find_and_delete_redundant_relations(self, problematic_jobs):
-        '''
+    def find_and_delete_redundant_relations(self, problematic_jobs: dict) -> None:
+        """
         Jobs with intrisic rules than can't be safelty not added without messing other workflows.
         The graph will have the least amount of edges added as much as safely possible before this function.
         Structure:
         problematic_jobs structure is {section: {child_name: [parent_names]}}
 
         :return:
-        '''
+        """
         delete_relations = set()
         for section, jobs in problematic_jobs.items():
             for child_name, parents in jobs.items():
@@ -481,7 +481,7 @@ class JobList(object):
 
 
     @staticmethod
-    def _manage_dependencies(dependencies_keys, dic_jobs):
+    def _manage_dependencies(dependencies_keys: dict, dic_jobs: DicJobs) -> dict[Any, Dependency]:
         parameters = dic_jobs.experiment_data["JOBS"]
         dependencies = dict()
         for key in list(dependencies_keys):
@@ -550,7 +550,7 @@ class JobList(object):
         return final_values
 
     @staticmethod
-    def _parse_filter_to_check(value_to_check, value_list=[], level_to_check="DATES_FROM", splits=None):
+    def _parse_filter_to_check(value_to_check, value_list=[], level_to_check="DATES_FROM", splits=None) -> []:
         """
         Parse the filter to check and return the value to check.
         Selection process:
@@ -699,7 +699,7 @@ class JobList(object):
             filters = [{}]
         return filters
 
-    def _check_dates(self, relationships, current_job):
+    def _check_dates(self, relationships: Dict, current_job: Job) -> {}:
         """
         Check if the current_job_value is included in the filter_from and retrieve filter_to value
         :param relationships: Remaining filters to apply.
@@ -729,7 +729,7 @@ class JobList(object):
         # {DATES_TO: "20020201", MEMBERS_TO: "fc2", CHUNKS_TO: "ALL", SPLITS_TO: "2"}
         return filters_to_apply
 
-    def _check_members(self, relationships, current_job):
+    def _check_members(self, relationships: Dict, current_job: Job) -> Dict:
         """
         Check if the current_job_value is included in the filter_from and retrieve filter_to value
         :param relationships: Remaining filters to apply.
@@ -749,7 +749,7 @@ class JobList(object):
         filters_to_apply = self._unify_to_filters(filters_to_apply)
         return filters_to_apply
 
-    def _check_chunks(self, relationships, current_job):
+    def _check_chunks(self, relationships: Dict, current_job: Job) -> {}:
         """
         Check if the current_job_value is included in the filter_from and retrieve filter_to value
         :param relationships: Remaining filters to apply.
@@ -779,7 +779,7 @@ class JobList(object):
         filters_to_apply = self._unify_to_filters(filters_to_apply, current_job.splits)
         return filters_to_apply
 
-    def _unify_to_filter(self, unified_filter, filter_to, filter_type, splits = None):
+    def _unify_to_filter(self, unified_filter, filter_to, filter_type, splits = None) -> {}:
         """
         Unify filter_to filters into a single dictionary
         :param unified_filter: Single dictionary with all filters_to
@@ -818,13 +818,9 @@ class JobList(object):
                                                                     level_to_check=filter_type, splits=splits)
                     # convert list to str
                     skip = False
-                    if isinstance(parsed_element, list):
-                        # check if any element is natural or none
-                        for ele in parsed_element:
-                            if type(ele) is str and ele.lower() in ["natural", "none"]:
-                                skip = True
-                    else:
-                        if type(parsed_element) is str and parsed_element.lower() in ["natural", "none"]:
+                    # check if any element is natural or none
+                    for ele in parsed_element:
+                        if type(ele) is str and ele.lower() in ["natural", "none"]:
                             skip = True
                     if skip and len(unified_filter[filter_type]) > 0:
                         continue
@@ -839,7 +835,7 @@ class JobList(object):
         return unified_filter
 
     @staticmethod
-    def _normalize_to_filters(filter_to, filter_type):
+    def _normalize_to_filters(filter_to: dict, filter_type: str) -> None:
         """
         Normalize filter_to filters to a single string or "all"
         :param filter_to: Unified filter_to dictionary

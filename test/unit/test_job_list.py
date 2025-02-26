@@ -13,9 +13,12 @@ import tempfile
 from mock import Mock, patch
 from random import randrange
 from pathlib import Path
+
+
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_common import Type
+from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
@@ -130,13 +133,6 @@ class TestJobList(TestCase):
             self.assertEqual(job_list_to_load._job_list, job_list._job_list)
             job_list_to_load.load(True)
             self.assertEqual(job_list_to_load._job_list, job_list._job_list)
-
-
-
-
-
-
-
 
     def test_get_job_list_returns_the_right_list(self):
         job_list = self.job_list.get_job_list()
@@ -355,6 +351,7 @@ class TestJobList(TestCase):
             'fake-section-1', 0, Type.BASH)
         dic_mock.read_section.assert_any_call(
             'fake-section-2', 1, Type.BASH)
+
     # autosubmit run -rm "fc0"
     def test_run_member(self):
         parser_mock = Mock()
@@ -401,7 +398,6 @@ class TestJobList(TestCase):
         job_list_aux = copy(job_list)
         job_list_aux.run_members = "not_exists"
         self.assertEqual(len(job_list_aux._job_list), 0)
-
 
     #autosubmit/job/job_list.py:create_dictionary - line 132
     def test_create_dictionary(self):
@@ -463,7 +459,6 @@ class TestJobList(TestCase):
                                        wrapper_jobs, self.as_conf)
             # assert
             self.assertEqual(len(job_list._ordered_jobs_by_date_member["WRAPPER_FAKESECTION"]["fake-date1"]["fake-member1"]), 1)
-
 
     def new_job_list(self,factory,temp_dir):
         job_list = JobList(self.experiment_id, FakeBasicConfig,
@@ -658,6 +653,38 @@ class TestJobList(TestCase):
                     self.assertTrue(job_list3.graph.nodes[node]["job"] in job_list3._job_list)
 
 
+    def test_find_and_delete_redundant_relations(self):
+        problematic_jobs = {'SECTION': {'CHILD': ['parents_names','parents_names1','parents_names2'], 'CHILD2':['parents_names3','parents_names4']}}
+        self.setUp()
+        with patch('autosubmit.job.job_list.DiGraph.has_successor') as mock_job_list:
+            try:
+                mock_job_list.return_value = True
+                assert self.job_list.find_and_delete_redundant_relations(problematic_jobs) is None
+                mock_job_list.return_value = False
+                assert self.job_list.find_and_delete_redundant_relations(problematic_jobs) is None
+
+            except Exception as e:
+                assert f'Find and delete redundant relations ran into an Error deleting the relationship between parent and child: {e}'
+
+    def test_normalize_to_filters(self):
+        """
+        validating behaviour of _normalize_to_filters
+        """
+        dict_filter = [
+            {"DATES_TO": ""},
+            {"DATES_TO": "all"},
+            {"DATES_TO": "20020205,[20020207:20020208],"},
+            {"DATES_TO": ",20020205,[20020207:20020208]"}
+            # ,{"DATES_TO": 123} # Error Case
+        ]
+        filter_type = "DATES_TO"
+
+        for filter_to in dict_filter:
+            try:
+                self.job_list._normalize_to_filters(filter_to, filter_type)
+            except Exception as e:
+                print(f'Unexpected exception raised: {e}')
+                assert not bool(e)
 
 
 
@@ -673,6 +700,7 @@ class TestJobList(TestCase):
 class FakeBasicConfig:
     def __init__(self):
         pass
+
     def props(self):
         pr = {}
         for name in dir(self):
@@ -680,6 +708,7 @@ class FakeBasicConfig:
             if not name.startswith('__') and not inspect.ismethod(value) and not inspect.isfunction(value):
                 pr[name] = value
         return pr
+
     DB_DIR = '/dummy/db/dir'
     DB_FILE = '/dummy/db/file'
     DB_PATH = '/dummy/db/path'
@@ -689,3 +718,43 @@ class FakeBasicConfig:
     DEFAULT_PLATFORMS_CONF = ''
     DEFAULT_JOBS_CONF = ''
     STRUCTURES_DIR = '/dummy/structure/dir'
+
+
+def test_manage_dependencies():
+    """
+    testing function _manage_dependencies from job_list
+    """
+    dependencies_keys = {'dummy=1':
+                             { 'test', 'test2' }
+                        ,'dummy-2':
+                             { 'test', 'test2' },
+                        'dummy+3': "", 'dummy*4': "", 'dummy?5': ""
+                    }
+
+    experiment_id = 'random-id'
+
+    as_conf = Mock()
+    as_conf.experiment_data = dict()
+    as_conf.experiment_data["JOBS"] = {}
+    as_conf.jobs_data = as_conf.experiment_data["JOBS"]
+    as_conf.experiment_data["PLATFORMS"] = {}
+
+    joblist_persistence = JobListPersistencePkl()
+    job_list = JobList(experiment_id, FakeBasicConfig, YAMLParserFactory(),joblist_persistence, as_conf)
+
+    job = {'dummy':
+               {'dummy': 'SIM.sh',
+                   'RUNNING': 'once'},
+            'RUNNING': 'once',
+            'dummy*4':{}
+    }
+
+    dic_jobs_fake = DicJobs(['fake-date1', 'fake-date2'],
+                            ['fake-member1', 'fake-member2'], list(range(2, 10 + 1)),
+                            'H', 1, as_conf)
+    dic_jobs_fake.experiment_data["JOBS"] = job
+    dependency = job_list._manage_dependencies(dependencies_keys, dic_jobs_fake)
+    assert len(dependency) == 3
+    for job in dependency:
+        assert job in dependencies_keys
+

@@ -249,11 +249,13 @@ def transitive_reduction(graph) -> DiGraph:
         graph.nodes[u]["job"].add_children([graph.nodes[v]["job"] for v in graph[u]])
     return graph
 
-def get_job_package_code(expid, job_name) -> int:
+
+def get_job_package_code(expid: str, job_name: str) -> int:
+
     """
     Finds the package code and retrieves it. None if no package.
 
-    :param job_name:
+    :param job_name: String
     :param expid: Experiment ID
     :type expid: String
 
@@ -282,8 +284,10 @@ class Dependency(object):
 
     """
 
+
     def __init__(self, section, distance=None, running=None, sign=None,
                  delay=-1, splits=None,relationships=None) -> None:
+
         self.section = section
         self.distance = distance
         self.running = running
@@ -309,8 +313,10 @@ class SubJob(object):
     Class to manage package times
     """
 
+
     def __init__(self, name, package=None, queue=0, run=0, total=0,
                  status="UNKNOWN") -> None:
+
         self.name = name
         self.package = package
         self.queue = queue
@@ -327,8 +333,10 @@ class SubJobManager(object):
     Class to manage list of SubJobs
     """
 
+
     def __init__(self, subjoblist, job_to_package=None, package_to_jobs=None,
                  current_structure=None) -> None:
+
         self.subjobList = subjoblist
         # print("Number of jobs in SubManager : {}".format(len(self.subjobList)))
         self.job_to_package = job_to_package

@@ -29,8 +29,7 @@ from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import AutosubmitCritical, Log
 
 
-def handle_start_time(start_time):
-    # type: (str) -> None
+def handle_start_time(start_time: str) -> None:
     """ Wait until the supplied time. """
     if start_time:
         Log.info("User provided starting time has been detected.")
