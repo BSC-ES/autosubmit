@@ -1114,11 +1114,13 @@ class JobPackagerHorizontal(object):
 
     def create_components_dict(self):
         self._sectionList = []
+        # it was job.parameters
+        parameters = {}  # TODO machinefiles, can wait nobody is using it and I really think this was not working before anyway
         for job in self.job_list:
             if job.section not in self._sectionList:
                 self._sectionList.append(job.section)
             if job.section not in self._components_dict:
                 self._components_dict[job.section] = dict()
                 self._components_dict[job.section]['COMPONENTS'] = {parameter: job.parameters[parameter]
-                                                                    for parameter in list(job.parameters.keys())
+                                                                    for parameter in list(parameters.keys())
                                                                     if '_NUMPROC' in parameter}

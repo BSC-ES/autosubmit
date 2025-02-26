@@ -111,7 +111,7 @@ class JobListPersistencePkl(JobListPersistence):
         setrecursionlimit(500000000)
         Log.debug("Saving JobList: " + path)
         with open(path, 'wb') as fd:
-            pickle.dump({job.name: job for job in job_list}, fd, pickle.HIGHEST_PROTOCOL)
+            pickle.dump({job.name: job.getstate() for job in job_list}, fd, pickle.HIGHEST_PROTOCOL)
         os.replace(path, path[:-4])
         Log.debug(f'JobList saved in {path[:-4]}')
 
