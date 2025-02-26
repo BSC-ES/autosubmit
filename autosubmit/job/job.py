@@ -171,11 +171,19 @@ class Job(object):
         return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in excluded])
 
     def __setstate__(self, state):
-        slot = None
-        value = None
+        for slot, value in state.items():
+            setattr(self, slot, value)
+
+
+    def setstate(self, state):
         for slot, value in state.items():
             setattr(self, slot, value)
         pass
+
+    def getstate(self):
+        excluded = ["_platform", "_children", "_parents", "submitter", "_log_path"]
+        return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in excluded])
+
 
     CHECK_ON_SUBMISSION = 'on_submission'
 

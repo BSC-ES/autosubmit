@@ -15,6 +15,7 @@
 # GNU General Public License for more details.
 
 import collections
+import gc
 import locale
 import platform
 import requests
@@ -2072,6 +2073,7 @@ class Autosubmit:
 
         Log.debug("Checking job_list current status")
         job_list.update_list(as_conf, first_time=True)
+        job_list.clear_generate()
         job_list.save()
         as_conf.save()
         if not recover:
@@ -4574,6 +4576,7 @@ class Autosubmit:
                         job_list.add_logs(prev_job_list_logs)
                     Log.info("\nSaving the jobs list...")
                     prev_job_list_logs = None
+                    job_list.clear_generate()
                     job_list.save()
                     as_conf.save()
                     try:
@@ -4647,7 +4650,7 @@ class Autosubmit:
                     os.fsync(fh.fileno())
                     if detail:
                         Autosubmit.detail(job_list)
-                    return True
+                    return 0
                 # catching Exception
                 except KeyboardInterrupt:
                     # Setting signal handler to handle subsequent CTRL-C
@@ -4660,6 +4663,7 @@ class Autosubmit:
         finally:
             if profile:
                 profiler.stop()
+
 
     @staticmethod
     def detail(job_list):

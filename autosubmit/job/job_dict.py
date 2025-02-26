@@ -645,12 +645,16 @@ class DicJobs:
             section_data.append(job)
             self.changes["NEWJOBS"] = True
         else:
-            self._job_list[name].adjust_loaded_parameters()
-            self._job_list[name].update_dict_parameters(self.as_conf)
-            self._job_list[name].status = Status.WAITING if self._job_list[name].status in [Status.DELAYED,
+            job = Job(name, 0, Status.WAITING, priority)
+            job.setstate(self._job_list[name])
+            self.job_list[name] = None
+            del self.job_list[name]
+            job.adjust_loaded_parameters()
+            job.update_dict_parameters(self.as_conf)
+            job.status = Status.WAITING if job.status in [Status.DELAYED,
                                                                                             Status.PREPARED,
                                                                                             Status.READY] else \
-                self._job_list[name].status
-            section_data.append(self._job_list[name])
-            self._job_list[name].splits = splits
+                job.status
+            section_data.append(job)
+            job.splits = splits
         self.workflow_jobs.append(name)

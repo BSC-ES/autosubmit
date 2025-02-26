@@ -118,7 +118,7 @@ class JobList(object):
 
     @property
     def jobs_data(self):
-        return self.experiment_data["JOBS"]
+        return self.as_conf.experiment_data["JOBS"]
 
     @property
     def run_members(self):
@@ -225,8 +225,8 @@ class JobList(object):
         try:
             loaded_job_list = self.load(create)
             Log.result("Load finished")
-        except:
-            Log.warning("Couldn't load the old job_list")
+        except BaseException as e:
+            Log.warning(f"Couldn't load the old job_list {e}")
             loaded_job_list = None
 
 
@@ -285,7 +285,6 @@ class JobList(object):
         if new:
             for job in self._job_list:
                 job._fail_count = 0
-                job.parameters = parameters
                 if not job.has_parents():
                     job.status = Status.READY
                 else:
@@ -318,9 +317,14 @@ class JobList(object):
                         job_platform = submitter.platforms[job.platform_name]
                     first = False
                 job.platform = job_platform
-            # clean
-            pass
 
+    def clear_generate(self):
+        self.dependency_map = {}
+        self.experiment_data = {}
+        self.parameters = {}
+        self._parameters = {}
+        self.graph = None
+        gc.collect()
     def split_by_platform(self):
         """
         Splits the job list by platform name
@@ -2708,7 +2712,7 @@ class JobList(object):
         Log.debug('Updating FAILED jobs')
         if not first_time:
             for job in self.get_failed():
-                if self.jobs_data[job.section].get("RETRIALS", None) is None:
+                if self.as_conf.jobs_data[job.section].get("RETRIALS", None) is None:
                     retrials = int(as_conf.get_retrials())
                 else:
                     retrials = int(job.retrials)
@@ -2725,7 +2729,7 @@ class JobList(object):
                             else:
                                 aux_job_delay = int(job.delay_retrials)
 
-                        if self.jobs_data[job.section].get("DELAY_RETRY_TIME", None) or aux_job_delay <= 0:
+                        if self.as_conf.jobs_data[job.section].get("DELAY_RETRY_TIME", None) or aux_job_delay <= 0:
                             delay_retry_time = str(as_conf.get_delay_retry_time())
                         else:
                             delay_retry_time = job.retry_delay
@@ -2982,7 +2986,7 @@ class JobList(object):
         out = True
         for job in self._job_list:
             show_logs = job.check_warnings
-            if not job.check_script(as_conf, self.parameters, show_logs):
+            if not job.check_script(as_conf, as_conf.parameters, show_logs):
                 out = False
         return out
 
@@ -3027,7 +3031,7 @@ class JobList(object):
             else:
                 if job.section in self.sections_checked:
                     show_logs = "false"
-            if not job.check_script(as_conf, self.parameters, show_logs):
+            if not job.check_script(as_conf, as_conf.parameters, show_logs):
                 out = False
             self.sections_checked.add(job.section)
         if out:
