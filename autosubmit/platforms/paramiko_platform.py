@@ -272,8 +272,12 @@ class ParamikoPlatform(Platform):
             self._ssh = paramiko.SSHClient()
             self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self._ssh_config = paramiko.SSHConfig()
-            if as_conf is not None:
+            if as_conf:
                 self.map_user_config_file(as_conf)
+            else:
+                with open(os.path.expanduser("~/.ssh/config"), "r") as fd:
+                    self._ssh_config.parse(fd)
+
             self._host_config = self._ssh_config.lookup(self.host)
             if "," in self._host_config['hostname']:
                 if reconnect:

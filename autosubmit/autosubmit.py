@@ -2127,6 +2127,9 @@ class Autosubmit:
     @staticmethod
     def check_logs_status(job_list, as_conf, new_run):
         for job in job_list.get_completed_failed_without_logs():
+            if new_run:
+                job.platform.spawn_log_retrieval_process(as_conf)
+
             job_list.update_log_status(job, as_conf, new_run)
 
     @staticmethod
@@ -2156,7 +2159,7 @@ class Autosubmit:
             profiler = Profiler(expid)
             profiler.start()
 
-        # Initialize common folders
+        # Initialize common folders'
         try:
             exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
             tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -2173,7 +2176,7 @@ class Autosubmit:
                     job_list, submitter , exp_history, host , as_conf, platforms_to_test, packages_persistence, _ = Autosubmit.prepare_run(expid, notransitive, start_time, start_after, run_only_members)
                 except AutosubmitCritical as e:
                     #e.message += " HINT: check the CUSTOM_DIRECTIVE syntax in your jobs configuration files."
-                    raise AutosubmitCritical(e.message, 7014, e.trace)
+                    raise
                 except Exception as e:
                     raise AutosubmitCritical("Error in run initialization", 7014, str(e))  # Changing default to 7014
                 Log.debug("Running main running loop")
@@ -2432,6 +2435,7 @@ class Autosubmit:
         platform_issues = ""
         ssh_config_issues = ""
         private_key_error = "Please, add your private key to the ssh-agent ( ssh-add <path_to_key> ) or use a non-encrypted key\nIf ssh agent is not initialized, prompt first eval `ssh-agent -s`"
+
         for platform in platform_to_test:
             platform_issues = ""
             try:
