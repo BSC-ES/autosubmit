@@ -25,7 +25,7 @@ def recover_platform_job_logs_wrapper(platform, recovery_queue, worker_event, cl
     platform.cleanup_event = cleanup_event
     platform.recover_platform_job_logs()
     _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
-    
+
 class UniqueQueue(Queue):
     """
     A queue that avoids retrieves the same job and retrial during the same run.
@@ -1020,6 +1020,25 @@ class Platform(object):
 
         Args:
             timeout (int): Maximum time to wait in seconds. Defaults to 60.
+        Returns:
+            bool: True if there is work to process, False otherwise.
+        """
+        process_log = False
+        while timeout > 0:
+            if not self.recovery_queue.empty() or self.cleanup_event.is_set() or self.work_event.is_set():
+                process_log = True
+                break
+            time.sleep(1)
+            timeout -= 1
+        return process_log
+
+    def wait_for_work(self, sleep_time: int = 60) -> bool:
+        """
+        Waits for work to process, first for a mandatory time and then until the keep_alive_timeout is reached.
+
+        Args:
+            sleep_time (int): Minimum time to wait in seconds. Defaults to 60.
+
 
         Returns:
             bool: True if there is work to process, False otherwise.
