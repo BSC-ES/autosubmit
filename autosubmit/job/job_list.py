@@ -117,10 +117,6 @@ class JobList(object):
         return self._expid
 
     @property
-    def jobs_data(self):
-        return self.as_conf.experiment_data["JOBS"]
-
-    @property
     def run_members(self):
         return self._run_members
 
@@ -154,7 +150,7 @@ class JobList(object):
                     wrapper_jobs[wrapper_section])
             else:
                 self._ordered_jobs_by_date_member[wrapper_section] = {}
-        pass
+
 
     def _delete_edgeless_jobs(self):
         # indices to delete
@@ -1549,7 +1545,7 @@ class JobList(object):
             for section in wrapper_jobs:
                 # RUNNING = once, as default. This value comes from jobs_.yml
                 try:
-                    sections_running_type_map[section] = str(self.jobs_data[section].get("RUNNING", 'once'))
+                    sections_running_type_map[section] = str(self.experiment_data["JOBS"][section].get("RUNNING", 'once'))
                 except BaseException as e:
                     raise AutosubmitCritical("Key {0} doesn't exists.".format(section), 7014, str(e))
 
@@ -2712,7 +2708,7 @@ class JobList(object):
         Log.debug('Updating FAILED jobs')
         if not first_time:
             for job in self.get_failed():
-                if self.as_conf.jobs_data[job.section].get("RETRIALS", None) is None:
+                if as_conf.jobs_data[job.section].get("RETRIALS", None) is None:
                     retrials = int(as_conf.get_retrials())
                 else:
                     retrials = int(job.retrials)
@@ -2729,7 +2725,7 @@ class JobList(object):
                             else:
                                 aux_job_delay = int(job.delay_retrials)
 
-                        if self.as_conf.jobs_data[job.section].get("DELAY_RETRY_TIME", None) or aux_job_delay <= 0:
+                        if as_conf.jobs_data[job.section].get("DELAY_RETRY_TIME", None) or aux_job_delay <= 0:
                             delay_retry_time = str(as_conf.get_delay_retry_time())
                         else:
                             delay_retry_time = job.retry_delay
