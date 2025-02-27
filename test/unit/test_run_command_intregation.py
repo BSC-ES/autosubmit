@@ -324,10 +324,8 @@ def check_profile(run_tmpdir) -> bool:
     """
     # write jobs_data
     profile_path = Path(f"{run_tmpdir.strpath}/t000/tmp/profile/")
-    if profile_path.exists():
-            return True
-    else:
-        return False
+    return profile_path.exists()
+
 
 
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status", [

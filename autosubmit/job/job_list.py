@@ -550,7 +550,7 @@ class JobList(object):
         return final_values
 
     @staticmethod
-    def _parse_filter_to_check(value_to_check, value_list=[], level_to_check="DATES_FROM", splits=None) -> []:
+    def _parse_filter_to_check(value_to_check, value_list=[], level_to_check="DATES_FROM", splits=None) -> list:
         """
         Parse the filter to check and return the value to check.
         Selection process:
