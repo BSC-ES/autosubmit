@@ -473,6 +473,7 @@ def test_run_interrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries
     from time import sleep
     log_dir = init_run(run_tmpdir, jobs_data)
     # Run the experiment
+<<<<<<< HEAD
     exit_code = Autosubmit.run_experiment(expid='t000')
     sleep(2)
     Autosubmit.stop(all=False, cancel=False, current_status='SUBMITTED, QUEUING, RUNNING', expids='t000', force=True,
@@ -487,3 +488,11 @@ def test_run_interrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries
     assert_files_recovered(files_check_list)
     # TODO: GITLAB pipeline is not returning 0 or 1 for check_exit_code(final_status, exit_code)
     # assert_exit_code(final_status, exit_code)
+=======
+    try:
+        Autosubmit.run_experiment(expid='t000', profile=profiler)
+        assert check_profile(run_tmpdir)
+    except Exception as exc:
+        print(f"test_run_uninterrupted_profile raised an exception: {exc}")
+        assert False
+>>>>>>> a4aaf377 (adjusting call of function)
