@@ -1016,6 +1016,22 @@ class Platform(object):
                 break
         return process_log
 
+    def wait_for_work(self, sleep_time: int = 60) -> bool:
+        """
+        Waits a mandatory time and then waits until there is work, no work to more process or the cleanup event is set.
+
+        Args:
+            sleep_time (int): Maximum time to wait in seconds. Defaults to 60.
+
+        Returns:
+            bool: True if there is work to process, False otherwise.
+        """
+        process_log = self.wait_mandatory_time(sleep_time)
+        if not process_log:
+            process_log = self.wait_until_timeout(self.keep_alive_timeout - sleep_time)
+        self.work_event.clear()
+        return process_log
+
     def wait_until_timeout(self, timeout: int = 60) -> bool:
         """
         Waits until the timeout is reached or any signal is set to process logs.
@@ -1026,10 +1042,12 @@ class Platform(object):
         Returns:
             bool: True if there is work to process, False otherwise.
         """
-        process_log = self.wait_mandatory_time(timeout)
-        if not process_log:
-            process_log = self.wait_until_timeout(self.keep_alive_timeout - timeout)
-        self.work_event.clear()
+        process_log = False
+        for _ in range(timeout, 0, -1):
+            time.sleep(1)
+            if self.work_event.is_set() or not self.recovery_queue.empty() or self.cleanup_event.is_set():
+                process_log = True
+                break
         return process_log
 
     def recover_job_log(self, identifier: str, jobs_pending_to_process: Set[Any]) -> Set[Any]:
@@ -1103,7 +1121,7 @@ class Platform(object):
             log_recovery_timeout = self.config.get("LOG_RECOVERY_TIMEOUT", 60)
             # Keep alive signal timeout is 5 minutes, but the sleeptime is 60 seconds.
             self.keep_alive_timeout = max(log_recovery_timeout*5, 60*5)
-            while self.wait_until_timeout(timeout=max(log_recovery_timeout, 60)):
+            while self.wait_for_work(sleep_time=max(log_recovery_timeout, 60)):
                 jobs_pending_to_process = self.recover_job_log(identifier, jobs_pending_to_process)
                 if self.cleanup_event.is_set():  # Check if the main process is waiting for this child to end.
                     self.recover_job_log(identifier, jobs_pending_to_process)
