@@ -440,4 +440,5 @@ def test_run_profile(run_tmpdir, jobs_data, profiler):
         Autosubmit.run_experiment(expid='t000', profile=profiler)
         assert check_profile(run_tmpdir)
     except Exception as exc:
-        assert False, f"test_run_uninterrupted_profile raised an exception: {exc}"
+        print(f"test_run_uninterrupted_profile raised an exception: {exc}")
+        assert False
