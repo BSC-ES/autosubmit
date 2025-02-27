@@ -80,7 +80,7 @@ def calendar_unitsize_isgreater(split_unit,chunk_unit) -> bool:
 def calendar_unitsize_getlowersize(unitsize) -> str:
     """
     Get the lower size of a calendar unit
-    :return: String
+    :return: str
     """
     unit_size = unitsize.lower()
     unit_value = CALENDAR_UNITSIZE_ENUM[unit_size]
@@ -94,7 +94,7 @@ def calendar_get_month_days(date_str) -> int:
     """
     Get the number of days in a month
     :param date_str: Date in string format (YYYYMMDD)
-    :return: Integer
+    :return: int
     """
     year = int(date_str[0:4])
     month = int(date_str[4:6])
@@ -134,7 +134,7 @@ def calendar_split_size_isvalid(date_str, split_size, split_unit,
     :param split_size: Size of the split
     :param split_unit: Unit of the split
     :param chunk_size_in_hours: chunk size in hours
-    :return: Boolean
+    :return: bool
     """
     if is_leap_year(int(date_str[0:4])):
         num_days_in_a_year = 366
@@ -162,7 +162,7 @@ def calendar_chunk_section(exp_data, section, date, chunk) -> int:
     Calendar for chunks
     :param section:
     :param parameters:
-    :return: Integer
+    :return: int
     """
     #next_auto_date = date
     splits = 0
