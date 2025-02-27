@@ -21,10 +21,10 @@ Test file for autosubmit_help.py
 """
 import datetime
 from datetime import timedelta
-from unittest.mock import patch
 
 from typing import Callable
 import pytest
+from mock.mock import patch, MagicMock
 
 import autosubmit.helpers.autosubmit_helper as helper
 from log.log import AutosubmitCritical
@@ -71,3 +71,44 @@ def test_get_allowed_members(as_member_list, ids, return_list_value, result,
     as_member_list.return_value = return_list_value
 
     assert helper.get_allowed_members(ids, as_config) == result
+
+
+@patch('autosubmit.helpers.autosubmit_helper.sleep')
+@patch('autosubmit.helpers.autosubmit_helper.ExperimentHistory.is_header_ready')
+@patch('autosubmit.helpers.autosubmit_helper.ExperimentHistory')
+@patch('autosubmit.helpers.autosubmit_helper.check_experiment_exists')
+@pytest.mark.parametrize('time, header_skip',[
+        ('a000', False),
+        ('04-00-00', False),
+        ('04:00:00', True),
+        ('2020:01:01 04:00:00', True)
+],ids=['expid instead of time','wrong format hours','right format hours','fulldate wrong format']
+)
+def teste_handle_start_after(autosubmit_helper, mock_experiment_history, mock_header_ready,
+                             mocked_sleep, autosubmit_config: Callable, time: str,
+                             header_skip: bool):
+    """
+    function to test the function handle_start_time inside autosubmit_helper
+    """
+    expid = 'a000'
+    autosubmit_config(expid, experiment_data = {})
+
+    experiment_history = experiment_history2 = MagicMock(spec='experiment_history')
+
+    experiment_history.finish = experiment_history.total = experiment_history.completed = (
+        experiment_history).suspended = experiment_history.queuing = experiment_history.running = (
+        experiment_history).failed = 0
+
+    experiment_history2.finish = experiment_history2.total = experiment_history2.completed = (
+        experiment_history2).suspended = experiment_history2.queuing = experiment_history2.running \
+        = experiment_history2.failed = 1
+
+    experiment_history.total = experiment_history2.total = 2
+
+    mock_experiment_history.return_value.manager.get_experiment_run_dc_with_max_id.side_effect = \
+        [experiment_history, experiment_history2]
+    mock_header_ready.return_value = header_skip
+    autosubmit_helper.return_value = True
+    mocked_sleep.return_value = 0
+
+    assert helper.handle_start_after(time, expid) is None
