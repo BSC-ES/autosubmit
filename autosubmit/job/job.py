@@ -363,6 +363,7 @@ class Job(object):
         if not hasattr(self, '_platform'):
             self._platform = None
 
+
     def clean_attributes(self):
         self.rerun_only = False
         self.script_name_wrapper = None
