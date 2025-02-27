@@ -242,12 +242,11 @@ def transitive_reduction(graph):
         graph.nodes[u]["job"].add_children([graph.nodes[v]["job"] for v in graph[u]])
     return graph
 
-def get_job_package_code(expid, job_name):
-    # type: (str, str) -> int
+def get_job_package_code(expid: str, job_name: str) -> int:
     """
     Finds the package code and retrieves it. None if no package.
 
-    :param job_name:
+    :param job_name: String
     :param expid: Experiment ID
     :type expid: String
 
@@ -276,7 +275,7 @@ class Dependency(object):
 
     """
 
-    def __init__(self, section, distance=None, running=None, sign=None, delay=-1, splits=None,relationships=None):
+    def __init__(self, section, distance=None, running=None, sign=None, delay=-1, splits=None,relationships=None) -> None:
         self.section = section
         self.distance = distance
         self.running = running
@@ -291,7 +290,7 @@ class SimpleJob(object):
     A simple replacement for jobs
     """
 
-    def __init__(self, name, tmppath, statuscode):
+    def __init__(self, name, tmppath, statuscode) -> None:
         self.name = name
         self._tmp_path = tmppath
         self.status = statuscode
@@ -302,7 +301,7 @@ class SubJob(object):
     Class to manage package times
     """
 
-    def __init__(self, name, package=None, queue=0, run=0, total=0, status="UNKNOWN"):
+    def __init__(self, name, package=None, queue=0, run=0, total=0, status="UNKNOWN") -> None:
         self.name = name
         self.package = package
         self.queue = queue
@@ -319,7 +318,7 @@ class SubJobManager(object):
     Class to manage list of SubJobs
     """
 
-    def __init__(self, subjoblist, job_to_package=None, package_to_jobs=None, current_structure=None):
+    def __init__(self, subjoblist, job_to_package=None, package_to_jobs=None, current_structure=None) -> None:
         self.subjobList = subjoblist
         # print("Number of jobs in SubManager : {}".format(len(self.subjobList)))
         self.job_to_package = job_to_package
@@ -330,14 +329,14 @@ class SubJobManager(object):
         self.process_index()
         self.process_times()
 
-    def process_index(self):
+    def process_index(self) -> None:
         """
         Builds a dictionary of jobname -> SubJob object. 
         """
         for subjob in self.subjobList:
             self.subjobindex[subjob.name] = subjob
 
-    def process_times(self):
+    def process_times(self) -> None:
         """
         """
         if self.job_to_package and self.package_to_jobs:
@@ -351,7 +350,7 @@ class SubJobManager(object):
                     # SubJob Name -> SubJob Object
                     local_index = dict()
                     subjobs_in_package = [x for x in self.subjobList if x.package ==
-                                                package]
+                                          package]
                     local_jobs_in_package = [job for job in subjobs_in_package]
                     # Build index
                     for sub in local_jobs_in_package:
@@ -361,7 +360,8 @@ class SubJobManager(object):
                         # If job in current_structure, store children names in dictionary
                         # local_structure: Job Name -> Children (if present in the Job package)
                         local_structure[sub_job.name] = [v for v in self.current_structure[sub_job.name]
-                                                         if v in self.package_to_jobs[package]] if sub_job.name in self.current_structure else list()
+                                                         if v in self.package_to_jobs[
+                                                             package]] if sub_job.name in self.current_structure else list()
                         # Assign children to SubJob in local_jobs_in_package
                         sub_job.children = local_structure[sub_job.name]
                         # Assign sub_job Name as a parent of each of its children
@@ -403,7 +403,7 @@ class SubJobManager(object):
                 for package in self.package_to_jobs:
                     # Filter only jobs in the current package
                     filtered = [x for x in self.subjobList if x.package ==
-                                      package]
+                                package]
                     # Order jobs by total time (queue + run)
                     filtered = sorted(
                         filtered, key=lambda x: x.total, reverse=False)
@@ -448,15 +448,14 @@ class SubJobManager(object):
                     for name in fixes_applied:
                         self.subjobfixes[name] = fixes_applied[name]
 
-    def get_subjoblist(self):
+    def get_subjoblist(self) -> set[SubJob]:
         """
         Returns the list of SubJob objects with their corrected queue times
         in the case of jobs that belong to a wrapper.
         """
         return self.subjobList
 
-    def get_collection_of_fixes_applied(self):
-        # type: () -> Dict[str, int]
+    def get_collection_of_fixes_applied(self) -> Dict[str, int]:
         """
         """
         return self.subjobfixes

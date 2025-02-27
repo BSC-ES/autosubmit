@@ -25,7 +25,7 @@ from log.log import Log
 from .data_classes.experiment_run import ExperimentRun
 from .data_classes.job_data import JobData
 from .database_managers.database_manager import DEFAULT_JOBDATA_DIR, DEFAULT_HISTORICAL_LOGS_DIR
-from .database_managers.experiment_history_db_manager import ExperimentHistoryDbManager
+from .database_managers.experiment_history_db_manager import create_experiment_history_db_manager, ExperimentHistoryDatabaseManager
 from .internal_logging import Logging
 from .platform_monitor.slurm_monitor import SlurmMonitor
 from .strategies import PlatformInformationHandler, SingleAssociationStrategy, StraightWrapperAssociationStrategy, \
@@ -41,8 +41,13 @@ class ExperimentHistory:
         self._log = Logging(expid, BasicConfig.HISTORICAL_LOG_DIR)
         self._job_data_dir_path = BasicConfig.JOBDATA_DIR
         self._historiclog_dir_path = BasicConfig.HISTORICAL_LOG_DIR
+        self.manager: ExperimentHistoryDatabaseManager = None
         try:
-            self.manager = ExperimentHistoryDbManager(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR)
+            options = {
+                'jobdata_dir_path': BasicConfig.JOBDATA_DIR,
+                'schema': self.expid
+            }
+            self.manager = create_experiment_history_db_manager(BasicConfig.DATABASE_BACKEND, **options)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')

@@ -2,9 +2,11 @@ import os
 import pwd
 import re
 from datetime import datetime, timedelta
-import pytest
 
+import pytest
+from mock.mock import patch
 from autosubmit.job.job import Job
+from autosubmit.job.job_utils import get_job_package_code, SubJob, SimpleJob, SubJobManager
 from autosubmit.platforms.psplatform import PsPlatform
 from pathlib import Path
 
@@ -282,3 +284,90 @@ def test_no_start_time(autosubmit_config, experiment_data):
     as_conf.data_changed = False
     job.update_parameters(as_conf, job.parameters)
     assert isinstance(job.start_time, datetime)
+
+
+def test_get_job_package_code(autosubmit_config):
+
+    autosubmit_config('dummy', {})
+    experiment_id = 'dummy'
+    job = Job(experiment_id, '1', 0, 1)
+
+
+    with patch ("autosubmit.job.job_utils.JobPackagePersistence") as mock_persistence:
+        mock_persistence.return_value.load.return_value = [
+            ['dummy', '0005_job_packages', 'dummy']
+        ]
+        code = get_job_package_code(job.expid ,job.name)
+
+        assert code == 5
+
+
+def test_simple_job_instantiation(tmp_path, autosubmit_config):
+    job = SimpleJob("dummy", tmp_path, 100)
+
+    assert job.name == "dummy"
+    assert job._tmp_path == tmp_path
+    assert job.status == 100
+
+
+def test_sub_job_instantiation(tmp_path, autosubmit_config):
+    job = SubJob("dummy",package=None,queue=0,run=0, total=0, status="UNKNOWN")
+
+    assert job.name == "dummy"
+    assert job.package is None
+    assert job.queue == 0
+    assert job.run == 0
+    assert job.total == 0
+    assert job.status == "UNKNOWN"
+
+
+@pytest.mark.parametrize("current_structure",
+                             [
+                                 ({
+                                         'dummy2':
+                                             {'dummy','dummy1','dummy4'},
+                                         'dummy3':
+                                             'dummy'
+                                     }),
+                                 ({}),
+                             ],
+                         ids=["Current structure of the Job Manager with multiple values",
+                              "Current structure of the Job Manager without values"]
+                         )
+def test_sub_job_manager(current_structure):
+    """
+    tester of the function _sub_job_manager
+    """
+    jobs = {
+        SubJob("dummy",package="test2",queue=0, run=1, total=30, status="UNKNOWN"),
+        SubJob("dummy",package=["test4","test1","test2","test3"],queue=1,
+               run=2, total=10, status="UNKNOWN"),
+        SubJob("dummy2",package="test2",queue=2, run=3, total=100, status="UNKNOWN"),
+        SubJob("dummy",package="test3",queue=3, run=4, total=1000, status="UNKNOWN"),
+    }
+
+    job_to_package = {
+        'dummy test'
+    }
+
+    package_to_job = {
+        'test':
+            {'dummy', 'dummy2'},
+        'test2':
+            {'dummy', 'dummy2'},
+        'test3':
+            {'dummy', 'dummy2'}
+    }
+
+    job_manager = SubJobManager(jobs, job_to_package, package_to_job, current_structure)
+    job_manager.process_index()
+    job_manager.process_times()
+
+    print(type(job_manager.get_subjoblist()))
+
+    assert job_manager is not None and type(job_manager) is SubJobManager
+    assert job_manager.get_subjoblist() is not None and type(job_manager.get_subjoblist()) is set
+    assert job_manager.subjobindex is not None and type(job_manager.subjobindex) is dict
+    assert job_manager.subjobfixes is not None and type(job_manager.subjobfixes) is dict
+    assert (job_manager.get_collection_of_fixes_applied() is not None
+            and type(job_manager.get_collection_of_fixes_applied()) is dict)
