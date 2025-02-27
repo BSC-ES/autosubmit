@@ -225,7 +225,7 @@ of how to install Autosubmit with Conda.
                <i class="fa-brands fa-gitlab fs-4" style="color: #4E8490;"></i>
                Open Source
              </p>
-             <p>Autosubmit code is hosted at BSC Earth Sciences' GitLab, licensed
+             <p>Autosubmit code is hosted on GitHub, licensed
                 under the GPLv3 License, and under active development.</p>
          </div>
       </div>
@@ -260,8 +260,8 @@ Contact Us
   :header-rows: 0
   :stub-columns: 1
 
-  * - GitLab
-    - https://earth.bsc.es/gitlab/es/autosubmit/
+  * - GitHub
+    - https://github.com/BSC-ES/autosubmit
   * - Email
     - support-autosubmit@bsc.es
 

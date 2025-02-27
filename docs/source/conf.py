@@ -145,9 +145,9 @@ html_theme_options = {
     'use_edit_page_button': True,
     'icon_links': [
         {
-            'name': 'GitLab',
-            'url': 'https://earth.bsc.es/gitlab/es/autosubmit/',
-            'icon': 'fa-brands fa-square-gitlab',
+            'name': 'GitHub',
+            'url': 'https://github.com/BSC-ES/autosubmit',
+            'icon': 'fa-brands fa-square-github',
             'type': 'fontawesome'
         },
         # TODO: https://github.com/pydata/pydata-sphinx-theme/blob/662758e6afb498be269fd123ba6e446a8099534a/docs/user_guide/header-links.rst#L252
@@ -163,10 +163,9 @@ html_theme_options = {
 }
 
 html_context = {
-    'gitlab_url': 'https://earth.bsc.es/gitlab',
-    'gitlab_user': 'es',
-    'gitlab_repo': 'autosubmit',
-    'gitlab_version': 'master',
+    'github_user': 'bsc-es',
+    'github_repo': 'autosubmit',
+    'github_version': 'master',
     'doc_path': 'docs/source/'
 }
 
