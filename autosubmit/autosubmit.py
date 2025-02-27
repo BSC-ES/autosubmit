@@ -1994,7 +1994,7 @@ class Autosubmit:
                 # Handling starting time
                 AutosubmitHelper.handle_start_time(start_time)
                 # Start after completion trigger block
-                AutosubmitHelper.handle_start_after(start_after, expid, BasicConfig())
+                AutosubmitHelper.handle_start_after(start_after, expid)
                 # Handling run_only_members
             except AutosubmitCritical as e:
                 raise

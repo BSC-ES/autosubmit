@@ -20,7 +20,7 @@
 import datetime
 import sys
 from time import sleep
-from typing import List
+from typing import Union, Any
 
 from autosubmit.database.db_common import check_experiment_exists
 from autosubmit.history.experiment_history import ExperimentHistory
@@ -35,7 +35,6 @@ def handle_start_time(start_time: str) -> None:
         Log.info("User provided starting time has been detected.")
         # current_time = time()
         datetime_now = datetime.datetime.now()
-        target_date = parsed_time = None
         try:
             # Trying first parse H:M:S
             parsed_time = datetime.datetime.strptime(start_time, "%H:%M:%S")
@@ -48,68 +47,64 @@ def handle_start_time(start_time: str) -> None:
             except Exception as e:
                 target_date = None
                 Log.critical(
-                    "The string input provided as the starting time of your experiment must have the format 'H:M:S' or 'yyyy-mm-dd H:M:S'. Your input was '{0}'.".format(
-                        start_time))
+                    "The string input provided as the starting time of your experiment must have the format 'H:M:S' or "
+                    f"'yyyy-mm-dd H:M:S'. Your input was '{start_time}'.")
                 return
         # Must be in the future
         if target_date < datetime.datetime.now():
             Log.critical(
-                "You must provide a valid date into the future. Your input was interpreted as '{0}', which is considered past.\nCurrent time {1}.".format(
-                    target_date.strftime("%Y-%m-%d %H:%M:%S"), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                f"You must provide a valid date into the future. Your input was interpreted as "
+                f"\'{target_date.strftime('%Y-%m-%d %H:%M:%S')}\', which is considered past."
+                f"\nCurrent time {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.")
             return
         # Starting waiting sequence
-        Log.info("Your experiment will start execution on {0}\n".format(target_date.strftime("%Y-%m-%d %H:%M:%S")))
+        Log.info(f"Your experiment will start execution on {target_date.strftime('%Y-%m-%d %H:%M:%S')}\n")
         # Check time every second
         while datetime.datetime.now() < target_date:
             elapsed_time = target_date - datetime.datetime.now()
-            sys.stdout.write("\r{0} until execution starts".format(elapsed_time))
+            sys.stdout.write(f"\r{elapsed_time} until execution starts")
             sys.stdout.flush()
             sleep(1)
 
 
-def handle_start_after(start_after, expid, BasicConfig):
-    # type: (str, str, BasicConfig) -> None
+def handle_start_after(start_after: str, expid: str) -> None:
     """ Wait until the start_after experiment has finished."""
     if start_after:
         Log.info("User provided expid completion trigger has been detected.")
         # The user tries to be tricky
         if str(start_after) == str(expid):
             Log.info(
-                "Hey! What do you think is going to happen? In theory, your experiment will run again after it has been completed. Good luck!")
+                "Hey! What do you think is going to happen? In theory, "
+                "your experiment will run again after it has been completed. Good luck!")
         # Check if experiment exists. If False or None, it does not exist
         if not check_experiment_exists(start_after):
             return None
-        # Historical Database: We use the historical database to retrieve the current progress data of the supplied expid (start_after)
+        # Historical Database: We use the historical database to retrieve the current progress
+        # data of the supplied expid (start_after)
         exp_history = ExperimentHistory(start_after, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                         historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
         if exp_history.is_header_ready() is False:
             Log.critical(
-                "Experiment {0} is running a database version which is not supported by the completion trigger function. An updated DB version is needed.".format(
-                    start_after))
+                f"Experiment {start_after} is running a database version which is not supported by the completion "
+                f"trigger function. An updated DB version is needed.")
             return
-        Log.info(
-            "Autosubmit will start monitoring experiment {0}. When the number of completed jobs plus suspended jobs becomes equal to the total number of jobs of experiment {0}, experiment {1} will start. Querying every 60 seconds. Status format Completed/Queuing/Running/Suspended/Failed.".format(
-                start_after, expid))
-        while True:
-            # Query current run
-            current_run = exp_history.manager.get_experiment_run_dc_with_max_id()
-            if current_run and current_run.finish > 0 and current_run.total > 0 and current_run.completed + current_run.suspended == current_run.total:
+        Log.info(f"Autosubmit will start monitoring experiment {start_after}. When the number of completed jobs plus "
+                 f"suspended jobs becomes equal to the total number of jobs of experiment {start_after}, experiment "
+                 f"{expid} will start. Querying every 60 seconds. Status format "
+                 f"Completed/Queuing/Running/Suspended/Failed.")
+        while current_run := exp_history.manager.get_experiment_run_dc_with_max_id():
+            if (current_run.finish > 0 and current_run.total > 0
+                    and current_run.total == current_run.completed + current_run.suspended):
                 break
-            else:
-                sys.stdout.write(
-                    "\rExperiment {0} ({1} total jobs) status {2}/{3}/{4}/{5}/{6}".format(start_after,
-                                                                                          current_run.total,
-                                                                                          current_run.completed,
-                                                                                          current_run.queuing,
-                                                                                          current_run.running,
-                                                                                          current_run.suspended,
-                                                                                          current_run.failed))
-                sys.stdout.flush()
+            sys.stdout.write(
+                f"\rExperiment {start_after} ({current_run.total} total jobs) status {current_run.completed}/"
+                f"{current_run.queuing}/{current_run.running}/{current_run.suspended}/{current_run.failed}")
+            sys.stdout.flush()
             # Update every 60 seconds
             sleep(60)
 
 
-def get_allowed_members(run_members: str, as_conf: AutosubmitConfig) -> dict:
+def get_allowed_members(run_members: str, as_conf: AutosubmitConfig) -> Union[list[str], list[Any]]:
     """Check if the members sent are allowed
 
    :param run_members: str
@@ -122,9 +117,9 @@ def get_allowed_members(run_members: str, as_conf: AutosubmitConfig) -> dict:
         rmember = [rmember for rmember in allowed_members if rmember not in as_conf.get_member_list()]
         if len(rmember) > 0:
             raise AutosubmitCritical(
-                "Some of the members ({0}) in the list of allowed members you supplied do not exist in the current list " +
-                "of members specified in the conf files.\nCurrent list of members: {1}".format(str(rmember),
-                                                                                               str(as_conf.get_member_list())))
+                f"Some of the members ({str(rmember)}) in the list of allowed members you supplied do not exist in "
+                f"the current list of members specified in the conf files."
+                f"\nCurrent list of members: {str(as_conf.get_member_list())}")
         if len(allowed_members) == 0:
             raise AutosubmitCritical("Not a valid -rom --run_only_members input: {0}".format(str(run_members)))
         return allowed_members

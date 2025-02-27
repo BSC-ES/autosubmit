@@ -92,7 +92,7 @@ def test_log_recovery_recover_log(prepare_test, local, mocker, as_conf):
     mocker.patch('autosubmit.platforms.platform.max', return_value=0)
     mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     local.keep_alive_timeout = 20
-    mocker.patch('autosubmit.job.job.Job.write_stats')  # Tested in test_run_command_intregation.py
+    mocker.patch('autosubmit.job.job.Job.write_stats')
     local.spawn_log_retrieval_process(as_conf)
     local.work_event.set()
     job = Job('t000', '0000', Status.COMPLETED, 0)
