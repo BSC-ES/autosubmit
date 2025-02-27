@@ -46,6 +46,7 @@ class UniqueQueue(Queue):
         self.all_items = deque(maxlen=max_items)  # Won't be popped, so even if it is being processed by the log retrieval process, it won't be added again.
         super().__init__(maxsize, ctx=ctx)
 
+
     def put(self, job: Any, block: bool = True, timeout: float = None) -> None:
         """
         Puts a job into the queue if it is not a duplicate.

@@ -1,11 +1,10 @@
 import os
 import pwd
 import time
-from distutils.command.config import config
 from pathlib import Path
-
 import pytest
 import multiprocessing as mp
+
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
@@ -382,3 +381,4 @@ def test_create_a_new_copy(local, pjm, slurm, ps, ecaccess):
     assert slurm.create_a_new_copy().name == slurm.name
     assert ps.create_a_new_copy().name == ps.name
     assert ecaccess.create_a_new_copy().name == ecaccess.name
+
