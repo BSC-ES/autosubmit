@@ -25,7 +25,6 @@ To install autosubmit, execute the following:
 Or download, unpack and:
 ::
 
-    python3 -m build
     pip install .
 
 .. hint::
