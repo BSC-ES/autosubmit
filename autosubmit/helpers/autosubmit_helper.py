@@ -109,9 +109,14 @@ def handle_start_after(start_after, expid, BasicConfig):
             sleep(60)
 
 
-def get_allowed_members(run_members, as_conf):
-    # type: (str, AutosubmitConfig) -> List
-    if run_members:
+def get_allowed_members(run_members: str, as_conf: AutosubmitConfig) -> dict:
+    """
+       Check if the members sent are allowed
+       :param run_members: str
+       :param as_conf: AutosubmitConfig
+       :return: dict
+    """
+    if run_members is not None:
         allowed_members = run_members.split()
         rmember = [rmember for rmember in allowed_members if rmember not in as_conf.get_member_list()]
         if len(rmember) > 0:
