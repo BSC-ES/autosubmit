@@ -85,14 +85,7 @@ class JobListPersistencePkl(JobListPersistence):
                     job_list = pickle.load(fd)
             finally:
                 os.remove(path_tmp)
-            # for u in ( node for node in graph ):
-            #     # Set after the dependencies are set
-            #     graph.nodes[u]["job"].children = set()
-            #     graph.nodes[u]["job"].parents = set()
-            #     # Set in recovery/run
-            #     graph.nodes[u]["job"]._platform = None
-            #     graph.nodes[u]["job"]._serial_platform = None
-            #     graph.nodes[u]["job"].submitter = None
+
             return job_list
 
     def save(self, persistence_path, persistence_file, job_list, graph):

@@ -17,7 +17,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import copy
 import datetime
-import gc
 import os
 import pickle
 import re
@@ -242,7 +241,6 @@ class JobList(object):
             self._dic_jobs._job_list = loaded_job_list
 
         self.graph = nx.DiGraph()
-        self._dic_jobs.graph = self.graph
 
         # This generates the job object and also finds if dic_jobs has modified from previous iteration in order to expand the workflow
         if show_log:
@@ -276,6 +274,8 @@ class JobList(object):
                         job.children.add(jobc)
         if show_log:
             Log.info("Looking for edgeless jobs...")
+
+        # This if allows to have jobs with dependencies set to themselves even if there are no more than one chunk, member or split.
         if len(self.graph.edges) > 0:
             self._delete_edgeless_jobs()
         if new:
@@ -319,8 +319,9 @@ class JobList(object):
         self.experiment_data = {}
         self.parameters = {}
         self._parameters = {}
+        self.graph.clear()
         self.graph = None
-        gc.collect()
+
     def split_by_platform(self):
         """
         Splits the job list by platform name
