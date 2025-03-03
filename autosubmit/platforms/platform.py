@@ -947,6 +947,9 @@ class Platform(object):
             del self.recovery_queue
         # Retrieval log process variables
         self.recovery_queue = UniqueQueue(max_items=self.log_queue_size, ctx=ctx)
+        # Cleanup will be automatically prompt on control + c or a normal exit
+        atexit.register(self.send_cleanup_signal)
+        atexit.register(self.closeConnection)
         return new_platform
 
     def create_new_process(self, ctx, new_platform) -> None:
@@ -965,9 +968,7 @@ class Platform(object):
         # Prevents zombies
         os.waitpid(self.log_recovery_process.pid, os.WNOHANG)
         Log.result(f"Process {self.log_recovery_process.name} started with pid {self.log_recovery_process.pid}")
-        # Cleanup will be automatically prompt on control + c or a normal exit
-        atexit.register(self.send_cleanup_signal)
-        atexit.register(self.closeConnection)
+
 
     def spawn_log_retrieval_process(self, as_conf: Any) -> None:
         """
