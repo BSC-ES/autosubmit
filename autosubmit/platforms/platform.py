@@ -9,7 +9,7 @@ import locale
 import os
 import traceback
 from autosubmit.job.job_common import Status
-from typing import List, Union, Set, Any
+from typing import List, Union, Set, Any, Tuple
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import AutosubmitCritical, AutosubmitError, Log
@@ -56,6 +56,68 @@ class CopyQueue(Queue):
             timeout (float): Timeout for blocking operations. Defaults to None.
         """
         super().put(job.__getstate__(), block, timeout)
+
+
+class LookupQueue(Queue):
+    """
+    A queue to check if a job log is recovered.
+    """
+
+    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, ctx: Any = None) -> None:
+        """
+        Initializes the UniqueQueue.
+
+        Args:
+            maxsize (int): Maximum size of the queue. Defaults to -1 (infinite size).
+            block (bool): Whether to block when the queue is full. Defaults to True.
+            timeout (float): Timeout for blocking operations. Defaults to None.
+            ctx (Context): Context for the queue. Defaults to None.
+        """
+        self.block = block
+        self.timeout = timeout
+        self.lock = multiprocessing.Lock()
+        super().__init__(maxsize, ctx=ctx)
+
+    def put(self, log_info: Tuple[str, str] = (None, None), block: bool = True, timeout: float = None) -> None:
+        """
+        Puts a log_info into the queue
+
+        Args:
+            log_info (Tuple[str, str]): The log_name to be added to the queue.
+            block (bool): Whether to block when the queue is full. Defaults to True.
+            timeout (float): Timeout for blocking operations. Defaults to None.
+        """
+        super().put(log_info, block, timeout)
+
+    def choose_action(self, requested_name: str = "", log_info: tuple[None, None] = "", block: bool = False, timeout: float = None) -> Any:
+        """
+        Gets or add the log_name from or to the queue.
+
+        Args:
+            requested_name (String): The name of the job to be recovered from the queue. # get & (optional) put
+            log_info (Tuple[str, str]): The log_name to be added to the queue. # put
+            block (bool): Whether to block when the queue is empty. Defaults to True.
+            timeout (float): Timeout for blocking operations. Defaults to None.
+        Returns:
+            Any: The job recovered from the queue.
+        """
+        with self.lock:
+            if log_info[0] and log_info[1]:
+                self.put(log_info, block, timeout)
+            else:
+                stack = {}  # We want the last log_name not in between
+                while not self.empty():
+                    log_info = super().get(block, timeout)
+                    stack[log_info[0]] = log_info[1]
+
+                for job_name, log_name in stack.items():
+                    if job_name != requested_name:
+                        super().put((job_name, log_name), block, timeout)
+                    else:
+                        log_info = (job_name, log_name)
+
+        return log_info
+
 
 
 class Platform(object):
@@ -149,6 +211,7 @@ class Platform(object):
             platform_total_jobs = self.config.get("PLATFORMS", {}).get('TOTAL_JOBS', config_total_jobs)
             log_queue_size = int(platform_total_jobs) * 2
         self.log_queue_size = log_queue_size
+        self.get_log_name_queue = None
 
     @classmethod
     def update_workers(cls, event_worker):
@@ -930,6 +993,8 @@ class Platform(object):
         if self.recovery_queue:
             del self.recovery_queue
         # Retrieval log process variables
+        self.recovery_queue = UniqueQueue(max_items=self.log_queue_size, ctx=ctx)
+        self.get_log_name_queue = LookupQueue(ctx=ctx)
         self.recovery_queue = CopyQueue(ctx=ctx)
         # Cleanup will be automatically prompt on control + c or a normal exit
         atexit.register(self.send_cleanup_signal)
