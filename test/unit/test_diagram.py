@@ -44,9 +44,7 @@ def test_job_agg_data():
 @patch('autosubmit.monitor.diagram._create_table')
 @patch('autosubmit.monitor.diagram._create_csv')
 def test_create_stats_report(jobs_by_association, create_table, create_csv):
-    """
-    function to test the function create_stats_report inside autosubmit/monitor/diagram.py
-    """
+    """ function to test the function create_stats_report inside autosubmit/monitor/diagram.py """
     expid = "a000"
     jobs_data = [
         Job('test', "a29z", "COMPLETED", 200),
