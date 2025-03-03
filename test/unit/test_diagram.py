@@ -16,8 +16,9 @@
 
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
-""" Test file for autosubmit/monitor/diagram.py """
+"""
+Test file for autosubmit/monitor/diagram.py
+"""
 import datetime
 
 import pytest
@@ -44,6 +45,15 @@ def test_job_agg_data():
     assert job_agg.values() == [{}, 0, datetime.timedelta(0), datetime.timedelta(0),
                                 datetime.timedelta(0), datetime.timedelta(0)]
     assert job_agg.number_of_columns() == 6
+
+
+def test_seq():
+    """
+    function to test the Class JobData inside autosubmit/monitor/diagram.py
+    """
+    for value in diagram._seq(100, 2, 10):
+        assert value is not None
+        assert isinstance(value, int)
 
 
 def test_create_csv_stats(tmpdir):
@@ -150,3 +160,22 @@ def test_create_bar_diagram(job_stats, failed_jobs, failed_jobs_dict, num_plots,
 
     with patch('autosubmit.monitor.diagram.MAX_NUM_PLOTS', num_plots):  # 1
         assert result == diagram.create_bar_diagram("a000", statistics, jobs_data, status)
+
+
+def test_populate_statistics():
+    """
+    function to test the Class JobData inside autosubmit/monitor/diagram.py
+    """
+    jobs_data = [
+        Job('test', "a29z", "COMPLETED", 200),
+        Job('test', "a28z", "COMPLETED", 200),
+        Job('test', "a27z", "COMPLETED", 200),
+        Job('test', "a26z", "FAILED", 10)
+    ]
+
+    date_ini = datetime.datetime.now()
+    date_fin = date_ini + datetime.timedelta(0.10)
+    queue_time_fixes = ['test', 5]
+
+    statistics = diagram.populate_statistics(jobs_data,date_ini,date_fin, queue_time_fixes)
+    assert statistics is not None
