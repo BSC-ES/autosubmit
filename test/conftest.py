@@ -19,21 +19,25 @@
 import os
 import pwd
 from dataclasses import dataclass
+from datetime import datetime
 from fileinput import FileInput
 from pathlib import Path
+from random import seed, randint, choice
 from re import sub
 from textwrap import dedent
 from time import time
-from typing import TYPE_CHECKING, Any, Dict, Callable, Protocol, Optional, Type
+from typing import TYPE_CHECKING, Any, Dict, Callable, Protocol, Optional, Type, List
 
 import pytest
+from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from pytest_mock import MockerFixture
 from ruamel.yaml import YAML
 
 from autosubmit.autosubmit import Autosubmit
+from autosubmit.job.job import Job
+from autosubmit.job.job_common import Status
 from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 if TYPE_CHECKING:
     from py._path.local import LocalPath  # type: ignore
@@ -118,6 +122,7 @@ def autosubmit_exp(
 
     TODO: Use minimal to avoid having to juggle with the configuration files.
     """
+
     def _create_autosubmit_exp(
             expid: Optional[str] = None,
             experiment_data: Optional[Dict] = None,
@@ -438,7 +443,7 @@ PLATFORMS:
         """)
     # add a job of each platform type
     with jobs_path.open('w') as f:
-        f.write(f"""
+        f.write("""
 JOBS:
     base:
         SCRIPT: |
@@ -497,3 +502,78 @@ def as_db_sqlite(monkeypatch: pytest.MonkeyPatch, tmp_path: "LocalPath") -> Type
     monkeypatch.setattr(BasicConfig, "DB_PATH", str(tmp_path / "autosubmit.db"))
 
     return BasicConfig
+
+
+@pytest.fixture(scope="function")
+def create_jobs(
+        mocker,
+        request
+) -> list[Job]:
+    """
+    :return: Jobs with random attributes and retrials.
+    """
+
+    def _create_jobs(
+            mock,
+            num_jobs,
+            max_num_retrials_per_job
+    ) -> List[Job]:
+        jobs = []
+        seed(time())
+        submit_time = datetime(2023, 1, 1, 10, 0, 0)
+        start_time = datetime(2023, 1, 1, 10, 30, 0)
+        end_time = datetime(2023, 1, 1, 11, 0, 0)
+        completed_retrial = [submit_time, start_time, end_time, "COMPLETED"]
+        partial_retrials = [
+            [submit_time, start_time, end_time, ""],
+            [submit_time, start_time, ""],
+            [submit_time, ""],
+            [""]
+        ]
+        job_statuses = Status.LOGICAL_ORDER
+        for i in range(num_jobs):
+            status = job_statuses[i % len(job_statuses)]  # random status
+            job_aux = Job(
+                name="example_name_" + str(i),
+                job_id="example_id_" + str(i),
+                status=status,
+                priority=i
+            )
+
+            # Custom values for job attributes
+            job_aux.processors = str(i)
+            job_aux.wallclock = '00:05'
+            job_aux.section = "example_section_" + str(i)
+            job_aux.member = "example_member_" + str(i)
+            job_aux.chunk = "example_chunk_" + str(i)
+            job_aux.processors_per_node = str(i)
+            job_aux.tasks = str(i)
+            job_aux.nodes = str(i)
+            job_aux.exclusive = "example_exclusive_" + str(i)
+
+            num_retrials = randint(1, max_num_retrials_per_job)  # random number of retrials, grater than 0
+            retrials = []
+
+            for j in range(num_retrials):
+                if j < num_retrials - 1:
+                    retrial = completed_retrial
+                else:
+                    if job_aux.status == "COMPLETED":
+                        retrial = completed_retrial
+                    else:
+                        retrial = choice(partial_retrials)
+                        if len(retrial) == 1:
+                            retrial[0] = job_aux.status
+                        elif len(retrial) == 2:
+                            retrial[1] = job_aux.status
+                        elif len(retrial) == 3:
+                            retrial[2] = job_aux.status
+                        else:
+                            retrial[3] = job_aux.status
+                retrials.append(retrial)
+            mock.patch("autosubmit.job.job.Job.get_last_retrials", return_value=retrials)
+            jobs.append(job_aux)
+
+        return jobs
+
+    return _create_jobs(mocker, request.param[0], request.param[1])

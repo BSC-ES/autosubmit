@@ -14,7 +14,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
 import datetime
 
 import pytest
@@ -43,6 +42,34 @@ def test_job_agg_data():
     assert job_agg.values() == [{}, 0, datetime.timedelta(0), datetime.timedelta(0),
                                 datetime.timedelta(0), datetime.timedelta(0)]
     assert job_agg.number_of_columns() == 6
+
+
+def test_seq():
+    """
+    function to test the Class JobData inside autosubmit/monitor/diagram.py
+    """
+    seq = [x for x in diagram._seq(100, 2, 10)]
+    assert len(seq) == 9
+    assert all([x for x in seq if isinstance(x, int)])
+
+
+@pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
+def test_populate_statistics(create_jobs):
+    """ function to test the Class JobData inside autosubmit/monitor/diagram.py """
+
+    date_ini = datetime.datetime.now()
+    date_fin = date_ini + datetime.timedelta(10.10)
+    queue_time_fixes = {'test': 5, 'test1': 50, 'test2': 500, 'test3': 5000, 'test4': 50000}
+
+    statistics = diagram.populate_statistics(create_jobs, date_ini, date_fin, queue_time_fixes)
+    for job_stat in statistics.jobs_stat:
+        assert ('example_name_' in job_stat.name and
+                'example_member_' in job_stat.member)
+    assert len(statistics._jobs) == 5
+    assert len(statistics.summary.get_as_list()) == 13
+    assert statistics.failed_jobs_dict == {'example_name_0': 1, 'example_name_1': 1,
+                                           'example_name_2': 1, 'example_name_3': 1,
+                                           'example_name_4': 1}
 
 
 def test_create_csv_stats(tmpdir):
