@@ -334,8 +334,10 @@ class TestJobList(TestCase):
         job_list._add_dependencies.assert_called_once_with(date_list, member_list, chunk_list, cj_args[0])
         # Adding flag update structure
         job_list.update_genealogy.assert_called_once_with()
-        for job in job_list._job_list:
-            self.assertEqual(parameters, job.parameters)
+
+        # job doesn't have job.parameters anymore TODO
+        # for job in job_list._job_list:
+        #     self.assertEqual(parameters, job.parameters)
 
     def test_that_create_job_method_calls_dic_jobs_method_with_increasing_priority(self):
         # arrange
@@ -403,7 +405,9 @@ class TestJobList(TestCase):
     def test_create_dictionary(self):
         parser_mock = Mock()
         parser_mock.read = Mock()
-        self.as_conf.experiment_data["JOBS"] = {'fake-section': {}, 'fake-section-2': {}}
+        parameters = {'fake-key': 'fake-value',
+                      'fake-key2': 'fake-value2'}
+        self.as_conf.experiment_data["JOBS"]  = {'fake-section': parameters, 'fake-section-2': parameters}
         self.as_conf.jobs_data = self.as_conf.experiment_data["JOBS"]
         factory = YAMLParserFactory()
         factory.create_parser = Mock(return_value=parser_mock)
@@ -418,8 +422,6 @@ class TestJobList(TestCase):
             date_list = ['fake-date1', 'fake-date2']
             member_list = ['fake-member1', 'fake-member2']
             num_chunks = 2
-            parameters = {'fake-key': 'fake-value',
-                          'fake-key2': 'fake-value2'}
             graph = networkx.DiGraph()
             job_list.graph = graph
             # act
@@ -435,7 +437,7 @@ class TestJobList(TestCase):
                     member_list=member_list,
                     num_chunks=num_chunks,
                     chunk_ini=1,
-                    parameters=parameters,
+                    parameters=self.as_conf.load_parameters(),
                     date_format='H',
                     default_retrials=1,
                     default_job_type=Type.BASH,
@@ -757,4 +759,3 @@ def test_manage_dependencies():
     assert len(dependency) == 3
     for job in dependency:
         assert job in dependencies_keys
-

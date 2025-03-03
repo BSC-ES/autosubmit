@@ -24,7 +24,7 @@ class EcCcaHeader(object):
     """Class to handle the ECMWF headers of a job"""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_queue_directive(self, job):
+    def get_queue_directive(self, job, parameters):
         """
         Returns queue directive for the specified job
 
@@ -34,7 +34,7 @@ class EcCcaHeader(object):
         :rtype: str
         """
         # There is no queue, so directive is empty
-        queue = job.parameters['CURRENT_QUEUE']
+        queue = parameters['CURRENT_QUEUE']
         if not queue:
             if job.is_serial:
                 queue = 'ns'
@@ -44,21 +44,21 @@ class EcCcaHeader(object):
         return "PBS -q {0}".format(queue)
 
     # noinspection PyMethodMayBeStatic
-    def get_tasks_per_node(self, job):
+    def get_tasks_per_node(self, job, parameters):
         if not isinstance(job.tasks, str):
             return ""
         else:
             return '#PBS -l EC_tasks_per_node={0}'.format(job.tasks)
 
     # noinspection PyMethodMayBeStatic
-    def get_threads_per_task(self, job):
+    def get_threads_per_task(self, job, parameters):
         if not isinstance(job.threads, str):
             return ""
         else:
             return '#PBS -l EC_threads_per_task={0}'.format(job.threads)
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_memory_per_task_directive(self, job):
+    def get_memory_per_task_directive(self, job, parameters):
         """
         Returns memory per task directive for the specified job
 
@@ -68,12 +68,12 @@ class EcCcaHeader(object):
         :rtype: str
         """
         # There is no memory per task, so directive is empty
-        if job.parameters['MEMORY_PER_TASK'] != '':
-            return "#PBS -l EC_memory_per_task={0}mb".format(job.parameters['MEMORY_PER_TASK'])
+        if parameters['MEMORY_PER_TASK'] != '':
+            return "#PBS -l EC_memory_per_task={0}mb".format(parameters['MEMORY_PER_TASK'])
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_hyperthreading_directive(self, job):
+    def get_hyperthreading_directive(self, job, parameters):
         """
         Returns hyperthreading directive for the specified job
 
@@ -83,12 +83,12 @@ class EcCcaHeader(object):
         :rtype: str
         """
         # There is no memory per task, so directive is empty
-        if job.parameters['HYPERTHREADING'] == "true":
+        if parameters['HYPERTHREADING'] == "true":
             return "#PBS -l EC_hyperthreads=2"
         return "#PBS -l EC_hyperthreads=1"
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_custom_directives(self, job):
+    def get_custom_directives(self, job, parameters):
         """
         Returns custom directives for the specified job
 
@@ -98,10 +98,9 @@ class EcCcaHeader(object):
         :rtype: str
         """
         # There is no custom directives, so directive is empty
-        if job.parameters['CUSTOM_DIRECTIVES'] != '':
-            return '\n'.join(str(s) for s in job.parameters['CUSTOM_DIRECTIVES'])
+        if parameters['CUSTOM_DIRECTIVES'] != '':
+            return '\n'.join(str(s) for s in parameters['CUSTOM_DIRECTIVES'])
         return ""
-
 
     SERIAL = textwrap.dedent("""\
              ###############################################################################

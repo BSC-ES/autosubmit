@@ -67,9 +67,10 @@ class TestDicJobs(TestCase):
         }
 
 
-        self.job_list.jobs_data[section] = options
         self.dictionary.experiment_data = dict()
-        self.dictionary.experiment_data["JOBS"] = self.job_list.jobs_data
+        self.dictionary.experiment_data["JOBS"] = {}
+        self.dictionary.experiment_data["JOBS"][section] = options
+
         self.dictionary._create_jobs_once = Mock()
         self.dictionary._create_jobs_startdate = Mock()
         self.dictionary._create_jobs_member = Mock()
@@ -106,9 +107,9 @@ class TestDicJobs(TestCase):
             'EXCLUDED_LIST_M': [],
             'RUNNING': running
         }
-        self.job_list.jobs_data[section] = options
         self.dictionary.experiment_data = dict()
-        self.dictionary.experiment_data["JOBS"] = self.job_list.jobs_data
+        self.dictionary.experiment_data["JOBS"] = {}
+        self.dictionary.experiment_data["JOBS"][section] = options
         self.dictionary._create_jobs_once = Mock()
         self.dictionary._create_jobs_startdate = Mock()
         self.dictionary._create_jobs_member = Mock()
@@ -144,9 +145,10 @@ class TestDicJobs(TestCase):
             'RUNNING': running
         }
 
-        self.job_list.jobs_data[section] = options
         self.dictionary.experiment_data = dict()
-        self.dictionary.experiment_data["JOBS"] = self.job_list.jobs_data
+        self.dictionary.experiment_data["JOBS"] = {}
+        self.dictionary.experiment_data["JOBS"][section] = options
+
         self.dictionary._create_jobs_once = Mock()
         self.dictionary._create_jobs_startdate = Mock()
         self.dictionary._create_jobs_member = Mock()
@@ -178,9 +180,9 @@ class TestDicJobs(TestCase):
             'RUNNING': "chunk"
         }
 
-        self.job_list.jobs_data[section] = options
         self.dictionary.experiment_data = dict()
-        self.dictionary.experiment_data["JOBS"] = self.job_list.jobs_data
+        self.dictionary.experiment_data["JOBS"] = {}
+        self.dictionary.experiment_data["JOBS"][section] = options
         self.dictionary._create_jobs_once = Mock()
         self.dictionary._create_jobs_startdate = Mock()
         self.dictionary._create_jobs_member = Mock()
@@ -198,7 +200,10 @@ class TestDicJobs(TestCase):
     @patch('autosubmit.job.job_dict.date2str')
     def test_build_job_with_existent_job_list_status(self,mock_date2str):
         # arrange
-        self.dictionary.job_list = [ Job("random-id_fake-date_fc0_2_fake-section", 1, Status.READY, 0), Job("random-id_fake-date_fc0_2_fake-section2", 2, Status.RUNNING, 0)]
+        job_list = [ Job("random-id_fake-date_fc0_2_fake-section", 1, Status.READY, 0), Job("random-id_fake-date_fc0_2_fake-section2", 2, Status.RUNNING, 0)]
+        self.dictionary.job_list = {}
+        for job in job_list:
+            self.dictionary.job_list[job.name] = job.getstate()
         mock_date2str.side_effect = lambda x, y: str(x)
         section = 'fake-section'
         priority = 0
@@ -377,11 +382,10 @@ class TestDicJobs(TestCase):
         chunk = 'ch0'
         # arrange
 
-        self.job_list.jobs_data[section] = {}
         self.dictionary.experiment_data = dict()
         self.dictionary.experiment_data["DEFAULT"] =  dict()
         self.dictionary.experiment_data["DEFAULT"]["EXPID"] = "random-id"
-        self.dictionary.experiment_data["JOBS"] = self.job_list.jobs_data
+        self.dictionary.experiment_data["JOBS"] = {}
         self.dictionary.experiment_data["PLATFORMS"] = {}
         self.dictionary.experiment_data["CONFIG"] = {}
         self.dictionary.experiment_data["PLATFORMS"]["FAKE-PLATFORM"] = {}

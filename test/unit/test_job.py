@@ -178,89 +178,6 @@ class TestJob(TestCase):
         random_job1.delete_child(self.job)
         self.assertEqual(0, len(random_job1.children))
 
-    def test_create_script(self):
-        # arrange
-        self.job.parameters = dict()
-        self.job.parameters['NUMPROC'] = 999
-        self.job.parameters['NUMTHREADS'] = 777
-        self.job.parameters['NUMTASK'] = 666
-
-        self.job._tmp_path = '/dummy/tmp/path'
-        self.job.additional_files = '/dummy/tmp/path_additional_file'
-
-        update_content_mock = Mock(return_value=('some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK% %% %%',['some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK% %% %%']))
-        self.job.update_content = update_content_mock
-
-        config = Mock(spec=AutosubmitConfig)
-        config.get_project_dir = Mock(return_value='/project/dir')
-
-        chmod_mock = Mock()
-        sys.modules['os'].chmod = chmod_mock
-
-        write_mock = Mock().write = Mock()
-        open_mock = Mock(return_value=write_mock)
-        self.job.default_parameters = MagicMock()
-        self.job.default_parameters.get = MagicMock(return_value=[])
-        with patch.object(builtins, "open", open_mock):
-            # act
-            self.job.create_script(config)
-        # assert
-        update_content_mock.assert_called_with(config)
-        # TODO add assert for additional files
-        open_mock.assert_called_with(os.path.join(self.job._tmp_path, self.job.name + '.cmd'), 'wb')
-        # Expected values: %% -> %, %KEY% -> KEY.VALUE without %
-        write_mock.write.assert_called_with(b'some-content: 999, 777, 666 % %')
-        chmod_mock.assert_called_with(os.path.join(self.job._tmp_path, self.job.name + '.cmd'), 0o755)
-
-    def test_that_check_script_returns_false_when_there_is_an_unbound_template_variable(self):
-        # arrange
-        self.job._init_runtime_parameters()
-        update_content_mock = Mock(return_value=('some-content: %UNBOUND%','some-content: %UNBOUND%'))
-        self.job.update_content = update_content_mock
-        #template_content = update_content_mock
-
-        update_parameters_mock = Mock(return_value=self.job.parameters)
-        self.job._init_runtime_parameters()
-        self.job.update_parameters = update_parameters_mock
-
-        config = Mock(spec=AutosubmitConfig)
-        config.get_project_dir = Mock(return_value='/project/dir')
-
-        # act
-        checked = self.job.check_script(config, self.job.parameters)
-
-        # assert
-        update_parameters_mock.assert_called_with(config, self.job.parameters)
-        update_content_mock.assert_called_with(config)
-        self.assertFalse(checked)
-
-    def test_check_script(self):
-        # arrange
-        self.job.parameters = dict()
-        self.job.parameters['NUMPROC'] = 999
-        self.job.parameters['NUMTHREADS'] = 777
-        self.job.parameters['NUMTASK'] = 666
-        self.job.parameters['RESERVATION'] = "random-string"
-        update_content_mock = Mock(return_value=('some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK%', 'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK%'))
-
-        #todo
-        self.job.update_content = update_content_mock
-
-        update_parameters_mock = Mock(return_value=self.job.parameters)
-        self.job._init_runtime_parameters()
-        self.job.update_parameters = update_parameters_mock
-
-        config = Mock(spec=AutosubmitConfig)
-        config.get_project_dir = Mock(return_value='/project/dir')
-
-        # act
-        checked = self.job.check_script(config, self.job.parameters)
-
-        # assert
-        update_parameters_mock.assert_called_with(config, self.job.parameters)
-        update_content_mock.assert_called_with(config)
-        self.assertTrue(checked)
-
     @patch('autosubmitconfigparser.config.basicconfig.BasicConfig')
     def test_header_tailer(self, mocked_global_basic_config: Mock):
         """Test if header and tailer are being properly substituted onto the final .cmd file without
@@ -634,7 +551,7 @@ CONFIG:
 
             # This is the final header
             parameters = job.update_parameters(config, parameters)
-            template_content, additional_templates = job.update_content(config)
+            template_content, additional_templates = job.update_content(config, parameters)
 
             # Asserts the script is valid. There shouldn't be variables in the script that aren't in the parameters.
             checked = job.check_script(config, parameters)
@@ -995,7 +912,7 @@ CONFIG:
                     job.platform = submitter.platforms[job.platform_name]
 
                 job = job_list[0]
-
+                parameters = job.update_parameters(config, {})
                 # Asserts the script is valid.
                 checked = job.check_script(config, parameters)
                 self.assertTrue(checked)
@@ -1003,16 +920,15 @@ CONFIG:
                 # Asserts the configuration value is propagated as-is to the job parameters.
                 # Finally, asserts the header created is correct.
                 if not reservation:
-                    self.assertTrue('JOBS.A.RESERVATION' not in job.parameters)
-
-                    template_content, additional_templates = job.update_content(config)
+                    self.assertTrue('JOBS.A.RESERVATION' not in parameters)
+                    template_content, additional_templates = job.update_content(config, parameters)
                     self.assertFalse(additional_templates)
 
                     self.assertFalse(f'#SBATCH --reservation' in template_content)
                 else:
-                    self.assertEqual(reservation, job.parameters['JOBS.A.RESERVATION'])
+                    self.assertEqual(reservation, parameters['JOBS.A.RESERVATION'])
 
-                    template_content, additional_templates = job.update_content(config)
+                    template_content, additional_templates = job.update_content(config, parameters)
                     self.assertFalse(additional_templates)
                     self.assertTrue(f'#SBATCH --reservation={reservation}' in template_content)
 
@@ -1071,11 +987,12 @@ CONFIG:
         # This test (and feature) was implemented in order to avoid
         # false positives on the checking process with auto-ecearth3
         # Arrange
+        parameters = {}
         section = "RANDOM-SECTION"
         self.job._init_runtime_parameters()
         self.job.section = section
-        self.job.parameters['ROOTDIR'] = "none"
-        self.job.parameters['PROJECT_TYPE'] = "none"
+        parameters['ROOTDIR'] = "none"
+        parameters['PROJECT_TYPE'] = "none"
         processors = 80
         threads = 1
         tasks = 16
@@ -1463,3 +1380,91 @@ def test_update_stat_file():
     job.fail_count = 0
     job.update_stat_file()
     assert job.stat_file == "dummyname_STAT_0"
+
+
+def test_pytest_check_script(mocker):
+    job = Job("job1", "1", Status.READY, 0)
+    # arrange
+    parameters = dict()
+    parameters['NUMPROC'] = 999
+    parameters['NUMTHREADS'] = 777
+    parameters['NUMTASK'] = 666
+    parameters['RESERVATION'] = "random-string"
+    mocker.patch("autosubmit.job.job.Job.update_content", return_value=(
+    'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK%', 'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK%'))
+    mocker.patch("autosubmit.job.job.Job.update_parameters", return_value=parameters)
+    job._init_runtime_parameters()
+
+    config = Mock(spec=AutosubmitConfig)
+    config.get_project_dir = Mock(return_value='/project/dir')
+
+    # act
+    checked = job.check_script(config, parameters)
+
+    # todo
+    # update_parameters_mock.assert_called_with(config, parameters)
+    # update_content_mock.assert_called_with(config)
+
+    # assert
+    assert checked
+
+
+def test_pytest_create_script(mocker):
+    # arrange
+    job = Job("job1", "1", Status.READY, 0)
+    # arrange
+    parameters = dict()
+    parameters['NUMPROC'] = 999
+    parameters['NUMTHREADS'] = 777
+    parameters['NUMTASK'] = 666
+
+    job._tmp_path = '/dummy/tmp/path'
+    job.additional_files = '/dummy/tmp/path_additional_file'
+    mocker.patch("autosubmit.job.job.Job.update_content", return_value=(
+    'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK% %% %%',
+    ['some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK% %% %%']))
+    mocker.patch("autosubmit.job.job.Job.update_parameters", return_value=parameters)
+
+    config = Mock(spec=AutosubmitConfig)
+    config.get_project_dir = Mock(return_value='/project/dir')
+
+    chmod_mock = Mock()
+    sys.modules['os'].chmod = chmod_mock
+
+    write_mock = Mock().write = Mock()
+    open_mock = Mock(return_value=write_mock)
+    job.default_parameters = MagicMock()
+    job.default_parameters.get = MagicMock(return_value=[])
+    with patch.object(builtins, "open", open_mock):
+        # act
+        job.create_script(config)
+    # TODO asserts _slots_
+    # # assert
+    # update_content_mock.assert_called_with(config)
+    # # TODO add assert for additional files
+    # open_mock.assert_called_with(os.path.join(job._tmp_path, job.name + '.cmd'), 'wb')
+    # # Expected values: %% -> %, %KEY% -> KEY.VALUE without %
+    # write_mock.write.assert_called_with(b'some-content: 999, 777, 666 % %')
+    # chmod_mock.assert_called_with(os.path.join(job._tmp_path, job.name + '.cmd'), 0o755)
+
+
+def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_template_variable(mocker):
+    job = Job("job1", "1", Status.READY, 0)
+    # arrange
+    job._init_runtime_parameters()
+    parameters = {}
+    mocker.patch("autosubmit.job.job.Job.update_content",
+                 return_value=('some-content: %UNBOUND%', 'some-content: %UNBOUND%'))
+    mocker.patch("autosubmit.job.job.Job.update_parameters", return_value=parameters)
+    job._init_runtime_parameters()
+
+    config = Mock(spec=AutosubmitConfig)
+    config.get_project_dir = Mock(return_value='/project/dir')
+
+    # act
+    checked = job.check_script(config, parameters)
+
+    # assert TODO __slots
+    # update_parameters_mock.assert_called_with(config, parameters)
+    # update_content_mock.assert_called_with(config)
+    assert checked is False

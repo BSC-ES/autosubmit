@@ -60,7 +60,6 @@ class DicJobs:
         self.recreate_jobs = False
         self.changes = {}
         self._job_list = {}
-        self.workflow_jobs = []
 
     @property
     def job_list(self):
@@ -641,15 +640,10 @@ class DicJobs:
             job.chunk = chunk
             job.split = split
             job.splits = splits
-            job.update_dict_parameters(self.as_conf)
-            section_data.append(job)
-            self.changes["NEWJOBS"] = True
         else:
-            self._job_list[name].update_dict_parameters(self.as_conf)
-            self._job_list[name].status = Status.WAITING if self._job_list[name].status in [Status.DELAYED,
-                                                                                            Status.PREPARED,
-                                                                                            Status.READY] else \
-                self._job_list[name].status
-            section_data.append(self._job_list[name])
-            self._job_list[name].splits = splits
-        self.workflow_jobs.append(name)
+            job = Job(loaded_data=self._job_list[name])
+
+        self.changes["NEWJOBS"] = True
+        # job.adjust_loaded_parameters()
+        job.update_dict_parameters(self.as_conf)
+        section_data.append(job)

@@ -24,7 +24,7 @@ class PsHeader(object):
     """Class to handle the Ps headers of a job"""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_queue_directive(self, job):
+    def get_queue_directive(self, job, parameters):
         """
         Returns queue directive for the specified job
 
@@ -37,7 +37,7 @@ class PsHeader(object):
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_custom_directives(self, job):
+    def get_custom_directives(self, job, parameters):
         """
         Returns custom directives for the specified job
 
