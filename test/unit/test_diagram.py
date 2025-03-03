@@ -16,18 +16,14 @@
 
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-"""
-Test file for autosubmit/monitor/diagram.py
-"""
+""" Test file for autosubmit/monitor/diagram.py """
 import datetime
 
 from autosubmit.monitor.diagram import JobData
 
 
 def test_job_data():
-    """
-    function to test the Class JobData inside autosubmit/monitor/diagram.py
-    """
+    """ function to test the Class JobData inside autosubmit/monitor/diagram.py """
     job_data = JobData()
 
     assert job_data.headers() == ['Job Name', 'Queue Time', 'Run Time', 'Status']
