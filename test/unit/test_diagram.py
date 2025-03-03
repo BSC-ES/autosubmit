@@ -19,7 +19,6 @@
 """
 Test file for autosubmit/monitor/diagram.py
 """
-import datetime
 import tempfile
 from pathlib import Path
 
@@ -27,7 +26,6 @@ from mock.mock import patch
 
 from autosubmit.job.job import Job
 from autosubmit.monitor import diagram
-from tempfile import TemporaryDirectory
 
 from autosubmit.monitor.diagram import JobData, JobAggData
 
@@ -52,5 +50,6 @@ def test_create_stats_report(jobs_by_association, create_table, create_csv):
             Path(temp_dir).mkdir(parents=True, mode=0o777)
 
     jobs_by_association.return_value = [JobData(),JobAggData()]
-    create_status = diagram.create_stats_report(expid, jobs_data, {}, temp_dir,True,True,False,None,None,None)
-    assert create_status == False
+    create_status = diagram.create_stats_report(expid, jobs_data, {}, temp_dir,True,True,False,None,
+                                                None,None)
+    assert create_status is False

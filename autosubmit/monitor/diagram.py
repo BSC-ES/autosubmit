@@ -35,7 +35,7 @@ from autosubmit.job.job import Job
 
 from log.log import Log
 from datetime import datetime, timedelta
-from typing import List, Dict, Union, Any, Optional
+from typing import List, Dict, Union, Any
 from typing_extensions import LiteralString
 
 
