@@ -21,15 +21,15 @@ Test file for autosubmit/monitor/diagram.py
 """
 import datetime
 
-from autosubmit.monitor.diagram import JobAggData
+from autosubmit.monitor.diagram import JobData
 
 
-def test_job_agg_data():
+def test_job_data():
     """
-    function to test the Class JobAggData inside autosubmit/monitor/diagram.py
+    function to test the Class JobData inside autosubmit/monitor/diagram.py
     """
-    job_agg = JobAggData()
-    assert job_agg.headers() == ['Section', 'Count', 'Queue Sum', 'Avg Queue', 'Run Sum', 'Avg Run']
-    assert job_agg.values() == [{}, 0, datetime.timedelta(0), datetime.timedelta(0),
-                                datetime.timedelta(0), datetime.timedelta(0)]
-    assert job_agg.number_of_columns() == 6
+    job_data = JobData()
+
+    assert job_data.headers() == ['Job Name', 'Queue Time', 'Run Time', 'Status']
+    assert job_data.values() == ['', datetime.timedelta(0), datetime.timedelta(0), '']
+    assert job_data.number_of_columns() == 4
