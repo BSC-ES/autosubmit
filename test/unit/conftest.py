@@ -1,20 +1,25 @@
-# Fixtures available to multiple test files must be created in this file.
+import os
 from contextlib import suppress
-
-import pytest
 from dataclasses import dataclass
 from pathlib import Path
-from ruamel.yaml import YAML
-from shutil import rmtree
 from tempfile import TemporaryDirectory
-from typing import Any, Dict, Callable, List, Protocol, Optional
-import os
+from textwrap import dedent
+from typing import Any, Dict, Callable, List, Protocol, Optional, TYPE_CHECKING
 
-from autosubmit.autosubmit import Autosubmit
-from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
+import pytest
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from ruamel.yaml import YAML
+
+from autosubmit.autosubmit import Autosubmit
+from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
+
+if TYPE_CHECKING:
+    import pytest_mock
+
+"""Fixtures available to multiple Autosubmit tests."""
 
 
 @dataclass
@@ -28,29 +33,136 @@ class AutosubmitExperiment:
     status_dir: Path
     platform: ParamikoPlatform
 
+
+class ExperimentFactory(Protocol):
+    def __call__(self, description: str, platform: str) -> AutosubmitExperiment: ...
+
+
+@pytest.fixture
+def create_experiment(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> ExperimentFactory:
+    """Create an Autosubmit experiment. Callers do not control the expid."""
+
+    original_autosubmitrc: str = os.getenv('AUTOSUBMIT_CONFIGURATION', default='')
+    tmp_dir = TemporaryDirectory()
+    tmp_path = Path(tmp_dir.name)
+    def _create_experiment(description: str, platform: str = 'local') -> AutosubmitExperiment:
+        autosubmitrc = tmp_path / 'autosubmitrc'
+        autosubmitrc.touch()
+        folder = str(tmp_path)
+        autosubmitrc.write_text(data=dedent(f'''[database]
+               path = {folder}
+               filename = tests.db
+               
+               [local]
+               path = {folder}
+               
+               [globallogs]
+               path = {folder}
+               
+               [structures]
+               path = {folder}
+               
+               [historicdb]
+               path = {folder}
+               
+               [historiclog]
+               path = {folder}
+               
+               [defaultstats]
+               path = {folder}'''))
+
+        os.environ['AUTOSUBMIT_CONFIGURATION'] = str(autosubmitrc)
+
+        BasicConfig.read()
+        Autosubmit.install()
+
+        expid = Autosubmit.expid(
+            description=description,
+            hpc="",
+            copy_id="",
+            dummy=True,
+            minimal_configuration=True,
+            git_repo="",
+            git_branch="",
+            git_as_conf="",
+            operational=False,
+            testcase=True,
+            use_local_minimal=False
+        )
+
+        exp_path = tmp_path / expid
+        aslogs_dir = exp_path / BasicConfig.LOCAL_ASLOG_DIR
+        exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
+        status_dir = exp_path / 'status'
+        aslogs_dir.mkdir(parents=True, exist_ok=True)
+        status_dir.mkdir(parents=True, exist_ok=True)
+
+        platform_config = {
+            "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
+            "LOCAL_TMP_DIR": str(exp_tmp_dir),
+            "LOCAL_ASLOG_DIR": str(aslogs_dir)
+        }
+        if platform == 'local':
+            platform_obj = LocalPlatform(expid=expid, name=platform, config=platform_config)
+        else:
+            platform_obj = SlurmPlatform(expid=expid, name=platform, config=platform_config)
+            platform_obj.job_status = {
+                'COMPLETED': [],
+                'RUNNING': [],
+                'QUEUING': [],
+                'FAILED': []
+            }
+            submit_platform_script = aslogs_dir / 'submit_local.sh'
+            submit_platform_script.touch(exist_ok=True)
+
+        return AutosubmitExperiment(
+            expid=expid,
+            autosubmit=autosubmit,
+            exp_path=exp_path,
+            tmp_dir=exp_tmp_dir,
+            aslogs_dir=aslogs_dir,
+            status_dir=status_dir,
+            platform=platform_obj  # type: ignore # TODO: given a string, get the platform object
+        )
+
+    def finalizer():
+        if original_autosubmitrc:
+            os.environ['AUTOSUBMIT_CONFIGURATION'] = original_autosubmitrc
+        if tmp_path and tmp_path.exists():
+            tmp_dir.cleanup()
+
+    request.addfinalizer(finalizer)
+
+    return _create_experiment
+
+
+class AutosubmitExperimentFactory(Protocol):
+    def __call__(self, expid: str) -> AutosubmitExperiment: ...
+
+
 @pytest.fixture(scope='function')
-def autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> Callable:
+def create_autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> AutosubmitExperimentFactory:
     """Create an instance of ``Autosubmit`` with an experiment."""
 
     original_root_dir = BasicConfig.LOCAL_ROOT_DIR
     tmp_dir = TemporaryDirectory()
     tmp_path = Path(tmp_dir.name)
 
-
-    def _create_autosubmit_exp(expid: str):
+    def _create_autosubmit_exp(expid: str) -> AutosubmitExperiment:
+        # directories used when searching for logs to cat
         root_dir = tmp_path
         BasicConfig.LOCAL_ROOT_DIR = str(root_dir)
         exp_path = BasicConfig.expid_dir(expid)
-        
+
         # directories used when searching for logs to cat
-        exp_tmp_dir = BasicConfig.expid_tmp_dir(expid) 
-        aslogs_dir = BasicConfig.expid_aslog_dir(expid) 
+        exp_tmp_dir = BasicConfig.expid_tmp_dir(expid)
+        aslogs_dir = BasicConfig.expid_aslog_dir(expid)
         status_dir =exp_path / 'status'
         if not os.path.exists(aslogs_dir):
             os.makedirs(aslogs_dir)
         if not os.path.exists(status_dir):
             os.makedirs(status_dir)
-        
+
         platform_config = {
             "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
             "LOCAL_TMP_DIR": str(exp_tmp_dir),
@@ -79,7 +191,7 @@ def autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> Ca
     def finalizer():
         BasicConfig.LOCAL_ROOT_DIR = original_root_dir
         if tmp_path and tmp_path.exists():
-            rmtree(tmp_path)
+            tmp_dir.cleanup()
 
     request.addfinalizer(finalizer)
 
@@ -121,7 +233,8 @@ def create_as_conf() -> Callable:  # May need to be changed to use the autosubmi
 
     return _create_as_conf
 
-class AutosubmitConfigFactory(Protocol):  # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
+class AutosubmitConfigFactory(Protocol):
+    """Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf."""
 
     def __call__(self, expid: str, experiment_data: Optional[Dict], *args: Any, **kwargs: Any) -> AutosubmitConfig: ...
 
@@ -177,7 +290,7 @@ def autosubmit_config(
     def finalizer() -> None:
         BasicConfig.LOCAL_ROOT_DIR = original_root_dir
         with suppress(FileNotFoundError):
-            rmtree(tmp_path)
+            tmp_dir.cleanup()
 
     request.addfinalizer(finalizer)
 
