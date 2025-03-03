@@ -17,6 +17,10 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+"""
+Diagram generator File
+"""
+
 import itertools
 import math
 import traceback
@@ -25,7 +29,7 @@ from dataclasses import dataclass, field
 
 import matplotlib as mtp
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
+from matplotlib import gridspec
 import matplotlib.patches as mpatches
 from matplotlib.backends.backend_pdf import PdfPages
 
@@ -67,16 +71,31 @@ class JobAggData:
 
     @staticmethod
     def headers() -> List[str]:
+        """
+            Header function
+            :param
+            :return: List[str]
+        """
         spaced = [k.split('_') for k in JobAggData.__annotations__.keys()]
         return [
             ' '.join([key.capitalize() for key in keys]) for keys in spaced
         ]
 
     def values(self) -> List[Any]:
+        """
+            Values function
+            :param
+            :return: List[Any]
+        """
         return list(self.__dict__.values())
 
     @staticmethod
     def number_of_columns() -> int:
+        """
+            Num of columns function
+            :param
+            :return: int
+        """
         return len(JobAggData.__annotations__)
 
 

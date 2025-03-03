@@ -16,9 +16,8 @@
 
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-"""
-Test file for autosubmit/monitor/diagram.py
-"""
+""" Test file for autosubmit/monitor/diagram.py """
+
 import tempfile
 from pathlib import Path
 
@@ -29,6 +28,17 @@ from autosubmit.monitor import diagram
 
 from autosubmit.monitor.diagram import JobData, JobAggData
 
+
+def test_job_agg_data():
+    """
+    function to test the Class JobAggData inside autosubmit/monitor/diagram.py
+    """
+    job_agg = JobAggData()
+    assert job_agg.headers() == ['Section', 'Count', 'Queue Sum', 'Avg Queue', 'Run Sum', 'Avg Run']
+    assert job_agg.values() == [{}, 0, datetime.timedelta(0), datetime.timedelta(0),
+                                datetime.timedelta(0), datetime.timedelta(0)]
+    assert job_agg.number_of_columns() == 6
+    
 
 @patch('autosubmit.monitor.diagram._aggregate_jobs_by_section')
 @patch('autosubmit.monitor.diagram._create_table')
