@@ -19,6 +19,7 @@
 """ Test file for autosubmit/monitor/diagram.py """
 
 import tempfile
+import datetime
 from pathlib import Path
 
 from mock.mock import patch
@@ -30,15 +31,12 @@ from autosubmit.monitor.diagram import JobData, JobAggData
 
 
 def test_job_agg_data():
-    """
-    function to test the Class JobAggData inside autosubmit/monitor/diagram.py
-    """
+    """ function to test the Class JobAggData inside autosubmit/monitor/diagram.py """
     job_agg = JobAggData()
     assert job_agg.headers() == ['Section', 'Count', 'Queue Sum', 'Avg Queue', 'Run Sum', 'Avg Run']
     assert job_agg.values() == [{}, 0, datetime.timedelta(0), datetime.timedelta(0),
                                 datetime.timedelta(0), datetime.timedelta(0)]
     assert job_agg.number_of_columns() == 6
-    
 
 @patch('autosubmit.monitor.diagram._aggregate_jobs_by_section')
 @patch('autosubmit.monitor.diagram._create_table')
