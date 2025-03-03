@@ -2658,7 +2658,7 @@ class JobList(object):
         if hasattr(job, "x11") and job.x11: # X11 has it log written in the run.out file. No need to check for log files as there are none
             job.updated_log = True
             return
-        log_recovered = self.check_if_log_is_recovered(job)
+        log_recovered = self.check_if_log_is_recovered(job, new_run)
         if log_recovered:
             job.local_logs = (log_recovered.name, log_recovered.name[:-4] + ".err") # we only want the last one
             job.updated_log = True
@@ -2666,7 +2666,7 @@ class JobList(object):
             job.platform.add_job_to_log_recover(job)
         return log_recovered
 
-    def check_if_log_is_recovered(self, job: Job) -> Path:
+    def check_if_log_is_recovered(self, job: Job, new_run) -> Path:
         """
         Check if the log is recovered.
 
@@ -2680,8 +2680,10 @@ class JobList(object):
         Returns:
             Path: The path to the recovered log file if found, otherwise None.
         """
-
-        if not hasattr(job, "updated_log") or not job.updated_log:
+        job.new_run = new_run
+        if not new_run and not job.updated_log:
+            job.platform.get_log_name_queue.choose_action(requested_name=job.name)
+        elif new_run and not job.updated_log:
             for log_recovered in self.path_to_logs.glob(f"{job.name}.*.out"):
                 file_timestamp = int(datetime.datetime.fromtimestamp(log_recovered.stat().st_mtime).strftime("%Y%m%d%H%M%S"))
                 if job.ready_date and file_timestamp >= int(job.ready_date):
