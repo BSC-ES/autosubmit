@@ -210,7 +210,17 @@ def create_stats_report(
     return hide
 
 
-def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job], general_stats: List[str]) -> bool:
+def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job],
+                       general_stats: List[str]) -> bool:
+    """
+        create_bar_diagram Function
+        :param
+        :expid: str with the id of a experiment
+        :exp_stats: Statistics of the jobs of the experiment
+        :jobs_list: List[Job] of jobs in the experiment
+        :general_stats: List[str] of status of the jobs
+        :return: bool
+    """
     # Error prevention
     normal_plots_count = 0
     failed_jobs_plots_count = 0

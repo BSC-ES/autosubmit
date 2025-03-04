@@ -71,10 +71,10 @@ def test_job_agg_data():
 def test_create_bar_diagram(job_stats, failed_jobs, failed_jobs_dict, num_plots, result):
     """ function to test the function create_bar_diagram inside autosubmit/monitor/diagram.py """
     jobs_data = [
-        Job('test', "a29z", "COMPLETED", 200),
-        Job('test', "a28z", "COMPLETED", 200),
-        Job('test', "a27z", "COMPLETED", 200),
-        Job('test', "a26z", "FAILED", 10)
+        Job('test', "a000", "COMPLETED", 200),
+        Job('test', "a000", "COMPLETED", 200),
+        Job('test', "a000", "COMPLETED", 200),
+        Job('test', "a000", "FAILED", 10)
     ]
 
     status = ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED"]
