@@ -371,3 +371,4 @@ def test_sub_job_manager(current_structure):
     assert job_manager.subjobfixes is not None and type(job_manager.subjobfixes) is dict
     assert (job_manager.get_collection_of_fixes_applied() is not None
             and type(job_manager.get_collection_of_fixes_applied()) is dict)
+
