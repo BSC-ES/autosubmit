@@ -20,6 +20,9 @@
 """ Test file for autosubmit/monitor/diagram.py """
 import datetime
 
+import pytest
+from mock.mock import patch
+
 from autosubmit.job.job import Job
 from autosubmit.monitor import diagram
 from autosubmit.monitor.diagram import JobData, JobAggData
@@ -34,9 +37,7 @@ def test_job_data():
     assert job_data.number_of_columns() == 4
 
 def test_job_agg_data():
-    """
-    function to test the Class JobAggData inside autosubmit/monitor/diagram.py
-    """
+    """ function to test the Class JobAggData inside autosubmit/monitor/diagram.py """
     job_agg = JobAggData()
     assert job_agg.headers() == ['Section', 'Count', 'Queue Sum', 'Avg Queue', 'Run Sum', 'Avg Run']
     assert job_agg.values() == [{}, 0, datetime.timedelta(0), datetime.timedelta(0),
@@ -62,3 +63,63 @@ def test_create_csv_stats(tmpdir):
 
     tmpdir += '.csv'
     assert tmpdir.exists()
+
+
+@pytest.mark.parametrize("job_stats, failed_jobs, failed_jobs_dict, num_plots, result", [
+    (
+            ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED"],
+            [0, 0, 0, 1],
+            {"a26z": 1},
+            40,
+            True
+    ), (
+            ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED"],
+            [0, 0, 0, 1],
+            {"a26z": 1},
+            0,
+            False
+    ), (
+            ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED", "COMPLETED", "COMPLETED", "COMPLETED",
+             "FAILED", "COMPLETED", "COMPLETED", "COMPLETED", "FAILED", "COMPLETED", "COMPLETED",
+             "COMPLETED", "FAILED", "COMPLETED", "COMPLETED", "COMPLETED", "FAILED", "COMPLETED",
+             "COMPLETED", "COMPLETED", "FAILED", "COMPLETED", "COMPLETED", "COMPLETED", "FAILED",
+             "COMPLETED", "COMPLETED", "COMPLETED", "FAILED"],
+            [0, 0, 0, 1],
+            {"a26z": 1},
+            10,
+            True
+    ), (
+            [],
+            [0, 0, 0, 1],
+            {},
+            40,
+            True
+    ), (
+            [],
+            [],
+            {},
+            40,
+            True
+    ),
+], ids=['all run', 'divided by zero', 'run with continue', 'fail job_dict', 'no run']
+                         )
+def test_create_bar_diagram(job_stats, failed_jobs, failed_jobs_dict, num_plots, result):
+    """ function to test the function create_bar_diagram inside autosubmit/monitor/diagram.py """
+    jobs_data = [
+        Job('test', "a000", "COMPLETED", 200),
+        Job('test', "a000", "COMPLETED", 200),
+        Job('test', "a000", "COMPLETED", 200),
+        Job('test', "a000", "FAILED", 10)
+    ]
+    date_ini = datetime.datetime.now()
+    date_fin = date_ini + datetime.timedelta(0.10)
+    queue_time_fixes = ['test', 5]
+
+    status = ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED"]
+    statistics = diagram.populate_statistics(jobs_data, date_ini, date_fin, queue_time_fixes)
+    statistics.jobs_stat = job_stats
+    statistics.failed_jobs = failed_jobs
+    statistics.failed_jobs_dict = failed_jobs_dict
+
+    with patch('autosubmit.monitor.diagram.MAX_NUM_PLOTS', num_plots):  # 1
+        assert result == diagram.create_bar_diagram("a000", statistics, jobs_data, status)
