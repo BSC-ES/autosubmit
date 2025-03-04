@@ -318,7 +318,7 @@ def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job], 
         except Exception as exp:
             print(exp)
             print((traceback.format_exc()))
-    return plot
+    return True if plot is not False else False
 
 
 def create_csv_stats(exp_stats: Statistics, jobs_list: List[Job],
