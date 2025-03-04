@@ -67,7 +67,7 @@ def test_job_agg_data():
                 [0, 0, 0, 1],
                 {"a26z": 1},
                 10,
-                False
+                True
         ),(
                 [],
                 [0, 0, 0, 1],
