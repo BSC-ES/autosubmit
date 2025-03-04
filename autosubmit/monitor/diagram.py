@@ -341,12 +341,14 @@ def create_csv_stats(exp_stats: Statistics, jobs_list: List[Job],
 def build_legends(plot: Any, rects: list[str], experiment_stats: Statistics,
                   general_stats: List[str]) -> None:
     """
-        build_legends Function
+    build_legends Function
+
         :param
-        :plot: Any
-        :rects: List[str]
-        :experiment_stats: Statistics of the jobs of the experiment
-        :general_stats: List[str] of status of the jobs
+            :plot: Any
+            :rects: List[str]
+            :experiment_stats: Statistics of the jobs of the experiment
+            :general_stats: List[str] of status of the jobs
+
         :return: None
     """
     # Main legend with colourful rectangles
