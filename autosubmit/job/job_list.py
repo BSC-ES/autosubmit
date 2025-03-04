@@ -309,7 +309,7 @@ class JobList(object):
                         submitter = _get_submitter(as_conf)
                         submitter.load_platforms(as_conf)
                         if job.platform_name not in submitter.platforms:
-                            job.update_parameters(as_conf,{})
+                            job.update_parameters(as_conf)
                         job_platform = submitter.platforms[job.platform_name]
                     first = False
                 job.platform = job_platform
@@ -2660,6 +2660,7 @@ class JobList(object):
             return
         log_recovered = self.check_if_log_is_recovered(job)
         if log_recovered:
+            job.clean_attributes()
             job.local_logs = (log_recovered.name, log_recovered.name[:-4] + ".err") # we only want the last one
             job.updated_log = True
         elif new_run and not job.updated_log and str(as_conf.platforms_data.get(job.platform.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "false":
@@ -2983,7 +2984,7 @@ class JobList(object):
         out = True
         for job in self._job_list:
             show_logs = job.check_warnings
-            if not job.check_script(as_conf, as_conf.parameters, show_logs):
+            if not job.check_script(as_conf, show_logs):
                 out = False
         return out
 
@@ -3028,7 +3029,7 @@ class JobList(object):
             else:
                 if job.section in self.sections_checked:
                     show_logs = "false"
-            if not job.check_script(as_conf, as_conf.parameters, show_logs):
+            if not job.check_script(as_conf, show_logs):
                 out = False
             self.sections_checked.add(job.section)
         if out:

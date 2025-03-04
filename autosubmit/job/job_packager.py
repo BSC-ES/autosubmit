@@ -542,8 +542,7 @@ class JobPackager(object):
                     event.set()
 
             if job.section not in section_jobs_to_submit: # This is to fix TOTAL_JOBS when is set at job_level # Only for non-wrapped jobs
-                job.update_parameters(self._as_config,
-                                      {})  # Ensure to have the correct processors for the wrapper building code
+                job.update_parameters(self._as_config)  # Ensure to have the correct processors for the wrapper building code
                 if int(job.max_waiting_jobs) != int(job.platform.max_waiting_jobs):
                     section_max_wait_jobs_to_submit = int(job.max_waiting_jobs) - int(self.waiting_jobs)
                 else:
@@ -838,7 +837,7 @@ class JobPackagerVertical(object):
         :return: List of jobs that are wrapped together.
         :rtype: List() of Job Object
         """
-        job.update_parameters(wrapper_info[-1],{}) # update_parameter has moved, so this is now needed.
+        job.update_parameters(wrapper_info[-1]) # update_parameter has moved, so this is now needed.
         self.total_wallclock = job.wallclock # reset total wallclock for package
         stack = [(job, 1)]
         while stack:
@@ -856,7 +855,7 @@ class JobPackagerVertical(object):
                 continue
             child = self.get_wrappable_child(job)
             if child is not None and len(str(child)) > 0:
-                child.update_parameters(wrapper_info[-1], {})
+                child.update_parameters(wrapper_info[-1])
                 self.total_wallclock = sum_str_hours(self.total_wallclock, child.wallclock)
                 # Local jobs could not have a wallclock defined
                 if self.total_wallclock <= self.max_wallclock or not self.max_wallclock:
@@ -1006,7 +1005,7 @@ class JobPackagerHorizontal(object):
                     for event in job.platform.worker_events:  # keep alive log retrieval workers.
                         if not event.is_set():
                             event.set()
-                job.update_parameters(wrapper_info[-1], {})
+                job.update_parameters(wrapper_info[-1])
                 if str(job.processors).isdigit() and str(job.nodes).isdigit() and int(job.nodes) > 0 and int(job.processors) <= 1:
                     job.processors = 0
                 if job.total_processors == "":
@@ -1075,7 +1074,7 @@ class JobPackagerHorizontal(object):
                             if other_parent.status != Status.COMPLETED and other_parent not in self.job_list:
                                 wrappable = False
                         if wrappable and child not in next_section_list:
-                            child.update_parameters(self.wrapper_info[-1], {})
+                            child.update_parameters(self.wrapper_info[-1])
                             next_section_list.append(child)
 
             next_section_list.sort(

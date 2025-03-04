@@ -29,7 +29,6 @@ from ruamel.yaml import YAML
 from typing import Dict, Set, Tuple, Union, Any, List, Optional
 
 from autosubmit.database.db_common import update_experiment_descrip_version
-from autosubmit.helpers.parameters import PARAMETERS
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
@@ -2200,10 +2199,30 @@ class Autosubmit:
                 max_recovery_retrials = as_conf.experiment_data.get("CONFIG",{}).get("RECOVERY_RETRIALS",3650)  # (72h - 122h )
                 recovery_retrials = 0
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
+                import tracemalloc
+                tracemalloc.start()
+
+
+                count = 10
+                i = 0
                 while job_list.get_active():
+                    if i == count:
+                        snapshot1 = tracemalloc.take_snapshot()
+                    if i >= count:
+                        snapshot2 = tracemalloc.take_snapshot()
+                        top_stats = snapshot2.compare_to(snapshot1, 'lineno')
+                        print("[ Top 10 differences ]")
+                        for stat in top_stats[:30]:
+                            try:
+                                if "dbeltran" in stat.traceback._frames[0][0]:
+                                    if ".venv" not in stat.traceback._frames[0][0]:
+                                        print(stat)
+                            except:
+                                pass
+                    i += 1
                     Autosubmit.refresh_log_recovery_process(platforms_to_test, as_conf)
                     for job in [job for job in job_list.get_job_list() if job.status == Status.READY]:
-                        job.update_parameters(as_conf, {})
+                        job.update_parameters(as_conf)
                     did_run = True
                     try:
                         if Autosubmit.exit:
@@ -2280,7 +2299,7 @@ class Autosubmit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             job_list.save()
                             as_conf.save()
-                        time.sleep(safetysleeptime)
+                        #time.sleep(safetysleeptime)
                         #Log.debug(f"FD endsubmit: {fd_show.fd_table_status_str()}")
 
 
@@ -3255,7 +3274,7 @@ class Autosubmit:
                 jobs_parameters = {}
                 try:
                     for job in job_list.get_job_list():
-                        job_parameters = job.update_parameters(as_conf, {})
+                        job_parameters = job.update_parameters(as_conf)
                         for key, value in job_parameters.items():
                             jobs_parameters["JOBS"+"."+job.section+"."+key] = value
                 except Exception:

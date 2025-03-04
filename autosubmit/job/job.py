@@ -364,57 +364,60 @@ class Job(object):
             self._platform = None
 
     def clean_attributes(self):
-        self.rerun_only = False
-        self.script_name_wrapper = None
-        self.delay_end = None
-        self.wrapper_type = None
-        self._wrapper_queue = None
-        self._queue = None
-        self._partition = None
-        self.retry_delay = None
-        self._wallclock = None
-        self.wchunkinc = None
-        self._tasks = None
-        self._nodes = None
-        self.default_parameters = None
-        self._threads = None
-        self._processors = None
-        self._memory = None
-        self._memory_per_task = None
-        self.undefined_variables = set()
-        self.executable = None
-        self.packed = False
-        self.hold = False
-        self._export = "none"
-        self.start_time = None
-        self.total_jobs = None
-        self.max_waiting_jobs = None
-        self.exclusive = ""
-        self.current_checkpoint_step = 0
-        self.max_checkpoint_step = 0
-        self.reservation = ""
-        self.het = {}
-        self.updated_log = False
-        self._script = None
-        self._log_recovery_retries = None
-        self.wrapper_name = None
-        self.is_wrapper = False
-        self._wallclock_in_seconds = None
-        self._notify_on = None
-        self._processors_per_node = None
-        self._shape = None
-        self._x11 = False
-        self._x11_options = None
-        self._hyperthreading = None
-        self._scratch_free_space = None
-        self._delay_retrials = None
-        self._custom_directives = None
-        if hasattr(self, 'packed_during_building'):
-            self.packed_during_building = False
-        # Tentative
-        self._platform = None
-        self._parents = set()
-        self.children = set()
+        if self.status == Status.FAILED and self.fail_count >= self.retrials:
+            return None
+        elif self.status in [Status.FAILED, Status.WAITING, Status.COMPLETED]:
+            self.rerun_only = False
+            self.script_name_wrapper = None
+            self.delay_end = None
+            self.wrapper_type = None
+            self._wrapper_queue = None
+            self._queue = None
+            self._partition = None
+            self.retry_delay = None
+            self._wallclock = None
+            self.wchunkinc = None
+            self._tasks = None
+            self._nodes = None
+            self.default_parameters = None
+            self._threads = None
+            self._processors = None
+            self._memory = None
+            self._memory_per_task = None
+            self.undefined_variables = set()
+            self.executable = None
+            self.packed = False
+            self.hold = False
+            self._export = "none"
+            self.start_time = None
+            self.total_jobs = None
+            self.max_waiting_jobs = None
+            self.exclusive = ""
+            self.current_checkpoint_step = 0
+            self.max_checkpoint_step = 0
+            self.reservation = ""
+            self.het = {}
+            self.updated_log = False
+            self._script = None
+            self._log_recovery_retries = None
+            self.wrapper_name = None
+            self.is_wrapper = False
+            self._wallclock_in_seconds = None
+            self._notify_on = None
+            self._processors_per_node = None
+            self._shape = None
+            self._x11 = False
+            self._x11_options = None
+            self._hyperthreading = None
+            self._scratch_free_space = None
+            self._delay_retrials = None
+            self._custom_directives = None
+            if hasattr(self, 'packed_during_building'):
+                self.packed_during_building = False
+            # Tentative
+            self._parents = set()
+            self.children = set()
+            self.dependencies = None
 
 
     def _init_runtime_parameters(self):
@@ -2212,18 +2215,13 @@ class Job(object):
         self.retrials = parameters["RETRIALS"]
         self.reservation = parameters["RESERVATION"]
 
-    def update_parameters(self, as_conf, parameters,
-                          default_parameters={'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%',
-                                              'M': '%M%', 'M_': '%M_%', 'm': '%m%', 'm_': '%m_%'}):
+    def update_parameters(self, as_conf):
         """
         Refresh parameters value
 
-        :param default_parameters:
-        :type default_parameters: dict
+
         :param as_conf:
         :type as_conf: AutosubmitConfig
-        :param parameters:
-        :type parameters: dict
         """
         as_conf.reload()
         self._init_runtime_parameters()
@@ -2231,10 +2229,8 @@ class Job(object):
             self.start_time = datetime.datetime.now()
         # Parameters that affect to all the rest of parameters
         self.update_dict_parameters(as_conf)
-        parameters = parameters.copy()
-        if hasattr(as_conf,"parameters"):
-            parameters.update(as_conf.parameters)
-        parameters.update(default_parameters)
+        parameters = as_conf.load_parameters()
+        parameters.update(self.default_parameters)
         parameters = as_conf.substitute_dynamic_variables(parameters,25)
         parameters['ROOTDIR'] = os.path.join(
             BasicConfig.LOCAL_ROOT_DIR, self.expid)
@@ -2389,7 +2385,7 @@ class Job(object):
             lang = locale.getdefaultlocale()[1]
             if lang is None:
                 lang = 'UTF-8'
-        parameters = self.update_parameters(as_conf, {})
+        parameters = self.update_parameters(as_conf)
         template_content,additional_templates = self.update_content(as_conf, parameters)
         #enumerate and get value
         #TODO regresion test
@@ -2438,7 +2434,7 @@ class Job(object):
         return script_name
 
     def create_wrapped_script(self, as_conf, wrapper_tag='wrapped'):
-        parameters = self.update_parameters(as_conf, {})
+        parameters = self.update_parameters(as_conf)
         template_content = self.get_wrapped_content(as_conf, parameters)
         for key, value in parameters.items():
             template_content = re.sub(
@@ -2454,7 +2450,7 @@ class Job(object):
         os.chmod(os.path.join(self._tmp_path, script_name), 0o755)
         return script_name
 
-    def check_script(self, as_conf, parameters, show_logs="false"):
+    def check_script(self, as_conf, show_logs="false"):
         """
         Checks if script is well-formed
 
@@ -2469,7 +2465,7 @@ class Job(object):
         """
 
         out = False
-        parameters = self.update_parameters(as_conf, parameters)
+        parameters = self.update_parameters(as_conf)
         template_content, additional_templates = self.update_content(as_conf, parameters)
         if template_content is not False:
             variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content,flags=re.IGNORECASE)

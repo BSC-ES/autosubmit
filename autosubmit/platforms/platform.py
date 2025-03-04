@@ -44,7 +44,7 @@ class UniqueQueue(Queue):
         """
         self.block = block
         self.timeout = timeout
-        self.all_items = deque(maxlen=max_items)  # Won't be popped, so even if it is being processed by the log retrieval process, it won't be added again.
+        #self.all_items = deque(maxlen=max_items)  # Won't be popped, so even if it is being processed by the log retrieval process, it won't be added again.
         super().__init__(maxsize, ctx=ctx)
 
 
@@ -58,15 +58,15 @@ class UniqueQueue(Queue):
             timeout (float): Timeout for blocking operations. Defaults to None.
         """
 
-        if job.wrapper_type == "vertical":  # We gather all retrials at once
-            unique_name = job.name
-        else:
-            unique_name = job.name+str(job.fail_count)  # We gather retrial per retrial
-
-        if unique_name not in self.all_items:
-            self.all_items.append(unique_name)
-            # Without copy, the process seems to modify the job for other retrials.. My guess is that the object is not serialized until it is get from the queue.
-            super().put(copy(job), block, timeout)
+        # if job.wrapper_type == "vertical":  # We gather all retrials at once
+        #     unique_name = job.name
+        # else:
+        #     unique_name = job.name+str(job.fail_count)  # We gather retrial per retrial
+        #
+        # if unique_name not in self.all_items:
+        #     self.all_items.append(unique_name)
+        #     # Without copy, the process seems to modify the job for other retrials.. My guess is that the object is not serialized until it is get from the queue.
+        super().put(copy(job), block, timeout)
 
 
 class Platform(object):
@@ -1074,8 +1074,7 @@ class Platform(object):
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
                 try:
                     job.retrieve_logfiles(raise_error=True)
-                except Exception as e:
-                    Log.debug(e)
+                except Exception:
                     jobs_pending_to_process.add(job)
                     job._log_recovery_retries += 1
                     Log.warning(f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry:'{job.fail_count}'.")
