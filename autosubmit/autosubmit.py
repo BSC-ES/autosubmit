@@ -50,7 +50,6 @@ from .job.job_package_persistence import JobPackagePersistence
 from .job.job_packager import JobPackager
 from .job.job_utils import SubJob, SubJobManager
 from .profiler.profiler import Profiler
-from .monitor.monitor import Monitor
 from .notifications.mail_notifier import MailNotifier
 from .notifications.notifier import Notifier
 from .platforms.paramiko_submitter import ParamikoSubmitter
@@ -2615,6 +2614,8 @@ class Autosubmit:
         :type detail: bool
 
         """
+        from .monitor.monitor import Monitor
+
         # Start profiling if the flag has been used
         if profile:
             profiler = Profiler(expid)
@@ -2809,6 +2810,8 @@ class Autosubmit:
         :param db: Use database to get the statistics
         :type db: bool
         """
+        from .monitor.monitor import Monitor
+
         try:
             Log.info("Loading jobs...")
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
@@ -2877,6 +2880,8 @@ class Autosubmit:
         :param plot: set True to delete outdated plots
         :param stats: set True to delete outdated stats
         """
+        from .monitor.monitor import Monitor
+
         try:
             exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
 
@@ -3053,6 +3058,7 @@ class Autosubmit:
                 groups_dict = job_grouping.group_jobs()
 
             if not noplot:
+                from .monitor.monitor import Monitor
                 Log.info("\nPlotting the jobs list...")
                 monitor_exp = Monitor()
                 monitor_exp.generate_output(expid,
@@ -4605,6 +4611,7 @@ class Autosubmit:
                             Log.warning(
                                 "Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
                     if not noplot:
+                        from .monitor.monitor import Monitor
                         if group_by:
                             status = list()
                             if expand_status:
@@ -5380,6 +5387,7 @@ class Autosubmit:
                         "Changes NOT saved to the JobList!!!!:  use -s option to save", 3000)
                 #Visualization stuff that should be in a function common to monitor , create, -cw flag, inspect and so on
                 if not noplot:
+                    from .monitor.monitor import Monitor
                     if as_conf.get_wrapper_type() != 'none' and check_wrapper:
                         packages_persistence = JobPackagePersistence(
                             os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
