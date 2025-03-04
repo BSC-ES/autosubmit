@@ -110,11 +110,12 @@ def handle_start_after(start_after, expid, BasicConfig):
 
 
 def get_allowed_members(run_members: str, as_conf: AutosubmitConfig) -> dict:
-    """
-       Check if the members sent are allowed
-       :param run_members: str
-       :param as_conf: AutosubmitConfig
-       :return: dict
+    """Check if the members sent are allowed
+
+   :param run_members: str
+   :param as_conf: AutosubmitConfig
+
+   :return: dict
     """
     if run_members is not None:
         allowed_members = run_members.split()
