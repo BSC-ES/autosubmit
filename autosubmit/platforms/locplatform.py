@@ -21,7 +21,6 @@ import os
 from pathlib import Path
 from xml.dom.minidom import parseString
 import subprocess
-from matplotlib.patches import PathPatch
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.headers.local_header import LocalHeader
 from autosubmit.platforms.wrappers.wrapper_factory import LocalWrapperFactory

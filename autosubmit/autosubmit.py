@@ -18,19 +18,18 @@
 import collections
 import locale
 import platform
-import requests
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import threading
 from bscearth.utils.date import date2str
 from configparser import ConfigParser
-from distutils.util import strtobool
 from pathlib import Path
 from ruamel.yaml import YAML
 from typing import Dict, Set, Tuple, Union, Any, List, Optional
 
 from autosubmit.database.db_common import update_experiment_descrip_version
 from autosubmit.helpers.parameters import PARAMETERS
+from autosubmit.helpers.utils import strtobool
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
@@ -50,8 +49,6 @@ from .job.job_list_persistence import JobListPersistencePkl
 from .job.job_package_persistence import JobPackagePersistence
 from .job.job_packager import JobPackager
 from .job.job_utils import SubJob, SubJobManager
-from .profiler.profiler import Profiler
-from .monitor.monitor import Monitor
 from .notifications.mail_notifier import MailNotifier
 from .notifications.notifier import Notifier
 from .platforms.paramiko_submitter import ParamikoSubmitter
@@ -2143,6 +2140,7 @@ class Autosubmit:
         """
         # Start profiling if the flag has been used
         if profile:
+            from .profiler.profiler import Profiler
             profiler = Profiler(expid)
             profiler.start()
 
@@ -2603,8 +2601,11 @@ class Autosubmit:
         :type detail: bool
 
         """
+        from .monitor.monitor import Monitor
+
         # Start profiling if the flag has been used
         if profile:
+            from .profiler.profiler import Profiler
             profiler = Profiler(expid)
             profiler.start()
 
@@ -2797,6 +2798,8 @@ class Autosubmit:
         :param db: Use database to get the statistics
         :type db: bool
         """
+        from .monitor.monitor import Monitor
+
         try:
             Log.info("Loading jobs...")
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
@@ -2865,6 +2868,8 @@ class Autosubmit:
         :param plot: set True to delete outdated plots
         :param stats: set True to delete outdated stats
         """
+        from .monitor.monitor import Monitor
+
         try:
             exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
 
@@ -3041,6 +3046,7 @@ class Autosubmit:
                 groups_dict = job_grouping.group_jobs()
 
             if not noplot:
+                from .monitor.monitor import Monitor
                 Log.info("\nPlotting the jobs list...")
                 monitor_exp = Monitor()
                 monitor_exp.generate_output(expid,
@@ -3198,6 +3204,7 @@ class Autosubmit:
                     "Unable to gather the parameters from config files, check permissions.", 7012)
             # Performance Metrics call
             try:
+                import requests
                 BasicConfig.read()
                 request = requests.get(
                     "{0}/performance/{1}".format(BasicConfig.AUTOSUBMIT_API_URL, expid))
@@ -4463,6 +4470,7 @@ class Autosubmit:
         """
         # Start profiling if the flag has been used
         if profile:
+            from .profiler.profiler import Profiler
             profiler = Profiler(expid)
             profiler.start()
 
@@ -4593,6 +4601,7 @@ class Autosubmit:
                             Log.warning(
                                 "Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
                     if not noplot:
+                        from .monitor.monitor import Monitor
                         if group_by:
                             status = list()
                             if expand_status:
@@ -5368,6 +5377,7 @@ class Autosubmit:
                         "Changes NOT saved to the JobList!!!!:  use -s option to save", 3000)
                 #Visualization stuff that should be in a function common to monitor , create, -cw flag, inspect and so on
                 if not noplot:
+                    from .monitor.monitor import Monitor
                     if as_conf.get_wrapper_type() != 'none' and check_wrapper:
                         packages_persistence = JobPackagePersistence(
                             os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
