@@ -17,7 +17,6 @@
 import collections
 import locale
 import platform
-import requests
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import threading
@@ -3216,6 +3215,7 @@ class Autosubmit:
                     "Unable to gather the parameters from config files, check permissions.", 7012)
             # Performance Metrics call
             try:
+                import requests
                 BasicConfig.read()
                 request = requests.get(
                     "{0}/performance/{1}".format(BasicConfig.AUTOSUBMIT_API_URL, expid))
