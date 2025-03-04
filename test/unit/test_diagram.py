@@ -55,18 +55,33 @@ def test_job_agg_data():
                 True
         ),(
                 ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED"],
-                [0,0,0,1],
-                {},
-                1,
+                [0, 0, 0, 1],
+                {"a26z": 1},
+                0,
                 False
         ),(
-                [""],
-                [0],
-                {},
-                1,
+                ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED", "COMPLETED", "COMPLETED", "COMPLETED", "FAILED",
+                 "COMPLETED", "COMPLETED", "COMPLETED", "FAILED", "COMPLETED", "COMPLETED", "COMPLETED", "FAILED",
+                 "COMPLETED", "COMPLETED", "COMPLETED", "FAILED", "COMPLETED", "COMPLETED", "COMPLETED", "FAILED",
+                 "COMPLETED", "COMPLETED", "COMPLETED", "FAILED", "COMPLETED", "COMPLETED", "COMPLETED", "FAILED"],
+                [0, 0, 0, 1],
+                {"a26z": 1},
+                10,
                 False
+        ),(
+                [],
+                [0, 0, 0, 1],
+                {},
+                40,
+                True
+        ),(
+                [],
+                [],
+                {},
+                40,
+                True
         ),
-    ],ids=['all run', 'run with continue', 'no run']
+    ],ids=['all run', 'divided by zero', 'run with continue', 'fail job_dict', 'no run']
  )
 def test_create_bar_diagram(job_stats, failed_jobs, failed_jobs_dict, num_plots, result):
     """ function to test the function create_bar_diagram inside autosubmit/monitor/diagram.py """
