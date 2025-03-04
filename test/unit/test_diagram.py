@@ -20,6 +20,8 @@
 """ Test file for autosubmit/monitor/diagram.py """
 import datetime
 
+from autosubmit.job.job import Job
+from autosubmit.monitor import diagram
 from autosubmit.monitor.diagram import JobData, JobAggData
 
 
@@ -31,7 +33,6 @@ def test_job_data():
     assert job_data.values() == ['', datetime.timedelta(0), datetime.timedelta(0), '']
     assert job_data.number_of_columns() == 4
 
-    
 def test_job_agg_data():
     """
     function to test the Class JobAggData inside autosubmit/monitor/diagram.py
@@ -41,3 +42,23 @@ def test_job_agg_data():
     assert job_agg.values() == [{}, 0, datetime.timedelta(0), datetime.timedelta(0),
                                 datetime.timedelta(0), datetime.timedelta(0)]
     assert job_agg.number_of_columns() == 6
+
+def test_create_csv_stats(tmpdir):
+    """ function to test the Function create_csv_stats inside autosubmit/monitor/diagram.py """
+    jobs_data = [
+        Job('test', "a000", "COMPLETED", 200),
+        Job('test', "a000", "COMPLETED", 200),
+        Job('test', "a000", "COMPLETED", 200),
+        Job('test', "a000", "FAILED", 10)
+    ]
+
+    date_ini = datetime.datetime.now()
+    date_fin = date_ini + datetime.timedelta(0.10)
+    queue_time_fixes = ['test', 5]
+
+    statistics = diagram.populate_statistics(jobs_data, date_ini, date_fin, queue_time_fixes)
+    file_tmpdir = tmpdir + '.pdf'
+    diagram.create_csv_stats(statistics, jobs_data, str(file_tmpdir))
+
+    tmpdir += '.csv'
+    assert tmpdir.exists()
