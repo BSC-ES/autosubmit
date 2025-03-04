@@ -58,9 +58,9 @@ def test_build_legends():
 
     date_ini = datetime.datetime.now()
     date_fin = date_ini + datetime.timedelta(0.10)
-    queue_time_fixes = ['test', 5]
+    queue_time_fixes = {'test': 5}
 
-    react = (['dummy'], [''], ['test'])
+    react = [['dummy'], [''], ['test']]
     general_stats = [('status', 'status2'),('status', 'status2'),('status', 'status2')]
 
     statistics = diagram.populate_statistics(jobs_data, date_ini, date_fin, queue_time_fixes)
