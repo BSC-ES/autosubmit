@@ -20,8 +20,6 @@
 """ Test file for autosubmit/monitor/diagram.py """
 import datetime
 
-from mock.mock import Mock
-
 from autosubmit.job.job import Job
 from autosubmit.monitor import diagram
 from autosubmit.monitor.diagram import JobData, JobAggData
@@ -46,7 +44,7 @@ def test_job_agg_data():
     assert job_agg.number_of_columns() == 6
 
 
-def test_build_legends():
+def test_build_legends(mocker):
     """ function to test the function create_bar_diagram inside autosubmit/monitor/diagram.py """
     jobs_data = [
         Job('test', "a000", "COMPLETED", 200),
@@ -54,14 +52,14 @@ def test_build_legends():
         Job('test', "a000", "COMPLETED", 200),
         Job('test', "a000", "FAILED", 10)
     ]
-
-
     date_ini = datetime.datetime.now()
     date_fin = date_ini + datetime.timedelta(0.10)
     queue_time_fixes = {'test': 5}
 
+    statistics = diagram.populate_statistics(jobs_data, date_ini, date_fin, queue_time_fixes)
     react = [['dummy'], [''], ['test']]
     general_stats = [('status', 'status2'),('status', 'status2'),('status', 'status2')]
+    plot = mocker.Mock()
 
-    statistics = diagram.populate_statistics(jobs_data, date_ini, date_fin, queue_time_fixes)
-    assert diagram.build_legends(Mock(), react, statistics, general_stats) is None
+    number_of_legends = diagram.build_legends(plot, react, statistics, general_stats)
+    assert plot.legend.call_count == number_of_legends
