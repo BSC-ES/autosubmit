@@ -323,6 +323,15 @@ def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job], 
 
 def create_csv_stats(exp_stats: Statistics, jobs_list: List[Job],
                      output_file: Union[str, LiteralString, bytes]) -> None:
+    """create_csv_stats Function
+
+    :param
+    :exp_stats: Statistics of the jobs of the experiment
+    :jobs_list: List[Job] of jobs in the experiment
+    :output_file: Union[str, LiteralString, bytes] Path to the file (str)
+
+    :return: None
+    """
     job_names = [job.name for job in exp_stats.jobs_stat]
     start_times = exp_stats.start_times
     end_times = exp_stats.end_times
