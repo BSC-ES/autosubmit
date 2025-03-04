@@ -715,12 +715,7 @@ class Autosubmit:
                 return 0, None
             elif unknown or args.command is None:
                 parser.print_help()
-                return 1
-        except SystemExit as e:
-            return 1
-        except BaseException as e:
-            raise AutosubmitCritical(
-                "Incorrect arguments for this command", 7011)
+                return 1, None
 
             return 0, args
         except SystemExit:

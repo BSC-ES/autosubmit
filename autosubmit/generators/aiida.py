@@ -95,14 +95,14 @@ class Generator(AbstractGenerator):
         parser.add_argument('-o', '--output_dir', dest="output_dir", default=".", help='Output directory')
 
     def _validate(self) -> None:
-        ## validate jobs
-        for job_name, job_conf in self._as_conf.starter_conf['JOBS'].items():
+        """Validate jobs"""
+        for job_name, job_conf in self._as_conf.jobs_data.items():
             for key in job_conf.keys():
                 if key not in Generator.SUPPORTED_JOB_KEYWORDS:
-                    msg = f"Found in job {job_name} configuration file key {key} that is not supported for AiiDA generator."
+                    msg = f"Found in job {job_name} configuration file key {key} that is not officially supported for AiiDA generator. It might result in an error."
                     warnings.warn(msg)
         ## validate platforms
-        for platform_name, platform_conf in self._as_conf.starter_conf['PLATFORMS'].items():
+        for platform_name, platform_conf in self._as_conf.platforms_data.items():
             # only validate platforms that are used in jobs
             if platform_name in self._platforms_used_in_job.keys():
                 for key, value in platform_conf.items():
@@ -275,6 +275,7 @@ except NotExistent:
         code_section = "# WORKGRAPH_TASKS"
 
         for job in self._job_list.get_all():
+            # TODO(hack-conf) changes the as_conf
             script_name = job.create_script(self._as_conf)
             script_path = Path(job._tmp_path, script_name)
             script_text = open(script_path).read()

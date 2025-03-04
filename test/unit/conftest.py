@@ -171,7 +171,8 @@ def autosubmit_config(
         for arg, value in kwargs.items():
             setattr(config, arg, value)
 
-        config.current_loaded_files = [conf_dir / 'dummy-so-it-doesnt-force-reload.yml']
+        # TODO(hack-conf) this was a list before but it access the keys so I made dict
+        config.current_loaded_files = {conf_dir / 'dummy-so-it-doesnt-force-reload.yml': None}
         return config
 
     def finalizer() -> None:
