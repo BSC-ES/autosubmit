@@ -22,13 +22,13 @@ import platform
 import threading
 from bscearth.utils.date import date2str
 from configparser import ConfigParser
-from distutils.util import strtobool
 from pathlib import Path
 from ruamel.yaml import YAML
 from typing import Dict, Set, Tuple, Union, Any, List, Optional
 
 from autosubmit.database.db_common import update_experiment_descrip_version
 from autosubmit.helpers.parameters import PARAMETERS
+from autosubmit.helpers.utils import strtobool
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
@@ -48,7 +48,6 @@ from .job.job_list_persistence import JobListPersistencePkl
 from .job.job_package_persistence import JobPackagePersistence
 from .job.job_packager import JobPackager
 from .job.job_utils import SubJob, SubJobManager
-from .profiler.profiler import Profiler
 from .notifications.mail_notifier import MailNotifier
 from .notifications.notifier import Notifier
 from .platforms.paramiko_submitter import ParamikoSubmitter
@@ -2153,6 +2152,7 @@ class Autosubmit:
         """
         # Start profiling if the flag has been used
         if profile:
+            from .profiler.profiler import Profiler
             profiler = Profiler(expid)
             profiler.start()
 
@@ -2617,6 +2617,7 @@ class Autosubmit:
 
         # Start profiling if the flag has been used
         if profile:
+            from .profiler.profiler import Profiler
             profiler = Profiler(expid)
             profiler.start()
 
@@ -4481,6 +4482,7 @@ class Autosubmit:
         """
         # Start profiling if the flag has been used
         if profile:
+            from .profiler.profiler import Profiler
             profiler = Profiler(expid)
             profiler.start()
 

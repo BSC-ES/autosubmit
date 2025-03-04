@@ -27,17 +27,12 @@ from threading import Thread
 from typing import List, Dict, Tuple, Any
 from pathlib import Path
 
-import math
-import networkx as nx
-from bscearth.utils.date import date2str, parse_date
-from networkx import DiGraph
-from time import localtime, strftime, mktime
+from time import strftime
 
 import math
-import networkx as nx
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
-from time import localtime, mktime, time
+from time import localtime, mktime
 
 import autosubmit.database.db_structure as DbStructure
 from autosubmit.helpers.data_transfer import JobRow
@@ -48,7 +43,6 @@ from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency, _get_submitter
 from autosubmit.job.job_utils import transitive_reduction
-from autosubmit.platforms.platform import Platform
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import AutosubmitCritical, AutosubmitError, Log
@@ -222,11 +216,11 @@ class JobList(object):
         try:
             self.graph = self.load(create)
             if type(self.graph) is not DiGraph:
-                self.graph = nx.DiGraph()
+                self.graph = DiGraph()
         except AutosubmitCritical:
             raise
         except Exception:
-            self.graph = nx.DiGraph()
+            self.graph = DiGraph()
         self._dic_jobs = DicJobs(date_list, member_list, chunk_list, date_format, default_retrials, as_conf)
         self._dic_jobs.graph = self.graph
         if len(self.graph.nodes) > 0:
