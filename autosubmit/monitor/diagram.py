@@ -351,11 +351,15 @@ def build_legends(plot: Any, rects: list[list[str]], experiment_stats: Statistic
                   general_stats: list[tuple[str, str]]) -> int:
     """build_legends Function
 
-    :param plot: Any
-    :param rects: list[list[str]]
+    :param plot: Subplot arrangement part of a figure
+    :type plot: Any
+    :param rects: A string that contains the legends for the plot
+    :type rects: list[list[str]]
     :param experiment_stats: Statistics of the jobs of the experiment
-    :param general_stats: list[tuple[str, str]] of status of the jobs
-    :param
+    :type experiment_stats: Statistics
+    :param general_stats: list that contains the status of the jobs
+    :type general_stats: list[tuple[str, str]]
+    :returns: Return the length of the legends built
     :rtype: int
     """
     # Main legend with colourful rectangles
