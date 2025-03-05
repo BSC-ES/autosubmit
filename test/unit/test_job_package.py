@@ -111,14 +111,14 @@ class TestJobPackage(TestCase):
         options = {
             'TYPE': "vertical",
             'JOBS_IN_WRAPPER': "None",
-            'METHOD': "ASThread",
+            'METHOD': "ASTHREAD",
             'POLICY': "flexible",
             'EXTEND_WALLCLOCK': 0,
         }
         self.setUpWrappers(options)
         self.assertEqual(self.job_package_wrapper.wrapper_type, "vertical")
         self.assertEqual(self.job_package_wrapper.jobs_in_wrapper, "None")
-        self.assertEqual(self.job_package_wrapper.wrapper_method, "ASThread")
+        self.assertEqual(self.job_package_wrapper.wrapper_method, "ASTHREAD")
         self.assertEqual(self.job_package_wrapper.wrapper_policy, "flexible")
         self.assertEqual(self.job_package_wrapper.extensible_wallclock, 0)
 

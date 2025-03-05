@@ -612,6 +612,7 @@ class JobPackager(object):
                 built_packages_tmp = self._build_vertical_packages(jobs, wrapper_limits, wrapper_info=current_info)
             if len(built_packages_tmp) > 0:
                 Log.result(f"Built {len(built_packages_tmp)} wrappers for {wrapper_name}")
+
             self._propagate_inner_jobs_ready_date(built_packages_tmp)
             packages_to_submit, max_jobs_to_submit = self.check_packages_respect_wrapper_policy(built_packages_tmp, packages_to_submit, max_jobs_to_submit, wrapper_limits, any_simple_packages)
 
@@ -669,7 +670,7 @@ class JobPackager(object):
         for wrapper_name,jobs_in_wrapper in self.jobs_in_wrapper.items():
             section_name = ""
             for section in jobs_in_wrapper:
-                section_name += section+"&"
+                section_name += section+" "
             section_name = section_name[:-1]
             sections_split[wrapper_name] = section_name
             jobs_by_section[wrapper_name] = list()
@@ -679,7 +680,7 @@ class JobPackager(object):
         jobs_by_section["SIMPLE"] = []
         for wrapper_name,section_name in sections_split.items():
             for job in jobs_list[:]:
-                if job.section.upper() in section_name.split("&"):
+                if job.section.upper() in section_name.split(" "):
                     jobs_by_section[wrapper_name].append(job)
                     jobs_list.remove(job)
         for job in (job for job in jobs_list):
@@ -780,7 +781,7 @@ class JobPackager(object):
                 for job in current_package[level]:
                     job.level = level
         return JobPackageHorizontalVertical(current_package, max_procs, total_wallclock,
-                                            jobs_resources=jobs_resources, configuration=self._as_config, wrapper_section=self.current_wrapper_section)
+                                            jobs_resources=jobs_resources, configuration=self._as_config, wrapper_section=self.current_wrapper_section, method=wrapper_info[2])
 
     def _build_vertical_horizontal_package(self, horizontal_packager, jobs_resources, wrapper_info):
         total_wallclock = '00:00'
@@ -1009,7 +1010,7 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
         return False
 
 
-class JobPackagerHorizontal(object):
+class JobPackagerHorizontal(JobPackager):
     def __init__(self, job_list, max_processors, wrapper_limits, max_jobs, processors_node, method="ASThread"):
         self.processors_node = processors_node
         self.max_processors = max_processors
@@ -1063,7 +1064,7 @@ class JobPackagerHorizontal(object):
                         total_processors = int(self.processors_node) * nodes
                     else:
                         total_processors = job_total_processors
-                    if (self._current_processors + total_processors) <= int(self.max_processors):
+                    if self.max_processors == -1 or (self._current_processors + total_processors) <= int(self.max_processors):  # max_processors not set == infinite
                         current_package.append(job)
                         self._current_processors += total_processors
                         current_package_by_section[section] += 1
@@ -1077,7 +1078,7 @@ class JobPackagerHorizontal(object):
         return current_package
 
     def create_sections_order(self, jobs_sections):
-        for i, section in enumerate(jobs_sections.split('&')):
+        for i, section in enumerate(jobs_sections.split(' ')):  # With Autosubmit config changes this should always be a " " (blank space) between sections
             self._sort_order_dict[section] = i
 
     # EXIT FALSE IF A SECTION EXIST AND HAVE LESS PROCESSORS

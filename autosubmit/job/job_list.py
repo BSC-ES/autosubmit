@@ -241,6 +241,7 @@ class JobList(object):
                     self._dic_jobs._job_list = {job["job"].name: job["job"] for _, job in self.graph.nodes.data() if
                                                 job.get("job", None)}
         else:
+            Log.debug("Graph is empty")
             if not create:
                 raise AutosubmitCritical("Autosubmit couldn't load the workflow graph. Please run autosubmit create first. If the pkl file exists and was generated with Autosubmit v4.1+, try again.",7013)
             # Remove the previous pkl, if it exists.
