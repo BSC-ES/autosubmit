@@ -25,8 +25,6 @@ from bscearth.utils.date import date2str
 from configparser import ConfigParser
 from distutils.util import strtobool
 from pathlib import Path
-
-from pympler import muppy, summary, tracker
 from ruamel.yaml import YAML
 from typing import Dict, Set, Tuple, Union, Any, List, Optional
 
@@ -2277,7 +2275,7 @@ class Autosubmit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             job_list.save()
                             as_conf.save()
-                        #time.sleep(safetysleeptime)
+                        time.sleep(safetysleeptime)
                         #Log.debug(f"FD endsubmit: {fd_show.fd_table_status_str()}")
 
 

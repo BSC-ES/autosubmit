@@ -83,7 +83,7 @@ class JobListPersistencePkl(JobListPersistence):
                 shutil.copy(path, path_tmp)
                 with open(path_tmp, 'rb') as fd:
                     current_limit = getrecursionlimit()
-                    setrecursionlimit(500000000)
+                    setrecursionlimit(100000)
                     job_list = pickle.load(fd)
                     setrecursionlimit(current_limit)
             finally:
@@ -109,7 +109,7 @@ class JobListPersistencePkl(JobListPersistence):
             setrecursionlimit(100000)
             pickle.dump({job.name: job.__getstate__() for job in job_list}, fd, pickle.HIGHEST_PROTOCOL)
             setrecursionlimit(current_limit)
-            gc.collect()  # Force garbage collection to free memory
+            gc.collect()  # Tracemalloc show leaks without this
         os.replace(path, path[:-4])
         Log.debug(f'JobList saved in {path[:-4]}')
 
