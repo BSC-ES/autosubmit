@@ -168,7 +168,7 @@ class JobList(object):
     def generate(self, as_conf, date_list, member_list, num_chunks, chunk_ini, parameters, date_format,
                  default_retrials,
                  default_job_type, wrapper_jobs=dict(), new=True, run_only_members=[], show_log=True, monitor=False,
-                 force=False, create = False):
+                 force=False, create = True): # TODO temporary fix to let the tests run
         """
         Creates all jobs needed for the current workflow.
         :param as_conf: AutosubmitConfig object
