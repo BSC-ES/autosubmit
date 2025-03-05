@@ -26,25 +26,23 @@ def recover_platform_job_logs_wrapper(platform, recovery_queue, worker_event, cl
     platform.recover_platform_job_logs()
     _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
 
-class UniqueQueue(Queue):
+class CopyQueue(Queue):
     """
-    A queue that avoids retrieves the same job and retrial during the same run.
+    A queue that copies the object gathered.
     """
 
-    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, max_items: int = 200, ctx: Any = None) -> None:
+    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, ctx: Any = None) -> None:
         """
-        Initializes the UniqueQueue.
+        Initializes the Queue.
 
         Args:
             maxsize (int): Maximum size of the queue. Defaults to -1 (infinite size).
             block (bool): Whether to block when the queue is full. Defaults to True.
             timeout (float): Timeout for blocking operations. Defaults to None.
-            max_items (int): Maximum number of unique items to track. Defaults to 200.
             ctx (Context): Context for the queue. Defaults to None.
         """
         self.block = block
         self.timeout = timeout
-        #self.all_items = deque(maxlen=max_items)  # Won't be popped, so even if it is being processed by the log retrieval process, it won't be added again.
         super().__init__(maxsize, ctx=ctx)
 
 
@@ -58,13 +56,6 @@ class UniqueQueue(Queue):
             timeout (float): Timeout for blocking operations. Defaults to None.
         """
 
-        # if job.wrapper_type == "vertical":  # We gather all retrials at once
-        #     unique_name = job.name
-        # else:
-        #     unique_name = job.name+str(job.fail_count)  # We gather retrial per retrial
-        #
-        # if unique_name not in self.all_items:
-        #     self.all_items.append(unique_name)
         #     # Without copy, the process seems to modify the job for other retrials.. My guess is that the object is not serialized until it is get from the queue.
         super().put(copy(job), block, timeout)
 
@@ -946,7 +937,7 @@ class Platform(object):
         if self.recovery_queue:
             del self.recovery_queue
         # Retrieval log process variables
-        self.recovery_queue = UniqueQueue(max_items=self.log_queue_size, ctx=ctx)
+        self.recovery_queue = CopyQueue(ctx=ctx)
         # Cleanup will be automatically prompt on control + c or a normal exit
         atexit.register(self.send_cleanup_signal)
         atexit.register(self.closeConnection)
