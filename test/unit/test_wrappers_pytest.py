@@ -51,8 +51,8 @@ def setup(autosubmit_config, tmpdir, prepare_basic_config):
     as_conf.experiment_data["WRAPPERS"]["WRAPPERS"]["JOBS_IN_WRAPPER"] = "SECTION1"
     as_conf.experiment_data["WRAPPERS"]["WRAPPERS"]["TYPE"] = "vertical"
     Path(tmpdir / experiment_id / "tmp").mkdir(parents=True, exist_ok=True)
-    job_list = JobList(experiment_id, prepare_basic_config, YAMLParserFactory(),
-                       JobListPersistencePkl(), as_conf)
+    job_list = JobList(experiment_id, as_conf, YAMLParserFactory(),
+                       JobListPersistencePkl())
 
     platform = SlurmPlatform(experiment_id, 'dummy-platform', as_conf.experiment_data)
 

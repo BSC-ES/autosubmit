@@ -72,8 +72,11 @@ class ParamikoPlatform(Platform):
         display = os.getenv('DISPLAY')
         if display is None:
             display = "localhost:0"
-        self.local_x11_display = xlib_connect.get_display(display)
-
+        try:
+            self.local_x11_display = xlib_connect.get_display(display)
+        except Exception as e:
+            Log.warning(f"X11 display not found: {e}")
+            self.local_x11_display = None
     @property
     def header(self):
         """
@@ -113,7 +116,11 @@ class ParamikoPlatform(Platform):
         display = os.getenv('DISPLAY')
         if display is None:
             display = "localhost:0"
-        self.local_x11_display = xlib_connect.get_display(display)
+        try:
+            self.local_x11_display = xlib_connect.get_display(display)
+        except Exception as e:
+            Log.warning(f"X11 display not found: {e}")
+            self.local_x11_display = None
     def test_connection(self,as_conf):
         """
         Test if the connection is still alive, reconnect if not.
@@ -268,7 +275,11 @@ class ParamikoPlatform(Platform):
             display = os.getenv('DISPLAY')
             if display is None:
                 display = "localhost:0"
-            self.local_x11_display = xlib_connect.get_display(display)
+            try:
+                self.local_x11_display = xlib_connect.get_display(display)
+            except Exception as e:
+                Log.warning(f"X11 display not found: {e}")
+                self.local_x11_display = None
             self._ssh = paramiko.SSHClient()
             self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self._ssh_config = paramiko.SSHConfig()
@@ -1021,7 +1032,11 @@ class ParamikoPlatform(Platform):
                     display = os.getenv('DISPLAY')
                     if display is None or not display:
                         display = "localhost:0"
-                    self.local_x11_display = xlib_connect.get_display(display)
+                    try:
+                        self.local_x11_display = xlib_connect.get_display(display)
+                    except Exception as e:
+                        Log.warning(f"X11 display not found: {e}")
+                        self.local_x11_display = None
                     chan = self.transport.open_session()
                     chan.request_x11(single_connection=False,handler=self.x11_handler)
                 else:

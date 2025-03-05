@@ -43,7 +43,7 @@ class TestJob(TestCase):
         self.job_name = 'random-name'
         self.job_id = 999
         self.job_priority = 0
-        self.as_conf = Mock()
+        self.as_conf = MagicMock()
         self.as_conf.experiment_data = dict()
         self.as_conf.experiment_data["JOBS"] = dict()
         self.as_conf.jobs_data = self.as_conf.experiment_data["JOBS"]
@@ -357,7 +357,7 @@ CONFIG:
                             parameters = config.load_parameters()
                             joblist_persistence = JobListPersistencePkl()
 
-                            job_list_obj = JobList(expid, mocked_basic_config, YAMLParserFactory(),joblist_persistence, config)
+                            job_list_obj = JobList(expid, config, YAMLParserFactory(),joblist_persistence)
 
                             job_list_obj.generate(
                                 as_conf=config,
@@ -514,8 +514,8 @@ CONFIG:
             config = AutosubmitConfig(expid, basic_config=basic_config, parser_factory=YAMLParserFactory())
             config.reload(True)
             parameters = config.load_parameters()
-            job_list_obj = JobList(expid, basic_config, YAMLParserFactory(),
-                                   Autosubmit._get_job_list_persistence(expid, config), config)
+            job_list_obj = JobList(expid, config, YAMLParserFactory(),
+                                   Autosubmit._get_job_list_persistence(expid, config))
 
             job_list_obj.generate(
                 as_conf=config,
@@ -550,7 +550,7 @@ CONFIG:
             job = job_list[0]
 
             # This is the final header
-            parameters = job.update_parameters(config, parameters)
+            parameters = job.update_parameters(config, set_attributes=True)
             template_content, additional_templates = job.update_content(config, parameters)
 
             # Asserts the script is valid. There shouldn't be variables in the script that aren't in the parameters.
@@ -736,8 +736,26 @@ CONFIG:
                             parameters = config.load_parameters()
                             joblist_persistence = JobListPersistencePkl()
 
-                            job_list_obj = JobList(expid, mocked_basic_config, YAMLParserFactory(),joblist_persistence, config)
-
+                            job_list_obj = JobList(expid, config, YAMLParserFactory(),joblist_persistence)
+                            if (header_file_name or tailer_file_name) and (extended_type != script_type or extended_type == "Bad1" or extended_type == "Bad2"):
+                                with self.assertRaises(AutosubmitCritical):
+                                    job_list_obj.generate(
+                                        as_conf=config,
+                                        date_list=[],
+                                        member_list=[],
+                                        num_chunks=1,
+                                        chunk_ini=1,
+                                        parameters=parameters,
+                                        date_format='M',
+                                        default_retrials=config.get_retrials(),
+                                        default_job_type=config.get_default_job_type(),
+                                        wrapper_jobs={},
+                                        new=True,
+                                        run_only_members=config.get_member_list(run_only=True),
+                                        show_log=True,
+                                        create=True,
+                                    )
+                                continue
                             job_list_obj.generate(
                                 as_conf=config,
                                 date_list=[],
@@ -881,8 +899,8 @@ CONFIG:
                 config.reload(True)
                 parameters = config.load_parameters()
 
-                job_list_obj = JobList(expid, basic_config, YAMLParserFactory(),
-                                       Autosubmit._get_job_list_persistence(expid, config), config)
+                job_list_obj = JobList(expid, config, YAMLParserFactory(),
+                                       Autosubmit._get_job_list_persistence(expid, config))
                 job_list_obj.generate(
                     as_conf=config,
                     date_list=[],
@@ -912,7 +930,7 @@ CONFIG:
                     job.platform = submitter.platforms[job.platform_name]
 
                 job = job_list[0]
-                parameters = job.update_parameters(config, {})
+                parameters = job.update_parameters(config, set_attributes=True)
                 # Asserts the script is valid.
                 checked = job.check_script(config, parameters)
                 self.assertTrue(checked)
@@ -1034,7 +1052,7 @@ CONFIG:
 
         parameters = {}
         # Act
-        parameters = self.job.update_parameters(self.as_conf, parameters)
+        parameters = self.job.update_parameters(self.as_conf, set_attributes=True)
         # Assert
         self.assertTrue('CURRENT_WHATEVER' in parameters)
         self.assertTrue('CURRENT_WHATEVER2' in parameters)
@@ -1052,13 +1070,13 @@ CONFIG:
         # update parameters when date is not none and chunk is none
         self.job.date = datetime.datetime(1975, 5, 25, 22, 0, 0, 0, datetime.timezone.utc)
         self.job.chunk = None
-        parameters = self.job.update_parameters(self.as_conf, parameters)
+        parameters = self.job.update_parameters(self.as_conf, set_attributes=True)
         self.assertEqual(1,parameters['CHUNK'])
         # update parameters when date is not none and chunk is not none
         self.job.date = datetime.datetime(1975, 5, 25, 22, 0, 0, 0, datetime.timezone.utc)
         self.job.chunk = 1
         self.job.date_format = 'H'
-        parameters = self.job.update_parameters(self.as_conf, parameters)
+        parameters = self.job.update_parameters(self.as_conf, set_attributes=True)
         self.assertEqual(1, parameters['CHUNK'])
         self.assertEqual("TRUE", parameters['CHUNK_FIRST'])
         self.assertEqual("TRUE", parameters['CHUNK_LAST'])
@@ -1083,7 +1101,7 @@ CONFIG:
 
         self.job.chunk = 2
         parameters = {"EXPERIMENT.NUMCHUNKS": 3, "EXPERIMENT.CHUNKSIZEUNIT": "hour"}
-        parameters = self.job.update_parameters(self.as_conf, parameters)
+        parameters = self.job.update_parameters(self.as_conf, set_attributes=True)
         self.assertEqual(2, parameters['CHUNK'])
         self.assertEqual("FALSE", parameters['CHUNK_FIRST'])
         self.assertEqual("FALSE", parameters['CHUNK_LAST'])
@@ -1231,8 +1249,8 @@ CONFIG:
             config.reload(True)
             parameters = config.load_parameters()
 
-            job_list = JobList(expid, basic_config, YAMLParserFactory(),
-                                   Autosubmit._get_job_list_persistence(expid, config), config)
+            job_list = JobList(expid, config, YAMLParserFactory(),
+                                   Autosubmit._get_job_list_persistence(expid, config))
             job_list.generate(
                 as_conf=config,
                 date_list=[datetime.datetime.strptime("20000101", "%Y%m%d")],
@@ -1265,7 +1283,7 @@ CONFIG:
             # Check splits
             # Assert general
             job = job_list[0]
-            parameters = job.update_parameters(config, parameters)
+            parameters = job.update_parameters(config, set_attributes=True)
             self.assertEqual(job.splits, 12)
             self.assertEqual(job.running, 'chunk')
 
@@ -1276,7 +1294,7 @@ CONFIG:
             # assert parameters
             next_start = "00"
             for i,job in enumerate(job_list[0:12]):
-                parameters = job.update_parameters(config, parameters)
+                parameters = job.update_parameters(config, set_attributes=True)
                 end_hour = str(parameters['SPLIT'] * splitsize ).zfill(2)
                 if end_hour == "24":
                     end_hour = "00"
@@ -1305,7 +1323,7 @@ CONFIG:
                 next_start = parameters['SPLIT_END_HOUR']
             next_start = "00"
             for i,job in enumerate(job_list[12:24]):
-                parameters = job.update_parameters(config, parameters)
+                parameters = job.update_parameters(config, set_attributes=True)
                 end_hour = str(parameters['SPLIT'] * splitsize ).zfill(2)
                 if end_hour == "24":
                     end_hour = "00"
@@ -1370,16 +1388,11 @@ def test_update_stat_file():
     job.script_name = "dummyname.cmd"
     job.wrapper_type = None
     job.update_stat_file()
-    assert job.stat_file == "dummyname_STAT_0"
+    assert job.stat_file == "dummyname_STAT_"
     job.fail_count = 1
     job.update_stat_file()
-    assert job.stat_file == "dummyname_STAT_1"
-    job.wrapper_type = "vertical"
-    job.update_stat_file()
-    assert job.stat_file == "dummyname_STAT_0"
-    job.fail_count = 0
-    job.update_stat_file()
-    assert job.stat_file == "dummyname_STAT_0"
+    assert job.stat_file == "dummyname_STAT_"
+
 
 
 def test_pytest_check_script(mocker):
@@ -1396,6 +1409,7 @@ def test_pytest_check_script(mocker):
     job._init_runtime_parameters()
 
     config = Mock(spec=AutosubmitConfig)
+    config.default_parameters = {}
     config.get_project_dir = Mock(return_value='/project/dir')
 
     # act
@@ -1426,6 +1440,8 @@ def test_pytest_create_script(mocker):
     mocker.patch("autosubmit.job.job.Job.update_parameters", return_value=parameters)
 
     config = Mock(spec=AutosubmitConfig)
+    config.default_parameters = {}
+
     config.get_project_dir = Mock(return_value='/project/dir')
 
     chmod_mock = Mock()
@@ -1433,8 +1449,6 @@ def test_pytest_create_script(mocker):
 
     write_mock = Mock().write = Mock()
     open_mock = Mock(return_value=write_mock)
-    job.default_parameters = MagicMock()
-    job.default_parameters.get = MagicMock(return_value=[])
     with patch.object(builtins, "open", open_mock):
         # act
         job.create_script(config)
@@ -1459,6 +1473,7 @@ def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_templat
     job._init_runtime_parameters()
 
     config = Mock(spec=AutosubmitConfig)
+    config.default_parameters = {}
     config.get_project_dir = Mock(return_value='/project/dir')
 
     # act

@@ -54,8 +54,8 @@ class TestJobPackage(TestCase):
         self.as_conf.experiment_data["PLATFORMS"] = dict()
         self.as_conf.experiment_data["WRAPPERS"] = dict()
         self.temp_directory = tempfile.mkdtemp()
-        self.job_list = JobList(self.experiment_id, self.config, YAMLParserFactory(),
-                                JobListPersistenceDb(self.temp_directory, 'db'), self.as_conf)
+        self.job_list = JobList(self.experiment_id, self.as_conf, YAMLParserFactory(),
+                                JobListPersistenceDb(self.temp_directory, 'db'))
         self.parser_mock = MagicMock(spec='SafeConfigParser')
         for job in self.jobs:
             job._init_runtime_parameters()

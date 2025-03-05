@@ -65,7 +65,7 @@ class TestStop(TestCase):
         self.temp_directory = tempfile.mkdtemp()
         joblist_persistence = JobListPersistencePkl()
 
-        self.job_list = JobList(self.experiment_id, FakeBasicConfig, YAMLParserFactory(),joblist_persistence, self.as_conf)
+        self.job_list = JobList(self.experiment_id, self.as_conf, YAMLParserFactory(),joblist_persistence)
         # creating jobs for self list
         self.completed_job = self._createDummyJobWithStatus(Status.COMPLETED)
         self.submitted_job = self._createDummyJobWithStatus(Status.SUBMITTED)
@@ -115,4 +115,3 @@ class FakeBasicConfig:
     DEFAULT_PLATFORMS_CONF = ''
     DEFAULT_JOBS_CONF = ''
     STRUCTURES_DIR = '/dummy/structure/dir'
-

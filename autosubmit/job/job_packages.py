@@ -107,14 +107,14 @@ class JobPackageBase(object):
         return self._platform
 
     @threaded
-    def check_scripts(self, jobs, configuration, parameters, only_generate, hold):
+    def check_scripts(self, jobs, configuration, only_generate, hold):
         for job in jobs:
             if only_generate and not os.path.exists(os.path.join(configuration.get_project_dir(), job.file)):
                 break
             elif not os.path.exists(os.path.join(configuration.get_project_dir(), job.file)):
                 if configuration.get_project_type().lower() != "none" and len(configuration.get_project_type()) > 0:
                     raise AutosubmitCritical(f"Job script:{job.file} does not exists",7014)
-            if not job.check_script(configuration, parameters, show_logs=job.check_warnings):
+            if not job.check_script(configuration, show_logs=job.check_warnings):
                 Log.warning(f'Script {job.name} has some empty variables. An empty value has substituted these variables')
             else:
                 Log.result("Script {0} OK", job.name)
@@ -129,13 +129,11 @@ class JobPackageBase(object):
         pass
 
 
-    def submit_unthreaded(self, configuration, parameters,only_generate=False,hold=False):
+    def submit_unthreaded(self, configuration,only_generate=False,hold=False):
         """
         :param hold:
         :para configuration: Autosubmit basic configuration \n
         :type configuration: AutosubmitConfig object \n
-        :param parameters; Parameters from joblist \n
-        :type parameters: JobList,parameters \n
         :param only_generate: True if coming from generate_scripts_andor_wrappers(). If true, only generates scripts; otherwise, submits. \n
         :type only_generate: Boolean
         """
@@ -147,7 +145,7 @@ class JobPackageBase(object):
                 if configuration.get_project_type().lower() != "none" and len(configuration.get_project_type()) > 0:
                     raise AutosubmitCritical(
                         "Template [ {0} ] using CHECK=On_submission has some empty variable {0}".format(job.name), 7014)
-            if not job.check_script(configuration, parameters, show_logs=job.check_warnings):
+            if not job.check_script(configuration, show_logs=job.check_warnings):
                 Log.warning(
                     f'Script {job.name} has some empty variables. An empty value has substituted these variables')
             else:
@@ -177,7 +175,7 @@ class JobPackageBase(object):
         chunksize = int((len(self.jobs) + thread_number - 1) / thread_number)
         try:
             if len(self.jobs) < thread_number or str(configuration.experiment_data.get("CONFIG",{}).get("ENABLE_WRAPPER_THREADS","False")).lower() == "false":
-                self.submit_unthreaded(configuration, parameters, only_generate, hold)
+                self.submit_unthreaded(configuration, only_generate, hold)
                 Log.debug("Creating Scripts")
                 self._create_scripts(configuration)
             else:

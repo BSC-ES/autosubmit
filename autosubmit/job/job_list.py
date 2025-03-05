@@ -71,9 +71,8 @@ class JobList(object):
 
     """
 
-    def __init__(self, expid, config, parser_factory, job_list_persistence, as_conf):
-        self._persistence_path = os.path.join(
-            config.LOCAL_ROOT_DIR, expid, "pkl")
+    def __init__(self, expid, config, parser_factory, job_list_persistence):
+        self._persistence_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")
         self._update_file = "updated_list_" + expid + ".txt"
         self._failed_file = "failed_job_list_" + expid + ".pkl"
         self._persistence_file = "job_list_" + expid
@@ -82,7 +81,6 @@ class JobList(object):
         self.jobs_edges = {}
         self._expid = expid
         self._config = config
-        self.experiment_data = as_conf.experiment_data
         self._parser_factory = parser_factory
         self._stat_val = Status()
         self._parameters = []
@@ -303,20 +301,18 @@ class JobList(object):
         for platform in job_list_per_platform:
             first = True
             for job in job_list_per_platform[platform]:
+                job.update_parameters(as_conf, set_attributes=True, reset_logs=create or new)
                 job_platform = None
                 if first:
                     if not job.platform and hasattr(job, "platform_name") and job.platform_name:
                         submitter = _get_submitter(as_conf)
                         submitter.load_platforms(as_conf)
-                        if job.platform_name not in submitter.platforms:
-                            job.update_parameters(as_conf,{})
                         job_platform = submitter.platforms[job.platform_name]
                     first = False
                 job.platform = job_platform
 
     def clear_generate(self):
         self.dependency_map = {}
-        self.experiment_data = {}
         self.parameters = {}
         self._parameters = {}
         self.graph.clear()
@@ -1545,10 +1541,7 @@ class JobList(object):
 
             for section in wrapper_jobs:
                 # RUNNING = once, as default. This value comes from jobs_.yml
-                try:
-                    sections_running_type_map[section] = str(self.experiment_data["JOBS"][section].get("RUNNING", 'once'))
-                except BaseException as e:
-                    raise AutosubmitCritical("Key {0} doesn't exists.".format(section), 7014, str(e))
+                sections_running_type_map[section] = str(self._config.experiment_data["JOBS"].get(section, {}).get("RUNNING", 'once'))
 
             # Select only relevant jobs, those belonging to the sections defined in the wrapper
 
@@ -2660,6 +2653,10 @@ class JobList(object):
             return
         log_recovered = self.check_if_log_is_recovered(job)
         if log_recovered:
+            job.updated_log = True
+            # TODO in pickle -> db/yaml migration(I): Do the save of the job here then clean attributes from mem ( or even the full job )
+            job.clean_attributes()
+            # TODO in pickle -> db/yaml migration(II): And remove these two lines
             job.local_logs = (log_recovered.name, log_recovered.name[:-4] + ".err") # we only want the last one
             job.updated_log = True
         elif new_run and not job.updated_log and str(as_conf.platforms_data.get(job.platform.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "false":
@@ -2983,7 +2980,7 @@ class JobList(object):
         out = True
         for job in self._job_list:
             show_logs = job.check_warnings
-            if not job.check_script(as_conf, as_conf.parameters, show_logs):
+            if not job.check_script(as_conf, show_logs):
                 out = False
         return out
 
@@ -3028,7 +3025,7 @@ class JobList(object):
             else:
                 if job.section in self.sections_checked:
                     show_logs = "false"
-            if not job.check_script(as_conf, as_conf.parameters, show_logs):
+            if not job.check_script(as_conf, show_logs):
                 out = False
             self.sections_checked.add(job.section)
         if out:
