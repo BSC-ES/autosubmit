@@ -36,6 +36,7 @@ def test_job_data():
     assert job_data.values() == ['', datetime.timedelta(0), datetime.timedelta(0), '']
     assert job_data.number_of_columns() == 4
 
+
 def test_job_agg_data():
     """ function to test the Class JobAggData inside autosubmit/monitor/diagram.py """
     job_agg = JobAggData()
@@ -44,8 +45,10 @@ def test_job_agg_data():
                                 datetime.timedelta(0), datetime.timedelta(0)]
     assert job_agg.number_of_columns() == 6
 
+
 def test_create_csv_stats(tmpdir):
     """ function to test the Function create_csv_stats inside autosubmit/monitor/diagram.py """
+
     jobs_data = [
         Job('test', "a000", "COMPLETED", 200),
         Job('test', "a000", "COMPLETED", 200),
@@ -63,6 +66,28 @@ def test_create_csv_stats(tmpdir):
 
     tmpdir += '.csv'
     assert tmpdir.exists()
+
+
+def test_build_legends(mocker):
+    """ function to test the function build_legends inside autosubmit/monitor/diagram.py """
+
+    jobs_data = [
+        Job('test', "a000", "COMPLETED", 200),
+        Job('test', "a000", "COMPLETED", 200),
+        Job('test', "a000", "COMPLETED", 200),
+        Job('test', "a000", "FAILED", 10)
+    ]
+    date_ini = datetime.datetime.now()
+    date_fin = date_ini + datetime.timedelta(0.10)
+    queue_time_fixes = {'test': 5}
+
+    statistics = diagram.populate_statistics(jobs_data, date_ini, date_fin, queue_time_fixes)
+    react = [['dummy'], [''], ['test']]
+    general_stats = [('status', 'status2'), ('status', 'status2'), ('status', 'status2')]
+    plot = mocker.Mock()
+
+    number_of_legends = diagram.build_legends(plot, react, statistics, general_stats)
+    assert plot.legend.call_count == number_of_legends
 
 
 @pytest.mark.parametrize("job_stats, failed_jobs, failed_jobs_dict, num_plots, result", [
@@ -101,10 +126,11 @@ def test_create_csv_stats(tmpdir):
             40,
             True
     ),
-], ids=['all run', 'divided by zero', 'run with continue', 'fail job_dict', 'no run']
-                         )
+],
+ids=['all run', 'divided by zero', 'run with continue', 'fail job_dict', 'no run'])
 def test_create_bar_diagram(job_stats, failed_jobs, failed_jobs_dict, num_plots, result):
     """ function to test the function create_bar_diagram inside autosubmit/monitor/diagram.py """
+
     jobs_data = [
         Job('test', "a000", "COMPLETED", 200),
         Job('test', "a000", "COMPLETED", 200),
@@ -113,7 +139,8 @@ def test_create_bar_diagram(job_stats, failed_jobs, failed_jobs_dict, num_plots,
     ]
     date_ini = datetime.datetime.now()
     date_fin = date_ini + datetime.timedelta(0.10)
-    queue_time_fixes = ['test', 5]
+
+    queue_time_fixes = {'test', 5}
 
     status = ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED"]
     statistics = diagram.populate_statistics(jobs_data, date_ini, date_fin, queue_time_fixes)
