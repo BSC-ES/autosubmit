@@ -25,6 +25,8 @@ from bscearth.utils.date import date2str
 from configparser import ConfigParser
 from distutils.util import strtobool
 from pathlib import Path
+
+from pympler import muppy, summary, tracker
 from ruamel.yaml import YAML
 from typing import Dict, Set, Tuple, Union, Any, List, Optional
 
@@ -149,7 +151,6 @@ class Autosubmit:
         """Get the current voltage."""
         return self.experiment_data
 
-    sys.setrecursionlimit(500000)
     # Get the version number from the relevant file. If not, from autosubmit package
     script_dir = os.path.abspath(os.path.dirname(__file__))
 
@@ -2199,30 +2200,8 @@ class Autosubmit:
                 max_recovery_retrials = as_conf.experiment_data.get("CONFIG",{}).get("RECOVERY_RETRIALS",3650)  # (72h - 122h )
                 recovery_retrials = 0
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
-                import tracemalloc
-                tracemalloc.start()
-
-
-                count = 10
-                i = 0
                 while job_list.get_active():
-                    if i == count:
-                        snapshot1 = tracemalloc.take_snapshot()
-                    if i >= count:
-                        snapshot2 = tracemalloc.take_snapshot()
-                        top_stats = snapshot2.compare_to(snapshot1, 'lineno')
-                        print("[ Top 10 differences ]")
-                        for stat in top_stats[:30]:
-                            try:
-                                if "dbeltran" in stat.traceback._frames[0][0]:
-                                    if ".venv" not in stat.traceback._frames[0][0]:
-                                        print(stat)
-                            except:
-                                pass
-                    i += 1
                     Autosubmit.refresh_log_recovery_process(platforms_to_test, as_conf)
-                    for job in [job for job in job_list.get_job_list() if job.status == Status.READY]:
-                        job.update_parameters(as_conf)
                     did_run = True
                     try:
                         if Autosubmit.exit:
@@ -2985,6 +2964,7 @@ class Autosubmit:
             if len(current_active_jobs) > 0:
                 if force and save:
                     for job in current_active_jobs:
+                        job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", None)
                         if job.platform_name is None:
                             job.platform_name = hpcarch
                         job.platform = submitter.platforms[job.platform_name]
@@ -3004,6 +2984,7 @@ class Autosubmit:
         Log.info('Recovering experiment {0}'.format(expid))
         try:
             for job in job_list.get_job_list():
+                job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", None)
                 job.submitter = submitter
                 if job.platform_name is None:
                     job.platform_name = hpcarch
@@ -3012,7 +2993,7 @@ class Autosubmit:
                 # noinspection PyTypeChecker
                 platforms_to_test.add(platforms[job.platform_name])
             # establish the connection to all platforms
-            Autosubmit.restore_platforms(platforms_to_test,as_conf=as_conf)
+            Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf)
 
             if all_jobs:
                 jobs_to_recover = job_list.get_job_list()
@@ -3037,10 +3018,14 @@ class Autosubmit:
                     job.recover_last_ready_date()
                     job.recover_last_log_name()
                 elif job.status != Status.SUSPENDED:
+                    job.update_parameters(as_conf, set_attributes=True)
                     job.status = Status.WAITING
                     job._fail_count = 0
                     # Log.info("CHANGED job '{0}' status to WAITING".format(job.name))
                     # Log.status("CHANGED job '{0}' status to WAITING".format(job.name))
+
+                if save and job.status != Status.COMPLETED:
+                    job.update_parameters(as_conf, set_attributes=True)
 
             end = datetime.datetime.now()
             Log.info("Time spent: '{0}'".format(end - start))
@@ -3274,7 +3259,7 @@ class Autosubmit:
                 jobs_parameters = {}
                 try:
                     for job in job_list.get_job_list():
-                        job_parameters = job.update_parameters(as_conf)
+                        job_parameters = job.update_parameters(as_conf, set_attributes=True)
                         for key, value in job_parameters.items():
                             jobs_parameters["JOBS"+"."+job.section+"."+key] = value
                 except Exception:
@@ -5168,6 +5153,7 @@ class Autosubmit:
                                             j.chunk == int(chunk) and j.synchronize is not None]:
                                     final_list.append(job)
         return final_list
+
     @staticmethod
     def set_status(expid, noplot, save, final, filter_list, filter_chunks, filter_status, filter_section, filter_type_chunk, filter_type_chunk_split,
                    hide, group_by=None,
@@ -5225,6 +5211,7 @@ class Autosubmit:
                 submitter.load_platforms(as_conf)
                 hpcarch = as_conf.get_platform()
                 for job in job_list.get_job_list():
+                    job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", None)
                     if job.platform_name is None or job.platform_name.upper() == "":
                         job.platform_name = hpcarch
                     # noinspection PyTypeChecker
@@ -5382,6 +5369,12 @@ class Autosubmit:
                 job_list.update_list(as_conf, False, True)
 
                 if save and wrongExpid == 0:
+                    for job in final_list:
+                        job.update_parameters(as_conf, set_attributes=True, reset_logs=True)
+                        if job.status in [Status.COMPLETED, Status.FAILED]:
+                            job.recover_last_ready_date()
+                            job.recover_last_log_name()
+
                     job_list.save()
                     exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                                     historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)

@@ -55,6 +55,8 @@ Log.get_logger("Autosubmit")
 
 # A wrapper for encapsulate threads , TODO: Python 3+ to be replaced by the < from concurrent.futures >
 
+EXCLUDED = ["_platform", "_children", "_parents", "submitter"]
+
 
 def threaded(fn):
     def wrapper(*args, **kwargs):
@@ -142,7 +144,7 @@ class Job(object):
         'rerun_only', 'script_name_wrapper',
         'delay_end', 'wrapper_type', '_wrapper_queue',
         '_platform', '_queue', '_partition', 'retry_delay', '_section',
-        '_wallclock', 'wchunkinc', '_tasks', '_nodes', 'default_parameters',
+        '_wallclock', 'wchunkinc', '_tasks', '_nodes',
         '_threads', '_processors', '_memory', '_memory_per_task', '_chunk',
         '_member', 'date', 'date_split', '_splits', '_split', '_delay',
         '_frequency', '_synchronize', 'skippable', 'repacked', '_long_name',
@@ -166,27 +168,12 @@ class Job(object):
         'end_time_timestamp', '_log_recovered', 'packed_during_building'
     )
 
-    def setstate(self, state):
+    def __setstate__(self, state):
         for slot, value in state.items():
             setattr(self, slot, value)
 
-    def __setstate__(self, state):  # for queue logs, can't use function
-        for slot, value in state.items():
-            setattr(self, slot, value)
-
-    def __getstate__(self):  # for queue logs, can't use function
-        # included = ["id", "name", "_name", "status", "_status", "priority", "section", "date", "member", "chunk", "split", "splits", "log_recovered", "end_time_timestamp", "finish_time_timestamp", "fail_count", "local_logs", "remote_logs", "log_recovered", "packed", "stat_file"]
-        # return dict([(k, getattr(self, k, None)) for k in included])
-
-        excluded = ["_platform", "_children", "_parents", "submitter"]
-        return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in excluded])
-
-    def getstate(self):  # In another branch, I'm selecting less attributes
-        # included = ["id", "name", "_name", "status", "_status", "priority", "section", "date", "member", "chunk", "split", "splits", "log_recovered", "end_time_timestamp", "finish_time_timestamp", "fail_count", "local_logs", "remote_logs", "log_recovered", "packed", "stat_file"]
-        # return dict([(k, getattr(self, k, None)) for k in included])
-
-        excluded = ["_platform", "_children", "_parents", "submitter"]
-        return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in excluded])
+    def __getstate__(self):
+        return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in EXCLUDED])
 
     CHECK_ON_SUBMISSION = 'on_submission'
 
@@ -228,7 +215,6 @@ class Job(object):
         self.wchunkinc = None
         self._tasks = None
         self._nodes = None
-        self.default_parameters = None
         self._threads = None
         self._processors = None
         self._memory = None
@@ -248,7 +234,7 @@ class Job(object):
         self._long_name = None
         self.date_format = ''
         self.type = Type.BASH
-        self.undefined_variables = set()
+        self.undefined_variables = None
         self.log_retries = 5
         self.id = job_id
         self.file = None
@@ -327,115 +313,90 @@ class Job(object):
         self.end_time_timestamp = None
         self.packed_during_building = False
         if loaded_data:
-            self.setstate(loaded_data)
+            self.__setstate__(loaded_data)
             self.status = Status.WAITING if self.status in [Status.DELAYED,
                                                             Status.PREPARED,
                                                             Status.READY] else \
                 self.status
 
-    def adjust_loaded_parameters(self) -> None:
-        """
-        Adjusts job parameters for compatibility with newer added attributes.
-        """
-        # This function is always called at the start of a new run ( from update_parameters )
-        if not hasattr(self, 'is_wrapper'): # Added in 4.1.12
-            if not self.packed:
-                self.is_wrapper = False
-                self.wrapper_name = self.name
-            else:
-                self.is_wrapper = True
-                self.wrapper_name = "wrapped"
-
-        if not hasattr(self, "_log_path"):  # Added in 4.1.12
-            self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
-
-        if not hasattr(self, "_wallclock_in_seconds"):  # Added in 4.1.12
-            self._wallclock_in_seconds = None
-            self.wallclock = self.wallclock  # also sets the wallclock in seconds
-
-        if not hasattr(self, "ready_date"):
-            self.ready_date = None
-            self.recover_last_ready_date()
-
-        if not hasattr(self, 'packed_during_building'):  # Added in 4.1.12
-            self.packed_during_building = False
-
-        if not hasattr(self, '_platform'):
-            self._platform = None
-
     def clean_attributes(self):
         if self.status == Status.FAILED and self.fail_count >= self.retrials:
             return None
-        elif self.status in [Status.FAILED, Status.WAITING, Status.COMPLETED]:
-            self.rerun_only = False
-            self.script_name_wrapper = None
-            self.delay_end = None
-            self.wrapper_type = None
-            self._wrapper_queue = None
-            self._queue = None
-            self._partition = None
-            self.retry_delay = None
-            self._wallclock = None
-            self.wchunkinc = None
-            self._tasks = None
-            self._nodes = None
-            self.default_parameters = None
-            self._threads = None
-            self._processors = None
-            self._memory = None
-            self._memory_per_task = None
-            self.undefined_variables = set()
-            self.executable = None
-            self.packed = False
-            self.hold = False
-            self._export = "none"
-            self.start_time = None
-            self.total_jobs = None
-            self.max_waiting_jobs = None
-            self.exclusive = ""
-            self.current_checkpoint_step = 0
-            self.max_checkpoint_step = 0
-            self.reservation = ""
-            self.het = {}
-            self.updated_log = False
-            self._script = None
-            self._log_recovery_retries = None
-            self.wrapper_name = None
-            self.is_wrapper = False
-            self._wallclock_in_seconds = None
-            self._notify_on = None
-            self._processors_per_node = None
-            self._shape = None
-            self._x11 = False
-            self._x11_options = None
-            self._hyperthreading = None
-            self._scratch_free_space = None
-            self._delay_retrials = None
-            self._custom_directives = None
-            if hasattr(self, 'packed_during_building'):
-                self.packed_during_building = False
-            # Tentative
-            self._parents = set()
-            self.children = set()
-            self.dependencies = None
-
+        self.rerun_only = False
+        self.script_name_wrapper = None
+        self.delay_end = None
+        self.wrapper_type = None
+        self._wrapper_queue = None
+        self._queue = None
+        self._partition = None
+        self.retry_delay = None
+        self._wallclock = None
+        self.wchunkinc = None
+        self._tasks = None
+        self._nodes = None
+        self._threads = None
+        self._processors = None
+        self._memory = None
+        self._memory_per_task = None
+        self.undefined_variables = None
+        self.executable = None
+        self.packed = False
+        self.hold = False
+        self.export = None
+        self.start_time = None
+        self.total_jobs = None
+        self.max_waiting_jobs = None
+        self.exclusive = None
+        self.current_checkpoint_step = None
+        self.max_checkpoint_step = None
+        self.reservation = None
+        self.het = None
+        self.updated_log = False
+        self._script = None
+        self._log_recovery_retries = None
+        self.wrapper_name = None
+        self.is_wrapper = False
+        self._wallclock_in_seconds = None
+        self._notify_on = None
+        self._processors_per_node = None
+        self._shape = None
+        self._x11 = False
+        self._x11_options = None
+        self._hyperthreading = None
+        self._scratch_free_space = None
+        self._delay_retrials = None
+        self._custom_directives = None
+        self.packed_during_building = False
+        # Tentative
+        self.dependencies = None
+        self.local_logs = None
+        self.remote_logs = None
+        self.script_name = None
+        self.stat_file = None
 
     def _init_runtime_parameters(self):
         # hetjobs
         self.het = {'HETSIZE': 0}
         self._tasks = '0'
         self._nodes = ""
-        self.default_parameters = {'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%',
-                              'M': '%M%', 'M_': '%M_%', 'm': '%m%', 'm_': '%m_%'}
         self._threads = '1'
         self._processors = '1'
         self._memory = ''
         self._memory_per_task = ''
-        self.log_recovered = False
         self.start_time_timestamp = time.time()
         self.processors_per_node = ""
+        self.script_name = self.name + ".cmd"
         self.stat_file = self.script_name[:-4] + "_STAT_0"
+        self.reservation = ""
+        self.current_checkpoint_step = 0
+        self.max_checkpoint_step = 0
+        self.exclusive = ""
+        self.export = ""
+        self.local_logs = ('', '')
+        self.remote_logs = ('', '')
+        self.dependencies = ""
         self.packed_during_building = False
+        self.packed = False
 
     @property
     def wallclock_in_seconds(self):
@@ -1622,8 +1583,8 @@ class Job(object):
 
         return parameters
 
-    def update_platform_parameters(self,as_conf,parameters,job_platform):
-        if not job_platform:
+    def update_platform_parameters(self, as_conf, parameters, job_platform, set_attributes):
+        if set_attributes and not job_platform:
             submitter = job_utils._get_submitter(as_conf)
             submitter.load_platforms(as_conf)
             job_platform = submitter.platforms[self.platform_name]
@@ -1872,38 +1833,39 @@ class Job(object):
         self.wallclock = increase_wallclock_by_chunk(
             self.wallclock, self.wchunkinc, chunk)
 
-    def update_platform_associated_parameters(self, as_conf, parameters, job_platform, chunk):
-        self.x11_options = str(parameters.get("CURRENT_X11_OPTIONS", ""))
-        self.ec_queue = str(parameters.get("CURRENT_EC_QUEUE", ""))
-        self.executable = parameters.get("CURRENT_EXECUTABLE", "")
-        self.total_jobs = parameters.get("CURRENT_TOTALJOBS",
-                                         parameters.get("CURRENT_TOTAL_JOBS", job_platform.total_jobs))
-        self.max_waiting_jobs = parameters.get("CURRENT_MAXWAITINGJOBS", parameters.get("CURRENT_MAX_WAITING_JOBS",
-                                                                                        job_platform.max_waiting_jobs))
-        self.processors = parameters.get("CURRENT_PROCESSORS", "1")
-        self.shape = parameters.get("CURRENT_SHAPE", "")
-        self.processors_per_node = parameters.get("CURRENT_PROCESSORS_PER_NODE", "1")
-        self.nodes = parameters.get("CURRENT_NODES", "")
-        self.exclusive = parameters.get("CURRENT_EXCLUSIVE", False)
-        self.threads = parameters.get("CURRENT_THREADS", "1")
-        self.tasks = parameters.get("CURRENT_TASKS", "0")
-        self.reservation = parameters.get("CURRENT_RESERVATION", "")
-        self.hyperthreading = parameters.get("CURRENT_HYPERTHREADING", "none")
-        self.queue = parameters.get("CURRENT_QUEUE", "")
-        self.partition = parameters.get("CURRENT_PARTITION", "")
-        self.scratch_free_space = int(parameters.get("CURRENT_SCRATCH_FREE_SPACE", 0))
-        self.memory = parameters.get("CURRENT_MEMORY", "")
-        self.memory_per_task = parameters.get("CURRENT_MEMORY_PER_TASK", parameters.get("CURRENT_MEMORY_PER_TASK", ""))
-        self.wallclock = parameters.get("CURRENT_WALLCLOCK", parameters.get("CURRENT_MAX_WALLCLOCK", parameters.get("CONFIG.JOB_WALLCLOCK", "24:00")))
-        self.custom_directives = parameters.get("CURRENT_CUSTOM_DIRECTIVES", "")
-        self.process_scheduler_parameters(job_platform, chunk)
-        if self.het.get('HETSIZE', 1) > 1:
-            for name, components_value in self.het.items():
-                if name != "HETSIZE":
-                    for indx, component in enumerate(components_value):
-                        if indx == 0:
-                            parameters[name.upper()] = component
-                        parameters[f'{name.upper()}_{indx}'] = component
+    def update_platform_associated_parameters(self, as_conf, parameters, job_platform, chunk, set_attributes):
+        if set_attributes:
+            self.x11_options = str(parameters.get("CURRENT_X11_OPTIONS", ""))
+            self.ec_queue = str(parameters.get("CURRENT_EC_QUEUE", ""))
+            self.executable = parameters.get("CURRENT_EXECUTABLE", "")
+            self.total_jobs = parameters.get("CURRENT_TOTALJOBS",
+                                             parameters.get("CURRENT_TOTAL_JOBS", job_platform.total_jobs))
+            self.max_waiting_jobs = parameters.get("CURRENT_MAXWAITINGJOBS", parameters.get("CURRENT_MAX_WAITING_JOBS",
+                                                                                            job_platform.max_waiting_jobs))
+            self.processors = parameters.get("CURRENT_PROCESSORS", "1")
+            self.shape = parameters.get("CURRENT_SHAPE", "")
+            self.processors_per_node = parameters.get("CURRENT_PROCESSORS_PER_NODE", "1")
+            self.nodes = parameters.get("CURRENT_NODES", "")
+            self.exclusive = parameters.get("CURRENT_EXCLUSIVE", False)
+            self.threads = parameters.get("CURRENT_THREADS", "1")
+            self.tasks = parameters.get("CURRENT_TASKS", "0")
+            self.reservation = parameters.get("CURRENT_RESERVATION", "")
+            self.hyperthreading = parameters.get("CURRENT_HYPERTHREADING", "none")
+            self.queue = parameters.get("CURRENT_QUEUE", "")
+            self.partition = parameters.get("CURRENT_PARTITION", "")
+            self.scratch_free_space = int(parameters.get("CURRENT_SCRATCH_FREE_SPACE", 0))
+            self.memory = parameters.get("CURRENT_MEMORY", "")
+            self.memory_per_task = parameters.get("CURRENT_MEMORY_PER_TASK", parameters.get("CURRENT_MEMORY_PER_TASK", ""))
+            self.wallclock = parameters.get("CURRENT_WALLCLOCK", parameters.get("CURRENT_MAX_WALLCLOCK", parameters.get("CONFIG.JOB_WALLCLOCK", "24:00")))
+            self.custom_directives = parameters.get("CURRENT_CUSTOM_DIRECTIVES", "")
+            self.process_scheduler_parameters(job_platform, chunk)
+            if self.het.get('HETSIZE', 1) > 1:
+                for name, components_value in self.het.items():
+                    if name != "HETSIZE":
+                        for indx, component in enumerate(components_value):
+                            if indx == 0:
+                                parameters[name.upper()] = component
+                            parameters[f'{name.upper()}_{indx}'] = component
         parameters['TOTALJOBS'] = self.total_jobs
         parameters['MAXWAITINGJOBS'] = self.max_waiting_jobs
         parameters['PROCESSORS_PER_NODE'] = self.processors_per_node
@@ -2012,11 +1974,19 @@ class Job(object):
         self.total_jobs = job_data.get("TOTALJOBS",job_data.get("TOTALJOBS", job_platform.get("TOTALJOBS", job_platform.get("TOTAL_JOBS", -1))))
         self.max_waiting_jobs = job_data.get("MAXWAITINGJOBS",job_data.get("MAXWAITINGJOBS", job_platform.get("MAXWAITINGJOBS", job_platform.get("MAX_WAITING_JOBS", -1))))
 
-    def calendar_split(self, as_conf, parameters):
+    def calendar_split(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> None:
         """
-        Calendar for splits
-        :param parameters:
-        :return:
+        Calculate the calendar splits for the job.
+
+        This method processes the calendar splits based on the provided parameters and the Autosubmit configuration.
+
+        :param as_conf: The Autosubmit configuration object.
+        :type as_conf: AutosubmitConfig
+        :param parameters: The dictionary containing job parameters.
+        :type parameters: dict
+        :param set_attributes: Flag indicating whether to set attributes directly.
+        :type set_attributes: bool
+        :return: None
         """
         # Calendar struct type numbered ( year, month, day, hour )
 
@@ -2028,7 +1998,7 @@ class Job(object):
             cal = str(parameters.get('EXPERIMENT.CALENDAR', "standard")).lower()
             split_length = get_split_size(as_conf.experiment_data, self.section)
             start_date = parameters.get('CHUNK_START_DATE', None)
-            if start_date:
+            if set_attributes and start_date:
                 self.date_split = datetime.datetime.strptime(start_date, "%Y%m%d")
             split_start = chunk_start_date(self.date_split, int(self.split), split_length, split_unit, cal)
             split_end = chunk_end_date(split_start, split_length, split_unit, cal)
@@ -2143,19 +2113,24 @@ class Job(object):
                 parameters['CHUNK_LAST'] = 'FALSE'
         return parameters
 
-    def update_job_parameters(self, as_conf, parameters):
-        if self.splits == "auto":
-            self.splits = parameters.get("CURRENT_SPLITS", None)
-        self.delete_when_edgeless = parameters.get("CURRENT_DELETE_WHEN_EDGELESS", True)
-        self.check = parameters.get("CURRENT_CHECK", False)
-        self.check_warnings = parameters.get("CURRENT_CHECK_WARNINGS", False)
-        self.shape = parameters.get("CURRENT_SHAPE", "")
-        self.script = parameters.get("CURRENT_SCRIPT", "")
-        self.x11 = False if str(parameters.get("CURRENT_X11", False)).lower() == "false" else True
-        self.notify_on = parameters.get("CURRENT_NOTIFY_ON", [])
-        self.update_stat_file()
-        if self.checkpoint: # To activate placeholder sustitution per <empty> in the template
-            parameters["AS_CHECKPOINT"] = self.checkpoint
+    def update_job_parameters(self, as_conf, parameters, set_attributes):
+        if set_attributes:
+            if self.splits == "auto":
+                self.splits = parameters.get("CURRENT_SPLITS", None)
+            self.delete_when_edgeless = parameters.get("CURRENT_DELETE_WHEN_EDGELESS", True)
+            self.check = parameters.get("CURRENT_CHECK", False)
+            self.check_warnings = parameters.get("CURRENT_CHECK_WARNINGS", False)
+            self.shape = parameters.get("CURRENT_SHAPE", "")
+            self.script = parameters.get("CURRENT_SCRIPT", "")
+            self.x11 = False if str(parameters.get("CURRENT_X11", False)).lower() == "false" else True
+            self.notify_on = parameters.get("CURRENT_NOTIFY_ON", [])
+            self.update_stat_file()
+            if self.checkpoint:  # To activate placeholder sustitution per <empty> in the template
+                parameters["AS_CHECKPOINT"] = self.checkpoint
+            self.dependencies = parameters.get("CURRENT_DEPENDENCIES", "")
+            self.dependencies = str(self.dependencies)
+            self.wchunkinc = as_conf.get_wchunkinc(self.section)
+
         parameters['JOBNAME'] = self.name
         parameters['FAIL_COUNT'] = str(self.fail_count)
         parameters['SDATE'] = self.sdate
@@ -2172,20 +2147,16 @@ class Job(object):
         parameters['DELAY_RETRIALS'] = self.delay_retrials
         parameters['DELETE_WHEN_EDGELESS'] = self.delete_when_edgeless
         parameters = self.calendar_chunk(parameters)
-        parameters = self.calendar_split(as_conf,parameters)
+        parameters = self.calendar_split(as_conf, parameters, set_attributes)
         parameters['NUMMEMBERS'] = len(as_conf.get_member_list())
-        self.dependencies = parameters.get("CURRENT_DEPENDENCIES", "")
-        self.dependencies  = str(self.dependencies)
+
         parameters['JOB_DEPENDENCIES'] = self.dependencies
         parameters['EXPORT'] = self.export
         parameters['PROJECT_TYPE'] = as_conf.get_project_type()
         parameters['X11'] = self.x11
-        self.wchunkinc = as_conf.get_wchunkinc(self.section)
         return parameters
 
-
-
-    def update_job_variables_final_values(self,parameters):
+    def update_job_variables_final_values(self, parameters):
         """ Jobs variables final values based on parameters dict instead of as_conf
             This function is called to handle %CURRENT_% placeholders as they are filled up dynamically for each job
         """
@@ -2215,37 +2186,49 @@ class Job(object):
         self.retrials = parameters["RETRIALS"]
         self.reservation = parameters["RESERVATION"]
 
-    def update_parameters(self, as_conf):
+    def reset_logs(self):
+        self.log_recovered = False
+        self.packed_during_building = False
+
+    def update_parameters(self, as_conf: AutosubmitConfig, set_attributes: bool = False, reset_logs: bool = False) -> None:
         """
-        Refresh parameters value
+        Refresh the job's parameters value.
 
+        This method reloads the Autosubmit configuration and updates the job's parameters
+        based on the configuration and the current state of the job.
 
-        :param as_conf:
+        :param as_conf: The Autosubmit configuration object.
         :type as_conf: AutosubmitConfig
+        :param set_attributes: Flag indicating whether to set attributes, defaults to False.
+        :type set_attributes: bool
+        :param reset_logs: Flag indicating whether to reset logs, defaults to False.
+        :type reset_logs: bool
+        :return: None
         """
-        as_conf.reload()
-        self._init_runtime_parameters()
-        if not hasattr(self, "start_time"):
-            self.start_time = datetime.datetime.now()
-        # Parameters that affect to all the rest of parameters
-        self.update_dict_parameters(as_conf)
+        if not set_attributes and as_conf.needs_reload():
+            set_attributes = True
+
+        if set_attributes:
+            as_conf.reload()
+            if reset_logs:
+                self.reset_logs()
+            self._init_runtime_parameters()
+            if not hasattr(self, "start_time"):
+                self.start_time = datetime.datetime.now()
+            # Parameters that affect to all the rest of parameters
+            self.update_dict_parameters(as_conf)
         parameters = as_conf.load_parameters()
-        parameters.update(self.default_parameters)
-        parameters = as_conf.substitute_dynamic_variables(parameters,25)
-        parameters['ROOTDIR'] = os.path.join(
-            BasicConfig.LOCAL_ROOT_DIR, self.expid)
-        parameters['PROJDIR'] = as_conf.get_project_dir()
-        # Set parameters dictionary
-        # Set final value
-        parameters = self.update_platform_parameters(as_conf, parameters, self._platform)
+        parameters.update(as_conf.default_parameters)
+        parameters = as_conf.substitute_dynamic_variables(parameters, 25)
+        parameters = self.update_platform_parameters(as_conf, parameters, self._platform, set_attributes)
         parameters = self.update_current_parameters(as_conf, parameters)
         parameters = as_conf.deep_read_loops(parameters)
-        parameters = as_conf.substitute_dynamic_variables(parameters,80)
-        parameters = self.update_job_parameters(as_conf, parameters)
-        parameters = self.update_platform_associated_parameters(as_conf, parameters, self._platform, parameters['CHUNK'])
+        parameters = as_conf.substitute_dynamic_variables(parameters, 25)
+        parameters = self.update_job_parameters(as_conf, parameters, set_attributes)
+        parameters = self.update_platform_associated_parameters(as_conf, parameters, self._platform, parameters['CHUNK'], set_attributes)
         parameters = self.update_wrapper_parameters(as_conf, parameters)
-        self.update_job_variables_final_values(parameters)
-        # This return is only being used by the mock , to change the mock
+        if set_attributes:
+            self.update_job_variables_final_values(parameters)
         for event in self.platform.worker_events:  # keep alive log retrieval workers.
             if not event.is_set():
                 event.set()
@@ -2385,7 +2368,7 @@ class Job(object):
             lang = locale.getdefaultlocale()[1]
             if lang is None:
                 lang = 'UTF-8'
-        parameters = self.update_parameters(as_conf)
+        parameters = self.update_parameters(as_conf, set_attributes=False)
         template_content,additional_templates = self.update_content(as_conf, parameters)
         #enumerate and get value
         #TODO regresion test
@@ -2434,7 +2417,7 @@ class Job(object):
         return script_name
 
     def create_wrapped_script(self, as_conf, wrapper_tag='wrapped'):
-        parameters = self.update_parameters(as_conf)
+        parameters = self.update_parameters(as_conf, set_attributes=False)
         template_content = self.get_wrapped_content(as_conf, parameters)
         for key, value in parameters.items():
             template_content = re.sub(
@@ -2465,16 +2448,16 @@ class Job(object):
         """
 
         out = False
-        parameters = self.update_parameters(as_conf)
+        parameters = self.update_parameters(as_conf, set_attributes=False)
         template_content, additional_templates = self.update_content(as_conf, parameters)
         if template_content is not False:
             variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content,flags=re.IGNORECASE)
             variables = [variable[1:-1] for variable in variables]
-            variables = [variable for variable in variables if variable not in self.default_parameters]
+            variables = [variable for variable in variables if variable not in as_conf.default_parameters]
             for template in additional_templates:
                 variables_tmp = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template,flags=re.IGNORECASE)
                 variables_tmp = [variable[1:-1] for variable in variables_tmp]
-                variables_tmp = [variable for variable in variables_tmp if variable not in self.default_parameters]
+                variables_tmp = [variable for variable in variables_tmp if variable not in as_conf.default_parameters]
                 variables.extend(variables_tmp)
 
             out = set(parameters).issuperset(set(variables))
@@ -2484,12 +2467,13 @@ class Job(object):
                 if str(show_logs).lower() != "false":
                     Log.printlog("The following set of variables to be substituted in template script is not part of parameters set, and will be replaced by a blank value: {0}".format(
                         self.undefined_variables), 5013)
+                    if not set(variables).issuperset(set(parameters)):
+                        Log.printlog(
+                            "The following set of variables are not being used in the templates: {0}".format(
+                                str(set(parameters) - set(variables))), 5013)
+            else:
+                self.undefined_variables = set()
 
-            # Check which variables in the proj.yml are not being used in the templates
-            if str(show_logs).lower() != "false":
-                if not set(variables).issuperset(set(parameters)):
-                    Log.printlog("The following set of variables are not being used in the templates: {0}".format(
-                        str(set(parameters) - set(variables))), 5013)
         return out
 
     def update_local_logs(self, count=-1, update_submit_time=True):
