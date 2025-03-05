@@ -55,6 +55,8 @@ def jobs_in_wrapper_str(as_conf, current_wrapper):
         jobs_in_wrapper = jobs_in_wrapper.split(" ")
     jobs_in_wrapper = [job.strip(" ,") for job in jobs_in_wrapper]
     return "_".join(jobs_in_wrapper)
+
+
 class JobPackageBase(object):
     """
     Class to manage the package of jobs to be submitted by autosubmit
@@ -107,7 +109,7 @@ class JobPackageBase(object):
         return self._platform
 
     @threaded
-    def check_scripts(self, jobs, configuration, parameters, only_generate, hold):
+    def check_scripts(self, jobs, configuration, parameters, only_generate):
         for job in jobs:
             if only_generate and not os.path.exists(os.path.join(configuration.get_project_dir(), job.file)):
                 break
@@ -120,6 +122,7 @@ class JobPackageBase(object):
                 Log.result("Script {0} OK", job.name)
             # looking for directives on jobs
             self._custom_directives = self._custom_directives | set(job.custom_directives)
+
     @threaded
     def _create_scripts_threaded(self,jobs,configuration):
         for i in range(0, len(jobs)):
@@ -128,20 +131,17 @@ class JobPackageBase(object):
     def _create_common_script(self,filename=""):
         pass
 
-
-    def submit_unthreaded(self, configuration, parameters,only_generate=False,hold=False):
+    def submit_unthreaded(self, configuration, parameters: dict, only_generate=False) -> None:
         """
-        :param hold:
-        :para configuration: Autosubmit basic configuration \n
+        :param configuration: Autosubmit basic configuration \n
         :type configuration: AutosubmitConfig object \n
         :param parameters; Parameters from joblist \n
         :type parameters: JobList,parameters \n
-        :param only_generate: True if coming from generate_scripts_andor_wrappers(). If true, only generates scripts; otherwise, submits. \n
+        :param only_generate: True if coming from generate_scripts_andor_wrappers(). If true, only generates scripts; otherwise, submits.
         :type only_generate: Boolean
         """
         for job in self.jobs:
             if only_generate and not os.path.exists(os.path.join(configuration.get_project_dir(), job.file)):
-                exit_ = True
                 break
             if not os.path.exists(os.path.join(configuration.get_project_dir(), job.file)):
                 if configuration.get_project_type().lower() != "none" and len(configuration.get_project_type()) > 0:
@@ -155,7 +155,8 @@ class JobPackageBase(object):
             # looking for directives on jobs
             self._custom_directives = self._custom_directives | set(job.custom_directives)
         self._create_scripts(configuration)
-    def submit(self, configuration, parameters,only_generate=False,hold=False):
+
+    def submit(self, configuration, parameters, only_generate=False, hold=False):
         """
         :param hold:
         :para configuration: Autosubmit basic configuration \n
@@ -177,14 +178,14 @@ class JobPackageBase(object):
         chunksize = int((len(self.jobs) + thread_number - 1) / thread_number)
         try:
             if len(self.jobs) < thread_number or str(configuration.experiment_data.get("CONFIG",{}).get("ENABLE_WRAPPER_THREADS","False")).lower() == "false":
-                self.submit_unthreaded(configuration, parameters, only_generate, hold)
+                self.submit_unthreaded(configuration, parameters, only_generate)
                 Log.debug("Creating Scripts")
                 self._create_scripts(configuration)
             else:
                 lhandle = list()
                 for i in range(0, len(self.jobs), chunksize):
                     Log.debug("Checking Scripts")
-                    lhandle.append(self.check_scripts(self.jobs[i:i + chunksize], configuration, parameters, only_generate, hold))
+                    lhandle.append(self.check_scripts(self.jobs[i:i + chunksize], configuration, parameters, only_generate))
                 for dataThread in lhandle:
                     dataThread.join()
                 for i in range(0, len(self.jobs), chunksize):
@@ -208,8 +209,6 @@ class JobPackageBase(object):
         except BaseException as e:
             raise AutosubmitCritical("Error while submitting jobs: {0}".format(e), 7013)
 
-
-
     def _create_scripts(self, configuration):
         raise Exception('Not implemented')
 
@@ -227,6 +226,7 @@ class JobPackageBase(object):
             if hasattr(self, "name"): # TODO change this check for a property that checks if it is a wrapper or not, the same change has to be done in other parts of the code
                 job.wrapper_name = self.name
 
+
 class JobPackageSimple(JobPackageBase):
     """
     Class to manage a group of simple jobs, not packaged, to be submitted by autosubmit
@@ -240,7 +240,8 @@ class JobPackageSimple(JobPackageBase):
 
     def _create_scripts(self, configuration):
         for job in self.jobs:
-            self._job_scripts[job.name] = job.create_script(configuration)
+            if job.name not in self._job_scripts:
+                self._job_scripts[job.name] = job.create_script(configuration)
 
     def _send_files(self):
         for job in self.jobs:
@@ -283,6 +284,8 @@ class JobPackageSimple(JobPackageBase):
             job.status = Status.SUBMITTED
             job.wrapper_name = job.name
             job.id = str(job.id)
+
+        self._job_scripts.clear()
 
 
 

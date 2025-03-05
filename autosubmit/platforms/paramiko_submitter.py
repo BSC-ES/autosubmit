@@ -1,38 +1,40 @@
-#!/usr/bin/env python3
-
 # Copyright 2014 Climate Forecasting Unit, IC3
-
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http: www.gnu.org / licenses / >.
 
 
 import os
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
-from log.log import Log, AutosubmitError, AutosubmitCritical
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
-from .submitter import Submitter
-from autosubmit.platforms.psplatform import PsPlatform
-from autosubmit.platforms.pbsplatform import PBSPlatform
-from autosubmit.platforms.sgeplatform import SgePlatform
 from autosubmit.platforms.ecplatform import EcPlatform
-from autosubmit.platforms.slurmplatform import SlurmPlatform
-from autosubmit.platforms.pjmplatform import PJMPlatform
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.paramiko_platform import ParamikoPlatformException
+from autosubmit.platforms.pbsplatform import PBSPlatform
+from autosubmit.platforms.pjmplatform import PJMPlatform
+from autosubmit.platforms.psplatform import PsPlatform
+from autosubmit.platforms.sgeplatform import SgePlatform
+from autosubmit.platforms.slurmplatform import SlurmPlatform
+from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from log.log import Log, AutosubmitError, AutosubmitCritical
+from .submitter import Submitter
+
+if TYPE_CHECKING:
+    from autosubmit.platforms.platform import Platform
 
 
 class ParamikoSubmitter(Submitter):
@@ -41,50 +43,48 @@ class ParamikoSubmitter(Submitter):
     """
 
     def __init__(self):
-        self.platforms = None
+        super().__init__()
+        self.platforms = dict()
 
-    def load_platforms_migrate(self, asconf, retries=5):
+    def load_platforms_migrate(self, as_conf, retries=5):
         pass  # Add all info related to migrate
 
-    def load_local_platform(self, asconf):
-        platforms = dict()
+    def _init_local_platform(self, platform: "Platform", as_conf: AutosubmitConfig):
+        platform.max_wallclock = as_conf.get_max_wallclock()
+        platform.max_processors = as_conf.get_max_processors()
+        platform.max_waiting_jobs = as_conf.get_max_waiting_jobs()
+        platform.total_jobs = as_conf.get_total_jobs()
+        platform.scratch = os.path.join(BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, BasicConfig.LOCAL_TMP_DIR)
+        platform.temp_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, 'ASlogs')
+        platform.root_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, platform.expid)
+        platform.host = 'localhost'
+        self.platforms['LOCAL'] = platform
+
+    def load_local_platform(self, as_conf):
         # Build Local Platform Object
-        local_platform = LocalPlatform(asconf.expid, 'local', BasicConfig().props())
-        local_platform.max_wallclock = asconf.get_max_wallclock()
-        local_platform.max_processors = asconf.get_max_processors()
-        local_platform.max_waiting_jobs = asconf.get_max_waiting_jobs()
-        local_platform.total_jobs = asconf.get_total_jobs()
-        local_platform.scratch = os.path.join(
-            BasicConfig.LOCAL_ROOT_DIR, asconf.expid, BasicConfig.LOCAL_TMP_DIR)
-        local_platform.temp_dir = os.path.join(
-            BasicConfig.LOCAL_ROOT_DIR, 'ASlogs')
-        local_platform.root_dir = os.path.join(
-            BasicConfig.LOCAL_ROOT_DIR, local_platform.expid)
-        local_platform.host = 'localhost'
-        # Add object to entry in dictionary
-        platforms['local'] = local_platform
-        platforms['LOCAL'] = local_platform
-        self.platforms = platforms
+        local_platform = LocalPlatform(as_conf.expid, 'local', BasicConfig().props())
+        self._init_local_platform(local_platform, as_conf)
 
-
-    def load_platforms(self, asconf, retries=5, auth_password = None, local_auth_password = None):
-        """
-        Create all the platforms object that will be used by the experiment
+    def load_platforms(self, as_conf, retries=5, auth_password=None, local_auth_password=None):
+        """Create all the platforms object that will be used by the experiment
 
         :param retries: retries in case creation of service fails
-        :param asconf: autosubmit config to use
-        :type asconf: AutosubmitConfig
+        :param as_conf: autosubmit config to use
+        :param auth_password: authentication password
+        :param local_auth_password: local authentication password
+        :type as_conf: AutosubmitConfig
         :return: platforms used by the experiment
         :rtype: dict
         """
-        exp_data = asconf.experiment_data
+        self.platforms.clear()
+        exp_data = as_conf.experiment_data
         config = BasicConfig().props()
         config.update(exp_data)
-        raise_message=""
+        raise_message = ""
         platforms_used = list()
-        hpcarch = asconf.get_platform()
+        hpcarch = as_conf.get_platform()
         platforms_used.append(hpcarch)
-        platforms_serial_in_paralell = defaultdict(list)
+        platforms_serial_in_parallel = defaultdict(list)
         # Traverse jobs defined in jobs_.conf and add platforms found if not already included
         jobs_data = exp_data.get('JOBS', {})
         for job in jobs_data:
@@ -93,31 +93,17 @@ class ParamikoSubmitter(Submitter):
                 platforms_used.append(hpc)
         # Traverse used platforms and look for serial_platforms and add them if not already included
         for platform in platforms_used:
-            hpc = asconf.experiment_data.get("PLATFORMS",{}).get(platform,{}).get("SERIAL_PLATFORM", None)
+            hpc = as_conf.experiment_data.get("PLATFORMS", {}).get(platform, {}).get("SERIAL_PLATFORM", None)
             if hpc is not None:
-                platforms_serial_in_paralell[hpc].append(platform)
+                platforms_serial_in_parallel[hpc].append(platform)
                 if hpc not in platforms_used:
                     platforms_used.append(hpc)
 
         platform_data = exp_data.get('PLATFORMS', {})
-        # Declare platforms dictionary, key: Platform Name, Value: Platform Object
-        platforms = dict()
 
         # Build Local Platform Object
-        local_platform = LocalPlatform(asconf.expid, 'local', config, auth_password = local_auth_password)
-        local_platform.max_wallclock = asconf.get_max_wallclock()
-        local_platform.max_processors = asconf.get_max_processors()
-        local_platform.max_waiting_jobs = asconf.get_max_waiting_jobs()
-        local_platform.total_jobs = asconf.get_total_jobs()
-        local_platform.scratch = os.path.join(
-            BasicConfig.LOCAL_ROOT_DIR, asconf.expid, BasicConfig.LOCAL_TMP_DIR)
-        local_platform.temp_dir = os.path.join(
-            BasicConfig.LOCAL_ROOT_DIR, 'ASlogs')
-        local_platform.root_dir = os.path.join(
-            BasicConfig.LOCAL_ROOT_DIR, local_platform.expid)
-        local_platform.host = 'localhost'
-        # Add object to entry in dictionary
-        platforms['LOCAL'] = local_platform
+        local_platform = LocalPlatform(as_conf.expid, 'local', config, auth_password=local_auth_password)
+        self._init_local_platform(local_platform, as_conf)
 
         # parser is the platform's parser that represents platforms_.conf
         # Traverse sections []
@@ -132,22 +118,22 @@ class ParamikoSubmitter(Submitter):
             try:
                 if platform_type == 'pbs':
                     remote_platform = PBSPlatform(
-                        asconf.expid, section, config, platform_version)
+                        as_conf.expid, section, config, platform_version)
                 elif platform_type == 'sge':
                     remote_platform = SgePlatform(
-                        asconf.expid, section, config)
+                        as_conf.expid, section, config)
                 elif platform_type == 'ps':
                     remote_platform = PsPlatform(
-                        asconf.expid, section, config)
+                        as_conf.expid, section, config)
                 elif platform_type == 'ecaccess':
                     remote_platform = EcPlatform(
-                        asconf.expid, section, config, platform_version)
+                        as_conf.expid, section, config, platform_version)
                 elif platform_type == 'slurm':
                     remote_platform = SlurmPlatform(
-                        asconf.expid, section, config, auth_password = auth_password)
+                        as_conf.expid, section, config, auth_password=auth_password)
                 elif platform_type == 'pjm':
                     remote_platform = PJMPlatform(
-                        asconf.expid, section, config)
+                        as_conf.expid, section, config)
                 else:
                     platform_type_value = platform_type or "<not defined>"
                     raise AutosubmitCritical(f"PLATFORMS.{section.upper()}.TYPE: {platform_type_value} for {section.upper()} is not supported", 7012)
@@ -164,12 +150,12 @@ class ParamikoSubmitter(Submitter):
             if str(add_project_to_host).lower() != "false":
                 host = '{0}'.format(platform_data[section].get('HOST', ""))
                 if host.find(",") == -1:
-                    host = '{0}-{1}'.format(host,platform_data[section].get('PROJECT', ""))
+                    host = '{0}-{1}'.format(host, platform_data[section].get('PROJECT', ""))
                 else:
                     host_list = host.split(",")
                     host_aux = ""
                     for ip in host_list:
-                        host_aux += '{0}-{1},'.format(ip,platform_data[section].get('PROJECT', ""))
+                        host_aux += '{0}-{1},'.format(ip, platform_data[section].get('PROJECT', ""))
                     host = host_aux[:-1]
 
             else:
@@ -177,12 +163,12 @@ class ParamikoSubmitter(Submitter):
 
             remote_platform.host = host.strip(" ")
             # Retrieve more configurations settings and save them in the object
-            remote_platform.max_wallclock = platform_data[section].get('MAX_WALLCLOCK',"2:00")
-            remote_platform.max_processors = platform_data[section].get('MAX_PROCESSORS',asconf.get_max_processors())
-            remote_platform.max_waiting_jobs = platform_data[section].get('MAX_WAITING_JOBS',platform_data[section].get('MAXWAITINGJOBS',asconf.get_max_waiting_jobs()))
-            remote_platform.total_jobs = platform_data[section].get('TOTAL_JOBS',platform_data[section].get('TOTALJOBS',asconf.get_total_jobs()))
-            remote_platform.hyperthreading = str(platform_data[section].get('HYPERTHREADING',False)).lower()
-            remote_platform.project = platform_data[section].get('PROJECT',"")
+            remote_platform.max_wallclock = platform_data[section].get('MAX_WALLCLOCK', "2:00")
+            remote_platform.max_processors = platform_data[section].get('MAX_PROCESSORS', as_conf.get_max_processors())
+            remote_platform.max_waiting_jobs = platform_data[section].get('MAX_WAITING_JOBS', platform_data[section].get('MAXWAITINGJOBS', as_conf.get_max_waiting_jobs()))
+            remote_platform.total_jobs = platform_data[section].get('TOTAL_JOBS', platform_data[section].get('TOTALJOBS', as_conf.get_total_jobs()))
+            remote_platform.hyperthreading = str(platform_data[section].get('HYPERTHREADING', False)).lower()
+            remote_platform.project = platform_data[section].get('PROJECT', "")
             remote_platform.budget = platform_data[section].get('BUDGET', "")
             remote_platform.reservation = platform_data[section].get('RESERVATION', "")
             remote_platform.exclusivity = platform_data[section].get('EXCLUSIVITY', "")
@@ -200,26 +186,22 @@ class ParamikoSubmitter(Submitter):
 
             remote_platform.ec_queue = platform_data[section].get('EC_QUEUE', "hpc")
 
-            remote_platform.processors_per_node = platform_data[section].get('PROCESSORS_PER_NODE',"1")
-            remote_platform.custom_directives = platform_data[section].get('CUSTOM_DIRECTIVES',"")
+            remote_platform.processors_per_node = platform_data[section].get('PROCESSORS_PER_NODE', "1")
+            remote_platform.custom_directives = platform_data[section].get('CUSTOM_DIRECTIVES', "")
             if len(remote_platform.custom_directives) > 0:
                 Log.debug(f'Custom directives for {section}: {remote_platform.custom_directives}')
             remote_platform.scratch_free_space = str(platform_data[section].get('SCRATCH_FREE_SPACE', False)).lower()
             try:
-                remote_platform.root_dir = os.path.join(remote_platform.scratch, remote_platform.project,remote_platform.user, remote_platform.expid)
+                remote_platform.root_dir = os.path.join(remote_platform.scratch, remote_platform.project, remote_platform.user, remote_platform.expid)
                 remote_platform.update_cmds()
 
-                platforms[section] = remote_platform
+                self.platforms[section] = remote_platform
             except Exception as e:
-                raise_message = "Error in the definition of PLATFORM in YAML: SCRATCH_DIR, PROJECT, USER, EXPID must be defined for platform {0}".format(section)
-            # Executes update_cmds() from corresponding Platform Object
-            # Save platform into result dictionary
+                raise_message = f"Error in the definition of PLATFORM in YAML: SCRATCH_DIR, PROJECT, USER, EXPID must be defined for platform {section}: {str(e)}"
 
-        for serial,platforms_with_serial_options in platforms_serial_in_paralell.items():
+        for serial, platforms_with_serial_options in platforms_serial_in_parallel.items():
             for section in platforms_with_serial_options:
-                platforms[section].serial_platform = platforms[serial]
+                self.platforms[section].serial_platform = self.platforms[serial]
 
-
-        self.platforms = platforms
         if raise_message != "":
             raise AutosubmitError(raise_message)

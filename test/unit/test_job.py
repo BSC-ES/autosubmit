@@ -1117,7 +1117,7 @@ CONFIG:
 
         parameters = {}
         # Act
-        parameters = self.job.update_parameters(self.as_conf, parameters)
+        self.job.update_parameters(self.as_conf, parameters)
         # Assert
         self.assertTrue('CURRENT_WHATEVER' in parameters)
         self.assertTrue('CURRENT_WHATEVER2' in parameters)
@@ -1135,13 +1135,13 @@ CONFIG:
         # update parameters when date is not none and chunk is none
         self.job.date = datetime.datetime(1975, 5, 25, 22, 0, 0, 0, datetime.timezone.utc)
         self.job.chunk = None
-        parameters = self.job.update_parameters(self.as_conf, parameters)
+        self.job.update_parameters(self.as_conf, parameters)
         self.assertEqual(1,parameters['CHUNK'])
         # update parameters when date is not none and chunk is not none
         self.job.date = datetime.datetime(1975, 5, 25, 22, 0, 0, 0, datetime.timezone.utc)
         self.job.chunk = 1
         self.job.date_format = 'H'
-        parameters = self.job.update_parameters(self.as_conf, parameters)
+        self.job.update_parameters(self.as_conf, parameters)
         self.assertEqual(1, parameters['CHUNK'])
         self.assertEqual("TRUE", parameters['CHUNK_FIRST'])
         self.assertEqual("TRUE", parameters['CHUNK_LAST'])
@@ -1166,7 +1166,7 @@ CONFIG:
 
         self.job.chunk = 2
         parameters = {"EXPERIMENT.NUMCHUNKS": 3, "EXPERIMENT.CHUNKSIZEUNIT": "hour"}
-        parameters = self.job.update_parameters(self.as_conf, parameters)
+        self.job.update_parameters(self.as_conf, parameters)
         self.assertEqual(2, parameters['CHUNK'])
         self.assertEqual("FALSE", parameters['CHUNK_FIRST'])
         self.assertEqual("FALSE", parameters['CHUNK_LAST'])
@@ -1348,7 +1348,7 @@ CONFIG:
             # Check splits
             # Assert general
             job = job_list[0]
-            parameters = job.update_parameters(config, parameters)
+            job.update_parameters(config, parameters)
             self.assertEqual(job.splits, 12)
             self.assertEqual(job.running, 'chunk')
 
@@ -1359,7 +1359,7 @@ CONFIG:
             # assert parameters
             next_start = "00"
             for i,job in enumerate(job_list[0:12]):
-                parameters = job.update_parameters(config, parameters)
+                job.update_parameters(config, parameters)
                 end_hour = str(parameters['SPLIT'] * splitsize ).zfill(2)
                 if end_hour == "24":
                     end_hour = "00"

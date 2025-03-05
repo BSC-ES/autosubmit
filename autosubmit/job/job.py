@@ -51,19 +51,9 @@ from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import Log, AutosubmitCritical
 
-Log.get_logger("Autosubmit")
 
-# A wrapper for encapsulate threads , TODO: Python 3+ to be replaced by the < from concurrent.futures >
-
-
-def threaded(fn):
-    def wrapper(*args, **kwargs):
-        thread = Thread(target=fn, args=args, kwargs=kwargs)
-        thread.name = "JOB_" + str(args[0].name)
-        thread.start()
-        return thread
-    return wrapper
-
+RE_SCRIPT_FIND_VARIABLES = re.compile('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', re.IGNORECASE)
+"""Regular expression to locate placeholders, e.g. %VERSION%, in strings."""
 
 # This decorator contains groups of parameters, with each
 # parameter described. This is only for parameters which
@@ -1458,7 +1448,7 @@ class Job(object):
             else:
                 return default_status
 
-    def update_current_parameters(self, as_conf: AutosubmitConfig, parameters: dict) -> dict:
+    def update_current_parameters(self, as_conf: AutosubmitConfig, parameters: dict) -> None:
         """
         Update the %CURRENT_*% parameters with the current platform and jobs.
 
@@ -1475,9 +1465,7 @@ class Job(object):
         for key, value in as_conf.jobs_data[self.section].items():
             parameters[f"CURRENT_{key.upper()}"] = value
 
-        return parameters
-
-    def update_platform_parameters(self,as_conf,parameters,job_platform):
+    def update_platform_parameters(self, as_conf, parameters: dict, job_platform) -> None:
         if not job_platform:
             submitter = job_utils._get_submitter(as_conf)
             submitter.load_platforms(as_conf)
@@ -1496,7 +1484,6 @@ class Job(object):
         parameters['CURRENT_PROJ_DIR'] = job_platform.project_dir
         parameters['CURRENT_ROOTDIR'] = job_platform.root_dir
         parameters['CURRENT_LOGDIR'] = job_platform.get_files_path()
-        return parameters
 
     def process_scheduler_parameters(self, job_platform, chunk):
         """
@@ -1727,7 +1714,7 @@ class Job(object):
         self.wallclock = increase_wallclock_by_chunk(
             self.wallclock, self.wchunkinc, chunk)
 
-    def update_platform_associated_parameters(self, as_conf, parameters, job_platform, chunk):
+    def update_platform_associated_parameters(self, as_conf, parameters: dict, job_platform, chunk) -> None:
         self.x11_options = str(parameters.get("CURRENT_X11_OPTIONS", ""))
         self.ec_queue = str(parameters.get("CURRENT_EC_QUEUE", ""))
         self.executable = parameters.get("CURRENT_EXECUTABLE", "")
@@ -1797,9 +1784,7 @@ class Job(object):
         parameters['CURRENT_EC_QUEUE'] = self.ec_queue
         parameters['PARTITION'] = self.partition
 
-        return parameters
-
-    def update_wrapper_parameters(self,as_conf, parameters):
+    def update_wrapper_parameters(self,as_conf, parameters: dict) -> None:
         wrappers = as_conf.experiment_data.get("WRAPPERS", {})
         if len(wrappers) > 0:
             parameters['WRAPPER'] = as_conf.get_wrapper_type()
@@ -1821,9 +1806,8 @@ class Job(object):
                 as_conf.experiment_data["WRAPPERS"].get(wrapper_section))
             parameters[wrapper_section + "_EXTENSIBLE"] = int(
                 as_conf.get_extensible_wallclock(as_conf.experiment_data["WRAPPERS"].get(wrapper_section)))
-        return parameters
 
-    def update_dict_parameters(self,as_conf):
+    def update_dict_parameters(self,as_conf) -> None:
         self.retrials = as_conf.jobs_data.get(self.section,{}).get("RETRIALS", as_conf.experiment_data.get("CONFIG",{}).get("RETRIALS", 0))
         for wrapper_data in ( wrapper for wrapper in as_conf.experiment_data.get("WRAPPERS",{}).values() if type(wrapper) is dict):
             jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", "").upper()
@@ -1998,7 +1982,7 @@ class Job(object):
                 parameters['CHUNK_LAST'] = 'FALSE'
         return parameters
 
-    def update_job_parameters(self, as_conf, parameters):
+    def update_job_parameters(self, as_conf, parameters: dict) -> None:
         if self.splits == "auto":
             self.splits = parameters.get("CURRENT_SPLITS", None)
         self.delete_when_edgeless = parameters.get("CURRENT_DELETE_WHEN_EDGELESS", True)
@@ -2009,7 +1993,7 @@ class Job(object):
         self.x11 = False if str(parameters.get("CURRENT_X11", False)).lower() == "false" else True
         self.notify_on = parameters.get("CURRENT_NOTIFY_ON", [])
         self.update_stat_file()
-        if self.checkpoint: # To activate placeholder sustitution per <empty> in the template
+        if self.checkpoint: # To activate placeholder substitution per <empty> in the template
             parameters["AS_CHECKPOINT"] = self.checkpoint
         parameters['JOBNAME'] = self.name
         parameters['FAIL_COUNT'] = str(self.fail_count)
@@ -2030,17 +2014,14 @@ class Job(object):
         parameters = self.calendar_split(as_conf,parameters)
         parameters['NUMMEMBERS'] = len(as_conf.get_member_list())
         self.dependencies = parameters.get("CURRENT_DEPENDENCIES", "")
-        self.dependencies  = str(self.dependencies)
+        self.dependencies = str(self.dependencies)
         parameters['JOB_DEPENDENCIES'] = self.dependencies
         parameters['EXPORT'] = self.export
         parameters['PROJECT_TYPE'] = as_conf.get_project_type()
         parameters['X11'] = self.x11
         self.wchunkinc = as_conf.get_wchunkinc(self.section)
-        return parameters
 
-
-
-    def update_job_variables_final_values(self,parameters):
+    def update_job_variables_final_values(self, parameters: dict) -> None:
         """ Jobs variables final values based on parameters dict instead of as_conf
             This function is called to handle %CURRENT_% placeholders as they are filled up dynamically for each job
         """
@@ -2070,9 +2051,7 @@ class Job(object):
         self.retrials = parameters["RETRIALS"]
         self.reservation = parameters["RESERVATION"]
 
-    def update_parameters(self, as_conf, parameters,
-                          default_parameters={'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%',
-                                              'M': '%M%', 'M_': '%M_%', 'm': '%m%', 'm_': '%m_%'}):
+    def update_parameters(self, as_conf: AutosubmitConfig, parameters: dict, default_parameters=None) -> None:
         """
         Refresh parameters value
 
@@ -2083,14 +2062,15 @@ class Job(object):
         :param parameters:
         :type parameters: dict
         """
-        as_conf.reload()
+        if default_parameters is None:
+            default_parameters = {'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%',
+                                              'M': '%M%', 'M_': '%M_%', 'm': '%m%', 'm_': '%m_%'}
         self._adjust_new_parameters()
         self._init_runtime_parameters()
         if not hasattr(self, "start_time"):
             self.start_time = datetime.datetime.now()
         # Parameters that affect to all the rest of parameters
         self.update_dict_parameters(as_conf)
-        parameters = parameters.copy()
         if hasattr(as_conf,"parameters"):
             parameters.update(as_conf.parameters)
         parameters.update(default_parameters)
@@ -2100,21 +2080,19 @@ class Job(object):
         parameters['PROJDIR'] = as_conf.get_project_dir()
         # Set parameters dictionary
         # Set final value
-        parameters = self.update_platform_parameters(as_conf, parameters, self._platform)
-        parameters = self.update_current_parameters(as_conf, parameters)
+        self.update_platform_parameters(as_conf, parameters, self._platform)
+        self.update_current_parameters(as_conf, parameters)
         parameters = as_conf.deep_read_loops(parameters)
         parameters = as_conf.substitute_dynamic_variables(parameters,80)
-        parameters = self.update_job_parameters(as_conf, parameters)
-        parameters = self.update_platform_associated_parameters(as_conf, parameters, self._platform, parameters['CHUNK'])
-        parameters = self.update_wrapper_parameters(as_conf, parameters)
+        self.update_job_parameters(as_conf, parameters)
+        self.update_platform_associated_parameters(as_conf, parameters, self._platform, parameters['CHUNK'])
+        self.update_wrapper_parameters(as_conf, parameters)
         self.update_job_variables_final_values(parameters)
         # For some reason, there is return but the assignee is also necessary
         self.parameters = parameters
-        # This return is only being used by the mock , to change the mock
         for event in self.platform.worker_events:  # keep alive log retrieval workers.
             if not event.is_set():
                 event.set()
-        return parameters
 
     def update_content_extra(self,as_conf,files):
         additional_templates = []
@@ -2135,40 +2113,36 @@ class Job(object):
         :return: script code
         :rtype: str
         """
-        self.update_parameters(as_conf, self.parameters)
+        template: list[str] = ['']
         if self.script:
             if self.file:
                 Log.warning(f"Custom script for job {self.name} is being used, file contents are ignored.")
-            template = self.script
+            template.append(self.script)
         else:
             try:
                 if as_conf.get_project_type().lower() != "none" and len(as_conf.get_project_type()) > 0:
-                    template_file = open(os.path.join(as_conf.get_project_dir(), self.file), 'r')
-                    template = ''
-                    if as_conf.get_remote_dependencies() == "true":
-                        if self.type == Type.BASH:
-                            template = 'sleep 5' + "\n"
-                        elif self.type == Type.PYTHON2:
-                            template = 'time.sleep(5)' + "\n"
-                        elif self.type == Type.PYTHON3 or self.type == Type.PYTHON:
-                            template = 'time.sleep(5)' + "\n"
-                        elif self.type == Type.R:
-                            template = 'Sys.sleep(5)' + "\n"
-                    template += template_file.read()
-                    template_file.close()
+                    with open(os.path.join(as_conf.get_project_dir(), self.file), 'r') as template_file:
+                        if as_conf.get_remote_dependencies() == "true":
+                            if self.type == Type.BASH:
+                                template.append('sleep 5')
+                            elif self.type == Type.PYTHON2:
+                                template.append('time.sleep(5)')
+                            elif self.type == Type.PYTHON3 or self.type == Type.PYTHON:
+                                template.append('time.sleep(5)')
+                            elif self.type == Type.R:
+                                template.append('Sys.sleep(5)')
+                        template.append(template_file.read())
                 else:
                     if self.type == Type.BASH:
-                        template = 'sleep 5'
+                        template.append('sleep 5')
                     elif self.type == Type.PYTHON2:
-                        template = 'time.sleep(5)' + "\n"
+                        template.append('time.sleep(5)')
                     elif self.type == Type.PYTHON3 or self.type == Type.PYTHON:
-                        template = 'time.sleep(5)' + "\n"
+                        template.append('time.sleep(5)')
                     elif self.type == Type.R:
-                        template = 'Sys.sleep(5)'
-                    else:
-                        template = ''
+                        template.append('Sys.sleep(5)')
             except Exception as e:
-                template = ''
+                Log.warning(f'Unexpected error updating job script content: {str(e)}')
 
         if self.type == Type.BASH:
             snippet = StatisticsSnippetBash
@@ -2180,19 +2154,19 @@ class Job(object):
             snippet = StatisticsSnippetR
         else:
             raise Exception('Job type {0} not supported'.format(self.type))
-        template_content = self._get_template_content(as_conf, snippet, template)
+        template_str = '\n'.join(template)
+        template_content = self._get_template_content(snippet, template_str)
         additional_content = self.update_content_extra(as_conf,self.additional_files)
-        return template_content,additional_content
+        return template_content, additional_content
 
     def get_wrapped_content(self, as_conf):
         snippet = StatisticsSnippetEmpty
         template = 'python $SCRATCH/{1}/LOG_{1}/{0}.cmd'.format(
             self.name, self.expid)
-        template_content = self._get_template_content(
-            as_conf, snippet, template)
+        template_content = self._get_template_content(snippet, template)
         return template_content
 
-    def _get_template_content(self, as_conf, snippet, template):
+    def _get_template_content(self, snippet, template):
         #communications_library = as_conf.get_communications_library()
         # if communications_library == 'paramiko':
         return self._get_paramiko_template(snippet, template)
@@ -2251,12 +2225,12 @@ class Job(object):
             if lang is None:
                 lang = 'UTF-8'
         parameters = self.parameters
-        template_content,additional_templates = self.update_content(as_conf)
+        template_content, additional_templates = self.update_content(as_conf)
         #enumerate and get value
         #TODO regresion test
         for additional_file, additional_template_content in zip(self.additional_files, additional_templates):
             # append to a list all names don't matter the location, inside additional_template_content that  starts with % and ends with %
-            placeholders_inside_additional_template = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', additional_template_content,flags=re.IGNORECASE)
+            placeholders_inside_additional_template = re.findall(RE_SCRIPT_FIND_VARIABLES, additional_template_content)
             for placeholder in placeholders_inside_additional_template:
                 if placeholder in self.default_parameters.values():
                     continue
@@ -2330,17 +2304,19 @@ class Job(object):
         """
 
         out = False
-        parameters = self.update_parameters(as_conf, parameters)
-        template_content,additional_templates = self.update_content(as_conf)
+        # self.update_parameters(as_conf, parameters)
+        template_content, additional_templates = self.update_content(as_conf)
         if template_content is not False:
-            variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content,flags=re.IGNORECASE)
+            variables = re.findall(RE_SCRIPT_FIND_VARIABLES, template_content)
+            del template_content
             variables = [variable[1:-1] for variable in variables]
             variables = [variable for variable in variables if variable not in self.default_parameters]
             for template in additional_templates:
-                variables_tmp = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template,flags=re.IGNORECASE)
+                variables_tmp = re.findall(RE_SCRIPT_FIND_VARIABLES, template)
                 variables_tmp = [variable[1:-1] for variable in variables_tmp]
                 variables_tmp = [variable for variable in variables_tmp if variable not in self.default_parameters]
                 variables.extend(variables_tmp)
+            del additional_templates
 
             out = set(parameters).issuperset(set(variables))
             # Check if the variables in the templates are defined in the configurations

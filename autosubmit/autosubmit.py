@@ -19,12 +19,11 @@ import locale
 import platform
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-import threading
 from bscearth.utils.date import date2str
 from configparser import ConfigParser
 from pathlib import Path
 from ruamel.yaml import YAML
-from typing import Dict, Set, Tuple, Union, Any, List, Optional
+from typing import Dict, Set, Tuple, Union, Any, List, Optional, TYPE_CHECKING
 
 from autosubmit.database.db_common import update_experiment_descrip_version
 from autosubmit.helpers.parameters import PARAMETERS
@@ -69,7 +68,6 @@ import re
 import random
 import signal
 import datetime
-# import log.fd_show as fd_show
 from importlib.resources import files as read_files
 from importlib.metadata import version
 from collections import defaultdict
@@ -84,6 +82,11 @@ import autosubmit.statistics.utils as StatisticsUtils
 from autosubmit.helpers.utils import proccess_id, check_jobs_file_exists
 
 from contextlib import suppress
+
+
+if TYPE_CHECKING:
+    from autosubmit.platforms.submitter import Submitter
+
 
 dialog = None
 
@@ -1812,6 +1815,7 @@ class Autosubmit:
                                               Status.VALUE_TO_KEY[job.status],
                                               as_conf.experiment_data["MAIL"]["TO"])
         return job_changes_tracker
+
     @staticmethod
     def check_wrappers(as_conf, job_list, platforms_to_test, expid):
         """
@@ -1830,8 +1834,7 @@ class Autosubmit:
             for job_id, job in queuing_jobs.items():
                 # Check Wrappers one-by-one
                 if job_list.job_package_map and job_id in job_list.job_package_map:
-                    wrapper_job, save = Autosubmit.manage_wrapper_job(as_conf, job_list, platform,
-                                                                      job_id)
+                    wrapper_job, save = Autosubmit.manage_wrapper_job(as_conf, job_list, platform, job_id)
                     # Notifications e-mail
                     Autosubmit.wrapper_notify(as_conf, expid, wrapper_job)
                     # Detect and store changes for the GUI
@@ -1848,7 +1851,7 @@ class Autosubmit:
                             jobs_to_check[platform.name].append([job, job_prev_status])
                         else:
                             jobs_to_check[platform.name] = [[job, job_prev_status]]
-        return jobs_to_check,job_changes_tracker
+        return jobs_to_check, job_changes_tracker
 
     @staticmethod
     def check_wrapper_stored_status(as_conf: Any, job_list: Any, wrapper_wallclock: str) -> Any:
@@ -1938,11 +1941,29 @@ class Autosubmit:
             exp_history.process_job_list_changes_to_experiment_totals(job_list.get_job_list())
             Autosubmit.database_backup(expid)
         return exp_history
+
     @staticmethod
-    def prepare_run(expid, notransitive=False, start_time=None, start_after=None,
-                       run_only_members=None, recover = False, check_scripts= False, submitter=None):
-        """
-        Prepare the run of the experiment.
+    def prepare_run(
+            expid,
+            notransitive=False,
+            start_time=None,
+            start_after=None,
+            run_only_members=None,
+            recover=False,
+            check_scripts=False,
+            submitter=None
+    ) -> Tuple[
+        JobList,
+        "Submitter",
+        Optional[ExperimentHistory],
+        Optional[str],
+        AutosubmitConfig,
+        list[Platform],
+        JobPackagePersistence,
+        bool
+    ]:
+        """Prepare the run of the experiment.
+
         :param expid: a string with the experiment id.
         :param notransitive: a boolean to indicate for the experiment to not use transitive dependencies.
         :param start_time: a string with the starting time of the experiment.
@@ -1950,7 +1971,9 @@ class Autosubmit:
         :param run_only_members: a string with the members to run.
         :param recover: a boolean to indicate if the experiment is recovering from a failure.
         :param submitter: the actual loaded platforms if any
-        :return: a tuple
+        :param check_scripts: whether to check the template scripts or not
+        :return: a tuple with the job list, submitter, optional experiment history, optional platform host name,
+            the Autosubmit configuration object, a list of platforms to test, the job persistence package, and a flag.
         """
         host = platform.node()
         # Init the autosubmitconfigparser and check that every file exists and it is a valid configuration.
@@ -2099,11 +2122,11 @@ class Autosubmit:
             # establish the connection to all platforms
             # Restore is a misleading, it is actually a "connect" function when the recover flag is not set.
             Autosubmit.restore_platforms(platforms_to_test,as_conf=as_conf)
-            return job_list, submitter , exp_history, host , as_conf, platforms_to_test, packages_persistence, False
+            return job_list, submitter, exp_history, host, as_conf, platforms_to_test, packages_persistence, False
         else:
             return job_list, submitter, None, None, as_conf, platforms_to_test, packages_persistence, True
     @staticmethod
-    def get_iteration_info(as_conf,job_list):
+    def get_iteration_info(as_conf, job_list):
         """
         Prints the current iteration information
         :param as_conf: autosubmit configuration object
@@ -2164,6 +2187,12 @@ class Autosubmit:
             raise AutosubmitCritical("Failure during the loading of the experiment configuration, check file paths",
                                      7014, str(e))
 
+        tracing = False
+        if tracing:
+            from guppy import hpy
+        from autosubmit.trace_malloc import TraceMalloc
+        import gc
+
         try:
             with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
                 try:
@@ -2172,7 +2201,7 @@ class Autosubmit:
                     # If there are issues while running, this function will be called again to reinitialize the experiment.
                     job_list, submitter , exp_history, host , as_conf, platforms_to_test, packages_persistence, _ = Autosubmit.prepare_run(expid, notransitive, start_time, start_after, run_only_members)
                 except AutosubmitCritical as e:
-                    #e.message += " HINT: check the CUSTOM_DIRECTIVE syntax in your jobs configuration files."
+                    # e.message += " HINT: check the CUSTOM_DIRECTIVE syntax in your jobs configuration files."
                     raise AutosubmitCritical(e.message, 7014, e.trace)
                 except Exception as e:
                     raise AutosubmitCritical("Error in run initialization", 7014, str(e))  # Changing default to 7014
@@ -2197,10 +2226,22 @@ class Autosubmit:
                 max_recovery_retrials = as_conf.experiment_data.get("CONFIG",{}).get("RECOVERY_RETRIALS",3650)  # (72h - 122h )
                 recovery_retrials = 0
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
+
+                for job in [job for job in job_list.get_job_list() if job.status == Status.READY]:
+                    job.update_parameters(as_conf, {})
+                Log.debug("Reloading parameters...")
+                try:
+                    # This function name is not clear after the transformation it received across years.
+                    # What it does, is to load and transform all as_conf.experiment_data into a 1D dict stored in job_list object.
+                    Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
+                except BaseException as e:
+                    raise AutosubmitError("Config files seems to not be accessible", 6040, str(e))
+
+                safetysleeptime = as_conf.get_safetysleeptime()
+
                 while job_list.get_active():
                     Autosubmit.refresh_log_recovery_process(platforms_to_test, as_conf)
-                    for job in [job for job in job_list.get_job_list() if job.status == Status.READY]:
-                        job.update_parameters(as_conf, {})
+
                     did_run = True
                     try:
                         if Autosubmit.exit:
@@ -2208,22 +2249,9 @@ class Autosubmit:
                             if job_list.get_failed():
                                 return 1
                             return 0
-                        # reload parameters changes
-                        Log.debug("Reloading parameters...")
-                        try:
-                            # This function name is not clear after the transformation it received across years.
-                            # What it does, is to load and transform all as_conf.experiment_data into a 1D dict stored in job_list object.
-                            Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
-                        except BaseException as e:
-                            raise AutosubmitError("Config files seems to not be accessible", 6040, str(e))
-                        total_jobs, safetysleeptime, default_retrials, check_wrapper_jobs_sleeptime = Autosubmit.get_iteration_info(as_conf,job_list)
 
-                        save = False
-                        # End Check Current jobs
-                        if save:  # previous iteration
-                            job_list.backup_save()
                         # This function name is totally misleading, yes it check the status of the wrappers, but also orders jobs the jobs that  are not wrapped by platform.
-                        jobs_to_check,job_changes_tracker = Autosubmit.check_wrappers(as_conf, job_list, platforms_to_test, expid)
+                        jobs_to_check, job_changes_tracker = Autosubmit.check_wrappers(as_conf, job_list, platforms_to_test, expid)
                         # Jobs to check are grouped by platform.
                         # platforms_to_test could be renamed to active_platforms or something like that.
                         for platform in platforms_to_test:
@@ -2238,17 +2266,33 @@ class Autosubmit:
                             # mail notification ( in case of changes )
                             for job, job_prev_status in jobs_to_check[platform.name]:
                                 if job_prev_status != job.update_status(as_conf):
-                                    Autosubmit.job_notify(as_conf,expid,job,job_prev_status,job_changes_tracker)
+                                    Autosubmit.job_notify(as_conf,expid,job,job_prev_status, job_changes_tracker)
+                        del jobs_to_check
                         # Updates all workflow status with the new information.
-                        job_list.update_list(as_conf, submitter=submitter)
+                        job_list.update_list(as_conf)
                         job_list.save()
                         # Submit jobs that are ready to run
                         #Log.debug(f"FD submit: {fd_show.fd_table_status_str()}")
                         if len(job_list.get_ready()) > 0:
+                            if tracing:
+                                import ipdb
+                                hp = hpy()
+                                hp.setref()
+
+                            #with TraceMalloc('lineno') as tm:
                             Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence, hold=False)
-                            job_list.update_list(as_conf, submitter=submitter)
+
+                            # print(f' tm.memory_start={tm.memory_start}')
+                            # print(f'tm.memory_finish={tm.memory_finish}')
+                            # print(f'         tm.diff={tm.diff}')
+                            # for stat in tm.net_statistics():
+                            #     print(stat)
+                            job_list.update_list(as_conf)
                             job_list.save()
-                            as_conf.save()
+                            # as_conf.save()
+                            if tracing:
+                                heap = hp.heap()
+                                ipdb.set_trace()
 
                         # Submit jobs that are prepared to hold (if remote dependencies parameter are enabled)
                         # This currently is not used as SLURM no longer allows to jobs to acquire priority while in hold state.
@@ -2256,9 +2300,9 @@ class Autosubmit:
                         if as_conf.get_remote_dependencies() == "true" and len(job_list.get_prepared()) > 0:
                             Autosubmit.submit_ready_jobs(
                                 as_conf, job_list, platforms_to_test, packages_persistence, hold=True)
-                            job_list.update_list(as_conf, submitter=submitter)
+                            job_list.update_list(as_conf)
                             job_list.save()
-                            as_conf.save()
+                            # as_conf.save()
                         # Safe spot to store changes
                         try:
                             exp_history = Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker, expid)
@@ -2269,19 +2313,19 @@ class Autosubmit:
                                 Autosubmit.database_fix(expid)
                                 exp_history = Autosubmit.process_historical_data_iteration(job_list,
                                                                                            job_changes_tracker, expid)
-                            except Exception as e:
+                            except Exception:
                                 Log.warning(
                                     "Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
-                        job_changes_tracker = {}
+                        del job_changes_tracker
                         if Autosubmit.exit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             job_list.save()
                             as_conf.save()
+
                         time.sleep(safetysleeptime)
-                        #Log.debug(f"FD endsubmit: {fd_show.fd_table_status_str()}")
-
-
-                    except AutosubmitError as e:  # If an error is detected, restore all connections and job_list
+                        # Log.debug(f"FD endsubmit: {fd_show.fd_table_status_str()}")
+                    # If an error is detected, restore all connections and job_list
+                    except AutosubmitError as e:
                         Log.error("Trace: {0}", e.trace)
                         Log.error("{1} [eCode={0}]", e.code, e.message)
                         # Log.debug("FD recovery: {0}".format(log.fd_show.fd_table_status_str()))
@@ -2520,31 +2564,34 @@ class Autosubmit:
             for section in jobs_section:
                 if check_jobs_file_exists(as_conf, section):
                     raise AutosubmitCritical(f"Job {section} does not have a correct template// template not found", 7014)
+        save_jobs = False
         try:
             for platform in platforms_to_test:
                 packager = JobPackager(as_conf, platform, job_list, hold=hold)
                 packages_to_submit = packager.build_packages()
-                save_1, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = platform.submit_ready_jobs(as_conf,
-                                                                                                              job_list,
-                                                                                                              platforms_to_test,
-                                                                                                              packages_persistence,
-                                                                                                              packages_to_submit,
-                                                                                                              inspect=inspect,
-                                                                                                              only_wrappers=only_wrappers,
-                                                                                                              hold=hold)
+                save_1, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = (
+                    platform.submit_ready_jobs(
+                        as_conf,
+                        job_list,
+                        packages_persistence,
+                        packages_to_submit,
+                        inspect=inspect,
+                        only_wrappers=only_wrappers,
+                        hold=hold)
+                )
                 wrapper_errors.update(packager.wrappers_with_error)
                 # Jobs that are being retrieved in batch. Right now, only available for slurm platforms.
 
                 if not inspect and len(valid_packages_to_submit) > 0:
-                    job_list.save()
+                    save_jobs = True
                 save_2 = False
-                if platform.type.lower() in [ "slurm" , "pjm" ] and not inspect and not only_wrappers:
+                if platform.type.lower() in ["slurm", "pjm"] and not inspect and not only_wrappers:
                     # Process the script generated in submit_ready_jobs
                     save_2, valid_packages_to_submit = platform.process_batch_ready_jobs(valid_packages_to_submit,
                                                                                          failed_packages,
                                                                                          error_message="", hold=hold)
                     if not inspect and len(valid_packages_to_submit) > 0:
-                        job_list.save()
+                        save_jobs = True
                 # Save wrappers(jobs that has the same id) to be visualized and checked in other parts of the code
                 job_list.save_wrappers(valid_packages_to_submit, failed_packages, as_conf, packages_persistence,
                                        hold=hold, inspect=inspect)
@@ -2562,13 +2609,15 @@ class Autosubmit:
                 return True
             else:
                 return False
-
-        except AutosubmitError as e:
+        except AutosubmitError:
             raise
-        except AutosubmitCritical as e:
+        except AutosubmitCritical:
             raise
-        except BaseException as e:
+        except BaseException:
             raise
+        finally:
+            if save_jobs:
+                job_list.save()
 
     @staticmethod
     def monitor(expid, file_format, lst, filter_chunks, filter_status, filter_section, hide, txt_only=False,
@@ -4545,7 +4594,7 @@ class Autosubmit:
                     rerun = as_conf.get_rerun()
 
                     Log.info("\nCreating the jobs list...")
-                    job_list = JobList(expid, BasicConfig, YAMLParserFactory(),Autosubmit._get_job_list_persistence(expid, as_conf), as_conf)
+                    job_list = JobList(expid, Autosubmit._get_job_list_persistence(expid, as_conf), as_conf)
                     try:
                          prev_job_list_logs = Autosubmit.load_logs_from_previous_run(expid, as_conf)
                     except Exception:
@@ -5765,7 +5814,7 @@ class Autosubmit:
     def load_logs_from_previous_run(expid,as_conf):
         logs = None
         if Path(f'{BasicConfig.LOCAL_ROOT_DIR}/{expid}/pkl/job_list_{expid}.pkl').exists():
-            job_list = JobList(expid, BasicConfig, YAMLParserFactory(),Autosubmit._get_job_list_persistence(expid, as_conf), as_conf)
+            job_list = JobList(expid, Autosubmit._get_job_list_persistence(expid, as_conf), as_conf)
             with suppress(BaseException):
                 graph = job_list.load()
                 if len(graph.nodes) > 0:
@@ -5779,8 +5828,7 @@ class Autosubmit:
     @staticmethod
     def load_job_list(expid, as_conf, notransitive=False, monitor=False, new = True): # To be moved to utils
         rerun = as_conf.get_rerun()
-        job_list = JobList(expid, BasicConfig, YAMLParserFactory(),
-                           Autosubmit._get_job_list_persistence(expid, as_conf), as_conf)
+        job_list = JobList(expid, Autosubmit._get_job_list_persistence(expid, as_conf), as_conf)
         run_only_members = as_conf.get_member_list(run_only=True)
         date_list = as_conf.get_date_list()
         date_format = ''

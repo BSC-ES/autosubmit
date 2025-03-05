@@ -810,7 +810,8 @@ def test_normalize_auto_keyword(autosubmit_config, mocker):
     as_conf.experiment_data["JOBS"][job.section]["SPLITS"] = "auto"
     job.date = None
     mocker.patch("autosubmit.job.job.Job.calendar_split", side_effect=lambda x, y: y)
-    parameters = job.update_job_parameters(as_conf, {})
+    parameters = {}
+    job.update_job_parameters(as_conf, parameters)
     assert job.splits == "50"
     assert parameters["SPLITS"] == "50"
 

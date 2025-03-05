@@ -1355,60 +1355,42 @@ class ParamikoPlatform(Platform):
         else:
             header = self.header.PARALLEL
 
-        header = header.replace('%OUT_LOG_DIRECTIVE%', out_filename)
-        header = header.replace('%ERR_LOG_DIRECTIVE%', err_filename)
-        if job.het.get("HETSIZE",0) <= 1:
-            if hasattr(self.header, 'get_queue_directive'):
-                header = header.replace(
-                    '%QUEUE_DIRECTIVE%', self.header.get_queue_directive(job))
-            if hasattr(self.header, 'get_proccesors_directive'):
-                header = header.replace(
-                    '%NUMPROC_DIRECTIVE%', self.header.get_proccesors_directive(job))
-            if hasattr(self.header, 'get_partition_directive'):
-                header = header.replace(
-                    '%PARTITION_DIRECTIVE%', self.header.get_partition_directive(job))
-            if hasattr(self.header, 'get_tasks_per_node'):
-                header = header.replace(
-                    '%TASKS_PER_NODE_DIRECTIVE%', self.header.get_tasks_per_node(job))
-            if hasattr(self.header, 'get_threads_per_task'):
-                header = header.replace(
-                    '%THREADS_PER_TASK_DIRECTIVE%', self.header.get_threads_per_task(job))
-            if job.x11:
-                header = header.replace(
-                    '%X11%', "SBATCH --x11=batch")
-            else:
-                header = header.replace(
-                    '%X11%', "")
-            if hasattr(self.header, 'get_scratch_free_space'):
-                header = header.replace(
-                    '%SCRATCH_FREE_SPACE_DIRECTIVE%', self.header.get_scratch_free_space(job))
-            if hasattr(self.header, 'get_custom_directives'):
-                header = header.replace(
-                    '%CUSTOM_DIRECTIVES%', self.header.get_custom_directives(job))
-            if hasattr(self.header, 'get_exclusive_directive'):
-                header = header.replace(
-                    '%EXCLUSIVE_DIRECTIVE%', self.header.get_exclusive_directive(job))
-            if hasattr(self.header, 'get_account_directive'):
-                header = header.replace(
-                    '%ACCOUNT_DIRECTIVE%', self.header.get_account_directive(job))
-            if hasattr(self.header, 'get_shape_directive'):
-                header = header.replace(
-                    '%SHAPE_DIRECTIVE%', self.header.get_shape_directive(job))
-            if hasattr(self.header, 'get_nodes_directive'):
-                header = header.replace(
-                    '%NODES_DIRECTIVE%', self.header.get_nodes_directive(job))
-            if hasattr(self.header, 'get_reservation_directive'):
-                header = header.replace(
-                    '%RESERVATION_DIRECTIVE%', self.header.get_reservation_directive(job))
-            if hasattr(self.header, 'get_memory_directive'):
-                header = header.replace(
-                    '%MEMORY_DIRECTIVE%', self.header.get_memory_directive(job))
-            if hasattr(self.header, 'get_memory_per_task_directive'):
-                header = header.replace(
-                    '%MEMORY_PER_TASK_DIRECTIVE%', self.header.get_memory_per_task_directive(job))
-            if hasattr(self.header, 'get_hyperthreading_directive'):
-                header = header.replace(
-                    '%HYPERTHREADING_DIRECTIVE%', self.header.get_hyperthreading_directive(job))
+        replacements = {
+            '%OUT_LOG_DIRECTIVE%': out_filename,
+            '%ERR_LOG_DIRECTIVE%': err_filename,
+        }
+
+        if job.het.get("HETSIZE", 0) <= 1:
+            replacements['%X11%'] = "SBATCH --x11=batch" if job.x11 else ''
+
+            # A dictionary with the job functions, and their placeholders.
+            # For each job function found in ``self.header``, we will call that function passing the ``job``.
+            # The return value is used as a replacement for the defined placeholder.
+            functions_placeholders = {
+                'get_queue_directive': '%QUEUE_DIRECTIVE%',
+                'get_proccesors_directive': '%NUMPROC_DIRECTIVE%',
+                'get_partition_directive': '%PARTITION_DIRECTIVE%',
+                'get_tasks_per_node': '%TASKS_PER_NODE_DIRECTIVE%',
+                'get_threads_per_task': '%THREADS_PER_TASK_DIRECTIVE%',
+                'get_scratch_free_space': '%SCRATCH_FREE_SPACE_DIRECTIVE%',
+                'get_custom_directives': '%CUSTOM_DIRECTIVES%',
+                'get_exclusive_directive': '%EXCLUSIVE_DIRECTIVE%',
+                'get_account_directive': '%ACCOUNT_DIRECTIVE%',
+                'get_shape_directive': '%SHAPE_DIRECTIVE%',
+                'get_nodes_directive': '%NODES_DIRECTIVE%',
+                'get_reservation_directive': '%RESERVATION_DIRECTIVE%',
+                'get_memory_directive': '%MEMORY_DIRECTIVE%',
+                'get_memory_per_task_directive': '%MEMORY_PER_TASK_DIRECTIVE%',
+                'get_hyperthreading_directive': '%HYPERTHREADING_DIRECTIVE%',
+
+            }
+            for fn, placeholder in functions_placeholders.items():
+                if hasattr(self.header, fn):
+                    replacements[placeholder] = getattr(self.header, fn)(job)
+
+            for key, value in replacements.items():
+                header = header.replace(key, value)
+
         return header
 
     def closeConnection(self):

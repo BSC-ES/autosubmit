@@ -17,22 +17,20 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import copy
 import datetime
+import math
 import os
 import pickle
 import re
 import traceback
 from contextlib import suppress
-from shutil import move
-from threading import Thread
-from typing import List, Dict, Tuple, Any
 from pathlib import Path
-
+from shutil import move
+from time import localtime, mktime
 from time import strftime
+from typing import List, Dict, Tuple, Any
 
-import math
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
-from time import localtime, mktime
 
 import autosubmit.database.db_structure as DbStructure
 from autosubmit.helpers.data_transfer import JobRow
@@ -48,26 +46,15 @@ from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import AutosubmitCritical, AutosubmitError, Log
 
 
-
-def threaded(fn):
-    def wrapper(*args, **kwargs):
-        thread = Thread(target=fn, args=args, kwargs=kwargs)
-        thread.name = "data_processing"
-        thread.start()
-        return thread
-
-    return wrapper
-
-
-class JobList(object):
+class JobList:
     """
     Class to manage the list of jobs to be run by autosubmit
 
     """
 
-    def __init__(self, expid, config, parser_factory, job_list_persistence, as_conf):
+    def __init__(self, expid, job_list_persistence, as_conf):
         self._persistence_path = os.path.join(
-            config.LOCAL_ROOT_DIR, expid, "pkl")
+            BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")
         self._update_file = "updated_list_" + expid + ".txt"
         self._failed_file = "failed_job_list_" + expid + ".pkl"
         self._persistence_file = "job_list_" + expid
@@ -75,9 +62,7 @@ class JobList(object):
         self._base_job_list = list()
         self.jobs_edges = {}
         self._expid = expid
-        self._config = config
         self.experiment_data = as_conf.experiment_data
-        self._parser_factory = parser_factory
         self._stat_val = Status()
         self._parameters = []
         self._date_list = []
@@ -2295,17 +2280,15 @@ class JobList(object):
         else:
             return finished
 
-    def get_active(self, platform=None, wrapper=False):
+    def get_active(self, platform=None) -> list[Job]:
         """
         Returns a list of active jobs (In platforms queue + Ready)
 
-        :param wrapper:
         :param platform: job platform
         :type platform: HPCPlatform
         :return: active jobs
         :rtype: list
         """
-
         active = self.get_in_queue(platform) + self.get_ready(
             platform=platform, hold=True) + self.get_ready(platform=platform, hold=False) + self.get_delayed(
             platform=platform)
@@ -2697,13 +2680,11 @@ class JobList(object):
                     return log_recovered
         return None
 
-    def update_list(self, as_conf, store_change=True, fromSetStatus=False, submitter=None, first_time=False):
-        # type: (AutosubmitConfig, bool, bool, object, bool) -> bool
+    def update_list(self, as_conf: AutosubmitConfig, store_change=True, fromSetStatus=False, first_time=False) -> bool:
         """
         Updates job list, resetting failed jobs and changing to READY all WAITING jobs with all parents COMPLETED
 
         :param first_time:
-        :param submitter:
         :param fromSetStatus:
         :param store_change:
         :param as_conf: autosubmit config object
@@ -2869,8 +2850,6 @@ class JobList(object):
                                     break
             if as_conf.get_remote_dependencies() == "true":
                 for job in self.get_prepared():
-                    tmp = [
-                        parent for parent in job.parents if parent.status == Status.COMPLETED]
                     tmp2 = [parent for parent in job.parents if
                             parent.status == Status.COMPLETED or parent.status == Status.SKIPPED or parent.status == Status.FAILED]
                     tmp3 = [parent for parent in job.parents if
@@ -2989,26 +2968,9 @@ class JobList(object):
         # update job list view as transitive_Reduction also fills job._parents and job._children if recreate is set
         self._job_list = [job["job"] for job in self.graph.nodes().values()]
         try:
-            DbStructure.save_structure(self.graph, self.expid, self._config.STRUCTURES_DIR)
+            DbStructure.save_structure(self.graph, self.expid, BasicConfig.STRUCTURES_DIR)
         except Exception as exp:
             Log.warning(str(exp))
-
-    @threaded
-    def check_scripts_threaded(self, as_conf):
-        """
-        When we have created the scripts, all parameters should have been substituted.
-        %PARAMETER% handlers not allowed (thread test)
-
-        :param as_conf: experiment configuration
-        :type as_conf: AutosubmitConfig
-        """
-        as_conf.reload(force_load=True)
-        out = True
-        for job in self._job_list:
-            show_logs = job.check_warnings
-            if not job.check_script(as_conf, self.parameters, show_logs):
-                out = False
-        return out
 
     def save_wrappers(self, packages_to_save, failed_packages, as_conf, packages_persistence, hold=False,
                       inspect=False):
@@ -3141,13 +3103,6 @@ class JobList(object):
                             if not monitor:
                                 parent.status = Status.WAITING
                             Log.debug("Parent: " + parent.name)
-
-    def _get_jobs_parser(self):
-        jobs_parser = self._parser_factory.create_parser()
-        jobs_parser.optionxform = str
-        jobs_parser.load(
-            os.path.join(self._config.LOCAL_ROOT_DIR, self._expid, 'conf', "jobs_" + self._expid + ".yaml"))
-        return jobs_parser
 
     def remove_rerun_only_jobs(self, notransitive=False):
         """

@@ -289,7 +289,7 @@ class Platform(object):
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
 
-    def submit_ready_jobs(self, as_conf, job_list, platforms_to_test, packages_persistence, packages_to_submit,
+    def submit_ready_jobs(self, as_conf, job_list, packages_persistence, packages_to_submit,
                           inspect=False, only_wrappers=False, hold=False):
 
         """
@@ -301,8 +301,6 @@ class Platform(object):
         :type as_conf: AutosubmitConfig object  \n
         :param job_list: job list to check  \n
         :type job_list: JobList object  \n
-        :param platforms_to_test: platforms used  \n
-        :type platforms_to_test: set of Platform Objects, e.g. SgePlatform(), SlurmPlatform().  \n
         :param packages_persistence: Handles database per experiment. \n
         :type packages_persistence: JobPackagePersistence object \n
         :param inspect: True if coming from generate_scripts_andor_wrappers(). \n
@@ -492,7 +490,7 @@ class Platform(object):
             return True
         return self._allow_python_jobs == "true"
 
-    def add_parameters(self, parameters, main_hpc=False):
+    def add_parameters(self, parameters: dict, main_hpc=False) -> None:
         """
         Add parameters for the current platform to the given parameters list
 
@@ -888,17 +886,12 @@ class Platform(object):
         self.log_recovery_process = None
         self.processed_wrapper_logs = set()
 
-    def spawn_log_retrieval_process(self, as_conf: Any) -> None:
+    def spawn_log_retrieval_process(self, disable_recovery_threads=False, as_command='') -> None:
         """
         Spawns a process to recover the logs of the jobs that have been completed on this platform.
-
-        Args:
-            as_conf (AutosubmitConfig): Configuration object for the platform.
         """
-        if not self.log_retrieval_process_active and (
-                as_conf is None or str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS',
-                                                                                     "false")).lower() == "false"):
-            if as_conf and as_conf.misc_data.get("AS_COMMAND", "").lower() == "run":
+        if not self.log_retrieval_process_active and not disable_recovery_threads:
+            if as_command.lower() == "run":
                 self.log_retrieval_process_active = True
 
                 # Adds the keep_alive signal here to be accessible by all the classes
