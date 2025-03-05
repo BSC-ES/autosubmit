@@ -1143,8 +1143,7 @@ class Autosubmit:
 
         Log.info("Removing Structure db...")
         try:
-            if structure_db_path.exists():
-                os.remove(structure_db_path)
+            os.remove(structure_db_path)
         except BaseException as e:
             error_message += f"Cannot delete structure: {e}\n"
 
@@ -1236,7 +1235,7 @@ class Autosubmit:
                             yield key, value
         template_files = [file.name for file in (read_files('autosubmitconfigparser.config')/'files').iterdir() if file.is_file()]
         if parameters is None:
-            parameters = PARAMETERS
+            parameters = {}
         parameter_comments = dict(_recurse_into_parameters(parameters))
 
         for as_conf_file in template_files:
@@ -4543,7 +4542,7 @@ class Autosubmit:
                     rerun = as_conf.get_rerun()
 
                     Log.info("\nCreating the jobs list...")
-                    job_list = JobList(expid, BasicConfig, YAMLParserFactory(),Autosubmit._get_job_list_persistence(expid, as_conf), as_conf)
+                    job_list = JobList(expid, as_conf, YAMLParserFactory(),Autosubmit._get_job_list_persistence(expid, as_conf))
                     date_format = ''
                     if as_conf.get_chunk_size_unit() == 'hour':
                         date_format = 'H'
@@ -5764,8 +5763,8 @@ class Autosubmit:
     @staticmethod
     def load_job_list(expid, as_conf, notransitive=False, monitor=False, new = True): # To be moved to utils
         rerun = as_conf.get_rerun()
-        job_list = JobList(expid, BasicConfig, YAMLParserFactory(),
-                           Autosubmit._get_job_list_persistence(expid, as_conf), as_conf)
+        job_list = JobList(expid, as_conf, YAMLParserFactory(),
+                           Autosubmit._get_job_list_persistence(expid, as_conf))
         run_only_members = as_conf.get_member_list(run_only=True)
         date_list = as_conf.get_date_list()
         date_format = ''

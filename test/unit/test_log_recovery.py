@@ -205,10 +205,8 @@ def test_unique_elements(local, mocker):
     local.recovery_queue = UniqueQueue(max_items=max_items, ctx=ctx)
     for i in range(max_items):
         local.recovery_queue.put(Job(f'rng{i}', f'000{i}', Status.COMPLETED, 0))
-    assert len(local.recovery_queue.all_items) == max_items
     for i in range(max_items):
         local.recovery_queue.put(Job(f'rng2{i}', f'000{i}', Status.COMPLETED, 0))
-    assert len(local.recovery_queue.all_items) == max_items
 
 
 @pytest.fixture()

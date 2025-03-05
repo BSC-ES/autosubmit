@@ -89,7 +89,7 @@ class Platform(object):
         self._name = name  # type: str
         self.config = config
         self.tmp_path = os.path.join(
-            self.config.get("LOCAL_ROOT_DIR"), self.expid, self.config.get("LOCAL_TMP_DIR"))
+            self.config.get("LOCAL_ROOT_DIR", ""), self.expid, self.config.get("LOCAL_TMP_DIR", ""))
         self._serial_platform = None
         self._serial_queue = None
         self._serial_partition = None
@@ -680,8 +680,8 @@ class Platform(object):
         Returns:
             bool: True if the file was removed, False otherwise.
         """
-        if self.delete_file(job.stat_file):
-            Log.debug(f"{job.stat_file} have been removed")
+        if self.delete_file(f"{job.stat_file[:-1]}{job.fail_count}"):
+            Log.debug(f"{job.stat_file[:-1]}{job.fail_count} have been removed")
             return True
         return False
 
@@ -730,7 +730,7 @@ class Platform(object):
     def get_stat_file(self, job, count=-1):
 
         if count == -1:  # No internal retrials
-            filename = job.stat_file
+            filename = job.stat_file + "0"
         else:
             filename = job.name + '_STAT_{0}'.format(str(count))
         stat_local_path = os.path.join(

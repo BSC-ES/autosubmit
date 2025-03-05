@@ -28,7 +28,7 @@ def create_job_and_update_parameters(autosubmit_config, experiment_data, platfor
         platform = SlurmPlatform(expid='test-expid', name='DUMMY_PLATFORM', config=as_conf.experiment_data)
     job.section = 'RANDOM-SECTION'
     job.platform = platform
-    parameters = job.update_parameters(as_conf, as_conf.load_parameters())
+    parameters = job.update_parameters(as_conf, set_attributes=True)
     return job, as_conf, parameters
 
 
@@ -159,32 +159,6 @@ def test_update_parameters_attributes(autosubmit_config, experiment_data, attrib
         assert hasattr(job, attr)
         assert getattr(job, attr) == attributes_to_check[attr]
 
-
-@pytest.mark.parametrize('test_packed', [
-    False,
-    True,
-], ids=["Simple job", "Wrapped job"])
-def test_adjust_loaded_parameters(test_packed):
-    job = Job('dummy', '1', 0, 1)
-    stored_log_path = job._log_path
-    job.wallclock = "00:01"
-    del job.is_wrapper
-    del job.wrapper_name
-    del job._wallclock_in_seconds
-    del job._log_path
-    del job.ready_date
-    job.packed = test_packed
-    job.adjust_loaded_parameters()
-    assert job.ready_date is None
-    assert job.is_wrapper == test_packed
-    assert int(job._wallclock_in_seconds) == int(60*1.3)
-    if test_packed:
-        assert job.wrapper_name == "wrapped"
-    else:
-        assert job.wrapper_name == "dummy"
-    assert job._log_path == stored_log_path
-
-
 @pytest.mark.parametrize('custom_directives, test_type, result_by_lines', [
     ("test_str a", "platform", ["test_str a"]),
     (['test_list', 'test_list2'], "platform", ['test_list', 'test_list2']),
@@ -282,7 +256,7 @@ def test_no_start_time(autosubmit_config, experiment_data):
     del job.start_time
     as_conf.force_load = False
     as_conf.data_changed = False
-    job.update_parameters(as_conf, parameters)
+    job.update_parameters(as_conf, set_attributes=True)
     assert isinstance(job.start_time, datetime)
 
 

@@ -71,9 +71,8 @@ class JobList(object):
 
     """
 
-    def __init__(self, expid, config, parser_factory, job_list_persistence, as_conf):
-        self._persistence_path = os.path.join(
-            config.LOCAL_ROOT_DIR, expid, "pkl")
+    def __init__(self, expid, config, parser_factory, job_list_persistence):
+        self._persistence_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")
         self._update_file = "updated_list_" + expid + ".txt"
         self._failed_file = "failed_job_list_" + expid + ".pkl"
         self._persistence_file = "job_list_" + expid
@@ -1542,10 +1541,7 @@ class JobList(object):
 
             for section in wrapper_jobs:
                 # RUNNING = once, as default. This value comes from jobs_.yml
-                try:
-                    sections_running_type_map[section] = str(self._config.experiment_data["JOBS"][section].get("RUNNING", 'once'))
-                except BaseException as e:
-                    raise AutosubmitCritical("Key {0} doesn't exists.".format(section), 7014, str(e))
+                sections_running_type_map[section] = str(self._config.experiment_data["JOBS"].get(section, {}).get("RUNNING", 'once'))
 
             # Select only relevant jobs, those belonging to the sections defined in the wrapper
 

@@ -43,8 +43,8 @@ def setup_as_conf(autosubmit_config, tmpdir, prepare_basic_config):
 
 @pytest.fixture
 def new_job_list(setup_as_conf, tmpdir, prepare_basic_config):
-    job_list = JobList("random-id", prepare_basic_config, YAMLParserFactory(),
-                       JobListPersistencePkl(), setup_as_conf)
+    job_list = JobList("random-id", setup_as_conf, YAMLParserFactory(),
+                       JobListPersistencePkl())
 
     return job_list
 
