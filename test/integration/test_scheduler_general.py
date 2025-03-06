@@ -15,12 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import pytest
 from pathlib import Path
 from textwrap import dedent
 from typing import Callable
 
 from autosubmit.config.configcommon import AutosubmitConfig
+import pytest
 
 
 def _get_script_files_path() -> Path:
