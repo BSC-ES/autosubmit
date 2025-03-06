@@ -16,6 +16,7 @@ from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from time import time
 
 
 @dataclass
@@ -173,8 +174,7 @@ def autosubmit_config(
 
         for arg, value in kwargs.items():
             setattr(config, arg, value)
-
-        config.current_loaded_files = [conf_dir / 'dummy-so-it-doesnt-force-reload.yml']
+        config.current_loaded_files[str(conf_dir / 'dummy-so-it-doesnt-force-reload.yml')] = time()
         return config
 
     def finalizer() -> None:

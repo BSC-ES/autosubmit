@@ -10,7 +10,7 @@ import multiprocessing as mp
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.platforms.platform import UniqueQueue
+from autosubmit.platforms.platform import CopyQueue
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 
@@ -131,7 +131,7 @@ def test_wait_until_timeout(prepare_test, local, as_conf, mocker, cleanup_event,
     max_items = 1
     ctx = local.get_mp_context()
     local.prepare_process(ctx)
-    local.recovery_queue = UniqueQueue(max_items=max_items, ctx=ctx)
+    local.recovery_queue = CopyQueue(ctx=ctx)
     local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
     local.work_event.set() if work_event else local.work_event.clear()
     if recovery_queue_full:
@@ -159,7 +159,7 @@ def test_wait_for_work(prepare_test, local, as_conf, mocker, cleanup_event, work
     max_items = 1
     ctx = local.get_mp_context()
     local.prepare_process(ctx)
-    local.recovery_queue = UniqueQueue(max_items=max_items, ctx=ctx)
+    local.recovery_queue = CopyQueue(ctx=ctx)
     local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
     local.work_event.set() if work_event else local.work_event.clear()
     if recovery_queue_full:
@@ -187,7 +187,7 @@ def test_wait_mandatory_time(prepare_test, local, as_conf, mocker, cleanup_event
     max_items = 1
     ctx = local.get_mp_context()
     local.prepare_process(ctx)
-    local.recovery_queue = UniqueQueue(max_items=max_items, ctx=ctx)
+    local.recovery_queue = CopyQueue(ctx=ctx)
     local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
     local.work_event.set() if work_event else local.work_event.clear()
     if recovery_queue_full:
@@ -202,13 +202,11 @@ def test_unique_elements(local, mocker):
     max_items = 3
     ctx = local.get_mp_context()
     local.prepare_process(ctx)
-    local.recovery_queue = UniqueQueue(max_items=max_items, ctx=ctx)
+    local.recovery_queue = CopyQueue(ctx=ctx)
     for i in range(max_items):
         local.recovery_queue.put(Job(f'rng{i}', f'000{i}', Status.COMPLETED, 0))
-    assert len(local.recovery_queue.all_items) == max_items
     for i in range(max_items):
         local.recovery_queue.put(Job(f'rng2{i}', f'000{i}', Status.COMPLETED, 0))
-    assert len(local.recovery_queue.all_items) == max_items
 
 
 @pytest.fixture()

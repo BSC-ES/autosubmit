@@ -69,70 +69,6 @@ class DicJobs:
     def job_list(self, job_list):
         self._job_list = {job.name: job for job in job_list}
 
-    def compare_section(self, current_section):
-        """
-        Compare the current section metadata with the last run one to see if it has changed
-        :param current_section: current section
-        :type current_section: str
-        :rtype: bool
-        """
-        self.changes[current_section] = self.as_conf.detailed_deep_diff(
-            self.as_conf.experiment_data["JOBS"].get(current_section, {}),
-            self.as_conf.last_experiment_data.get("JOBS", {}).get(current_section, {}))
-        # Only dependencies is relevant at this step, the rest is lookup by job name and if it inside the stored list
-        if "DEPENDENCIES" not in self.changes[current_section]:
-            del self.changes[current_section]
-
-    def compare_backbone_sections(self):
-        """
-        Compare the backbone sections metadata with the last run one to see if it has changed
-        """
-        self.compare_experiment_section()
-        self.compare_jobs_section()
-        self.compare_config()
-        self.compare_default()
-
-    def compare_experiment_section(self):
-        """
-        Compare the experiment structure metadata with the last run one to see if it has changed
-        :return:
-        """
-        self.changes["EXPERIMENT"] = self.as_conf.detailed_deep_diff(self.experiment_data.get("EXPERIMENT", {}),
-                                                                     self.as_conf.last_experiment_data.get("EXPERIMENT",
-                                                                                                           {}))
-        if not self.changes["EXPERIMENT"]:
-            del self.changes["EXPERIMENT"]
-
-    def compare_default(self):
-        """
-        Compare the default structure metadata with the last run one to see if it has changed
-        :return:
-        """
-        self.changes["DEFAULT"] = self.as_conf.detailed_deep_diff(self.experiment_data.get("DEFAULT", {}),
-                                                                  self.as_conf.last_experiment_data.get("DEFAULT", {}))
-        if "HPCARCH" not in self.changes["DEFAULT"]:
-            del self.changes["DEFAULT"]
-
-    def compare_config(self):
-        """
-        Compare the config structure metadata with the last run one to see if it has changed
-        :return:
-        """
-        self.changes["CONFIG"] = self.as_conf.detailed_deep_diff(self.experiment_data.get("CONFIG", {}),
-                                                                 self.as_conf.last_experiment_data.get("CONFIG", {}))
-        if "VERSION" not in self.changes["CONFIG"]:
-            del self.changes["CONFIG"]
-
-    def compare_jobs_section(self):
-        """
-        Compare the jobs structure metadata with the last run one to see if it has changed
-        :return:
-        """
-        self.changes["JOBS"] = self.as_conf.detailed_deep_diff(self.experiment_data.get("JOBS", {}),
-                                                               self.as_conf.last_experiment_data.get("JOBS", {}))
-        if not self.changes["JOBS"]:
-            del self.changes["JOBS"]
-
     def read_section(self, section, priority, default_job_type):
         """
         Read a section from jobs conf and creates all jobs for it
@@ -144,7 +80,6 @@ class DicJobs:
         :param priority: priority for the jobs
         :type priority: int
         """
-        self.compare_section(section)
         parameters = self.experiment_data["JOBS"]
         splits = parameters[section].get("SPLITS", -1)
         running = str(parameters[section].get('RUNNING', "once")).lower()
