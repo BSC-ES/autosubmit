@@ -22,7 +22,6 @@ import signal
 from pathlib import Path
 from textwrap import dedent
 
-import pytest
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
@@ -67,14 +66,6 @@ def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
 
     assert new_yaml_file.exists()
     assert new_yaml_file.stat().st_size > 0
-
-
-def test_pkl_fix_postgres(monkeypatch, autosubmit):
-    """Test that trying to fix the pkl when using Postgres results in an error."""
-    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
-
-    with pytest.raises(AutosubmitCritical):
-        autosubmit.pkl_fix('a000')
 
 
 def test_database_backup_postgres(monkeypatch, autosubmit, mocker):
@@ -131,7 +122,6 @@ def test_iteration_info(completed, failed, mocker):
     if failed > 0:
         failed_text = "job has" if failed == 1 else "jobs have"
         assert failed_text in mocked_log.info.call_args_list[1][0][0]
-
 
 def test_install_creates_directories(monkeypatch, tmp_path, autosubmit, mocker):
     """install must create the Autosubmit directories (issue #2640)."""

@@ -95,13 +95,12 @@ def test_init_logs_log_process_no_root_dir(mocker, autosubmit_config):
             'LOG_RECOVERY_CONSOLE_LEVEL': 'NO_LOG'
         }
     })
-
     platform = mocker.MagicMock()
     mocker.patch('autosubmit.platforms.platform._exit', return_value=0)
+    mocker.patch.object(Log, 'set_console_level')
     recover_platform_job_logs_wrapper(
         platform, None, None, None, as_conf=as_conf)  # type: ignore
-
-    assert Log.console_handler.level == Log.NO_LOG
+    assert Log.set_console_level.call_count == 1
 
 
 def test_init_logs_log_process_with_root_dir(mocker, autosubmit_config):

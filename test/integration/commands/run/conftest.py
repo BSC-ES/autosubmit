@@ -132,7 +132,7 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, expid, run_type='simple
     }
 
     # Check job_data info
-    with sqlite3.connect(job_data_db) as conn:
+    with (sqlite3.connect(job_data_db) as conn):
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         c.execute("SELECT * FROM job_data ORDER BY job_name, counter")

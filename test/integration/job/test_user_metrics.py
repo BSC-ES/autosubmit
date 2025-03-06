@@ -16,7 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Integration tests for ``autosubmit.job.user_metrics``."""
-
+from sqlalchemy import select
 from typing import TYPE_CHECKING
 
 import pytest
@@ -43,12 +43,13 @@ def test_store_metric(as_db: str, autosubmit_exp, tmp_path: 'LocalPath'):
 
     # Check if the metric is stored in the database
     with user_metric_repository.engine.connect() as conn:
-        result = conn.execute(
-            user_metric_repository.table.select().where(
-                user_metric_repository.table.c.run_id == 1,
-                user_metric_repository.table.c.job_name == "test_job",
-                user_metric_repository.table.c.metric_name == "test_metric",
-            )
-        ).first()
+        with conn.begin():
+            result = conn.execute(
+                select(user_metric_repository.table).where(
+                    user_metric_repository.table.c.run_id == 1,
+                    user_metric_repository.table.c.job_name == "test_job",
+                    user_metric_repository.table.c.metric_name == "test_metric",
+                )
+            ).first()
         assert result is not None
         assert result.metric_value == "test_value"

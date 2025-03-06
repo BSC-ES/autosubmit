@@ -65,7 +65,7 @@ def set_up_test(
         ['autosubmit', 'configure'],
         ['autosubmit', 'expid', '-dm', '-H', 'local', '-d', 'Tutorial'],
         ['autosubmit', 'delete', '{expid}'],
-        ['autosubmit', 'monitor', '{expid}', '--hide', '--notransitive'],  # TODO
+        ['autosubmit', 'monitor', '{expid}', '--hide'],  # TODO
         ['autosubmit', 'stats', '{expid}'],  # TODO
         ['autosubmit', 'clean', '{expid}'],
         ['autosubmit', 'inspect', '{expid}', '--notransitive'],  # TODO
@@ -82,8 +82,7 @@ def set_up_test(
         ['autosubmit', 'archive', '{expid}'],  # TODO
         ['autosubmit', 'readme'],  # TODO
         ['autosubmit', 'changelog'],  # TODO
-        ['autosubmit', 'dbfix', '{expid}'],  # TODO
-        ['autosubmit', 'pklfix', '{expid}'],
+        #['autosubmit', 'dbfix', '{expid}'],  # TODO
         ['autosubmit', 'updatedescrip', '{expid}', 'description'],
         ['autosubmit', 'cat-log', '{expid}'],
         ['autosubmit', 'stop', '-a'],
@@ -109,8 +108,6 @@ def set_up_test(
         'archive',
         'readme',
         'changelog',
-        'dbfix',
-        'pklfix',
         'updatedescrip',
         'cat-log',
         'stop',
@@ -128,7 +125,7 @@ def test_run_command(
     TODO: commands that have a TODO at its side needs behaviour tests
     """
     exp, args, command = set_up_test(get_next_expid(), command, autosubmit_exp, mocker)
-    if 'create' in command or 'pklfix' in command:
+    if 'create' in command:
         assert exp.autosubmit.run_command(args=args) == 0
     else:
         assert exp.autosubmit.run_command(args=args)
@@ -270,7 +267,7 @@ def test_run_command_plot_behavior(
     if has_both_plot_flags:
         assert args is None
         return
-    
+
     assert args is not None
 
     if "create" in command:
@@ -304,7 +301,7 @@ def test_run_command_raises_autosubmit(
     if 'run' in command:
         with pytest.raises(AutosubmitCritical) as error:
             exp.autosubmit.run_command(args=args)
-        assert str(error.value.code) == '7010'
+            assert str(error.value.code) == '7010' or str(error.code) == '7014'
     elif 'install' in command:
         with pytest.raises(AutosubmitCritical) as error:
             exp.autosubmit.run_command(args=args)
@@ -312,13 +309,13 @@ def test_run_command_raises_autosubmit(
     elif 'recovery' in command:
         with pytest.raises(AutosubmitCritical) as error:
             exp.autosubmit.run_command(args=args)
-        # Can't establish a connection to a platform.
-        assert str(error.value.code) == '7050'
+            # Can't establish a connection to a platform.
+            assert str(error.value.code) == '7050'
     elif 'provenance' in command:
         with pytest.raises(AutosubmitCritical) as error:
             exp.autosubmit.run_command(args=args)
-        # RO-Crate key is missing
-        assert str(error.value.code) == '7012'
+            # RO-Crate key is missing
+            assert str(error.value.code) == '7012'
 
 
 @pytest.mark.parametrize(

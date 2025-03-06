@@ -55,7 +55,7 @@ class WrapperFactory(object):
             kwargs['reservation'] = self.reservation(wrapper_data.reservation)
 
         kwargs["executable"] = wrapper_data.executable
-        kwargs["fail_count"] = 0
+        kwargs["fail_count"] = wrapper_data.jobs[0].fail_count
 
         kwargs['header_directive'] = self.header_directives(**kwargs)
         kwargs['working_dir'] = self.platform.remote_log_dir

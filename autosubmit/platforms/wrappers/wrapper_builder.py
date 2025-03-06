@@ -646,8 +646,7 @@ class PythonVerticalHorizontalWrapperBuilder(PythonWrapperBuilder):
         joblist_thread = self.build_joblist_thread()
         nodes_list = self.build_nodes_list()
         # threads_launcher = self.build_parallel_threads_launcher("scripts", "JobListThread", footer=False)
-        threads_launcher = self.build_parallel_threads_launcher_vertical_horizontal("scripts", "JobListThread",
-                                                                                    footer=False)
+        threads_launcher = self.build_parallel_threads_launcher_vertical_horizontal("scripts", "JobListThread", footer=False)
 
         return joblist_thread + nodes_list + threads_launcher
 

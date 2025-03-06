@@ -125,7 +125,7 @@ def create_packages(as_conf, slurm_platform):
         job.platform_name = slurm_platform.name
         job.processors = 2
         job.section = "dummysection"
-        job._init_runtime_parameters()
+        job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
         job.wallclock = "00:01"
     packages = [
         JobPackageSimple(simple_jobs),
@@ -162,3 +162,28 @@ def test_process_ready_jobs_valid_packages_to_submit(mocker, slurm_platform, cre
 
 def test_get_submitted_job_id_x11(slurm_platform):
     assert slurm_platform.get_submitted_job_id("10000\n", x11=True) == 10000
+
+
+@pytest.mark.parametrize("exists", [True, False])
+def test_check_file_exists(mocker, slurm_platform, monkeypatch, tmp_path, exists):
+
+    # mocks to avoid connect to a remote platform (unit test)
+    monkeypatch.setattr(
+        slurm_platform,
+        "get_files_path",
+        lambda: str(tmp_path)
+    )
+
+    slurm_platform._ftpChannel = mocker.MagicMock()
+    slurm_platform._ftpChannel.stat = mocker.MagicMock()
+    if exists:
+        slurm_platform._ftpChannel.stat.return_value = exists
+    else:
+        slurm_platform._ftpChannel.stat.side_effect = FileNotFoundError
+
+    result = slurm_platform.check_file_exists("file.txt", max_retries=2, sleeptime=0)
+    assert result is exists
+
+    # Check that show_logs doesn't affect to the result
+    result = slurm_platform.check_file_exists("file.txt", show_logs=False, max_retries=2, sleeptime=0)
+    assert result is exists

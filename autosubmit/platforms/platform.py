@@ -30,6 +30,8 @@ from typing import Any, Optional, Union, TYPE_CHECKING
 
 import setproctitle
 
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log
@@ -73,19 +75,7 @@ def recover_platform_job_logs_wrapper(
     platform.recovery_queue = recovery_queue
     platform.work_event = worker_event
     platform.cleanup_event = cleanup_event
-    as_conf.experiment_data = {
-        "AS_ENV_PLATFORMS_PATH": as_conf.experiment_data.get("AS_ENV_PLATFORMS_PATH", None),
-        "AS_ENV_SSH_CONFIG_PATH": as_conf.experiment_data.get("AS_ENV_SSH_CONFIG_PATH", None),
-        "AS_ENV_CURRENT_USER": as_conf.experiment_data.get("AS_ENV_CURRENT_USER", None),
-        "ROOTDIR": as_conf.experiment_data.get("ROOTDIR", None),
-        "LOG_RECOVERY_CONSOLE_LEVEL": as_conf.experiment_data.get("CONFIG", {}).get("LOG_RECOVERY_CONSOLE_LEVEL",
-                                                                                    "DEBUG"),
-        "LOG_RECOVERY_FILE_LEVEL": as_conf.experiment_data.get("CONFIG", {}).get("LOG_RECOVERY_FILE_LEVEL",
-                                                                                 "EVERYTHING"),
-        # CPMIP notification needs EXPERIMENT (for CALENDAR) and MAIL (for NOTIFICATIONS, TO)
-        "EXPERIMENT": as_conf.experiment_data.get("EXPERIMENT", {}),
-        "MAIL": as_conf.experiment_data.get("MAIL", {}),
-    }
+    BasicConfig.read()
     _init_logs_log_process(as_conf, platform.name)
     platform.recover_platform_job_logs(as_conf)
     # Exit userspace after manually closing ssh sockets, recommended for child processes,
@@ -124,7 +114,16 @@ class CopyQueue(Queue):
         :param timeout: Timeout for blocking operations. Defaults to None.
         :type timeout: float
         """
-        super().put(job.__getstate__(), block, timeout)
+        job_data: dict = {
+            "id": job.id,
+            "name": job.name,
+            "fail_count": job.fail_count,
+            "submit_time_timestamp": job.submit_time_timestamp,
+            "start_time_timestamp": job.start_time_timestamp,
+            "finish_time_timestamp": job.finish_time_timestamp,
+            "wrapper_type": job.wrapper_type,
+        }
+        super().put(job_data, block, timeout)
 
 
 class Platform:
@@ -709,7 +708,7 @@ class Platform:
         if self.check_file_exists(filename):
             self.delete_file(filename)
 
-    def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3):
+    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3, show_logs: bool = True):
         return True
 
     def get_stat_file(self, job, count=-1):
@@ -791,7 +790,7 @@ class Platform:
         else:
             Log.warning(
                 f"Job {job.name} and retry number:{job.fail_count} has no job id. Autosubmit will no record this retry. This shouldn't happen!")
-            job.updated_log += 1
+        job.updated_log += 1
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """Establishes an SSH connection to the host.
@@ -863,6 +862,9 @@ class Platform:
         self.log_recovery_process = None
         self.work_event = None
         self.processed_wrapper_logs = set()
+
+    def update_as_conf(self, as_conf: 'AutosubmitConfig') -> None:
+        self.config = as_conf.experiment_data
 
     def load_process_info(self, platform):
 
@@ -1009,14 +1011,20 @@ class Platform:
 
         :return: Updated set of jobs pending to process.
         """
+        from autosubmit.job.job import Job
+
         while not self.recovery_queue.empty():
-            from autosubmit.job.job import Job
-            job = Job(loaded_data=self.recovery_queue.get(timeout=5))
-            job.platform_name = self.name  # Change the original platform to this process platform.
+            job_data = self.recovery_queue.get(timeout=1)
+            job = Job(loaded_data=jobs_db_manager.load_job_by_name(job_data["name"]))
+            job.platform_name = self.name
             job.platform = self
+            # Fill cpus etc..
+            job.update_parameters(as_conf, True, False, True)
+            for key in job_data:
+                setattr(job, key, job_data[key])
+            job.update_local_logs()
             report = job.retrieve_logfiles()
             job.send_cpmip_notification(self._as_conf)
-
             if not report.all_succeeded:
                 failed = [a for a in report.attempts if not a.success]
                 Log.warning(
@@ -1029,6 +1037,7 @@ class Platform:
                     f"{self.name}(log_recovery): Job {job.name} recovered "
                     f"{len(report.attempts)} attempt(s)."
                 )
+                jobs_db_manager.save_job_log(job)
 
     def recover_platform_job_logs(self, as_conf: 'AutosubmitConfig') -> None:
         """Recovers the logs of the jobs that have been submitted.
@@ -1037,6 +1046,7 @@ class Platform:
         self._as_conf = as_conf
         setproctitle.setproctitle(f"autosubmit log {self.expid} recovery {self.name.lower()}")
         identifier = f"{self.name.lower()}(log_recovery):"
+        jobs_db_manager = JobsDbManager(schema=self.expid)
         try:
             Log.info(f"{identifier} Starting...")
             self.connected = False

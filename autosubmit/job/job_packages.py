@@ -14,8 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
-
+import copy
 import datetime
 import json
 import locale
@@ -164,6 +163,7 @@ class JobPackageBase(object):
                     Log.warning(
                         f"[section:{job.section}]: Additional file:{additional_file} does not exists, skipping check")
 
+
     def build_scripts(self, configuration: 'AutosubmitConfig') -> None:
         """Submit jobs one by one without using threads.
 
@@ -198,6 +198,9 @@ class JobPackageBase(object):
     def _delete_previous_run_files(self):
         self.platform.delete_previous_run_files_by_job_names([job.name for job in self.jobs if job.fail_count == 0])
         self.platform.delete_previous_stat_files_by_job_names([job.name for job in self.jobs if job.fail_count == 0])
+
+    def _delete_failed_and_completed_files(self):
+        self.platform.delete_failed_and_completed_names([job.name for job in self.jobs])
 
     def _create_scripts(self, configuration: 'AutosubmitConfig'):
         raise Exception('Not implemented')
@@ -460,7 +463,8 @@ class JobPackageThread(JobPackageBase):
                 lang = 'UTF-8'
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
-        open(os.path.join(self._tmp_path, script_file), 'wb').write(script_content.encode(lang))
+        with open(Path(self._tmp_path) / script_file, 'wb') as f:
+            f.write(script_content.encode(lang))
         os.chmod(os.path.join(self._tmp_path, script_file), 0o755)
         return script_file
 
@@ -544,7 +548,8 @@ class JobPackageThreadWrapped(JobPackageThread):
     def _create_common_script(self, filename: str = ""):
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
-        open(os.path.join(self._tmp_path, script_file), 'wb').write(script_content)
+        with open(Path(self._tmp_path) / script_file, 'wb') as f:
+            f.write(script_content)
         os.chmod(os.path.join(self._tmp_path, script_file), 0o755)
         return script_file
 

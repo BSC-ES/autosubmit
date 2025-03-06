@@ -153,4 +153,3 @@ def test_run_command_describe(autosubmit_exp: Callable, autosubmit, mocker):
     output = autosubmit.run_command(args=args)
 
     assert getuser() == output[0]
-    

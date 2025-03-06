@@ -26,7 +26,6 @@ import select
 import socket
 import sys
 import threading
-import time
 from contextlib import suppress
 from io import BufferedReader
 from pathlib import Path
@@ -494,6 +493,14 @@ class ParamikoPlatform(Platform):
         return ""
 
     def send_file(self, filename, check=True) -> bool:
+        """
+        Sends a local file to the platform
+        :param check:
+        :param filename: name of the file to send
+        :type filename: str
+        """
+        local_path = None
+        remote_path = None
         if check:
             self.check_remote_log_dir()
             self.delete_file(filename)
