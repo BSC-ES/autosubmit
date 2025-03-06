@@ -62,8 +62,8 @@ def test_details_properties(autosubmit_exp, mocker):
 def test_details_repository(tmpdir, as_db: str):
     connection_url = get_connection_url(tmpdir / 'details.db')
     with session.create_engine(connection_url=connection_url).connect() as conn:
-        conn.execute(CreateTable(DetailsTable, if_not_exists=True))
-        conn.commit()
+        with conn.begin():
+            conn.execute(CreateTable(DetailsTable, if_not_exists=True))
 
     details_repo = create_experiment_details_repository(as_db)
 

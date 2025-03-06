@@ -2148,6 +2148,273 @@ def test_update_parameters(autosubmit_config, experiment_data):
     assert job.check_warnings is True
 
 
+def test_set_state():
+    state = {
+        '_name': 'test_job',
+        'undefined_variables': [],
+        'file': 'test_job.sh',
+        '_local_logs': ("from_log_process.out.local", "from_log_process.err.local"),
+        '_remote_logs': ("from_log_process.out.remote", "from_log_process.err.remote"),
+        '_local_logs_out': "from_database",
+        '_local_logs_err': "from_database",
+        '_remote_logs_out': "from_database",
+        '_remote_logs_err': "from_database",
+        '_status': "COMPLETED",
+        'status': "COMPLETED",
+        'date': "2023-08-15"
+    }
+
+    job = Job('blank', 1, Status.WAITING, 0)
+    job.__setstate__(state)
+    assert job.name == 'test_job'
+    assert job.file == 'test_job.sh'
+    assert job.status == Status.COMPLETED
+    assert job.date == datetime.strptime("20230815", "%Y%m%d")
+    assert job.local_logs == ("from_database", "from_database")
+    assert job.remote_logs == ("from_database", "from_database")
+
+
+def test_get_state():
+    job = Job('test_job', 1, Status.COMPLETED, 0)
+    job.file = 'test_job.sh'
+    job.date = datetime.strptime("20230815", "%Y%m%d")
+    job.local_logs = ("from_local.out", "from_local.err")
+    job.remote_logs = ("from_remote.out", "from_remote.err")
+
+    state = job.__getstate__()
+    assert state['name'] == 'test_job'
+    assert state.get('file') is None  # Load from yml file, later
+    assert state['status'] == "COMPLETED"
+    assert state['date'] == "2023-08-15T00:00:00"  # ISO format, which will be parsed when loading
+    assert state['local_logs_out'] == "from_local.out"
+    assert state['local_logs_err'] == "from_local.err"
+    assert state['remote_logs_out'] == "from_remote.out"
+    assert state['remote_logs_err'] == "from_remote.err"
+
+
+@pytest.mark.parametrize('loaded_data',
+                         [
+                             None,
+                             True,
+                         ],
+                         ids=["without loaded_data",
+                              "with loaded_data"])
+def test_init(loaded_data):
+    if loaded_data:
+        state = {
+            '_name': 'test_job',
+            'undefined_variables': [],
+            'local_logs': ("from_log_process.out.local", "from_log_process.err.local"),
+            'remote_logs': ("from_log_process.out.remote", "from_log_process.err.remote"),
+            'local_logs_out': "from_database",
+            'local_logs_err': "from_database",
+            'remote_logs_out': "from_database",
+            'remote_logs_err': "from_database",
+            'status': "COMPLETED",
+            'date': "2023-08-15T00:00:00"
+        }
+        job = Job(None, None, None, None, loaded_data=None)
+        job.__init__(None, None, None, None, loaded_data=state)
+        assert job.name == 'test_job'
+        assert job.status == Status.COMPLETED
+        assert job.date == datetime.strptime("20230815", "%Y%m%d")
+        assert job.local_logs == ("from_database", "from_database")
+        assert job.remote_logs == ("from_database", "from_database")
+    else:
+        job = Job(None, None, None, None, loaded_data=None)
+        job.__init__('test_job', 1, Status.COMPLETED, 0, loaded_data=None)
+        assert job.name == 'test_job'
+        assert job.file is None
+        assert job.status == Status.COMPLETED
+        assert job.date is None
+        assert job.local_logs == ('', '')
+        assert job.remote_logs == ('', '')
+
+
+@pytest.fixture()
+def experiment_data() -> dict:
+    return {
+        'AUTOSUBMIT': {'WORKFLOW_COMMIT': 'dummy'},
+        'JOBS': {
+            'test_job': {
+                'RETRIALS': 3,
+                'PLATFORM': 'DUMMY_PLATFORM',
+                'FILE': ['test.sh', 'add.sh', 'add2.sh'],
+                'DELETE_WHEN_EDGELESS': True,
+                'DEPENDENCIES': {"test_split": {}},
+                'RUNNING': "chunk",
+                'EXTENDED_HEADER_PATH': "bla",
+                'EXTENDED_TAILER_PATH': "bla2",
+                'CHECK': False,
+                'CHECK_WARNINGS': True
+            },
+            'test_split': {
+                'RETRIALS': 3,
+                'PLATFORM': 'DUMMY_PLATFORM',
+                'FILE': ['test.sh', 'add.sh', 'add2.sh'],
+                'DELETE_WHEN_EDGELESS': True,
+                'RUNNING': "chunk",
+                'EXTENDED_HEADER_PATH': "bla",
+                'EXTENDED_TAILER_PATH': "bla2",
+                'SPLITS': 2,
+                'CHECK': False,
+                'CHECK_WARNINGS': True
+            },
+        },
+        'WRAPPERS': {
+            'WRAPPER': {
+                'TYPE': 'vertical',
+                'JOBS_IN_WRAPPER': 'TEST_JOB&TEST_SPLIT',
+            }
+        },
+        'PLATFORMS': {
+            'dummy_platform': {
+                'TYPE': 'ps',
+
+            }
+        }
+    }
+
+
+def test_update_dict_parameters(autosubmit_config, experiment_data):
+    job_without_split = Job('test_job', 1, Status.READY, 0)
+    job_with_split = Job('test_split', 1, Status.READY, 0)
+    jobs = [job_without_split, job_with_split]
+    for job in jobs:
+        if job.name == "test_split":
+            job.splits = 2
+        job.section = job.name.upper()
+        job.chunk = 1
+        job.member = "fc00"
+        job.date = datetime.fromisoformat("2023-08-15T00:00:00")
+
+    as_conf = autosubmit_config(_EXPID, experiment_data=experiment_data)
+    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
+    as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
+    for job in jobs:
+        job.update_dict_parameters(as_conf)
+        assert job.retrials == 3
+        assert job.platform_name == "DUMMY_PLATFORM"
+        assert job.delete_when_edgeless is True
+        if job.name == "test_job":
+            assert job.dependencies == "{'TEST_SPLIT': {}}"
+        else:
+            assert job.dependencies == "{}"
+        assert job.running == "chunk"
+        assert job.ext_header_path == "bla"
+        assert job.ext_tailer_path == "bla2"
+        assert job.file == 'test.sh'
+        assert job.additional_files == ['add.sh', 'add2.sh']
+        if job.name == "test_split":
+            assert job.splits == 2
+        else:
+            assert job.splits is None
+
+
+def test_update_check_variables(autosubmit_config, experiment_data):
+    job_without_split = Job('test_job', 1, Status.READY, 0)
+    job_with_split = Job('test_split', 1, Status.READY, 0)
+    jobs = [job_without_split, job_with_split]
+    for job in jobs:
+        if job.name == "test_split":
+            job.splits = 2
+        job.section = job.name.upper()
+        job.chunk = 1
+        job.member = "fc00"
+        job.date = datetime.fromisoformat("2023-08-15T00:00:00")
+
+    as_conf = autosubmit_config(_EXPID, experiment_data=experiment_data)
+    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
+    as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
+    for job in jobs:
+        job.update_check_variables(as_conf)
+        assert job.check is False
+        assert job.check_warnings is True
+
+
+def test_update_job_parameters(autosubmit_config, experiment_data):
+    as_conf = autosubmit_config(_EXPID, experiment_data=experiment_data)
+    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
+    as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
+    job = Job('test_job', 1, Status.READY, 0)
+    job.section = 'TEST_JOB'
+    job.chunk = 1
+    job.member = "fc00"
+    job.date = datetime.fromisoformat("2023-08-15T00:00:00")
+    parameters = {}
+    expected = {'AS_CHECKPOINT': 'as_checkpoint', 'CHUNK': 1, 'CHUNK_END_DATE': '20230816', 'CHUNK_END_DAY': '16',
+                'CHUNK_END_HOUR': '00', 'CHUNK_END_IN_DAYS': '1', 'CHUNK_END_MONTH': '08', 'CHUNK_END_YEAR': '2023',
+                'CHUNK_FIRST': 'TRUE', 'CHUNK_LAST': 'TRUE', 'CHUNK_SECOND_TO_LAST_DATE': '20230815',
+                'CHUNK_SECOND_TO_LAST_DAY': '15', 'CHUNK_SECOND_TO_LAST_HOUR': '00', 'CHUNK_SECOND_TO_LAST_MONTH': '08',
+                'CHUNK_SECOND_TO_LAST_YEAR': '2023', 'CHUNK_START_DATE': '20230815', 'CHUNK_START_DAY': '15',
+                'CHUNK_START_HOUR': '00', 'CHUNK_START_MONTH': '08', 'CHUNK_START_YEAR': '2023',
+                'DAY_BEFORE': '20230814',
+                'DELAY': None, 'DELAY_RETRIALS': None, 'DELETE_WHEN_EDGELESS': True, 'EXPORT': 'none',
+                'FAIL_COUNT': '0',
+                'FREQUENCY': None, 'JOBNAME': 'test_job', 'JOB_DEPENDENCIES': [], 'MEMBER': 'fc00', 'NUMMEMBERS': 0,
+                'PACKED': False, 'PREV': '0', 'PROJECT_TYPE': 'none', 'RETRIALS': 0, 'RUN_DAYS': '1',
+                'SDATE': '20230815',
+                'SHAPE': '', 'SPLIT': None, 'SPLITS': None, 'SYNCHRONIZE': None, 'WORKFLOW_COMMIT': 'dummy',
+                'X11': False}
+    parameters = job.update_job_parameters(as_conf, parameters, True)
+    assert parameters == expected
+
+
+def test_update_parameters(autosubmit_config, experiment_data):
+    job = Job('test_job', 1, Status.READY, 0)
+    job.section = 'TEST_JOB'
+    job.chunk = 1
+    job.member = "fc00"
+    job.date = datetime.fromisoformat("2023-08-15T00:00:00")
+    as_conf = autosubmit_config(_EXPID, experiment_data=experiment_data)
+    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
+    as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
+
+    parameters = job.update_parameters(as_conf, set_attributes=True)
+    expected_current_only = {'CURRENT_ADDITIONAL_FILES': ['add.sh', 'add2.sh'], 'CURRENT_ARCH': 'DUMMY_PLATFORM',
+                             'CURRENT_BUDG': '',
+                             'CURRENT_CHECK': False, 'CURRENT_CHECK_WARNINGS': True,
+                             'CURRENT_DELETE_WHEN_EDGELESS': True,
+                             'CURRENT_DEPENDENCIES': {'TEST_SPLIT': {}}, 'CURRENT_EC_QUEUE': '',
+                             'CURRENT_EXCLUSIVITY': '',
+                             'CURRENT_EXTENDED_HEADER_PATH': 'bla', 'CURRENT_EXTENDED_TAILER_PATH': 'bla2',
+                             'CURRENT_FILE': 'test.sh', 'CURRENT_HOST': '', 'CURRENT_HYPERTHREADING': 'false',
+                             'CURRENT_LOGDIR': 't001/LOG_t001', 'CURRENT_METRIC_FOLDER': 't001/LOG_t001/test_job',
+                             'CURRENT_PLATFORM': 'DUMMY_PLATFORM', 'CURRENT_PROJ': '', 'CURRENT_PROJ_DIR': '',
+                             'CURRENT_QUEUE': '',
+                             'CURRENT_RESERVATION': '', 'CURRENT_RETRIALS': 3, 'CURRENT_ROOTDIR': 't001',
+                             'CURRENT_RUNNING': 'chunk',
+                             'CURRENT_SCRATCH_DIR': '', 'CURRENT_TYPE': 'ps', 'CURRENT_USER': '', 'CURRENT_WRAPPER_TYPE': 'vertical',
+                             'CURRENT_WRAPPER_JOBS_IN_WRAPPER': 'TEST_JOB&TEST_SPLIT'}
+    for key, value in parameters.items():
+        if key.startswith("CURRENT_"):
+            assert value == expected_current_only[key]
+    assert job.retrials == 3
+    assert job.platform_name == "DUMMY_PLATFORM"
+    assert job.delete_when_edgeless is True
+    assert job.dependencies == "{'TEST_SPLIT': {}}"
+    assert job.running == "chunk"
+    assert job.ext_header_path == "bla"
+    assert job.ext_tailer_path == "bla2"
+    assert job.file == 'test.sh'
+    assert job.additional_files == ['add.sh', 'add2.sh']
+    assert job.splits is None
+    assert job.check is False
+    assert job.check_warnings is True
+
+
 def test_process_scheduler_parameters(local):
     job = Job(_EXPID, '1', 'WAITING', 0, None)
     job.het = {}

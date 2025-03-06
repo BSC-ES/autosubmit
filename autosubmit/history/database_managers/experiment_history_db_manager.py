@@ -547,11 +547,11 @@ class SqlAlchemyExperimentHistoryDbManager:
 
     def create_historical_database(self):
         with self.engine.connect() as conn:
-            if BasicConfig.DATABASE_BACKEND != "sqlite":
-                conn.execute(CreateSchema(self.schema, if_not_exists=True))
-            conn.execute(CreateTable(get_table_with_schema(self.schema, ExperimentRunTable), if_not_exists=True))
-            conn.execute(CreateTable(get_table_with_schema(self.schema, JobDataTable), if_not_exists=True))
-            conn.commit()
+            with conn.begin():
+                if BasicConfig.DATABASE_BACKEND != "sqlite":
+                    conn.execute(CreateSchema(self.schema, if_not_exists=True))
+                conn.execute(CreateTable(get_table_with_schema(self.schema, ExperimentRunTable), if_not_exists=True))
+                conn.execute(CreateTable(get_table_with_schema(self.schema, JobDataTable), if_not_exists=True))
             # TODO: implement db migrations?
             # self._set_historical_pragma_version(CURRENT_DB_VERSION)
 
@@ -583,8 +583,8 @@ class SqlAlchemyExperimentHistoryDbManager:
             )
         )
         with self.engine.connect() as conn:
-            conn.execute(query)
-            conn.commit()
+            with conn.begin():
+                conn.execute(query)
         return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
 
     def update_experiment_run_dc_by_id(self, experiment_run_dc):
@@ -607,8 +607,8 @@ class SqlAlchemyExperimentHistoryDbManager:
             )
         )
         with self.engine.connect() as conn:
-            conn.execute(query)
-            conn.commit()
+            with conn.begin():
+                conn.execute(query)
         return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
 
     def _get_experiment_run_with_max_id(self):
@@ -791,8 +791,8 @@ class SqlAlchemyExperimentHistoryDbManager:
             )
         )
         with self.engine.connect() as conn:
-            result = conn.execute(insert_query)
-            conn.commit()
+            with conn.begin():
+                result = conn.execute(insert_query)
         return result.lastrowid
 
     def update_many_job_data_change_status(self, changes):
@@ -803,18 +803,18 @@ class SqlAlchemyExperimentHistoryDbManager:
         """
         job_data_table = get_table_with_schema(self.schema, JobDataTable)
         with self.engine.connect() as conn:
-            for change in changes:
-                query = (
-                    update(job_data_table).
-                    where(job_data_table.c.id == change[3]).  # type: ignore
-                    values(
-                        modified=change[0],
-                        status=change[1],
-                        rowstatus=change[2]
+            with conn.begin():
+                for change in changes:
+                    query = (
+                        update(job_data_table).
+                        where(job_data_table.c.id == change[3]).  # type: ignore
+                        values(
+                            modified=change[0],
+                            status=change[1],
+                            rowstatus=change[2]
+                        )
                     )
-                )
-                conn.execute(query)
-            conn.commit()
+                    conn.execute(query)
 
     def _update_job_data_by_id(self, job_data_dc):
         job_data_table = get_table_with_schema(self.schema, JobDataTable)
@@ -842,8 +842,8 @@ class SqlAlchemyExperimentHistoryDbManager:
             )
         )
         with self.engine.connect() as conn:
-            conn.execute(query)
-            conn.commit()
+            with conn.begin():
+                conn.execute(query)
 
     def get_job_data_by_job_id_name(self, job_id: int, job_name: str) -> JobData:
         """Get the job data by job ID and name."""

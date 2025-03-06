@@ -202,7 +202,10 @@ class Autosubmit:
                                    help='Sets members allowed on this run.')
             subparser.add_argument('-p', '--profile', action='store_true', default=False, required=False,
                                    help='Prints performance parameters of the execution of this command.')
-
+            subparser.add_argument('-t', '--trace', action='store_true', default=False, required=False,
+                                   help='Enables trace output for profiling (requires --profile).')
+            subparser.add_argument('-pm', '--profile_max_iterations', type=int, default=0, required=False,
+                                   help='Optional maximum number of iterations for the profiler (0 = no hard cap).')
             # Expid
             subparser = subparsers.add_parser(
                 'expid', description="Creates a new experiment")
@@ -737,8 +740,10 @@ class Autosubmit:
         if args.command != "configure" and args.command != "install":
             Autosubmit._init_logs(args, args.logconsole, args.logfile, expid)
         if args.command == 'run':
+            if args.trace and not args.profile:
+                raise AutosubmitCritical('Tracing is only available with profiling. Please add -p/--profile flag to run with tracing.', 7012)
             return Autosubmit.run_experiment(args.expid, args.start_time, args.start_after, args.run_only_members,
-                                             args.profile)
+                                             args.profile, args.trace, args.profile_max_iterations)
         elif args.command == 'expid':
             return Autosubmit.expid(args.description, args.HPC, args.copy, args.dummy, args.minimal_configuration,
                                     args.git_repo, args.git_branch, args.git_as_conf, args.operational, args.testcase,
@@ -1848,15 +1853,13 @@ class Autosubmit:
         # Could also load a backup from previous iteration.
         # The submit ready functions will cancel all job submitted if one submitted in that iteration had issues,
         # so it should be safe to recover from a backup without losing job ids
+
         if recover:
             Log.info("Recovering job_list")
         try:
             job_list = Autosubmit.load_job_list(
                 expid, as_conf, new=False, full_load=False, submitter=submitter,
-                check_failed_jobs=True)
-            # New runs, reset failed status to waiting
-            if not recover:
-                job_list.reset_jobs_on_first_run()
+                check_failed_jobs=True, run_mode=False)
 
         except IOError as e:
             raise AutosubmitError(
@@ -1964,8 +1967,30 @@ class Autosubmit:
                 p.work_event.set()
 
     @staticmethod
+    def check_non_wrapped_jobs(platforms_to_test: list[Platform], job_list: JobList, as_conf: AutosubmitConfig, expid: str) -> None:
+        """Check the status of non-wrapped jobs and notify if there are changes.
+        :param platforms_to_test: list of platforms to check
+        :param job_list: JobList object containing the jobs to check
+        :param as_conf: AutosubmitConfig object containing the configuration of the experiment
+        :param expid: experiment id
+        return: None, but updates the status of the jobs in the job_list and notifies if there are changes
+        """
+        for p in platforms_to_test:
+            platform_jobs = [job for job in job_list.get_in_queue(p) if job.id not in job_list.get_wrappers_id_from_db()]
+            if len(platform_jobs) == 0:
+                continue
+            Log.info(f"Checking {len(platform_jobs)} jobs for platform {p.name}")
+
+            if p.check_all_jobs(platform_jobs, as_conf):
+                job_list.save_jobs()
+
+            for job in platform_jobs:
+                if job.prev_status != job.status:
+                    Autosubmit.job_notify(as_conf, expid, job)
+
+    @staticmethod
     def run_experiment(expid: str, start_time: Optional[str] = None, start_after: Optional[str] = None,
-                       run_only_members: Optional[str] = None, profile=False) -> int:
+                       run_only_members: Optional[str] = None, profile: bool = False, trace: bool = False, profile_max_iterations: int = 0) -> int:
         """Runs and experiment (submitting all the jobs properly and repeating its execution in case of failure).
 
         :param expid: the experiment id
@@ -1973,14 +1998,19 @@ class Autosubmit:
         :param start_after: the expid after which the experiment should start
         :param run_only_members: the members to run
         :param profile: if True, the function will be profiled
+        :param trace: if True, the function will be traced
+        :param profile_max_iterations: the maximum number of iterations to run when profiling, 0 means no limit
         :return: exit status
 
         """
         # Start profiling if the flag has been used
         if profile:
             from .profiler.profiler import Profiler
-            profiler = Profiler(expid)
+            profiler = Profiler(expid, trace_enabled=trace, max_checkpoints=profile_max_iterations)
             profiler.start()
+            profiler.iteration_checkpoint(0, 0)
+        else:
+            profiler = None
 
         # Initialize common folders'
         try:
@@ -2011,8 +2041,6 @@ class Autosubmit:
                     Log.warning('Git operational check disabled by user')
 
                 Log.debug("Running main running loop")
-                Log.warning("Known issue: Due to recent changes in Autosubmit's script generation, error line numbers in "
-                            "`script.cmd.err` files may be offset by ~5 lines. Please adjust accordingly when debugging.")
                 #########################
                 # AUTOSUBMIT - MAIN LOOP
                 #########################
@@ -2033,11 +2061,12 @@ class Autosubmit:
                                                                                       3650)  # (72h - 122h )
                 recovery_retrials = 0
                 Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
-                job_list.recover_logs(new_run=True)
                 # Save metadata.
                 as_conf.save()
                 while job_list.continue_run():
                     try:
+                        if profile:
+                            Autosubmit.exit = profiler.iteration_checkpoint(len(job_list.graph.nodes()), len(job_list.graph_dict))
                         if Autosubmit.exit:
                             if len(job_list.get_failed_from_db()) > 0:
                                 return 1
@@ -2065,22 +2094,8 @@ class Autosubmit:
 
                         # Check wrappers status and inner jobs
                         Autosubmit.check_wrappers(as_conf, job_list, expid)
-                        wrappers_id = job_list.get_wrappers_id_from_db()
-
                         # Check non-wrapped jobs
-                        for p in platforms_to_test:
-                            platform_jobs = [job for job in job_list.get_in_queue(p) if job.id not in wrappers_id]
-                            if len(platform_jobs) == 0:
-                                continue
-                            Log.info(f"Checking {len(platform_jobs)} jobs for platform {p.name}")
-
-                            if p.check_all_jobs(platform_jobs, as_conf):
-                                job_list.save_jobs()
-
-                            for job in platform_jobs:
-                                if job.prev_status != job.status:
-                                    Autosubmit.job_notify(as_conf, expid, job)
-
+                        Autosubmit.check_non_wrapped_jobs(platforms_to_test, job_list, as_conf, expid)
                         # Safe spot to store changes
                         try:
                             # Track all jobs change for GUI
@@ -2201,6 +2216,8 @@ class Autosubmit:
                     Log.info("Some jobs have failed and reached maximum retrials")
                 else:
                     Log.result("Run successful")
+                    if profile:
+                        profiler.iteration_checkpoint(len(job_list.graph.nodes()), len(job_list.graph_dict))
                     # Updating finish time for job data header
                     # Database is locked, may be related to my local db todo 4.1.1
                     try:
@@ -4229,7 +4246,7 @@ class Autosubmit:
 
     @staticmethod
     def detail(job_list):
-        current_length = len(job_list.get_job_list())
+        current_length = len(job_list.graph.nodes())
         if current_length > 1000:
             Log.warning(
                 "-d option: Experiment has too many jobs to be printed in the terminal. Maximum job quantity is 1000, your experiment has " + str(
@@ -4346,8 +4363,8 @@ class Autosubmit:
             elif final_status in [Status.QUEUING, Status.RUNNING] and (job.status == Status.SUSPENDED):
                 if job.platform_name and job.platform_name.upper() != "LOCAL":
                     job.platform.send_command("scontrol release " + f"{job.id}", ignore_log=True)
-        if job.status == Status.FAILED and job.status != final_status:
-            job._fail_count = 0
+        # if job.status == Status.FAILED and job.status != final_status:
+        #     job._fail_count = 0
         job.status = final_status
         Log.info("CHANGED: job: " + job.name + " status to: " + final)
         Log.status("CHANGED: job: " + job.name + " status to: " + final)
@@ -4919,8 +4936,6 @@ class Autosubmit:
                 performed_changes = {}
                 Log.info(f"The selected number of jobs to change is: {len(final_list)}")
                 for job in final_list:
-                    if final_status in [Status.WAITING, Status.PREPARED, Status.DELAYED, Status.READY]:
-                        job.fail_count = 0
                     if job.status in [Status.QUEUING, Status.RUNNING,
                                       Status.SUBMITTED] and job.platform.name not in definitive_platforms:
                         Log.printlog(f"JOB: [{job.platform.name}] is ignored as the [{job.name}] platform is currently"
