@@ -24,15 +24,14 @@ from contextlib import suppress
 from pathlib import Path
 from typing import List, Optional, cast
 
-from autosubmit.config.basicconfig import BasicConfig
 from sqlalchemy import delete, select, Connection, insert, text, update, func
 from sqlalchemy.schema import CreateTable
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import tables, session
 from autosubmit.log.log import Log, AutosubmitCritical
 
 Log.get_logger("Autosubmit")
-
 
 CURRENT_DATABASE_VERSION = 1
 TIMEOUT = 15
@@ -95,22 +94,16 @@ def open_conn(check_version=True):
             version = row[0]
         except sqlite3.OperationalError:
             # If this exception is thrown it's because db_version does not exist.
-            # Database is from 2.x or 3.0 beta releases
-            try:
-                cursor.execute('SELECT type FROM experiment;')
-                # If type field exists, it's from 2.x
-                version = -1
-            except sqlite3.Error:
-                # If raises and error , it's from 3.0 beta releases
-                version = 0
+            version = 0
+            Log.warning("Database version table does not exist. Assuming version 0.")
 
         # If database version is not the expected, update database....
-        if version < CURRENT_DATABASE_VERSION:
+        if int(version) < int(CURRENT_DATABASE_VERSION):
             if not _update_database(version, cursor):
                 raise AutosubmitCritical('Database version does not match', 7001)
 
         # ... or ask for autosubmit upgrade
-        elif version > CURRENT_DATABASE_VERSION:
+        elif int(version) > int(CURRENT_DATABASE_VERSION):
             raise AutosubmitCritical('Database version is not compatible with this autosubmit version. '
                                      'Please execute pip install autosubmit --upgrade', 7002)
     return conn, cursor
@@ -158,9 +151,9 @@ def save_experiment(name: str, description: Optional[str], version: Optional[str
 
     try:
         result = queue.get(True, TIMEOUT)
-    except Exception:
-        raise AutosubmitCritical(f"The database process exceeded the timeout limit {TIMEOUT}s. "
-                                 f"Your experiment {name} couldn't be stored in the database.")
+    except BaseException:
+        raise AutosubmitCritical(
+            "The database process exceeded the timeout limit {0}s. Your experiment {1} couldn't be stored in the database.".format(TIMEOUT, name))
     finally:
         proc.terminate()
     return result
@@ -234,7 +227,7 @@ def get_autosubmit_version(expid):
     :type expid: str
     :return: If experiment exists returns the autosubmit version for it, if not returns None
     :rtype: str
-    """    
+    """
     fn = _get_autosubmit_version
     if BasicConfig.DATABASE_BACKEND == 'postgres':
         fn = _get_autosubmit_version_sqlalchemy
@@ -245,9 +238,9 @@ def get_autosubmit_version(expid):
 
     try:
         result = queue.get(True, TIMEOUT)
-    except Exception:
+    except Exception as e:
         raise AutosubmitCritical(f"The database process exceeded the timeout limit {TIMEOUT}s. "
-                                 f"Get experiment {expid} version failed to complete.")
+                                 f"Get experiment {expid} version failed to complete. {str(e)}")
     finally:
         proc.terminate()
     return result
@@ -269,7 +262,6 @@ def last_name_used(test=False, operational=False, evaluation=False):
     fn = _last_name_used
     if BasicConfig.DATABASE_BACKEND == 'postgres':
         fn = _last_name_used_sqlalchemy
-
     queue = multiprocessing.Queue(1)
     proc = multiprocessing.Process(target=fn_wrapper, args=(fn, queue, test, operational, evaluation))
     proc.start()
@@ -296,7 +288,6 @@ def delete_experiment(experiment_id):
     fn = _delete_experiment
     if BasicConfig.DATABASE_BACKEND == 'postgres':
         fn = _delete_experiment_sqlalchemy
-
     queue = multiprocessing.Queue(1)
     proc = multiprocessing.Process(target=fn_wrapper, args=(fn, queue, experiment_id))
     proc.start()
@@ -407,10 +398,8 @@ def _check_experiment_exists(name, error_on_inexistence=True):
 def get_experiment_description(expid: str):
     if BasicConfig.DATABASE_BACKEND == 'postgres':
         return _get_experiment_description_sqlalchemy(expid)
-
-    check_db()
-
     try:
+        check_db()
         (conn, cursor) = open_conn()
     except DbException as e:
         raise AutosubmitCritical(
@@ -487,7 +476,7 @@ def _get_autosubmit_version(expid):
     # behaviour with the next sentence
     conn.text_factory = str
     cursor.execute('SELECT autosubmit_version FROM experiment WHERE name=:expid', {
-                   'expid': expid})
+        'expid': expid})
     row = cursor.fetchone()
     close_conn(conn, cursor)
     if row is None:
@@ -507,7 +496,7 @@ def _last_name_used(test=False, operational=False, evaluation=False):
     :type test: bool
     :return: last experiment identifier used, 'empty' if there is none
     :rtype: str
-    """    
+    """
     check_db()
 
     try:
@@ -741,7 +730,7 @@ def _get_experiment_description_sqlalchemy(expid) -> List[List[str]]:
 
 
 def _update_experiment_description_version_sqlalchemy(
-    name: str, description: Optional[str] = None, version: Optional[str] = None
+        name: str, description: Optional[str] = None, version: Optional[str] = None
 ) -> bool:
     # Conditional update statement
     if description is None and version is None:
@@ -815,7 +804,7 @@ def _last_name_used_sqlalchemy(test=False, operational=False, evaluation=False) 
 
 def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:
     if not _check_experiment_exists_sqlalchemy(
-        experiment_id, False
+            experiment_id, False
     ):  # Reference the no anti-lock version.
         return True
 
@@ -869,3 +858,13 @@ def get_connection_url(db_path: Optional['Path'] = None) -> str:
         raise ValueError('For SQLite databases you MUST provide a database file.')
 
     return f'sqlite:///{str(Path(db_path).resolve())}'
+
+
+def check_db_path(db_path: Optional[Path], must_exists: bool = True) -> bool:
+    """Check if the database path exists."""
+    if db_path and not db_path.exists() and must_exists:
+        raise ValueError(f'Database path not found {str(db_path)}!')
+    elif db_path and not db_path.exists() and not must_exists:
+        return False
+    else:
+        return True

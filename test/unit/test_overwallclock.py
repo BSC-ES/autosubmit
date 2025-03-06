@@ -19,11 +19,9 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from autosubmit.autosubmit import Autosubmit
-from autosubmit.job.job import Job
+from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
@@ -60,8 +58,7 @@ def setup_as_conf(autosubmit_config, tmpdir):
 
 @pytest.fixture
 def new_job_list(setup_as_conf, tmpdir):
-    job_list = JobList("random-id", setup_as_conf, YAMLParserFactory(),
-                       JobListPersistencePkl())
+    job_list = JobList("random-id", setup_as_conf, YAMLParserFactory())
 
     return job_list
 
@@ -117,13 +114,28 @@ def test_check_wrapper_stored_status(setup_as_conf, new_job_list, new_platform_m
     dummy_jobs = [Job("dummy-1", 1, initial_status, 0), Job("dummy-2", 2, initial_status, 0),
                   Job("dummy-3", 3, initial_status, 0)]
     setup_jobs(dummy_jobs, new_platform_mock)
+
+    package = WrapperJob(
+        "dummy_wrapper",
+        dummy_jobs[0].id,
+        initial_status,
+        0,
+        dummy_jobs,
+        "00:01",
+        2,
+        new_platform_mock,
+        setup_as_conf,
+        hold=False
+    )
+
+    new_job_list.job_package_map[package.id] = package
     new_job_list.jobs = dummy_jobs
     if dummy_jobs[0].status != Status.UNKNOWN:
         new_job_list.packages_dict = {"dummy_wrapper": dummy_jobs}
-    new_job_list = Autosubmit.check_wrapper_stored_status(setup_as_conf, new_job_list, "03:30")
-    assert new_job_list is not None
-    if dummy_jobs[0].status != Status.UNKNOWN:
-        assert new_job_list.job_package_map[dummy_jobs[0].id].status == expected_status
+    new_job_list.check_wrapper_stored_status()
+
+    assert package.status == expected_status
+
 
 
 def test_parse_time(new_platform_mock):
@@ -152,6 +164,7 @@ def test_platform_job_is_over_wallclock(setup_as_conf, new_platform_mock, platfo
     job = Job("dummy-1", 1, Status.RUNNING, 0)
     setup_jobs([job], platform_instance)
     job.wallclock = "00:01"
+    platform_instance.get_completed_job_names = mocker.MagicMock(return_value=[])
     job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING)
     assert job_status == Status.RUNNING
     job.start_time = datetime.now() - timedelta(minutes=2)

@@ -123,7 +123,7 @@ class CopyQueue(Queue):
         :param timeout: Timeout for blocking operations. Defaults to None.
         :type timeout: float
         """
-        super().put(job.__getstate__(), block, timeout)
+        super().put(job.__getstate__(log_process=True), block, timeout)
 
 
 class Platform:
@@ -370,8 +370,7 @@ class Platform:
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
 
-    def submit_ready_jobs(self, as_conf: 'AutosubmitConfig', job_list: 'JobList',
-                          packages_persistence: 'JobPackagePersistence', packages_to_submit: list['JobPackageBase'],
+    def submit_ready_jobs(self, as_conf: 'AutosubmitConfig', job_list: 'JobList', packages_to_submit: list['JobPackageBase'],
                           inspect=False, only_wrappers=False, hold=False):
         """Gets READY jobs and send them to the platforms if there is available space on the queues.
 
@@ -381,8 +380,6 @@ class Platform:
         :type as_conf: AutosubmitConfig object
         :param job_list: job list to check
         :type job_list: JobList object
-        :param packages_persistence: Handles database per experiment.
-        :type packages_persistence: JobPackagePersistence object
         :param inspect: True if coming from generate_scripts_andor_wrappers().
         :type inspect: Boolean
         :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw.
@@ -395,7 +392,7 @@ class Platform:
         failed_packages = list()
         error_message = ""
         if not inspect:
-            job_list.save()
+            job_list.save_jobs()
         if not hold:
             Log.debug(f"\nJobs ready for {self.name}: {len(job_list.get_ready(self, hold=hold))}")
         else:
@@ -407,13 +404,7 @@ class Platform:
             try:
                 # If called from inspect command or -cw
                 if only_wrappers or inspect:
-                    if hasattr(package, "name"):
-                        job_list.packages_dict[package.name] = package.jobs
-                        from ..job.job import WrapperJob
-                        wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.READY, 0,
-                                                 package.jobs, package._wallclock, package.platform, as_conf, hold)
-                        job_list.job_package_map[package.jobs[0].id] = wrapper_job
-                        packages_persistence.save(package, inspect)
+                    package.status = Status.COMPLETED
                     for innerJob in package._jobs:
                         any_job_submitted = True
                         # Setting status to COMPLETED, so it does not get stuck in the loop that calls this function
@@ -421,42 +412,44 @@ class Platform:
                         innerJob.updated_log = False
 
                 # If called from RUN or inspect command
-                if not only_wrappers:
-                    try:
-                        package.submit(as_conf, job_list.parameters, inspect, hold=hold)
-                        save = True
-                        if not inspect:
-                            job_list.save()
-                        if package.x11 != "true":
-                            valid_packages_to_submit.append(package)
-                    except (IOError, OSError) as e:
-                        if package.jobs[0].id != 0:
-                            failed_packages.append(package.jobs[0].id)
-                        Log.warning(f'An unexpected error happened while submitting the package: {str(e)}')
-                        continue
-                    except AutosubmitError as e:
-                        if package.jobs[0].id != 0:
-                            failed_packages.append(package.jobs[0].id)
-                        self.connected = False
-                        if e.message.lower().find("bad parameters") != -1 or e.message.lower().find(
-                                "scheduler is not installed") != -1:
-                            error_msg = ""
-                            for package_tmp in valid_packages_to_submit:
-                                for job_tmp in package_tmp.jobs:
-                                    if job_tmp.section not in error_msg:
-                                        error_msg += job_tmp.section + "&"
-                            for job_tmp in package.jobs:
+                try:
+                    package.submit(as_conf, job_list.parameters, inspect or only_wrappers, hold=hold)
+                    save = True
+                    if package.x11 != "true":
+                        valid_packages_to_submit.append(package)
+                except (IOError, OSError):
+                    if package.jobs[0].id != 0:
+                        failed_packages.append(package.jobs[0].id)
+                    continue
+                except AutosubmitError as e:
+                    if package.jobs[0].id != 0:
+                        failed_packages.append(package.jobs[0].id)
+                    self.connected = False
+                    if e.message.lower().find("bad parameters") != -1 or e.message.lower().find(
+                            "scheduler is not installed") != -1:
+                        error_msg = ""
+                        for package_tmp in valid_packages_to_submit:
+                            for job_tmp in package_tmp.jobs:
                                 if job_tmp.section not in error_msg:
                                     error_msg += job_tmp.section + "&"
-                            if e.message.lower().find("bad parameters") != -1:
-                                error_message += f"\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {error_msg[:-1]}"
-                            else:
-                                error_message += f"\ncheck that {self.name} platform has set the correct scheduler. Sections that could be affected: {error_msg[:-1]}"
-                    except AutosubmitCritical:
-                        raise
-                    except Exception:
-                        self.connected = False
-                        raise
+                        for job_tmp in package.jobs:
+                            if job_tmp.section not in error_msg:
+                                error_msg += job_tmp.section + "&"
+                        if e.message.lower().find("bad parameters") != -1:
+                            error_message += f"\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {error_msg[:-1]}"
+                        else:
+                            error_message += f"\ncheck that {self.name} platform has set the correct scheduler. Sections that could be affected: {error_msg[:-1]}"
+
+                except AutosubmitCritical:
+                    raise
+                except Exception:
+                    self.connected = False
+                    raise
+
+            except AutosubmitCritical:
+                raise
+            except AutosubmitError:
+                raise
             except Exception:
                 raise
         if valid_packages_to_submit:
@@ -712,7 +705,7 @@ class Platform:
         if self.check_file_exists(filename):
             self.delete_file(filename)
 
-    def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3):
+    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3, show_logs: bool = True):
         return True
 
     def get_stat_file(self, job, count=-1):
@@ -764,8 +757,15 @@ class Platform:
         raise NotImplementedError  # pragma: no cover
 
     def check_all_jobs(self, job_list: list['Job'], as_conf:'AutosubmitConfig', retries: int = 5):
-        for job, job_prev_status in job_list:
-            self.check_job(job)
+        """Checks jobs running status
+
+        :param job_list: list of jobs
+        :type job_list: list
+        :param as_conf: config
+        :type as_conf: as_conf
+        :param retries: retries
+        :type retries: int
+        """
 
     def check_job(self, job: 'Job', default_status: str = Status.COMPLETED, retries:int = 5,
                   submit_hold_check: bool = False, is_wrapper: bool = False):
@@ -850,6 +850,9 @@ class Platform:
         self.cleanup_event = self.ctx.Event()
         self.log_recovery_process = self.ctx.Process()
         self.processed_wrapper_logs = set()
+
+    def update_as_conf(self, as_conf: 'AutosubmitConfig') -> None:
+        self.config = as_conf.experiment_data
 
     def load_process_info(self, platform):
 
@@ -995,7 +998,10 @@ class Platform:
         while not self.recovery_queue.empty():
             try:
                 from autosubmit.job.job import Job
-                job = Job(loaded_data=self.recovery_queue.get(timeout=1))
+                job = Job(loaded_data=self.recovery_queue.get(timeout=1), log_process=True)
+                if not job.local_logs[0]:
+                    Log.debug(f"{identifier} Job '{job.name}_{job.fail_count}' has no local log file name")
+                    job.update_local_logs(update_submit_time=False)
                 job.platform_name = self.name  # Change the original platform to this process platform.
                 job.platform = self
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
@@ -1020,6 +1026,8 @@ class Platform:
             try:
                 job.retrieve_logfiles(raise_error=True)
                 job._log_recovery_retries += 1
+                Log.result(
+                    f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
             except Exception as e:
                 if job._log_recovery_retries < 5:
                     jobs_pending_to_process.add(job)
@@ -1105,3 +1113,22 @@ class Platform:
         :param job_names: List of job names to check. If None, all jobs will be checked.
         :return: List of completed job names.
         """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_failed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+        """Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
+
+        :param job_names: If provided, filters the results to include only these job names.
+        :type job_names: Optional[List[str]]
+        :return: List of job names with COMPLETED files.
+        :rtype: List[str]
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def delete_failed_and_completed_names(self, job_names: list[str]) -> None:
+        """Deletes the COMPLETED and FAILED files for the given job names from the remote log directory.
+
+        :param job_names: List of job names whose COMPLETED and FAILED files should be deleted
+        :type job_names: List[str]
+        """
+        raise NotImplementedError  # pragma: no cover

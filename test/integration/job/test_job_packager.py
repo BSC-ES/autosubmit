@@ -24,7 +24,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_packager import JobPackager
 
-_EXPID = 't000'
+
 
 
 class CreatePackagerFixture(Protocol):
@@ -42,13 +42,11 @@ def create_packager(autosubmit_exp, autosubmit, local) -> CreatePackagerFixture:
     def _job_packager(experiment_data: Optional[dict], total_jobs: Optional[int] = 20) -> JobPackager:
         local.total_jobs = total_jobs
 
-        exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
+        exp = autosubmit_exp(experiment_data=experiment_data, include_jobs=False)
         as_conf = exp.as_conf
         parameters = as_conf.load_parameters()
 
-        job_list_persistence = autosubmit._get_job_list_persistence(_EXPID, as_conf)
-        job_list = JobList(_EXPID, exp.as_conf, YAMLParserFactory(), job_list_persistence)
-
+        job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory())
         job_list.generate(
             as_conf,
             as_conf.get_date_list(),
@@ -61,8 +59,9 @@ def create_packager(autosubmit_exp, autosubmit, local) -> CreatePackagerFixture:
             as_conf.get_default_job_type(),
             {},
             run_only_members=[],
-            force=False,
-            create=True)
+            full_load=True)
+        for job in job_list.get_job_list():
+            job.update_parameters(as_conf, set_attributes=True)
 
         return JobPackager(exp.as_conf, local, job_list)
 
