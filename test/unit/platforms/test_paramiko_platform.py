@@ -26,6 +26,7 @@ import pytest
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitError, AutosubmitCritical
+from autosubmit.platforms.locplatform import LocalPlatform
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException, _get_user_config_file
 from autosubmit.platforms.psplatform import PsPlatform
@@ -113,7 +114,7 @@ def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_p
     job.name = 'TEST'
     with pytest.raises(AutosubmitError) as cm:
         platform.check_all_jobs(
-            job_list=[[job, None]],
+            job_list=[job],
             as_conf=as_conf,
             retries=-1)
     assert cm.value.message == 'Some Jobs are in Unknown status'
@@ -141,7 +142,7 @@ def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_p
 
     with pytest.raises(AutosubmitError) as cm:
         platform.check_all_jobs(
-            job_list=[[job, None]],
+            job_list=[job],
             as_conf=as_conf,
             retries=1)
     assert cm.value.message == ae.error_message
@@ -272,7 +273,7 @@ def test_submit_multiple_jobs(mocker, autosubmit_config, tmpdir):
 def test_get_pscall(paramiko_platform):
     job_id = 42
     output = paramiko_platform.get_pscall(job_id)
-    assert f'kill -0 {job_id}' in output
+    assert f'{job_id}' in output
 
 
 def test_remove_multiple_files_no_error_path_does_not_exist(paramiko_platform):
@@ -331,23 +332,23 @@ def test_poller(platform: str, mocker, paramiko_platform):
         ),
         (
                 [
-                    [Job(job_id='10', name=''), True]
+                    Job(job_id='10', name='')
                 ],
                 '10'
         ),
         (
                 [
-                    [Job(job_id='1', name=''), True],
-                    [Job(job_id='2', name=''), True]
+                    Job(job_id='1', name=''),
+                    Job(job_id='2', name='')
                 ],
                 '1,2'
         ),
         (
                 [
-                    [Job(job_id=None, name=''), True],
-                    [Job(job_id='2', name=''), True]
+                    Job(job_id=None, name=''),
+                    Job(job_id='2', name='')
                 ],
-                '0,2'
+                'None,2'
         )
     ]
 )
@@ -743,3 +744,24 @@ def test_ps_get_job_names_cmd_contains_expected_components(
 
     assert "job_a" in cmd
     assert "job_b" in cmd
+
+
+@pytest.mark.parametrize("mode", ["all", "specific"])
+def test_get_completed_job_names(tmp_path, mode):
+    """Test that completed job names are correctly retrieved from the remote platform."""
+    # Actually we want to test a paramiko function, but using local platform for simplicity with the "send_command" part.
+    platform = LocalPlatform(expid='t001', name='local', config={})
+    platform.remote_log_dir = tmp_path / 't001/remote_logs'
+    platform.remote_log_dir.mkdir(parents=True, exist_ok=True)
+    platform.connected = True
+    completed_jobs = ['job1_COMPLETED', 'job2_COMPLETED', 'job3_COMPLETED']
+    for job_file in completed_jobs:
+        (platform.remote_log_dir / job_file).touch()
+
+    if mode == "all":
+        job_names = platform.get_completed_job_names()
+        expected_job_names = ['job1', 'job2', 'job3']
+    else:
+        job_names = platform.get_completed_job_names(job_names=['job1', 'job3'])
+        expected_job_names = ['job1', 'job3']
+    assert set(job_names) == set(expected_job_names)

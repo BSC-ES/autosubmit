@@ -18,6 +18,7 @@
 
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Union
 
 LOCAL_TZ = datetime.now(timezone.utc).astimezone().tzinfo
@@ -61,6 +62,20 @@ def create_file_with_full_permissions(path: str) -> None:
     """ creates a database files with full permissions """
     os.umask(0)
     os.open(path, os.O_WRONLY | os.O_CREAT, 0o777)
+
+
+def create_path_if_not_exists(path: str) -> bool:
+    """Create the directory if it does not exist.
+
+    :param path: Directory path to ensure.
+    :return: ``True`` when the directory is created, ``False`` if it already exists.
+    :raises OSError: If the directory cannot be created.
+    """
+    directory = Path(path)
+    if directory.exists():
+        return False
+    directory.mkdir(parents=True, exist_ok=True)
+    return True
 
 
 class SupportedStatus:
