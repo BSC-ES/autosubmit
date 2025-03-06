@@ -49,6 +49,7 @@ def test_configure(mocker, tmp_path, suffix: str, autosubmit) -> None:
 
     expected = dedent(f"""\
         [database]
+        backend = sqlite
         path = {str(tmp_path)}/database
         filename = autosubmit.db
         

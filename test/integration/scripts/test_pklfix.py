@@ -18,22 +18,21 @@
 """Test for the autosubmit pklfix command"""
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
-from pytest_mock import MockerFixture
 
 from autosubmit.scripts.autosubmit import main
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 _EXPID = "t111"
 
 
 @pytest.mark.parametrize("force", [True, False])
-def test_pklfix_bypass_prompt_confirmation(
-    autosubmit_exp, mocker: MockerFixture, force: bool
-):
-    """
-    Test if the --force option bypasses the prompt confirmation
-    """
+def test_pklfix_bypass_prompt_confirmation(autosubmit_exp, mocker: 'MockerFixture', force: bool):
+    """Test if the --force option bypasses the prompt confirmation."""
     exp = autosubmit_exp(_EXPID, experiment_data={})
 
     as_conf = exp.as_conf
@@ -53,11 +52,9 @@ def test_pklfix_bypass_prompt_confirmation(
     passed_args = ["autosubmit", "pklfix"] + (["-f"] if force else []) + [_EXPID]
     mocker.patch("sys.argv", passed_args)
 
-    mock_user_yes_no_query = mocker.patch(
-        "autosubmit.autosubmit.Autosubmit._user_yes_no_query"
-    )
+    mock_user_yes_no_query = mocker.patch("autosubmit.autosubmit.Autosubmit._user_yes_no_query")
     mock_user_yes_no_query.return_value = False
 
-    assert main() is None
+    assert main() == 0
 
     assert mock_user_yes_no_query.call_count == (0 if force else 1)

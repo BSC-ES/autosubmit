@@ -17,9 +17,8 @@
 
 import os
 import pwd
-from pathlib import Path
-
 import pytest
+from pathlib import Path
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig

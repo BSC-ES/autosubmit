@@ -23,9 +23,9 @@ import pytest
 
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from test.conftest import AutosubmitExperimentFixture
 
 if TYPE_CHECKING:
+    from test.integration.conftest import AutosubmitExperimentFixture
     from testcontainers.core.container import DockerContainer
 
 _EXPID = 't001'
@@ -122,7 +122,7 @@ def test_create_platform_slurm(autosubmit_exp):
     'Simple Workflow',
     'Dependency Workflow',
 ])
-def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, experiment_data: dict,
+def test_run_simple_workflow_slurm(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict,
                                    slurm_server: 'DockerContainer'):
     """Runs a simple Bash script using Slurm."""
     exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
@@ -132,7 +132,6 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 
-@pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     # Vertical Wrapper Workflow
     {
@@ -371,7 +370,9 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
     'Wrapper Horizontal-vertical',
     'Wrapper Vertical-horizontal',
 ])
-def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: AutosubmitExperimentFixture,
+@pytest.mark.docker
+@pytest.mark.slurm
+def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 'AutosubmitExperimentFixture',
                                          slurm_server: 'DockerContainer'):
     """Runs a simple Bash script using Slurm."""
     exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, wrapper=True)
@@ -393,7 +394,6 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 
-@pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     {
         'JOBS': {
@@ -465,10 +465,10 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
                     },
                     'COMPILE_DA': {},
                     'DA': {
-                        'DATES_FROM':{
+                        'DATES_FROM': {
                             '20120201': {
-                                'CHUNKS_FROM':{
-                                    '1':{
+                                'CHUNKS_FROM': {
+                                    '1': {
                                         'DATES_TO': '20120101',
                                     },
                                 },
@@ -582,10 +582,10 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
                     },
                     'COMPILE_DA': {},
                     'DA': {
-                        'DATES_FROM':{
+                        'DATES_FROM': {
                             '20120201': {
-                                'CHUNKS_FROM':{
-                                    '1':{
+                                'CHUNKS_FROM': {
+                                    '1': {
                                         'DATES_TO': '20120101',
                                         'CHUNKS_TO': '1',
                                     },
@@ -630,6 +630,8 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
     'Complex Wrapper vertical-horizontal',
     'Complex Wrapper horizontal-vertical',
 ])
+@pytest.mark.docker
+@pytest.mark.slurm
 def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubmit_exp: 'AutosubmitExperimentFixture',
                                                  slurm_server: 'DockerContainer'):
     """Runs a simple Bash script using Slurm."""

@@ -33,7 +33,7 @@ jobs:
   #       run: |
   #         ruff check .
 
-  test:
+  test-unit:
     # needs: lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -50,9 +50,11 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          # See: https://github.com/actions/setup-python#caching-packages-dependencies
+          cache: 'pip' # caching pip dependencies
 
       - name: Install system dependencies
-        run: sudo apt-get install -y graphviz rsync curl
+        run: sudo apt-get install -y curl graphviz rsync
 
       - name: Install dependencies
         run: |
@@ -64,7 +66,8 @@ jobs:
           pytest \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
-            test/unit
+            --dist load \
+            test/unit -m "not postgres"
 
       - name: Coverage report
         run: |
@@ -85,6 +88,16 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
+        pytest-markers: ["not postgres and not slurm"]
+        # Here we include an extra build with the lowest version of Python and Postgres.
+        # We do it this way to avoid wasting CICD resources since we already tested the
+        # code with SQLite. So we run just one build with Postgres (normally newer versions
+        # of Python may succeed while older fail -- e.g. using newer features in a code that
+        # must support older versions).
+        # https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/running-variations-of-jobs-in-a-workflow#example-adding-configurations
+        include:
+          - python-version: '3.9'
+            pytest-markers: 'postgres and not slurm'
 
     steps:
       - name: Checkout code
@@ -94,6 +107,8 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          # See: https://github.com/actions/setup-python#caching-packages-dependencies
+          cache: 'pip' # caching pip dependencies
 
       - name: Install system dependencies
         run: sudo apt-get install -y curl git graphviz rsync
@@ -119,8 +134,9 @@ jobs:
           pytest \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
+            --dist load \
             test/integration \
-            -m 'not slurm'
+            -m "${{ matrix.pytest-markers }}"
 
       - name: Coverage report
         run: |
@@ -130,7 +146,7 @@ jobs:
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coverage_integration_py-${{ matrix.python-version }}
+          name: coverage_integration_py-${{ matrix.python-version }}-${{ matrix.pytest-markers }}
           path: coverage.xml
           retention-days: 7
 
@@ -307,7 +323,7 @@ jobs:
           cffconvert --validate -i CITATION.cff
 
   coverage:
-    needs: [test, test-integration, test-regression, test-slurm, test-docs]
+    needs: [test-unit, test-integration, test-regression, test-slurm, test-docs]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

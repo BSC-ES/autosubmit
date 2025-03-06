@@ -17,20 +17,16 @@
 
 """Tests for ``AutosubmitGit``."""
 
-from contextlib import nullcontext as does_not_raise
 from pathlib import Path
 from textwrap import dedent
-from typing import TYPE_CHECKING
 
 import pytest
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
-from test.conftest import AutosubmitConfigFactory
+from autosubmit.log.log import AutosubmitCritical
+from test.unit.conftest import AutosubmitConfigFactory
 
-if TYPE_CHECKING:
-    from test.conftest import AutosubmitExperimentFixture
-    from contextlib import AbstractContextManager
 
 def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
     """function to test copy_as_config from autosubmit.py
@@ -69,39 +65,17 @@ def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
     assert new_yaml_file.stat().st_size > 0
 
 
-@pytest.mark.parametrize('experiment_data,context_mgr', [
-    ({
-         'JOBS': {
-             'DQC': {
-                 'FOR': {
-                     'NAME': [
-                         'BASIC',
-                         'FULL',
-                     ],
-                     'WALLCLOCK': "00:40",
-                 },
-             },
-         },
-     }, pytest.raises(IndexError)),
-    ({
-         'JOBS': {
-             'DQC': {
-                 'FOR': {
-                     'NAME': [
-                         'BASIC',
-                         'FULL',
-                     ],
-                 },
-                 'WALLCLOCK': "00:40",
-             },
-         },
-     }, does_not_raise()),
-], ids=[
-    'Missing WALLCLOCK in FOR',
-    'Correct FOR',
-])
-def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict, context_mgr: 'AbstractContextManager'):
-    exp = autosubmit_exp('t000', experiment_data, reload=False, create=False)
-    as_conf = exp.as_conf
-    with context_mgr:
-        as_conf.reload(force_load=True)
+def test_pkl_fix_postgres(monkeypatch, autosubmit):
+    """Test that trying to fix the pkl when using Postgres results in an error."""
+    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
+
+    with pytest.raises(AutosubmitCritical):
+        autosubmit.pkl_fix('a000')
+
+
+def test_database_backup_postgres(monkeypatch, autosubmit, mocker):
+    """Test that trying to back up a Postgres DB results in just a log message of WIP."""
+    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
+    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
+    autosubmit.database_backup('a000')
+    assert mocked_log.debug.called

@@ -1,5 +1,12 @@
 ### 4.1.16: Unreleased
 
+This release adds support to Postgres using SQLAlchemy, without removing the
+SQLite support. By default, Autosubmit will use SQLite. Postgres support is
+experimental and not recommended for production yet.
+
+Autosubmit Config Parser code has been merged back into this code base. LOCAL
+platform does not support wrappers anymore (it was used for testing).
+
 **Bug fixes:**
 
 - Fixed issue with the verification of dirty Git local repositories in operational experiments #2446
@@ -20,6 +27,7 @@
   automatically answer yes to prompts #2569
 - Improvement of error message when `LOCAL` project location is a file, not a directory #1972 #1254
 - Removed the code for wrappers with local platform that were create only for tests #2522
+- Added SQLAlchemy as the main database entrypoint, enabling backends of Sqlite (default) and Postgres (new) #2187
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 
@@ -49,7 +57,7 @@ the filter the jobs. Not using any value for `-fp` still returns all jobs.
 - EDITO Autosubmit-Demo container updated to install API in different environment #2398
 - Update portalocker requirement from <=3.1.1 to <=3.2.0 #2423
 - Additional files are now generated upon using the `autosubmit inspect` command #2323
-- Operational runs now require no pending commits, ensuring a cleaner workflow. [#2220](https://github.com/BSC-ES/autosubmit/issues/2220), [PR](https://github.com/BSC-ES/autosubmit/pull/2293)
+- Operational runs now require no pending commits, ensuring a cleaner workflow. [#2220](https://github.com/BSC-ES/autosubmit/issues/2220), [PR](https://github.com/BSC-ES/autosubmit/pull/2293) 
 
 ### 4.1.14: Bug fixes, enhancements, and new features
 

@@ -27,7 +27,7 @@ from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 
 if TYPE_CHECKING:
-    from test.conftest import AutosubmitConfigFactory
+    from test.unit.conftest import AutosubmitConfigFactory
 
 
 def test_get_submodules_list_default_empty_list(autosubmit_config: 'AutosubmitConfigFactory'):

@@ -18,15 +18,17 @@
 import copy
 import json
 import locale
-import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+from sqlalchemy.schema import CreateTable, CreateSchema
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.database import session, tables
 from autosubmit.log.log import Log
 
 if TYPE_CHECKING:
@@ -45,10 +47,10 @@ class MetricSpecSelectorType(Enum):
 @dataclass
 class MetricSpecSelector:
     type: MetricSpecSelectorType
-    key: Optional[List[str]]
+    key: Optional[list[str]]
 
     @staticmethod
-    def load(data: Optional[Dict[str, Any]]) -> "MetricSpecSelector":
+    def load(data: Optional[dict[str, Any]]) -> "MetricSpecSelector":
         if data is None:
             _type = MetricSpecSelectorType.TEXT
             return MetricSpecSelector(type=_type, key=None)
@@ -89,7 +91,7 @@ class MetricSpec:
     max_read_size_mb: int = MAX_FILE_SIZE_MB
 
     @staticmethod
-    def load(data: Dict[str, Any]) -> "MetricSpec":
+    def load(data: dict[str, Any]) -> "MetricSpec":
         if not isinstance(data, dict):
             raise ValueError("Invalid metric spec")
 
@@ -114,24 +116,29 @@ class MetricSpec:
 
 class UserMetricRepository:
     def __init__(self, expid: str):
-        exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
-        tmp_path = Path(exp_path).joinpath(BasicConfig.LOCAL_TMP_DIR)
-        self.db_path = tmp_path.joinpath(f"metrics_{expid}.db")
+        self.expid = expid
 
-        with sqlite3.connect(self.db_path) as conn:
-            # Create the metrics table if it does not exist
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS user_metrics (
-                    user_metric_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    run_id INTEGER,
-                    job_name TEXT,
-                    metric_name TEXT,
-                    metric_value TEXT,
-                    modified TEXT
-                );
-                """
-            )
+        if BasicConfig.DATABASE_BACKEND == "postgres":
+            # Postgres backend
+            self.connection_url = BasicConfig.DATABASE_CONN_URL
+            self.schema = self.expid
+        else:
+            # SQLite backend
+            exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
+            tmp_path = Path(exp_path).joinpath(BasicConfig.LOCAL_TMP_DIR)
+            db_path = tmp_path.joinpath(f"metrics_{expid}.db")
+            self.connection_url = f"sqlite:///{db_path}"
+            self.schema = None
+
+        self.table = tables.get_table_from_name(
+            schema=self.schema, table_name="user_metrics"
+        )
+        self.engine = session.create_engine(self.connection_url)
+
+        with self.engine.connect() as conn:
+            if self.schema:
+                conn.execute(CreateSchema(self.schema, if_not_exists=True))
+            conn.execute(CreateTable(self.table, if_not_exists=True))
             conn.commit()
 
     def store_metric(
@@ -140,26 +147,27 @@ class UserMetricRepository:
         """
         Store the metric value in the database. Will overwrite the value if it already exists.
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with self.engine.connect() as conn:
+            # Delete the existing metric
             conn.execute(
-                """
-                DELETE FROM user_metrics
-                WHERE run_id = ? AND job_name = ? AND metric_name = ?;
-                """,
-                (run_id, job_name, metric_name),
+                self.table.delete().where(
+                    self.table.c.run_id == run_id,
+                    self.table.c.job_name == job_name,
+                    self.table.c.metric_name == metric_name,
+                )
             )
+
+            # Insert the new metric
             conn.execute(
-                """
-                INSERT INTO user_metrics (run_id, job_name, metric_name, metric_value, modified)
-                VALUES (?, ?, ?, ?, ?);
-                """,
-                (
-                    run_id,
-                    job_name,
-                    metric_name,
-                    str(metric_value),
-                    datetime.now(tz=timezone.utc).isoformat(timespec="seconds"),
-                ),
+                self.table.insert().values(
+                    run_id=run_id,
+                    job_name=job_name,
+                    metric_name=metric_name,
+                    metric_value=str(metric_value),
+                    modified=datetime.now(tz=timezone.utc).isoformat(
+                        timespec="seconds"
+                    ),
+                )
             )
             conn.commit()
 
@@ -174,21 +182,22 @@ class UserMetricProcessor:
         self.user_metric_repository = UserMetricRepository(job.expid)
         self._processed_metrics = {}
 
-    def read_metrics_specs(self) -> List[MetricSpec]:
+    def read_metrics_specs(self) -> list[MetricSpec]:
         try:
-            raw_metrics: List[Dict[str, Any]] = self.as_conf.get_section(
+            # TODO: Remove ignored type once AS config parser has been moved back and types have been added there.
+            raw_metrics = self.as_conf.get_section(  # type: ignore
                 ["JOBS", self.job.section, "METRICS"]
             )
 
             # Normalize the parameters keys
-            raw_metrics = [
+            raw_metrics: list[dict[str, Any]] = [
                 self.as_conf.deep_normalize(metric) for metric in raw_metrics
             ]
         except Exception as exc:
             Log.printlog("Invalid or missing metrics section", code=6019)
             raise ValueError(f"Invalid or missing metrics section: {str(exc)}")
 
-        metrics_specs: List[MetricSpec] = []
+        metrics_specs: list[MetricSpec] = []
         for raw_metric in raw_metrics:
             """
             Read the metrics specs of the job
@@ -196,8 +205,8 @@ class UserMetricProcessor:
             try:
                 spec = MetricSpec.load(raw_metric)
                 metrics_specs.append(spec)
-            except Exception:
-                Log.printlog(f"Invalid metric spec: {str(raw_metric)}", code=6019)
+            except Exception as e:
+                Log.printlog(f"Invalid metric spec: {str(raw_metric)}: {str(e)}", code=6019)
 
         return metrics_specs
 
@@ -260,14 +269,14 @@ class UserMetricProcessor:
                         for k in key:
                             value = value[k]
                     self.store_metric(metric_spec.name, value)
-                except Exception:
+                except Exception as e:
                     Log.printlog(
-                        f"Error processing JSON content in file {spec_path}", code=6018
+                        f"Error processing JSON content in file {spec_path}: {str(e)}", code=6018
                     )
             else:
                 Log.printlog(
-                    f"Invalid Metric Spec: Unsupported selector type {metric_spec.selector.type} for metric {metric_spec.name}",
-                    code=6019,
+                    f"Invalid Metric Spec: Unsupported selector type {metric_spec.selector.type} "
+                    f"for metric {metric_spec.name}", code=6019,
                 )
 
         return self._processed_metrics

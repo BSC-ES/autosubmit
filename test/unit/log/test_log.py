@@ -303,19 +303,19 @@ def test_set_file(_type, handler_added, tmp_path, mocker):
     assert mocked_log.addHandler.called == handler_added
 
 
-def test_set_file_more_than_10_files(tmp_path, mocker):
-    tmp_file = tmp_path / 'test.tmp'
+def test_set_file_more_than_10_files(test_tmp_path: Path, mocker):
+    tmp_file = test_tmp_path / 'test.tmp'
 
     # TODO: This is strange too, you want to set the file, but first you must have an
     #       existing log file, with the same name, but with the date. (What about the
     #       first ever call? Chicken or egg case?)".
     for i in range(0, 20):
-        tmp_file_with_date = tmp_path / f'{i}_test.tmp'
+        tmp_file_with_date = test_tmp_path / f'{i}_test.tmp'
         tmp_file_with_date.touch()
 
-    assert len(list(tmp_path.iterdir())) == 20
-    assert Path(tmp_path / '0_test.tmp').exists()
-    assert not Path(tmp_path / '100_test.tmp').exists()
+    assert len(list(test_tmp_path.iterdir())) == 20
+    assert Path(test_tmp_path / '0_test.tmp').exists()
+    assert not Path(test_tmp_path / '100_test.tmp').exists()
 
     mocked_log = mocker.patch('autosubmit.log.log.Log.log')
     mocker.patch('autosubmit.log.log.Log.date', '100_')
@@ -326,6 +326,6 @@ def test_set_file_more_than_10_files(tmp_path, mocker):
     # Here we confirm the number of log files remains the same (because it's more than 10),
     # and that the new log file has been created, and the first in the sorted by name list
     # has been deleted.
-    assert len(list(tmp_path.iterdir())) == 20
-    assert not Path(tmp_path / '0_test.tmp').exists()
-    assert Path(tmp_path / '100_test.tmp').exists()
+    assert len(list(test_tmp_path.iterdir())) == 20
+    assert not Path(test_tmp_path / '0_test.tmp').exists()
+    assert Path(test_tmp_path / '100_test.tmp').exists()
