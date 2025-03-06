@@ -18,10 +18,9 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """ Test file for autosubmit/monitor/diagram.py """
-import tempfile
 import datetime
-from pathlib import Path
 
+from test.unit.test_statistics import jobs
 import pytest
 from mock.mock import patch
 
@@ -48,27 +47,21 @@ def test_job_agg_data():
     assert job_agg.number_of_columns() == 6
 
 
-@patch('autosubmit.monitor.diagram._aggregate_jobs_by_section')
-@patch('autosubmit.monitor.diagram._create_table')
-@patch('autosubmit.monitor.diagram._create_csv')
-def test_create_stats_report(jobs_by_association, create_table, create_csv):
+def test_create_stats_report(jobs, tmp_path):
     """ function to test the function create_stats_report inside autosubmit/monitor/diagram.py """
+
     expid = "a000"
-    jobs_data = [
-        Job('test', "a29z", "COMPLETED", 200),
-        Job('test', "a28z", "COMPLETED", 200),
-        Job('test', "a27z", "COMPLETED", 200),
-        Job('test', "a26z", "FAILED", 10)
-    ]
+    period_ini = datetime.datetime.now()
+    period_fi = period_ini+ datetime.timedelta(10)
+    tmp_path_pdf = tmp_path / "report.pdf"
+    tmp_path_csv = tmp_path / "report.csv"
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        if Path(temp_dir).exists() is False:
-            Path(temp_dir).mkdir(parents=True, mode=0o777)
-
-    jobs_by_association.return_value = [JobData(),JobAggData()]
-    create_status = diagram.create_stats_report(expid, jobs_data, {}, temp_dir,True,True,False,None,
-                                                None,None)
-    assert create_status is False
+    with patch('autosubmit.monitor.diagram._create_table'):
+        diagram.create_stats_report(expid, jobs, [], str(tmp_path_pdf),True,True,
+        False,period_ini, period_fi, {'test':1, 'test1':5, 'test2':50, 'test3':500, 'test4':5000})
+        assert tmp_path.exists()
+        assert tmp_path_pdf.exists()
+        assert tmp_path_csv.exists()
 
 
 def test_create_csv_stats(tmpdir):
