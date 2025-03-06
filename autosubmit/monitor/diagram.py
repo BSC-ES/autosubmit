@@ -356,9 +356,21 @@ def create_csv_stats(exp_stats: Statistics, jobs_list: List[Job],
                 job_names[i], start_times[i], end_times[i], queuing_times[i], running_times[i]))
 
 
-def build_legends(plot, rects, experiment_stats, general_stats):
-    # type: (plt.figure, List[plt.bar], Statistics, List[str]) -> None
+def build_legends(plot: Any, rects: list[list[str]], experiment_stats: Statistics,
+                  general_stats: list[tuple[str, str]]) -> int:
+    """build_legends Function
 
+    :param plot: Subplot arrangement part of a figure
+    :type plot: Any
+    :param rects: A string that contains the legends for the plot
+    :type rects: list[list[str]]
+    :param experiment_stats: Statistics of the jobs of the experiment
+    :type experiment_stats: Statistics
+    :param general_stats: list that contains the status of the jobs
+    :type general_stats: list[tuple[str, str]]
+    :returns: Return the length of the legends built
+    :rtype: int
+    """
     # Main legend with colourful rectangles
     legend_rects = [[rect[0] for rect in rects]]
 
@@ -386,6 +398,7 @@ def build_legends(plot, rects, experiment_stats, general_stats):
     legends = create_legends(plot, legend_rects, legend_titles, legend_locs, legend_handlelengths)
     for legend in legends:
         plt.gca().add_artist(legend)
+    return len(legends)
 
 
 def create_legends(plot, rects, titles, locs, handlelengths):
