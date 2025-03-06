@@ -299,7 +299,7 @@ def get_table_with_schema(schema: Optional[str], table: Table) -> Table:
 
     # TODO: .copy is deprecated, https://github.com/sqlalchemy/sqlalchemy/discussions/8213
     for col in cast(List, table.columns):
-        dest_table.append_column(col.copy())
+        dest_table.append_column(col._copy())
 
     return dest_table
 

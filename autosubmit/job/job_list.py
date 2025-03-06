@@ -146,10 +146,11 @@ class JobList(object):
         raise AttributeError("graph_dict is a dynamic view and cannot be directly modified.")
 
     @property
-    def job_list(self) -> List[Job]:
-        """Dynamically return a list of all 'job' attributes from the graph nodes."""
+    def job_list(self) -> list[Job]:
+        """Dynamically return a generator of all 'job' attributes from the graph nodes."""
         try:
-            return [data['job'] for _, data in self.graph.nodes(data=True)]
+            for _, data in self.graph.nodes(data=True):
+                yield data["job"]
         except BaseException as e:
             err_msg = ""
             for node in self.graph.nodes:
@@ -204,7 +205,7 @@ class JobList(object):
     def _delete_edgeless_jobs(self):
         """Deletes jobs that have no dependencies and are marked for deletion when edgeless."""
         # indices to delete
-        for job in self.job_list[:]:
+        for job in self.job_list:
             if job.dependencies is not None and job.dependencies not in ["{}", "[]"]:
                 if ((len(job.dependencies) > 0 and not job.has_parents() and not
                 job.has_children()) and str(job.delete_when_edgeless).casefold() ==
@@ -697,7 +698,6 @@ class JobList(object):
                 7014,
                 str(e),
             )
-
 
     def clear_generate(self):
         self.dependency_map = {}
@@ -1326,7 +1326,6 @@ class JobList(object):
                 relationships.pop("SPLITS_FROM", None)
                 filters_to_apply = relationships
         return filters_to_apply
-
 
     def add_special_conditions(
             self,
@@ -2102,7 +2101,6 @@ class JobList(object):
                         # Important to note that the only differentiating factor would be chunk
                         # OR num_chunks
 
-
                         # Bringing back original job if identified
                         for idx in range(0, len(jobs_to_sort)):
                             # Test if it is a fake job
@@ -2125,7 +2123,7 @@ class JobList(object):
                 dict_jobs[date][member].sort(
                     key=lambda job: (int(job.chunk) if sections_running_type_map.get(
                         job.section, 'once') == 'chunk' and job.chunk is not None else
-                        num_chunks))
+                                     num_chunks))
 
         return dict_jobs
 
@@ -2196,7 +2194,7 @@ class JobList(object):
         return str_date
 
     def __len__(self):
-        return self.job_list.__len__()
+        return len(self.graph.nodes())
 
     def get_date_list(self):
         """Get inner date list.
@@ -2365,7 +2363,7 @@ class JobList(object):
         :rtype: list
         """
         unsubmitted = [job for job in self.job_list if (platform is None or
-                                                         job.platform.name == platform.name) and (
+                                                        job.platform.name == platform.name) and (
                                job.status != Status.SUBMITTED and
                                job.status != Status.QUEUING and job.status != Status.RUNNING)]
 
@@ -2676,7 +2674,7 @@ class JobList(object):
                 job.submitter = self.submitter
                 job.update_parameters(self._as_conf, set_attributes=True, reset_logs=False if job.status in (
                         self._IN_SCHEDULER + self._FINAL_STATUSES) else True)
-        Log.debug(f"Jobs loaded: {len(self.job_list)}")
+        Log.debug(f"Jobs loaded: {len(self.graph.nodes())}")
         Log.debug(f"Edges loaded: {len(self.graph_dict)}")
         self.update_wrappers_references()
         return len(self.get_active()) > 0
@@ -2695,7 +2693,7 @@ class JobList(object):
             )
         ]
         # update edges completion status before removing them
-        for job in (job for job in jobs_to_unload):
+        for job in jobs_to_unload:
             for child in job.children:
                 self.graph.edges[job.name, child.name]['completion_status'] = "COMPLETED"
             for parent in job.parents:
@@ -2703,17 +2701,22 @@ class JobList(object):
                     self.graph.edges[parent.name, job.name]['completion_status'] = "COMPLETED"
         if jobs_to_unload:
             self.save_edges()
-        for job in (job for job in jobs_to_unload):
-            for child in job.children:
+
+        for job in jobs_to_unload:
+            for child in list(job.children):
                 if self.graph.has_edge(job.name, child.name):
                     self.graph.remove_edge(job.name, child.name)
-            for parent in job.parents:
+                child.parents.discard(job)
+
+
+            for parent in list(job.parents):
                 if self.graph.has_edge(parent.name, job.name):
                     self.graph.remove_edge(parent.name, job.name)
-            job.children = set()
-            job.parents = set()
+                parent.children.discard(job)
+            job.children.clear()
+            job.parents.clear()
+            job.platform = None
             self.graph.remove_node(job.name)
-            del job
 
     def get_active(self, platform=None, wrapper=False):
         """Returns a list of active jobs (In platforms queue + Ready).
@@ -2783,7 +2786,6 @@ class JobList(object):
                 else:
                     jobs.append(job)
         return jobs
-
 
     def sort_by_name(self):
         """Returns a list of jobs sorted by name.
@@ -3166,7 +3168,8 @@ class JobList(object):
                 job.fail_count = ref_fail_count
 
         else:
-            jobs_to_recover = [job for job in self.job_list if not getattr(job, "x11", False) and job.status in self._FINAL_STATUSES and job.log_recovery_call_count <= job.fail_count]
+            jobs_to_recover = [job for job in self.job_list if
+                               not getattr(job, "x11", False) and job.status in self._FINAL_STATUSES and job.log_recovery_call_count <= job.fail_count]
             for job in jobs_to_recover:
                 self._recover_log(job)
 
@@ -3233,7 +3236,6 @@ class JobList(object):
         if self.job_package_map and int(job.id) in self.job_package_map:
             job.packed = True
         return job.packed
-
 
     def _update_failed_jobs(self, as_conf: AutosubmitConfig) -> bool:
         """
@@ -3389,7 +3391,6 @@ class JobList(object):
                 return False
         return True
 
-
     def _skip_jobs(self, as_conf: AutosubmitConfig) -> bool:
         """Skip jobs that meet the skipping criteria.
 
@@ -3413,7 +3414,7 @@ class JobList(object):
                                         job.platform.send_command(job.platform.cancel_cmd +
                                                                   " " + str(job.id), ignore_log=True)
                                 except Exception:
-                                        pass  # jobid finished already
+                                    pass  # jobid finished already
                                 job.status = Status.SKIPPED
                                 save = True
                     elif job.running == 'member':
@@ -3427,7 +3428,7 @@ class JobList(object):
                                         job.platform.send_command(job.platform.cancel_cmd +
                                                                   " " + str(job.id), ignore_log=True)
                                 except Exception:
-                                        pass  # job_id finished already
+                                    pass  # job_id finished already
                                 job.status = Status.SKIPPED
                                 save = True
         return save
@@ -3628,7 +3629,7 @@ class JobList(object):
         out = True
         # Implementing checking scripts feedback to the users in a minimum of 4 messages
         count = stage = 0
-        for job in (job for job in self.job_list):
+        for job in self.job_list:
             job.update_check_variables(as_conf)
             count += 1
             if (count >= len(self.job_list) / 4 * (stage + 1)) or count == len(self.job_list):
@@ -3737,7 +3738,7 @@ class JobList(object):
     def remove_rerun_only_jobs(self) -> None:
         """Removes all jobs to be run only in reruns. """
         flag = False
-        for job in self.job_list[:]:
+        for job in self.job_list:
             if job.rerun_only == "true":
                 self._remove_job(job)
                 flag = True
@@ -4139,9 +4140,6 @@ class JobList(object):
             # Fixes: https://github.com/BSC-ES/autosubmit/pull/2700#issuecomment-3563572977
             if not jobs_ran_atleast_once:
                 job.updated_log = True
-
-
-
 
     def _get_jobs_by_name(self, status: Optional[list[int]] = None, platform: Platform = None, return_only_names=False) -> Union[List[str], List["Job"]]:
         """Return jobs filtered by status and/or platform as names or Job objects.

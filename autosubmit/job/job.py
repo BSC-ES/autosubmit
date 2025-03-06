@@ -738,36 +738,35 @@ class Job(object):
         else:
             error_message_type = "tailer"
 
-        try:
-            # find the absolute path
-            script_file = open(os.path.join(as_conf.get_project_dir(), script_path), 'r')
-        except Exception as e:
-            # We stop Autosubmit if we don't find the script
-            raise AutosubmitCritical(f"Extended {error_message_type} script: failed to fetch {str(e)} \n", 7014)
-        for line in script_file:
-            if line[:2] != "#!":
-                script += line
-            else:
-                found_hashbang = True
-                # check if the type of the script matches the one in the extended
-                if "bash" in line:
-                    if self.type != Language.BASH:
-                        raise AutosubmitCritical(
-                            f"Extended {error_message_type} script: script {script_name} seems Bash but job"
-                            f" {self.script_name} isn't\n", 7011)
-                elif "Rscript" in line:
-                    if self.type != Language.R:
-                        raise AutosubmitCritical(
-                            f"Extended {error_message_type} script: script {script_name} seems Rscript but job"
-                            f" {self.script_name} isn't\n", 7011)
-                elif "python" in line:
-                    if self.type not in (Language.PYTHON2, Language.PYTHON3, Language.PYTHON):
-                        raise AutosubmitCritical(
-                            f"Extended {error_message_type} script: script {script_name} seems Python but job"
-                            f" {self.script_name} isn't\n", 7011)
+        script_file = Path(as_conf.get_project_dir()) / script_path
+        if not script_file.exists():
+            raise AutosubmitCritical(f"Extended {error_message_type} script: script {script_name} not found\n", 7013)
+
+        with open(script_file, 'r') as script_file:
+            for line in script_file:
+                if line[:2] != "#!":
+                    script += line
                 else:
-                    raise AutosubmitCritical(
-                        f"Extended {error_message_type} script: couldn't figure out script {script_name} type\n", 7011)
+                    found_hashbang = True
+                    # check if the type of the script matches the one in the extended
+                    if "bash" in line:
+                        if self.type != Language.BASH:
+                            raise AutosubmitCritical(
+                                f"Extended {error_message_type} script: script {script_name} seems Bash but job"
+                                f" {self.script_name} isn't\n", 7011)
+                    elif "Rscript" in line:
+                        if self.type != Language.R:
+                            raise AutosubmitCritical(
+                                f"Extended {error_message_type} script: script {script_name} seems Rscript but job"
+                                f" {self.script_name} isn't\n", 7011)
+                    elif "python" in line:
+                        if self.type not in (Language.PYTHON2, Language.PYTHON3, Language.PYTHON):
+                            raise AutosubmitCritical(
+                                f"Extended {error_message_type} script: script {script_name} seems Python but job"
+                                f" {self.script_name} isn't\n", 7011)
+                    else:
+                        raise AutosubmitCritical(
+                            f"Extended {error_message_type} script: couldn't figure out script {script_name} type\n", 7011)
 
         if not found_hashbang:
             raise AutosubmitCritical(
@@ -1112,7 +1111,8 @@ class Job(object):
             fail_count = fail_count
             logname = os.path.join(self._tmp_path, f"{self.stat_file}{fail_count}")
         if os.path.exists(logname):
-            lines = open(logname).readlines()
+            with open(logname) as f:
+                lines = f.readlines()
             if len(lines) >= index + 1:
                 return int(lines[index])
             else:
@@ -1192,7 +1192,9 @@ class Job(object):
         if os.path.exists(log_name):
             already_completed = False
             # Read lines of the TOTAL_STATS file starting from last
-            for retrial in reversed(open(log_name).readlines()):
+            with open(log_name) as f:
+                lines = f.readlines()
+            for retrial in reversed(lines):
                 retrial_fields: list = retrial.split()
                 if Job.is_a_completed_retrial(retrial_fields):
                     # It's a COMPLETED run
@@ -2310,7 +2312,6 @@ class Job(object):
         if not self.submitter:
             self.submitter = ParamikoSubmitter(as_conf=as_conf)
 
-
         if not self.platform:
             if not self.platform_name:
                 self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
@@ -2322,7 +2323,11 @@ class Job(object):
             if as_conf.get_project_type().lower() == "none":
                 template = "%DEFAULT.EXPID%"
             else:
-                template = open(os.path.join(as_conf.get_project_dir(), file), 'r').read()
+                if (Path(as_conf.get_project_dir()) / file).exists():
+                    with open(Path(as_conf.get_project_dir()) / file, 'r') as f:
+                        template = f.read()
+                else:
+                    raise AutosubmitCritical(f"Additional file {file} not found in the project directory.", 6001)
             additional_templates += [template]
         return additional_templates
 
@@ -2521,8 +2526,8 @@ class Job(object):
                 '%(?<!%%)' + variable + '%(?!%%)', '', template_content, flags=re.I)
         template_content = template_content.replace("%%", "%")
         script_name = f'{self.name}.{wrapper_tag}.cmd'
-        open(os.path.join(self._tmp_path, script_name),
-             'w').write(template_content)
+        with open(Path(self._tmp_path) / script_name, 'w', encoding='utf-8') as f:
+            f.write(template_content)
         os.chmod(os.path.join(self._tmp_path, script_name), 0o755)
         return script_name
 
@@ -2917,7 +2922,7 @@ class WrapperJob(Job):
         """
         save = False
         if scheduler_fetched_status not in [Status.COMPLETED, Status.FAILED]:
-            for job in [job for job in self.job_list]:
+            for job in self.job_list:
                 # Has the wrapped parent finished?
                 if all(parent.status == Status.COMPLETED for parent in job.parents):
                     job.new_status = scheduler_fetched_status
