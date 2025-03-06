@@ -30,8 +30,15 @@ def test_autosubmit_commands_help(autosubmit_exp, mocker):
     It must produce three PNG files. One with the job summary, one with the
     section summary, and one with the general statistics.
     """
-
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(_EXPID, experiment_data={
+        'JOBS': {
+            'SIM': {
+                'RUNNING': 'once',
+                'PLATFORM': 'local',
+                'SCRIPT': 'echo "OK"'
+            }
+        }
+    })
 
     exp.autosubmit._check_ownership_and_set_last_command(
         exp.as_conf,

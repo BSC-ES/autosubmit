@@ -1,28 +1,27 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""
-Module containing functions to manage autosubmit's experiments.
-"""
+"""Module containing functions to manage Autosubmit experiments."""
 import string
+from pathlib import Path
+
 from autosubmit.database import db_common
-from log.log import Log,AutosubmitCritical
+from log.log import Log, AutosubmitCritical
+
 Log.get_logger("Autosubmit")
 
 
@@ -110,7 +109,6 @@ def copy_experiment(experiment_id, description, version, test=False, operational
                                  f"as a new experiment in the db: {e}", 7011) from e
 
 
-
 def next_experiment_id(current_id):
     """
     Get next experiment identifier
@@ -185,3 +183,25 @@ def base36decode(number):
     :rtype: int
     """
     return int(number, 36)
+
+
+def create_required_folders(exp_id: str, exp_folder: Path) -> None:
+    """Create the minimum set of required folders for an Autosubmit experiment.
+
+    The newly created folders will be relative to the given experiment folder.
+
+    Each new folder with have the sme permission, ``755`` (important if you are
+    expecting something else, e.g. umask).
+
+    :param exp_id: experiment identifier
+    :param exp_folder: experiment folder
+    :raises IOError: if there are errors creating the new experiment folders (permission, not found, etc.)
+    """
+    dir_mode = 0o755
+
+    exp_folder.mkdir(mode=dir_mode)
+
+    required_dirs = ["conf", "pkl", "tmp", "tmp/ASLOGS", f"tmp/LOG_{exp_id}", "plot", "status"]
+    for required_dir in required_dirs:
+        Path(exp_folder / required_dir).mkdir(mode=dir_mode)
+

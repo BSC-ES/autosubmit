@@ -33,7 +33,7 @@ from rocrate.rocrate import ROCrate, File
 from rocrate.utils import iso_now
 
 from autosubmit.database.db_common import get_autosubmit_version
-from autosubmit.database.db_common import get_experiment_descrip
+from autosubmit.database.db_common import get_experiment_description
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmitconfigparser.config.basicconfig import BasicConfig
@@ -361,7 +361,7 @@ def create_rocrate_archive(
     })
 
     # Fetch the experiment description from the main database
-    crate.description = get_experiment_descrip(expid)[0][0]
+    crate.description = get_experiment_description(expid)[0][0]
 
     # Add files generated after its execution (retrospective provenance)
 
