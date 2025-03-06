@@ -17,7 +17,7 @@
 
 
 import datetime
-from typing import cast, List, Optional
+from typing import Optional
 
 from sqlalchemy import (
     MetaData,
@@ -138,6 +138,8 @@ JobDataTable = Table(
     UniqueConstraint("counter", "job_name", name="unique_counter_and_job_name"),
 )
 
+"""Table that holds the Historical structure of the experiment jobs."""
+
 # TODO this doesn't work in POSTGRESQL
 # JobStatusEnum = Enum(
 #     "WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING",
@@ -158,7 +160,7 @@ JobsTable = Table(
     Column("status", Text, nullable=False, index=True),  # Should be job_status_enum
     Column("frequency", String),  # TODO move to Section table ?
     Column("synchronize", Boolean),  # TODO move to Section table ?
-    Column("section", String, ForeignKey("sections.name")),
+    Column("section", String),
     Column("chunk", Integer),
     Column("member", Text),
     Column("splits", Integer),
@@ -187,13 +189,30 @@ JobsTable = Table(
 ExperimentStructureTable = Table(
     "experiment_structure",
     metadata_obj,
-    Column("e_from", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True, index=True),
-    Column("e_to", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True, index=True),
+    Column("e_from", String, nullable=False, primary_key=True, index=True),
+    Column("e_to", String, nullable=False, primary_key=True, index=True),
     Column("min_trigger_status", String),
     Column("completion_status", String),
     Column("from_step", Integer),
     Column("fail_ok", Boolean),
     UniqueConstraint("e_from", "e_to", name="unique_e_from_and_e_to"),
+)
+
+# TODO: This should have
+# Column("e_from", String, ForeignKey("experiment_structure.e_to"), nullable=False, primary_key=True, index=True),
+# Column("e_to", String, ForeignKey("experiment_structure.e_from"), nullable=False, primary_key=True, index=True),
+# But in sqlite the table is in another file
+StructureDataTable = Table(
+    "structure_data",
+    metadata_obj,
+    Column("run_id", Integer, ForeignKey("experiment_run.run_id"), nullable=False, primary_key=True, index=True),
+    Column("e_from", String, nullable=False, primary_key=True, index=True),
+    Column("e_to", String, nullable=False, primary_key=True, index=True),
+    Column("min_trigger_status", String),
+    Column("completion_status", String),
+    Column("from_step", Integer),
+    Column("fail_ok", Boolean),
+    UniqueConstraint("run_id", "e_from", "e_to", name="unique_structure_data_run_id_e_from_and_e_to"),
 )
 
 SectionsStructureTable = Table(
@@ -234,10 +253,12 @@ def create_wrapper_tables(name, metadata_obj_):
     table_jobs_inside_wrapper = Table(
         f"{name}_jobs",
         metadata_obj_,
-        Column("package_id", Integer, ForeignKey("{name}_info.id"), nullable=False, primary_key=True),
-        Column("package_name", String, ForeignKey(f"{name}_info.name"), nullable=False, primary_key=True),
+        Column("package_id", Integer, nullable=False, primary_key=True),
+        Column("package_name", String, nullable=False, primary_key=True),
         Column("job_name", String, ForeignKey("jobs.name"), nullable=False, primary_key=True),
         Column("timestamp", String, nullable=True),
+        UniqueConstraint("package_id", "package_name", "job_name", name=f"unique_{name}_jobs_package_id_package_name_job_name"),
+
     )
     return table_package_info, table_jobs_inside_wrapper
 
@@ -256,66 +277,76 @@ UserMetricsTable = Table(
     Column("modified", Text),
 )
 
-GENERALTABLES = (
-    ExperimentTable,
-    ExperimentStatusTable,
-    ExperimentRunTable,
-    DBVersionTable,
-    JobDataTable,
-    DetailsTable,
-    UserMetricsTable,
-)
+GENERALTABLES = {
+    ExperimentTable.name: ExperimentTable,
+    ExperimentStatusTable.name: ExperimentStatusTable,
+    ExperimentRunTable.name: ExperimentRunTable,
+    DBVersionTable.name: DBVersionTable,
+    JobDataTable.name: JobDataTable,
+    StructureDataTable.name: StructureDataTable,
+    DetailsTable.name: DetailsTable,
+    UserMetricsTable.name: UserMetricsTable,
+}
 
-JOBLISTTABLES = (
-    JobsTable,
-    ExperimentStructureTable,
-    WrapperInfoTable,
-    WrapperJobsTable,
-    PreviewWrapperInfoTable,
-    PreviewWrapperJobsTable,
-    SectionsStructureTable,
-)
-
-TABLES = GENERALTABLES + JOBLISTTABLES
-
-"""The tables available in the Autosubmit databases."""
+JOBLISTTABLES = {
+    JobsTable.name: JobsTable,
+    ExperimentStructureTable.name: ExperimentStructureTable,
+    WrapperInfoTable.name: WrapperInfoTable,
+    WrapperJobsTable.name: WrapperJobsTable,
+    PreviewWrapperInfoTable.name: PreviewWrapperInfoTable,
+    PreviewWrapperJobsTable.name: PreviewWrapperJobsTable,
+    SectionsStructureTable.name: SectionsStructureTable,
+}
 
 
-def get_table_with_schema(schema: Optional[str], table: Optional[Table]) -> Table:
-    """Get the ``Table`` instance with the metadata modified.
-    The metadata will use the given container. This means you can
-    have table ``A`` with no schema, then call this function with
-    ``schema=a000``, and then a new table ``A`` with ``schema=a000``
-    will be returned.
-    :param schema: The target schema for the table metadata.
-    :param table: The SQLAlchemy Table.
-    :return: The same table, but with the given schema set as metadata.
+def get_all_tables_by_name() -> dict[str, Table]:
+    """Return a dictionary of all tables, combining general and job-list tables."""
+    return {**GENERALTABLES, **JOBLISTTABLES}
+
+
+class TableRegistry:
+    """Manage SQLAlchemy Table instances keyed by schema and table name.
+
+    Tables are created once per (schema, table_name) pair and reused on
+    subsequent lookups, avoiding redundant MetaData and Table construction.
     """
-    if not isinstance(table, Table):
-        raise ValueError("Invalid source type on table schema change")
 
-    metadata = MetaData(schema=schema)
-    dest_table = Table(table.name, metadata)
+    def __init__(self, schema) -> None:
+        """Initialize the registry with an empty cache."""
+        self._cache: dict[tuple[Optional[str], str], Table] = {}
+        self._metadata: dict[Optional[str], MetaData] = {}
+        self._schema = schema
 
-    # TODO: .copy is deprecated, https://github.com/sqlalchemy/sqlalchemy/discussions/8213
-    for col in cast(List, table.columns):
-        dest_table.append_column(col.copy())
+    def get_metadata(self) -> MetaData:
+        """Return the MetaData instance for the given schema, creating it if needed.
+        :return: The MetaData instance for the schema.
+        """
+        if self._schema not in self._metadata:
+            self._metadata[self._schema] = MetaData(schema=self._schema)
+        return self._metadata[self._schema]
 
-    return dest_table
+    def get(self, table_name: str) -> Table:
+        """Return the Table for the given name and schema, creating it if needed.
 
+        :param table_name: The name of the table.
+        :return: The SQLAlchemy Table instance.
+        :raises KeyError: If no table definition exists for ``table_name``.
+        """
+        key = (self._schema, table_name)
+        if key not in self._cache:
+            self._cache[key] = self._build(table_name)
+        return self._cache[key]
 
-def get_table_from_name(*, schema: Optional[str], table_name: str) -> Table:
-    """Get the table from a given table name.
-    :param schema: The schema name.
-    :param table_name: The table name.
-    :return: The table if found, ``None`` otherwise.
-    :raises ValueError: If the table name is not provided.
-    """
-    if not table_name:
-        raise ValueError(f"Missing table name: {table_name}")
+    def _build(self, table_name: str) -> Table:
+        """Build and return a new Table for the given name attached to this schema.
 
-    def predicate(t: Table) -> bool:
-        return t.name.lower() == table_name.lower()
-
-    table = next(filter(predicate, TABLES), None)
-    return get_table_with_schema(schema, table)
+        :param table_name: The name of the table to build.
+        :return: A new SQLAlchemy ``Table`` instance.
+        :raises KeyError: If ``table_name`` is not found in the global table registry.
+        """
+        all_tables_def = get_all_tables_by_name()
+        if table_name not in all_tables_def:
+            raise KeyError(f"No table definition found for '{table_name}'.")
+        definition_table = all_tables_def[table_name]
+        metadata = self.get_metadata()
+        return definition_table.to_metadata(metadata)

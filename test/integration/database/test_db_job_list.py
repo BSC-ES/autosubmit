@@ -23,7 +23,7 @@ from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_manager_job_list import JobsDbManager
-from autosubmit.database.tables import WrapperJobsTable, get_table_from_name, JobsTable, ExperimentStructureTable
+from autosubmit.database.tables import WrapperJobsTable, JobsTable, ExperimentStructureTable
 from autosubmit.job.job import Job
 from autosubmit.job.job_list import JobList
 
@@ -413,7 +413,7 @@ def test_select_latest_inner_jobs(
     }
     db_manager.insert(WrapperJobsTable.name, updated_job)
 
-    innerjobs_table = get_table_from_name(schema=db_manager.schema, table_name=WrapperJobsTable.name)
+    innerjobs_table = db_manager.table_registry.get(WrapperJobsTable.name)
     latest_wrapped_jobs = db_manager.select_latest_inner_jobs(innerjobs_table)
 
     assert len(latest_wrapped_jobs) == 3
@@ -686,8 +686,8 @@ def test_backup_and_restore(monkeypatch, tmp_path, _expid, as_db, as_exp: Any):
         return 0
     db_manager = _create_db_manager(schema=_expid)
     # Create tables
-    jobs_table = get_table_from_name(schema=db_manager.schema, table_name=JobsTable.name)
-    edges_table = get_table_from_name(schema=db_manager.schema, table_name=ExperimentStructureTable.name)
+    jobs_table = db_manager.table_registry.get(JobsTable.name)
+    edges_table = db_manager.table_registry.get(ExperimentStructureTable.name)
     db_manager.create_table(jobs_table.name)
     db_manager.create_table(edges_table.name)
     # Insert some data

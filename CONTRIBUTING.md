@@ -165,3 +165,39 @@ $ docker run -d --name some-postgres \
     -p 5432:5432 \
     postgres 
 ```
+
+## Test GitHub Actions locally
+
+Prerequisites: `docker`, `act` and a GitHub token.
+
+Go to the root directory of the repository and configure one `event.json` file
+with the content below ( for a PR ) :
+
+Example to trigger the `metrics` job on a PR comment `/metrics`:
+
+```json
+{
+  "comment": { "body": "/metrics" }, 
+  "issue": { "number": %pr_number%, "pull_request": { "url": "https://api.github.com/repos/BSC-ES/autosubmit/pulls/%pr_number%" } },
+  "repository": { "full_name": "BSC-ES/autosubmit", "name": "autosubmit", "owner": { "login": "BSC-ES" } },
+  "sender": { "login": "%yourusername%" }
+}
+```
+Note: replace `%pr_number%` and `%yourusername%` with your PR number and GitHub username.
+Note: you can also create an `event.json` for other events, e.g., `push`.
+
+Then you can run `act` with:
+
+```bash
+$ act -j metrics -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest -e event.json -s GITHUB_TOKEN="$GITHUB_TOKEN" --artifact-server-path /tmp/artifacts
+```
+replace `metrics_markdown` with the name of the job you want to run
+
+For debugging purposes, you can also enter the container where the job is
+being executed with:
+
+```bash
+$ act --reuse -j metrics -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest -e event.json -s GITHUB_TOKEN="$GITHUB_TOKEN" --artifact-server-path /tmp/artifacts
+$ docker exec -it <container_id> /bin/bash
+cd /home/runner/work/<repo>/<repo>
+```

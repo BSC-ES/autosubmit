@@ -18,19 +18,16 @@
 """Contains code to manage a database via SQLAlchemy."""
 import os
 from pathlib import Path
-from typing import Any, Optional, cast, TYPE_CHECKING, List, Dict, Union
+from typing import Any, Optional, cast, List, Dict, Union
 
-from sqlalchemy import Engine, delete, func, insert, select, ClauseElement
+from sqlalchemy import Engine, delete, func, insert, select, ClauseElement, desc, asc
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.schema import CreateTable, CreateSchema, DropTable
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
-from autosubmit.database.tables import get_table_from_name
-
-if TYPE_CHECKING:
-    from autosubmit.database.tables import Table
+from autosubmit.database.tables import TableRegistry, GENERALTABLES, Table
 
 
 class DbManager:
@@ -40,59 +37,88 @@ class DbManager:
     as Postgres, Mongo, MySQL, etc.
     """
 
-    def __init__(self, connection_url: str, schema: Optional[str] = None) -> None:
-        self.engine: Engine = session.create_engine(connection_url)
-        self.schema = schema if self.engine.name != "sqlite" else None
+    def __init__(self, connection_url: str, schema: Optional[str] = None, historical: Optional[bool] = False) -> None:
+        self.engine = None
+        self.engine_historical = None
+        if BasicConfig.DATABASE_BACKEND == "sqlite":
+            if historical:
+                self.engine_historical = session.create_engine(connection_url)
+                if self.engine_historical.url.database and not Path(self.engine_historical.url.database).exists():
+                    Path(self.engine_historical.url.database).touch()
+                    Path(self.engine_historical.url.database).chmod(0o775)
+            else:
+                self.engine = session.create_engine(connection_url)
+                # make file
+                if self.engine.url.database and not Path(self.engine.url.database).exists():
+                    Path(self.engine.url.database).touch()
+                    Path(self.engine.url.database).chmod(0o775)
+        else:
+            # Postgres is unified
+            self.engine: Engine = session.create_engine(connection_url)
+            self.engine_historical = self.engine
+
+        self.schema = schema if BasicConfig.DATABASE_BACKEND != "sqlite" else None
         self.restore_path = Path(BasicConfig.DB_PATH) / "autosubmit_db.sql"
+        self.table_registry = TableRegistry(self.schema)
+
+    def _get_engine(self, table_name: Optional[str] = None) -> Engine:
+        """Return the appropriate engine based on context.
+
+        :param table_name: If True, return the historical engine.
+        :return: The selected SQLAlchemy engine.
+        """
+        if table_name and table_name in GENERALTABLES and self.engine_historical:
+            return self.engine_historical
+        return self.engine
 
     def create_table(self, table_name: str) -> None:
-        table = get_table_from_name(schema=self.schema, table_name=table_name)
-        with self.engine.connect() as conn:
-            if self.schema:
-                conn.execute(CreateSchema(self.schema, if_not_exists=True))
-            conn.execute(CreateTable(table, if_not_exists=True))
-            conn.commit()
+        table = self.table_registry.get(table_name)
+        with self._get_engine(table_name).connect() as conn:
+            with conn.begin():
+                if self.schema:
+                    conn.execute(CreateSchema(self.schema, if_not_exists=True))
+                conn.execute(CreateTable(table, if_not_exists=True))
 
     def drop_table(self, table_name: str) -> None:
-        table = get_table_from_name(schema=self.schema, table_name=table_name)
-        with self.engine.connect() as conn:
-            conn.execute(DropTable(table, if_exists=True))
-            conn.commit()
+        table = self.table_registry.get(table_name)
+        with self._get_engine(table_name).connect() as conn:
+            with conn.begin():
+                conn.execute(DropTable(table, if_exists=True))
 
     def insert(self, table_name: str, data: dict[str, Any]) -> None:
         if not data:
             return
-        table = get_table_from_name(schema=self.schema, table_name=table_name)
-        with self.engine.connect() as conn:
-            conn.execute(insert(table), data)
-            conn.commit()
+        table = self.table_registry.get(table_name)
+        with self._get_engine(table_name).connect() as conn:
+            with conn.begin():
+                conn.execute(insert(table), data)
 
     def insert_many(self, table_name: str, data: list[dict[str, Any]]) -> int:
         if not data:
             return 0
-        table = get_table_from_name(schema=self.schema, table_name=table_name)
-        with self.engine.connect() as conn:
-            result = conn.execute(insert(table), data)
-            conn.commit()
-        return cast(int, result.rowcount)
+        table = self.table_registry.get(table_name)
+        with self._get_engine(table_name).connect() as conn:
+            with conn.begin():
+                result = conn.execute(insert(table), data)
+                return cast(int, result.rowcount)
 
     def select_first_where(self, table_name: str, where: Optional[dict[str, str]]) -> Optional[Any]:
-        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        table = self.table_registry.get(table_name)
         query = select(table)
         if where:
             for key, value in where.items():
                 query = query.where(getattr(table.c, key) == value)
-        with self.engine.connect() as conn:
+        with self._get_engine(table_name).connect() as conn:
             row = conn.execute(query).first()
-        return row.tuple() if row else None
+            return row.tuple() if row else None
 
     def select_all_with_columns(self, table_name: str) -> List[tuple[tuple[str, Any]]]:
         """Select rows from a table. Return a list of hasheable tuples."""
-        table = get_table_from_name(schema=self.schema, table_name=table_name)
-        with self.engine.connect() as conn:
+        table = self.table_registry.get(table_name)
+        with self._get_engine(table_name).connect() as conn:
             rows = conn.execute(select(table)).fetchall()
-        columns = table.c.keys()
-        return [tuple(zip(columns, row)) for row in rows]
+            columns = table.c.keys()
+            return [tuple(zip(columns, row)) for row in rows]
 
     def select_where_with_columns(
             self,
@@ -124,23 +150,23 @@ class DbManager:
         else:
             query = query.where(where)
 
-        with self.engine.connect() as conn:
+        with self._get_engine(table.name).connect() as conn:
             rows = conn.execute(query).fetchall()
 
         return [tuple(zip(columns, row)) for row in rows]
 
     def count(self, table_name: str) -> int:
-        table = get_table_from_name(schema=self.schema, table_name=table_name)
-        with self.engine.connect() as conn:
+        table = self.table_registry.get(table_name)
+        with self._get_engine(table_name).connect() as conn:
             row = conn.execute(select(func.count()).select_from(table))
             return cast(int, row.scalar())
 
     def delete_all(self, table_name: str) -> int:
-        table = get_table_from_name(schema=self.schema, table_name=table_name)
-        with self.engine.connect() as conn:
-            result = conn.execute(delete(table))
-            conn.commit()
-        return result.rowcount
+        table = self.table_registry.get(table_name)
+        with self._get_engine(table_name).connect() as conn:
+            with conn.begin():
+                result = conn.execute(delete(table))
+                return result.rowcount
 
     def delete_where(self, table_name: str, where: Optional[Union[dict[str, Any], ClauseElement]]) -> int:
         """Delete rows from a table where the specified conditions are met.
@@ -154,7 +180,7 @@ class DbManager:
         :rtype: int
         :raises ValueError: If 'where' is empty.
         """
-        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        table = self.table_registry.get(table_name)
         query = delete(table)
 
         if where:
@@ -168,9 +194,9 @@ class DbManager:
             raise ValueError(
                 "The 'where' parameter must be a non-empty dictionary. Multiple-table criteria within Delete are not supported.")
 
-        with self.engine.connect() as conn:
-            result = conn.execute(query)
-            conn.commit()
+        with self._get_engine(table_name).connect() as conn:
+            with conn.begin():
+                result = conn.execute(query)
         return result.rowcount
 
     def upsert_many(self, table_name: str, data: List[Dict[str, Any]], conflict_cols: List[str], batch_size: int = 1000) -> int:
@@ -187,16 +213,16 @@ class DbManager:
         if not data:
             return 0
 
-        table: Table = get_table_from_name(schema=self.schema, table_name=table_name)
+        table: Table = self.table_registry.get(table_name)
         update_cols = [col for col in data[0].keys() if col not in conflict_cols]
 
         # NOTE general insert doesn't have on_conflict
-        if self.engine.dialect.name == "postgresql":
+        if self._get_engine(table_name).dialect.name == "postgresql":
             insert_stmt = pg_insert(table)
-        elif self.engine.dialect.name == "sqlite":
+        elif self._get_engine(table_name).dialect.name == "sqlite":
             insert_stmt = sqlite_insert(table)
         else:
-            raise ValueError(f"Unsupported dialect: {self.engine.dialect.name}")
+            raise ValueError(f"Unsupported dialect: {self._get_engine(table_name).dialect.name}")
 
         # add on_conflict clause
         update_stmt = insert_stmt.on_conflict_do_update(
@@ -205,22 +231,22 @@ class DbManager:
         )
 
         total_rows = 0
-        with self.engine.connect() as conn:
-            for i in range(0, len(data), batch_size):
-                batch = data[i:i + batch_size]
-                result = conn.execute(update_stmt, batch)
-                total_rows += result.rowcount
-            conn.commit()
+        with self._get_engine(table_name).connect() as conn:
+            with conn.begin():
+                for i in range(0, len(data), batch_size):
+                    batch = data[i:i + batch_size]
+                    result = conn.execute(update_stmt, batch)
+                    total_rows += result.rowcount
 
         return total_rows
 
     def count_where(self, table_name: str, where: dict[str, Any]) -> int:
         """Count the number of rows in a table that match a given condition."""
-        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        table = self.table_registry.get(table_name)
         query = select(func.count()).select_from(table)
         for key, value in where.items():
             query = query.where(getattr(table.c, key) == value)
-        with self.engine.connect() as conn:
+        with self._get_engine(table_name).connect() as conn:
             row = conn.execute(query).scalar()
         return cast(int, row) if row is not None else 0
 
@@ -236,7 +262,7 @@ class DbManager:
             if self.restore_path.exists():
                 os.remove(self.restore_path)
 
-            con = self.engine.raw_connection()
+            con = self._get_engine().raw_connection()
             bck = sqlite3.connect(self.restore_path)
             with bck:
                 con.connection.backup(bck)
@@ -253,7 +279,7 @@ class DbManager:
             #     os.remove(self.restore_path)
             # try:
             #     # use pg_dump
-            #     db_url = self.engine.url
+            #     db_url = self._get_engine(table_name).url
             #     cmd = f"cd {str(self.restore_path.parent)}; pg_dump --host {db_url.host} --port {db_url.port} --username {db_url.username} --dbname {db_url.database} --format=c --file={self.restore_path}"
             #     env = os.environ.copy()
             #     env["PGPASSWORD"] = db_url.password
@@ -267,7 +293,7 @@ class DbManager:
             import sqlite3  # Bulk operation , SQLACHEMY is too slow for these operations
             if not self.restore_path.exists():
                 raise FileNotFoundError(f"Backup file {self.restore_path} does not exist.")
-            con = self.engine.raw_connection()
+            con = self._get_engine().raw_connection()
             bck = sqlite3.connect(self.restore_path)
             bck.backup(con.connection)
             bck.close()
@@ -278,7 +304,7 @@ class DbManager:
             # if not self.restore_path.exists():
             #     raise FileNotFoundError(f"Backup file {self.restore_path} does not exist.")
             # try:
-            #     db_url = self.engine.url
+            #     db_url = self._get_engine(table_name).url
             #     cmd = (
             #         f"cd {str(self.restore_path.parent)}; "
             #         f"pg_restore --host {db_url.host} --port {db_url.port} "
@@ -305,7 +331,7 @@ class DbManager:
         :return: Number of rows updated.
         :raises ValueError: If 'where' is empty.
         """
-        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        table = self.table_registry.get(table_name)
         query = table.update().values(**values)
 
         for key, value in where.items():
@@ -315,8 +341,57 @@ class DbManager:
             else:
                 query = query.where(column == value)
 
-        with self.engine.connect() as conn:
-            result = conn.execute(query)
-            conn.commit()
+        with self._get_engine(table_name).connect() as conn:
+            with conn.begin():
+                result = conn.execute(query)
 
         return result.rowcount
+
+    def select_latest_inner_jobs(
+            self,
+            innerjobs_table: Table,
+            job_names: Optional[List[str]] = None
+    ) -> List[Dict[str, object]]:
+        """
+        Select the row with the latest timestamp for each job_name from the inner jobs table.
+        If job_names is provided, filter only those job_names.
+
+        :param innerjobs_table: SQLAlchemy Table object for the inner jobs.
+        :type innerjobs_table: Table
+        :param job_names: Optional list of job_name values to filter by.
+        :type job_names: Optional[List[str]]
+        :return: List of dictionaries with the latest row per job_name.
+        :rtype: List[Dict[str, object]]
+        """
+        row_number = func.row_number().over(
+            partition_by=innerjobs_table.c.job_name,
+            order_by=desc(innerjobs_table.c.timestamp)
+        ).label('row_number')
+
+        stmt = select(*innerjobs_table.c, row_number)
+        if job_names:
+            stmt = stmt.where(innerjobs_table.c.job_name.in_(job_names))
+        subquery = stmt.alias('subq')
+        query = select(*(col for col in subquery.c if col.name != 'row_number')).where(subquery.c.row_number == 1)
+        with self._get_engine(innerjobs_table.name).connect() as conn:
+            result = conn.execute(query)
+            return [dict(row) for row in result.mappings().all()]
+
+    def select_last_with_columns(self, table_name: str, columns: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
+        """Return the latest row from a table ordered by descending update time.
+
+        :param table_name: Name of the table to select from.
+        :param columns: Optional list of column names to include. If None, all columns are included.
+        :return: Dictionary representing the latest row, or None if the table is empty.
+        """
+        table: Table = self.table_registry.get(table_name)
+        self.create_table(table.name)
+
+        col_keys = columns if columns is not None else list(table.c.keys())
+        selected_cols = [table.c[col] for col in col_keys]
+
+        stmt = select(*selected_cols).order_by(desc(table.c.modified)).limit(1)
+        with self._get_engine(table_name).connect() as conn:
+            row = conn.execute(stmt).fetchone()
+
+        return dict(zip(col_keys, row)) if row else None
