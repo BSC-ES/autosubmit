@@ -168,10 +168,10 @@ def test_open_conn_check_version_real_sqlite(monkeypatch, tmp_path: "LocalPath")
         conn.close()
 
     monkeypatch.setattr("autosubmit.database.db_common.BasicConfig.DATABASE_BACKEND", "sqlite", raising=False)
-    monkeypatch.setattr("autosubmit.database.db_common.BasicConfig.DB_PATH", str(db_path), raising=False)
+    monkeypatch.setattr("autosubmit.database.db_common.BasicConfig.DB_PATH", db_path, raising=False)
 
     with pytest.raises(AutosubmitCritical) as e:
-        open_conn(str(db_path))
+        open_conn()
         assert "not compatible" in str(e.value).lower()
 
 
@@ -428,7 +428,7 @@ def test_check_db_sqlite(monkeypatch, tmp_path, as_db: str):
     """
     if as_db == "postgres":
         pytest.skip("Skipping sqlite specific test when using postgres")
-    db_manager = _create_db_manager(BasicConfig.DB_PATH)
+    db_manager = _create_db_manager(Path(BasicConfig.DB_PATH))
     db_manager.create_table(DBVersionTable.name)
     db_manager.insert(DBVersionTable.name, {'version': 3})
     with pytest.raises(ValueError):

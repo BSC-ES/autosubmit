@@ -1881,6 +1881,37 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
     assert parameters["TIMEFORMAT"] == "%keep_format_as_INTRODUCED%"
 
 
+def test_update_job_parameters(autosubmit_config, experiment_data):
+    as_conf = autosubmit_config(_EXPID, experiment_data=experiment_data)
+    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
+    as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
+    job = Job('test_job', 1, Status.READY, 0)
+    job.section = 'TEST_JOB'
+    job.chunk = 1
+    job.member = "fc00"
+    job.date = datetime.fromisoformat("2023-08-15T00:00:00")
+    parameters = {}
+    expected = {'AS_CHECKPOINT': 'as_checkpoint', 'CHUNK': 1, 'CHUNK_END_DATE': '20230816', 'CHUNK_END_DAY': '16',
+                'CHUNK_END_HOUR': '00', 'CHUNK_END_IN_DAYS': '1', 'CHUNK_END_MONTH': '08', 'CHUNK_END_YEAR': '2023',
+                'CHUNK_FIRST': 'TRUE', 'CHUNK_LAST': 'TRUE', 'CHUNK_SECOND_TO_LAST_DATE': '20230815',
+                'CHUNK_SECOND_TO_LAST_DAY': '15', 'CHUNK_SECOND_TO_LAST_HOUR': '00', 'CHUNK_SECOND_TO_LAST_MONTH': '08',
+                'CHUNK_SECOND_TO_LAST_YEAR': '2023', 'CHUNK_START_DATE': '20230815', 'CHUNK_START_DAY': '15',
+                'CHUNK_START_HOUR': '00', 'CHUNK_START_MONTH': '08', 'CHUNK_START_YEAR': '2023',
+                'DAY_BEFORE': '20230814',
+                'DELAY': None, 'DELAY_RETRIALS': None, 'DELETE_WHEN_EDGELESS': True, 'EXPORT': 'none',
+                'FAIL_COUNT': '0',
+                'FREQUENCY': None, 'JOBNAME': 'test_job', 'JOB_DEPENDENCIES': [], 'MEMBER': 'fc00', 'NUMMEMBERS': 0,
+                'PACKED': False, 'PREV': '0', 'PROJECT_TYPE': 'none', 'RETRIALS': 0, 'RUN_DAYS': '1',
+                'SDATE': '20230815',
+                'SHAPE': '', 'SPLIT': None, 'SPLITS': None, 'SYNCHRONIZE': None, 'WORKFLOW_COMMIT': 'dummy',
+                'X11': False}
+    parameters = job.update_job_parameters(as_conf, parameters, True)
+    assert parameters == expected
+
+
 def test_set_state():
     state = {
         '_name': 'test_job',
@@ -2071,37 +2102,6 @@ def test_update_check_variables(autosubmit_config, experiment_data):
         assert job.check_warnings is True
 
 
-def test_update_job_parameters(autosubmit_config, experiment_data):
-    as_conf = autosubmit_config(_EXPID, experiment_data=experiment_data)
-    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
-    as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
-    as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
-    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
-    as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
-    job = Job('test_job', 1, Status.READY, 0)
-    job.section = 'TEST_JOB'
-    job.chunk = 1
-    job.member = "fc00"
-    job.date = datetime.fromisoformat("2023-08-15T00:00:00")
-    parameters = {}
-    expected = {'AS_CHECKPOINT': 'as_checkpoint', 'CHUNK': 1, 'CHUNK_END_DATE': '20230816', 'CHUNK_END_DAY': '16',
-                'CHUNK_END_HOUR': '00', 'CHUNK_END_IN_DAYS': '1', 'CHUNK_END_MONTH': '08', 'CHUNK_END_YEAR': '2023',
-                'CHUNK_FIRST': 'TRUE', 'CHUNK_LAST': 'TRUE', 'CHUNK_SECOND_TO_LAST_DATE': '20230815',
-                'CHUNK_SECOND_TO_LAST_DAY': '15', 'CHUNK_SECOND_TO_LAST_HOUR': '00', 'CHUNK_SECOND_TO_LAST_MONTH': '08',
-                'CHUNK_SECOND_TO_LAST_YEAR': '2023', 'CHUNK_START_DATE': '20230815', 'CHUNK_START_DAY': '15',
-                'CHUNK_START_HOUR': '00', 'CHUNK_START_MONTH': '08', 'CHUNK_START_YEAR': '2023',
-                'DAY_BEFORE': '20230814',
-                'DELAY': None, 'DELAY_RETRIALS': None, 'DELETE_WHEN_EDGELESS': True, 'EXPORT': 'none',
-                'FAIL_COUNT': '0',
-                'FREQUENCY': None, 'JOBNAME': 'test_job', 'JOB_DEPENDENCIES': [], 'MEMBER': 'fc00', 'NUMMEMBERS': 0,
-                'PACKED': False, 'PREV': '0', 'PROJECT_TYPE': 'none', 'RETRIALS': 0, 'RUN_DAYS': '1',
-                'SDATE': '20230815',
-                'SHAPE': '', 'SPLIT': None, 'SPLITS': None, 'SYNCHRONIZE': None, 'WORKFLOW_COMMIT': 'dummy',
-                'X11': False}
-    parameters = job.update_job_parameters(as_conf, parameters, True)
-    assert parameters == expected
-
-
 def test_update_parameters(autosubmit_config, experiment_data):
     job = Job('test_job', 1, Status.READY, 0)
     job.section = 'TEST_JOB'
@@ -2271,6 +2271,7 @@ def test_check_remote_log_exists(tmp_path, show_logs: bool, exists, autosubmit_c
         assert log
     else:
         assert not log
+
 
 @pytest.mark.parametrize(
     'count, with_stat_file',

@@ -579,7 +579,8 @@ class JobPackageThread(JobPackageBase):
                 lang = 'UTF-8'
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
-        open(os.path.join(self._tmp_path, script_file), 'wb').write(script_content.encode(lang))
+        with open(Path(self._tmp_path) / script_file, 'wb') as f:
+            f.write(script_content.encode(lang))
         os.chmod(os.path.join(self._tmp_path, script_file), 0o755)
         return script_file
 
@@ -704,7 +705,8 @@ class JobPackageThreadWrapped(JobPackageThread):
     def _create_common_script(self, filename: str = ""):
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
-        open(os.path.join(self._tmp_path, script_file), 'wb').write(script_content)
+        with open(Path(self._tmp_path) / script_file, 'wb') as f:
+            f.write(script_content)
         os.chmod(os.path.join(self._tmp_path, script_file), 0o755)
         return script_file
 

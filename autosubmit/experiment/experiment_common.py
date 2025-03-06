@@ -172,7 +172,7 @@ def _delete_expid(expid_delete: str, force: bool = False) -> None:
 
     :raises AutosubmitCritical: If the experiment does not exist or if there are insufficient permissions.
     """
-
+    expid_delete = expid_delete.lower().strip()
     if not expid_delete:
         raise AutosubmitCritical("Experiment identifier is required for deletion.", 7011)
     experiment_path = Path(f"{BasicConfig.LOCAL_ROOT_DIR}/{expid_delete}")

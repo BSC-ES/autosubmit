@@ -20,7 +20,6 @@ from random import randrange
 from typing import Dict, Any, Tuple
 
 import pytest
-from mock import patch
 from networkx import DiGraph
 
 from autosubmit.config.yamlparser import YAMLParserFactory
