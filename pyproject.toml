@@ -60,8 +60,8 @@ dependencies = [
     "autosubmitconfigparser==1.0.79",
     "configparser",
     "setproctitle",
-    "invoke>=2.0"
-    # 'sqlalchemy[mypy]' # TODO: pending Postgres MR
+    "invoke>=2.0",
+    "SQLAlchemy~=2.0.23",
 ]
 
 [project.urls]
@@ -93,8 +93,8 @@ docs = [
 ]
 all = [
     "autosubmit[tests]",
-    "autosubmit[docs]"
-    # "autosubmit[postgres]"
+    "autosubmit[docs]",
+    "autosubmit[postgres]"
 ]
 
 [tool.setuptools.packages.find]
