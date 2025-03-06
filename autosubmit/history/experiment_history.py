@@ -74,7 +74,48 @@ class ExperimentHistory:
 
     def write_submit_time(self, job_name, submit=0, status="UNKNOWN", ncpus=0, wallclock="00:00", qos="debug", date="",
                           member="", section="", chunk=0, platform="NA", job_id=0, wrapper_queue=None,
-                          wrapper_code=None, children="", workflow_commit=""):
+                          wrapper_code=None, children="", workflow_commit="", split=None, splits=None) -> Optional[JobData]:
+        """Writes a new job submission entry to the database.
+
+        :param job_name: The name of the job.
+        :type job_name: str
+        :param submit: The submission time of the job. Default to 0.
+        :type submit: int
+        :param status: The status of the job. Defaults to "UNKNOWN".
+        :type status: str
+        :param ncpus: The number of CPUs allocated for the job. Default to 0.
+        :type ncpus: int
+        :param wallclock: The wallclock time allocated for the job. Default to "00:00".
+        :type wallclock: str
+        :param qos: The quality of service. Default to "debug".
+        :type qos: str
+        :param date: The date associated with the job. Default to an empty string.
+        :type date: str
+        :param member: The member associated with the job. Default to an empty string.
+        :type member: str
+        :param section: The section associated with the job. Default to an empty string.
+        :type section: str
+        :param chunk: The chunk number associated with the job. Default to 0.
+        :type chunk: int
+        :param platform: The platform on which the job is run. Default to "NA".
+        :type platform: str
+        :param job_id: The job ID. Default to 0.
+        :type job_id: int
+        :param wrapper_queue: The wrapper queue. Defaults to None.
+        :type wrapper_queue: Optional[str]
+        :param wrapper_code: The wrapper code. Defaults to None.
+        :type wrapper_code: Optional[str]
+        :param children: The children. Default to an empty string.
+        :type children: str
+        :param workflow_commit: The workflow commit identifier. Default to an empty string.
+        :type workflow_commit: str
+        :param split: The split identifier. Default to None.
+        :type split: Optional[str]
+        :param splits: The splits information. Default to None.
+        :type splits: Optional[str]
+        :return: The result of registering the job data, or None if an exception occurs.
+        :rtype: Optional[JobData]
+        """
 
         try:
             next_counter = self._get_next_counter_by_job_name(job_name)
@@ -96,7 +137,9 @@ class ExperimentHistory:
                                   job_id=job_id,
                                   children=children,
                                   run_id=current_experiment_run.run_id,
-                                  workflow_commit=workflow_commit)
+                                  workflow_commit=workflow_commit,
+                                  split=split,
+                                  splits=splits)
             return self.manager.register_submitted_job_data_dc(job_data_dc)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
@@ -104,7 +147,8 @@ class ExperimentHistory:
 
             return None
 
-    def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug", job_id: int = 0, wrapper_queue: str = None, wrapper_code: str = None, children: str = "") -> JobData:
+    def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug", job_id: int = 0, wrapper_queue: str = None, wrapper_code: str = None,
+                         children: str = "") -> JobData:
         """
         Updates the start time and other details of a job in the database.
 

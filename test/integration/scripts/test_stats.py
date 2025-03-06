@@ -40,11 +40,11 @@ def test_autosubmit_commands_help(autosubmit_exp, mocker):
             }
         }
     })
-
     exp.autosubmit._check_ownership_and_set_last_command(
         exp.as_conf,
         exp.expid,
         'run')
+    assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
     processes_before_run = Process().children(recursive=True)
     assert 0 == exp.autosubmit.run_experiment(exp.expid)

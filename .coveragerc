@@ -19,6 +19,7 @@ parallel = True
 source = ./autosubmit
 timid = False
 sigterm = True
+patch = subprocess
 
 [report]
 exclude_lines =

@@ -46,7 +46,22 @@ from test.integration.test_utils.misc import wait_locker
             retrials: 2  
 
     """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
-], ids=["Success", "Failure"])
+
+    # Test Splits
+    (dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '1'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World with id=TestSplits"
+                sleep 1
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            SPLITS: '2'
+            wallclock: 00:01
+    """), 2, "COMPLETED", "split"),
+], ids=["Success", "Failure", "Test Splits"])
 def test_run_uninterrupted(
         autosubmit_exp,
         jobs_data: str,
@@ -72,7 +87,7 @@ def test_run_uninterrupted(
     # Check and display results
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid)
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid, run_type)
     e_msg = f"Current folder: {str(run_tmpdir)}\n"
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
     for check, value in db_check_list.items():

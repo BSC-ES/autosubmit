@@ -17,16 +17,16 @@
 
 import datetime
 import re
+from typing import Union, Optional
 
 from bscearth.utils.date import date2str
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.log.log import AutosubmitCritical
 
 
-class DicJobs:
+class DicJobs: # Not accurate name, to rename to JobBuilder or something in these lines
     """
     Class to create and build jobs from conf file and to find jobs by start date, member and chunk
 
@@ -54,7 +54,6 @@ class DicJobs:
         self.as_conf = as_conf
         self.experiment_data = as_conf.experiment_data
         self.recreate_jobs = False
-        self.changes = {}
         self._job_list = {}
 
     @property
@@ -63,26 +62,22 @@ class DicJobs:
 
     @job_list.setter
     def job_list(self, job_list):
-        self._job_list = {job.name: job for job in job_list}
+        self._job_list = job_list
 
-    def read_section(self, section, priority, default_job_type):
-        """
-        Read a section from jobs conf and creates all jobs for it
+    def read_section(self, section: str, priority: int, default_job_type: str) -> None:
+        """Read a section from jobs conf and creates all jobs for it.
 
-        :param default_job_type: default type for jobs
-        :type default_job_type: str
-        :param section: section to read, and it's info
-        :type section: tuple(str,dict)
-        :param priority: priority for the jobs
-        :type priority: int
+        :param section: Section to read.
+        :param priority: Priority for the jobs.
+        :param default_job_type: Default type for jobs.
         """
         parameters = self.experiment_data["JOBS"]
         splits = parameters[section].get("SPLITS", -1)
         running = str(parameters[section].get('RUNNING', "once")).lower()
 
-        if splits == "auto" and running != "chunk":
+        if isinstance(splits, dict) and running != "chunk":
             raise AutosubmitCritical("SPLITS=auto is only allowed for running=chunk")
-        elif splits != "auto":
+        elif not isinstance(splits, dict):
             splits = int(splits)
         frequency = int(parameters[section].get("FREQUENCY", 1))
         if running == 'once':
@@ -196,10 +191,6 @@ class DicJobs:
                 self._dic[section][date][member] = dict()
                 count = 0
                 for chunk in (chunk for chunk in self._chunk_list):
-                    if splits == "auto":
-                        real_splits = calendar_chunk_section(self.experiment_data, section, date, chunk)
-                    else:
-                        real_splits = splits
                     count += 1
                     if delay == -1 or delay < chunk:
                         if count % frequency == 0 or count == len(self._chunk_list):
@@ -211,12 +202,38 @@ class DicJobs:
                                     self._dic[section][date][member][chunk] = tmp_dic[chunk][date]
                             else:
                                 self._dic[section][date][member][chunk] = []
-                                self._create_jobs_split(real_splits, section, date, member, chunk, priority,
+                                self._create_jobs_split(splits, section, date, member, chunk, priority,
                                                         default_job_type,
                                                         self._dic[section][date][member][chunk])
 
-    def _create_jobs_split(self, splits, section, date, member, chunk, priority, default_job_type, section_data):
-        splits_list = [-1] if splits <= 0 else range(1, splits + 1)
+    def _create_jobs_split(
+        self,
+        splits: Union[int, dict[str, list[int]]],
+        section: str,
+        date: Optional[datetime.datetime],
+        member: Optional[str],
+        chunk: Optional[int],
+        priority: int,
+        default_job_type: str,
+        section_data: list[Job],
+    ) -> None:
+        """Generate split-specific jobs for the requested section.
+
+        :param splits: Number of splits or mapping of date strings to chunk splits.
+        :param section: Section name associated with the jobs.
+        :param date: Start date used for naming and indexing.
+        :param member: Member identifier used for naming and indexing.
+        :param chunk: Chunk identifier used for naming and indexing.
+        :param priority: Priority assigned to the created jobs.
+        :param default_job_type: Default job type to assign.
+        :param section_data: Collection that receives the generated jobs.
+        """
+        if isinstance(splits, dict):
+            date_str = date2str(date, self._date_format)
+            splits_list = [-1] if splits[date_str][chunk-1] <= 0 else range(1, splits[date_str][chunk-1] + 1)
+        else:
+            splits_list = [-1] if splits <= 0 else range(1, splits + 1)
+
         for split in splits_list:
             self.build_job(section, priority, date, member, chunk, default_job_type, section_data, splits, split)
 
@@ -233,6 +250,7 @@ class DicJobs:
             current_jobs.append(next_level_jobs)
         return current_jobs
 
+    # TODO: For another PR, This is a perfomance hotspot to consider while generating a new job_list with splits
     def get_jobs_filtered(self, section, job, filters_to, natural_date, natural_member, natural_chunk,
                           filters_to_of_parent):
         #  datetime.strptime("20020201", "%Y%m%d")
@@ -574,7 +592,5 @@ class DicJobs:
         else:
             job = Job(loaded_data=self._job_list[name])
 
-        self.changes["NEWJOBS"] = True
-        # job.adjust_loaded_parameters()
         job.update_dict_parameters(self.as_conf)
         section_data.append(job)
