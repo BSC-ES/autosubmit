@@ -7,9 +7,10 @@ How to install
 
 The Autosubmit code is hosted in Git, at the BSC GitHub public repository. The Autosubmit Python package is available through PyPI, the primary source for Python packages.
 
-- Pre-requisites: bash, python3, sqlite3, git-scm > 1.8.2, subversion, dialog, curl, python-tk(tkinter in centOS), graphviz >= 2.41, pip3, rsync
+- Pre-requisites: bash, python3, sqlite3, git-scm > 1.8.2, subversion, pip >= 24.0, dialog, curl, python-tk(tkinter in centOS), graphviz >= 2.41, rsync
 
 .. important:: (SYSTEM) Graphviz version must be >= 2.38 except 2.40(not working). You can check the version using dot -v.
+.. important:: (SYSTEM) Pip version must be >= 24.0. You can check the version using dot -v.
 
 - Python dependencies: configobj>=5.0.6, argparse>=1.4.0 , python-dateutil>=2.8.2, matplotlib==3.4.3, numpy==1.21.6, py3dotplus>=1.1.0, pyparsing>=3.0.7, paramiko>=2.9.2, mock>=4.0.3, six>=1.10, portalocker>=2.3.2, networkx==2.6.3, requests>=2.27.1, bscearth.utils>=0.5.2, cryptography>=36.0.1, setuptools>=60.8.2, xlib>=0.21, pip>=22.0.3, ruamel.yaml, pythondialog, pytest, nose, coverage, PyNaCl==1.4.0, six>=1.10.0, requests, xlib, Pygments, packaging==19, typing>=3.7, autosubmitconfigparser
 
