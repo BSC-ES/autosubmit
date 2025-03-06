@@ -1049,10 +1049,11 @@ class JobList(object):
                     return distance
         return distance
 
-    def _calculate_natural_dependencies(self, dic_jobs, job, dependency, date, member, chunk,
-            graph, dependencies_keys_without_special_chars, distances_of_current_section,
-            distances_of_current_section_members, key, dependencies_of_that_section, chunk_list,
-            date_list, member_list, special_dependencies, max_distance, problematic_dependencies):
+
+    def _calculate_natural_dependencies(self, dic_jobs, job, dependency, date, member, chunk, graph,
+                                distances_of_current_section, key, dependencies_of_that_section,
+                                chunk_list, date_list, member_list, special_dependencies,
+                                max_distance, problematic_dependencies):
         """
         Calculate natural dependencies and add them to the graph if they're necessary.
         :param dic_jobs: JobList
@@ -1062,10 +1063,8 @@ class JobList(object):
         :param member: Member
         :param chunk: Chunk
         :param graph: Graph
-        :param dependencies_keys_without_special_chars: Dependencies of current job without
         special chars ( without SIM-10 -> SIM )
         :param distances_of_current_section: Distances of current section
-        :param distances_of_current_section_members: Distances of current section members
         :param key: Key
         :param dependencies_of_that_section: Dependencies of that section ( Dependencies of
         target parent )
@@ -1165,7 +1164,6 @@ class JobList(object):
 
     def _calculate_filter_dependencies(self, filters_to_apply, dic_jobs, job, dependency, date,
             member, chunk, graph, dependencies_keys_without_special_chars,
-            distances_of_current_section, distances_of_current_section_members, key,
             dependencies_of_that_section, chunk_list, date_list, member_list, special_dependencies,
             problematic_dependencies):
         """
@@ -1180,9 +1178,6 @@ class JobList(object):
         :param chunk: Chunk
         :param graph: Graph
         :param dependencies_keys_without_special_chars: Dependencies keys without special chars
-        :param distances_of_current_section: Distances of current section
-        :param distances_of_current_section_members: Distances of current section members
-        :param key: Key
         :param dependencies_of_that_section: Dependencies of that section
         :param chunk_list: Chunk list
         :param date_list: Date list
@@ -1464,7 +1459,6 @@ class JobList(object):
                 special_dependencies, problematic_dependencies = (
                     self._calculate_filter_dependencies(filters_to_apply, dic_jobs, job, dependency,
                         date, member, chunk, graph, dependencies_keys_without_special_chars,
-                        distances_of_current_section, distances_of_current_section_member, key,
                         dependencies_of_that_section, chunk_list, date_list, member_list,
                         special_dependencies, problematic_dependencies))
             if key in dependencies_non_natural_to_del:
@@ -1488,8 +1482,7 @@ class JobList(object):
             # Adds the dependencies to the job, and if not possible, adds the job to the
             # problematic_dependencies
             problematic_dependencies = self._calculate_natural_dependencies(dic_jobs, job,
-                dependency, date, member, chunk, graph, dependencies_keys_without_special_chars,
-                distances_of_current_section, distances_of_current_section_member, key,
+                dependency, date, member, chunk, graph, distances_of_current_section, key,
                 dependencies_of_that_section, chunk_list, date_list, member_list,
                 special_dependencies, max_distance, problematic_dependencies)
         return problematic_dependencies
