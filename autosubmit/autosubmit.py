@@ -29,7 +29,6 @@ from ruamel.yaml import YAML
 from typing import Dict, Set, Tuple, Union, Any, List, Optional
 
 from autosubmit.database.db_common import update_experiment_descrip_version
-from autosubmit.helpers.parameters import PARAMETERS
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
@@ -150,7 +149,6 @@ class Autosubmit:
         """Get the current voltage."""
         return self.experiment_data
 
-    sys.setrecursionlimit(500000)
     # Get the version number from the relevant file. If not, from autosubmit package
     script_dir = os.path.abspath(os.path.dirname(__file__))
 
@@ -1143,8 +1141,7 @@ class Autosubmit:
 
         Log.info("Removing Structure db...")
         try:
-            if structure_db_path.exists():
-                os.remove(structure_db_path)
+            os.remove(structure_db_path)
         except BaseException as e:
             error_message += f"Cannot delete structure: {e}\n"
 
@@ -1236,7 +1233,7 @@ class Autosubmit:
                             yield key, value
         template_files = [file.name for file in (read_files('autosubmitconfigparser.config')/'files').iterdir() if file.is_file()]
         if parameters is None:
-            parameters = PARAMETERS
+            parameters = {}
         parameter_comments = dict(_recurse_into_parameters(parameters))
 
         for as_conf_file in template_files:
@@ -1551,8 +1548,6 @@ class Autosubmit:
                                   "pkl", "job_packages_" + expid + ".db"), 0o644)
 
             packages_persistence.reset_table(True)
-            job_list_original = Autosubmit.load_job_list(
-                expid, as_conf, notransitive=notransitive)
             job_list = Autosubmit.load_job_list(
                 expid, as_conf, notransitive=notransitive)
             job_list.packages_dict = {}
@@ -1791,8 +1786,6 @@ class Autosubmit:
                 wrapper_job.new_status)
             # Erase from packages if the wrapper failed to be queued ( Hold Admin bug )
             if wrapper_job.status == Status.WAITING:
-                for inner_job in wrapper_job.job_list:
-                    inner_job.packed = False
                 job_list.job_package_map.pop(
                     wrapper_id, None)
                 job_list.packages_dict.pop(
@@ -2005,6 +1998,7 @@ class Autosubmit:
             raise AutosubmitCritical(
                 "Corrupted job_list, backup couldn't be restored", 7040, e.message)
         except BaseException as e:
+            Log.debug(f"Error while loading job_list: {str(e)}")
             raise AutosubmitCritical(
                 "Corrupted job_list, backup couldn't be restored", 7040, str(e))
         Log.debug("Length of the jobs list: {0}", len(job_list))
@@ -2076,6 +2070,7 @@ class Autosubmit:
 
         Log.debug("Checking job_list current status")
         job_list.update_list(as_conf, first_time=True)
+        job_list.clear_generate()
         job_list.save()
         as_conf.save()
         if not recover:
@@ -2204,8 +2199,6 @@ class Autosubmit:
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
                 while job_list.get_active():
                     Autosubmit.refresh_log_recovery_process(platforms_to_test, as_conf)
-                    for job in [job for job in job_list.get_job_list() if job.status == Status.READY]:
-                        job.update_parameters(as_conf, {})
                     did_run = True
                     try:
                         if Autosubmit.exit:
@@ -2968,6 +2961,7 @@ class Autosubmit:
             if len(current_active_jobs) > 0:
                 if force and save:
                     for job in current_active_jobs:
+                        job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", None)
                         if job.platform_name is None:
                             job.platform_name = hpcarch
                         job.platform = submitter.platforms[job.platform_name]
@@ -2987,6 +2981,7 @@ class Autosubmit:
         Log.info('Recovering experiment {0}'.format(expid))
         try:
             for job in job_list.get_job_list():
+                job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", None)
                 job.submitter = submitter
                 if job.platform_name is None:
                     job.platform_name = hpcarch
@@ -2995,7 +2990,7 @@ class Autosubmit:
                 # noinspection PyTypeChecker
                 platforms_to_test.add(platforms[job.platform_name])
             # establish the connection to all platforms
-            Autosubmit.restore_platforms(platforms_to_test,as_conf=as_conf)
+            Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf)
 
             if all_jobs:
                 jobs_to_recover = job_list.get_job_list()
@@ -3020,10 +3015,14 @@ class Autosubmit:
                     job.recover_last_ready_date()
                     job.recover_last_log_name()
                 elif job.status != Status.SUSPENDED:
+                    job.update_parameters(as_conf, set_attributes=True)
                     job.status = Status.WAITING
                     job._fail_count = 0
                     # Log.info("CHANGED job '{0}' status to WAITING".format(job.name))
                     # Log.status("CHANGED job '{0}' status to WAITING".format(job.name))
+
+                if save and job.status != Status.COMPLETED:
+                    job.update_parameters(as_conf, set_attributes=True)
 
             end = datetime.datetime.now()
             Log.info("Time spent: '{0}'".format(end - start))
@@ -3257,7 +3256,7 @@ class Autosubmit:
                 jobs_parameters = {}
                 try:
                     for job in job_list.get_job_list():
-                        job_parameters = job.update_parameters(as_conf, {})
+                        job_parameters = job.update_parameters(as_conf, set_attributes=True)
                         for key, value in job_parameters.items():
                             jobs_parameters["JOBS"+"."+job.section+"."+key] = value
                 except Exception:
@@ -4541,11 +4540,7 @@ class Autosubmit:
                     rerun = as_conf.get_rerun()
 
                     Log.info("\nCreating the jobs list...")
-                    job_list = JobList(expid, BasicConfig, YAMLParserFactory(),Autosubmit._get_job_list_persistence(expid, as_conf), as_conf)
-                    try:
-                         prev_job_list_logs = Autosubmit.load_logs_from_previous_run(expid, as_conf)
-                    except Exception:
-                        prev_job_list_logs = None
+                    job_list = JobList(expid, as_conf, YAMLParserFactory(),Autosubmit._get_job_list_persistence(expid, as_conf))
                     date_format = ''
                     if as_conf.get_chunk_size_unit() == 'hour':
                         date_format = 'H'
@@ -4572,8 +4567,7 @@ class Autosubmit:
                     else:
                         job_list.remove_rerun_only_jobs(notransitive)
                     Log.info("\nSaving the jobs list...")
-                    if prev_job_list_logs:
-                        job_list.add_logs(prev_job_list_logs)
+                    job_list.clear_generate()
                     job_list.save()
                     as_conf.save()
                     try:
@@ -4647,7 +4641,7 @@ class Autosubmit:
                     os.fsync(fh.fileno())
                     if detail:
                         Autosubmit.detail(job_list)
-                    return True
+                    return 0
                 # catching Exception
                 except KeyboardInterrupt:
                     # Setting signal handler to handle subsequent CTRL-C
@@ -4660,6 +4654,7 @@ class Autosubmit:
         finally:
             if profile:
                 profiler.stop()
+
 
     @staticmethod
     def detail(job_list):
@@ -5155,6 +5150,7 @@ class Autosubmit:
                                             j.chunk == int(chunk) and j.synchronize is not None]:
                                     final_list.append(job)
         return final_list
+
     @staticmethod
     def set_status(expid, noplot, save, final, filter_list, filter_chunks, filter_status, filter_section, filter_type_chunk, filter_type_chunk_split,
                    hide, group_by=None,
@@ -5212,6 +5208,7 @@ class Autosubmit:
                 submitter.load_platforms(as_conf)
                 hpcarch = as_conf.get_platform()
                 for job in job_list.get_job_list():
+                    job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", None)
                     if job.platform_name is None or job.platform_name.upper() == "":
                         job.platform_name = hpcarch
                     # noinspection PyTypeChecker
@@ -5339,7 +5336,6 @@ class Autosubmit:
                 performed_changes = {}
                 for job in final_list:
                     if final_status in [Status.WAITING, Status.PREPARED, Status.DELAYED, Status.READY]:
-                        job.packed = False
                         job.fail_count = 0
                     if job.status in [Status.QUEUING, Status.RUNNING,
                                       Status.SUBMITTED] and job.platform.name not in definitive_platforms:
@@ -5370,6 +5366,12 @@ class Autosubmit:
                 job_list.update_list(as_conf, False, True)
 
                 if save and wrongExpid == 0:
+                    for job in final_list:
+                        job.update_parameters(as_conf, set_attributes=True, reset_logs=True)
+                        if job.status in [Status.COMPLETED, Status.FAILED]:
+                            job.recover_last_ready_date()
+                            job.recover_last_log_name()
+
                     job_list.save()
                     exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                                     historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
@@ -5755,26 +5757,12 @@ class Autosubmit:
 
         open(as_conf.experiment_file, 'wb').write(content)
 
-    @staticmethod
-    def load_logs_from_previous_run(expid,as_conf):
-        logs = None
-        if Path(f'{BasicConfig.LOCAL_ROOT_DIR}/{expid}/pkl/job_list_{expid}.pkl').exists():
-            job_list = JobList(expid, BasicConfig, YAMLParserFactory(),Autosubmit._get_job_list_persistence(expid, as_conf), as_conf)
-            with suppress(BaseException):
-                graph = job_list.load()
-                if len(graph.nodes) > 0:
-                    # fast-look if graph existed, skips some steps
-                    job_list._job_list = [job["job"] for _, job in graph.nodes.data() if
-                                                job.get("job", None)]
-                logs = job_list.get_logs()
-            del job_list
-        return logs
 
     @staticmethod
     def load_job_list(expid, as_conf, notransitive=False, monitor=False, new = True): # To be moved to utils
         rerun = as_conf.get_rerun()
-        job_list = JobList(expid, BasicConfig, YAMLParserFactory(),
-                           Autosubmit._get_job_list_persistence(expid, as_conf), as_conf)
+        job_list = JobList(expid, as_conf, YAMLParserFactory(),
+                           Autosubmit._get_job_list_persistence(expid, as_conf))
         run_only_members = as_conf.get_member_list(run_only=True)
         date_list = as_conf.get_date_list()
         date_format = ''
@@ -5800,11 +5788,6 @@ class Autosubmit:
             job_list.rerun(rerun_jobs, as_conf, monitor=monitor)
         else:
             job_list.remove_rerun_only_jobs(notransitive)
-
-        # Inspect -cw and Create -cw commands had issues at this point.
-        # Reset packed value on load so the jobs can be wrapped again.
-        for job in job_list.get_waiting() + job_list.get_ready():
-            job.packed = False
 
         return job_list
 
@@ -6043,7 +6026,7 @@ class Autosubmit:
             current_status = current_status.upper().split(" ")
         try:
             current_status = [Status.KEY_TO_VALUE[x.strip()] for x in current_status]
-        except Exception:
+        except Exception as e:
             raise AutosubmitCritical("Invalid status -fs. All values must match one of {0}".format(Status.VALUE_TO_KEY.keys()), 7011)
 
 

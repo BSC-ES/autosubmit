@@ -18,32 +18,31 @@ from multiprocessing.queues import Queue
 import time
 
 
+
 def recover_platform_job_logs_wrapper(platform, recovery_queue, worker_event, cleanup_event):
     platform.recovery_queue = recovery_queue
     platform.work_event = worker_event
     platform.cleanup_event = cleanup_event
     platform.recover_platform_job_logs()
+    _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
 
-
-class UniqueQueue(Queue):
+class CopyQueue(Queue):
     """
-    A queue that avoids retrieves the same job and retrial during the same run.
+    A queue that copies the object gathered.
     """
 
-    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, max_items: int = 200, ctx: Any = None) -> None:
+    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, ctx: Any = None) -> None:
         """
-        Initializes the UniqueQueue.
+        Initializes the Queue.
 
         Args:
             maxsize (int): Maximum size of the queue. Defaults to -1 (infinite size).
             block (bool): Whether to block when the queue is full. Defaults to True.
             timeout (float): Timeout for blocking operations. Defaults to None.
-            max_items (int): Maximum number of unique items to track. Defaults to 200.
             ctx (Context): Context for the queue. Defaults to None.
         """
         self.block = block
         self.timeout = timeout
-        self.all_items = deque(maxlen=max_items)  # Won't be popped, so even if it is being processed by the log retrieval process, it won't be added again.
         super().__init__(maxsize, ctx=ctx)
 
 
@@ -57,15 +56,8 @@ class UniqueQueue(Queue):
             timeout (float): Timeout for blocking operations. Defaults to None.
         """
 
-        if job.wrapper_type == "vertical":  # We gather all retrials at once
-            unique_name = job.name
-        else:
-            unique_name = job.name+str(job.fail_count)  # We gather retrial per retrial
-
-        if unique_name not in self.all_items:
-            self.all_items.append(unique_name)
-            # Without copy, the process seems to modify the job for other retrials.. My guess is that the object is not serialized until it is get from the queue.
-            super().put(copy(job), block, timeout)
+        #     # Without copy, the process seems to modify the job for other retrials.. My guess is that the object is not serialized until it is get from the queue.
+        super().put(copy(job), block, timeout)
 
 
 class Platform(object):
@@ -88,7 +80,7 @@ class Platform(object):
         self._name = name  # type: str
         self.config = config
         self.tmp_path = os.path.join(
-            self.config.get("LOCAL_ROOT_DIR"), self.expid, self.config.get("LOCAL_TMP_DIR"))
+            self.config.get("LOCAL_ROOT_DIR", ""), self.expid, self.config.get("LOCAL_TMP_DIR", ""))
         self._serial_platform = None
         self._serial_queue = None
         self._serial_partition = None
@@ -679,8 +671,8 @@ class Platform(object):
         Returns:
             bool: True if the file was removed, False otherwise.
         """
-        if self.delete_file(job.stat_file):
-            Log.debug(f"{job.stat_file} have been removed")
+        if self.delete_file(f"{job.stat_file[:-1]}{job.fail_count}"):
+            Log.debug(f"{job.stat_file[:-1]}{job.fail_count} have been removed")
             return True
         return False
 
@@ -729,7 +721,7 @@ class Platform(object):
     def get_stat_file(self, job, count=-1):
 
         if count == -1:  # No internal retrials
-            filename = job.stat_file
+            filename = job.stat_file + "0"
         else:
             filename = job.name + '_STAT_{0}'.format(str(count))
         stat_local_path = os.path.join(
@@ -945,7 +937,10 @@ class Platform(object):
         if self.recovery_queue:
             del self.recovery_queue
         # Retrieval log process variables
-        self.recovery_queue = UniqueQueue(max_items=self.log_queue_size, ctx=ctx)
+        self.recovery_queue = CopyQueue(ctx=ctx)
+        # Cleanup will be automatically prompt on control + c or a normal exit
+        atexit.register(self.send_cleanup_signal)
+        atexit.register(self.closeConnection)
         return new_platform
 
     def create_new_process(self, ctx, new_platform) -> None:
@@ -964,9 +959,7 @@ class Platform(object):
         # Prevents zombies
         os.waitpid(self.log_recovery_process.pid, os.WNOHANG)
         Log.result(f"Process {self.log_recovery_process.name} started with pid {self.log_recovery_process.pid}")
-        # Cleanup will be automatically prompt on control + c or a normal exit
-        atexit.register(self.send_cleanup_signal)
-        atexit.register(self.closeConnection)
+
 
     def spawn_log_retrieval_process(self, as_conf: Any) -> None:
         """
@@ -1015,6 +1008,22 @@ class Platform(object):
                 break
         return process_log
 
+    def wait_for_work(self, sleep_time: int = 60) -> bool:
+        """
+        Waits a mandatory time and then waits until there is work, no work to more process or the cleanup event is set.
+
+        Args:
+            sleep_time (int): Maximum time to wait in seconds. Defaults to 60.
+
+        Returns:
+            bool: True if there is work to process, False otherwise.
+        """
+        process_log = self.wait_mandatory_time(sleep_time)
+        if not process_log:
+            process_log = self.wait_until_timeout(self.keep_alive_timeout - sleep_time)
+        self.work_event.clear()
+        return process_log
+
     def wait_until_timeout(self, timeout: int = 60) -> bool:
         """
         Waits until the timeout is reached or any signal is set to process logs.
@@ -1026,28 +1035,11 @@ class Platform(object):
             bool: True if there is work to process, False otherwise.
         """
         process_log = False
-        while timeout > 0:
-            if not self.recovery_queue.empty() or self.cleanup_event.is_set() or self.work_event.is_set():
+        for _ in range(timeout, 0, -1):
+            time.sleep(1)
+            if self.work_event.is_set() or not self.recovery_queue.empty() or self.cleanup_event.is_set():
                 process_log = True
                 break
-            time.sleep(1)
-            timeout -= 1
-        return process_log
-
-    def wait_for_work(self, sleep_time: int = 60) -> bool:
-        """
-        Waits for work to process, first for a mandatory time and then until the keep_alive_timeout is reached.
-
-        Args:
-            sleep_time (int): Minimum time to wait in seconds. Defaults to 60.
-
-        Returns:
-            bool: True if there is work to process, False otherwise.
-        """
-        process_log = self.wait_mandatory_time(sleep_time)
-        if not process_log:
-            process_log = self.wait_until_timeout(self.keep_alive_timeout - sleep_time)
-        self.work_event.clear()
         return process_log
 
     def recover_job_log(self, identifier: str, jobs_pending_to_process: Set[Any]) -> Set[Any]:
@@ -1068,11 +1060,12 @@ class Platform(object):
                 job = self.recovery_queue.get(
                     timeout=1)  # Should be non-empty, but added a timeout for other possible errors.
                 job.children = set()  # Children can't be serialized, so we set it to an empty set for this process.
-                job.platform = self  # Change the original platform to this process platform.
+                job.platform_name = self.name # Change the original platform to this process platform.
+                job.platform = self
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
                 try:
-                    job.retrieve_logfiles(self, raise_error=True)
-                except:
+                    job.retrieve_logfiles(raise_error=True)
+                except Exception:
                     jobs_pending_to_process.add(job)
                     job._log_recovery_retries += 1
                     Log.warning(f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry:'{job.fail_count}'.")
@@ -1088,7 +1081,7 @@ class Platform(object):
             job = jobs_pending_to_process.pop()
             job._log_recovery_retries += 1
             try:
-                job.retrieve_logfiles(self, raise_error=True)
+                job.retrieve_logfiles(raise_error=True)
                 job._log_recovery_retries += 1
             except:
                 if job._log_recovery_retries < 5:

@@ -1,6 +1,7 @@
 import os
 import pwd
 import time
+from distutils.command.config import config
 from pathlib import Path
 import pytest
 import multiprocessing as mp
@@ -9,88 +10,12 @@ import multiprocessing as mp
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.platforms.platform import UniqueQueue
+from autosubmit.platforms.platform import CopyQueue
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 
 def _get_script_files_path() -> Path:
     return Path(__file__).resolve().parent / 'files'
-
-
-@pytest.fixture
-def current_tmpdir(tmpdir_factory):
-    folder = tmpdir_factory.mktemp(f'tests')
-    os.mkdir(folder.join('scratch'))
-    file_stat = os.stat(f"{folder.strpath}")
-    file_owner_id = file_stat.st_uid
-    file_owner = pwd.getpwuid(file_owner_id).pw_name
-    folder.owner = file_owner
-    return folder
-
-
-@pytest.fixture
-def prepare_test(current_tmpdir):
-    # touch as_misc
-    platforms_path = Path(f"{current_tmpdir.strpath}/platforms_t000.yml")
-    jobs_path = Path(f"{current_tmpdir.strpath}/jobs_t000.yml")
-    project = "whatever"
-    scratch_dir = f"{current_tmpdir.strpath}/scratch"
-    Path(f"{scratch_dir}/{project}/{current_tmpdir.owner}").mkdir(parents=True, exist_ok=True)
-    Path(f"{scratch_dir}/LOG_t000").mkdir(parents=True, exist_ok=True)
-    Path(f"{scratch_dir}/LOG_t000/t000.cmd.out.0").touch()
-    Path(f"{scratch_dir}/LOG_t000/t000.cmd.err.0").touch()
-
-    # Add each platform to test
-    with platforms_path.open('w') as f:
-        f.write(f"""
-PLATFORMS:
-    pytest-ps:
-        type: ps
-        host: 127.0.0.1
-        user: {current_tmpdir.owner}
-        project: {project}
-        scratch_dir: {scratch_dir}
-        """)
-    # add a job of each platform type
-    with jobs_path.open('w') as f:
-        f.write(f"""
-JOBS:
-    base:
-        SCRIPT: |
-            echo "Hello World"
-            echo sleep 5
-        QUEUE: hpc
-        PLATFORM: pytest-ps
-        RUNNING: once
-        wallclock: 00:01
-EXPERIMENT:
-    # List of start dates
-    DATELIST: '20000101'
-    # List of members.
-    MEMBERS: fc0
-    # Unit of the chunk size. Can be hour, day, month, or year.
-    CHUNKSIZEUNIT: month
-    # Size of each chunk.
-    CHUNKSIZE: '4'
-    # Number of chunks of the experiment.
-    NUMCHUNKS: '2'
-    CHUNKINI: ''
-    # Calendar used for the experiment. Can be standard or noleap.
-    CALENDAR: standard
-  """)
-    return current_tmpdir
-
-
-@pytest.fixture
-def local(prepare_test):
-    # Init Local platform
-    from autosubmit.platforms.locplatform import LocalPlatform
-    config = {
-        'LOCAL_ROOT_DIR': f"{prepare_test}/scratch",
-        'LOCAL_TMP_DIR': f"{prepare_test}/scratch",
-    }
-    local = LocalPlatform(expid='t000', name='local', config=config)
-    return local
 
 
 @pytest.fixture
@@ -206,7 +131,7 @@ def test_wait_until_timeout(prepare_test, local, as_conf, mocker, cleanup_event,
     max_items = 1
     ctx = local.get_mp_context()
     local.prepare_process(ctx)
-    local.recovery_queue = UniqueQueue(max_items=max_items, ctx=ctx)
+    local.recovery_queue = CopyQueue(ctx=ctx)
     local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
     local.work_event.set() if work_event else local.work_event.clear()
     if recovery_queue_full:
@@ -234,7 +159,7 @@ def test_wait_for_work(prepare_test, local, as_conf, mocker, cleanup_event, work
     max_items = 1
     ctx = local.get_mp_context()
     local.prepare_process(ctx)
-    local.recovery_queue = UniqueQueue(max_items=max_items, ctx=ctx)
+    local.recovery_queue = CopyQueue(ctx=ctx)
     local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
     local.work_event.set() if work_event else local.work_event.clear()
     if recovery_queue_full:
@@ -262,7 +187,7 @@ def test_wait_mandatory_time(prepare_test, local, as_conf, mocker, cleanup_event
     max_items = 1
     ctx = local.get_mp_context()
     local.prepare_process(ctx)
-    local.recovery_queue = UniqueQueue(max_items=max_items, ctx=ctx)
+    local.recovery_queue = CopyQueue(ctx=ctx)
     local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
     local.work_event.set() if work_event else local.work_event.clear()
     if recovery_queue_full:
@@ -277,13 +202,11 @@ def test_unique_elements(local, mocker):
     max_items = 3
     ctx = local.get_mp_context()
     local.prepare_process(ctx)
-    local.recovery_queue = UniqueQueue(max_items=max_items, ctx=ctx)
+    local.recovery_queue = CopyQueue(ctx=ctx)
     for i in range(max_items):
         local.recovery_queue.put(Job(f'rng{i}', f'000{i}', Status.COMPLETED, 0))
-    assert len(local.recovery_queue.all_items) == max_items
     for i in range(max_items):
         local.recovery_queue.put(Job(f'rng2{i}', f'000{i}', Status.COMPLETED, 0))
-    assert len(local.recovery_queue.all_items) == max_items
 
 
 @pytest.fixture()
@@ -381,4 +304,3 @@ def test_create_a_new_copy(local, pjm, slurm, ps, ecaccess):
     assert slurm.create_a_new_copy().name == slurm.name
     assert ps.create_a_new_copy().name == ps.name
     assert ecaccess.create_a_new_copy().name == ecaccess.name
-
