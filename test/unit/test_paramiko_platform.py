@@ -111,7 +111,7 @@ def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_p
     job.name = 'TEST'
     with pytest.raises(AutosubmitError) as cm:
         platform.check_Alljobs(
-            job_list=[[job, None]],
+            job_list=[job],
             as_conf=as_conf,
             retries=-1)
     assert cm.value.message == 'Some Jobs are in Unknown status'
@@ -139,7 +139,7 @@ def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_p
 
     with pytest.raises(AutosubmitError) as cm:
         platform.check_Alljobs(
-            job_list=[[job, None]],
+            job_list=[job],
             as_conf=as_conf,
             retries=1)
     assert cm.value.message == ae.error_message

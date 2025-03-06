@@ -22,6 +22,7 @@ import os
 from collections import defaultdict
 from typing import Optional, Union, TYPE_CHECKING
 
+
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmit.platforms.ecplatform import EcPlatform
@@ -31,6 +32,7 @@ from autosubmit.platforms.pjmplatform import PJMPlatform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from autosubmit.platforms.submitter import Submitter
+from .platform import Platform
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -111,6 +113,15 @@ class ParamikoSubmitter(Submitter):
 
     def __init__(self):
         self.platforms = None
+
+    @property
+    def platforms_object(self) -> list[Platform]:
+        """
+        Returns a list of all the platforms objects used by the experiment.
+        :return: List of platform objects
+        :rtype: list[Platform]
+        """
+        return list(self.platforms.values())
 
     def load_local_platform(self, as_conf: 'AutosubmitConfig', experiment_data: Optional[dict] = None,
                             auth_password: Optional[str] = None) -> None:

@@ -55,6 +55,7 @@ class WrapperFactory(object):
             kwargs['reservation'] = self.reservation(wrapper_data.reservation)
 
         kwargs["executable"] = wrapper_data.executable
+        kwargs["fail_count"] = wrapper_data.jobs[0].fail_count
 
         kwargs['header_directive'] = self.header_directives(**kwargs)
         wrapper_cmd = self.wrapper_director.construct(wrapper_builder(**kwargs))
@@ -64,8 +65,11 @@ class WrapperFactory(object):
                                                  wrapper_cmd, flags=re.IGNORECASE)
         for placeholder in placeholders_inside_wrapper:
             placeholder = placeholder[1:-1]
-
-            value = str(wrapper_data.jobs[0].parameters.get(placeholder.upper(), ""))
+            try:
+                value = str(wrapper_data.jobs[0].parameters.get(placeholder.upper(), ""))
+            except BaseException:
+                pass
+            value = ""
             if not value or value == "[]":
                 wrapper_cmd = re.sub('%(?<!%%)' + placeholder + '%(?!%%)', '', wrapper_cmd, flags=re.I)
             else:

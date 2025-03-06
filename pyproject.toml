@@ -78,7 +78,7 @@ version =  {file = "VERSION"}
 readme = {file = "README_PIP.md"}
 
 [project.optional-dependencies]
-postgres = ["psycopg2"]
+postgres = ["psycopg", "psycopg2"]
 tests = [
     # TODO: remove mock by pytest-mock
     "mock",

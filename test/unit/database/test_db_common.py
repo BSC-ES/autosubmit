@@ -24,13 +24,26 @@ the ``test/integration/test_db_common.py`` for more tests.
 import inspect
 
 import pytest
-
 from autosubmit.config.basicconfig import BasicConfig
+
 from autosubmit.database import db_common
 from autosubmit.log.log import AutosubmitCritical
 
 
-def test_db_common_sqlite_multiprocessing_queue_error(mocker):
+@pytest.mark.parametrize(
+    "fn",
+    [
+        "check_experiment_exists",
+        "delete_experiment",
+        "get_autosubmit_version",
+        "get_experiment_description",
+        "get_experiment_id",
+        "last_name_used",
+        "save_experiment",
+        "update_experiment_description_version",
+    ],
+)
+def test_db_common_sqlite_multiprocessing_queue_error(mocker, fn: str, tmp_path) -> None:
     """Test the queue timeout error path for ``db_common`` functions.
 
     ``db_common`` uses multiprocessing and a ``Queue`` to launch database operations (SQLite).
@@ -44,28 +57,13 @@ def test_db_common_sqlite_multiprocessing_queue_error(mocker):
     mocked_queue = mocker.patch('multiprocessing.Queue')
     mocker.patch('multiprocessing.Queue', return_value=mocked_queue)
     mocker.patch('multiprocessing.Process')
-
     mocked_queue.get.side_effect = [Exception]
 
-    for fn in [
-        'check_experiment_exists',
-        'delete_experiment',
-        'get_autosubmit_version',
-        'get_experiment_id',
-        'last_name_used',
-        'save_experiment',
-        'update_experiment_description_version'
-    ]:
-        try:
-            db_common_fn = getattr(db_common, fn)
-            sig = inspect.signature(db_common_fn)
-            params = ['' for _ in range(len(sig.parameters))]
-            db_common_fn(*params)
-        except AutosubmitCritical:
-            pass
-        else:
-            raise AssertionError(f'The function {fn} should raise an AutosubmitCritical in this case!')
-
+    db_common_fn = getattr(db_common, fn)
+    sig = inspect.signature(db_common_fn)
+    params = ['' for _ in range(len(sig.parameters))]
+    with pytest.raises(AutosubmitCritical):
+        db_common_fn(*params)
 
 def test_save_experiment_sqlite_open_conn_error(monkeypatch, tmp_path, mocker):
     """Test the ``open_conn`` error path for ``db_common`` functions.
@@ -94,3 +92,16 @@ def test_save_experiment_sqlite_open_conn_error(monkeypatch, tmp_path, mocker):
             sig = inspect.signature(db_common_fn)
             params = ['' for _ in range(len(sig.parameters))]
             db_common_fn(*params)
+
+def test_save_experiment_integrity_error(monkeypatch, tmp_path, mocker):
+    """Test the ``IntegrityError`` error path for ``db_common.save_experiment``.."""
+    monkeypatch.setattr(db_common, 'TIMEOUT', 1)
+    monkeypatch.setattr(BasicConfig, 'DB_PATH', str(tmp_path))
+
+    from sqlalchemy.exc import IntegrityError
+
+    mocker.patch('autosubmit.database.db_common.open_conn', side_effect=IntegrityError('bla', 'bla', 'bla'))
+
+    with pytest.raises(AutosubmitCritical) as e:
+        db_common.save_experiment('', '', '')
+        assert "could not register experiment" in str(e.value)

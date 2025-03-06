@@ -389,9 +389,9 @@ def create_rocrate_archive(
     _add_dir_and_files(crate, experiment_path, "plot")
     # Add status files.
     _add_dir_and_files(crate, experiment_path, "status")
-    # Add SQLite DB and pickle files.
-    _add_dir_and_files(crate, experiment_path, "pkl", "application/binary")
-
+    # Add SQLite DB files.
+    _add_dir_and_files(crate, experiment_path, "db", "application/binary")
+    # TODO job_list_to_db test ro-crate
     # Register Workflow Run RO-Crate (WRROC) profile. This code was adapted from COMPSs and StreamFlow.
     #
     # See: https://gitlab.bsc.es/wdc/compss/framework/-/blob/9cc5a8a5ba76457cf9b71d698bb77b8fa0aa0c9c/compss/runtime/scripts/system/provenance/generate_COMPSs_RO-Crate.py
