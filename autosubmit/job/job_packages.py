@@ -14,8 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
-
+import copy
 import datetime
 import json
 import locale
@@ -49,6 +48,7 @@ def threaded(fn):
         thread.name = "data_processing"
         thread.start()
         return thread
+
     return wrapper
 
 
@@ -164,7 +164,7 @@ class JobPackageBase(object):
                     if not only_generate:
                         raise AutosubmitCritical(f"[section:{job.section}]: Additional file:{additional_file} does not exists", 7014)
                     Log.warning(f"[section:{job.section}]: Additional file:{additional_file} does not exists, skipping check")
-                    
+
 
     def build_scripts(self, configuration: 'AutosubmitConfig') -> None:
         """Submit jobs one by one without using threads.
@@ -236,11 +236,15 @@ class JobPackageBase(object):
                 Log.debug("Sending Files")
                 self._send_files()
                 Log.debug("Submitting")
+                self._delete_failed_and_completed_files()
                 self._do_submission(hold=hold)
         except AutosubmitCritical:
             raise
         except BaseException as e:
             raise AutosubmitCritical(f"Error while submitting jobs: {e}", 7013)
+
+    def _delete_failed_and_completed_files(self):
+        self.platform.delete_failed_and_completed_names([job.name for job in self.jobs])
 
     def _create_scripts(self, configuration: 'AutosubmitConfig'):
         raise Exception('Not implemented')
@@ -252,13 +256,14 @@ class JobPackageBase(object):
         """ Submit package to the platform. """
         pass  # pragma: no cover
 
-    def process_jobs_to_submit(self, job_id: str, hold: bool = False) -> None:
+    def process_jobs_to_submit(self, job_id: int, hold: bool = False) -> None:
         for i, job in enumerate(self.jobs):
             job.hold = hold
-            job.id = str(job_id)
+            job.id = copy.copy(job_id)
+            job.prev_status = job.status
             job.status = Status.SUBMITTED
             Log.result(
-                f"Job: {job.name} submitted with job_id: {job.id.strip()} and workflow commit: {job.workflow_commit}")
+                f"Job: {job.name} submitted with job_id: {job.id} and workflow commit: {job.workflow_commit}")
             if hasattr(self, "name"):
                 # TODO change this check for a property that checks if it is a wrapper or not, the same change has to be done in other parts of the code
                 job.wrapper_name = self.name
@@ -318,7 +323,7 @@ class JobPackageSimple(JobPackageBase):
             Log.info(f"{job.name} submitted")
             job.status = Status.SUBMITTED
             job.wrapper_name = job.name
-            job.id = str(job.id)
+            job.id = int(job.id)
 
 
 class JobPackageSimpleWrapped(JobPackageSimple):
@@ -418,6 +423,7 @@ class JobPackageArray(JobPackageBase):
         for i in range(0, len(self.jobs)):  # platforms without a submit.cmd
             Log.info(f"{self.jobs[i].name} submitted")
             self.jobs[i].id = str(package_id) + f'[{i}]'
+            self.jobs[i].prev_status = self.jobs[i].status
             self.jobs[i].status = Status.SUBMITTED
             # Identify to which wrapper this job belongs once it is in the recovery queue
             self.jobs[i].wrapper_name = self.name
@@ -685,7 +691,8 @@ class JobPackageThread(JobPackageBase):
             return
         for i in range(0, len(self.jobs)):
             Log.info(f"{self.jobs[i].name} submitted")
-            self.jobs[i].id = str(package_id)
+            self.jobs[i].id = int(package_id)
+            self.jobs[i].prev_status = self.jobs[i].status
             self.jobs[i].status = Status.SUBMITTED
             self.jobs[i].wrapper_name = self.name
 
@@ -776,6 +783,7 @@ class JobPackageThreadWrapped(JobPackageThread):
         for i in range(0, len(self.jobs)):
             Log.info(f"{self.jobs[i].name} submitted")
             self.jobs[i].id = str(package_id)
+            self.jobs[i].prev_status = self.jobs[i].status
             self.jobs[i].status = Status.SUBMITTED
             self.jobs[i].wrapper_name = self.name
 

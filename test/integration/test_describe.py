@@ -24,7 +24,6 @@ from pytest_mock import MockerFixture
 from ruamel.yaml import YAML
 
 from autosubmit.autosubmit import Autosubmit
-
 _EXPIDS = ['z000', 'z001']
 
 
@@ -81,9 +80,7 @@ def test_describe(
             for line_tuple in mocked_log.result.mock_calls
             if line_tuple[1][0].startswith('Location: ')
         ]
-
         assert len(location_lines) == len(exps)
-
         for exp in exps:
             assert f'Location: {exp.exp_path}' in location_lines
 
@@ -93,7 +90,7 @@ def test_run_command_describe(autosubmit_exp: Callable, autosubmit, mocker):
 
     ``sys.argv`` is mocked to return what ``argparse`` would parse for a command
     such as ``autosubmit -lc ERROR -lf WARNING describe z000``.
-    
+
     This triggers the log initialization, and verifies that log levels work too,
     as documented.
 

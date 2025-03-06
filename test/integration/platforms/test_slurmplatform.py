@@ -31,6 +31,7 @@ from pathlib import Path
 
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.history.experiment_history import ExperimentHistory
@@ -644,6 +645,22 @@ def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubm
 
     exp = autosubmit_exp('t002', experiment_data=experiment_data, wrapper=True)
     _create_slurm_platform(exp.expid, exp.as_conf)
+
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, "t001")
+    tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+    aslogs_path = Path(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
+
+    exp.autosubmit._setup_log_files(
+        command="run",
+        expids=[],
+        expid="t001",
+        owner=True,
+        tmp_path=str(tmp_path),
+        aslogs_path=str(aslogs_path),
+        exp_path=str(exp_path),
+        log_level="DEBUG",
+        console_level="DEBUG"
+    )
 
     exp.as_conf.experiment_data = {
         'EXPERIMENT': {
