@@ -49,7 +49,7 @@ HOW TO DEPLOY/SETUP AUTOSUBMIT FRAMEWORK
   machine. These packages (argparse, dateutil, pyparsing, numpy, pydotplus, matplotlib, paramiko,
   python2-pythondialog*, mock, portalocker) must be available for python runtime. And the machine is also able to access
   HPC platforms via password-less ssh.
-  Pip must be availbale with version `>= 24.0`.
+  Pip must be available with version `>= 24.0`.
 
   *: optional
 
