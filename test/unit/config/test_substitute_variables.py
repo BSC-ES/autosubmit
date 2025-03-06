@@ -29,7 +29,7 @@ FOR_CONF = {
             "FOR": {
                 "NAME": "%var%"
             },
-            "path": "/home/dbeltran/conf/stuff_to_read/%NAME%/test.yml"
+            "path": "/something/%NAME%/test.yml"
         }
     }
 }
@@ -58,7 +58,6 @@ TEST_NESTED_DICT = {
 }
 
 
-@pytest.mark.skip('references /home/dbeltran/...')
 def test_substitute_dynamic_variables_yaml_files_short_format_for(autosubmit_config):
     as_conf = autosubmit_config(
         expid='a000',
@@ -69,7 +68,7 @@ def test_substitute_dynamic_variables_yaml_files_short_format_for(autosubmit_con
     assert as_conf.experiment_data['VAR'] == ['%NOTFOUND%', 'VARIABLEX', 'VARIABLEY']
 
 
-@pytest.mark.skip('references /home/dbeltran/...')
+@pytest.mark.skip('no longer references /home/dbeltran/..., but still does not work')
 def test_substitute_dynamic_variables_yaml_files_with_for_short_format(autosubmit_config):
     as_conf = autosubmit_config(
         expid='a000',
@@ -82,14 +81,13 @@ def test_substitute_dynamic_variables_yaml_files_with_for_short_format(autosubmi
     assert as_conf.experiment_data['VAR'] == ['%NOTFOUND%', 'VARIABLEX', 'VARIABLEY']
     assert as_conf.experiment_data['JOBS']['JOB_VARIABLEX'] == {'ADDITIONAL_FILES': [], 'DEPENDENCIES': {}, 'FILE': '',
                                                                  'NAME': 'VARIABLEX',
-                                                                 'PATH': '/home/dbeltran/conf/stuff_to_read/VARIABLEX/test.yml'}
+                                                                 'PATH': "/something/VARIABLEX/test.yml"}
     assert as_conf.experiment_data['JOBS']['JOB_VARIABLEY'] == {'ADDITIONAL_FILES': [], 'DEPENDENCIES': {}, 'FILE': '',
                                                                  'NAME': 'VARIABLEY',
-                                                                 'PATH': '/home/dbeltran/conf/stuff_to_read/VARIABLEY/test.yml'}
+                                                                 'PATH': "/something/VARIABLEY/test.yml"}
     assert as_conf.experiment_data['JOBS'].get('%NOTFOUND%', None) is None
 
-
-@pytest.mark.skip('references /home/dbeltran/...')
+@pytest.mark.skip('no longer references /home/dbeltran/..., but still does not work')
 def test_substitute_dynamic_variables_yaml_files_with_for_short_format_and_custom_config(autosubmit_config):
     as_conf = autosubmit_config(
         expid='a000',
@@ -102,10 +100,10 @@ def test_substitute_dynamic_variables_yaml_files_with_for_short_format_and_custo
     assert as_conf.experiment_data['VAR'] == ['%NOTFOUND%', 'VARIABLEX', 'VARIABLEY']
     assert as_conf.experiment_data['JOBS']['JOB_VARIABLEX'] == {'ADDITIONAL_FILES': [], 'DEPENDENCIES': {}, 'FILE': '',
                                                                  'NAME': 'VARIABLEX',
-                                                                 'PATH': '/home/dbeltran/conf/stuff_to_read/VARIABLEX/test.yml'}
+                                                                 'PATH': "/something/VARIABLEX/test.yml"}
     assert as_conf.experiment_data['JOBS']['JOB_VARIABLEY'] == {'ADDITIONAL_FILES': [], 'DEPENDENCIES': {}, 'FILE': '',
                                                                  'NAME': 'VARIABLEY',
-                                                                 'PATH': '/home/dbeltran/conf/stuff_to_read/VARIABLEY/test.yml'}
+                                                                 'PATH': "/something/VARIABLEY/test.yml"}
     assert as_conf.experiment_data['JOBS'].get('%NOTFOUND%', None) is None
 
 

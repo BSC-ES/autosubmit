@@ -15,5 +15,5 @@ MAIL:
   NOTIFICATIONS: False
   TO:
 STORAGE:
-  TYPE: pkl
+  TYPE: sqlite
   COPY_REMOTE_LOGS: true

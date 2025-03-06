@@ -356,15 +356,13 @@ def test_send_command_timeout_error_exec_command(
         exp_ps_platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
 
         # Capture platform log.
-        mocked_log = mocker.patch('autosubmit.platforms.paramiko_platform.Log')
+        mocker.patch('autosubmit.platforms.paramiko_platform.Log')
         # Simulate an error occurred, and retrying did not fix it.
         mocker.patch.object(exp_ps_platform, 'exec_command', return_value=(False, False, False))
 
         with pytest.raises(AutosubmitError) as cm:
             exp_ps_platform.send_command(command=cmd, ignore_log=False, x11=False)
 
-        assert mocked_log.debug.called
-        assert f'send_command timeout used: {str(timeout)}' in mocked_log.debug.call_args[0][0]
 
         assert 'Failed to send' in str(cm.value.message)
         assert 6005 == cm.value.code

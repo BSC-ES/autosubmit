@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 # -- Tests
 
+@pytest.mark.xdist_group("slurm")
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -101,6 +102,7 @@ def test_run_uninterrupted(
         pytest.fail(e_msg)
 
 
+@pytest.mark.xdist_group("slurm")
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
