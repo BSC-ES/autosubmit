@@ -60,11 +60,11 @@ dependencies = [
     "configparser",
     "setproctitle",
     "invoke>=2.0",
-    "ruamel.yaml==0.18.15",
+    "SQLAlchemy~=2.0.23",
+    "ruamel.yaml==0.18.14",
     "configobj",
     "pyparsing",
     "configparser"
-    # 'sqlalchemy[mypy]' # TODO: pending Postgres MR
 ]
 
 [project.urls]
@@ -98,8 +98,8 @@ docs = [
 ]
 all = [
     "autosubmit[tests]",
-    "autosubmit[docs]"
-    # "autosubmit[postgres]"
+    "autosubmit[docs]",
+    "autosubmit[postgres]"
 ]
 
 [tool.setuptools.packages.find]

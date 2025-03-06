@@ -20,12 +20,14 @@
 from datetime import datetime
 from os import utime
 from pathlib import Path
+from shutil import rmtree
 from subprocess import CalledProcessError, SubprocessError
 from typing import Any, Optional, Tuple
 
 import pytest
 # noinspection PyProtectedMember
 from _pytest._py.path import LocalPath
+from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
@@ -404,7 +406,7 @@ def test_generate_output(
             monitor.generate_output(
                 expid=_EXPID,
                 joblist=job_list.get_job_list(),
-                path=exp_path / f'tmp/LOG_{_EXPID}',
+                path=str(exp_path / f'tmp/LOG_{_EXPID}'),
                 output_format=output_format,
                 show=show,
                 groups=None,
@@ -418,7 +420,7 @@ def test_generate_output(
         monitor.generate_output(
             expid=_EXPID,
             joblist=job_list.get_job_list(),
-            path=exp_path / f'tmp/LOG_{_EXPID}',
+            path=str(exp_path / f'tmp/LOG_{_EXPID}'),
             output_format=output_format,
             show=show,
             groups=None,
@@ -498,9 +500,9 @@ def test_generate_output_txt(jobs: list[Job], classictxt: bool, status_dir_exist
     as_conf = autosubmit_config(_EXPID, experiment_data={})
     status_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, 'status')
     if status_dir_exists:
-        status_path.mkdir(parents=True)
+        status_path.mkdir(parents=True, exist_ok=True)
     else:
-        status_path.unlink(missing_ok=True)
+        rmtree(status_path, ignore_errors=True)
 
     status_file = status_path / f'{_EXPID}_{time_str}.txt'
 
