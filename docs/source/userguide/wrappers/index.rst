@@ -484,7 +484,7 @@ Considering the following configuration:
     WRAPPERS:
       WRAPPER_SIMDA:
         TYPE: "horizontal-vertical"
-        JOBS_IN_WRAPPER: "SIM DA"
+        JOBS_IN_WRAPPER: "SIM&DA"
 
 
 
@@ -493,7 +493,7 @@ Considering the following configuration:
     wrappers:
       wrapper_simda:
         TYPE: "horizontal-vertical"
-        JOBS_IN_WRAPPER: "SIM DA"
+        JOBS_IN_WRAPPER: "SIM&DA"
 
 .. autosubmitfigure::
     :command: create

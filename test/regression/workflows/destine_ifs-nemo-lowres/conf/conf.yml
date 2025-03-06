@@ -66,7 +66,7 @@ JOBS:
     DEPENDENCIES:
       SIM:
         STATUS: RUNNING
-        ANY_FINAL_STATUS_IS_VALID: true
+        OPTIONAL: true
     RUNNING: chunk
     WALLCLOCK: 00:30
     CHECK: on_submission

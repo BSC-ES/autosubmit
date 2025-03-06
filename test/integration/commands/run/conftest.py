@@ -27,49 +27,99 @@ import os
 import pwd
 import sqlite3
 from pathlib import Path
-from textwrap import dedent
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable
 
 import pytest
+from threading import Thread
 
 if TYPE_CHECKING:
-    from testcontainers.core.container import DockerContainer
     from test.conftest import AutosubmitExperiment
 
 _EXPID = 't000'
 """The experiment ID used throughout the test."""
 
 
-# TODO expand the tests to test Slurm, PSPlatform, Ecplatform whenever possible
+# TODO expand the tests (Ecplatform, PJM) whenever possible
+# TODO The db check could be improved to check everything not only the job_data table
 
 # --- Fixtures.
+@pytest.fixture(autouse=True, scope="function")
+def set_debug_log_level() -> None:
+    """
+    Set the console log level to DEBUG for all tests in the session.
+    """
+    from autosubmit.log.log import Log
+    Log.set_console_level("DEBUG")
 
-@pytest.fixture
-def as_exp(autosubmit_exp):
-    exp = autosubmit_exp(_EXPID, experiment_data={
+
+@pytest.fixture(scope="function")
+def common_conf(tmp_path) -> dict:
+    return {
         'PROJECT': {
             'PROJECT_TYPE': 'none',
             'PROJECT_DESTINATION': 'dummy_project'
+        },
+        'AUTOSUBMIT': {
+            'WORKFLOW_COMMIT': 'dummy_commit',
+            'LOCAL_ROOT_DIR': str(tmp_path)  # Override root dir to tmp_path
+        },
+        'CONFIG': {
+            "SAFETYSLEEPTIME": 0,
+        },
+        'PLATFORMS': {
+            'TEST_SLURM': {
+                'TYPE': 'slurm',
+                'ADD_PROJECT_TO_HOST': 'False',
+                'HOST': '127.0.0.1',
+                'MAX_WALLCLOCK': '48:00',
+                'PROJECT': 'group',
+                'QUEUE': 'gp_debug',
+                'SCRATCH_DIR': '/tmp/scratch',
+                'TEMP_DIR': '',
+                'USER': 'root',
+                'PROCESSORS': '1',
+                'MAX_PROCESSORS': '128',
+                'PROCESSORS_PER_NODE': '128',
+            },
+            'TEST_PS': {
+                'TYPE': 'PS',
+                'ADD_PROJECT_TO_HOST': 'False',
+                'HOST': '127.0.0.1',
+                'MAX_WALLCLOCK': '48:00',
+                'PROJECT': 'group',
+                'QUEUE': 'gp_debug',
+                'SCRATCH_DIR': '/tmp/scratch',
+                'TEMP_DIR': '',
+                'USER': 'root',
+                'PROCESSORS': '1',
+                'MAX_PROCESSORS': '128',
+                'PROCESSORS_PER_NODE': '128',
+            }
         }
-    })
+    }
 
-    run_tmpdir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    dummy_dir = Path(run_tmpdir, f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/dummy_dir")
-    real_data = Path(run_tmpdir, f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/real_data")
-    # We write some dummy data inside the scratch_dir
+@pytest.fixture
+def prepare_scratch(tmp_path: Path) -> Any:
+    """
+    Create an isolated experiment using a temporary directory for each test.
+
+    :param tmp_path: Temporary directory unique to the test.
+    :type tmp_path: Path
+    :return: Configured experiment object.
+    :rtype: Any
+    """
+    run_tmpdir = tmp_path
+
+    dummy_dir = run_tmpdir / f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/dummy_dir"
+    real_data = run_tmpdir / f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/real_data"
     dummy_dir.mkdir(parents=True)
     real_data.mkdir(parents=True)
 
     with open(dummy_dir / 'dummy_file', 'w') as f:
         f.write('dummy data')
 
-    # create some dummy absolute symlinks in expid_dir to test migrate function
-    Path(real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
-
-    exp.as_conf.reload(force_load=True)
-
-    return exp
+    (real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
 
 
 # --- Internal utility functions.
@@ -111,7 +161,25 @@ def _print_db_results(db_check_list, rows_as_dicts, run_tmpdir):
                 print(f"Job entry: {job_name} assert {str(all_ok).upper()}")
 
 
-def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[str, Any]:
+def run_in_thread(target: Callable[..., Any], *args, **kwargs) -> Thread:
+    """
+    Run the given target function in a separate thread.
+
+    :param target: The function to execute in the thread.
+    :type target: Callable[..., Any]
+    :param args: Positional arguments for the target function.
+    :type args: Any
+    :param kwargs: Keyword arguments for the target function.
+    :type kwargs: Any
+    :return: The started Thread object.
+    :rtype: Thread
+    """
+    thread = Thread(target=target, args=args, kwargs=kwargs)
+    thread.start()
+    return thread
+
+
+def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[str, (bool, str)]:
     """Check that the database contains the expected number of entries,
     and that all fields contain data after a completed run."""
     # Test database exists.
@@ -214,14 +282,13 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[s
                     "finish>=previous_submit": check_finish_previous_submit_retry,
                 }
 
-                db_check_job[i]["empty_fields"] = " ".join(
+                db_check_job[i]["empty_fields"] = "".join(
                     {
                         str(k): v
                         for k, v in row_dict.items()
                         if k not in excluded_keys and v == ""
                     }.keys()
                 )
-
                 previous_retry_row = row_dict
     _print_db_results(db_check_list, rows_as_dicts, run_tmpdir)
     return db_check_list
@@ -308,357 +375,3 @@ def _assert_files_recovered(files_check_list):
     """Assert that the files are recovered correctly."""
     for check_name in files_check_list:
         assert files_check_list[check_name]
-
-
-def _init_run(as_exp, jobs_data) -> Path:
-    as_conf = as_exp.as_conf
-    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
-
-    exp_path = run_tmpdir / _EXPID
-    jobs_path = exp_path / f"conf/jobs_{_EXPID}.yml"
-    with jobs_path.open('w') as f:
-        f.write(jobs_data)
-
-    # This is set in _init_log which is not done automatically by Autosubmit
-    as_exp.autosubmit._check_ownership_and_set_last_command(
-        as_exp.as_conf,
-        as_exp.expid,
-        'run')
-
-    # We have to reload as we changed the jobs.
-    as_conf.reload(force_load=True)
-
-    return exp_path / f'tmp/LOG_{_EXPID}'
-
-
-# -- Tests
-
-@pytest.mark.slurm
-@pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
-    # Success
-    (dedent("""\
-    EXPERIMENT:
-        NUMCHUNKS: '3'
-    JOBS:
-        job:
-            SCRIPT: |
-                echo "Hello World with id=Success"
-                sleep 1
-            PLATFORM: TEST_SLURM
-            RUNNING: chunk
-            wallclock: 00:01
-    PLATFORMS:
-        TEST_SLURM:
-            ADD_PROJECT_TO_HOST: 'False'
-            HOST: '127.0.0.1'
-            MAX_WALLCLOCK: '00:03'
-            PROJECT: 'group'
-            QUEUE: 'gp_debug'
-            SCRATCH_DIR: '/tmp/scratch/'
-            TEMP_DIR: ''
-            TYPE: 'slurm'
-            USER: 'root'
-    """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
-
-    # Success wrapper
-    (dedent("""\
-    EXPERIMENT:
-        NUMCHUNKS: '2'
-    JOBS:
-        job:
-            SCRIPT: |
-                echo "Hello World with id=Success + wrappers"
-                sleep 1
-            DEPENDENCIES: job-1
-            PLATFORM: TEST_SLURM
-            RUNNING: chunk
-            wallclock: 00:01
-
-        job2:
-            SCRIPT: |
-                echo "Hello World with id=Success + wrappers"
-                sleep 1
-            DEPENDENCIES: job2-1
-            PLATFORM: TEST_SLURM
-            RUNNING: chunk
-            wallclock: 00:01
-
-    wrappers:
-        wrapper:
-            JOBS_IN_WRAPPER: job
-            TYPE: vertical
-        wrapper2:
-            JOBS_IN_WRAPPER: job2
-            TYPE: vertical
-            
-    PLATFORMS:
-        TEST_SLURM:
-            ADD_PROJECT_TO_HOST: 'False'
-            HOST: '127.0.0.1'
-            MAX_WALLCLOCK: '00:03'
-            PROJECT: 'group'
-            QUEUE: 'gp_debug'
-            SCRATCH_DIR: '/tmp/scratch/'
-            TEMP_DIR: ''
-            TYPE: 'slurm'
-            USER: 'root'
-    """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
-
-    # Failure
-    (dedent("""\
-    EXPERIMENT:
-        NUMCHUNKS: '2'
-    JOBS:
-        job:
-            SCRIPT: |
-                sleep 2
-                d_echo "Hello World with id=FAILED"
-            PLATFORM: TEST_SLURM
-            RUNNING: chunk
-            wallclock: 00:01
-            retrials: 2  # In local, it started to fail at 18 retrials.
-    PLATFORMS:
-        TEST_SLURM:
-            ADD_PROJECT_TO_HOST: 'False'
-            HOST: '127.0.0.1'
-            MAX_WALLCLOCK: '00:03'
-            PROJECT: 'group'
-            QUEUE: 'gp_debug'
-            SCRATCH_DIR: '/tmp/scratch/'
-            TEMP_DIR: ''
-            TYPE: 'slurm'
-            USER: 'root'
-    """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
-
-    # Failure wrappers
-    (dedent("""\
-    JOBS:
-        job:
-            SCRIPT: |
-                sleep 2
-                d_echo "Hello World with id=FAILED + wrappers"
-            PLATFORM: TEST_SLURM
-            DEPENDENCIES: job-1
-            RUNNING: chunk
-            wallclock: 00:10
-            retrials: 2
-    wrappers:
-        wrapper:
-            JOBS_IN_WRAPPER: job
-            TYPE: vertical
-    PLATFORMS:
-        TEST_SLURM:
-            ADD_PROJECT_TO_HOST: 'False'
-            HOST: '127.0.0.1'
-            MAX_WALLCLOCK: '00:10'
-            PROJECT: 'group'
-            QUEUE: 'gp_debug'
-            SCRATCH_DIR: '/tmp/scratch/'
-            TEMP_DIR: ''
-            TYPE: 'slurm'
-            USER: 'root'
-    """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
-], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
-def test_run_uninterrupted(
-        as_exp,
-        jobs_data,
-        expected_db_entries,
-        final_status,
-        wrapper_type,
-        slurm_server: 'DockerContainer'
-):
-    as_conf = as_exp.as_conf
-    log_dir = _init_run(as_exp, jobs_data)
-
-    # Run the experiment
-    exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
-    _assert_exit_code(final_status, exit_code)
-
-    # Check and display results
-    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
-
-    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status)
-    e_msg = f"Current folder: {str(run_tmpdir)}\n"
-    files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
-    for check, value in db_check_list.items():
-        if not value:
-            e_msg += f"{check}: {value}\n"
-        elif isinstance(value, dict):
-            for job_name in value:
-                for job_counter in value[job_name]:
-                    for check_name, value_ in value[job_name][job_counter].items():
-                        if not value_:
-                            e_msg += f"{job_name}_run_number_{job_counter} field: {check_name}: {value_}\n"
-
-    for check, value in files_check_list.items():
-        if not value:
-            e_msg += f"{check}: {value}\n"
-    try:
-        _assert_db_fields(db_check_list)
-        _assert_files_recovered(files_check_list)
-    except AssertionError:
-        pytest.fail(e_msg)
-
-
-@pytest.mark.slurm
-@pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
-    # Success
-    (dedent("""\
-    EXPERIMENT:
-        NUMCHUNKS: '3'
-    JOBS:
-        job:
-            SCRIPT: |
-                echo "Hello World with id=Success"
-                sleep 1
-            PLATFORM: TEST_SLURM
-            RUNNING: chunk
-            wallclock: 00:01
-    PLATFORMS:
-        TEST_SLURM:
-            ADD_PROJECT_TO_HOST: 'False'
-            HOST: '127.0.0.1'
-            MAX_WALLCLOCK: '00:03'
-            PROJECT: 'group'
-            QUEUE: 'gp_debug'
-            SCRATCH_DIR: '/tmp/scratch/'
-            TEMP_DIR: ''
-            TYPE: 'slurm'
-            USER: 'root'
-    """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
-
-    # Success wrapper
-    (dedent("""\
-    EXPERIMENT:
-        NUMCHUNKS: '2'
-    JOBS:
-        job:
-            SCRIPT: |
-                echo "Hello World with id=Success + wrappers"
-                sleep 1
-            DEPENDENCIES: job-1
-            PLATFORM: TEST_SLURM
-            RUNNING: chunk
-            wallclock: 00:01
-
-        job2:
-            SCRIPT: |
-                echo "Hello World with id=Success + wrappers"
-                sleep 1
-            DEPENDENCIES: job2-1
-            PLATFORM: TEST_SLURM
-            RUNNING: chunk
-            wallclock: 00:01
-
-    wrappers:
-        wrapper:
-            JOBS_IN_WRAPPER: job
-            TYPE: vertical
-        wrapper2:
-            JOBS_IN_WRAPPER: job2
-            TYPE: vertical
-            
-    PLATFORMS:
-        TEST_SLURM:
-            ADD_PROJECT_TO_HOST: 'False'
-            HOST: '127.0.0.1'
-            MAX_WALLCLOCK: '00:03'
-            PROJECT: 'group'
-            QUEUE: 'gp_debug'
-            SCRATCH_DIR: '/tmp/scratch/'
-            TEMP_DIR: ''
-            TYPE: 'slurm'
-            USER: 'root'
-    """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
-
-    # Failure
-    (dedent("""\
-    EXPERIMENT:
-        NUMCHUNKS: '2'
-    JOBS:
-        job:
-            SCRIPT: |
-                sleep 2
-                d_echo "Hello World with id=FAILED"
-            PLATFORM: TEST_SLURM
-            RUNNING: chunk
-            wallclock: 00:01
-            retrials: 2  # In local, it started to fail at 18 retrials.
-    PLATFORMS:
-        TEST_SLURM:
-            ADD_PROJECT_TO_HOST: 'False'
-            HOST: '127.0.0.1'
-            MAX_WALLCLOCK: '00:03'
-            PROJECT: 'group'
-            QUEUE: 'gp_debug'
-            SCRATCH_DIR: '/tmp/scratch/'
-            TEMP_DIR: ''
-            TYPE: 'slurm'
-            USER: 'root'
-    """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
-
-    # Failure wrappers
-    (dedent("""\
-    JOBS:
-        job:
-            SCRIPT: |
-                sleep 2
-                d_echo "Hello World with id=FAILED + wrappers"
-            PLATFORM: TEST_SLURM
-            DEPENDENCIES: job-1
-            RUNNING: chunk
-            wallclock: 00:10
-            retrials: 2
-    wrappers:
-        wrapper:
-            JOBS_IN_WRAPPER: job
-            TYPE: vertical
-    PLATFORMS:
-        TEST_SLURM:
-            ADD_PROJECT_TO_HOST: 'False'
-            HOST: '127.0.0.1'
-            MAX_WALLCLOCK: '00:10'
-            PROJECT: 'group'
-            QUEUE: 'gp_debug'
-            SCRATCH_DIR: '/tmp/scratch/'
-            TEMP_DIR: ''
-            TYPE: 'slurm'
-            USER: 'root'
-    """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
-], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
-def test_run_interrupted(
-        jobs_data: str,
-        expected_db_entries: int,
-        final_status: str,
-        wrapper_type: str,
-        as_exp: 'AutosubmitExperiment',
-        slurm_server: 'DockerContainer'
-):
-    as_conf = as_exp.as_conf
-    log_dir = _init_run(as_exp, jobs_data)
-
-    # Run the experiment
-    exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
-    _assert_exit_code(final_status, exit_code)
-
-    current_statuses = 'SUBMITTED, QUEUING, RUNNING'
-    as_exp.autosubmit.stop(
-        all_expids=False,
-        cancel=False,
-        current_status=current_statuses,
-        expids_string=_EXPID,
-        force=True,
-        force_all=True,
-        status='FAILED')
-
-    exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
-    _assert_exit_code(final_status, exit_code)
-
-    # Check and display results
-    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
-
-    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status)
-    _assert_db_fields(db_check_list)
-
-    files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
-    _assert_files_recovered(files_check_list)

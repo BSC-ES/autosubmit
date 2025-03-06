@@ -41,6 +41,7 @@ if TYPE_CHECKING:
     from autosubmit.job.job_packages import JobPackageBase
 
 
+
 def _init_logs_log_process(as_conf, platform_name):
     Log.set_console_level(as_conf.experiment_data.get("LOG_RECOVERY_CONSOLE_LEVEL", "DEBUG"))
     if as_conf.experiment_data["ROOTDIR"]:
@@ -125,7 +126,7 @@ class CopyQueue(Queue):
         :param timeout: Timeout for blocking operations. Defaults to None.
         :type timeout: float
         """
-        super().put(job.__getstate__(), block, timeout)
+        super().put(job.__getstate__(log_process=True), block, timeout)
 
 
 class Platform(object):
@@ -212,8 +213,8 @@ class Platform(object):
             self.pw = None
         self.max_waiting_jobs = 20
         self.recovery_queue = None
-        self.work_event = None
-        self.cleanup_event = None
+        self.work_event: Optional[Event] = None
+        self.cleanup_event: Optional[Event] = None
         self.log_retrieval_process_active = False
         self.log_recovery_process = None
         self.keep_alive_timeout = 60 * 5  # Useful in case of kill -9
@@ -234,7 +235,7 @@ class Platform(object):
             self.compress_remote_logs = platform_config.get("COMPRESS_REMOTE_LOGS", False)
             self.remote_logs_compress_type = platform_config.get("REMOTE_LOGS_COMPRESS_TYPE", "gzip")
             self.compression_level = platform_config.get("COMPRESSION_LEVEL", 9)
-            
+
         self.log_queue_size = log_queue_size
         self.remote_log_dir = None
 
@@ -372,7 +373,7 @@ class Platform(object):
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
 
-    def submit_ready_jobs(self, as_conf, job_list, packages_persistence, packages_to_submit,
+    def submit_ready_jobs(self, as_conf, job_list, platforms_to_test, packages_to_submit,
                           inspect=False, only_wrappers=False, hold=False):
 
         """
@@ -384,8 +385,6 @@ class Platform(object):
         :type as_conf: AutosubmitConfig object
         :param job_list: job list to check
         :type job_list: JobList object
-        :param packages_persistence: Handles database per experiment.
-        :type packages_persistence: JobPackagePersistence object
         :param inspect: True if coming from generate_scripts_andor_wrappers().
         :type inspect: Boolean
         :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw.
@@ -398,7 +397,7 @@ class Platform(object):
         failed_packages = list()
         error_message = ""
         if not inspect:
-            job_list.save()
+            job_list.save_jobs()
         if not hold:
             Log.debug("\nJobs ready for {1}: {0}", len(
                 job_list.get_ready(self, hold=hold)), self.name)
@@ -412,13 +411,7 @@ class Platform(object):
             try:
                 # If called from inspect command or -cw
                 if only_wrappers or inspect:
-                    if hasattr(package, "name"):
-                        job_list.packages_dict[package.name] = package.jobs
-                        from ..job.job import WrapperJob
-                        wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.READY, 0,
-                                                 package.jobs, package._wallclock, package.platform, as_conf, hold)
-                        job_list.job_package_map[package.jobs[0].id] = wrapper_job
-                        packages_persistence.save(package, inspect)
+                    package.status = Status.COMPLETED
                     for innerJob in package._jobs:
                         any_job_submitted = True
                         # Setting status to COMPLETED, so it does not get stuck in the loop that calls this function
@@ -426,44 +419,45 @@ class Platform(object):
                         innerJob.updated_log = False
 
                 # If called from RUN or inspect command
-                if not only_wrappers:
-                    try:
-                        package.submit(as_conf, job_list.parameters, inspect, hold=hold)
-                        save = True
-                        if not inspect:
-                            job_list.save()
-                        if package.x11 != "true":
-                            valid_packages_to_submit.append(package)
-                    except (IOError, OSError) as e:
-                        if package.jobs[0].id != 0:
-                            failed_packages.append(package.jobs[0].id)
-                        Log.warning(f'An unexpected error happened while submitting the package: {str(e)}')
-                        continue
-                    except AutosubmitError as e:
-                        if package.jobs[0].id != 0:
-                            failed_packages.append(package.jobs[0].id)
-                        self.connected = False
-                        if e.message.lower().find("bad parameters") != -1 or e.message.lower().find(
-                                "scheduler is not installed") != -1:
-                            error_msg = ""
-                            for package_tmp in valid_packages_to_submit:
-                                for job_tmp in package_tmp.jobs:
-                                    if job_tmp.section not in error_msg:
-                                        error_msg += job_tmp.section + "&"
-                            for job_tmp in package.jobs:
+                try:
+                    package.submit(as_conf, job_list.parameters, inspect or only_wrappers, hold=hold)
+                    save = True
+                    if package.x11 != "true":
+                        valid_packages_to_submit.append(package)
+                except (IOError, OSError):
+                    if package.jobs[0].id != 0:
+                        failed_packages.append(package.jobs[0].id)
+                    continue
+                except AutosubmitError as e:
+                    if package.jobs[0].id != 0:
+                        failed_packages.append(package.jobs[0].id)
+                    self.connected = False
+                    if e.message.lower().find("bad parameters") != -1 or e.message.lower().find(
+                            "scheduler is not installed") != -1:
+                        error_msg = ""
+                        for package_tmp in valid_packages_to_submit:
+                            for job_tmp in package_tmp.jobs:
                                 if job_tmp.section not in error_msg:
                                     error_msg += job_tmp.section + "&"
-                            if e.message.lower().find("bad parameters") != -1:
-                                error_message += "\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {0}".format(
-                                    error_msg[:-1])
-                            else:
-                                error_message += "\ncheck that {1} platform has set the correct scheduler. Sections that could be affected: {0}".format(
-                                    error_msg[:-1], self.name)
-                    except AutosubmitCritical:
-                        raise
-                    except Exception:
-                        self.connected = False
-                        raise
+                        for job_tmp in package.jobs:
+                            if job_tmp.section not in error_msg:
+                                error_msg += job_tmp.section + "&"
+                        if e.message.lower().find("bad parameters") != -1:
+                            error_message += "\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {0}".format(
+                                error_msg[:-1])
+                        else:
+                            error_message += "\ncheck that {1} platform has set the correct scheduler. Sections that could be affected: {0}".format(
+                                error_msg[:-1], self.name)
+                except AutosubmitCritical:
+                    raise
+                except Exception:
+                    self.connected = False
+                    raise
+
+            except AutosubmitCritical:
+                raise
+            except AutosubmitError:
+                raise
             except Exception:
                 raise
         if valid_packages_to_submit:
@@ -678,8 +672,6 @@ class Platform(object):
 
         :param job: Get the checkpoint files
         :type job: Job
-        :param max_step: max step possible
-        :type max_step: int
         """
         if not job.current_checkpoint_step:
             job.current_checkpoint_step = 0
@@ -694,32 +686,6 @@ class Platform(object):
                 job.current_checkpoint_step += 1
                 self.get_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}', False, ignore_log=True)
 
-    def get_completed_files(self, job_name, retries=0, recovery=False, wrapper_failed=False):
-        """
-        Get the COMPLETED file of the given job
-
-        :param wrapper_failed:
-        :param recovery:
-        :param job_name: name of the job
-        :type job_name: str
-        :param retries: Max number of tries to get the file
-        :type retries: int
-        :return: True if successful, false otherwise
-        :rtype: bool
-        """
-        if recovery:
-            retries = 5
-            for i in range(retries):
-                if self.get_file('{0}_COMPLETED'.format(job_name), False, ignore_log=recovery):
-                    return True
-            return False
-        if self.check_file_exists('{0}_COMPLETED'.format(job_name), wrapper_failed=wrapper_failed):
-            if self.get_file('{0}_COMPLETED'.format(job_name), True, wrapper_failed=wrapper_failed):
-                return True
-            else:
-                return False
-        else:
-            return False
 
     def remove_stat_file(self, job: Any) -> bool:
         """
@@ -760,7 +726,7 @@ class Platform(object):
         if self.check_file_exists(filename):
             self.delete_file(filename)
 
-    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3):
+    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3, show_logs: bool = True):
         return True
 
     def get_stat_file(self, job, count=-1):
@@ -814,9 +780,19 @@ class Platform(object):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def check_Alljobs(self, job_list, as_conf, retries=5):
-        for job, job_prev_status in job_list:
-            self.check_job(job)
+    def check_Alljobs(self, job_list: list[Any], as_conf, retries=5):
+        """
+        Checks jobs running status
+
+        :param job_list: list of jobs
+        :type job_list: list
+        :param as_conf: config
+        :type as_conf: as_conf
+        :param retries: retries
+        :type retries: int
+        :return: current job status
+        :rtype: autosubmit.job.job_common.Status
+        """
 
     def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
         """
@@ -904,6 +880,9 @@ class Platform(object):
         self.cleanup_event = None
         self.log_recovery_process = None
         self.processed_wrapper_logs = set()
+
+    def update_as_conf(self, as_conf: 'AutosubmitConfig') -> None:
+        self.config = as_conf.experiment_data
 
     def load_process_info(self, platform):
 
@@ -1054,7 +1033,10 @@ class Platform(object):
         while not self.recovery_queue.empty():
             try:
                 from autosubmit.job.job import Job
-                job = Job(loaded_data=self.recovery_queue.get(timeout=1))
+                job = Job(loaded_data=self.recovery_queue.get(timeout=1), log_process=True)
+                if not job.local_logs[0]:
+                    Log.debug(f"{identifier} Job '{job.name}_{job.fail_count}' has no local log file name")
+                    job.update_local_logs(update_submit_time=False)
                 job.platform_name = self.name  # Change the original platform to this process platform.
                 job.platform = self
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
@@ -1079,14 +1061,15 @@ class Platform(object):
             try:
                 job.retrieve_logfiles(raise_error=True)
                 job._log_recovery_retries += 1
+                Log.result(
+                    f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
             except Exception as e:
                 Log.debug(str(e))
                 if job._log_recovery_retries < 5:
                     jobs_pending_to_process.add(job)
                 Log.warning(
                     f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry '{job.fail_count}'.")
-            Log.result(
-                f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
+
         if len(jobs_pending_to_process) > 0:
             self.restore_connection(as_conf,
                                     log_recovery_process=True)  # Restore the connection if there was an issue with one or more jobs.
@@ -1129,24 +1112,60 @@ class Platform(object):
         raise NotImplementedError  # pragma: no cover
 
     def get_file_size(self, src: str) -> Union[int, None]:
-        """
-        Get file size in bytes
+        """Get file size in bytes
+
         :param src: file path
         """
         raise NotImplementedError  # pragma: no cover
 
     def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
-        """
-        Read file content as bytes. If max_size is set, only the first max_size bytes are read.
+        """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
+
         :param src: file path
         :param max_size: maximum size to read
         """
         raise NotImplementedError  # pragma: no cover
 
     def compress_file(self, file_path: str) -> Union[str, None]:
-        """
-        Compress a file.
+        """Compress a file.
+
         :param file_path: file path
         :return: path to the compressed file. None if compression failed.
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_remote_log_dir(self) -> str:
+        """Get the variable remote_log_dir that stores the directory of the Log of the experiment.
+
+        :return: The remote_log_dir variable.
+        :rtype: str
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_completed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+        """Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
+
+        :param job_names: If provided, filters the results to include only these job names.
+        :type job_names: Optional[List[str]]
+        :return: List of job names with COMPLETED files.
+        :rtype: List[str]
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_failed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+        """Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
+
+        :param job_names: If provided, filters the results to include only these job names.
+        :type job_names: Optional[List[str]]
+        :return: List of job names with COMPLETED files.
+        :rtype: List[str]
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def delete_failed_and_completed_names(self, job_names: list[str]) -> None:
+        """Deletes the COMPLETED and FAILED files for the given job names from the remote log directory.
+
+        :param job_names: List of job names whose COMPLETED and FAILED files should be deleted
+        :type job_names: List[str]
         """
         raise NotImplementedError  # pragma: no cover

@@ -478,6 +478,14 @@ class ParamikoPlatform(Platform):
         return ""
 
     def send_file(self, filename, check=True) -> bool:
+        """
+        Sends a local file to the platform
+        :param check:
+        :param filename: name of the file to send
+        :type filename: str
+        """
+        local_path = None
+        remote_path = None
         if check:
             self.check_remote_log_dir()
             self.delete_file(filename)
@@ -735,8 +743,8 @@ class ParamikoPlatform(Platform):
     def job_is_over_wallclock(self, job, job_status, cancel=False):
         if job.is_over_wallclock():
             try:
-                job.platform.get_completed_files(job.name)
-                job_status = job.check_completion(over_wallclock=True)
+                job.check_completion()
+                job_status = job.new_status
             except Exception as e:
                 job_status = Status.FAILED
                 Log.debug(f"Unexpected error checking completed files for a job over wallclock: {str(e)}")
@@ -749,6 +757,59 @@ class ParamikoPlatform(Platform):
                 except Exception as e:
                     Log.debug(f"Error cancelling job {job.id}: {str(e)}")
         return job_status
+
+    def get_completed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+        """
+        Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
+
+        :param job_names: If provided, filters the results to include only these job names.
+        :type job_names: Optional[List[str]]
+        :return: List of job names with COMPLETED files.
+        :rtype: List[str]
+        """
+        if not job_names:
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_COMPLETED' -type f"
+        else:
+            patterns = ' -o '.join([f"-name '{name}_COMPLETED'" for name in job_names])
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {patterns} \\) -type f"
+        self.send_command(cmd)
+        output = self.get_ssh_output()
+        completed_files = output.strip().split('\n') if output else []
+        job_names = [Path(file).name.replace('_COMPLETED', '') for file in completed_files]
+        return job_names
+
+    def get_failed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+        """
+        Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
+
+        :param job_names: If provided, filters the results to include only these job names.
+        :type job_names: Optional[List[str]]
+        :return: List of job names with COMPLETED files.
+        :rtype: List[str]
+        """
+        if not job_names:
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_FAILED' -type f"
+        else:
+            patterns = ' -o '.join([f"-name '{name}_FAILED'" for name in job_names])
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {patterns} \\) -type f"
+        self.send_command(cmd)
+        output = self.get_ssh_output()
+        completed_files = output.strip().split('\n') if output else []
+        job_names = [Path(file).name.replace('_FAILED', '') for file in completed_files]
+        return job_names
+
+    def delete_failed_and_completed_names(self, job_names: list[str]) -> None:
+        """
+        Deletes the COMPLETED and FAILED files for the given job names from the remote log directory.
+
+        :param job_names: List of job names whose COMPLETED and FAILED files should be deleted
+        :type job_names: List[str]
+        """
+        if job_names:
+            if self.expid in str(self.remote_log_dir): # Ensure we are in the right experiment
+                job_name_str = ' -o -name '.join([f"'{name}_COMPLETED' -o -name '{name}_FAILED'" for name in job_names])
+                cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( -name {job_name_str} \\) -type f -delete"
+                self.send_command(cmd)
 
     def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
         """
@@ -793,26 +854,14 @@ class ParamikoPlatform(Platform):
                 self.get_ssh_output()).strip("\n")
             # URi: define status list in HPC Queue Class
             if job_status in self.job_status['COMPLETED'] or retries == 0:
-                # The Local platform has only 0 or 1, so it necessary to look for the completed file.
-                if self.type == "local":
-                    if not job.is_wrapper:
-                        # Not sure why it is called over_wallclock but is the only way to return a value
-                        job_status = job.check_completion(over_wallclock=True)
-                    else:
-                        # wrapper has a different file name
-                        if Path(f"{self.remote_log_dir}/WRAPPER_FAILED").exists():
-                            job_status = Status.FAILED
-                        else:
-                            job_status = Status.COMPLETED
-                else:
-                    job_status = Status.COMPLETED
+                job_status = Status.COMPLETED
 
             elif job_status in self.job_status['RUNNING']:
                 job_status = Status.RUNNING
                 if not is_wrapper:
                     if job.status != Status.RUNNING:
                         job.start_time = datetime.datetime.now()  # URi: start time
-                    if job.start_time is not None and str(job.wrapper_type).lower() == "none":
+                    if job.start_time is not None and str(job.wrapper_type).lower() in ["simple", "none"]:
                         wallclock = job.wallclock
                         if job.wallclock == "00:00" or job.wallclock is None:
                             wallclock = job.platform.max_wallclock
@@ -859,8 +908,9 @@ class ParamikoPlatform(Platform):
                 return False
         return True
 
-    def parse_joblist(self, job_list: list[list['Job', Any]]) -> str:
-        """Return a string containing a comma-separated list of job IDs.
+    def parse_joblist(self, job_list: list) -> str:
+        """
+        Convert a list of job_list to job_list_cmd
 
         If a job in the provided list is missing its ID, this function will initialize
         it to a string containing the digit zero,``"0"``.
@@ -868,18 +918,15 @@ class ParamikoPlatform(Platform):
         :param job_list: A list of jobs.
         :return: A comma-separated string containing the job IDs.
         """
-        job_list_cmd: list[str] = []
-        # TODO: second item in tuple, _, is a ``job_prev_status``? What for?
-        for job, _ in job_list:
-            if job.id is None:
-                job_str = "0"
-            else:
-                job_str = str(job.id)
-            job_list_cmd.append(job_str)
+        job_list_cmd = ""
+        for job in job_list:
+            job_list_cmd += str(job.id) + ","
+        if job_list_cmd[-1] == ",":
+            job_list_cmd = job_list_cmd[:-1]
 
         return ','.join(job_list_cmd)
 
-    def check_Alljobs(self, job_list: list[list['Job']], as_conf, retries=5):
+    def check_Alljobs(self, job_list: list["Job"], as_conf, retries=5):
         """
         Checks jobs running status
 
@@ -924,9 +971,9 @@ class ParamikoPlatform(Platform):
             Log.debug('Successful check job command')
             in_queue_jobs = []
             list_queue_jobid = ""
-            for job, job_prev_status in job_list:
+            for job in job_list:
                 if not slurm_error:
-                    job_id = job.id
+                    job_id = str(job.id)
                     job_status = self.parse_Alljobs_output(job_list_status, job_id)
                     while len(job_status) <= 0 <= retries:
                         retries -= 1
@@ -965,7 +1012,6 @@ class ParamikoPlatform(Platform):
                     job_status = Status.FAILED
                 elif retries == 0:
                     job_status = Status.COMPLETED
-                    job.update_status(as_conf)
                 else:
                     job_status = Status.UNKNOWN
                     Log.error(
@@ -973,7 +1019,7 @@ class ParamikoPlatform(Platform):
                 job.new_status = job_status
             self.get_queue_status(in_queue_jobs, list_queue_jobid, as_conf)
         else:
-            for job, job_prev_status in job_list:
+            for job in job_list:
                 job_status = Status.UNKNOWN
                 Log.warning(
                     'check_job() The job id ({0}) from platform {1} has an status of {2}.', job.id, self.name,
@@ -982,6 +1028,10 @@ class ParamikoPlatform(Platform):
             # job.new_status=job_status
         if slurm_error:
             raise AutosubmitError(e_msg, 6000)
+
+        for job in job_list:
+            if job.new_status != job.status:
+                job.update_status(as_conf)
 
     def get_jobid_by_jobname(self, job_name, retries=2):
         """
@@ -1439,7 +1489,8 @@ class ParamikoPlatform(Platform):
         :return: command to check job status script
         :rtype: str
         """
-        return f'nohup kill -0 {job_id} > /dev/null 2>&1; echo $?'
+        # Now it checks if it is a zombie process too
+        return f"ps -o stat= -p {job_id} 2>/dev/null | grep -qv '^Z' && echo 0 || echo 1"
 
     def get_submitted_job_id(self, output, x11=False):
         """
@@ -1630,7 +1681,7 @@ class ParamikoPlatform(Platform):
         except Exception:
             Log.debug(f"Error reading file {src}")
             return None
-        
+
     def compress_file(self, file_path):
         Log.debug(f"Compressing file {file_path} using {self.remote_logs_compress_type}")
         try:

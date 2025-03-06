@@ -62,6 +62,8 @@ class WrapperBuilder(object):
         self.machinefiles_name = ''
         self.machinefiles_indent = 0
         self.exit_thread = ''
+        self.fail_count = kwargs.get('fail_count', 0)
+
         if "wallclock_by_level" in list(kwargs.keys()):
             self.wallclock_by_level = kwargs['wallclock_by_level']
 
@@ -164,17 +166,18 @@ class PythonWrapperBuilder(WrapperBuilder):
         """).format(str(self.job_scripts), self.get_random_alphanumeric_string(5,5),'\n'.ljust(13))
 
     def build_job_thread(self):
-        return textwrap.dedent("""
+        return textwrap.dedent(f"""
         class JobThread(Thread):
             def __init__ (self, template, id_run):
                 Thread.__init__(self)
                 self.template = template
                 self.id_run = id_run
+                self.fail_count = {self.fail_count}
 
             def run(self):
                 jobname = self.template.replace('.cmd', '')
-                out = str(self.template) + ".out." + str(0)
-                err = str(self.template) + ".err." + str(0)
+                out = str(self.template) + ".out." + str(self.fail_count)
+                err = str(self.template) + ".err." + str(self.fail_count)
                 print(out+"\\n")
                 command = "./" + str(self.template) + " " + str(self.id_run) + " " + os.getcwd()
                 (self.status) = getstatusoutput(command + " > " + out + " 2> " + err)
@@ -398,15 +401,16 @@ for i in range(len(pid_list)):
         failed_filename = {0}[i].replace('.cmd', '_FAILED')
         failed_path = os.path.join(os.getcwd(),failed_filename)
         failed_wrapper = os.path.join(os.getcwd(),wrapper_id)
-        Failed = False
+        exit_code = 0
         if os.path.exists(completed_path):
             print((datetime.now(), "The job ", pid.template," has been COMPLETED"))
         else:
             open(failed_wrapper, 'w').close()
             open(failed_path, 'w').close()
             print((datetime.now(), "The job ", pid.template," has FAILED"))
+            exit_code = 1
                     """).format(jobs_list, self.exit_thread, '\n'.ljust(13)), 4)
-
+        parallel_threads_launcher += self._indent(textwrap.dedent("""exit(exit_code)\n"""),0)
         return parallel_threads_launcher
     def build_parallel_threads_launcher_vertical_horizontal(self, jobs_list, thread, footer=True):
         parallel_threads_launcher = textwrap.dedent("""

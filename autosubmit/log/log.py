@@ -72,7 +72,7 @@ class AutosubmitCritical(Exception):
         return " "
 
 
-class LogFormatter:
+class LogFormatter(logging.Formatter):
     """
     Class to format log output.
 
@@ -87,7 +87,8 @@ class LogFormatter:
     ERROR = '\033[38;5;214m'
     WARNING = "\x1b[33;20m"
 
-    def __init__(self, to_file=False):
+    def __init__(self, to_file: bool = False):
+        super().__init__()
         """
         Initializer for LogFormatter
 
@@ -261,7 +262,7 @@ class Log:
                     err_file_handler.setFormatter(LogFormatter(True))
                     Log.log.addHandler(err_file_handler)
                 elif type == 'status':
-                    custom_filter = StatusFilter()
+                    custom_filter: logging.Filter = StatusFilter()
                     file_path = os.path.join(directory, filename)
                     status_file_handler = logging.FileHandler(file_path, 'w')
                     status_file_handler.setLevel(Log.STATUS)
@@ -269,12 +270,12 @@ class Log:
                     status_file_handler.addFilter(custom_filter)
                     Log.log.addHandler(status_file_handler)
                 elif type == 'status_failed':
-                    custom_filter = StatusFailedFilter()
+                    custom_filter_failed: logging.Filter = StatusFailedFilter()
                     file_path = os.path.join(directory, filename)
                     status_file_handler = logging.FileHandler(file_path, 'w')
                     status_file_handler.setLevel(Log.STATUS_FAILED)
                     status_file_handler.setFormatter(LogFormatter(False))
-                    status_file_handler.addFilter(custom_filter)
+                    status_file_handler.addFilter(custom_filter_failed)
                     Log.log.addHandler(status_file_handler)
                 os.chmod(file_path, 509)
             except Exception as exc:  # retry again
@@ -301,18 +302,18 @@ class Log:
             if type == 'status':
                 while len(Log.log.handlers) > 3:
                     Log.log.handlers.pop()
-                custom_filter = StatusFilter()
+                custom_filter: logging.Filter = StatusFilter()
                 status_file_handler = logging.FileHandler(file_path, 'w')
                 status_file_handler.setLevel(Log.STATUS)
                 status_file_handler.setFormatter(LogFormatter(False))
                 status_file_handler.addFilter(custom_filter)
                 Log.log.addHandler(status_file_handler)
             elif type == 'status_failed':
-                custom_filter = StatusFailedFilter()
+                custom_filter_failed: logging.Filter = StatusFailedFilter()
                 status_file_handler = logging.FileHandler(file_path, 'w')
                 status_file_handler.setLevel(Log.STATUS_FAILED)
                 status_file_handler.setFormatter(LogFormatter(False))
-                status_file_handler.addFilter(custom_filter)
+                status_file_handler.addFilter(custom_filter_failed)
                 Log.log.addHandler(status_file_handler)
         except Exception:  # retry again
             pass
@@ -328,7 +329,7 @@ class Log:
         """
         if type(level) is str:
             level = getattr(Log, level)
-        Log.console_handler.level = level
+        Log.console_handler.level = int(level)
 
     @staticmethod
     def _verify_args_message(msg: str, *args):

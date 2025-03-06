@@ -73,7 +73,7 @@ class SlurmPlatform(ParamikoPlatform):
         self.job_status['QUEUING'] = ['PENDING', 'CONFIGURING', 'RESIZING']
         self.job_status['FAILED'] = ['FAILED', 'CANCELLED', 'CANCELLED+', 'NODE_FAIL',
                                      'PREEMPTED', 'SUSPENDED', 'TIMEOUT', 'OUT_OF_MEMORY', 'OUT_OF_ME+', 'OUT_OF_ME']
-        self._pathdir = "\$HOME/LOG_" + self.expid
+        self._pathdir = "\$HOME/LOG_" + self.expid # noqa
         self._allow_arrays = False
         self._allow_wrappers = True
         self.update_cmds()
@@ -208,10 +208,10 @@ class SlurmPlatform(ParamikoPlatform):
                     sleep(10)
                 jobid_index = 0
                 for package in valid_packages_to_submit:
-                    current_package_id = str(jobs_id[jobid_index])
+                    current_package_id = int(jobs_id[jobid_index])
                     if hold:
                         retries = 5
-                        package.jobs[0].id = current_package_id
+                        package.jobs[0].id = int(current_package_id)
                         try:
                             can_continue = True
                             while can_continue and retries > 0:
@@ -713,7 +713,7 @@ class SlurmPlatform(ParamikoPlatform):
         return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
 
     def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5,
-                          max_retries: int = 3) -> bool:
+                          max_retries: int = 3, show_logs: bool = True) -> bool:
         """
         Checks if a file exists on the FTP server.
         :param src: The name of the file to check.
@@ -724,6 +724,8 @@ class SlurmPlatform(ParamikoPlatform):
         :type sleeptime: int
         :param max_retries: Maximum number of retries. Defaults to 3.
         :type max_retries: int
+        :param show_logs: Whether to show logs if the file does not exist. Defaults to True.
+        :type show_logs: bool
 
         :return: True if the file exists, False otherwise
         :rtype: bool
@@ -751,6 +753,6 @@ class SlurmPlatform(ParamikoPlatform):
                 else:
                     file_exist = False  # won't exist
                     retries = 999  # no more retries
-        if not file_exist:
+        if not file_exist and show_logs:
             Log.warning(f"File {src} couldn't be found")
         return file_exist

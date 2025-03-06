@@ -176,7 +176,7 @@ def test_check_jobs_file_exists_all_good(autosubmit_exp, tmp_path):
                 'FILE': 'dummy.sh'
             }
         }
-    })
+    }, include_jobs=False)
 
     with does_not_raise():
         check_jobs_file_exists(exp.as_conf)

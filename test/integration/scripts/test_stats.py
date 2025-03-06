@@ -39,7 +39,6 @@ def test_autosubmit_commands_help(autosubmit_exp, mocker):
             }
         }
     })
-
     exp.autosubmit._check_ownership_and_set_last_command(
         exp.as_conf,
         exp.expid,

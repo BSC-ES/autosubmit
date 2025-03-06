@@ -26,7 +26,12 @@ if TYPE_CHECKING:
 
 # TODO: We have one submitter, this can possibly be deleted.
 class Submitter:
-    """Class to manage the experiments platforms."""
+    """
+    Class to manage the experiments platform
+    """
+
+    def __init__(self):
+        self.platforms = None
 
     def load_platforms(self, as_conf: 'AutosubmitConfig', auth_password: Optional[str] = None,
                        local_auth_password=None) -> None:

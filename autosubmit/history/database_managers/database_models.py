@@ -18,13 +18,13 @@
 
 import collections
 
-JobDataRow = collections.namedtuple('JobDataRow', ['id', 'counter', 'job_name', 'created', 'modified', 'submit', 'start', 'finish', 
-                                                  'status', 'rowtype', 'ncpus', 'wallclock', 'qos', 'energy', 'date', 'section', 'member', 
-                                                  'chunk', 'last', 'platform', 'job_id', 'extra_data', 'nnodes', 'run_id', 'MaxRSS', 'AveRSS', 
-                                                  'out', 'err', 'rowstatus', 'children', 'platform_output', 'workflow_commit'])
+JobDataRow = collections.namedtuple('JobDataRow', ['id', 'counter', 'job_name', 'created', 'modified', 'submit', 'start', 'finish',
+                                                   'status', 'rowtype', 'ncpus', 'wallclock', 'qos', 'energy', 'date', 'section', 'member',
+                                                   'chunk', 'last', 'platform', 'job_id', 'extra_data', 'nnodes', 'run_id', 'MaxRSS', 'AveRSS',
+                                                   'out', 'err', 'rowstatus', 'children', 'platform_output', 'workflow_commit'])
 
 ExperimentRunRow = collections.namedtuple('ExperimentRunRow', [
-                                           'run_id', 'created', 'modified', 'start', 'finish', 'chunk_unit', 'chunk_size', 'completed', 'total', 'failed', 'queuing', 'running', 'submitted', 'suspended', 'metadata'])
+    'run_id', 'created', 'modified', 'start', 'finish', 'chunk_unit', 'chunk_size', 'completed', 'total', 'failed', 'queuing', 'running', 'submitted', 'suspended', 'metadata'])
 
 ExperimentStatusRow = collections.namedtuple(
     'ExperimentStatusRow', ['exp_id', 'name', 'status', 'seconds_diff', 'modified'])
@@ -32,22 +32,22 @@ ExperimentStatusRow = collections.namedtuple(
 ExperimentRow = collections.namedtuple('ExperimentRow', ["id", "name", "autosubmit_version", "description"])
 
 PragmaVersion = collections.namedtuple('PragmaVersion', ['version'])
-MaxCounterRow = collections.namedtuple('MaxCounter', ['maxcounter'])
+MaxCounter = collections.namedtuple('MaxCounter', ['maxcounter'])
 
 
 class RunningStatus:
-  RUNNING = "RUNNING"
-  NOT_RUNNING = "NOT RUNNING"
+    RUNNING = "RUNNING"
+    NOT_RUNNING = "NOT RUNNING"
 
 
 class RowType:
     NORMAL = 2
-    # PACKED = 2
+    PACKED = 1
 
 
 class RowStatus:
     INITIAL = 0
-    COMPLETED = 1    
+    COMPLETED = 1
     PROCESSED = 2
     FAULTY = 3
     CHANGED = 4
@@ -55,9 +55,9 @@ class RowStatus:
 
 
 table_name_to_model = {
-  "experiment" : ExperimentRow,
-  "experiment_status" : ExperimentStatusRow,
-  "job_data" : JobDataRow,
-  "experiment_run" : ExperimentRunRow,
-  "pragma_version" : PragmaVersion
+    "experiment": ExperimentRow,
+    "experiment_status": ExperimentStatusRow,
+    "job_data": JobDataRow,
+    "experiment_run": ExperimentRunRow,
+    "pragma_version": PragmaVersion
 }
