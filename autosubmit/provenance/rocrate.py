@@ -380,7 +380,7 @@ def create_rocrate_archive(
     # Add status files.
     _add_files(crate, experiment_path, "status", expid, "text/plain")
     # Add SQLite DB and pickle files.
-    _add_files(crate, experiment_path, "pkl", expid, "application/octet-stream")
+    _add_files(crate, experiment_path, "db", expid, "application/octet-stream")
 
     # Register Workflow Run RO-Crate (WRROC) profile. This code was adapted from COMPSs and StreamFlow.
     #

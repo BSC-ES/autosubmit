@@ -97,9 +97,7 @@ def test_describe(
             for line_tuple in mocked_log.result.mock_calls
             if line_tuple[1][0].startswith('Location: ')
         ]
-
         assert len(location_lines) == len(exps)
-
         for exp in exps:
             assert f'Location: {exp.exp_path}' in location_lines
 

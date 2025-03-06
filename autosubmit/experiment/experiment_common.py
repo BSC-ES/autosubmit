@@ -395,9 +395,9 @@ def create_required_folders(exp_id: str, exp_folder: Path) -> None:
 
     exp_folder.mkdir(mode=dir_mode)
 
-    required_dirs = ["conf", "pkl", "tmp", "tmp/ASLOGS", f"tmp/LOG_{exp_id}", "plot", "status"]
+    required_dirs = ["conf", "db", "tmp", "tmp/ASLOGS", f"tmp/LOG_{exp_id}", "plot", "status"]
     for required_dir in required_dirs:
-        Path(exp_folder / required_dir).mkdir(mode=dir_mode)
+        Path(exp_folder / required_dir).mkdir(mode=dir_mode, exist_ok=True)
 
 
 def check_ownership(expid: str, raise_error=False) -> tuple[bool, bool, Optional[str]]:
