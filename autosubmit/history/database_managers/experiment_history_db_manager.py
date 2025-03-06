@@ -450,7 +450,7 @@ class ExperimentHistoryDatabaseManager(Protocol):
 
 
 def create_experiment_history_db_manager(
-    db_engine: str, **options: Any
+    **options: Any
 ) -> ExperimentHistoryDatabaseManager:
   return cast(ExperimentHistoryDatabaseManager, ExperimentHistoryDbManager(
     options['schema'],
