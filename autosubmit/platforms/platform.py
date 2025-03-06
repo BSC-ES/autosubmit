@@ -18,7 +18,6 @@
 import atexit
 import multiprocessing
 import os
-import queue  # only for the exception
 import time
 import traceback
 from contextlib import suppress
@@ -32,6 +31,8 @@ from typing import Any, Optional, Union, TYPE_CHECKING
 
 import setproctitle
 
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log
@@ -41,12 +42,12 @@ if TYPE_CHECKING:
     from autosubmit.job.job_packages import JobPackageBase
     from autosubmit.job.job import Job
     from autosubmit.job.job_list import JobList
-    from autosubmit.job.job_package_persistence import JobPackagePersistence
+    from multiprocessing.process import BaseProcess
 
 
 def _init_logs_log_process(as_conf: 'AutosubmitConfig', platform_name: str) -> None:
     Log.set_console_level(as_conf.experiment_data.get("LOG_RECOVERY_CONSOLE_LEVEL", "DEBUG"))
-    if as_conf.experiment_data["ROOTDIR"]:
+    if as_conf.experiment_data.get("ROOTDIR", None):
         aslogs_path = Path(as_conf.experiment_data["ROOTDIR"], "tmp/ASLOGS")
         Log.set_file(
             str(aslogs_path / f'{platform_name.lower()}_log_recovery.log'), "out",
@@ -75,16 +76,7 @@ def recover_platform_job_logs_wrapper(
     platform.recovery_queue = recovery_queue
     platform.work_event = worker_event
     platform.cleanup_event = cleanup_event
-    as_conf.experiment_data = {
-        "AS_ENV_PLATFORMS_PATH": as_conf.experiment_data.get("AS_ENV_PLATFORMS_PATH", None),
-        "AS_ENV_SSH_CONFIG_PATH": as_conf.experiment_data.get("AS_ENV_SSH_CONFIG_PATH", None),
-        "AS_ENV_CURRENT_USER": as_conf.experiment_data.get("AS_ENV_CURRENT_USER", None),
-        "ROOTDIR": as_conf.experiment_data.get("ROOTDIR", None),
-        "LOG_RECOVERY_CONSOLE_LEVEL": as_conf.experiment_data.get("CONFIG", {}).get("LOG_RECOVERY_CONSOLE_LEVEL",
-                                                                                    "DEBUG"),
-        "LOG_RECOVERY_FILE_LEVEL": as_conf.experiment_data.get("CONFIG", {}).get("LOG_RECOVERY_FILE_LEVEL",
-                                                                                 "EVERYTHING"),
-    }
+    BasicConfig.read()
     _init_logs_log_process(as_conf, platform.name)
     platform.recover_platform_job_logs(as_conf)
     # Exit userspace after manually closing ssh sockets, recommended for child processes,
@@ -123,7 +115,16 @@ class CopyQueue(Queue):
         :param timeout: Timeout for blocking operations. Defaults to None.
         :type timeout: float
         """
-        super().put(job.__getstate__(), block, timeout)
+        job_data: dict = {
+            "id": job.id,
+            "name": job.name,
+            "fail_count": job.fail_count,
+            "submit_time_timestamp": job.submit_time_timestamp,
+            "start_time_timestamp": job.start_time_timestamp,
+            "finish_time_timestamp": job.finish_time_timestamp,
+            "wrapper_type": job.wrapper_type,
+        }
+        super().put(job_data, block, timeout)
 
 
 class Platform:
@@ -719,7 +720,7 @@ class Platform:
         if self.check_file_exists(filename):
             self.delete_file(filename)
 
-    def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3):
+    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3, show_logs: bool = True):
         return True
 
     def get_stat_file(self, job, count=-1):
@@ -754,9 +755,17 @@ class Platform:
             path = Path(self.remote_log_dir)
         return str(path)
 
-    def check_all_jobs(self, job_list: list['Job'], as_conf: 'AutosubmitConfig'):
-        for job, job_prev_status in job_list:
-            self.check_job(job)
+
+    def check_all_jobs(self, job_list: list['Job'], as_conf:'AutosubmitConfig', retries: int = 5):
+        """Checks jobs running status
+
+        :param job_list: list of jobs
+        :type job_list: list
+        :param as_conf: config
+        :type as_conf: as_conf
+        :param retries: retries
+        :type retries: int
+        """
 
     def check_job(self, job: 'Job', default_status: str = Status.COMPLETED, retries: int = 5,
                   submit_hold_check: bool = False, is_wrapper: bool = False):
@@ -789,10 +798,11 @@ class Platform:
     def add_job_to_log_recover(self, job):
         if job.id and int(job.id) != 0:
             self.recovery_queue.put(job)
+            Log.debug(f"Added job {job.name} and retry number:{job.fail_count} to the log recovery queue.")
         else:
             Log.warning(
-                f"Job {job.name} and retry number:{job.fail_count} has no job id. Autosubmit will no record this retry.")
-            job.updated_log = True
+                f"Job {job.name} and retry number:{job.fail_count} has no job id. Autosubmit will no record this retry. This shouldn't happen!")
+        job.updated_log += 1
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """Establishes an SSH connection to the host.
@@ -863,6 +873,9 @@ class Platform:
         self.log_recovery_process = None
         self.work_event = None
         self.processed_wrapper_logs = set()
+
+    def update_as_conf(self, as_conf: 'AutosubmitConfig') -> None:
+        self.config = as_conf.experiment_data
 
     def load_process_info(self, platform):
 
@@ -972,101 +985,54 @@ class Platform:
             self.cleanup_event.set()
             self.log_recovery_process.join(timeout=60)
 
-            if self.log_recovery_process.is_alive():
-                Log.warning(f"Process {self.log_recovery_process.pid} didn't terminate within the timeout.")
-                self.log_recovery_process.terminate()
-                self.log_recovery_process.join(timeout=60)
+        if self.log_recovery_process.is_alive():
+            Log.warning(f"Process {self.log_recovery_process.pid} didn't terminate within the timeout.")
+            self.log_recovery_process.terminate()
+            self.log_recovery_process.join(timeout=60)
 
         if self.work_event is not None:
             self.remove_workers(self.work_event)
             self.work_event = None
             self.cleanup_event = None
 
-    def wait_mandatory_time(self, sleep_time: int = 60) -> bool:
-        """Waits for the work_event to be set or the cleanup_event to be set for a mandatory time.
+    def wait_for_work(self) -> bool:
+        """Waits until there is work, or the keep alive timeout is reached.
 
-        :param sleep_time: Minimum time to wait in seconds. Defaults to 60.
-        :type sleep_time: int
         :return: True if there is work to process, False otherwise.
-        :rtype: bool
         """
         process_log = False
-        for _ in range(0, sleep_time, 5):
-            time.sleep(5)
-            try:
-                if self.work_event.is_set() or not self.recovery_queue.empty() or self.cleanup_event.is_set():
-                    process_log = True
-                    break
-            except OSError:
-                Log.warning(f"Queue is empty and process log is {sleep_time} seconds.")
-        if not process_log:
-            Log.warning(f"No work found within {sleep_time} seconds.")
-        return process_log
+        for _ in range(self.keep_alive_timeout, 0, -1):
+            if self.work_event.is_set() or not self.recovery_queue.empty() or self.cleanup_event.is_set():
+                process_log = True
+                break
+            else:
+                time.sleep(1)
 
-    def wait_for_work(self, sleep_time: int = 60) -> bool:
-        """Waits a mandatory time and then waits until there is work, no work to more process or the cleanup event is set.
-
-        :param sleep_time: Maximum time to wait in seconds. Defaults to 60.
-        :type sleep_time: int
-        :return: True if there is work to process, False otherwise.
-        :rtype: bool
-        """
-        process_log = self.wait_mandatory_time(sleep_time)
-        if not process_log:
-            process_log = self.wait_mandatory_time(self.keep_alive_timeout - sleep_time)
         self.work_event.clear()
         return process_log
 
-    def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any],
-                        as_conf: 'AutosubmitConfig') -> set[Any]:
-        """Recovers log files for jobs from the recovery queue and retries failed jobs.
-
-        :param identifier: Identifier for logging purposes.
-        :param jobs_pending_to_process: Set of jobs that had issues during log retrieval.
-        :param as_conf: The Autosubmit configuration object containing experiment data.
-        :return: Updated set of jobs pending to process.
+    def recover_job_log(self, jobs_db_manager: 'JobsDbManager', as_conf: 'AutosubmitConfig') -> set[Any]:
+        """Recover log files for jobs and persist job state.
+        :param jobs_db_manager: Optional jobs DB manager to use for persistence.
+        :type jobs_db_manager: JobsDbManager
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: AutosubmitConfig
+        :return: Updated set of jobs still pending log recovery.
         """
+        from autosubmit.job.job import Job
+
         while not self.recovery_queue.empty():
-            try:
-                from autosubmit.job.job import Job
-                job = Job(loaded_data=self.recovery_queue.get(timeout=1))
-                job.platform_name = self.name  # Change the original platform to this process platform.
-                job.platform = self
-                job._log_recovery_retries = 0  # Reset the log recovery retries.
-                try:
-                    job.retrieve_logfiles(raise_error=True)
-                except Exception:
-                    jobs_pending_to_process.add(job)
-                    job._log_recovery_retries += 1
-                    Log.warning(
-                        f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry:'{job.fail_count}'.")
-            except queue.Empty:
-                pass
-
-        if len(jobs_pending_to_process) > 0:  # Restore the connection if there was an issue with one or more jobs.
-            self.restore_connection(as_conf, log_recovery_process=True)
-
-        # This second while is to keep retring the failed jobs.
-        # With the unique queue, the main process won't send the job again, so we have to store it here.
-        while len(jobs_pending_to_process) > 0:  # jobs that had any issue during the log retrieval
-            job = jobs_pending_to_process.pop()
-            job._log_recovery_retries += 1
-            try:
-                job.retrieve_logfiles(raise_error=True)
-                job._log_recovery_retries += 1
-            except Exception as e:
-                if job._log_recovery_retries < 5:
-                    jobs_pending_to_process.add(job)
-                Log.warning(
-                    f"{identifier} (Retry) Failed to recover log for job '{job.name}' "
-                    f"and retry '{job.fail_count}': {str(e)}")
-            Log.result(
-                f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
-        if len(jobs_pending_to_process) > 0:
-            self.restore_connection(as_conf,
-                                    log_recovery_process=True)  # Restore the connection if there was an issue with one or more jobs.
-
-        return jobs_pending_to_process
+            job_data = self.recovery_queue.get(timeout=1)
+            job = Job(loaded_data=jobs_db_manager.load_job_by_name(job_data["name"]))
+            job.platform_name = self.name  # Change the original platform to this process platform.º
+            job.platform = self
+            # Fill cpus etc..
+            job.update_parameters(as_conf, True, False, True)
+            for key in job_data:
+                setattr(job, key, job_data[key])
+            job.update_local_logs()
+            job.retrieve_logfiles(raise_error=True)
+            jobs_db_manager.save_job_log(job)
 
     def recover_platform_job_logs(self, as_conf: 'AutosubmitConfig') -> None:
         """Recovers the logs of the jobs that have been submitted.
@@ -1074,20 +1040,21 @@ class Platform:
         """
         setproctitle.setproctitle(f"autosubmit log {self.expid} recovery {self.name.lower()}")
         identifier = f"{self.name.lower()}(log_recovery):"
+        jobs_db_manager = JobsDbManager(schema=self.expid)
         try:
             Log.info(f"{identifier} Starting...")
-            jobs_pending_to_process: set = set()
             self.connected = False
             self.restore_connection(as_conf, log_recovery_process=True)
             Log.result(f"{identifier} successfully connected.")
-            log_recovery_timeout = self.config.get("LOG_RECOVERY_TIMEOUT", 60)
-            # Keep alive signal timeout is 5 minutes, but the sleeptime is 60 seconds.
-            self.keep_alive_timeout = max(log_recovery_timeout * 5, 60 * 5)
-            while self.wait_for_work(sleep_time=max(log_recovery_timeout, 60)):
-                jobs_pending_to_process = self.recover_job_log(identifier, jobs_pending_to_process, as_conf)
-                if self.cleanup_event.is_set():  # Check if the main process is waiting for this child to end.
-                    self.recover_job_log(identifier, jobs_pending_to_process, as_conf)
-                    break
+            self.keep_alive_timeout = self.config.get("LOG_RECOVERY_TIMEOUT", 60 * 5)
+            while not self.cleanup_event.is_set() and self.wait_for_work():
+                try:
+                    self.recover_job_log(jobs_db_manager, as_conf)
+                except Exception as e:
+                    Log.debug(f'{identifier} Error during log recovery: {e}')
+                    Log.debug(traceback.format_exc())
+                    self.restore_connection(as_conf, log_recovery_process=True)
+            self.recover_job_log(jobs_db_manager, as_conf)
         except Exception as e:
             Log.error(f"{identifier} {e}")
             Log.debug(traceback.format_exc())
@@ -1139,3 +1106,22 @@ class Platform:
         :param job_names: List of job names to check. If None, all jobs will be checked.
         :return: List of completed job names.
         """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_failed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+        """Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
+
+        :param job_names: If provided, filters the results to include only these job names.
+        :type job_names: Optional[List[str]]
+        :return: List of job names with COMPLETED files.
+        :rtype: List[str]
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def delete_failed_and_completed_names(self, job_names: list[str]) -> None:
+        """Deletes the COMPLETED and FAILED files for the given job names from the remote log directory.
+
+        :param job_names: List of job names whose COMPLETED and FAILED files should be deleted
+        :type job_names: List[str]
+        """
+        raise NotImplementedError  # pragma: no cover

@@ -14,8 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
-
+import copy
 import datetime
 import json
 import locale
@@ -30,7 +29,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Optional, TYPE_CHECKING
 
-from bscearth.utils.date import sum_str_hours
+from bscearth.utils.date import sum_str_hours, date2str
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
@@ -156,6 +155,7 @@ class JobPackageBase(object):
                         raise AutosubmitCritical(f"[section:{job.section}]: Additional file:{additional_file} does not exists", 7014)
                     Log.warning(f"[section:{job.section}]: Additional file:{additional_file} does not exists, skipping check")
 
+
     def build_scripts(self, configuration: 'AutosubmitConfig') -> None:
         """Submit jobs one by one without using threads.
 
@@ -183,6 +183,8 @@ class JobPackageBase(object):
 
     def _clean_previous_run(self):
         """ Clean previous run logs on local and platform. """
+        # TODO: check after rebase
+        self._delete_failed_and_completed_files()
         for job in self.jobs:
             # This sets the log names but also the submission time for non-vertical wrapped jobs.
             job.update_local_logs()
@@ -195,6 +197,9 @@ class JobPackageBase(object):
                 log_stat.unlink(missing_ok=True)
             self.platform.remove_stat_file(job)
             self.platform.remove_completed_file(job.name)
+
+    def _delete_failed_and_completed_files(self):
+        self.platform.delete_failed_and_completed_names([job.name for job in self.jobs])
 
     def _create_scripts(self, configuration: 'AutosubmitConfig'):
         raise Exception('Not implemented')
@@ -453,7 +458,8 @@ class JobPackageThread(JobPackageBase):
                 lang = 'UTF-8'
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
-        open(os.path.join(self._tmp_path, script_file), 'wb').write(script_content.encode(lang))
+        with open(Path(self._tmp_path) / script_file, 'wb') as f:
+            f.write(script_content.encode(lang))
         os.chmod(os.path.join(self._tmp_path, script_file), 0o755)
         return script_file
 
@@ -537,7 +543,8 @@ class JobPackageThreadWrapped(JobPackageThread):
     def _create_common_script(self, filename: str = ""):
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
-        open(os.path.join(self._tmp_path, script_file), 'wb').write(script_content)
+        with open(Path(self._tmp_path) / script_file, 'wb') as f:
+            f.write(script_content)
         os.chmod(os.path.join(self._tmp_path, script_file), 0o755)
         return script_file
 
