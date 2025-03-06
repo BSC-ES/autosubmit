@@ -14,6 +14,7 @@
 
 import traceback
 from time import time, sleep
+from typing import Optional
 
 import autosubmit.history.database_managers.database_models as Models
 import autosubmit.history.utils as HUtils
@@ -40,7 +41,7 @@ class ExperimentHistory:
         self._log = Logging(expid, BasicConfig.HISTORICAL_LOG_DIR)
         self._job_data_dir_path = BasicConfig.JOBDATA_DIR
         self._historiclog_dir_path = BasicConfig.HISTORICAL_LOG_DIR
-        self.manager: ExperimentHistoryDatabaseManager = None
+        self.manager: Optional[ExperimentHistoryDatabaseManager] = None
         try:
             options = {
                 'jobdata_dir_path': BasicConfig.JOBDATA_DIR,
