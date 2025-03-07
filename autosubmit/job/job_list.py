@@ -48,7 +48,6 @@ from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import AutosubmitCritical, AutosubmitError, Log
 
 
-
 def threaded(fn):
     def wrapper(*args, **kwargs):
         thread = Thread(target=fn, args=args, kwargs=kwargs)
@@ -97,7 +96,8 @@ class JobList(object):
         self.graph = DiGraph()
         self.depends_on_previous_chunk = dict()
         self.depends_on_previous_split = dict()
-        self.path_to_logs = Path(BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR,f'LOG_{self.expid}')
+        self.path_to_logs = Path(BasicConfig.LOCAL_ROOT_DIR,
+                                 self.expid, BasicConfig.LOCAL_TMP_DIR, f'LOG_{self.expid}')
 
     @property
     def expid(self):
@@ -124,22 +124,21 @@ class JobList(object):
             self._base_job_list = [job for job in self._job_list]
             found_member = False
             processed_job_list = []
-            for job in self._job_list:  # We are assuming that the jobs are sorted in topological order (which is the default)
-                if (job.member is None and not found_member) or job.member in self._run_members or job.status not in [
-                    Status.WAITING, Status.READY]:
+            # We are assuming that the jobs are sorted in topological order (which is the default)
+            for job in self._job_list:
+                if ((job.member is None and not found_member) or job.member in self._run_members or
+                        job.status not in [Status.WAITING, Status.READY]):
                     processed_job_list.append(job)
                 if job.member is not None and len(str(job.member)) > 0:
                     found_member = True
             self._job_list = processed_job_list
-            # Old implementation that also considered children of the members.        
-            # self._job_list = [job for job in old_job_list if len(
-            #     job.parents) == 0 or len(set(old_job_list_names).intersection(set([jobp.name for jobp in job.parents]))) == len(job.parents)]
 
-    def create_dictionary(self, date_list, member_list, num_chunks, chunk_ini, date_format, default_retrials,
-                          wrapper_jobs, as_conf):
+    def create_dictionary(self, date_list, member_list, num_chunks, chunk_ini,
+                          date_format, default_retrials, wrapper_jobs, as_conf):
         chunk_list = list(range(chunk_ini, num_chunks + 1))
 
-        dic_jobs = DicJobs(date_list, member_list, chunk_list, date_format, default_retrials, as_conf)
+        dic_jobs = DicJobs(date_list, member_list, chunk_list,
+                           date_format, default_retrials, as_conf)
         self._dic_jobs = dic_jobs
         for wrapper_section in wrapper_jobs:
             if str(wrapper_jobs[wrapper_section]).lower() != 'none':
@@ -153,24 +152,28 @@ class JobList(object):
         # indices to delete
         for job in self._job_list[:]:
             if job.dependencies is not None and job.dependencies not in ["{}", "[]"]:
-                if (len(job.dependencies) > 0 and not job.has_parents() and not job.has_children()) and str(
-                        job.delete_when_edgeless).casefold() == "true".casefold():
+                if ((len(job.dependencies) > 0 and not job.has_parents() and not job.has_children())
+                        and str(job.delete_when_edgeless).casefold() == "true".casefold()):
                     self._job_list.remove(job)
                     self.graph.remove_node(job.name)
+
     @staticmethod
     def check_split_set_to_auto(as_conf):
         # If this is true, the workflow needs to be recreated on create
-        for job_name, values in as_conf.experiment_data.get("JOBS",{}).items():
+        for job_name, values in as_conf.experiment_data.get("JOBS", {}).items():
             if values.get("SPLITS", None) == "auto":
                 return True
         return False
 
-    def generate(self, as_conf, date_list, member_list, num_chunks, chunk_ini, parameters, date_format,
-                 default_retrials,
-                 default_job_type, wrapper_jobs=dict(), new=True, run_only_members=[], show_log=True, monitor=False,
-                 force=False, create = False):
+    def generate(self, as_conf, date_list, member_list, num_chunks, chunk_ini, parameters,
+                 date_format, default_retrials, default_job_type, wrapper_jobs=dict(), new=True,
+                 run_only_members=[], show_log=True, monitor=False, force=False, create=False):
         """
         Creates all jobs needed for the current workflow.
+        :param create:
+        :type create: bool
+        :param force:
+        :type force: bool
         :param as_conf: AutosubmitConfig object
         :type as_conf: AutosubmitConfig
         :param date_list: list of dates
@@ -221,7 +224,8 @@ class JobList(object):
             raise
         except Exception:
             self.graph = DiGraph()
-        self._dic_jobs = DicJobs(date_list, member_list, chunk_list, date_format, default_retrials, as_conf)
+        self._dic_jobs = DicJobs(date_list, member_list, chunk_list, date_format, default_retrials,
+                                 as_conf)
         self._dic_jobs.graph = self.graph
         if len(self.graph.nodes) > 0:
             if show_log:
@@ -231,40 +235,48 @@ class JobList(object):
             else:
                 self._dic_jobs.compare_backbone_sections()
             if not self._dic_jobs.changes:
-                self._dic_jobs._job_list = {job["job"].name: job["job"] for _, job in self.graph.nodes.data() if
-                                            job.get("job", None)}
+                self._dic_jobs._job_list = {job["job"].name: job["job"] for _, job in
+                                            self.graph.nodes.data() if job.get("job", None)}
             else:
                 # fast-look if graph existed, skips some steps
                 # If VERSION in CONFIG or HPCARCH in DEFAULT it will exist, if not it won't.
-                if not new and not self._dic_jobs.changes.get("EXPERIMENT", {}) and not self._dic_jobs.changes.get(
-                        "CONFIG", {}) and not self._dic_jobs.changes.get("DEFAULT", {}):
-                    self._dic_jobs._job_list = {job["job"].name: job["job"] for _, job in self.graph.nodes.data() if
-                                                job.get("job", None)}
+                if (not new and not self._dic_jobs.changes.get("EXPERIMENT", {}) and not
+                self._dic_jobs.changes.get("CONFIG", {}) and not
+                self._dic_jobs.changes.get("DEFAULT", {})):
+                    self._dic_jobs._job_list = {job["job"].name: job["job"] for _, job in
+                                                self.graph.nodes.data() if job.get("job", None)}
         else:
             if not create:
-                raise AutosubmitCritical("Autosubmit couldn't load the workflow graph. Please run autosubmit create first. If the pkl file exists and was generated with Autosubmit v4.1+, try again.",7013)
+                raise AutosubmitCritical(
+                    "Autosubmit couldn't load the workflow graph. Please run autosubmit create "
+                    "first. If the pkl file exists and was generated with Autosubmit v4.1+, "
+                    "try again.",
+                    7013)
             # Remove the previous pkl, if it exists.
             if not new:
                 Log.info(
-                    "Removing previous pkl file due to empty graph, likely due using an Autosubmit 4.0.XXX version")
+                    "Removing previous pkl file due to empty graph, likely due using an "
+                    "Autosubmit 4.0.XXX version")
             with suppress(FileNotFoundError):
                 os.remove(os.path.join(self._persistence_path, self._persistence_file + ".pkl"))
             with suppress(FileNotFoundError):
                 os.remove(os.path.join(self._persistence_path, self._persistence_file + "_backup.pkl"))
             new = True
-        # This generates the job object and also finds if dic_jobs has modified from previous iteration in order to expand the workflow
+        # This generates the job object and also finds if dic_jobs has modified from previous
+        # iteration in order to expand the workflow
         if show_log:
             Log.info("Creating jobs...")
         self._create_jobs(self._dic_jobs, 0, default_job_type)
         # not needed anymore all data is inside their correspondent sections in dic_jobs
-        # This dic_job is key to the dependencies management as they're ordered by date[member[chunk]]
+        # This dic_job is key to the dependencies management as they're ordered
+        # by date[member[chunk]]
         del self._dic_jobs._job_list
         if show_log:
             Log.info("Adding dependencies to the graph..")
         # del all nodes that are only in the current graph
         if len(self.graph.nodes) > 0:
-            gen = (name for name in set(self.graph.nodes).symmetric_difference(set(self._dic_jobs.workflow_jobs)) if
-                   name in self.graph.nodes)
+            gen = (name for name in set(self.graph.nodes).symmetric_difference(set(
+                self._dic_jobs.workflow_jobs)) if name in self.graph.nodes)
             for name in gen:
                 self.graph.remove_node(name)
         # This actually, also adds the node to the graph if it isn't already there
@@ -282,8 +294,8 @@ class JobList(object):
             old_job_list = [job for job in self._job_list]
             self._job_list = [
                 job for job in old_job_list if
-                job.member is None or job.member in run_only_members or job.status not in [Status.WAITING,
-                                                                                           Status.READY]]
+                job.member is None or job.member in run_only_members or job.status
+                not in [Status.WAITING, Status.READY]]
             for job in self._job_list:
                 for jobp in job.parents:
                     if jobp in self._job_list:
@@ -306,15 +318,16 @@ class JobList(object):
 
         for wrapper_section in wrapper_jobs:
             try:
-                if wrapper_jobs[wrapper_section] is not None and len(str(wrapper_jobs[wrapper_section])) > 0:
-                    self._ordered_jobs_by_date_member[wrapper_section] = self._create_sorted_dict_jobs(
-                        wrapper_jobs[wrapper_section])
+                if (wrapper_jobs[wrapper_section] is not None and
+                        len(str(wrapper_jobs[wrapper_section])) > 0):
+                    self._ordered_jobs_by_date_member[wrapper_section] = (
+                        self._create_sorted_dict_jobs(wrapper_jobs[wrapper_section]))
                 else:
                     self._ordered_jobs_by_date_member[wrapper_section] = {}
             except BaseException as e:
                 raise AutosubmitCritical(
-                    "Some section jobs of the wrapper:{0} are missing from your JOBS definition in YAML".format(
-                        wrapper_section), 7014, str(e))
+                    "Some section jobs of the wrapper:{0} are missing from your JOBS definition in "
+                    "YAML".format(wrapper_section), 7014, str(e))
         # divide job_list per platform name
         job_list_per_platform = self.split_by_platform()
 
@@ -327,7 +340,7 @@ class JobList(object):
                         submitter = _get_submitter(as_conf)
                         submitter.load_platforms(as_conf)
                         if job.platform_name not in submitter.platforms:
-                            job.update_parameters(as_conf,{})
+                            job.update_parameters(as_conf, {})
                         job_platform = submitter.platforms[job.platform_name]
                     first = False
                 job.platform = job_platform
@@ -344,18 +357,19 @@ class JobList(object):
                 job_list_per_platform[job.platform] = []
             job_list_per_platform[job.platform].append(job)
         return job_list_per_platform
+
     def _add_all_jobs_edge_info(self, dic_jobs, option="DEPENDENCIES"):
         jobs_data = dic_jobs.experiment_data.get("JOBS", {})
         sections_gen = (section for section in jobs_data.keys())
         for job_section in sections_gen:
             jobs_gen = (job for job in dic_jobs.get_jobs(job_section))
             dependencies_keys = jobs_data.get(job_section, {}).get(option, None)
-            dependencies = JobList._manage_dependencies(dependencies_keys, dic_jobs) if dependencies_keys else {}
+            dependencies = JobList._manage_dependencies(dependencies_keys, dic_jobs) \
+                if dependencies_keys else {}
             for job in jobs_gen:
                 self._apply_jobs_edge_info(job, dependencies)
 
-
-    def _deep_map_dependencies(self, section, jobs_data, option, dependency_list = set(), strip_keys = True):
+    def _deep_map_dependencies(self, section, jobs_data, option, dependency_list=set(), strip_keys=True):
         """
         Recursive function to map dependencies of dependencies
         """
@@ -374,11 +388,10 @@ class JobList(object):
                     dependency = dependency.split("+")[0]
                 elif "-" in dependency:
                     dependency = dependency.split("-")[0]
-            dependency_list = self._deep_map_dependencies(dependency, jobs_data, option, dependency_list, strip_keys)
+            dependency_list = self._deep_map_dependencies(dependency, jobs_data,
+                                                          option, dependency_list, strip_keys)
             dependency_list.add(dependency)
         return dependency_list
-
-
 
     def _add_dependencies(self, date_list, member_list, chunk_list, dic_jobs, option="DEPENDENCIES"):
         jobs_data = dic_jobs.experiment_data.get("JOBS", {})
@@ -386,26 +399,29 @@ class JobList(object):
         # map dependencies
         self.dependency_map = dict()
         for section in jobs_data.keys():
-            self.dependency_map[section] = self._deep_map_dependencies(section, jobs_data, option, set(), strip_keys = True)
+            self.dependency_map[section] = self._deep_map_dependencies(section, jobs_data, option, set(),
+                                                                       strip_keys=True)
             self.dependency_map[section].remove(section)
         # map dependencies
         self.dependency_map_with_distances = dict()
         for section in jobs_data.keys():
             self.dependency_map_with_distances[section] = self._deep_map_dependencies(section, jobs_data, option, set(),
-                                                                       strip_keys=False)
+                                                                                      strip_keys=False)
             self.dependency_map_with_distances[section].remove(section)
 
         changes = False
         if len(self.graph.out_edges) > 0:
             sections_gen = (section for section in jobs_data.keys())
-            for job_section in sections_gen: # Room for improvement: Do changes only to jobs affected by the yaml changes
-                if dic_jobs.changes.get(job_section, None) or dic_jobs.changes.get("EXPERIMENT", None) or dic_jobs.changes.get("NEWJOBS", False):
+            for job_section in sections_gen:  # Room for improvement: Do changes only to jobs affected by the yaml changes
+                if dic_jobs.changes.get(job_section, None) or dic_jobs.changes.get("EXPERIMENT",
+                                                                                   None) or dic_jobs.changes.get(
+                        "NEWJOBS", False):
                     changes = True
                     break
             Log.debug("Looking if there are changes in the workflow")
             if changes:
                 Log.debug("Changes detected, removing all dependencies")
-                self.graph.clear_edges() # reset edges of all jobs as they need to be recalculated
+                self.graph.clear_edges()  # reset edges of all jobs as they need to be recalculated
                 Log.debug("Dependencies deleted, recalculating dependencies")
             else:
                 Log.debug("No changes detected, keeping edges")
@@ -417,7 +433,8 @@ class JobList(object):
             for job in (job for job in dic_jobs.get_jobs(job_section, sort_string=True)):
                 if job.name not in self.graph.nodes:
                     self.graph.add_node(job.name, job=job)
-                elif job.name in self.graph.nodes and self.graph.nodes.get(job.name).get("job", None) is None:  # Old versions of autosubmit needs re-adding the job to the graph
+                elif job.name in self.graph.nodes and self.graph.nodes.get(job.name).get("job",
+                                                                                         None) is None:  # Old versions of autosubmit needs re-adding the job to the graph
                     self.graph.nodes.get(job.name)["job"] = job
 
         for job_section in (section for section in jobs_data.keys()):
@@ -439,9 +456,10 @@ class JobList(object):
                 if dependencies and changes:
                     job = self.graph.nodes.get(job.name)['job']
                     ## Adds the dependencies to the job, and if not possible, adds the job to the problematic_dependencies
-                    problematic_dependencies = self._manage_job_dependencies(dic_jobs, job, date_list, member_list, chunk_list,
-                                                  dependencies_keys,
-                                                  dependencies, self.graph)
+                    problematic_dependencies = self._manage_job_dependencies(dic_jobs, job, date_list, member_list,
+                                                                             chunk_list,
+                                                                             dependencies_keys,
+                                                                             dependencies, self.graph)
                     if len(problematic_dependencies) > 1:
                         if job_section not in problematic_jobs.keys():
                             problematic_jobs[job_section] = {}
@@ -472,7 +490,6 @@ class JobList(object):
         for relation_to_delete in delete_relations:
             with suppress(Exception):
                 self.graph.remove_edge(relation_to_delete[0], relation_to_delete[1])
-
 
     @staticmethod
     def _manage_dependencies(dependencies_keys: dict, dic_jobs: DicJobs) -> dict[Any, Dependency]:
@@ -641,7 +658,8 @@ class JobList(object):
             if not start:
                 start = 0
             if not end:
-                Log.warning("SPLITS Issue: Invalid SPLIT_TO: START:END value. Returning empty list. Check the configuration file.")
+                Log.warning(
+                    "SPLITS Issue: Invalid SPLIT_TO: START:END value. Returning empty list. Check the configuration file.")
                 return []
             return [number_gen for number_gen in range(int(start), int(end) + 1, int(step))]
 
@@ -773,7 +791,7 @@ class JobList(object):
         filters_to_apply = self._unify_to_filters(filters_to_apply, current_job.splits)
         return filters_to_apply
 
-    def _unify_to_filter(self, unified_filter, filter_to, filter_type, splits = None) -> {}:
+    def _unify_to_filter(self, unified_filter, filter_to, filter_type, splits=None) -> {}:
         """
         Unify filter_to filters into a single dictionary
         :param unified_filter: Single dictionary with all filters_to
@@ -848,7 +866,7 @@ class JobList(object):
             if "," in filter_to[filter_type][0]:
                 filter_to[filter_type] = filter_to[filter_type][1:]
 
-    def _unify_to_filters(self, filter_to_apply, splits = None):
+    def _unify_to_filters(self, filter_to_apply, splits=None):
         """
         Unify all filter_to filters into a single dictionary ( of current selection )
         :param filter_to_apply: Filters to apply
@@ -978,7 +996,8 @@ class JobList(object):
             special_conditions = dict()
             special_conditions["STATUS"] = filters_to_apply_by_section[key].pop("STATUS", None)
             special_conditions["FROM_STEP"] = filters_to_apply_by_section[key].pop("FROM_STEP", None)
-            special_conditions["ANY_FINAL_STATUS_IS_VALID"] = filters_to_apply_by_section[key].pop("ANY_FINAL_STATUS_IS_VALID", False)
+            special_conditions["ANY_FINAL_STATUS_IS_VALID"] = filters_to_apply_by_section[key].pop(
+                "ANY_FINAL_STATUS_IS_VALID", False)
 
             for parent in list_of_parents:
                 self.add_special_conditions(job, special_conditions, filters_to_apply_by_section[key],
@@ -1012,9 +1031,11 @@ class JobList(object):
         return distance
 
     def _calculate_natural_dependencies(self, dic_jobs, job, dependency, date, member, chunk, graph,
-                                      dependencies_keys_without_special_chars, distances_of_current_section, distances_of_current_section_members,
-                                      key, dependencies_of_that_section,
-                                      chunk_list, date_list, member_list, special_dependencies, max_distance, problematic_dependencies):
+                                        dependencies_keys_without_special_chars, distances_of_current_section,
+                                        distances_of_current_section_members,
+                                        key, dependencies_of_that_section,
+                                        chunk_list, date_list, member_list, special_dependencies, max_distance,
+                                        problematic_dependencies):
         """
         Calculate natural dependencies and add them to the graph if they're necessary.
         :param dic_jobs: JobList
@@ -1038,12 +1059,14 @@ class JobList(object):
         :return:
         """
         if key != job.section and not date and not member and not chunk:
-            if key in dependencies_of_that_section and str(dic_jobs.as_conf.jobs_data[key].get("RUNNING","once")) == "chunk":
+            if key in dependencies_of_that_section and str(
+                    dic_jobs.as_conf.jobs_data[key].get("RUNNING", "once")) == "chunk":
                 natural_parents = [natural_parent for natural_parent in
                                    dic_jobs.get_jobs(dependency.section, date, member, chunk_list[-1]) if
                                    natural_parent.name != job.name]
 
-            elif key in dependencies_of_that_section and str(dic_jobs.as_conf.jobs_data[key].get("RUNNING","once")) == "member":
+            elif key in dependencies_of_that_section and str(
+                    dic_jobs.as_conf.jobs_data[key].get("RUNNING", "once")) == "member":
                 natural_parents = [natural_parent for natural_parent in
                                    dic_jobs.get_jobs(dependency.section, date, member_list[-1], chunk) if
                                    natural_parent.name != job.name]
@@ -1053,13 +1076,16 @@ class JobList(object):
                                    natural_parent.name != job.name]
 
         else:
-            natural_parents = [natural_parent for natural_parent in dic_jobs.get_jobs(dependency.section, date, member, chunk) if natural_parent.name != job.name]
+            natural_parents = [natural_parent for natural_parent in
+                               dic_jobs.get_jobs(dependency.section, date, member, chunk) if
+                               natural_parent.name != job.name]
         # Natural jobs, no filters to apply we can safely add the edge
         for parent in natural_parents:
             if parent.name in special_dependencies:
                 continue
-            if dependency.relationships: # If this section has filter, selects..
-                found = [ aux for aux in dic_jobs.as_conf.jobs_data[parent.section].get("DEPENDENCIES",{}).keys() if job.section == aux ]
+            if dependency.relationships:  # If this section has filter, selects..
+                found = [aux for aux in dic_jobs.as_conf.jobs_data[parent.section].get("DEPENDENCIES", {}).keys() if
+                         job.section == aux]
                 if found:
                     continue
             if distances_of_current_section.get(dependency.section, 0) == 0:
@@ -1081,9 +1107,9 @@ class JobList(object):
                 if job.section == parent.section:
                     if self.actual_job_depends_on_previous_chunk:
                         skip = False
-                        for aux in [ aux for aux in self.dependency_map[job.section] if aux != job.section]:
+                        for aux in [aux for aux in self.dependency_map[job.section] if aux != job.section]:
                             distance = 0
-                            for aux_ in self.dependency_map_with_distances.get(aux,[]):
+                            for aux_ in self.dependency_map_with_distances.get(aux, []):
                                 if "-" in aux_:
                                     if job.section == aux_.split("-")[0]:
                                         distance = int(aux_.split("-")[1])
@@ -1114,9 +1140,11 @@ class JobList(object):
         return problematic_dependencies
 
     def _calculate_filter_dependencies(self, filters_to_apply, dic_jobs, job, dependency, date, member, chunk, graph,
-                                     dependencies_keys_without_special_chars, distances_of_current_section, distances_of_current_section_members,
-                                     key, dependencies_of_that_section,
-                                     chunk_list, date_list, member_list, special_dependencies, problematic_dependencies):
+                                       dependencies_keys_without_special_chars, distances_of_current_section,
+                                       distances_of_current_section_members,
+                                       key, dependencies_of_that_section,
+                                       chunk_list, date_list, member_list, special_dependencies,
+                                       problematic_dependencies):
         """
         Calculate dependencies that has any kind of filter set and add them to the graph if they're necessary.
         :param filters_to_apply: Filters to apply
@@ -1157,15 +1185,17 @@ class JobList(object):
                 dependencies_of_that_section.get(dependency.section)))
         else:
             filters_to_apply_of_parent = {}
-        possible_parents = [ possible_parent for possible_parent in dic_jobs.get_jobs_filtered(dependency.section, job, filters_to_apply, date, member, chunk,
-                                                      filters_to_apply_of_parent) if possible_parent.name != job.name]
+        possible_parents = [possible_parent for possible_parent in
+                            dic_jobs.get_jobs_filtered(dependency.section, job, filters_to_apply, date, member, chunk,
+                                                       filters_to_apply_of_parent) if possible_parent.name != job.name]
         for parent in possible_parents:
             edge_added = False
             if any_all_filter:
                 if (
                         (parent.chunk and parent.chunk != self.depends_on_previous_chunk.get(parent.section,
                                                                                              parent.chunk)) or
-                        (parent.running == "chunk" and parent.chunk != chunk_list[-1] and not filters_to_apply_of_parent) or
+                        (parent.running == "chunk" and parent.chunk != chunk_list[
+                            -1] and not filters_to_apply_of_parent) or
                         self.actual_job_depends_on_previous_chunk or
                         self.actual_job_depends_on_special_chunk or
                         (parent.name in special_dependencies)
@@ -1179,7 +1209,7 @@ class JobList(object):
                 graph.add_edge(parent.name, job.name)
                 edge_added = True
             else:
-                if parent.name not in self.depends_on_previous_special_section.get(job.section,set()) or job.split > 0:
+                if parent.name not in self.depends_on_previous_special_section.get(job.section, set()) or job.split > 0:
                     graph.add_edge(parent.name, job.name)
                     edge_added = True
             if parent.section == job.section:
@@ -1197,7 +1227,6 @@ class JobList(object):
                 self.depends_on_previous_special_section[job.section].add(parent.name)
                 problematic_dependencies.add(parent.name)
 
-
         JobList.handle_frequency_interval_dependencies(chunk, chunk_list, date, date_list, dic_jobs, job, member,
                                                        member_list, dependency.section, possible_parents)
 
@@ -1208,7 +1237,9 @@ class JobList(object):
         filters_to_apply.pop("STATUS", None)
         # Don't do perform special filter if only "FROM_STEP" is applied
         if "FROM_STEP" in filters_to_apply:
-            if filters_to_apply.get("CHUNKS_TO","none") == "none" and filters_to_apply.get("MEMBERS_TO","none") == "none" and filters_to_apply.get("DATES_TO","none") == "none" and filters_to_apply.get("SPLITS_TO","none") == "none":
+            if filters_to_apply.get("CHUNKS_TO", "none") == "none" and filters_to_apply.get("MEMBERS_TO",
+                                                                                            "none") == "none" and filters_to_apply.get(
+                    "DATES_TO", "none") == "none" and filters_to_apply.get("SPLITS_TO", "none") == "none":
                 filters_to_apply = {}
         filters_to_apply.pop("FROM_STEP", None)
         filters_to_apply.pop("ANY_FINAL_STATUS_IS_VALID", None)
@@ -1319,9 +1350,9 @@ class JobList(object):
                 aux_key = dependency_key
                 distance = 0
             if dic_jobs.as_conf.jobs_data.get(aux_key, {}).get("RUNNING",
-                                                            "once") == "chunk":
+                                                               "once") == "chunk":
                 distances_of_current_section[aux_key] = distance
-            elif dic_jobs.as_conf.jobs_data.get(aux_key, {}).get("RUNNING","once") == "member":
+            elif dic_jobs.as_conf.jobs_data.get(aux_key, {}).get("RUNNING", "once") == "member":
                 distances_of_current_section_member[aux_key] = distance
             if distance != 0:
                 if job.running == "chunk":
@@ -1354,7 +1385,7 @@ class JobList(object):
                             if job.chunk <= int(dic_jobs.as_conf.jobs_data[aux_key].get("DELAY", 0)):
                                 continue
                         # check doc example
-                        if dependencies.get(stripped_key,None) and not dependencies[stripped_key].relationships:
+                        if dependencies.get(stripped_key, None) and not dependencies[stripped_key].relationships:
                             dependencies_to_del.add(key)
 
         max_distance = 0
@@ -1368,11 +1399,11 @@ class JobList(object):
             else:
                 distance = 0
             max_distance = max(max_distance, distance)
-            if dic_jobs.as_conf.jobs_data.get(aux_key, {}).get("RUNNING","once") == "chunk":
+            if dic_jobs.as_conf.jobs_data.get(aux_key, {}).get("RUNNING", "once") == "chunk":
                 if aux_key in distances_of_current_section:
                     if distance > distances_of_current_section[aux_key]:
                         distances_of_current_section[aux_key] = distance
-            elif dic_jobs.as_conf.jobs_data.get(aux_key, {}).get("RUNNING","once") == "member":
+            elif dic_jobs.as_conf.jobs_data.get(aux_key, {}).get("RUNNING", "once") == "member":
                 if aux_key in distances_of_current_section_member:
                     if distance > distances_of_current_section_member[aux_key]:
                         distances_of_current_section_member[aux_key] = distance
@@ -1394,15 +1425,24 @@ class JobList(object):
             if len(filters_to_apply) > 0:
                 dependencies_of_that_section = dic_jobs.as_conf.jobs_data[dependency.section].get("DEPENDENCIES", {})
                 ## Adds the dependencies to the job, and if not possible, adds the job to the problematic_dependencies
-                special_dependencies, problematic_dependencies = self._calculate_filter_dependencies(filters_to_apply, dic_jobs, job, dependency, date, member, chunk,
-                                                  graph,
-                                                  dependencies_keys_without_special_chars,
-                                                  distances_of_current_section, distances_of_current_section_member,
-                                                  key,
-                                                  dependencies_of_that_section, chunk_list, date_list, member_list, special_dependencies, problematic_dependencies)
+                special_dependencies, problematic_dependencies = self._calculate_filter_dependencies(filters_to_apply,
+                                                                                                     dic_jobs, job,
+                                                                                                     dependency, date,
+                                                                                                     member, chunk,
+                                                                                                     graph,
+                                                                                                     dependencies_keys_without_special_chars,
+                                                                                                     distances_of_current_section,
+                                                                                                     distances_of_current_section_member,
+                                                                                                     key,
+                                                                                                     dependencies_of_that_section,
+                                                                                                     chunk_list,
+                                                                                                     date_list,
+                                                                                                     member_list,
+                                                                                                     special_dependencies,
+                                                                                                     problematic_dependencies)
             else:
                 if key in dependencies_non_natural_to_del:
-                     continue
+                    continue
                 else:
                     natural_sections.append(key)
         for key in natural_sections:
@@ -1424,12 +1464,17 @@ class JobList(object):
                 dependencies_of_that_section.append(key_aux_stripped)
             ## Adds the dependencies to the job, and if not possible, adds the job to the problematic_dependencies
             problematic_dependencies = self._calculate_natural_dependencies(dic_jobs, job, dependency, date,
-                                               member, chunk, graph,
-                                               dependencies_keys_without_special_chars,
-                                               distances_of_current_section, distances_of_current_section_member,
-                                               key,
-                                               dependencies_of_that_section, chunk_list, date_list, member_list, special_dependencies, max_distance, problematic_dependencies)
+                                                                            member, chunk, graph,
+                                                                            dependencies_keys_without_special_chars,
+                                                                            distances_of_current_section,
+                                                                            distances_of_current_section_member,
+                                                                            key,
+                                                                            dependencies_of_that_section, chunk_list,
+                                                                            date_list, member_list,
+                                                                            special_dependencies, max_distance,
+                                                                            problematic_dependencies)
         return problematic_dependencies
+
     @staticmethod
     def _calculate_dependency_metadata(chunk, chunk_list, member, member_list, date, date_list, dependency):
         skip = False
@@ -1783,8 +1828,10 @@ class JobList(object):
             List[Job]: List of completed and failed jobs without updated logs.
         """
 
-        completed_failed_jobs = [job for job in self._job_list if (platform is None or job.platform.name == platform.name) and
-                                 (job.status == Status.COMPLETED or job.status == Status.FAILED) and job.updated_log is False ]
+        completed_failed_jobs = [job for job in self._job_list if
+                                 (platform is None or job.platform.name == platform.name) and
+                                 (
+                                             job.status == Status.COMPLETED or job.status == Status.FAILED) and job.updated_log is False]
 
         return completed_failed_jobs
 
@@ -2458,9 +2505,11 @@ class JobList(object):
                 return self._persistence.load(self._persistence_path, self._persistence_file + "_backup")
         except ValueError as e:
             if not create:
-                raise AutosubmitCritical(f'JobList could not be loaded due pkl being saved with a different version of Autosubmit or Python version. {e}')
+                raise AutosubmitCritical(
+                    f'JobList could not be loaded due pkl being saved with a different version of Autosubmit or Python version. {e}')
             else:
-                Log.warning(f'Job list will be created from scratch due pkl being saved with a different version of Autosubmit or Python version. {e}')
+                Log.warning(
+                    f'Job list will be created from scratch due pkl being saved with a different version of Autosubmit or Python version. {e}')
         except PermissionError as e:
             if not create:
                 raise AutosubmitCritical(f'JobList could not be loaded due to permission error. {e}')
@@ -2660,18 +2709,22 @@ class JobList(object):
         """
         Updates the log err and log out.
         """
-        if not hasattr(job, "updated_log"): # hasattr for backward compatibility (job.updated_logs is only for newer jobs, as the loaded ones may not have this set yet)
+        if not hasattr(job,
+                       "updated_log"):  # hasattr for backward compatibility (job.updated_logs is only for newer jobs, as the loaded ones may not have this set yet)
             job.updated_log = False
         elif job.updated_log:
             return
-        if hasattr(job, "x11") and job.x11: # X11 has it log written in the run.out file. No need to check for log files as there are none
+        if hasattr(job,
+                   "x11") and job.x11:  # X11 has it log written in the run.out file. No need to check for log files as there are none
             job.updated_log = True
             return
         log_recovered = self.check_if_log_is_recovered(job)
         if log_recovered:
-            job.local_logs = (log_recovered.name, log_recovered.name[:-4] + ".err") # we only want the last one
+            job.local_logs = (log_recovered.name, log_recovered.name[:-4] + ".err")  # we only want the last one
             job.updated_log = True
-        elif new_run and not job.updated_log and str(as_conf.platforms_data.get(job.platform.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "false":
+        elif new_run and not job.updated_log and str(
+                as_conf.platforms_data.get(job.platform.name, {}).get('DISABLE_RECOVERY_THREADS',
+                                                                      "false")).lower() == "false":
             job.platform.add_job_to_log_recover(job)
         return log_recovered
 
@@ -2692,7 +2745,8 @@ class JobList(object):
 
         if not hasattr(job, "updated_log") or not job.updated_log:
             for log_recovered in self.path_to_logs.glob(f"{job.name}.*.out"):
-                file_timestamp = int(datetime.datetime.fromtimestamp(log_recovered.stat().st_mtime).strftime("%Y%m%d%H%M%S"))
+                file_timestamp = int(
+                    datetime.datetime.fromtimestamp(log_recovered.stat().st_mtime).strftime("%Y%m%d%H%M%S"))
                 if job.ready_date and file_timestamp >= int(job.ready_date):
                     return log_recovered
         return None
@@ -2773,7 +2827,8 @@ class JobList(object):
                     job.packed = False
                     save = True
         else:
-            for job in [ job for job in self._job_list if job.status in [ Status.WAITING, Status.READY, Status.DELAYED, Status.PREPARED ] ]:
+            for job in [job for job in self._job_list if
+                        job.status in [Status.WAITING, Status.READY, Status.DELAYED, Status.PREPARED]]:
                 job.fail_count = 0
                 job.packed = False
         # Check checkpoint jobs, the status can be Any
@@ -2789,8 +2844,8 @@ class JobList(object):
         for job in self.get_completed():
             job.packed = False
             # Log name has this format:
-                # a02o_20000101_fc0_2_SIM.20240212115021.err
-                # $jobname.$(YYYYMMDDHHMMSS).err or .out
+            # a02o_20000101_fc0_2_SIM.20240212115021.err
+            # $jobname.$(YYYYMMDDHHMMSS).err or .out
             if job.synchronize is not None and len(str(job.synchronize)) > 0:
                 tmp = [parent for parent in job.parents if parent.status == Status.COMPLETED]
                 if len(tmp) != len(job.parents):
@@ -3024,7 +3079,8 @@ class JobList(object):
                     self.job_package_map[package.jobs[0].id] = wrapper_job
                     if isinstance(package, JobPackageThread):
                         # Saving only when it is a real multi job package
-                        packages_persistence.save(package, inspect) # Need to store the wallclock for the is_overwallclock function
+                        packages_persistence.save(package,
+                                                  inspect)  # Need to store the wallclock for the is_overwallclock function
 
     def check_scripts(self, as_conf):
         """
@@ -3046,7 +3102,7 @@ class JobList(object):
                 Log.info("{} of {} checked".format(count, len(self._job_list)))
 
             show_logs = str(job.check_warnings).lower()
-            if str(job.check).lower() in ['on_submission','false']:
+            if str(job.check).lower() in ['on_submission', 'false']:
                 continue
             else:
                 if job.section in self.sections_checked:
@@ -3415,7 +3471,7 @@ class JobList(object):
 
             # Using standard procedure
             if status_code in [Status.RUNNING, Status.SUBMITTED, Status.QUEUING,
-                               Status.FAILED]    or make_exception is True:
+                               Status.FAILED] or make_exception is True:
                 # COMPLETED adds too much overhead so these values are now stored in a database and retrieved separately
                 submit_time, start_time, finish_time, status = JobList._job_running_check(
                     status_code, name, tmp_path)
