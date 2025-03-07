@@ -25,9 +25,9 @@ def test_log_debug_raises_error(mocker):
     try:
         _fn()
     except BaseException as e:
-        mocker.patch('autosubmit._exit')  # mock this to avoid the system from exiting
-        mocked_log = mocker.patch('autosubmit.Log')
-        mocked_print = mocker.patch('autosubmit.print')
+        mocker.patch('autosubmit.scripts.autosubmit._exit')  # mock this to avoid the system from exiting
+        mocked_log = mocker.patch('autosubmit.scripts.autosubmit.Log')
+        mocked_print = mocker.patch('autosubmit.scripts.autosubmit.print')
 
         mocked_log.debug.side_effect = BaseException()
 
@@ -71,9 +71,9 @@ def test_exit_from_error(
     try:
         _fn()
     except BaseException as e:
-        mocker.patch('autosubmit._exit')  # mock this to avoid the system from exiting
-        mocked_log = mocker.patch('autosubmit.Log')
-        mocked_delete = mocker.patch('autosubmit.delete_lock_file')
+        mocker.patch('autosubmit.scripts.autosubmit._exit')  # mock this to avoid the system from exiting
+        mocked_log = mocker.patch('autosubmit.scripts.autosubmit.Log')
+        mocked_delete = mocker.patch('autosubmit.scripts.autosubmit.delete_lock_file')
 
         exit_from_error(e)
 
