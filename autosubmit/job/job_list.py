@@ -1481,10 +1481,11 @@ class JobList(object):
                 dependencies_of_that_section.append(key_aux_stripped)
             # Adds the dependencies to the job, and if not possible, adds the job to the
             # problematic_dependencies
+            ## Adds the dependencies to the job, and if not possible, adds the job to the problematic_dependencies
             problematic_dependencies = self._calculate_natural_dependencies(dic_jobs, job,
-                dependency, date, member, chunk, graph, distances_of_current_section, key,
-                dependencies_of_that_section, chunk_list, date_list, member_list,
-                special_dependencies, max_distance, problematic_dependencies)
+                        dependency, date, member, chunk, graph, distances_of_current_section, key,
+                        dependencies_of_that_section, chunk_list, date_list, member_list,
+                        special_dependencies, max_distance, problematic_dependencies)
         return problematic_dependencies
 
     @staticmethod
