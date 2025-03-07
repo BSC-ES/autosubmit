@@ -19,14 +19,14 @@
 
 import sqlite3
 import os
-from typing import Dict, Iterable, List, Protocol, Union, cast
+from typing import Any, Dict, Iterable, List, Protocol, Union, cast
 
 class DbManager(object):
     """
     Class to manage an SQLite database.
     """
 
-    def __init__(self, root_path, db_name, db_version):
+    def __init__(self, root_path: str, db_name: str, db_version: int):
         self.root_path = root_path
         self.db_name = db_name
         self.db_version = db_version
@@ -153,7 +153,7 @@ class DbManager(object):
         if os.path.exists(self._get_db_filepath()):
             os.remove(self._get_db_filepath())
 
-    def _get_db_filepath(self):
+    def _get_db_filepath(self) -> str:
         """
         Returns the path of the .db file
         :return path: int
@@ -173,7 +173,7 @@ class DbManager(object):
         self.insert(options_table_name, columns, ['name', self.db_name])
         self.insert(options_table_name, columns, ['version', self.db_version])
 
-    def _select_with_all_fields(self, table_name, where=[]):
+    def _select_with_all_fields(self, table_name: str, where: List[str] = []) -> sqlite3.Cursor:
         """
         Returns the cursor of the select command with the given parameters
         :param table_name: str
@@ -190,7 +190,7 @@ class DbManager(object):
     """
 
     @staticmethod
-    def generate_create_table_command(table_name, fields):
+    def generate_create_table_command(table_name: str, fields: List[str]) -> str:
         create_command = 'CREATE TABLE IF NOT EXISTS ' + table_name + ' (' + fields.pop(0)
         for field in fields:
             create_command += (', ' + field)
@@ -198,12 +198,14 @@ class DbManager(object):
         return create_command
 
     @staticmethod
-    def generate_drop_table_command(table_name):
+    def generate_drop_table_command(table_name: str) -> str:
         drop_command = 'DROP TABLE IF EXISTS ' + table_name
         return drop_command
 
     @staticmethod
-    def generate_insert_command(table_name, columns, values):
+    def generate_insert_command(
+        table_name: str, columns: List[str], values: List[str]
+    ) -> str:
         insert_command = 'INSERT INTO ' + table_name + '(' + columns.pop(0)
         for column in columns:
             insert_command += (', ' + column)
@@ -214,7 +216,7 @@ class DbManager(object):
         return insert_command
 
     @staticmethod
-    def generate_insert_many_command(table_name, num_of_values):
+    def generate_insert_many_command(table_name: str, num_of_values: int) -> str:
         insert_command = 'INSERT INTO ' + table_name + ' VALUES (?'
         num_of_values -= 1
         while num_of_values > 0:
@@ -224,12 +226,12 @@ class DbManager(object):
         return insert_command
 
     @staticmethod
-    def generate_count_command(table_name):
+    def generate_count_command(table_name: str) -> str:
         count_command = 'SELECT count(*) FROM ' + table_name
         return count_command
 
     @staticmethod
-    def generate_select_command(table_name, where=[]):
+    def generate_select_command(table_name: str, where: List[str] = []) -> str:
         basic_select = 'SELECT * FROM ' + table_name
         select_command = basic_select if len(where) == 0 else basic_select + ' WHERE ' + where.pop(0)
         for condition in where:
@@ -237,7 +239,7 @@ class DbManager(object):
         return select_command
     
     @staticmethod
-    def generate_delete_command(table_name: str, where: list[str] = []):
+    def generate_delete_command(table_name: str, where: List[str] = []) -> str:
         delete_command = "DELETE FROM " + table_name + " WHERE " + where.pop(0)
         for condition in where:
             delete_command += " AND " + condition
@@ -260,11 +262,11 @@ class DatabaseManager(Protocol):
     def insert(self, table_name: str, columns: List[str], values: List[str]): ...
     def insertMany(self, table_name: str, data: List[Union[Iterable, Dict]]): ...
     def delete_where(self, table_name: str, where: List[str]): ...
-    def select_first(self, table_name: str): ...
-    def select_first_where(self, table_name: str, where: List[str]): ...
-    def select_all(self, table_name: str): ...
-    def select_all_where(self, table_name: str, where: List[str]): ...
-    def count(self, table_name: str): ...
+    def select_first(self, table_name: str) -> List[Any]: ...
+    def select_first_where(self, table_name: str, where: List[str]) -> List[Any]: ...
+    def select_all(self, table_name: str) -> List[List[Any]]: ...
+    def select_all_where(self, table_name: str, where: List[str]) -> List[List[Any]]: ...
+    def count(self, table_name: str) -> int: ...
     def drop(self): ...
 
 
