@@ -1,7 +1,3 @@
-#!/usr/bin/env python
-from _pytest._py.path import LocalPath
-from _pytest.legacypath import TempdirFactory
-
 # Copyright 2015-2020 Earth Sciences Department, BSC-CNS
 
 # This file is part of Autosubmit.
@@ -18,13 +14,18 @@ from _pytest.legacypath import TempdirFactory
 
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
+"""
+File to create a test for the profiling
+"""
 from test.unit.utils.common import create_database, init_expid
 from pathlib import Path
 
 import os
 import pwd
 import pytest
+
+from _pytest._py.path import LocalPath
+from _pytest.legacypath import TempdirFactory
 
 from autosubmit.autosubmit import Autosubmit
 
@@ -65,7 +66,8 @@ def run_tmpdir(tmpdir_factory: TempdirFactory) -> LocalPath:
     os.environ['AUTOSUBMIT_CONFIGURATION'] = str(folder.join(Path('autosubmitrc')))
     create_database(str(folder.join(Path('autosubmitrc'))))
     assert "tests.db" in [Path(f).name for f in folder.listdir()]
-    init_expid(str(folder.join(Path('autosubmitrc'))), platform='local', create=False, test_type='test')
+    init_expid(str(folder.join(Path('autosubmitrc'))),
+               platform='local', create=False, test_type='test')
     assert "t000" in [Path(f).name for f in folder.listdir()]
     return folder
 
@@ -108,6 +110,8 @@ def check_profile(run_tmpdir) -> bool:
 
 @pytest.mark.parametrize("jobs_data, profiler", [
         ("""
+            CONFIG:
+                SAFETYSLEEPTIME: 0
             EXPERIMENT:
                 NUMCHUNKS: '1'
             JOBS:
