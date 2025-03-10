@@ -233,6 +233,8 @@ class Autosubmit:
 
             group.add_argument('-op', '--operational', action='store_true',
                                help='creates a new experiment with operational experiment id')
+            group.add_argument('-ev', '--evalutation', action='store_true',
+                               help='creates a new experiment with evaluation experiment id')
             subparser.add_argument('-H', '--HPC', required=False, default="local",
                                    help='specifies the HPC to use for the experiment')
             subparser.add_argument('-d', '--description', type=str, required=True,
@@ -1325,7 +1327,7 @@ class Autosubmit:
                     f.write(content)
 
     @staticmethod
-    def expid(description, hpc="", copy_id='', dummy=False, minimal_configuration=False, git_repo="", git_branch="", git_as_conf="", operational=False,  testcase = False,use_local_minimal=False):
+    def expid(description, hpc="", copy_id='', dummy=False, minimal_configuration=False, git_repo="", git_branch="", git_as_conf="", operational=False,  testcase = False, evaluation = False, use_local_minimal=False):
         """
         Creates a new experiment for given HPC
         description: description of the experiment
@@ -1337,6 +1339,7 @@ class Autosubmit:
         git_branch: git branch to clone
         git_as_conf: path to as_conf file in git repository
         operational: if true, creates an operational experiment
+        evaluation: if true, creates an evaluation experiment
         local: Gets local minimal instead of git minimal
         """
         if use_local_minimal:
@@ -1360,10 +1363,10 @@ class Autosubmit:
                 if not os.path.exists(copy_id_folder):
                     raise AutosubmitCritical(
                         "Experiment {0} doesn't exists".format(copy_id), 7011)
-                exp_id = copy_experiment(copy_id, description, Autosubmit.autosubmit_version, testcase, operational)
+                exp_id = copy_experiment(copy_id, description, Autosubmit.autosubmit_version, testcase, operational, evaluation)
             else:
                 # Create a new experiment from scratch
-                exp_id = new_experiment(description, Autosubmit.autosubmit_version, testcase, operational)
+                exp_id = new_experiment(description, Autosubmit.autosubmit_version, testcase, operational, evaluation)
 
             if exp_id == '':
                 raise AutosubmitCritical("No expid", 7011)

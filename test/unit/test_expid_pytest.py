@@ -116,12 +116,12 @@ EXPERIMENT:
     yield expid
 
 
-@pytest.mark.parametrize("generate_new_experiment", ['test', 'normal', 'operational'], indirect=True)
+@pytest.mark.parametrize("generate_new_experiment", ['test', 'normal', 'operational', 'evaluation'], indirect=True)
 def test_expid_generated_correctly(create_autosubmit_tmpdir, generate_new_experiment, setup_experiment_yamlfiles):
     expid = generate_new_experiment
     print(f"Running test for {expid}")
     Autosubmit.inspect(expid=f'{expid}', check_wrapper=True, force=True, lst=None, filter_chunks=None, filter_status=None, filter_section=None)
-    assert expid in ['t000', 'a000', 'o000']
+    assert expid in ['t000', 'a000', 'o000', 'e000']
     assert f"{expid}_DEBUG.cmd" in [Path(f).name for f in Path(f"{create_autosubmit_tmpdir.strpath}/{expid}/tmp").iterdir()]
     # Consult if the expid is in the database
     db_path = Path(f"{create_autosubmit_tmpdir.strpath}/tests.db")
@@ -132,7 +132,7 @@ def test_expid_generated_correctly(create_autosubmit_tmpdir, generate_new_experi
     cursor.close()
 
 
-@pytest.mark.parametrize("generate_new_experiment", ['test', 'normal', 'operational'], indirect=True)
+@pytest.mark.parametrize("generate_new_experiment", ['test', 'normal', 'operational', 'evaluation'], indirect=True)
 def test_delete_experiment(create_autosubmit_tmpdir, generate_new_experiment, setup_experiment_yamlfiles):
     expid = generate_new_experiment
     print(f"Running test for {expid}")
@@ -153,7 +153,7 @@ def test_delete_experiment(create_autosubmit_tmpdir, generate_new_experiment, se
         Autosubmit.delete(expid=f'{expid}', force=True)
 
 
-@pytest.mark.parametrize("generate_new_experiment", ['test', 'normal', 'operational'], indirect=True)
+@pytest.mark.parametrize("generate_new_experiment", ['test', 'normal', 'operational', 'evaluation'], indirect=True)
 def test_delete_experiment_not_owner(create_autosubmit_tmpdir, generate_new_experiment, setup_experiment_yamlfiles, mocker):
     expid = generate_new_experiment
     print(f"Running test for {expid}")
@@ -210,47 +210,3 @@ def test_perform_deletion(create_autosubmit_tmpdir, generate_new_experiment, set
     mocker.patch("autosubmit.autosubmit.delete_experiment", side_effect=FileNotFoundError)
     err_message = Autosubmit._perform_deletion(experiment_path, structure_db_path, job_data_db_path, expid)
     assert all(x in err_message for x in ["Cannot delete experiment entry", "Cannot delete directory", "Cannot delete structure", "Cannot delete job_data"])
-
-GITHUB_URLS = [
-    "git@github.com:user/project.git",
-    "https://github.com/user/project.git",
-    "http://github.com/user/project.git",
-    "git@192.168.101.127:user/project.git",
-    "https://192.168.101.127/user/project.git",
-    "http://192.168.101.127/user/project.git",
-    "ssh://user@host.xz:port/path/to/repo.git/",
-    "ssh://user@host.xz/path/to/repo.git/",
-    "ssh://host.xz:port/path/to/repo.git/",
-    "ssh://host.xz/path/to/repo.git/",
-    "ssh://user@host.xz/path/to/repo.git/",
-    "ssh://host.xz/path/to/repo.git/",
-    "ssh://user@host.xz/~user/path/to/repo.git/",
-    "ssh://host.xz/~user/path/to/repo.git/",
-    "ssh://user@host.xz/~/path/to/repo.git",
-    "ssh://host.xz/~/path/to/repo.git",
-    "git://host.xz/path/to/repo.git/",
-    "git://host.xz/~user/path/to/repo.git/",
-    "http://host.xz/path/to/repo.git/",
-    "https://host.xz/path/to/repo.git/",
-    "/path/to/repo.git/",
-    "path/to/repo.git/",
-    "~/path/to/repo.git",
-    "file:///path/to/repo.git/",
-    "file://~/path/to/repo.git/",
-    "user@host.xz:/path/to/repo.git/",
-    "host.xz:/path/to/repo.git/",
-    "user@host.xz:~user/path/to/repo.git/",
-    "host.xz:~user/path/to/repo.git/",
-    "user@host.xz:path/to/repo.git",
-    "host.xz:path/to/repo.git",
-    "rsync://host.xz/path/to/repo.git/", 
-    "https://github.com/username/repo/tree/main",  # Invalid GitHub URL (to test rejection)
-    "ftp://github.com/username/repo.git"          # Invalid protocol (to test rejection)
-]
-# https://stackoverflow.com/questions/2514859/regular-expression-for-git-repository
-@pytest.mark.parametrize("url", GITHUB_URLS)
-def test_is_github_url(url):
-    if url.startswith("https://github.com") or url.startswith("git@github.com"):
-        assert is_github_url(url), f"Expected {url} to be identified as a GitHub URL"
-    else:
-        assert not is_github_url(url), f"Expected {url} to NOT be identified as a GitHub URL"

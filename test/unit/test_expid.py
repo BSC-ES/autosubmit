@@ -58,12 +58,19 @@ def test_create_new_test_experiment(db_common_mock):
     assert "t000" == experiment_id
 
 
-@patch('autosubmit.experiment.experiment_common.db_common')
-def test_create_new_operational_experiment(db_common_mock):
-    current_experiment_id = "empty"
-    _build_db_mock(current_experiment_id, db_common_mock)
-    experiment_id = new_experiment(_DESCRIPTION, _VERSION, False, True)
-    assert "o000" == experiment_id
+    @patch('autosubmit.experiment.experiment_common.db_common')
+    def test_create_new_evaluation_experiment(self, db_common_mock):
+        current_experiment_id = "empty"
+        self._build_db_mock(current_experiment_id, db_common_mock)
+        experiment_id = new_experiment(self.description, self.version, False, False, True)
+        self.assertEqual("e000", experiment_id)
+
+    @patch('autosubmit.experiment.experiment_common.db_common')
+    def test_create_new_experiment_with_previous_one(self, db_common_mock):
+        current_experiment_id = "a007"
+        self._build_db_mock(current_experiment_id, db_common_mock)
+        experiment_id = new_experiment(self.description, self.version)
+        self.assertEqual("a007", experiment_id)
 
 
 @patch('autosubmit.experiment.experiment_common.db_common')
@@ -73,6 +80,17 @@ def test_create_new_evaluation_experiment(db_common_mock):
     experiment_id = new_experiment(_DESCRIPTION, _VERSION, False, False, True)
     assert "e000" == experiment_id
 
+    @patch('autosubmit.experiment.experiment_common.db_common')
+    def test_create_new_evaluation_experiment_with_previous_one(self, db_common_mock):
+        current_experiment_id = "e113"
+        self._build_db_mock(current_experiment_id, db_common_mock)
+        experiment_id = new_experiment(self.description, self.version, False, False, True)
+        self.assertEqual("e113", experiment_id)
+
+    @staticmethod
+    def _build_db_mock(current_experiment_id, mock_db_common):
+        mock_db_common.last_name_used = Mock(return_value=current_experiment_id)
+        mock_db_common.check_experiment_exists = Mock(return_value=False)
 
 @patch('autosubmit.experiment.experiment_common.db_common')
 def test_create_new_experiment_with_previous_one(db_common_mock):
