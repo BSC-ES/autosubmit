@@ -233,7 +233,7 @@ class Autosubmit:
 
             group.add_argument('-op', '--operational', action='store_true',
                                help='creates a new experiment with operational experiment id')
-            group.add_argument('-ev', '--evalutation', action='store_true',
+            group.add_argument('-ev', '--evaluation', action='store_true',
                                help='creates a new experiment with evaluation experiment id')
             subparser.add_argument('-H', '--HPC', required=False, default="local",
                                    help='specifies the HPC to use for the experiment')
@@ -722,7 +722,7 @@ class Autosubmit:
         if args.command == 'run':
             return Autosubmit.run_experiment(args.expid, args.notransitive,args.start_time,args.start_after, args.run_only_members, args.profile)
         elif args.command == 'expid':
-            return Autosubmit.expid(args.description,args.HPC,args.copy, args.dummy,args.minimal_configuration,args.git_repo,args.git_branch,args.git_as_conf,args.operational,args.testcase,args.use_local_minimal) != ''
+            return Autosubmit.expid(args.description,args.HPC,args.copy, args.dummy,args.minimal_configuration,args.git_repo,args.git_branch,args.git_as_conf,args.operational,args.testcase,args.evaluation,args.use_local_minimal) != ''
         elif args.command == 'delete':
             return Autosubmit.delete(args.expid, args.force)
         elif args.command == 'monitor':
