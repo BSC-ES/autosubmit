@@ -3166,16 +3166,15 @@ class JobList(object):
         return out
 
     def save_wrappers(self, packages_to_save, failed_packages, as_conf, packages_persistence,
-                      old=False, inspect=False):
+                      hold=False, inspect=False):
         for package in packages_to_save:
             if package.jobs[0].id not in failed_packages:
                 if hasattr(package, "name"):
                     self.packages_dict[package.name] = package.jobs
                     from ..job.job import WrapperJob
                     wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.SUBMITTED, 0,
-                                             package.jobs,
-                                             package._wallclock, package._num_processors,
-                                             package.platform, as_conf, hold)
+                                  package.jobs, package._wallclock, package._num_processors,
+                                  package.platform, as_conf, hold)
                     self.job_package_map[package.jobs[0].id] = wrapper_job
                     if isinstance(package, JobPackageThread):
                         # Saving only when it is a real multi job package
