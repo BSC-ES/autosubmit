@@ -189,10 +189,10 @@ class JobList(object):
             force = True
         if force:
             Log.debug("Resetting the workflow graph to a zero state")
-            if os.path.exists(os.path.join(self._persistence_path, self._persistence_file + ".pkl")):
-                os.remove(os.path.join(self._persistence_path, self._persistence_file + ".pkl"))
-            if os.path.exists(os.path.join(self._persistence_path, self._persistence_file + "_backup.pkl")):
-                os.remove(os.path.join(self._persistence_path, self._persistence_file + "_backup.pkl"))
+            if Path(self._persistence_path +"/"+ self._persistence_file + ".pkl").exists():
+                Path(self._persistence_path +"/"+ self._persistence_file + ".pkl").rmdir()
+            if Path(self._persistence_path +"/"+ self._persistence_file + "_backup.pkl").exists():
+                Path(self._persistence_path +"/"+ self._persistence_file + "_backup.pkl").rmdir()
         self._parameters = parameters
         self._date_list = date_list
         self._member_list = member_list
