@@ -97,7 +97,14 @@ def test_create_new_evaluation_experiment(db_common_mock):
         self._build_db_mock(current_experiment_id, db_common_mock)
         experiment_id = copy_experiment(current_experiment_id, self.description, self.version, False, False, True)
         self.assertEqual("", experiment_id)
-    
+
+    @patch('autosubmit.experiment.experiment_common.db_common')
+    def test_create_new_evaluation_experiment_with_empty_current(self, db_common_mock):
+        current_experiment_id = ""
+        self._build_db_mock(current_experiment_id, db_common_mock)
+        experiment_id = new_experiment(self.description, self.version, False, False, True)
+        self.assertEqual("", experiment_id)
+
     @staticmethod
     def _build_db_mock(current_experiment_id, mock_db_common):
         mock_db_common.last_name_used = Mock(return_value=current_experiment_id)
