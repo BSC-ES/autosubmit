@@ -13,12 +13,7 @@ def filter_by_section(jobs, section):
   if section and section != "Any":
     return [job for job in jobs if job.section == section]
   return jobs
-  
-def discard_ready_and_waiting(jobs):
-  # type: (List[Job]) -> List[Job]
-  if jobs and len(jobs) > 0:
-    return [job for job in jobs if job.status not in [Status.READY, Status.WAITING]]
-  return jobs
+
 
 def filter_by_time_period(jobs, hours_span):
   # type: (List[Job], int) -> Tuple[List[Job], datetime, datetime]
