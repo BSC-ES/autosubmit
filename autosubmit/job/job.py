@@ -37,7 +37,7 @@ from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_da
 from functools import reduce
 from threading import Thread
 from time import sleep
-from typing import List, Union, Dict, Any, Tuple
+from typing import List, Union, Dict, Tuple
 
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
@@ -46,7 +46,6 @@ from autosubmit.job.job_common import StatisticsSnippetR, StatisticsSnippetEmpty
 from autosubmit.job.job_common import Status, Type, increase_wallclock_by_chunk
 from autosubmit.job.job_utils import get_job_package_code, get_split_size_unit, get_split_size
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
-from autosubmit.platforms.platform import Platform
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import Log, AutosubmitCritical
@@ -141,8 +140,7 @@ class Job(object):
     """
 
     __slots__ = (
-        'rerun_only', 'script_name_wrapper',
-        'delay_end', 'wrapper_type', '_wrapper_queue',
+        'rerun_only', 'delay_end', 'wrapper_type', '_wrapper_queue',
         '_platform', '_queue', '_partition', 'retry_delay', '_section',
         '_wallclock', 'wchunkinc', '_tasks', '_nodes',
         '_threads', '_processors', '_memory', '_memory_per_task', '_chunk',
@@ -151,9 +149,9 @@ class Job(object):
         'date_format', 'type', '_name',
         'undefined_variables', 'log_retries', 'id',
         'file', 'additional_files', 'executable', '_local_logs',
-        '_remote_logs', 'script_name', 'stat_file', '_status', 'prev_status', 'old_status',
+        '_remote_logs', 'script_name', 'stat_file', '_status', 'prev_status',
         'new_status', 'priority', '_parents', '_children', '_fail_count', 'expid',
-        'parameters', '_tmp_path', '_log_path', 'write_start', '_platform', 'check',
+        'parameters', '_tmp_path', '_log_path', '_platform', 'check',
         'check_warnings', '_packed', 'hold', 'distance_weight', 'level', '_export',
         '_dependencies', 'running', 'start_time', 'ext_header_path', 'ext_tailer_path',
         'edge_info', 'total_jobs', 'max_waiting_jobs', 'exclusive', '_retrials',
@@ -162,7 +160,7 @@ class Job(object):
         'submit_time_timestamp', 'start_time_timestamp', 'finish_time_timestamp',
         '_script', '_log_recovery_retries', 'ready_date', 'wrapper_name',
         'is_wrapper', '_wallclock_in_seconds', '_notify_on', '_processors_per_node',
-        'log_avaliable', 'ec_queue', 'platform_name', '_serial_platform',
+        'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
         '_log_recovered', 'packed_during_building', 'workflow_commit'
@@ -202,7 +200,6 @@ class Job(object):
             priority = loaded_data['priority']
 
         self.rerun_only = False
-        self.script_name_wrapper = None
         self.delay_end = None
         self.wrapper_type = None
         self._wrapper_queue = None
@@ -248,7 +245,6 @@ class Job(object):
         self._status = None
         self.status = status
         self.prev_status = status
-        self.old_status = self.status
         self.new_status = status
         self.priority = priority
         self._parents = set()
@@ -259,7 +255,6 @@ class Job(object):
         self._tmp_path = os.path.join(
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
         self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
-        self.write_start = False
         self._platform = None
         self.check = 'true'
         self.check_warnings = False
@@ -290,7 +285,7 @@ class Job(object):
         self.log_recovered = False
         self.submit_time_timestamp = None # for wrappers, all jobs inside a wrapper are submitted at the same time
         self.start_time_timestamp = None
-        self.finish_time_timestamp = None # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
+        self.finish_time_timestamp = None
         self._script = None # Inline code to be executed
         self._log_recovery_retries = None
         self.ready_date = None
@@ -299,7 +294,6 @@ class Job(object):
         self._wallclock_in_seconds = None
         self._notify_on = None
         self._processors_per_node = None
-        self.log_avaliable = None
         self.ec_queue = None
         self.platform_name = None
         self._serial_platform = None
@@ -324,7 +318,6 @@ class Job(object):
         if self.status == Status.FAILED and self.fail_count >= self.retrials:
             return None
         self.rerun_only = False
-        self.script_name_wrapper = None
         self.delay_end = None
         self.wrapper_type = None
         self._wrapper_queue = None
@@ -447,6 +440,7 @@ class Job(object):
     def script(self):
         """Allows to launch inline code instead of using the file parameter"""
         return self._script
+
     @script.setter
     def script(self, value):
         self._script = value
@@ -773,14 +767,14 @@ class Job(object):
                 else:
                     raise AutosubmitCritical(
                         "Extended {2} script: couldn't figure out script {0} type\n".format(script_name,
-                                                                                           self.script_name,
-                                                                                           error_message_type), 7011)
+                                                                                            self.script_name,
+                                                                                            error_message_type), 7011)
 
         if not found_hashbang:
             raise AutosubmitCritical(
                 "Extended {2} script: couldn't figure out script {0} type\n".format(script_name,
-                                                                                   self.script_name,
-                                                                                   error_message_type), 7011)
+                                                                                    self.script_name,
+                                                                                    error_message_type), 7011)
 
         if is_header:
             script = "\n###############\n# Header script\n###############\n" + script
@@ -829,7 +823,6 @@ class Job(object):
         Sets the log_recovered
         """
         self._log_recovered = log_recovered
-
 
     @property
     def status_str(self):
@@ -897,6 +890,7 @@ class Job(object):
         :type value: HPCPlatform
         """
         self._queue = value
+
     @property
     def partition(self):
         """
@@ -1081,6 +1075,7 @@ class Job(object):
         for child in (child for child in children if child.name != self.name):
             self.__add_child(child)
             child._parents.add(self)
+
     def __add_child(self, new_child):
         """
         Adds a new child to the job
@@ -1102,7 +1097,7 @@ class Job(object):
         if special_conditions["STATUS"] not in self.edge_info:
             self.edge_info[special_conditions["STATUS"]] = {}
 
-        self.edge_info[special_conditions["STATUS"]][parent.name] = (parent,special_conditions.get("FROM_STEP", 0))
+        self.edge_info[special_conditions["STATUS"]][parent.name] = (parent, special_conditions.get("FROM_STEP", 0))
 
     def delete_parent(self, parent):
         """
@@ -1131,7 +1126,7 @@ class Job(object):
         """
         return self.parents.__len__()
 
-    def _get_from_stat(self, index: int, fail_count: int =-1) -> int:
+    def _get_from_stat(self, index: int, fail_count: int = -1) -> int:
         """
         Returns value from given row index position in STAT file associated to job.
 
@@ -1194,7 +1189,7 @@ class Job(object):
         :return: start time
         :rtype: str
         """
-        return self._get_from_stat(0,fail_count)
+        return self._get_from_stat(0, fail_count)
 
     def check_retrials_end_time(self):
         """
@@ -1235,12 +1230,12 @@ class Job(object):
                         break
                     already_completed = True
                 retrial_dates = list(map(lambda y: parse_date(y) if y != 'COMPLETED' and y != 'FAILED' else y,
-                                    retrial_fields))
+                                         retrial_fields))
                 # Inserting list [submit, start, finish] of datetime at the beginning of the list. Restores ordering.
                 retrials_list.insert(0, retrial_dates)
         return retrials_list
 
-    def get_new_remotelog_name(self, count = -1):
+    def get_new_remotelog_name(self, count=-1):
         """
         Checks if remote log file exists on remote host
         if it exists, remote_log variable is updated
@@ -1382,9 +1377,11 @@ class Job(object):
             self.write_stats(last_retrial)
             if self.wrapper_type == "vertical":
                 for retrial in range(0, last_retrial + 1):
-                    Log.result(f"{self.platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{retrial}'.")
+                    Log.result(
+                        f"{self.platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{retrial}'.")
             else:
-                Log.result(f"{self.platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{self.fail_count}'.")
+                Log.result(
+                    f"{self.platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{self.fail_count}'.")
         self.log_recovered = log_recovered
 
     def _max_possible_wallclock(self):
@@ -1413,8 +1410,9 @@ class Job(object):
         if not total_platform:
             total_platform = total
         if total > total_platform:
-            Log.warning(f"Job {self.name} has a wallclock time '{total} seconds' higher than the maximum allowed by the platform '{total_platform} seconds' "
-                        f"Setting wallclock time to the maximum allowed by the platform.")
+            Log.warning(
+                f"Job {self.name} has a wallclock time '{total} seconds' higher than the maximum allowed by the platform '{total_platform} seconds' "
+                f"Setting wallclock time to the maximum allowed by the platform.")
             total = total_platform
         wallclock_delta = datetime.timedelta(seconds=total)
         return int(wallclock_delta.total_seconds())
@@ -1422,7 +1420,7 @@ class Job(object):
     @staticmethod
     def parse_time(wallclock):
         if type(wallclock) != str:  # TODO This is a workaround for the time being, just defined for tests passing without more issues
-            return datetime.timedelta(24*60*60)
+            return datetime.timedelta(24 * 60 * 60)
         regex = re.compile(r'(((?P<hours>\d+):)((?P<minutes>\d+)))(:(?P<seconds>\d+))?')
         parts = regex.match(wallclock)
         if not parts:
@@ -1456,7 +1454,6 @@ class Job(object):
         :param failed_file: boolean, if True, checks if the job failed
         :return:
         """
-        self.log_avaliable = False
         previous_status = self.status
         self.prev_status = previous_status
         new_status = self.new_status
@@ -1659,7 +1656,8 @@ class Job(object):
             # Get the max tasks, each element can be a str or int
             self.het['TASKS'] = list()
             if len(self.tasks) == 1:
-                if int(job_platform.processors_per_node) > 1 and int(self.tasks) > int(job_platform.processors_per_node):
+                if int(job_platform.processors_per_node) > 1 and int(self.tasks) > int(
+                        job_platform.processors_per_node):
                     self.tasks = job_platform.processors_per_node
                 for task in range(self.het['HETSIZE']):
                     if int(job_platform.processors_per_node) > 1 and int(task) > int(
@@ -1675,7 +1673,8 @@ class Job(object):
                         task = job_platform.processors_per_node
                     self.het['TASKS'].append(str(task))
         else:
-            if job_platform.processors_per_node and int(job_platform.processors_per_node) > 1 and int(self.tasks) > int(job_platform.processors_per_node):
+            if job_platform.processors_per_node and int(job_platform.processors_per_node) > 1 and int(self.tasks) > int(
+                    job_platform.processors_per_node):
                 self.tasks = job_platform.processors_per_node
             self.tasks = str(self.tasks)
 
@@ -1808,7 +1807,7 @@ class Job(object):
                     self.custom_directives = json.loads(self.custom_directives)
             if len(self.het['CUSTOM_DIRECTIVES']) < self.het['HETSIZE']:
                 for x in range(self.het['HETSIZE'] - len(self.het['CUSTOM_DIRECTIVES'])):
-                    self.het['CUSTOM_DIRECTIVES'].append(self.custom_directives )
+                    self.het['CUSTOM_DIRECTIVES'].append(self.custom_directives)
         else:
             self.custom_directives = []
 
@@ -1848,8 +1847,11 @@ class Job(object):
             self.partition = parameters.get("CURRENT_PARTITION", "")
             self.scratch_free_space = int(parameters.get("CURRENT_SCRATCH_FREE_SPACE", 0))
             self.memory = parameters.get("CURRENT_MEMORY", "")
-            self.memory_per_task = parameters.get("CURRENT_MEMORY_PER_TASK", parameters.get("CURRENT_MEMORY_PER_TASK", ""))
-            self.wallclock = parameters.get("CURRENT_WALLCLOCK", parameters.get("CURRENT_MAX_WALLCLOCK", parameters.get("CONFIG.JOB_WALLCLOCK", "24:00")))
+            self.memory_per_task = parameters.get("CURRENT_MEMORY_PER_TASK",
+                                                  parameters.get("CURRENT_MEMORY_PER_TASK", ""))
+            self.wallclock = parameters.get("CURRENT_WALLCLOCK", parameters.get("CURRENT_MAX_WALLCLOCK",
+                                                                                parameters.get("CONFIG.JOB_WALLCLOCK",
+                                                                                               "24:00")))
             self.custom_directives = parameters.get("CURRENT_CUSTOM_DIRECTIVES", "")
             self.process_scheduler_parameters(self.platform, chunk)
             if self.het.get('HETSIZE', 1) > 1:
@@ -1923,9 +1925,12 @@ class Job(object):
                 as_conf.get_extensible_wallclock(as_conf.experiment_data["WRAPPERS"].get(wrapper_section)))
         return parameters
 
-    def update_dict_parameters(self,as_conf):
-        self.retrials = as_conf.jobs_data.get(self.section,{}).get("RETRIALS", as_conf.experiment_data.get("CONFIG",{}).get("RETRIALS", 0))
-        for wrapper_data in ( wrapper for wrapper in as_conf.experiment_data.get("WRAPPERS",{}).values() if type(wrapper) is dict):
+    def update_dict_parameters(self, as_conf):
+        self.retrials = as_conf.jobs_data.get(self.section, {}).get("RETRIALS",
+                                                                    as_conf.experiment_data.get("CONFIG", {}).get(
+                                                                        "RETRIALS", 0))
+        for wrapper_data in (wrapper for wrapper in as_conf.experiment_data.get("WRAPPERS", {}).values() if
+                             type(wrapper) is dict):
             jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", "").upper()
             if "," in jobs_in_wrapper:
                 jobs_in_wrapper = jobs_in_wrapper.split(",")
@@ -1934,15 +1939,17 @@ class Job(object):
             if self.section.upper() in jobs_in_wrapper:
                 self.retrials = wrapper_data.get("RETRIALS", self.retrials)
         if not self.splits:
-            self.splits = as_conf.jobs_data.get(self.section,{}).get("SPLITS", None)
-        self.delete_when_edgeless = as_conf.jobs_data.get(self.section,{}).get("DELETE_WHEN_EDGELESS", True)
-        self.dependencies = str(as_conf.jobs_data.get(self.section,{}).get("DEPENDENCIES",""))
-        self.running = as_conf.jobs_data.get(self.section,{}).get("RUNNING", "once")
-        self.platform_name = as_conf.jobs_data.get(self.section,{}).get("PLATFORM", as_conf.experiment_data.get("DEFAULT",{}).get("HPCARCH", None))
-        self.file = as_conf.jobs_data.get(self.section,{}).get("FILE", None)
-        self.additional_files = as_conf.jobs_data.get(self.section,{}).get("ADDITIONAL_FILES", [])
+            self.splits = as_conf.jobs_data.get(self.section, {}).get("SPLITS", None)
+        self.delete_when_edgeless = as_conf.jobs_data.get(self.section, {}).get("DELETE_WHEN_EDGELESS", True)
+        self.dependencies = str(as_conf.jobs_data.get(self.section, {}).get("DEPENDENCIES", ""))
+        self.running = as_conf.jobs_data.get(self.section, {}).get("RUNNING", "once")
+        self.platform_name = as_conf.jobs_data.get(self.section, {}).get("PLATFORM",
+                                                                         as_conf.experiment_data.get("DEFAULT", {}).get(
+                                                                             "HPCARCH", None))
+        self.file = as_conf.jobs_data.get(self.section, {}).get("FILE", None)
+        self.additional_files = as_conf.jobs_data.get(self.section, {}).get("ADDITIONAL_FILES", [])
 
-        type_ = str(as_conf.jobs_data.get(self.section,{}).get("TYPE", "bash")).lower()
+        type_ = str(as_conf.jobs_data.get(self.section, {}).get("TYPE", "bash")).lower()
         if type_ == "bash":
             self.type = Type.BASH
         elif type_ == "python" or type_ == "python3":
@@ -1953,19 +1960,25 @@ class Job(object):
             self.type = Type.PYTHON2
         else:
             self.type = Type.BASH
-        self.ext_header_path = as_conf.jobs_data.get(self.section,{}).get('EXTENDED_HEADER_PATH', None)
-        self.ext_tailer_path = as_conf.jobs_data.get(self.section,{}).get('EXTENDED_TAILER_PATH', None)
+        self.ext_header_path = as_conf.jobs_data.get(self.section, {}).get('EXTENDED_HEADER_PATH', None)
+        self.ext_tailer_path = as_conf.jobs_data.get(self.section, {}).get('EXTENDED_TAILER_PATH', None)
         if self.platform_name:
             self.platform_name = self.platform_name.upper()
 
-    def update_check_variables(self,as_conf):
+    def update_check_variables(self, as_conf):
         job_data = as_conf.jobs_data.get(self.section, {})
-        job_platform_name = job_data.get("PLATFORM", as_conf.experiment_data.get("DEFAULT",{}).get("HPCARCH", None))
-        job_platform = job_data.get("PLATFORMS",{}).get(job_platform_name, {})
+        job_platform_name = job_data.get("PLATFORM", as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", None))
+        job_platform = job_data.get("PLATFORMS", {}).get(job_platform_name, {})
         self.check = job_data.get("CHECK", True)
         self.check_warnings = job_data.get("CHECK_WARNINGS", False)
-        self.total_jobs = job_data.get("TOTALJOBS",job_data.get("TOTALJOBS", job_platform.get("TOTALJOBS", job_platform.get("TOTAL_JOBS", -1))))
-        self.max_waiting_jobs = job_data.get("MAXWAITINGJOBS",job_data.get("MAXWAITINGJOBS", job_platform.get("MAXWAITINGJOBS", job_platform.get("MAX_WAITING_JOBS", -1))))
+        self.total_jobs = job_data.get("TOTALJOBS", job_data.get("TOTALJOBS", job_platform.get("TOTALJOBS",
+                                                                                               job_platform.get(
+                                                                                                   "TOTAL_JOBS", -1))))
+        self.max_waiting_jobs = job_data.get("MAXWAITINGJOBS", job_data.get("MAXWAITINGJOBS",
+                                                                            job_platform.get("MAXWAITINGJOBS",
+                                                                                             job_platform.get(
+                                                                                                 "MAX_WAITING_JOBS",
+                                                                                                 -1))))
 
     def calendar_split(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> None:
         """
@@ -1983,9 +1996,8 @@ class Job(object):
         """
         # Calendar struct type numbered ( year, month, day, hour )
 
-
-        job_data = as_conf.jobs_data.get(self.section,{})
-        if job_data.get("SPLITS", None) and self.running != "once": # once jobs has no date
+        job_data = as_conf.jobs_data.get(self.section, {})
+        if job_data.get("SPLITS", None) and self.running != "once":  # once jobs has no date
             # total_split = int(self.splits)
             split_unit = get_split_size_unit(as_conf.experiment_data, self.section)
             cal = str(parameters.get('EXPERIMENT.CALENDAR', "standard")).lower()
@@ -2420,7 +2432,6 @@ class Job(object):
                 '%(?<!%%)' + variable + '%(?!%%)', '', template_content,flags=re.I)
         template_content = template_content.replace("%%", "%")
         script_name = '{0}.{1}.cmd'.format(self.name, wrapper_tag)
-        self.script_name_wrapper = '{0}.{1}.cmd'.format(self.name, wrapper_tag)
         open(os.path.join(self._tmp_path, script_name),
              'w').write(template_content)
         os.chmod(os.path.join(self._tmp_path, script_name), 0o755)
