@@ -60,6 +60,7 @@ def timedelta2hours(deltatime: timedelta) -> float:
     :param deltatime: timedelta
     :return: float
     """
+
     return deltatime.days * 24 + deltatime.seconds / 3600.0
 
 

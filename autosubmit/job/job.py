@@ -33,7 +33,7 @@ import os
 import re
 import textwrap
 import time
-from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, Log, subs_dates, add_time
+from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, Log, subs_dates
 from functools import reduce
 from threading import Thread
 from time import sleep
@@ -54,16 +54,6 @@ from log.log import Log, AutosubmitCritical
 Log.get_logger("Autosubmit")
 
 # A wrapper for encapsulate threads , TODO: Python 3+ to be replaced by the < from concurrent.futures >
-
-
-def threaded(fn):
-    def wrapper(*args, **kwargs):
-        thread = Thread(target=fn, args=args, kwargs=kwargs)
-        thread.name = "JOB_" + str(args[0].name)
-        thread.start()
-        return thread
-    return wrapper
-
 
 # This decorator contains groups of parameters, with each
 # parameter described. This is only for parameters which
@@ -2948,14 +2938,6 @@ class WrapperJob(Job):
                 if job.wrapper_type == "vertical":  # job is being retrieved internally by the wrapper
                     job.fail_count = job.retrials
 
-
-    def _update_completed_jobs(self):
-        for job in self.job_list:
-            if job.status == Status.RUNNING:
-                self.running_jobs_start.pop(job, None)
-                Log.debug('Setting job {0} to COMPLETED'.format(job.name))
-                job.new_status = Status.COMPLETED
-                job.update_status(self.as_config)
 
     def _is_over_wallclock(self, start_time, wallclock):
         elapsed = datetime.datetime.now() - parse_date(start_time)
