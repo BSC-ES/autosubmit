@@ -21,7 +21,7 @@
 Module containing functions to manage autosubmit's experiments.
 """
 import string
-import autosubmit.database.db_common as db_common
+from autosubmit.database import db_common
 from log.log import Log,AutosubmitCritical
 Log.get_logger("Autosubmit")
 
@@ -76,7 +76,8 @@ def new_experiment(description, version, test=False, operational=False, evaluati
         Log.info('The new experiment "{0}" has been registered.', new_name)
         return new_name
     except Exception as e:
-        raise AutosubmitCritical(f"Error while generating a new experiment in the db: {e}", 7011)
+        raise AutosubmitCritical(f'Error while generating a new experiment in the db: {e}',
+                                 7011) from e
 
 
 def copy_experiment(experiment_id, description, version, test=False, operational=False, evaluation=False):
@@ -104,7 +105,8 @@ def copy_experiment(experiment_id, description, version, test=False, operational
         new_name = new_experiment(description, version, test, operational, evaluation)
         return new_name
     except Exception as e:
-        raise AutosubmitCritical(f"Error while copying the experiment {experiment_id} as a new experiment in the db: {e}", 7011)
+        raise AutosubmitCritical(f"Error while copying the experiment {experiment_id} "
+                                 f"as a new experiment in the db: {e}", 7011) from e
 
 
 
