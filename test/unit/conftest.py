@@ -2,19 +2,26 @@
 from contextlib import suppress
 
 import pytest
+import pytest_mock
 from dataclasses import dataclass
 from pathlib import Path
 from ruamel.yaml import YAML
 from shutil import rmtree
 from tempfile import TemporaryDirectory
-from typing import Any, Dict, Callable, List, Protocol, Optional
+from typing import Any, Dict, Callable, Generator, List, Protocol, Optional, Type
 import os
+from sqlalchemy import Connection, create_engine, text
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+
+
+DEFAULT_DATABASE_CONN_URL = (
+    "postgresql://postgres:mysecretpassword@localhost:5432/autosubmit_test"
+)
 
 
 @dataclass
@@ -202,3 +209,83 @@ def prepare_basic_config(tmpdir):
     BasicConfig.DENIED_HOSTS = ""
     BasicConfig.CONFIG_FILE_FOUND = False
     return basic_conf
+
+
+def _identity_value(value=None):
+    """A type of identity function; returns a function that returns ``value``."""
+    return lambda *ignore_args, **ignore_kwargs: value
+
+
+@pytest.fixture
+def as_db_sqlite(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Type[BasicConfig]:
+    """Overwrites the BasicConfig to use SQLite database for testing.
+    Args:
+        monkeypatch: Monkey Patcher.
+    Returns:
+        BasicConfig class.
+    """
+    monkeypatch.setattr(BasicConfig, "read", _identity_value())
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "sqlite")
+    monkeypatch.setattr(BasicConfig, "DB_PATH", str(tmp_path / "autosubmit.db"))
+
+    return BasicConfig
+
+
+def _setup_pg_db(conn: Connection) -> None:
+    """Reset the database.
+    Drops all schemas except the system ones and restoring the public schema.
+    Args:
+        conn: Database connection.
+    """
+    # Get all schema names that are not from the system
+    results = conn.execute(
+        text("""SELECT schema_name FROM information_schema.schemata
+               WHERE schema_name NOT LIKE 'pg_%'
+               AND schema_name != 'information_schema'""")
+    ).all()
+    schema_names = [res[0] for res in results]
+
+    # Drop all schemas
+    for schema_name in schema_names:
+        conn.execute(text(f"""DROP SCHEMA IF EXISTS "{schema_name}" CASCADE"""))
+
+    # Restore default public schema
+    conn.execute(text("CREATE SCHEMA public"))
+    conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
+    conn.execute(text("GRANT ALL ON SCHEMA public TO postgres"))
+
+
+@pytest.fixture
+def as_db_postgres(monkeypatch: pytest.MonkeyPatch) -> Generator[BasicConfig, Any, None]:
+    """Fixture to set up and tear down a Postgres database for testing.
+    It will overwrite the ``BasicConfig`` to use Postgres.
+    It uses the environment variable ``PYTEST_DATABASE_CONN_URL`` to connect to the database.
+    If the variable is not set, it uses the default connection URL.
+    Args:
+        monkeypatch: Monkey Patcher.
+    Returns:
+        Autosubmit configuration for Postgres.
+    """
+
+    conn_url = os.environ.get("PYTEST_DATABASE_CONN_URL", DEFAULT_DATABASE_CONN_URL)
+
+    # Apply patch BasicConfig
+    monkeypatch.setattr(BasicConfig, "read", _identity_value())
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "postgres")
+    monkeypatch.setattr(
+        BasicConfig,
+        "DATABASE_CONN_URL",
+        conn_url,
+    )
+
+    # Setup database
+    with create_engine(conn_url).connect() as conn:
+        _setup_pg_db(conn)
+        conn.commit()
+
+    yield BasicConfig
+
+    # Teardown database
+    with create_engine(conn_url).connect() as conn:
+        _setup_pg_db(conn)
+        conn.commit()

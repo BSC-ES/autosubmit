@@ -1,8 +1,9 @@
 import shutil
 import tempfile
+from pathlib import Path
 
 from unittest import TestCase
-from mock import Mock
+from mock import Mock, patch
 
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
@@ -12,9 +13,27 @@ from random import randrange
 from autosubmit.job.job import Job
 from autosubmit.monitor.monitor import Monitor
 import unittest
+
+
+class FakeBasicConfig:
+    def __init__(self):
+        pass
+
+    DB_DIR = '/dummy/db/dir'
+    DB_FILE = '/dummy/db/file'
+    DB_PATH = '/dummy/db/path'
+    LOCAL_ROOT_DIR = '/dummy/local/root/dir'
+    LOCAL_TMP_DIR = '/dummy/local/temp/dir'
+    LOCAL_PROJ_DIR = '/dummy/local/proj/dir'
+    DEFAULT_PLATFORMS_CONF = ''
+    DEFAULT_JOBS_CONF = ''
+    DATABASE_BACKEND = 'sqlite'
+
+
 class TestJobGraph(TestCase):
 
-    def setUp(self):
+    @patch('autosubmit.job.job_list_persistence.BasicConfig', new_callable=FakeBasicConfig)
+    def setUp(self, patched_basic_config):
         self.experiment_id = 'random-id'
         self.as_conf = Mock()
         self.as_conf.experiment_data = dict()
@@ -22,8 +41,19 @@ class TestJobGraph(TestCase):
         self.as_conf.jobs_data = self.as_conf.experiment_data["JOBS"]
         self.as_conf.experiment_data["PLATFORMS"] = dict()
         self.temp_directory = tempfile.mkdtemp()
+
+        patched_basic_config.DB_DIR = self.temp_directory
+        patched_basic_config.DB_FILE = Path(self.temp_directory, 'test-db.db')
+        patched_basic_config.DB_PATH = patched_basic_config.DB_FILE
+        patched_basic_config.LOCAL_PROJ_DIR = self.temp_directory
+        patched_basic_config.LOCAL_ROOT_DIR = self.temp_directory
+        patched_basic_config.LOCAL_TMP_DIR = self.temp_directory
+
+        Path(patched_basic_config.DB_FILE).touch()
+        Path(patched_basic_config.LOCAL_ROOT_DIR, self.experiment_id, 'pkl').mkdir(parents=True, exist_ok=True)
+
         self.job_list = JobList(self.experiment_id, FakeBasicConfig, YAMLParserFactory(),
-                                JobListPersistenceDb(self.temp_directory, 'db'),self.as_conf)
+                                JobListPersistenceDb(self.experiment_id),self.as_conf)
         self.parser_mock = Mock(spec='SafeConfigParser')
 
         # Basic workflow with SETUP, INI, SIM, POST, CLEAN
@@ -926,15 +956,3 @@ class TestJobGraph(TestCase):
         job.split = split
 
         return job
-class FakeBasicConfig:
-    def __init__(self):
-        pass
-
-    DB_DIR = '/dummy/db/dir'
-    DB_FILE = '/dummy/db/file'
-    DB_PATH = '/dummy/db/path'
-    LOCAL_ROOT_DIR = '/dummy/local/root/dir'
-    LOCAL_TMP_DIR = '/dummy/local/temp/dir'
-    LOCAL_PROJ_DIR = '/dummy/local/proj/dir'
-    DEFAULT_PLATFORMS_CONF = ''
-    DEFAULT_JOBS_CONF = ''

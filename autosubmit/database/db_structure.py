@@ -23,8 +23,12 @@ import textwrap
 import traceback
 import sqlite3
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 from log.log import Log
+from networkx import DiGraph
+
+from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.database.db_manager import DatabaseManager, create_db_manager
 
 
 def get_structure(exp_id, structures_path):
@@ -35,6 +39,9 @@ def get_structure(exp_id, structures_path):
     :return: Map from experiment name source to name destination  
     :rtype: Dictionary Key: String, Value: List(of String)
     """
+    if BasicConfig.DATABASE_BACKEND == "postgres":
+        return get_structure_sqlalchemy(exp_id, structures_path)
+
     try:        
         if os.path.exists(structures_path):
             db_structure_path = os.path.join(
@@ -76,7 +83,7 @@ def create_connection(db_file):
     try:
         conn = sqlite3.connect(db_file)
         return conn
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -118,6 +125,9 @@ def save_structure(graph, exp_id, structures_path):
     """
     Saves structure if path is valid
     """
+    if BasicConfig.DATABASE_BACKEND == "postgres":
+        return save_structure_sqlalchemy(graph, exp_id, "")
+
     conn = None
     # Path to structures folder exists
     if os.path.exists(structures_path):
@@ -175,3 +185,80 @@ def _delete_table_content(conn):
     except sqlite3.Error as e:
         Log.debug(traceback.format_exc())
         Log.warning("Error on Delete : {0}".format(str(type(e).__name__)))
+
+# Code added for SQLAlchemy support
+
+def get_structure_sqlalchemy(exp_id: str, structures_path: str) -> Dict[str, List[str]]:
+    """
+    Creates file of database and table of experiment structure if it does not exist. Returns current structure.
+    :return: Map from experiment name source to name destination
+    """
+    db_manager: Optional[DatabaseManager] = None
+    options = {'schema': exp_id}
+    try:
+        db_manager = create_db_manager('postgres', **options)
+
+        # FIXME: to verify, the old code did what's shown below;
+        #        does that also apply to the new code?
+        # if not os.path.exists(db_structure_path):
+        #     open(db_structure_path, "w")
+        # print(db_structure_path)
+        # There used to be a function ``create_table`` here, but its feature/behaviour
+        # is already implemented in the ``DbManager`` class (which handles DDL), so that
+        # can be deleted as ``DbManager`` creates SQLite and SQLAlchemy tables.
+        db_manager.create_table(
+            table_name='experiment_structure',
+            fields=['e_from text NOT NULL',
+                    'e_to text NOT NULL',
+                    'UNIQUE(e_from,e_to)']
+        )
+        # The call below is equivalent of ``_get_exp_structure`` in the old code.
+        current_table = db_manager.select_all('experiment_structure')
+        current_table_structure = dict()
+        for item in current_table:
+            _from, _to = item
+            current_table_structure.setdefault(_from, []).append(_to)
+            current_table_structure.setdefault(_to, [])
+        return current_table_structure
+    except Exception as exp:
+        Log.printlog("Get structure error: {0}".format(str(exp)), 6014)
+        Log.debug(traceback.format_exc())
+    finally:
+        if db_manager:
+            db_manager.disconnect()
+
+
+def save_structure_sqlalchemy(graph: DiGraph, exp_id: str, structures_path: str):
+    """
+    Saves structure using SQLAlchemy.
+    This overwrites the old structure if it exists.
+    """
+    db_manager: Optional[DatabaseManager] = None
+    options = {'schema': exp_id}
+    try:
+        db_manager = create_db_manager('postgres', **options)
+
+        # Create table if it doesn't exist
+        db_manager.create_table(
+            table_name='experiment_structure',
+            fields=['e_from text NOT NULL',
+                    'e_to text NOT NULL',
+                    'UNIQUE(e_from,e_to)']
+        )
+
+        # Delete all rows in the table
+        db_manager.delete_all('experiment_structure')
+
+        # Save structure
+        nodes_edges = {u for u, v in graph.edges()}
+        nodes_edges.update({v for u, v in graph.edges()})
+        independent_nodes = {
+            u for u in graph.nodes() if u not in nodes_edges}
+        data = {(u, v) for u, v in graph.edges()}
+        data.update({(u, u) for u in independent_nodes})
+        # save
+        edges = [{"e_from": e[0], "e_to": e[1]} for e in data]
+        db_manager.insertMany('experiment_structure', edges)
+    finally:
+        if db_manager:
+            db_manager.disconnect()
