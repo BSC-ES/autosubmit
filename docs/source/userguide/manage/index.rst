@@ -222,6 +222,12 @@ Migrate file example: $expid/conf/migrate.yml
     Example for a RES account to BSC account the tmp folder must have rwx|rwx|--- permissions.
     The temporary directory must be in the same filesystem.
 
+.. warning:: Autosubmit will use rsync to copy the data during the offer as a last resort.
+
+.. warning:: Autosubmit will use rsync to transfer the files' ownership from the former remote platform to the newer one during the pickup.
+
+When rsync is activated, it will try to move the data up to 25 tries afterward, if some data is still not moved, you can perform ``autosubmit migrate -o or -p $expid`` again.
+
 User A, To offer the experiment:
 ::
 
