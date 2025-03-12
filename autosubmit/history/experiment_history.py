@@ -69,7 +69,7 @@ class ExperimentHistory:
 
     def write_submit_time(self, job_name, submit=0, status="UNKNOWN", ncpus=0, wallclock="00:00", qos="debug", date="",
                           member="", section="", chunk=0, platform="NA", job_id=0, wrapper_queue=None,
-                          wrapper_code=None, children=""):
+                          wrapper_code=None, children="", commit=""):
 
         try:
             next_counter = self._get_next_counter_by_job_name(job_name)
@@ -90,7 +90,8 @@ class ExperimentHistory:
                                   platform=platform,
                                   job_id=job_id,
                                   children=children,
-                                  run_id=current_experiment_run.run_id)
+                                  run_id=current_experiment_run.run_id,
+                                  commit=commit)
             return self.manager.register_submitted_job_data_dc(job_data_dc)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())

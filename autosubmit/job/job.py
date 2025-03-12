@@ -165,7 +165,7 @@ class Job(object):
         'log_avaliable', 'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        'end_time_timestamp', '_log_recovered', 'packed_during_building'
+        'end_time_timestamp', '_log_recovered', 'packed_during_building', 'workflow_commit'
     )
 
     def __setstate__(self, state):
@@ -312,6 +312,7 @@ class Job(object):
         self._custom_directives = None
         self.end_time_timestamp = None
         self.packed_during_building = False
+        self.workflow_commit = None
         if loaded_data:
             self.__setstate__(loaded_data)
             self.status = Status.WAITING if self.status in [Status.DELAYED,
@@ -2186,9 +2187,10 @@ class Job(object):
         self.retrials = parameters["RETRIALS"]
         self.reservation = parameters["RESERVATION"]
 
-    def reset_logs(self):
+    def reset_logs(self, as_conf: AutosubmitConfig) -> None:
         self.log_recovered = False
         self.packed_during_building = False
+        self.workflow_commit = as_conf.experiment_data.get("WORKFLOW_COMMIT", "not-versioned")
 
     def update_parameters(self, as_conf: AutosubmitConfig, set_attributes: bool = False, reset_logs: bool = False) -> None:
         """
@@ -2211,7 +2213,7 @@ class Job(object):
         if set_attributes:
             as_conf.reload()
             if reset_logs:
-                self.reset_logs()
+                self.reset_logs(as_conf)
             self._init_runtime_parameters()
             if not hasattr(self, "start_time"):
                 self.start_time = datetime.datetime.now()
@@ -2503,7 +2505,7 @@ class Job(object):
         exp_history.write_submit_time(self.name, submit=data_time[1], status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), ncpus=self.processors,
                                     wallclock=self.wallclock, qos=self.queue, date=self.date, member=self.member, section=self.section, chunk=self.chunk,
                                     platform=self.platform_name, job_id=self.id, wrapper_queue=self._wrapper_queue, wrapper_code=get_job_package_code(self.expid, self.name),
-                                    children=self.children_names_str)
+                                    children=self.children_names_str, commit=self.workflow_commit)
 
     def update_start_time(self, count=-1):
         start_time_ = self.check_start_time(count) # last known start time from the .cmd file
