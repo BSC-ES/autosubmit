@@ -72,8 +72,9 @@ class SlurmPlatform(ParamikoPlatform):
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh")
         self._submit_script_base_name = os.path.join(
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
-        self._submit_script_file = open(self._submit_script_path, 'wb').close()
 
+    def create_a_new_copy(self):
+        return SlurmPlatform(self.expid, self.name, self.config)
 
     def get_submit_cmd_x11(self, args, script_name, job):
         """
@@ -85,8 +86,9 @@ class SlurmPlatform(ParamikoPlatform):
         return cmd
 
     def generate_new_name_submit_script_file(self):
+        if os.path.exists(self._submit_script_path):
+            os.remove(self._submit_script_path)
         self._submit_script_path = self._submit_script_base_name + os.urandom(16).hex() + ".sh"
-        self._submit_script_file = open(self._submit_script_path, 'wb').close()
 
     def process_batch_ready_jobs(self,valid_packages_to_submit,failed_packages,error_message="",hold=False):
         """
@@ -214,18 +216,15 @@ class SlurmPlatform(ParamikoPlatform):
             raise AutosubmitError("{0} submission failed".format(self.name), 6015, str(e))
         return save,valid_packages_to_submit
 
-    def open_submit_script(self):
-        self._submit_script_file = open(self._submit_script_path, 'wb').close()
+    def generate_submit_script(self):
         # remove file
         with suppress(FileNotFoundError):
             os.remove(self._submit_script_path)
         self.generate_new_name_submit_script_file()
-        self._submit_script_file = open(self._submit_script_path, 'ab')
 
     def get_submit_script(self):
-        self._submit_script_file.close()
         os.chmod(self._submit_script_path, 0o750)
-        return os.path.join(self.config.get("LOCAL_ASLOG_DIR"), os.path.basename(self._submit_script_path))
+        return self._submit_script_path
 
     def submit_job(self, job, script_name, hold=False, export="none"):
         """
@@ -287,6 +286,7 @@ class SlurmPlatform(ParamikoPlatform):
             except Exception as e:
                 raise
             jobs_id = self.get_submitted_job_id(self.get_ssh_output())
+
             return jobs_id
         except IOError as e:
             raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e))
@@ -579,10 +579,11 @@ class SlurmPlatform(ParamikoPlatform):
                     lang = locale.getdefaultlocale()[1]
                     if lang is None:
                         lang = 'UTF-8'
-                if not hold:
-                    self._submit_script_file.write((export + self._submit_cmd + job_script + "\n").encode(lang))
-                else:
-                    self._submit_script_file.write((export + self._submit_hold_cmd + job_script + "\n").encode(lang))
+                with open(self._submit_script_path, "ab") as submit_script_file:
+                    if not hold:
+                        submit_script_file.write((export + self._submit_cmd + job_script + "\n").encode(lang))
+                    else:
+                        submit_script_file.write((export + self._submit_hold_cmd + job_script + "\n").encode(lang))
             except BaseException as e:
                 pass
 

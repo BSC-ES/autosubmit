@@ -24,7 +24,7 @@ class LocalHeader(object):
     """Class to handle the Ps headers of a job"""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_queue_directive(self, job):
+    def get_queue_directive(self, job, parameters):
         """
         Returns queue directive for the specified job
 

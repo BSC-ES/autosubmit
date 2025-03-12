@@ -24,7 +24,7 @@ class PJMHeader(object):
     """Class to handle the PJM headers of a job"""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_queue_directive(self, job):
+    def get_queue_directive(self, job, parameters):
         """
         Returns queue directive for the specified job
 
@@ -34,14 +34,13 @@ class PJMHeader(object):
         :rtype: str
         """
         # There is no queue, so directive is empty
-        if job.parameters['CURRENT_QUEUE'] == '':
+        if parameters['CURRENT_QUEUE'] == '':
             return ""
         else:
-            return "PJM -L rscgrp={0}".format(job.parameters['CURRENT_QUEUE'])
-
+            return "PJM -L rscgrp={0}".format(parameters['CURRENT_QUEUE'])
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_account_directive(self, job):
+    def get_account_directive(self, job, parameters):
         """
         Returns account directive for the specified job
 
@@ -51,11 +50,11 @@ class PJMHeader(object):
         :rtype: str
         """
         # wallet,account group_name. source: nkl.cc.u-tokyo.ac.jp
-        if job.parameters['CURRENT_PROJ'] != '':
-            return "PJM -g {0}".format(job.parameters['CURRENT_PROJ'])
+        if parameters['CURRENT_PROJ'] != '':
+            return "PJM -g {0}".format(parameters['CURRENT_PROJ'])
         return ""
 
-    def get_nodes_directive(self, job):
+    def get_nodes_directive(self, job, parameters):
         """
         Returns nodes directive for the specified job
         :param job: job to create nodes directive for
@@ -64,12 +63,13 @@ class PJMHeader(object):
         :rtype: str
         """
         # There is no account, so directive is empty
-        nodes = job.parameters.get('NODES',"")
+        nodes = parameters.get('NODES', "")
         if nodes != '':
             return "PJM -L node={0}".format(nodes)
         return ""
+
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_memory_directive(self, job):
+    def get_memory_directive(self, job, parameters):
         """
         Returns memory directive for the specified job
 
@@ -78,12 +78,12 @@ class PJMHeader(object):
         :return: memory directive
         :rtype: str
         """
-        if job.parameters['MEMORY'] != '':
-            return "PJM --node-mem={0}".format(job.parameters['MEMORY'])
+        if parameters['MEMORY'] != '':
+            return "PJM --node-mem={0}".format(parameters['MEMORY'])
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_memory_per_task_directive(self, job):
+    def get_memory_per_task_directive(self, job, parameters):
         """
         Returns memory per task directive for the specified job
 
@@ -92,12 +92,12 @@ class PJMHeader(object):
         :return: memory per task directive
         :rtype: str
         """
-        if job.parameters['MEMORY_PER_TASK'] != '':
-            return "PJM --core-mem={0}".format(job.parameters['MEMORY_PER_TASK'])
+        if parameters['MEMORY_PER_TASK'] != '':
+            return "PJM --core-mem={0}".format(parameters['MEMORY_PER_TASK'])
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_custom_directives(self, job):
+    def get_custom_directives(self, job, parameters):
         """
         Returns custom directives for the specified job
 
@@ -107,11 +107,11 @@ class PJMHeader(object):
         :rtype: str
         """
         # There is no custom directives, so directive is empty
-        if job.parameters['CUSTOM_DIRECTIVES'] != '':
-            return '\n'.join(str(s) for s in job.parameters['CUSTOM_DIRECTIVES'])
+        if parameters['CUSTOM_DIRECTIVES'] != '':
+            return '\n'.join(str(s) for s in parameters['CUSTOM_DIRECTIVES'])
         return ""
 
-    def get_tasks_directive(self,job, het=-1):
+    def get_tasks_directive(self, job, het=-1):
         """
         Returns tasks per node directive for the specified job
 
@@ -120,21 +120,21 @@ class PJMHeader(object):
         :return: tasks per node directive
         :rtype: str
         """
-        if int(job.parameters['TASKS']) > 1:
-            return "max-proc-per-node={0}".format(job.parameters['TASKS'])
+        if int(parameters['TASKS']) > 1:
+            return "max-proc-per-node={0}".format(parameters['TASKS'])
         return ""
-    def get_shape_directive(self, job):
+
+    def get_shape_directive(self, job, parameters):
         """
         Returns shape directive for the specified job
         :param job:
         :return:
         """
-        if job.parameters['SHAPE'] != '':
-            return "PJM --mpi 'shape={0}'".format(job.parameters['SHAPE'])
+        if parameters['SHAPE'] != '':
+            return "PJM --mpi 'shape={0}'".format(parameters['SHAPE'])
         return ""
 
-
-    def get_tasks_per_node(self, job):
+    def get_tasks_per_node(self, job, parameters):
         """
         Returns tasks per node directive for the specified job
 
@@ -143,10 +143,11 @@ class PJMHeader(object):
         :return: tasks per node directive
         :rtype: str
         """
-        if int(job.parameters['TASKS']) > 1:
-            return "max-proc-per-node={0}".format(job.parameters['TASKS'])
+        if int(parameters['TASKS']) > 1:
+            return "max-proc-per-node={0}".format(parameters['TASKS'])
         return ""
-    def get_threads_per_task(self, job, het=-1):
+
+    def get_threads_per_task(self, job, parameters, het=-1):
         """
         Returns threads per task directive for the specified job
 
@@ -160,8 +161,8 @@ class PJMHeader(object):
             if job.het['NUMTHREADS'][het] != '':
                 return f"export OMP_NUM_THREADS={job.het['NUMTHREADS'][het]}"
         else:
-            if job.parameters['NUMTHREADS'] != '':
-                return "export OMP_NUM_THREADS={0}".format(job.parameters['NUMTHREADS'])
+            if parameters['NUMTHREADS'] != '':
+                return "export OMP_NUM_THREADS={0}".format(parameters['NUMTHREADS'])
         return ""
 
     SERIAL = textwrap.dedent("""\

@@ -1,4 +1,5 @@
 # Fixtures available to multiple test files must be created in this file.
+import pwd
 from contextlib import suppress
 
 import pytest
@@ -15,6 +16,7 @@ from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from time import time
 
 
 @dataclass
@@ -28,6 +30,7 @@ class AutosubmitExperiment:
     status_dir: Path
     platform: ParamikoPlatform
 
+
 @pytest.fixture(scope='function')
 def autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> Callable:
     """Create an instance of ``Autosubmit`` with an experiment."""
@@ -36,21 +39,20 @@ def autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> Ca
     tmp_dir = TemporaryDirectory()
     tmp_path = Path(tmp_dir.name)
 
-
     def _create_autosubmit_exp(expid: str):
         root_dir = tmp_path
         BasicConfig.LOCAL_ROOT_DIR = str(root_dir)
         exp_path = BasicConfig.expid_dir(expid)
-        
+
         # directories used when searching for logs to cat
-        exp_tmp_dir = BasicConfig.expid_tmp_dir(expid) 
-        aslogs_dir = BasicConfig.expid_aslog_dir(expid) 
-        status_dir =exp_path / 'status'
+        exp_tmp_dir = BasicConfig.expid_tmp_dir(expid)
+        aslogs_dir = BasicConfig.expid_aslog_dir(expid)
+        status_dir = exp_path / 'status'
         if not os.path.exists(aslogs_dir):
             os.makedirs(aslogs_dir)
         if not os.path.exists(status_dir):
             os.makedirs(status_dir)
-        
+
         platform_config = {
             "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
             "LOCAL_TMP_DIR": str(exp_tmp_dir),
@@ -121,7 +123,9 @@ def create_as_conf() -> Callable:  # May need to be changed to use the autosubmi
 
     return _create_as_conf
 
-class AutosubmitConfigFactory(Protocol):  # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
+
+class AutosubmitConfigFactory(
+    Protocol):  # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
 
     def __call__(self, expid: str, experiment_data: Optional[Dict], *args: Any, **kwargs: Any) -> AutosubmitConfig: ...
 
@@ -170,8 +174,7 @@ def autosubmit_config(
 
         for arg, value in kwargs.items():
             setattr(config, arg, value)
-
-        config.current_loaded_files = [conf_dir / 'dummy-so-it-doesnt-force-reload.yml']
+        config.current_loaded_files[str(conf_dir / 'dummy-so-it-doesnt-force-reload.yml')] = time()
         return config
 
     def finalizer() -> None:
@@ -202,3 +205,79 @@ def prepare_basic_config(tmpdir):
     BasicConfig.DENIED_HOSTS = ""
     BasicConfig.CONFIG_FILE_FOUND = False
     return basic_conf
+
+
+@pytest.fixture
+def current_tmpdir(tmpdir_factory):
+    folder = tmpdir_factory.mktemp(f'tests')
+    os.mkdir(folder.join('scratch'))
+    file_stat = os.stat(f"{folder.strpath}")
+    file_owner_id = file_stat.st_uid
+    file_owner = pwd.getpwuid(file_owner_id).pw_name
+    folder.owner = file_owner
+    return folder
+
+
+@pytest.fixture
+def prepare_test(current_tmpdir):
+    # touch as_misc
+    platforms_path = Path(f"{current_tmpdir.strpath}/platforms_t000.yml")
+    jobs_path = Path(f"{current_tmpdir.strpath}/jobs_t000.yml")
+    project = "whatever"
+    scratch_dir = f"{current_tmpdir.strpath}/scratch"
+    Path(f"{scratch_dir}/{project}/{current_tmpdir.owner}").mkdir(parents=True, exist_ok=True)
+    Path(f"{scratch_dir}/LOG_t000").mkdir(parents=True, exist_ok=True)
+    Path(f"{scratch_dir}/LOG_t000/t000.cmd.out.0").touch()
+    Path(f"{scratch_dir}/LOG_t000/t000.cmd.err.0").touch()
+
+    # Add each platform to test
+    with platforms_path.open('w') as f:
+        f.write(f"""
+PLATFORMS:
+    pytest-ps:
+        type: ps
+        host: 127.0.0.1
+        user: {current_tmpdir.owner}
+        project: {project}
+        scratch_dir: {scratch_dir}
+        """)
+    # add a job of each platform type
+    with jobs_path.open('w') as f:
+        f.write(f"""
+JOBS:
+    base:
+        SCRIPT: |
+            echo "Hello World"
+            echo sleep 5
+        QUEUE: hpc
+        PLATFORM: pytest-ps
+        RUNNING: once
+        wallclock: 00:01
+EXPERIMENT:
+    # List of start dates
+    DATELIST: '20000101'
+    # List of members.
+    MEMBERS: fc0
+    # Unit of the chunk size. Can be hour, day, month, or year.
+    CHUNKSIZEUNIT: month
+    # Size of each chunk.
+    CHUNKSIZE: '4'
+    # Number of chunks of the experiment.
+    NUMCHUNKS: '2'
+    CHUNKINI: ''
+    # Calendar used for the experiment. Can be standard or noleap.
+    CALENDAR: standard
+  """)
+    return current_tmpdir
+
+
+@pytest.fixture
+def local(prepare_test):
+    # Init Local platform
+    from autosubmit.platforms.locplatform import LocalPlatform
+    config = {
+        'LOCAL_ROOT_DIR': f"{prepare_test}/scratch",
+        'LOCAL_TMP_DIR': f"{prepare_test}/scratch",
+    }
+    local = LocalPlatform(expid='t000', name='local', config=config)
+    return local

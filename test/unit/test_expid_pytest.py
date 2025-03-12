@@ -64,6 +64,8 @@ def generate_new_experiment(create_autosubmit_tmpdir, request):
     test_type = request.param
     # Setup code that depends on the expid parameter
     expid = init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=None, create=True, test_type=test_type)
+    Path(f"{BasicConfig.STRUCTURES_DIR}/structure_{expid}.db").touch()
+
     yield expid
 
 
@@ -207,6 +209,8 @@ def test_perform_deletion(create_autosubmit_tmpdir, generate_new_experiment, set
     experiment_path = Path(f"{basic_config.LOCAL_ROOT_DIR}/{expid}")
     structure_db_path = Path(f"{basic_config.STRUCTURES_DIR}/structure_{expid}.db")
     job_data_db_path = Path(f"{basic_config.JOBDATA_DIR}/job_data_{expid}")
+    if all("tmp" not in path for path in [str(experiment_path), str(structure_db_path), str(job_data_db_path)]):
+        raise AutosubmitCritical("tmp not in path")
     mocker.patch("autosubmit.autosubmit.delete_experiment", side_effect=FileNotFoundError)
     err_message = Autosubmit._perform_deletion(experiment_path, structure_db_path, job_data_db_path, expid)
     assert all(x in err_message for x in ["Cannot delete experiment entry", "Cannot delete directory", "Cannot delete structure", "Cannot delete job_data"])
