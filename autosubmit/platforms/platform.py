@@ -1052,7 +1052,7 @@ class Platform(object):
             try:
                 from autosubmit.job.job import Job
                 job = Job(loaded_data=self.recovery_queue.get(timeout=1))
-                job.platform_name = self.name # Change the original platform to this process platform.
+                job.platform_name = self.name  # Change the original platform to this process platform.
                 job.platform = self
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
                 try:
