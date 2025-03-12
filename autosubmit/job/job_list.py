@@ -299,7 +299,7 @@ class JobList(object):
                 if create or new:
                     job.reset_logs()
                     # The platform mayn't exist. ( The Autosubmit config parser should check this )
-                    if job.platform_name in submitter.platforms:
+                    if job.platform_name and job.platform_name in submitter.platforms:
                         job.platform = submitter.platforms[job.platform_name]
 
 

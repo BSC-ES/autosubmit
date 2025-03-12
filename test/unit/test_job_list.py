@@ -82,6 +82,7 @@ class TestJobList(TestCase):
     def test_load(self):
         as_conf = Mock()
         as_conf.experiment_data = dict()
+        as_conf.expid = "random-id"
         parser_mock = Mock()
         parser_mock.read = Mock()
         factory = YAMLParserFactory()
@@ -308,6 +309,8 @@ class TestJobList(TestCase):
         graph = networkx.DiGraph()
         as_conf = MagicMock()
         job_list.graph = graph
+        as_conf.experiment_data = {}
+        as_conf.get_platform = Mock(return_value="fake-platform")
         # act
         with patch('autosubmit.job.job.Job.update_parameters', return_value={}):
 
@@ -365,6 +368,7 @@ class TestJobList(TestCase):
     def test_run_member(self):
         parser_mock = Mock()
         parser_mock.read = Mock()
+        self.as_conf.get_platform = MagicMock(return_value="fake-platform")
 
         factory = YAMLParserFactory()
         factory.create_parser = Mock(return_value=parser_mock)
@@ -382,6 +386,8 @@ class TestJobList(TestCase):
                       'fake-key2': 'fake-value2'}
         graph = networkx.DiGraph()
         as_conf = MagicMock()
+        as_conf.experiment_data = {}
+        as_conf.get_platform = Mock(return_value="fake-platform")
         job_list.graph = graph
         # act
         with patch('autosubmit.job.job.Job.update_parameters', return_value={}):
