@@ -307,11 +307,10 @@ class JobList(object):
         for platform in job_list_per_platform:
             for job in job_list_per_platform[platform]:
                 if create or new:
-                    job.reset_logs()
+                    job.reset_logs(as_conf)
                     # The platform mayn't exist. ( The Autosubmit config parser should check this )
                     if job.platform_name and job.platform_name in submitter.platforms:
                         job.platform = submitter.platforms[job.platform_name]
-
 
     def clear_generate(self):
         self.dependency_map = {}
