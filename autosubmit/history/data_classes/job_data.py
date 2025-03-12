@@ -32,7 +32,7 @@ class JobData(object):
                  status="UNKNOWN", rowtype=0, ncpus=0, wallclock="00:00", qos="debug", energy=0, date="", section="",
                  member="", chunk=0, last=1, platform="NA", job_id=0, extra_data="", nnodes=0, run_id=None, MaxRSS=0.0,
                  AveRSS=0.0, out="", err="", rowstatus=Models.RowStatus.INITIAL, children="", platform_output="",
-                 commit=""):
+                 workflow_commit=""):
         """
         """
         self._id = _id
@@ -76,7 +76,7 @@ class JobData(object):
         self.rowstatus = rowstatus
         self.children = children  # DB 17
         self.platform_output = platform_output  # DB 17
-        self.commit = commit
+        self.workflow_commit = workflow_commit
 
     @classmethod
     def from_model(cls, row):
@@ -112,7 +112,7 @@ class JobData(object):
                        row.rowstatus,
                        row.children,
                        row.platform_output,
-                       row.commit)
+                       row.workflow_commit)
         return job_data
 
     @property

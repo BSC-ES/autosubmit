@@ -2190,7 +2190,7 @@ class Job(object):
     def reset_logs(self, as_conf: AutosubmitConfig) -> None:
         self.log_recovered = False
         self.packed_during_building = False
-        self.workflow_commit = as_conf.experiment_data.get("WORKFLOW_COMMIT", "not-versioned")
+        self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT",{}).get("WORKFLOW_COMMIT", "")
 
     def update_parameters(self, as_conf: AutosubmitConfig, set_attributes: bool = False, reset_logs: bool = False) -> None:
         """
@@ -2502,10 +2502,13 @@ class Job(object):
 
         # Writing database
         exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-        exp_history.write_submit_time(self.name, submit=data_time[1], status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), ncpus=self.processors,
-                                    wallclock=self.wallclock, qos=self.queue, date=self.date, member=self.member, section=self.section, chunk=self.chunk,
-                                    platform=self.platform_name, job_id=self.id, wrapper_queue=self._wrapper_queue, wrapper_code=get_job_package_code(self.expid, self.name),
-                                    children=self.children_names_str, commit=self.workflow_commit)
+        exp_history.write_submit_time(self.name, submit=data_time[1],
+                                      status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), ncpus=self.processors,
+                                      wallclock=self.wallclock, qos=self.queue, date=self.date, member=self.member,
+                                      section=self.section, chunk=self.chunk,
+                                      platform=self.platform_name, job_id=self.id, wrapper_queue=self._wrapper_queue,
+                                      wrapper_code=get_job_package_code(self.expid, self.name),
+                                      children=self.children_names_str, workflow_commit=self.workflow_commit)
 
     def update_start_time(self, count=-1):
         start_time_ = self.check_start_time(count) # last known start time from the .cmd file
