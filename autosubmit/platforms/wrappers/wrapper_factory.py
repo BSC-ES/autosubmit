@@ -19,8 +19,10 @@
 
 from autosubmit.platforms.wrappers.wrapper_builder import WrapperDirector, PythonVerticalWrapperBuilder, \
     PythonHorizontalWrapperBuilder, PythonHorizontalVerticalWrapperBuilder, PythonVerticalHorizontalWrapperBuilder, \
-    BashHorizontalWrapperBuilder, BashVerticalWrapperBuilder, SrunHorizontalWrapperBuilder,SrunVerticalHorizontalWrapperBuilder
+    BashHorizontalWrapperBuilder, BashVerticalWrapperBuilder, SrunHorizontalWrapperBuilder, \
+    SrunVerticalHorizontalWrapperBuilder, SrunVerticalWrapperBuilder, SrunHorizontalVerticalWrapperBuilder
 import re
+
 
 class WrapperFactory(object):
 
@@ -36,11 +38,13 @@ class WrapperFactory(object):
         if wrapper_data.het.get("HETSIZE",0) <= 1:
             if not str(kwargs['num_processors_value']).isdigit():
                 kwargs['num_processors_value'] = 1
+
             if str(wrapper_data.nodes).isdigit() and int(wrapper_data.nodes) > 1 and int(kwargs['num_processors_value']) <= 1:
                 kwargs['num_processors'] = "#"
             else:
                 kwargs['num_processors'] = self.processors(kwargs['num_processors_value'])
-            kwargs['allocated_nodes'] = self.allocated_nodes()
+
+            kwargs['allocated_nodes'] = self.allocated_nodes(kwargs['method'])
             kwargs['dependency'] = self.dependency(kwargs['dependency'])
             kwargs['partition'] = self.partition(wrapper_data.partition)
             kwargs["exclusive"] = self.exclusive(wrapper_data.exclusive)
@@ -49,6 +53,10 @@ class WrapperFactory(object):
             kwargs["custom_directives"] = self.custom_directives(wrapper_data.custom_directives)
             kwargs['queue'] = self.queue(wrapper_data.queue)
             kwargs['threads'] = self.threads(wrapper_data.threads)
+            if kwargs['threads'] == '#':
+                kwargs['threads_number'] = '1'
+            else:
+                kwargs['threads_number'] = kwargs['threads'].split('=')[1]
             kwargs['reservation'] = self.reservation(wrapper_data.reservation)
 
         kwargs["executable"] = wrapper_data.executable
@@ -86,7 +94,7 @@ class WrapperFactory(object):
     def header_directives(self, **kwargs):
         pass
 
-    def allocated_nodes(self):
+    def allocated_nodes(self, method):
         return ''
 
     def reservation(self, reservation):
@@ -144,20 +152,26 @@ class WrapperFactory(object):
 class LocalWrapperFactory(WrapperFactory):
 
     def vertical_wrapper(self, **kwargs):
-        return PythonVerticalWrapperBuilder(**kwargs)
+        if kwargs["method"].upper() == "SRUN":
+            return SrunVerticalWrapperBuilder(**kwargs)
+        else:
+            return PythonVerticalWrapperBuilder(**kwargs)
 
     def horizontal_wrapper(self, **kwargs):
 
-        if kwargs["method"] == 'srun':
+        if kwargs["method"].upper() == 'SRUN':
             return SrunHorizontalWrapperBuilder(**kwargs)
         else:
             return PythonHorizontalWrapperBuilder(**kwargs)
 
     def hybrid_wrapper_horizontal_vertical(self, **kwargs):
-        return PythonHorizontalVerticalWrapperBuilder(**kwargs)
+        if kwargs["method"].upper() == 'SRUN':
+            return SrunHorizontalVerticalWrapperBuilder(**kwargs)
+        else:
+            return PythonHorizontalVerticalWrapperBuilder(**kwargs)
 
     def hybrid_wrapper_vertical_horizontal(self, **kwargs):
-        if kwargs["method"] == 'srun':
+        if kwargs["method"].upper() == 'SRUN':
             return SrunVerticalHorizontalWrapperBuilder(**kwargs)
         else:
             return PythonVerticalHorizontalWrapperBuilder(**kwargs)
@@ -200,7 +214,7 @@ class LocalWrapperFactory(WrapperFactory):
 
     def horizontal_wrapper(self, **kwargs):
 
-        if kwargs["method"] == 'srun':
+        if kwargs["method"].upper() == 'SRUN':
             return SrunHorizontalWrapperBuilder(**kwargs)
         else:
             return PythonHorizontalWrapperBuilder(**kwargs)
@@ -209,7 +223,7 @@ class LocalWrapperFactory(WrapperFactory):
         return PythonHorizontalVerticalWrapperBuilder(**kwargs)
 
     def hybrid_wrapper_vertical_horizontal(self, **kwargs):
-        if kwargs["method"] == 'srun':
+        if kwargs["method"].upper() == 'SRUN':
             return SrunVerticalHorizontalWrapperBuilder(**kwargs)
         else:
             return PythonVerticalHorizontalWrapperBuilder(**kwargs)
@@ -244,23 +258,30 @@ class LocalWrapperFactory(WrapperFactory):
     def header_directives(self, **kwargs):
         return ""
 
+
 class SlurmWrapperFactory(WrapperFactory):
 
     def vertical_wrapper(self, **kwargs):
-        return PythonVerticalWrapperBuilder(**kwargs)
+        if kwargs["method"].upper() == "SRUN":
+            return SrunVerticalWrapperBuilder(**kwargs)
+        else:
+            return PythonVerticalWrapperBuilder(**kwargs)
 
     def horizontal_wrapper(self, **kwargs):
 
-        if kwargs["method"] == 'srun':
+        if kwargs["method"].upper() == 'SRUN':
             return SrunHorizontalWrapperBuilder(**kwargs)
         else:
             return PythonHorizontalWrapperBuilder(**kwargs)
 
     def hybrid_wrapper_horizontal_vertical(self, **kwargs):
-        return PythonHorizontalVerticalWrapperBuilder(**kwargs)
+        if kwargs["method"].upper() == 'SRUN':
+            return SrunHorizontalVerticalWrapperBuilder(**kwargs)
+        else:
+            return PythonHorizontalVerticalWrapperBuilder(**kwargs)
 
     def hybrid_wrapper_vertical_horizontal(self, **kwargs):
-        if kwargs["method"] == 'srun':
+        if kwargs["method"].upper() == 'SRUN':
             return SrunVerticalHorizontalWrapperBuilder(**kwargs)
         else:
             return PythonVerticalHorizontalWrapperBuilder(**kwargs)
@@ -268,8 +289,8 @@ class SlurmWrapperFactory(WrapperFactory):
     def header_directives(self, **kwargs):
         return self.platform.wrapper_header(**kwargs)
 
-    def allocated_nodes(self):
-        return self.platform.allocated_nodes()
+    def allocated_nodes(self, method):
+        return self.platform.allocated_nodes(method)
 
     def reservation_directive(self, reservation):
         return "#SBATCH --reservation={0}".format(reservation)
@@ -298,7 +319,7 @@ class PJMWrapperFactory(WrapperFactory):
 
     def horizontal_wrapper(self, **kwargs):
 
-        if kwargs["method"] == 'srun':
+        if kwargs["method"].upper() == 'SRUN':
             return SrunHorizontalWrapperBuilder(**kwargs)
         else:
             return PythonHorizontalWrapperBuilder(**kwargs)
@@ -307,7 +328,7 @@ class PJMWrapperFactory(WrapperFactory):
         return PythonHorizontalVerticalWrapperBuilder(**kwargs)
 
     def hybrid_wrapper_vertical_horizontal(self, **kwargs):
-        if kwargs["method"] == 'srun':
+        if kwargs["method"].upper() == 'SRUN':
             return SrunVerticalHorizontalWrapperBuilder(**kwargs)
         else:
             return PythonVerticalHorizontalWrapperBuilder(**kwargs)
@@ -315,8 +336,8 @@ class PJMWrapperFactory(WrapperFactory):
     def header_directives(self, **kwargs):
         return self.platform.wrapper_header(**kwargs)
 
-    def allocated_nodes(self):
-        return self.platform.allocated_nodes()
+    def allocated_nodes(self, method):
+        return self.platform.allocated_nodes(method)
 
     def reservation_directive(self, reservation):
         return "#" # Reservation directive doesn't exist in PJM, they're handled directly by admins
@@ -359,5 +380,3 @@ class EcWrapperFactory(WrapperFactory):
 
     def dependency_directive(self, dependency):
         return '#PBS -v depend=afterok:{0}'.format(dependency)
-
-

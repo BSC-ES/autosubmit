@@ -2734,7 +2734,7 @@ class Autosubmit:
         except BaseException as e:
             if profile:
                 profiler.stop()
-            raise AutosubmitCritical("Issues during the wrapper loading, may be related to IO issues", 7040, str(e))
+            raise
 
         groups_dict = dict()
         try:

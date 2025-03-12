@@ -649,8 +649,9 @@ class SlurmPlatform(ParamikoPlatform):
         return self._header.wrapper_header(**kwargs)
 
     @staticmethod
-    def allocated_nodes():
-        return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
+    def allocated_nodes(method="ASTHREAD"):
+        if method.upper() != "SRUN":
+            return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
 
     def check_file_exists(self, filename: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3) -> bool:
         """
