@@ -7,7 +7,6 @@ from os import _exit
 import setproctitle
 import locale
 import os
-import traceback
 from autosubmit.job.job_common import Status
 from typing import List, Union, Set, Any
 from autosubmit.helpers.parameters import autosubmit_parameter
@@ -113,25 +112,15 @@ class Platform(object):
         self.get_cmd = None
         self.put_cmd = None
         self._submit_hold_cmd = None
-        self._submit_command_name = None
         self._submit_cmd = None
         self._submit_cmd_x11 = None
         self._checkhost_cmd = None
         self.cancel_cmd = None
-        self.otp_timeout = None
         self.two_factor_auth = None
-        self.otp_timeout = self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA_TIMEOUT", 60 * 5)
         self.two_factor_auth = self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA", False)
         self.two_factor_method = self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA_METHOD", "token")
-        if not self.two_factor_auth:
-            self.pw = None
-        elif auth_password is not None and self.two_factor_auth:
-            if type(auth_password) == list:
-                self.pw = auth_password[0]
-            else:
-                self.pw = auth_password
-        else:
-            self.pw = None
+
+        # Retrieval log process variables
         self.max_waiting_jobs = 20
         self.recovery_queue = None
         self.work_event = None
@@ -281,20 +270,6 @@ class Platform(object):
     def root_dir(self, value):
         self._root_dir = value
 
-    def get_exclusive_directive(self, job):
-        """
-        Returns exclusive directive for the specified job
-        :param job: job to create exclusive directive for
-        :type job: Job
-        :return: exclusive directive
-        :rtype: str
-        """
-        # only implemented for slurm
-        return ""
-
-    def get_multiple_jobids(self, job_list, valid_packages_to_submit, failed_packages, error_message="", hold=False):
-        return False, valid_packages_to_submit
-        # raise NotImplementedError
 
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
@@ -532,41 +507,6 @@ class Platform(object):
 
         as_conf.experiment_data['{0}LOGDIR'.format(prefix)] = self.get_files_path()
 
-    def send_file(self, filename, check=True):
-        """
-        Sends a local file to the platform
-        :param check:
-        :param filename: name of the file to send
-        :type filename: str
-        """
-        raise NotImplementedError
-
-    def move_file(self, src, dest):
-        """
-        Moves a file on the platform
-        :param src: source name
-        :type src: str
-        :param dest: destination name
-        :type dest: str
-        """
-        raise NotImplementedError
-
-    def get_file(self, filename, must_exist=True, relative_path='', ignore_log=False, wrapper_failed=False):
-        """
-        Copies a file from the current platform to experiment's tmp folder
-
-        :param wrapper_failed:
-        :param ignore_log:
-        :param filename: file name
-        :type filename: str
-        :param must_exist: If True, raises an exception if file can not be copied
-        :type must_exist: bool
-        :param relative_path: relative path inside tmp folder
-        :type relative_path: str
-        :return: True if file is copied successfully, false otherwise
-        :rtype: bool
-        """
-        raise NotImplementedError
 
     def get_files(self, files, must_exist=True, relative_path=''):
         """
@@ -583,17 +523,6 @@ class Platform(object):
         """
         for filename in files:
             self.get_file(filename, must_exist, relative_path)
-
-    def delete_file(self, filename):
-        """
-        Deletes a file from this platform
-
-        :param filename: file name
-        :type filename: str
-        :return: True if successful or file does not exist
-        :rtype: bool
-        """
-        raise NotImplementedError
 
     # Executed when calling from Job
     def get_logs_files(self, exp_id, remote_logs):
@@ -642,15 +571,12 @@ class Platform(object):
         """
         if recovery:
             retries = 5
-            for i in range(retries):
+            for _ in range(retries):
                 if self.get_file('{0}_COMPLETED'.format(job_name), False, ignore_log=recovery):
                     return True
             return False
-        if self.check_file_exists('{0}_COMPLETED'.format(job_name), wrapper_failed=wrapper_failed):
-            if self.get_file('{0}_COMPLETED'.format(job_name), True, wrapper_failed=wrapper_failed):
-                return True
-            else:
-                return False
+        if self.get_file('{0}_COMPLETED'.format(job_name), True, wrapper_failed=wrapper_failed):
+            return True
         else:
             return False
 
@@ -669,19 +595,6 @@ class Platform(object):
             return True
         return False
 
-    def remove_stat_file_by_retrials(self, job_name):
-        """
-        Removes *STAT* files from remote
-
-        :param job_name: name of job to check
-        :type job_name: str
-        :return: True if successful, False otherwise
-        :rtype: bool
-        """
-        filename = job_name
-        if self.delete_file(filename):
-            return True
-        return False
 
     def remove_completed_file(self, job_name):
         """
@@ -708,8 +621,6 @@ class Platform(object):
         if self.check_file_exists(filename):
             self.delete_file(filename)
 
-    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3):
-        return True
 
     def get_stat_file(self, job, count=-1):
 
@@ -743,44 +654,11 @@ class Platform(object):
             path = os.path.join(self.root_dir, 'LOG_{0}'.format(self.expid))
         return path
 
-    def submit_job(self, job, script_name, hold=False, export="none"):
-        """
-        Submit a job from a given job object.
-
-        :param job: job object
-        :type job: autosubmit.job.job.Job
-        :param script_name: job script's name
-        :rtype script_name: str
-        :param hold: if True, the job will be submitted in hold state
-        :type hold: bool
-        :param export: export environment variables
-        :type export: str
-        :return: job id for the submitted job
-        :rtype: int
-        """
-        raise NotImplementedError
 
     def check_Alljobs(self, job_list, as_conf, retries=5):
-        for job, job_prev_status in job_list:
+        for job, _ in job_list:
             self.check_job(job)
 
-    def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
-        """
-        Checks job running status
-
-        :param is_wrapper:
-        :param submit_hold_check:
-        :param job:
-        :param retries: retries
-        :param default_status: status to assign if it can be retrieved from the platform
-        :type default_status: autosubmit.job.job_common.Status
-        :return: current job status
-        :rtype: autosubmit.job.job_common.Status
-        """
-        raise NotImplementedError
-
-    def closeConnection(self):
-        return
 
     def write_jobid(self, jobid, complete_path):
         """
@@ -867,11 +745,6 @@ class Platform(object):
             Log.warning(f"Job {job.name} and retry number:{job.fail_count} has no job id. Autosubmit will no record this retry.")
             job.updated_log = True
 
-    def connect(self, as_conf, reconnect=False):
-        raise NotImplementedError
-
-    def restore_connection(self, as_conf):
-        raise NotImplementedError
 
     def clean_log_recovery_process(self) -> None:
         """
@@ -992,7 +865,7 @@ class Platform(object):
             bool: True if there is work to process, False otherwise.
         """
         process_log = False
-        for remaining in range(sleep_time, 0, -1):
+        for _ in range(sleep_time, 0, -1):
             time.sleep(1)
             if self.work_event.is_set() or not self.recovery_queue.empty():
                 process_log = True
