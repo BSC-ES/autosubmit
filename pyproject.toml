@@ -49,7 +49,7 @@ dependencies = [
     "xlib==0.21",
     "setuptools<=76.0.0",
     "bscearth.utils<=0.5.2",
-    "requests<=2.31.0",
+    "requests<=2.32.3",
     "networkx<=2.6.3",
     "portalocker<=2.7.0",
     "paramiko>=3.5.0",
