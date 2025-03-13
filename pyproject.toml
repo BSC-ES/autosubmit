@@ -81,7 +81,7 @@ readme = {file = "README_PIP.md"}
 [project.optional-dependencies]
 postgres = ["psycopg2"]
 tests = [
-    "pytest==8.2.*",
+    "pytest>=8.2,<8.4",
     "pytest-cov",
     "pytest-mock",
     "ruff==0.6.2"
@@ -96,7 +96,7 @@ docs = [
     "sphinx-reredirects==0.1.*"
 ]
 all = ["psycopg2",
-    "pytest==8.2.*",
+    "pytest>=8.2,<8.4",
     "pytest-cov",
     "pytest-mock",
     "ruff==0.6.2",
