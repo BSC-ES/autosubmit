@@ -1,4 +1,5 @@
 import pytest
+from fontTools.misc.cython import returns
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
@@ -86,3 +87,23 @@ def test_process_batch_ready_jobs_valid_packages_to_submit(mocker, slurm_platfor
             else:
                 assert job.wrapper_name is None
     assert failed_packages == []
+
+
+def test_submit_job(mocker, slurm_platform):
+    slurm_platform.get_submit_cmd = mocker.MagicMock(returns="dummy")
+    slurm_platform.send_command = mocker.MagicMock(returns="dummy")
+    slurm_platform._ssh_output = "10000"
+    job = Job("dummy", 10000, Status.SUBMITTED, 0)
+    job._platform = slurm_platform
+    job.platform_name = slurm_platform.name
+    jobs_id = slurm_platform.submit_job(job, "dummy")
+    assert not jobs_id
+    job.x11 = True
+    jobs_id = slurm_platform.submit_job(job, "dummy")
+    assert jobs_id == 10000
+    job.workflow_commit = "dummy"
+    jobs_id = slurm_platform.submit_job(job, "dummy")
+    assert jobs_id == 10000
+    slurm_platform._ssh_output = "10000\n"
+    jobs_id = slurm_platform.submit_job(job, "dummy")
+    assert jobs_id == 10000
