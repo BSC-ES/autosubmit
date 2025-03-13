@@ -63,9 +63,8 @@ class JobList(object):
 
     """
 
-    def __init__(self, expid, config, parser_factory, job_list_persistence, as_conf):
-        self._persistence_path = os.path.join(
-            config.LOCAL_ROOT_DIR, expid, "pkl")
+    def __init__(self, expid, config, parser_factory, job_list_persistence):
+        self._persistence_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")
         self._update_file = "updated_list_" + expid + ".txt"
         self._failed_file = "failed_job_list_" + expid + ".pkl"
         self._persistence_file = "job_list_" + expid
@@ -74,7 +73,6 @@ class JobList(object):
         self.jobs_edges = {}
         self._expid = expid
         self._config = config
-        self.experiment_data = as_conf.experiment_data
         self._parser_factory = parser_factory
         self._stat_val = Status()
         self._parameters = []
@@ -109,10 +107,6 @@ class JobList(object):
         return self._expid
 
     @property
-    def jobs_data(self):
-        return self.experiment_data["JOBS"]
-
-    @property
     def run_members(self):
         return self._run_members
 
@@ -145,7 +139,7 @@ class JobList(object):
                     wrapper_jobs[wrapper_section])
             else:
                 self._ordered_jobs_by_date_member[wrapper_section] = {}
-        pass
+
 
     def _delete_edgeless_jobs(self):
         # indices to delete
@@ -216,70 +210,46 @@ class JobList(object):
         self._member_list = member_list
         chunk_list = list(range(chunk_ini, num_chunks + 1))
         self._chunk_list = chunk_list
+        self._dic_jobs = DicJobs(date_list, member_list, chunk_list, date_format,
+                                 default_retrials, as_conf)
+
         try:
-            self.graph = self.load(create)
-            if type(self.graph) is not DiGraph:
-                self.graph = DiGraph()
-        except AutosubmitCritical:
-            raise
-        except Exception:
-            self.graph = DiGraph()
-        self._dic_jobs = DicJobs(date_list, member_list, chunk_list, date_format, default_retrials,
-                                 as_conf)
-        self._dic_jobs.graph = self.graph
-        if len(self.graph.nodes) > 0:
-            if show_log:
-                Log.info("Load finished")
-            if monitor:
-                self._dic_jobs.changes = {}
-            else:
-                self._dic_jobs.compare_backbone_sections()
-            if not self._dic_jobs.changes:
-                self._dic_jobs._job_list = {job["job"].name: job["job"] for _, job in
-                                            self.graph.nodes.data() if job.get("job", None)}
-            else:
-                # fast-look if graph existed, skips some steps
-                # If VERSION in CONFIG or HPCARCH in DEFAULT it will exist, if not it won't.
-                if (not new and not self._dic_jobs.changes.get("EXPERIMENT", {}) and not
-                self._dic_jobs.changes.get("CONFIG", {}) and not
-                self._dic_jobs.changes.get("DEFAULT", {})):
-                    self._dic_jobs._job_list = {job["job"].name: job["job"] for _, job in
-                                                self.graph.nodes.data() if job.get("job", None)}
-        else:
-            if not create:
-                raise AutosubmitCritical(
-                    "Autosubmit couldn't load the workflow graph. Please run autosubmit create "
-                    "first. If the pkl file exists and was generated with Autosubmit v4.1+, "
-                    "try again.",
-                    7013)
-            # Remove the previous pkl, if it exists.
-            if not new:
-                Log.info(
-                    "Removing previous pkl file due to empty graph, likely due using an "
-                    "Autosubmit 4.0.XXX version")
+            loaded_job_list = self.load(create)
+            Log.result("Load finished")
+        except BaseException as e:
+            Log.warning(f"Couldn't load the old job_list {e}")
+            loaded_job_list = None
+
+
+        if (not loaded_job_list and not create) or (loaded_job_list and
+                                                    len(loaded_job_list) == 0 and not create):
+            raise AutosubmitCritical(
+                "Autosubmit couldn't load the workflow graph. Please run autosubmit create first."
+                "If the pkl file exists and was generated with Autosubmit v4.1+, try again.",
+                7013)
+        elif loaded_job_list and len(loaded_job_list) == 0 and create:
+            new = True
+            Log.info(
+                "Removing previous pkl file due to empty graph, "
+                "likely due using an Autosubmit 4.0.XXX version")
             with suppress(FileNotFoundError):
                 os.remove(os.path.join(self._persistence_path, self._persistence_file + ".pkl"))
             with suppress(FileNotFoundError):
                 os.remove(os.path.join(self._persistence_path, self._persistence_file + "_backup.pkl"))
-            new = True
-        # This generates the job object and also finds if dic_jobs has modified from previous
+        if loaded_job_list:
+            self._dic_jobs._job_list = loaded_job_list
+
+        self.graph = DiGraph()
+
+        # This generates the job object and also finds if dic_jobs has modified from previous 
         # iteration in order to expand the workflow
         if show_log:
             Log.info("Creating jobs...")
         self._create_jobs(self._dic_jobs, 0, default_job_type)
-        # not needed anymore all data is inside their correspondent sections in dic_jobs
-        # This dic_job is key to the dependencies management as they're ordered
+        # This dic_job is key to the dependencies management as they're ordered 
         # by date[member[chunk]]
-        del self._dic_jobs._job_list
         if show_log:
             Log.info("Adding dependencies to the graph..")
-        # del all nodes that are only in the current graph
-        if len(self.graph.nodes) > 0:
-            gen = (name for name in set(self.graph.nodes).symmetric_difference(set(
-                self._dic_jobs.workflow_jobs)) if name in self.graph.nodes)
-            for name in gen:
-                self.graph.remove_node(name)
-        # This actually, also adds the node to the graph if it isn't already there
         self._add_dependencies(date_list, member_list, chunk_list, self._dic_jobs)
 
         if show_log:
@@ -305,14 +275,15 @@ class JobList(object):
                         job.children.add(jobc)
         if show_log:
             Log.info("Looking for edgeless jobs...")
-        self._delete_edgeless_jobs()
+
+        # This if allows to have jobs with dependencies set to themselves even if there are no more than one chunk, member or split.
+        if len(self.graph.edges) > 0:
+            self._delete_edgeless_jobs()
         if new:
             for job in self._job_list:
                 job._fail_count = 0
-                job.parameters = parameters
                 if not job.has_parents():
                     job.status = Status.READY
-                    job.packed = False
                 else:
                     job.status = Status.WAITING
 
@@ -330,20 +301,24 @@ class JobList(object):
                     "JOBS definition in YAML".format(wrapper_section), 7014, str(e))
         # divide job_list per platform name
         job_list_per_platform = self.split_by_platform()
+        submitter = _get_submitter(as_conf)
+        submitter.load_platforms(as_conf)
 
         for platform in job_list_per_platform:
-            first = True
             for job in job_list_per_platform[platform]:
-                job_platform = None
-                if first:
-                    if not job.platform and hasattr(job, "platform_name") and job.platform_name:
-                        submitter = _get_submitter(as_conf)
-                        submitter.load_platforms(as_conf)
-                        if job.platform_name not in submitter.platforms:
-                            job.update_parameters(as_conf, {})
-                        job_platform = submitter.platforms[job.platform_name]
-                    first = False
-                job.platform = job_platform
+                if create or new:
+                    job.reset_logs()
+                    # The platform mayn't exist. ( The Autosubmit config parser should check this )
+                    if job.platform_name and job.platform_name in submitter.platforms:
+                        job.platform = submitter.platforms[job.platform_name]
+
+
+    def clear_generate(self):
+        self.dependency_map = {}
+        self.parameters = {}
+        self._parameters = {}
+        self.graph.clear()
+        self.graph = None
 
     def split_by_platform(self):
         """
@@ -353,9 +328,9 @@ class JobList(object):
         """
         job_list_per_platform = dict()
         for job in self._job_list:
-            if job.platform not in job_list_per_platform:
-                job_list_per_platform[job.platform] = []
-            job_list_per_platform[job.platform].append(job)
+            if job.platform_name not in job_list_per_platform:
+                job_list_per_platform[job.platform_name] = []
+            job_list_per_platform[job.platform_name].append(job)
         return job_list_per_platform
 
     def _add_all_jobs_edge_info(self, dic_jobs, option="DEPENDENCIES"):
@@ -570,8 +545,8 @@ class JobList(object):
         return final_values
 
     @staticmethod
-    def _parse_filter_to_check(value_to_check, value_list=[], level_to_check="DATES_FROM",
-                               splits=None) -> []:
+    def _parse_filter_to_check(value_to_check, value_list=[], level_to_check="DATES_FROM", 
+                               splits=None) -> list:
         """
         Parse the filter to check and return the value to check.
         Selection process:
@@ -1655,12 +1630,8 @@ class JobList(object):
 
             for section in wrapper_jobs:
                 # RUNNING = once, as default. This value comes from jobs_.yml
-                try:
-                    sections_running_type_map[section] = str(self.jobs_data[section].
-                                                             get("RUNNING", 'once'))
-                except BaseException as e:
-                    raise AutosubmitCritical("Key {0} doesn't exists.".
-                                             format(section), 7014, str(e))
+                sections_running_type_map[section] = str(self._config.experiment_data["JOBS"].
+                                                         get(section, {}).get("RUNNING", 'once'))
 
             # Select only relevant jobs, those belonging to the sections defined in the wrapper
 
@@ -2792,6 +2763,12 @@ class JobList(object):
             return
         log_recovered = self.check_if_log_is_recovered(job)
         if log_recovered:
+            job.updated_log = True
+            # TODO in pickle -> db/yaml migration(I): 
+            #  Do the save of the job here then clean attributes from mem ( or even the full job )
+            job.clean_attributes()
+            # TODO in pickle -> db/yaml migration(II): 
+            #  And remove these two lines
             # we only want the last one
             job.local_logs = (log_recovered.name, log_recovered.name[:-4] + ".err")
             job.updated_log = True
@@ -2849,8 +2826,7 @@ class JobList(object):
         Log.debug('Updating FAILED jobs')
         if not first_time:
             for job in self.get_failed():
-                job.packed = False
-                if self.jobs_data[job.section].get("RETRIALS", None) is None:
+                if as_conf.jobs_data[job.section].get("RETRIALS", None) is None:
                     retrials = int(as_conf.get_retrials())
                 else:
                     retrials = int(job.retrials)
@@ -2867,7 +2843,7 @@ class JobList(object):
                             else:
                                 aux_job_delay = int(job.delay_retrials)
 
-                        if (self.jobs_data[job.section].get("DELAY_RETRY_TIME", None) or
+                        if (as_conf.jobs_data[job.section].get("DELAY_RETRY_TIME", None) or 
                                 aux_job_delay <= 0):
                             delay_retry_time = str(as_conf.get_delay_retry_time())
                         else:
@@ -2889,40 +2865,32 @@ class JobList(object):
                                       format(job.name))
                         else:
                             job.status = Status.READY
-                            job.packed = False
-                            Log.debug("Resetting job: {0} status to: READY for retrial...".
-                                      format(job.name))
+                            Log.debug(f"Resetting job: {job.name} status to: READY for retrial...")
                         job.id = None
-                        job.packed = False
                         save = True
 
                     else:
                         job.status = Status.WAITING
                         save = True
-                        job.packed = False
-                        Log.debug("Resetting job: {0} status to: WAITING for parents completion...".
-                                  format(job.name))
+                        Log.debug(f"Resetting job: {job.name} status to: "
+                                  f"WAITING for parents completion...")
                 else:
                     job.status = Status.FAILED
-                    job.packed = False
                     save = True
         else:
             for job in [job for job in self._job_list if job.status in
                             [Status.WAITING, Status.READY, Status.DELAYED, Status.PREPARED]]:
                 job.fail_count = 0
-                job.packed = False
         # Check checkpoint jobs, the status can be Any
         for job in self.check_special_status():
             job.status = Status.READY
             # Run start time in format (YYYYMMDDHH:MM:SS) from current time
             job.id = None
-            job.packed = False
             job.wrapper_type = None
             save = True
             Log.debug(f"Special condition fulfilled for job {job.name}")
         # if waiting jobs has all parents completed change its State to READY
         for job in self.get_completed():
-            job.packed = False
             # Log name has this format:
             # a02o_20000101_fc0_2_SIM.20240212115021.err
             # $jobname.$(YYYYMMDDHHMMSS).err or .out
@@ -2951,7 +2919,6 @@ class JobList(object):
             for job in self.get_delayed():
                 if datetime.datetime.now() >= job.delay_end:
                     job.status = Status.READY
-                    job.packed = False
             for job in self.get_waiting():
                 tmp = [parent for parent in job.parents if
                        parent.status == Status.COMPLETED or parent.status == Status.SKIPPED]
@@ -2963,7 +2930,6 @@ class JobList(object):
                 failed_ones = [parent for parent in job.parents if parent.status == Status.FAILED]
                 if job.parents is None or len(tmp) == len(job.parents):
                     job.status = Status.READY
-                    job.packed = False
                     job.hold = False
                     Log.debug("Setting job: {0} status to: READY "
                               "(all parents completed)...".format(job.name))
@@ -2984,7 +2950,6 @@ class JobList(object):
                                     break
                             if not strong_dependencies_failure and weak_dependencies_failure:
                                 job.status = Status.READY
-                                job.packed = False
                                 job.hold = False
                                 Log.debug("Setting job: {0} status to: READY "
                                     "(conditional jobs are completed/failed)...".format(job.name))
@@ -2997,7 +2962,6 @@ class JobList(object):
                                 if (parent.name in job.edge_info and job.edge_info[parent.name].
                                         get('optional', False)):
                                     job.status = Status.READY
-                                    job.packed = False
                                     job.hold = False
                                     Log.debug("Setting job: {0} status to: READY"
                                     " (conditional jobs are completed/failed)...".format(job.name))
@@ -3013,9 +2977,7 @@ class JobList(object):
                             parent.status == Status.SKIPPED or parent.status == Status.FAILED]
                     if len(tmp2) == len(job.parents) and len(tmp3) != len(job.parents):
                         job.status = Status.READY
-                        job.packed = False
                         # Run start time in format (YYYYMMDDHH:MM:SS) from current time
-                        job.packed = False
                         job.hold = False
                         save = True
                         Log.debug("A job in prepared status has all parent completed, job:"
@@ -3127,7 +3089,7 @@ class JobList(object):
         # job._parents and job._children if recreate is set
         self._job_list = [job["job"] for job in self.graph.nodes().values()]
         try:
-            DbStructure.save_structure(self.graph, self.expid, self._config.STRUCTURES_DIR)
+            DbStructure.save_structure(self.graph, self.expid, self._config.experiment_data["STRUCTURES_DIR"])
         except Exception as exp:
             Log.warning(str(exp))
 
@@ -3144,7 +3106,7 @@ class JobList(object):
         out = True
         for job in self._job_list:
             show_logs = job.check_warnings
-            if not job.check_script(as_conf, self.parameters, show_logs):
+            if not job.check_script(as_conf, show_logs):
                 out = False
         return out
 
@@ -3189,7 +3151,7 @@ class JobList(object):
             else:
                 if job.section in self.sections_checked:
                     show_logs = "false"
-            if not job.check_script(as_conf, self.parameters, show_logs):
+            if not job.check_script(as_conf, show_logs):
                 out = False
             self.sections_checked.add(job.section)
         if out:
@@ -3427,7 +3389,7 @@ class JobList(object):
         """
         Retrieves dictionaries that map the collection of packages in the experiment
 
-        :param BasicConfig: Basic configuration 
+        :param BasicConfig: Basic configuration
         :type BasicConfig: Configuration Object
         :param expid: Experiment ID
         :type expid: String
@@ -3490,16 +3452,16 @@ class JobList(object):
     def retrieve_times(status_code, name, tmp_path, make_exception=False, job_times=None,
                        seconds=False, job_data_collection=None):
         """
-        Retrieve job timestamps from database.  
+        Retrieve job timestamps from database.
         :param job_data_collection:
         :param seconds:
         :param status_code: Code of the Status of the job
-        :type status_code: Integer  
-        :param name: Name of the job  
-        :type name: String  
-        :param tmp_path: Path to the tmp folder of the experiment  
-        :type tmp_path: String  
-        :param make_exception: flag for testing purposes  
+        :type status_code: Integer
+        :param name: Name of the job
+        :type name: String
+        :param tmp_path: Path to the tmp folder of the experiment
+        :type tmp_path: String
+        :param make_exception: flag for testing purposes
         :type make_exception: Boolean
         :param job_times: Detail from as_times.job_times for the experiment
         :type job_times: Dictionary Key: job name, Value: 5-tuple (submit time,
@@ -3633,14 +3595,14 @@ class JobList(object):
     @staticmethod
     def _job_running_check(status_code, name, tmp_path):
         """
-        Receives job data and returns the data from its TOTAL_STATS file in an ordered way.  
-        :param status_code: Status of job  
-        :type status_code: Integer  
-        :param name: Name of job  
-        :type name: String  
-        :param tmp_path: Path to the tmp folder of the experiment  
-        :type tmp_path: String  
-        :return: submit time, start time, end time, status  
+        Receives job data and returns the data from its TOTAL_STATS file in an ordered way.
+        :param status_code: Status of job
+        :type status_code: Integer
+        :param name: Name of job
+        :type name: String
+        :param tmp_path: Path to the tmp folder of the experiment
+        :type tmp_path: String
+        :return: submit time, start time, end time, status
         :rtype: 4-tuple in datetime format
         """
         # name = "a2d0_20161226_001_124_ARCHIVE"

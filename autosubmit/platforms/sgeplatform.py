@@ -143,5 +143,3 @@ class SgePlatform(ParamikoPlatform):
         """
         self.connected = True
         self.connected(as_conf,True) # This platform may be deprecated, so ignore the change
-
-
