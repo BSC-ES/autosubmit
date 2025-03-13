@@ -1,4 +1,7 @@
 import pytest
+
+from autosubmit.job.job import Job
+from autosubmit.job.job_common import Status
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 import os
 import autosubmitconfigparser.config.configcommon
@@ -58,3 +61,24 @@ def test_map_user_config_file(tmpdir, autosubmit_config, mocker, generate_all_fi
         assert platform._user_config_file == "~/.ssh/config"
     else:
         assert platform._user_config_file == str(tmpdir.join(f".ssh/config_{user}"))
+
+
+def test_submit_job(mocker, autosubmit_config, tmpdir):
+    experiment_data = {
+        "ROOTDIR": str(tmpdir),
+        "PROJDIR": str(tmpdir),
+        "LOCAL_TMP_DIR": str(tmpdir),
+        "LOCAL_ROOT_DIR": str(tmpdir),
+        "AS_ENV_CURRENT_USER": "dummy",
+    }
+    platform = ParamikoPlatform(expid='a000', name='local', config=experiment_data)
+    platform._ssh_config = mocker.MagicMock()
+    platform.get_submit_cmd = mocker.MagicMock(returns="dummy")
+    platform.send_command = mocker.MagicMock(returns="dummy")
+    platform.get_submitted_job_id = mocker.MagicMock(return_value="10000")
+    platform._ssh_output = "10000"
+    job = Job("dummy", 10000, Status.SUBMITTED, 0)
+    job._platform = platform
+    job.platform_name = platform.name
+    jobs_id = platform.submit_job(job, "dummy")
+    assert jobs_id == 10000
