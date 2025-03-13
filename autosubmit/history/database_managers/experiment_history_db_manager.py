@@ -25,7 +25,7 @@ from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from .database_manager import DatabaseManager, DEFAULT_JOBDATA_DIR
 
-CURRENT_DB_VERSION = 19 # 19
+CURRENT_DB_VERSION = 19  # Update this if you change the database schema
 DB_EXPERIMENT_HEADER_SCHEMA_CHANGES = 14
 DB_VERSION_SCHEMA_CHANGES = 12
 DEFAULT_DB_VERSION = 10
