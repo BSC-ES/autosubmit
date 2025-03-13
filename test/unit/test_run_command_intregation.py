@@ -113,6 +113,8 @@ project:
     PROJECT_TYPE: None
     # Folder to hold the project sources.
     PROJECT_DESTINATION: local_project
+AUTOSUBMIT:
+  WORKFLOW_COMMIT: "debug-commit-hash"
 """)
     expid_dir = Path(f"{run_tmpdir.strpath}/scratch/whatever/{run_tmpdir.owner}/t000")
     dummy_dir = Path(f"{run_tmpdir.strpath}/scratch/whatever/{run_tmpdir.owner}/t000/dummy_dir")

@@ -254,7 +254,7 @@ class SlurmPlatform(ParamikoPlatform):
             if self.send_command(cmd, x11=x11):
                 job_id = self.get_submitted_job_id(self.get_ssh_output(), x11=x11)
                 if job:
-                    Log.result(f"Job: {job.name} submitted with job_id: {job_id[:-1]} and workflow commit: {job.workflow_commit}")
+                    Log.result(f"Job: {job.name} submitted with job_id: {str(job_id).strip()} and workflow commit: {job.workflow_commit}")
                 return int(job_id)
             else:
                 return None
