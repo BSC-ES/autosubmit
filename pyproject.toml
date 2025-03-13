@@ -55,7 +55,7 @@ dependencies = [
     "typing_extensions==4.*",
     "psutil<=7.0.0",
     "py3dotplus==1.1.0",
-    "numpy<2",
+    "numpy<3",
     "rocrate==0.*",
     "autosubmitconfigparser==1.0.79",
     "configparser",
