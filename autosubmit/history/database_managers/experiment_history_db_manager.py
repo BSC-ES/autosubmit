@@ -359,8 +359,8 @@ class ExperimentHistoryDbManager(DatabaseManager):
             job_data_dc.last, job_data_dc.submit, job_data_dc.start, job_data_dc.finish, HUtils.get_current_datetime(),
             job_data_dc.job_id, job_data_dc.status, job_data_dc.energy, job_data_dc.extra_data,
             job_data_dc.nnodes, job_data_dc.ncpus, job_data_dc.rowstatus, job_data_dc.out, job_data_dc.err,
-            job_data_dc.children, job_data_dc.platform_output, job_data_dc._id, job_data_dc._id,
-            job_data_dc.workflow_commit)
+            job_data_dc.children, job_data_dc.platform_output, job_data_dc._id, job_data_dc.workflow_commit, job_data_dc._id
+            )
         self.execute_statement_with_arguments_on_dbfile(self.historicaldb_file_path, statement, arguments)
 
     def _update_experiment_run(self, experiment_run_dc):
