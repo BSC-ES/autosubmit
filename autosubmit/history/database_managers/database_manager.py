@@ -96,8 +96,9 @@ class DatabaseManager(metaclass=ABCMeta):
             try:
                 self.execute_statement_on_dbfile(path, statement)
             except Exception as exp:
-                Log.debug(
-                    f"Error executing statement {statement} on {path}: {str(exp)}, Traceback: {traceback.format_exc()}")
+                if "duplicate" not in str(exp).lower():
+                    Log.debug(
+                        f"Error executing statement {statement} on {path}: {str(exp)}, Traceback: {traceback.format_exc()}")
 
     def get_from_statement(self, path, statement):
         # type : (str, str) -> List[Tuple]
