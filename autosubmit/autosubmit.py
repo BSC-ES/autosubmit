@@ -1365,22 +1365,19 @@ class Autosubmit:
             raise AutosubmitCritical(
                 "Check that the parameters are defined (-H) ", 7011)
         # Register the experiment in the database
-        try:
-            # Copy another experiment from the database
-            if copy_id != '' and copy_id is not None:
-                copy_id_folder = os.path.join(root_folder, copy_id)
-                if not os.path.exists(copy_id_folder):
-                    raise AutosubmitCritical(
-                        "Experiment {0} doesn't exists".format(copy_id), 7011)
-                exp_id = copy_experiment(copy_id, description, Autosubmit.autosubmit_version, testcase, operational, evaluation)
-            else:
-                # Create a new experiment from scratch
-                exp_id = new_experiment(description, Autosubmit.autosubmit_version, testcase, operational, evaluation)
+        # Copy another experiment from the database
+        if copy_id != '' and copy_id is not None:
+            copy_id_folder = os.path.join(root_folder, copy_id)
+            if not os.path.exists(copy_id_folder):
+                raise AutosubmitCritical(
+                    "Experiment {0} doesn't exists".format(copy_id), 7011)
+            exp_id = copy_experiment(copy_id, description, Autosubmit.autosubmit_version, testcase, operational, evaluation)
+        else:
+            # Create a new experiment from scratch
+            exp_id = new_experiment(description, Autosubmit.autosubmit_version, testcase, operational, evaluation)
 
-            if exp_id == '':
-                raise AutosubmitCritical("No expid", 7011)
-        except Exception as e:
-            raise AutosubmitCritical("Error while generating a new experiment in the db: {0}".format(str(e)), 7011)
+        if exp_id == '':
+            raise AutosubmitCritical("No expid", 7011)
 
         # Create the experiment structure
         Log.info("Generating folder structure...")
