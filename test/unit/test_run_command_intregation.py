@@ -475,8 +475,8 @@ def test_run_interrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries
     # Run the experiment
     exit_code = Autosubmit.run_experiment(expid='t000')
     sleep(2)
-    Autosubmit.stop(all=False, cancel=False, current_status='SUBMITTED, QUEUING, RUNNING', expids='t000', force=True,
-                    force_all=False, status='FAILED')
+    Autosubmit.stop(all_expids=False, cancel=False, current_status='SUBMITTED, QUEUING, RUNNING', expids='t000',
+                    force=True, force_all=False, status='FAILED')
     Autosubmit.run_experiment(expid='t000')
     # Check and display results
     db_check_list = check_db_fields(run_tmpdir, expected_db_entries, final_status)
