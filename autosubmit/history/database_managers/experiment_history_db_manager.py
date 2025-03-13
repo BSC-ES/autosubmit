@@ -119,6 +119,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
             rowstatus INTEGER NOT NULL DEFAULT 0,
             children TEXT,
             platform_output TEXT,
+            workflow_commit TEXT,
             UNIQUE(counter,job_name)
             );
             ''')

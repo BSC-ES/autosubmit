@@ -91,7 +91,7 @@ class ExperimentHistory:
                                   job_id=job_id,
                                   children=children,
                                   run_id=current_experiment_run.run_id,
-                                  commit=workflow_commit)
+                                  workflow_commit=workflow_commit)
             return self.manager.register_submitted_job_data_dc(job_data_dc)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
@@ -224,7 +224,7 @@ class ExperimentHistory:
                 current_experiment_run_dc = self.manager.get_experiment_run_dc_with_max_id()
                 update_these_changes = self._get_built_list_of_changes(job_list)
             except Exception as exp:
-                Log.warning(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
+                Log.warning(str(exp))
                 current_experiment_run_dc = 0
                 update_these_changes = []
                 # ("no runs")
