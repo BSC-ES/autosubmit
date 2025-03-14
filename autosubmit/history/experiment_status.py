@@ -35,7 +35,7 @@ class ExperimentStatus:
         'main_db_name': BasicConfig.DB_FILE,
         'local_root_dir_path': BasicConfig.LOCAL_ROOT_DIR,
       }
-      self.manager = create_experiment_status_db_manager(BasicConfig.DATABASE_BACKEND, **options)
+      self.manager = create_experiment_status_db_manager(**options)
     except Exception as exp:
       message = "Error while trying to update {0} in experiment_status.".format(str(self.expid))      
       Logging(self.expid, BasicConfig.HISTORICAL_LOG_DIR).log(message, traceback.format_exc())

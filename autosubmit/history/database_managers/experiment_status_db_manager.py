@@ -162,14 +162,13 @@ class ExperimentStatusDatabaseManager(Protocol):
 
 
 def create_experiment_status_db_manager(
-    db_engine: str, **options
+    **options
 ) -> ExperimentStatusDatabaseManager:
     """
     Creates a Postgres or SQLite database manager based on the Autosubmit configuration.
     Note that you must provide the options even if they are optional, in which case
     you must provide ``options=None``, or you will get a ``KeyError``.
     TODO: better example and/or link to DbManager.
-    :param db_engine: The database engine type.
     :return: An ``ExperimentStatusDatabaseManager``.
     :raises ValueError: If the database engine type is not valid.
     :raises KeyError: If the ``options`` dictionary is missing a required parameter for an engine.
