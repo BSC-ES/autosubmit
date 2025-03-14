@@ -20,96 +20,100 @@ import collections
 import autosubmit.history.utils as HUtils
 import autosubmit.history.database_managers.database_models as Models
 from datetime import datetime, timedelta
-from json import dumps , loads
+from json import dumps, loads
+
 
 class JobData(object):
     """
     Robust representation of a row in the job_data table of the experiment history database.
     """
 
-    def __init__(self, _id, counter=1, job_name="None", created=None, modified=None, submit=0, start=0, finish=0, 
-                status="UNKNOWN", rowtype=0, ncpus=0, wallclock="00:00", qos="debug", energy=0, date="", section="", 
-                member="", chunk=0, last=1, platform="NA", job_id=0, extra_data="", nnodes=0, run_id=None, MaxRSS=0.0, 
-                AveRSS=0.0, out="", err="", rowstatus=Models.RowStatus.INITIAL, children="", platform_output=""):
-      """
-      """
-      self._id = _id
-      self.counter = counter
-      self.job_name = job_name
-      self.created = HUtils.get_current_datetime_if_none(created)
-      self.modified = HUtils.get_current_datetime_if_none(modified)
-      self._submit = int(submit)
-      self._start = int(start)
-      self._finish = int(finish)
-      self.status = status
-      self.rowtype = rowtype
-      self.ncpus = ncpus
-      self.wallclock = wallclock
-      self.qos = qos if qos else "debug"
-      self._energy = round(energy, 2) if energy else 0
-      self.date = date if date else ""
-      self.section = section if section else ""
-      self.member = member if member else ""
-      self.chunk = chunk if chunk else 0
-      self.last = last
-      self._platform = platform if platform and len(
-          platform) > 0 else "NA"
-      self.job_id = job_id if job_id else 0
-      # TODO jobs_data wilmer did this part... need to check that is loading yaml.
-      self.extra_data_parsed = {} # Fail fast
-      try:
-          if extra_data != "":
-            self.extra_data_parsed = loads(extra_data)
-      except Exception as exp:
-          self.extra_data_parsed = {} # Fail fast
-      self.extra_data = extra_data
-      self.nnodes = nnodes
-      self.run_id = run_id
-      self.require_update = False
-      # DB VERSION 15 attributes
-      self.MaxRSS = MaxRSS
-      self.AveRSS = AveRSS
-      self.out = out
-      self.err = err
-      self.rowstatus = rowstatus      
-      self.children = children # DB 17
-      self.platform_output = platform_output # DB 17
+    def __init__(self, _id, counter=1, job_name="None", created=None, modified=None, submit=0, start=0, finish=0,
+                 status="UNKNOWN", rowtype=0, ncpus=0, wallclock="00:00", qos="debug", energy=0, date="", section="",
+                 member="", chunk=0, last=1, platform="NA", job_id=0, extra_data="", nnodes=0, run_id=None, MaxRSS=0.0,
+                 AveRSS=0.0, out="", err="", rowstatus=Models.RowStatus.INITIAL, children="", platform_output="",
+                 workflow_commit=""):
+        """
+        """
+        self._id = _id
+        self.counter = counter
+        self.job_name = job_name
+        self.created = HUtils.get_current_datetime_if_none(created)
+        self.modified = HUtils.get_current_datetime_if_none(modified)
+        self._submit = int(submit)
+        self._start = int(start)
+        self._finish = int(finish)
+        self.status = status
+        self.rowtype = rowtype
+        self.ncpus = ncpus
+        self.wallclock = wallclock
+        self.qos = qos if qos else "debug"
+        self._energy = round(energy, 2) if energy else 0
+        self.date = date if date else ""
+        self.section = section if section else ""
+        self.member = member if member else ""
+        self.chunk = chunk if chunk else 0
+        self.last = last
+        self._platform = platform if platform and len(
+            platform) > 0 else "NA"
+        self.job_id = job_id if job_id else 0
+        # TODO jobs_data wilmer did this part... need to check that is loading yaml.
+        self.extra_data_parsed = {}  # Fail fast
+        try:
+            if extra_data != "":
+                self.extra_data_parsed = loads(extra_data)
+        except Exception as exp:
+            self.extra_data_parsed = {}  # Fail fast
+        self.extra_data = extra_data
+        self.nnodes = nnodes
+        self.run_id = run_id
+        self.require_update = False
+        # DB VERSION 15 attributes
+        self.MaxRSS = MaxRSS
+        self.AveRSS = AveRSS
+        self.out = out
+        self.err = err
+        self.rowstatus = rowstatus
+        self.children = children  # DB 17
+        self.platform_output = platform_output  # DB 17
+        self.workflow_commit = workflow_commit
 
     @classmethod
     def from_model(cls, row):
-      """ Build JobData from JobDataRow. """
-      job_data = cls(row.id, 
-                      row.counter,
-                      row.job_name,
-                      row.created,
-                      row.modified,
-                      row.submit,
-                      row.start,
-                      row.finish,
-                      row.status,
-                      row.rowtype,
-                      row.ncpus,
-                      row.wallclock,
-                      row.qos,
-                      row.energy,
-                      row.date,
-                      row.section,
-                      row.member,
-                      row.chunk,
-                      row.last,
-                      row.platform,
-                      row.job_id,
-                      row.extra_data,
-                      row.nnodes,
-                      row.run_id,
-                      row.MaxRSS,
-                      row.AveRSS,
-                      row.out,
-                      row.err,
-                      row.rowstatus,
-                      row.children,
-                      row.platform_output)
-      return job_data
+        """ Build JobData from JobDataRow. """
+        job_data = cls(row.id,
+                       row.counter,
+                       row.job_name,
+                       row.created,
+                       row.modified,
+                       row.submit,
+                       row.start,
+                       row.finish,
+                       row.status,
+                       row.rowtype,
+                       row.ncpus,
+                       row.wallclock,
+                       row.qos,
+                       row.energy,
+                       row.date,
+                       row.section,
+                       row.member,
+                       row.chunk,
+                       row.last,
+                       row.platform,
+                       row.job_id,
+                       row.extra_data,
+                       row.nnodes,
+                       row.run_id,
+                       row.MaxRSS,
+                       row.AveRSS,
+                       row.out,
+                       row.err,
+                       row.rowstatus,
+                       row.children,
+                       row.platform_output,
+                       row.workflow_commit)
+        return job_data
 
     @property
     def children_list(self):
@@ -119,7 +123,7 @@ class JobData(object):
 
     @property
     def computational_weight(self):
-        return round(float(self.running_time * self.ncpus),4)
+        return round(float(self.running_time * self.ncpus), 4)
 
     @property
     def submit(self):
@@ -155,13 +159,13 @@ class JobData(object):
         Returns the energy spent value (JOULES) as an integer.
         """
         return self._energy
-    
+
     @property
     def wrapper_code(self):
         """ 
         Another name for rowtype
         """
-        if self.rowtype > 2:        
+        if self.rowtype > 2:
             return self.rowtype
         else:
             return None
@@ -245,6 +249,7 @@ class JobData(object):
             return o_datetime.strftime(HUtils.DATETIME_FORMAT)
         else:
             return None
+
     @property
     def start_datetime_str(self):
         """
@@ -255,6 +260,7 @@ class JobData(object):
             return o_datetime.strftime(HUtils.DATETIME_FORMAT)
         else:
             return None
+
     @property
     def finish_datetime_str(self):
         """
@@ -275,7 +281,7 @@ class JobData(object):
         :rtype: int
         """
         if self.status in ["RUNNING", "COMPLETED", "FAILED"]:
-            return HUtils.calculate_run_time_in_seconds(self.start, self.finish)                        
+            return HUtils.calculate_run_time_in_seconds(self.start, self.finish)
         return 1
 
     @property
@@ -287,7 +293,7 @@ class JobData(object):
         :rtype: int
         """
         if self.status in ["SUBMITTED", "QUEUING", "RUNNING", "COMPLETED", "HELD", "PREPARED", "FAILED", "SKIPPED"]:
-            return HUtils.calculate_queue_time_in_seconds(self.submit, self.start)            
+            return HUtils.calculate_queue_time_in_seconds(self.submit, self.start)
         return 0
 
     def get_hdata(self):

@@ -574,9 +574,7 @@ class ParamikoPlatform(Platform):
             x11 = False if job is None else job.x11
             job_id = self.get_submitted_job_id(self.get_ssh_output(), x11 )
             if job:
-                Log.result(f"Job: {job.name} submitted with job_id: {job_id}")
-            else:
-                Log.result(f"Job submitted with job_id: {job_id}")
+                Log.result(f"Job: {job.name} submitted with job_id: {str(job_id).strip()} and workflow commit: {job.workflow_commit}")
             return int(job_id)
         else:
             return None

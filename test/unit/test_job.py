@@ -1446,6 +1446,19 @@ def test_pytest_create_script(mocker):
     # chmod_mock.assert_called_with(os.path.join(job._tmp_path, job.name + '.cmd'), 0o755)
 
 
+def test_reset_logs(autosubmit_config):
+    experiment_data = {
+        'AUTOSUBMIT': {
+            'WORKFLOW_COMMIT': "dummy-commit",
+        },
+    }
+    as_conf = autosubmit_config("test-expid", experiment_data)
+    job = Job("job1", "1", Status.READY, 0)
+    job.reset_logs(as_conf)
+    assert job.workflow_commit == "dummy-commit"
+    assert job.updated_log is False
+    assert job.packed_during_building is False
+
 def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_template_variable(mocker):
     job = Job("job1", "1", Status.READY, 0)
     # arrange
