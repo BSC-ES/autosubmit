@@ -1390,14 +1390,11 @@ class Autosubmit:
         exp_folder = root_folder / Path(exp_id)
         try:
             # Setting folders and permissions
-            exp_folder.mkdir(mode = 0o755)
-            Path(exp_folder / "conf").mkdir(mode = 0o755)
-            Path(exp_folder / "pkl").mkdir(mode = 0o755)
-            Path(exp_folder / "tmp").mkdir(mode = 0o755)
-            Path(exp_folder / "tmp" / "ASLOGS").mkdir(mode = 0o755)
-            Path(exp_folder / "tmp" / f"LOG_{exp_id}").mkdir(mode = 0o755)
-            Path(exp_folder / "plot").mkdir(mode = 0o755)
-            Path(exp_folder / "status").mkdir(mode = 0o755)
+            dir_mode = 0o755
+            exp_folder.mkdir(mode=dir_mode)
+            required_dirs = ["conf", "pkl", "tmp", "tmp/ASLOGS", f"tmp/LOG_{exp_id}", "plot", "status"]
+            for required_dir in required_dirs:
+                Path(exp_folder / required_dir).mkdir(mode=dir_mode)
             Log.info(f"Experiment folder: {exp_folder}")
         except OSError as e:
             try:
