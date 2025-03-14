@@ -67,8 +67,7 @@ def handle_start_time(start_time: str) -> None:
             sleep(1)
 
 
-def handle_start_after(start_after, expid, BasicConfig):
-    # type: (str, str, BasicConfig) -> None
+def handle_start_after(start_after: str, expid: str) -> None:
     """ Wait until the start_after experiment has finished."""
     if start_after:
         Log.info("User provided expid completion trigger has been detected.")
@@ -93,7 +92,7 @@ def handle_start_after(start_after, expid, BasicConfig):
         while True:
             # Query current run
             current_run = exp_history.manager.get_experiment_run_dc_with_max_id()
-            if current_run and current_run.finish > 0 and current_run.total > 0 and current_run.completed + current_run.suspended == current_run.total:
+            if current_run is not None and current_run.finish > 0 and 0 < current_run.total == current_run.completed + current_run.suspended:
                 break
             else:
                 sys.stdout.write(
