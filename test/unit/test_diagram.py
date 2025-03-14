@@ -165,18 +165,6 @@ def test_create_bar_diagram(job_stats, failed_jobs, failed_jobs_dict, num_plots,
         assert result == diagram.create_bar_diagram("a000", statistics, jobs_data, status)
 
 
-def test_populate_statistics():
-    """
-    function to test the Class JobData inside autosubmit/monitor/diagram.py
-    """
-    jobs_data = [
-        Job('test', "a29z", "COMPLETED", 200),
-        Job('test', "a28z", "COMPLETED", 200),
-        Job('test', "a27z", "COMPLETED", 200),
-        Job('test', "a26z", "FAILED", 10)
-    ]
-
-
 def test_populate_statistics(jobs):
     """ function to test the Class JobData inside autosubmit/monitor/diagram.py """
 
