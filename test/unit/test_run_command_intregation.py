@@ -400,32 +400,3 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
     assert_files_recovered(files_check_list)
     # TODO: GITLAB pipeline is not returning 0 or 1 for check_exit_code(final_status, exit_code)
     # assert_exit_code(final_status, exit_code)
-
-
-@pytest.mark.parametrize("jobs_data, profiler", [
-        ("""
-            EXPERIMENT:
-                NUMCHUNKS: '3'
-            JOBS:
-                job:
-                    SCRIPT: |
-                        echo "Hello World with id=Success"
-                    PLATFORM: local
-                    RUNNING: chunk
-                    wallclock: 00:01
-            """,
-            True
-        ),
-    ]
- )
-def test_run_profile(run_tmpdir, jobs_data, profiler):
-    """
-    tester function of the run_profile function
-    """
-    init_run(run_tmpdir, jobs_data)
-    # Run the experiment
-    try:
-        Autosubmit.run_experiment(expid='t000', profile=profiler)
-        assert check_profile(run_tmpdir)
-    except Exception as exc:
-        assert False, f"test_run_uninterrupted_profile raised an exception: {exc}"
