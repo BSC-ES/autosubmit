@@ -1179,7 +1179,12 @@ class ParamikoPlatform(Platform):
                     raise AutosubmitError(
                         'SSH Session not active, will restart the platforms', 6005)
                 if errorLine.find("command not found") != -1:
-                    raise AutosubmitCritical("scheduler is not installed.",7052,self._ssh_output_err)
+                    raise AutosubmitError(
+                        f"A platform command was not found. This may be a temporary issue. "
+                        f"Please verify that the correct scheduler is specified for this platform: '{self.name}.{self.type}'.",
+                        7052,
+                        self._ssh_output_err
+                    )
                 elif errorLine.find("syntax error") != -1:
                     raise AutosubmitCritical("Syntax error",7052,self._ssh_output_err)
                 elif errorLine.find("refused") != -1 or errorLine.find("slurm_persist_conn_open_without_init") != -1 or errorLine.find("slurmdbd") != -1 or errorLine.find("submission failed") != -1 or errorLine.find("git clone") != -1 or errorLine.find("sbatch: error: ") != -1 or errorLine.find("not submitted") != -1 or errorLine.find("invalid") != -1 or "[ERR.] PJM".lower() in errorLine:
