@@ -1,28 +1,24 @@
 import inspect
+from unittest import TestCase
 from unittest.mock import MagicMock
 
 import os
-from unittest import TestCase
 from copy import copy
-import networkx
-from networkx import DiGraph
-#import patch
-from textwrap import dedent
+from random import randrange
 import shutil
 import tempfile
-from mock import Mock, patch
-from random import randrange
 from pathlib import Path
+from mock import Mock, patch
+import networkx
+from networkx import DiGraph
 
-
+from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_common import Type
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
-from log.log import AutosubmitCritical
 
 
 class TestJobList(TestCase):
@@ -40,7 +36,7 @@ class TestJobList(TestCase):
         self.as_conf.default_parameters = {}
         self.temp_directory = tempfile.mkdtemp()
         joblist_persistence = JobListPersistencePkl()
-        self.job_list = JobList(self.experiment_id, self.as_conf, YAMLParserFactory(),joblist_persistence)
+        self.job_list = JobList(self.experiment_id, self.as_conf, YAMLParserFactory(), joblist_persistence)
         # creating jobs for self list
         self.completed_job = self._createDummyJobWithStatus(Status.COMPLETED)
         self.completed_job2 = self._createDummyJobWithStatus(Status.COMPLETED)
@@ -133,7 +129,8 @@ class TestJobList(TestCase):
             job_list_to_load.load(True)
             self.assertEqual(job_list_to_load._job_list, job_list._job_list)
             os.chmod(f'{temp_dir}/{self.experiment_id}/pkl/job_list_random-id.pkl', 0o777)
-            shutil.copy(f'{temp_dir}/{self.experiment_id}/pkl/job_list_random-id.pkl',f'{temp_dir}/{self.experiment_id}/pkl/job_list_random-id_backup.pkl')
+            shutil.copy(f'{temp_dir}/{self.experiment_id}/pkl/job_list_random-id.pkl',
+                        f'{temp_dir}/{self.experiment_id}/pkl/job_list_random-id_backup.pkl')
             os.remove(f'{temp_dir}/{self.experiment_id}/pkl/job_list_random-id.pkl')
             job_list_to_load.load(False)
             self.assertEqual(job_list_to_load._job_list, job_list._job_list)
@@ -313,7 +310,6 @@ class TestJobList(TestCase):
         as_conf.get_platform = Mock(return_value="fake-platform")
         # act
         with patch('autosubmit.job.job.Job.update_parameters', return_value={}):
-
             job_list.generate(
                 as_conf=as_conf,
                 date_list=date_list,
@@ -329,7 +325,6 @@ class TestJobList(TestCase):
                 create=True,
             )
 
-
             # assert
             self.assertEqual(job_list.parameters, parameters)
             self.assertEqual(job_list._date_list, date_list)
@@ -339,7 +334,7 @@ class TestJobList(TestCase):
             cj_args, cj_kwargs = job_list._create_jobs.call_args
             self.assertEqual(0, cj_args[2])
 
-            #_add_dependencies(self, date_list, member_list, chunk_list, dic_jobs, option="DEPENDENCIES"):
+            # _add_dependencies(self, date_list, member_list, chunk_list, dic_jobs, option="DEPENDENCIES"):
 
             job_list._add_dependencies.assert_called_once_with(date_list, member_list, chunk_list, cj_args[0])
             # Adding flag update structure
@@ -391,7 +386,6 @@ class TestJobList(TestCase):
         job_list.graph = graph
         # act
         with patch('autosubmit.job.job.Job.update_parameters', return_value={}):
-
             job_list.generate(
                 as_conf=as_conf,
                 date_list=date_list,
@@ -416,13 +410,13 @@ class TestJobList(TestCase):
             job_list_aux.run_members = "not_exists"
             self.assertEqual(len(job_list_aux._job_list), 0)
 
-    #autosubmit/job/job_list.py:create_dictionary - line 132
+    # autosubmit/job/job_list.py:create_dictionary - line 132
     def test_create_dictionary(self):
         parser_mock = Mock()
         parser_mock.read = Mock()
         parameters = {'fake-key': 'fake-value',
                       'fake-key2': 'fake-value2'}
-        self.as_conf.experiment_data["JOBS"]  = {'fake-section': parameters, 'fake-section-2': parameters}
+        self.as_conf.experiment_data["JOBS"] = {'fake-section': parameters, 'fake-section-2': parameters}
         self.as_conf.jobs_data = self.as_conf.experiment_data["JOBS"]
         factory = YAMLParserFactory()
         factory.create_parser = Mock(return_value=parser_mock)
@@ -477,18 +471,18 @@ class TestJobList(TestCase):
             job_list.create_dictionary(date_list, member_list, num_chunks, chunk_ini, date_format, default_retrials,
                                        wrapper_jobs, self.as_conf)
             # assert
-            self.assertEqual(len(job_list._ordered_jobs_by_date_member["WRAPPER_FAKESECTION"]["fake-date1"]["fake-member1"]), 1)
+            self.assertEqual(
+                len(job_list._ordered_jobs_by_date_member["WRAPPER_FAKESECTION"]["fake-date1"]["fake-member1"]), 1)
 
-    def new_job_list(self,factory,temp_dir):
+    def new_job_list(self, factory, temp_dir):
         job_list = JobList(self.experiment_id, self.as_conf,
                            factory, JobListPersistencePkl())
         job_list._persistence_path = f'{str(temp_dir)}/{self.experiment_id}/pkl'
 
-
-        #job_list._create_jobs = Mock()
-        #job_list._add_dependencies = Mock()
-        #job_list.update_genealogy = Mock()
-        #job_list._job_list = [Job('random-name', 9999, Status.WAITING, 0),
+        # job_list._create_jobs = Mock()
+        # job_list._add_dependencies = Mock()
+        # job_list.update_genealogy = Mock()
+        # job_list._job_list = [Job('random-name', 9999, Status.WAITING, 0),
         #                      Job('random-name2', 99999, Status.WAITING, 0)]
         return job_list
 
@@ -521,15 +515,16 @@ class TestJobList(TestCase):
         parameters = {'fake-key': 'fake-value',
                       'fake-key2': 'fake-value2'}
         with tempfile.TemporaryDirectory() as temp_dir:
-            job_list = self.new_job_list(factory,temp_dir)
+            job_list = self.new_job_list(factory, temp_dir)
             FakeBasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
             Path(temp_dir, self.experiment_id).mkdir()
-            for path in [f'{self.experiment_id}/tmp', f'{self.experiment_id}/tmp/ASLOGS', f'{self.experiment_id}/tmp/ASLOGS_{self.experiment_id}', f'{self.experiment_id}/proj',
+            for path in [f'{self.experiment_id}/tmp', f'{self.experiment_id}/tmp/ASLOGS',
+                         f'{self.experiment_id}/tmp/ASLOGS_{self.experiment_id}', f'{self.experiment_id}/proj',
                          f'{self.experiment_id}/conf', f'{self.experiment_id}/pkl']:
                 Path(temp_dir, path).mkdir()
             job_list.changes = Mock(return_value=['random_section', 'random_section'])
             as_conf.detailed_deep_diff = Mock(return_value={})
-            #as_conf.get_member_list = Mock(return_value=member_list)
+            # as_conf.get_member_list = Mock(return_value=member_list)
             with patch('autosubmit.job.job.Job.update_parameters', return_value={}):
                 # act
                 job_list.generate(
@@ -547,7 +542,7 @@ class TestJobList(TestCase):
                     create=True,
                 )
                 job_list.save()
-                job_list2 = self.new_job_list(factory,temp_dir)
+                job_list2 = self.new_job_list(factory, temp_dir)
                 # act
                 job_list2.generate(
                     as_conf=as_conf,
@@ -564,22 +559,22 @@ class TestJobList(TestCase):
                     create=True,
                 )
 
-                #return False
+                # return False
                 job_list2.update_from_file = Mock()
                 job_list2.update_from_file.return_value = False
                 job_list2.update_list(as_conf, False)
 
                 # check that name is the same
-                for index,job in enumerate(job_list._job_list):
+                for index, job in enumerate(job_list._job_list):
                     self.assertEqual(job_list2._job_list[index].name, job.name)
                 # check that status is the same
-                for index,job in enumerate(job_list._job_list):
+                for index, job in enumerate(job_list._job_list):
                     self.assertEqual(job_list2._job_list[index].status, job.status)
                 self.assertEqual(job_list2._date_list, job_list._date_list)
                 self.assertEqual(job_list2._member_list, job_list._member_list)
                 self.assertEqual(job_list2._chunk_list, job_list._chunk_list)
                 self.assertEqual(job_list2.parameters, job_list.parameters)
-                job_list3 = self.new_job_list(factory,temp_dir)
+                job_list3 = self.new_job_list(factory, temp_dir)
                 job_list3.generate(
                     as_conf=as_conf,
                     date_list=date_list,
@@ -601,20 +596,20 @@ class TestJobList(TestCase):
                 for index, job in enumerate(job_list._job_list):
                     self.assertEqual(job_list3._job_list[index].name, job.name)
                 # check that status is the same
-                for index,job in enumerate(job_list._job_list):
+                for index, job in enumerate(job_list._job_list):
                     self.assertEqual(job_list3._job_list[index].status, job.status)
                 self.assertEqual(job_list3._date_list, job_list._date_list)
                 self.assertEqual(job_list3._member_list, job_list._member_list)
                 self.assertEqual(job_list3._chunk_list, job_list._chunk_list)
                 self.assertEqual(job_list3.parameters, job_list.parameters)
                 # DELETE WHEN EDGELESS TEST
-                job_list3._job_list[0].dependencies = {"not_exist":None}
+                job_list3._job_list[0].dependencies = {"not_exist": None}
                 job_list3._delete_edgeless_jobs()
                 self.assertEqual(len(job_list3._job_list), 1)
                 # Update Mayor Version test ( 4.0 -> 4.1)
                 job_list3.graph = DiGraph()
                 job_list3.save()
-                job_list3 = self.new_job_list(factory,temp_dir)
+                job_list3 = self.new_job_list(factory, temp_dir)
                 job_list3.update_genealogy = Mock(wraps=job_list3.update_genealogy)
                 job_list3.generate(
                     as_conf=as_conf,
@@ -635,7 +630,7 @@ class TestJobList(TestCase):
                 job_list3.update_genealogy.assert_called_once_with()
 
                 # Test when the graph previous run has more jobs than the current run
-                job_list3.graph.add_node("fake-node",job=job_list3._job_list[0])
+                job_list3.graph.add_node("fake-node", job=job_list3._job_list[0])
                 job_list3.save()
                 job_list3.generate(
                     as_conf=as_conf,
@@ -650,7 +645,7 @@ class TestJobList(TestCase):
                     wrapper_jobs={},
                     new=False,
                 )
-                self.assertEqual(len(job_list3.graph.nodes),len(job_list3._job_list))
+                self.assertEqual(len(job_list3.graph.nodes), len(job_list3._job_list))
                 # Test when the graph previous run has fewer jobs than the current run
                 as_conf.experiment_data["JOBS"]["fake-section3"] = dict()
                 as_conf.experiment_data["JOBS"]["fake-section3"]["file"] = "fake-file3"
@@ -674,9 +669,9 @@ class TestJobList(TestCase):
                     if node in [job.name for job in job_list3._job_list]:
                         self.assertTrue(job_list3.graph.nodes[node]["job"] in job_list3._job_list)
 
-
     def test_find_and_delete_redundant_relations(self):
-        problematic_jobs = {'SECTION': {'CHILD': ['parents_names','parents_names1','parents_names2'], 'CHILD2':['parents_names3','parents_names4']}}
+        problematic_jobs = {'SECTION': {'CHILD': ['parents_names', 'parents_names1', 'parents_names2'],
+                                        'CHILD2': ['parents_names3', 'parents_names4']}}
         self.setUp()
         with patch('autosubmit.job.job_list.DiGraph.has_successor') as mock_job_list:
             try:
@@ -708,16 +703,13 @@ class TestJobList(TestCase):
                 print(f'Unexpected exception raised: {e}')
                 assert not bool(e)
 
-
-
-
-
     def _createDummyJobWithStatus(self, status):
         job_name = str(randrange(999999, 999999999))
         job_id = randrange(1, 999)
         job = Job(job_name, job_id, status, 0)
         job.type = randrange(0, 2)
         return job
+
 
 class FakeBasicConfig:
     def __init__(self):
@@ -747,11 +739,11 @@ def test_manage_dependencies():
     testing function _manage_dependencies from job_list
     """
     dependencies_keys = {'dummy=1':
-                             { 'test', 'test2' }
-                        ,'dummy-2':
-                             { 'test', 'test2' },
-                        'dummy+3': "", 'dummy*4': "", 'dummy?5': ""
-                    }
+                             {'test', 'test2'}
+        , 'dummy-2':
+                             {'test', 'test2'},
+                         'dummy+3': "", 'dummy*4': "", 'dummy?5': ""
+                         }
 
     experiment_id = 'random-id'
 
@@ -762,14 +754,94 @@ def test_manage_dependencies():
     as_conf.experiment_data["PLATFORMS"] = {}
 
     joblist_persistence = JobListPersistencePkl()
-    job_list = JobList(experiment_id, as_conf, YAMLParserFactory(),joblist_persistence)
+    job_list = JobList(experiment_id, as_conf, YAMLParserFactory(), joblist_persistence)
 
     job = {'dummy':
                {'dummy': 'SIM.sh',
-                   'RUNNING': 'once'},
-            'RUNNING': 'once',
-            'dummy*4':{}
-    }
+                'RUNNING': 'once'},
+           'RUNNING': 'once',
+           'dummy*4': {}
+           }
+
+    dic_jobs_fake = DicJobs(['fake-date1', 'fake-date2'],
+                            ['fake-member1', 'fake-member2'], list(range(2, 10 + 1)),
+                            'H', 1, as_conf)
+    dic_jobs_fake.experiment_data["JOBS"] = job
+    dependency = job_list._manage_dependencies(dependencies_keys, dic_jobs_fake)
+    assert len(dependency) == 3
+    for job in dependency:
+        assert job in dependencies_keys
+
+        self.assertEqual(len(job_list_aux._job_list), 1)
+        job_list_aux = copy(job_list)
+        job_list_aux.run_members = "not_exists"
+        self.assertEqual(len(job_list_aux._job_list), 0)
+
+
+def new_job_list(self, factory, temp_dir):
+    job_list = JobList(self.experiment_id, self.as_conf,
+                       factory, JobListPersistencePkl())
+    job_list._persistence_path = f'{str(temp_dir)}/{self.experiment_id}/pkl'
+
+    # job_list._create_jobs = Mock()
+    # job_list._add_dependencies = Mock()
+    # job_list.update_genealogy = Mock()
+    # job_list._job_list = [Job('random-name', 9999, Status.WAITING, 0),
+    #                      Job('random-name2', 99999, Status.WAITING, 0)]
+    return job_list
+
+
+class FakeBasicConfig:
+    def __init__(self):
+        pass
+
+    def props(self):
+        pr = {}
+        for name in dir(self):
+            value = getattr(self, name)
+            if not name.startswith('__') and not inspect.ismethod(value) and not inspect.isfunction(value):
+                pr[name] = value
+        return pr
+
+    DB_DIR = '/dummy/db/dir'
+    DB_FILE = '/dummy/db/file'
+    DB_PATH = '/dummy/db/path'
+    LOCAL_ROOT_DIR = '/dummy/local/root/dir'
+    LOCAL_TMP_DIR = '/dummy/local/temp/dir'
+    LOCAL_PROJ_DIR = '/dummy/local/proj/dir'
+    DEFAULT_PLATFORMS_CONF = ''
+    DEFAULT_JOBS_CONF = ''
+    STRUCTURES_DIR = '/dummy/structure/dir'
+
+
+def test_manage_dependencies():
+    """
+    testing function _manage_dependencies from job_list
+    """
+    dependencies_keys = {'dummy=1':
+                             {'test', 'test2'}
+        , 'dummy-2':
+                             {'test', 'test2'},
+                         'dummy+3': "", 'dummy*4': "", 'dummy?5': ""
+                         }
+
+    experiment_id = 'random-id'
+
+    as_conf = Mock()
+    as_conf.experiment_data = dict()
+    as_conf.experiment_data["JOBS"] = {}
+    as_conf.jobs_data = as_conf.experiment_data["JOBS"]
+    as_conf.experiment_data["PLATFORMS"] = {}
+
+    joblist_persistence = JobListPersistencePkl()
+    job_list = JobList(experiment_id, as_conf, YAMLParserFactory(), joblist_persistence)
+
+    job = {'dummy':
+               {'dummy': 'SIM.sh',
+                'RUNNING': 'once'},
+           'RUNNING': 'once',
+           'dummy*4': {}
+           }
 
     dic_jobs_fake = DicJobs(['fake-date1', 'fake-date2'],
                             ['fake-member1', 'fake-member2'], list(range(2, 10 + 1)),
