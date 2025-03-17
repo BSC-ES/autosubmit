@@ -1583,27 +1583,27 @@ class Job(object):
 
         return parameters
 
-    def update_platform_parameters(self, as_conf, parameters, job_platform, set_attributes):
-        if set_attributes and not job_platform:
+    def update_platform_parameters(self, as_conf, parameters):
+        if not self.platform:
             submitter = job_utils._get_submitter(as_conf)
             submitter.load_platforms(as_conf)
             if not self.platform_name:
                 self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
             job_platform = submitter.platforms.get(self.platform_name)
             self.platform = job_platform
-        parameters['CURRENT_ARCH'] = job_platform.name
-        parameters['CURRENT_HOST'] = job_platform.host
-        parameters['CURRENT_USER'] = job_platform.user
-        parameters['CURRENT_PROJ'] = job_platform.project
-        parameters['CURRENT_BUDG'] = job_platform.budget
-        parameters['CURRENT_RESERVATION'] = job_platform.reservation
-        parameters['CURRENT_EXCLUSIVITY'] = job_platform.exclusivity
-        parameters['CURRENT_HYPERTHREADING'] = job_platform.hyperthreading
-        parameters['CURRENT_TYPE'] = job_platform.type
-        parameters['CURRENT_SCRATCH_DIR'] = job_platform.scratch
-        parameters['CURRENT_PROJ_DIR'] = job_platform.project_dir
-        parameters['CURRENT_ROOTDIR'] = job_platform.root_dir
-        parameters['CURRENT_LOGDIR'] = job_platform.get_files_path()
+        parameters['CURRENT_ARCH'] = self.platform.name
+        parameters['CURRENT_HOST'] = self.platform.host
+        parameters['CURRENT_USER'] = self.platform.user
+        parameters['CURRENT_PROJ'] = self.platform.project
+        parameters['CURRENT_BUDG'] = self.platform.budget
+        parameters['CURRENT_RESERVATION'] = self.platform.reservation
+        parameters['CURRENT_EXCLUSIVITY'] = self.platform.exclusivity
+        parameters['CURRENT_HYPERTHREADING'] = self.platform.hyperthreading
+        parameters['CURRENT_TYPE'] = self.platform.type
+        parameters['CURRENT_SCRATCH_DIR'] = self.platform.scratch
+        parameters['CURRENT_PROJ_DIR'] = self.platform.project_dir
+        parameters['CURRENT_ROOTDIR'] = self.platform.root_dir
+        parameters['CURRENT_LOGDIR'] = self.platform.get_files_path()
         return parameters
 
     def process_scheduler_parameters(self, job_platform, chunk):
@@ -1836,15 +1836,15 @@ class Job(object):
         self.wallclock = increase_wallclock_by_chunk(
             self.wallclock, self.wchunkinc, chunk)
 
-    def update_platform_associated_parameters(self, as_conf, parameters, job_platform, chunk, set_attributes):
+    def update_platform_associated_parameters(self, as_conf, parameters, chunk, set_attributes):
         if set_attributes:
             self.x11_options = str(parameters.get("CURRENT_X11_OPTIONS", ""))
             self.ec_queue = str(parameters.get("CURRENT_EC_QUEUE", ""))
             self.executable = parameters.get("CURRENT_EXECUTABLE", "")
             self.total_jobs = parameters.get("CURRENT_TOTALJOBS",
-                                             parameters.get("CURRENT_TOTAL_JOBS", job_platform.total_jobs))
+                                             parameters.get("CURRENT_TOTAL_JOBS", self.platform.total_jobs))
             self.max_waiting_jobs = parameters.get("CURRENT_MAXWAITINGJOBS", parameters.get("CURRENT_MAX_WAITING_JOBS",
-                                                                                            job_platform.max_waiting_jobs))
+                                                                                            self.platform.max_waiting_jobs))
             self.processors = parameters.get("CURRENT_PROCESSORS", "1")
             self.shape = parameters.get("CURRENT_SHAPE", "")
             self.processors_per_node = parameters.get("CURRENT_PROCESSORS_PER_NODE", "1")
@@ -1861,7 +1861,7 @@ class Job(object):
             self.memory_per_task = parameters.get("CURRENT_MEMORY_PER_TASK", parameters.get("CURRENT_MEMORY_PER_TASK", ""))
             self.wallclock = parameters.get("CURRENT_WALLCLOCK", parameters.get("CURRENT_MAX_WALLCLOCK", parameters.get("CONFIG.JOB_WALLCLOCK", "24:00")))
             self.custom_directives = parameters.get("CURRENT_CUSTOM_DIRECTIVES", "")
-            self.process_scheduler_parameters(job_platform, chunk)
+            self.process_scheduler_parameters(self.platform, chunk)
             if self.het.get('HETSIZE', 1) > 1:
                 for name, components_value in self.het.items():
                     if name != "HETSIZE":
@@ -2190,7 +2190,7 @@ class Job(object):
     def reset_logs(self, as_conf: AutosubmitConfig) -> None:
         self.log_recovered = False
         self.packed_during_building = False
-        self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT",{}).get("WORKFLOW_COMMIT", "")
+        self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT", {}).get("WORKFLOW_COMMIT", "")
 
     def update_parameters(self, as_conf: AutosubmitConfig, set_attributes: bool = False, reset_logs: bool = False) -> None:
         """
@@ -2222,12 +2222,12 @@ class Job(object):
         parameters = as_conf.load_parameters()
         parameters.update(as_conf.default_parameters)
         parameters = as_conf.substitute_dynamic_variables(parameters, 25)
-        parameters = self.update_platform_parameters(as_conf, parameters, self._platform, set_attributes)
+        parameters = self.update_platform_parameters(as_conf, parameters)
         parameters = self.update_current_parameters(as_conf, parameters)
         parameters = as_conf.deep_read_loops(parameters)
         parameters = as_conf.substitute_dynamic_variables(parameters, 25)
         parameters = self.update_job_parameters(as_conf, parameters, set_attributes)
-        parameters = self.update_platform_associated_parameters(as_conf, parameters, self._platform, parameters['CHUNK'], set_attributes)
+        parameters = self.update_platform_associated_parameters(as_conf, parameters, parameters['CHUNK'], set_attributes)
         parameters = self.update_wrapper_parameters(as_conf, parameters)
         if set_attributes:
             self.update_job_variables_final_values(parameters)

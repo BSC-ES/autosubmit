@@ -345,3 +345,23 @@ def test_sub_job_manager(current_structure):
     assert job_manager.subjobfixes is not None and type(job_manager.subjobfixes) is dict
     assert (job_manager.get_collection_of_fixes_applied() is not None
             and type(job_manager.get_collection_of_fixes_applied()) is dict)
+
+
+def test_update_parameters_reset_logs(autosubmit_config, tmpdir):
+    # TODO This experiment_data (aside from WORKFLOW_COMMIT and maybe JOBS) could be a good candidate for a fixture in the conf_test. "basic functional configuration"
+    as_conf = autosubmit_config(
+        expid='a000',
+        experiment_data={
+            'AUTOSUBMIT': {'WORKFLOW_COMMIT': 'dummy'},
+            'PLATFORMS': {'DUMMY_P': {'TYPE': 'ps'}},
+            'JOBS': {'DUMMY_S': {'FILE': 'dummy.sh', 'PLATFORM': 'DUMMY_P'}},
+            'DEFAULT': {'HPCARCH': 'DUMMY_P'},
+        }
+    )
+    job = Job('DUMMY', '1', 0, 1)
+    job.section = 'DUMMY_S'
+    job.log_recovered = True
+    job.packed_during_building = True
+    job.workflow_commit = "incorrect"
+    job.update_parameters(as_conf, set_attributes=True, reset_logs=True)
+    assert job.workflow_commit == "dummy"
