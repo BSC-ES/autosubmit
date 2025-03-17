@@ -47,7 +47,7 @@ class ExperimentHistory:
                 'jobdata_dir_path': BasicConfig.JOBDATA_DIR,
                 'schema': self.expid
             }
-            self.manager = create_experiment_history_db_manager(**options)
+            self.manager = create_experiment_history_db_manager(BasicConfig.DATABASE_BACKEND, **options)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
