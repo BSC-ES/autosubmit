@@ -450,8 +450,9 @@ class ExperimentHistoryDatabaseManager(Protocol):
 
 
 def create_experiment_history_db_manager(
-    db_engine: str, **options: Any
+    db_engine: str, **options: Any  # noqa: F841
 ) -> ExperimentHistoryDatabaseManager:
+  # pylint: disable=W0613
   return cast(ExperimentHistoryDatabaseManager, ExperimentHistoryDbManager(
     options['schema'],
     options.get('jobdata_dir_path', DEFAULT_JOBDATA_DIR)
