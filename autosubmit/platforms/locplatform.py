@@ -68,6 +68,9 @@ class LocalPlatform(ParamikoPlatform):
 
         self.update_cmds()
 
+    def create_a_new_copy(self):
+        return LocalPlatform(self.expid, self.name, self.config)
+
     def update_cmds(self):
         """
         Updates commands for platforms

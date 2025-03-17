@@ -47,22 +47,22 @@ classifiers = [
 
 dependencies = [
     "xlib==0.21",
-    "setuptools<=68.2.2",
+    "setuptools<=76.0.0",
     "bscearth.utils<=0.5.2",
-    "requests<=2.31.0",
+    "requests<=2.32.3",
     "networkx<=2.6.3",
     "portalocker<=2.7.0",
     "paramiko>=3.5.0",
-    "pyparsing==3.1.1",
+    "pyparsing==3.2.1",
     "matplotlib<=3.8.3",
-    "packaging<=23.2",
+    "packaging<=24.2",
     "typing_extensions==4.*",
     "typing<=3.7.4.3",
     "psutil<=7.0.0",
     "py3dotplus==1.1.0",
     "numpy<2",
     "rocrate==0.*",
-    "autosubmitconfigparser==1.0.77",
+    "autosubmitconfigparser==1.0.78rc2",
     "configparser",
     "setproctitle",
     "invoke>=2.0"
@@ -81,29 +81,29 @@ readme = {file = "README_PIP.md"}
 [project.optional-dependencies]
 postgres = ["psycopg2"]
 tests = [
-    "pytest==8.2.*",
+    "pytest>=8.2,<8.4",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.6.2"
+    "ruff==0.9.10"
     # 'testcontainers'  # TODO: pending Postgres MR
 ]
 docs = [
     "livereload",
     "pydata-sphinx-theme==0.15.*",
-    "sphinx==5.*",
-    "sphinx-autobuild==2021.3.*",
+    "sphinx>=5,<9",
+    "sphinx-autobuild>=2021.3,<2024.11",
     "sphinx_rtd_theme",
     "sphinx-reredirects==0.1.*"
 ]
 all = ["psycopg2",
-    "pytest==8.2.*",
+    "pytest>=8.2,<8.4",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.6.2",
+    "ruff==0.9.10",
     "livereload",
     "pydata-sphinx-theme==0.15.*",
-    "sphinx==5.*",
-    "sphinx-autobuild==2021.3.*",
+    "sphinx>=5,<9",
+    "sphinx-autobuild>=2021.3,<2024.11",
     "sphinx_rtd_theme",
     "sphinx-reredirects==0.1.*"
 ]

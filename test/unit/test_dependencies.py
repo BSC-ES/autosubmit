@@ -53,8 +53,8 @@ class TestJobList(unittest.TestCase):
         self.as_conf.jobs_data = self.as_conf.experiment_data["JOBS"]
         self.as_conf.experiment_data["PLATFORMS"] = dict()
         self.temp_directory = tempfile.mkdtemp()
-        self.JobList = JobList(self.experiment_id, FakeBasicConfig, YAMLParserFactory(),
-                               JobListPersistenceDb(self.temp_directory, 'db'), self.as_conf)
+        self.JobList = JobList(self.experiment_id, self.as_conf, YAMLParserFactory(),
+                               JobListPersistenceDb(self.temp_directory, 'db'))
         self.date_list = ["20020201", "20020202", "20020203", "20020204", "20020205", "20020206", "20020207",
                           "20020208", "20020209", "20020210"]
         self.member_list = ["fc1", "fc2", "fc3", "fc4", "fc5", "fc6", "fc7", "fc8", "fc9", "fc10"]
@@ -745,10 +745,9 @@ def test_normalize_auto_keyword(autosubmit_config, mocker):
     })
     job_list = JobList(
         as_conf.expid,
-        FakeBasicConfig,
+        as_conf,
         YAMLParserFactory(),
-        Autosubmit._get_job_list_persistence(as_conf.expid, as_conf),
-        as_conf
+        Autosubmit._get_job_list_persistence(as_conf.expid, as_conf)
     )
     dependency = Dependency("test")
 
@@ -809,8 +808,9 @@ def test_normalize_auto_keyword(autosubmit_config, mocker):
     as_conf.experiment_data["JOBS"][job.section] = {}
     as_conf.experiment_data["JOBS"][job.section]["SPLITS"] = "auto"
     job.date = None
-    mocker.patch("autosubmit.job.job.Job.calendar_split", side_effect=lambda x, y: y)
-    parameters = job.update_job_parameters(as_conf, {})
+    mocker.patch("autosubmit.job.job.Job.calendar_split", side_effect=lambda x, y, z: y)
+    parameters = as_conf.load_parameters()
+    parameters = job.update_job_parameters(as_conf, parameters, True)
     assert job.splits == "50"
     assert parameters["SPLITS"] == "50"
 

@@ -64,6 +64,8 @@ def generate_new_experiment(create_autosubmit_tmpdir, request):
     test_type = request.param
     # Setup code that depends on the expid parameter
     expid = init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=None, create=True, test_type=test_type)
+    Path(f"{BasicConfig.STRUCTURES_DIR}/structure_{expid}.db").touch()
+
     yield expid
 
 
@@ -116,12 +118,12 @@ EXPERIMENT:
     yield expid
 
 
-@pytest.mark.parametrize("generate_new_experiment", ['test', 'normal', 'operational'], indirect=True)
+@pytest.mark.parametrize("generate_new_experiment", ['test', 'normal', 'operational', 'evaluation'], indirect=True)
 def test_expid_generated_correctly(create_autosubmit_tmpdir, generate_new_experiment, setup_experiment_yamlfiles):
     expid = generate_new_experiment
     print(f"Running test for {expid}")
     Autosubmit.inspect(expid=f'{expid}', check_wrapper=True, force=True, lst=None, filter_chunks=None, filter_status=None, filter_section=None)
-    assert expid in ['t000', 'a000', 'o000']
+    assert expid in ['t000', 'a000', 'o000', 'e000']
     assert f"{expid}_DEBUG.cmd" in [Path(f).name for f in Path(f"{create_autosubmit_tmpdir.strpath}/{expid}/tmp").iterdir()]
     # Consult if the expid is in the database
     db_path = Path(f"{create_autosubmit_tmpdir.strpath}/tests.db")
@@ -132,7 +134,7 @@ def test_expid_generated_correctly(create_autosubmit_tmpdir, generate_new_experi
     cursor.close()
 
 
-@pytest.mark.parametrize("generate_new_experiment", ['test', 'normal', 'operational'], indirect=True)
+@pytest.mark.parametrize("generate_new_experiment", ['test', 'normal', 'operational', 'evaluation'], indirect=True)
 def test_delete_experiment(create_autosubmit_tmpdir, generate_new_experiment, setup_experiment_yamlfiles):
     expid = generate_new_experiment
     print(f"Running test for {expid}")
@@ -153,7 +155,7 @@ def test_delete_experiment(create_autosubmit_tmpdir, generate_new_experiment, se
         Autosubmit.delete(expid=f'{expid}', force=True)
 
 
-@pytest.mark.parametrize("generate_new_experiment", ['test', 'normal', 'operational'], indirect=True)
+@pytest.mark.parametrize("generate_new_experiment", ['test', 'normal', 'operational', 'evaluation'], indirect=True)
 def test_delete_experiment_not_owner(create_autosubmit_tmpdir, generate_new_experiment, setup_experiment_yamlfiles, mocker):
     expid = generate_new_experiment
     print(f"Running test for {expid}")
@@ -207,6 +209,8 @@ def test_perform_deletion(create_autosubmit_tmpdir, generate_new_experiment, set
     experiment_path = Path(f"{basic_config.LOCAL_ROOT_DIR}/{expid}")
     structure_db_path = Path(f"{basic_config.STRUCTURES_DIR}/structure_{expid}.db")
     job_data_db_path = Path(f"{basic_config.JOBDATA_DIR}/job_data_{expid}")
+    if all("tmp" not in path for path in [str(experiment_path), str(structure_db_path), str(job_data_db_path)]):
+        raise AutosubmitCritical("tmp not in path")
     mocker.patch("autosubmit.autosubmit.delete_experiment", side_effect=FileNotFoundError)
     err_message = Autosubmit._perform_deletion(experiment_path, structure_db_path, job_data_db_path, expid)
     assert all(x in err_message for x in ["Cannot delete experiment entry", "Cannot delete directory", "Cannot delete structure", "Cannot delete job_data"])

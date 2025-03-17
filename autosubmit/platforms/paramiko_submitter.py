@@ -78,8 +78,6 @@ class ParamikoSubmitter(Submitter):
         :rtype: dict
         """
         exp_data = asconf.experiment_data
-        config = BasicConfig().props()
-        config.update(exp_data)
         raise_message=""
         platforms_used = list()
         hpcarch = asconf.get_platform()
@@ -104,7 +102,7 @@ class ParamikoSubmitter(Submitter):
         platforms = dict()
 
         # Build Local Platform Object
-        local_platform = LocalPlatform(asconf.expid, 'local', config, auth_password = local_auth_password)
+        local_platform = LocalPlatform(asconf.expid, 'local', exp_data, auth_password = local_auth_password)
         local_platform.max_wallclock = asconf.get_max_wallclock()
         local_platform.max_processors = asconf.get_max_processors()
         local_platform.max_waiting_jobs = asconf.get_max_waiting_jobs()
@@ -132,26 +130,25 @@ class ParamikoSubmitter(Submitter):
             try:
                 if platform_type == 'pbs':
                     remote_platform = PBSPlatform(
-                        asconf.expid, section, config, platform_version)
+                        asconf.expid, section, exp_data, platform_version)
                 elif platform_type == 'sge':
                     remote_platform = SgePlatform(
-                        asconf.expid, section, config)
+                        asconf.expid, section, exp_data)
                 elif platform_type == 'ps':
                     remote_platform = PsPlatform(
-                        asconf.expid, section, config)
+                        asconf.expid, section, exp_data)
                 elif platform_type == 'ecaccess':
                     remote_platform = EcPlatform(
-                        asconf.expid, section, config, platform_version)
+                        asconf.expid, section, exp_data, platform_version)
                 elif platform_type == 'slurm':
                     remote_platform = SlurmPlatform(
-                        asconf.expid, section, config, auth_password = auth_password)
+                        asconf.expid, section, exp_data, auth_password = auth_password)
                 elif platform_type == 'pjm':
                     remote_platform = PJMPlatform(
-                        asconf.expid, section, config)
+                        asconf.expid, section, exp_data)
                 else:
                     platform_type_value = platform_type or "<not defined>"
                     raise AutosubmitCritical(f"PLATFORMS.{section.upper()}.TYPE: {platform_type_value} for {section.upper()} is not supported", 7012)
-                remote_platform.main_process_id = os.getpid()
             except ParamikoPlatformException as e:
                 Log.error("Queue exception: {0}".format(str(e)))
                 return None
