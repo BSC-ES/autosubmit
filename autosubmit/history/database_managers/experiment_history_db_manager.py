@@ -154,8 +154,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
 
     def create_historical_database(self):
         """ Creates the historical database with the latest changes. """
-        self.execute_statement_on_dbfile(self.historicaldb_file_path,
-                                         self.create_table_header_query)
+        self.execute_statement_on_dbfile(self.historicaldb_file_path, self.create_table_header_query)
         self.execute_statement_on_dbfile(self.historicaldb_file_path, self.create_table_query)
         self.execute_statement_on_dbfile(self.historicaldb_file_path, self.create_index_query)
         self._set_historical_pragma_version(CURRENT_DB_VERSION)
@@ -257,12 +256,12 @@ class ExperimentHistoryDbManager(DatabaseManager):
                                                     "last=1 and job_name=? ORDER BY counter DESC")
         arguments = (job_name,)
         job_data_rows_last = self.get_from_statement_with_arguments(
-          self.historicaldb_file_path, statement, arguments)
+            self.historicaldb_file_path, statement, arguments)
         if not job_data_rows_last:  # if previous job didn't finished but a new create has been made
             statement = self.get_built_select_statement("job_data",
-                                                   "last=0 and job_name=? ORDER BY counter DESC")
+                                                        "last=0 and job_name=? ORDER BY counter DESC")
             job_data_rows_last = self.get_from_statement_with_arguments(
-              self.historicaldb_file_path, statement, arguments)
+                self.historicaldb_file_path, statement, arguments)
         return [Models.JobDataRow(*row) for row in job_data_rows_last]
 
     def get_job_data_dcs_last_by_run_id(self, run_id):
@@ -272,18 +271,17 @@ class ExperimentHistoryDbManager(DatabaseManager):
     def _get_job_data_last_by_run_id(self, run_id):
         """ Get List of Models.JobDataRow for last=1 and run_id """
         statement = self.get_built_select_statement("job_data",
-                                              "run_id=? and last=1 and rowtype >= 2 ORDER BY id")
+                                                    "run_id=? and last=1 and rowtype >= 2 ORDER BY id")
         arguments = (run_id,)
         job_data_rows = self.get_from_statement_with_arguments(
-          self.historicaldb_file_path, statement, arguments)
+            self.historicaldb_file_path, statement, arguments)
         return [Models.JobDataRow(*row) for row in job_data_rows]
 
     def get_job_data_dcs_last_by_wrapper_code(self, wrapper_code):
         if wrapper_code and wrapper_code > 2:
             return [JobData.from_model(row)
                     for row in self._get_job_data_last_by_wrapper_code(wrapper_code)]
-        else:
-            return []
+        return []
 
     def _get_job_data_last_by_wrapper_code(self, wrapper_code):
         """ Get List of Models.JobDataRow for last=1 and rowtype=wrapper_code """
@@ -323,7 +321,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
                      job_data.run_id, job_data.MaxRSS, job_data.AveRSS, job_data.out, job_data.err,
                      job_data.rowstatus, job_data.children, job_data.platform_output)
         return self.insert_statement_with_arguments(
-          self.historicaldb_file_path, statement, arguments)
+            self.historicaldb_file_path, statement, arguments)
 
     def _insert_experiment_run(self, experiment_run):
         """ Insert data class ExperimentRun into database """
@@ -337,7 +335,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
                      experiment_run.failed, experiment_run.queuing, experiment_run.running,
                      experiment_run.submitted, experiment_run.suspended, experiment_run.metadata)
         return self.insert_statement_with_arguments(
-          self.historicaldb_file_path, statement, arguments)
+            self.historicaldb_file_path, statement, arguments)
 
     def update_many_job_data_change_status(self, changes):
         # type : (List[Tuple]) -> None
@@ -347,7 +345,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
         """
         statement = ''' UPDATE job_data SET modified=?, status=?, rowstatus=?  WHERE id=? '''
         self.execute_many_statement_with_arguments_on_dbfile(
-          self.historicaldb_file_path, statement, changes)
+            self.historicaldb_file_path, statement, changes)
 
     def _update_job_data_by_id(self, job_data_dc: Any) -> None:
         """
@@ -366,13 +364,13 @@ class ExperimentHistoryDbManager(DatabaseManager):
                     nnodes=?, ncpus=?, rowstatus=?, out=?, err=?, 
                     children=?, platform_output=?, id=? WHERE id=?'''
         arguments = (
-        job_data_dc.last, job_data_dc.submit, job_data_dc.start, job_data_dc.finish,
-        HUtils.get_current_datetime(), job_data_dc.job_id, job_data_dc.status, job_data_dc.energy,
-        job_data_dc.extra_data, job_data_dc.nnodes, job_data_dc.ncpus, job_data_dc.rowstatus,
-        job_data_dc.out, job_data_dc.err, job_data_dc.children, job_data_dc.platform_output,
-        job_data_dc._id, job_data_dc._id)
+            job_data_dc.last, job_data_dc.submit, job_data_dc.start, job_data_dc.finish,
+            HUtils.get_current_datetime(), job_data_dc.job_id, job_data_dc.status, job_data_dc.energy,
+            job_data_dc.extra_data, job_data_dc.nnodes, job_data_dc.ncpus, job_data_dc.rowstatus,
+            job_data_dc.out, job_data_dc.err, job_data_dc.children, job_data_dc.platform_output,
+            job_data_dc._id, job_data_dc._id)
         self.execute_statement_with_arguments_on_dbfile(
-          self.historicaldb_file_path, statement, arguments)
+            self.historicaldb_file_path, statement, arguments)
 
     def _update_experiment_run(self, experiment_run_dc):
         """
@@ -390,15 +388,15 @@ class ExperimentHistoryDbManager(DatabaseManager):
                      experiment_run_dc.suspended, HUtils.get_current_datetime(),
                      experiment_run_dc.run_id)
         self.execute_statement_with_arguments_on_dbfile(
-          self.historicaldb_file_path, statement, arguments)
+            self.historicaldb_file_path, statement, arguments)
 
     def _get_job_data_last_by_run_id_and_finished(self, run_id):
         """ Get List of Models.JobDataRow for last=1, finished > 0 and run_id   """
         statement = self.get_built_select_statement("job_data",
-                             "run_id=? and last=1 and finish > 0 and rowtype >= 2 ORDER BY id")
+                                                    "run_id=? and last=1 and finish > 0 and rowtype >= 2 ORDER BY id")
         arguments = (run_id,)
         job_data_rows = self.get_from_statement_with_arguments(
-          self.historicaldb_file_path, statement, arguments)
+            self.historicaldb_file_path, statement, arguments)
         return [Models.JobDataRow(*row) for row in job_data_rows]
 
     def get_job_data_by_job_id_name(self, job_id: int, job_name: str) -> JobData:
@@ -416,7 +414,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
                                                     "job_id=? AND job_name=? ORDER BY counter")
         arguments = (int(job_id), str(job_name),)
         job_data_rows = self.get_from_statement_with_arguments(
-          self.historicaldb_file_path, statement, arguments)
+            self.historicaldb_file_path, statement, arguments)
         models = [Models.JobDataRow(*row) for row in job_data_rows][-1]
         return JobData.from_model(models)
 
@@ -435,14 +433,14 @@ class ExperimentHistoryDbManager(DatabaseManager):
         statement = ''' DELETE FROM job_data WHERE id=? '''
         arguments = (id_,)
         self.execute_statement_with_arguments_on_dbfile(
-          self.historicaldb_file_path, statement, arguments)
+            self.historicaldb_file_path, statement, arguments)
 
     def delete_experiment_run(self, run_id):
         """ Deletes row in experiment_run by run_id. Useful for testing. """
         statement = ''' DELETE FROM experiment_run where run_id=? '''
         arguments = (run_id,)
         self.execute_statement_with_arguments_on_dbfile(
-          self.historicaldb_file_path, statement, arguments)
+            self.historicaldb_file_path, statement, arguments)
 
     def _set_historical_pragma_version(self, version=10):
         """ Sets the pragma version. """
@@ -453,7 +451,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
         """ Gets current pragma version as int. """
         statement = "pragma user_version;"
         pragma_result = self.get_from_statement(
-          self.historicaldb_file_path, statement)
+            self.historicaldb_file_path, statement)
         if len(pragma_result) <= 0:
             raise Exception(
                 "Error while getting the pragma version."
