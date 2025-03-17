@@ -1090,7 +1090,6 @@ CONFIG:
         self.assertEqual("FALSE", parameters['CHUNK_FIRST'])
         self.assertEqual("FALSE", parameters['CHUNK_LAST'])
 
-
     def test_get_from_total_stats(self):
         # arrange
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1114,7 +1113,17 @@ CONFIG:
 
             lst = self.job._get_from_total_stats(1)
 
-        assert len(lst) > 0
+        assert len(lst) == 3
+
+        fmt = '%Y-%m-%d %H:%M'
+        expected = [
+            datetime.datetime(1998, 1, 1, 0, 0),
+            datetime.datetime(1998, 3, 1, 0, 0),
+            datetime.datetime(1998, 3, 24, 0, 0)
+        ]
+
+        for left, right in zip(lst, expected):
+            assert left.strftime(fmt) == right.strftime(fmt)
 
     def test_sdate(self):
         """Test that the property getter for ``sdate`` works as expected."""
