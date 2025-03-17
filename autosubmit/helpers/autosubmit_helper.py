@@ -92,18 +92,13 @@ def handle_start_after(start_after: str, expid: str) -> None:
         while True:
             # Query current run
             current_run = exp_history.manager.get_experiment_run_dc_with_max_id()
-            if (current_run and current_run.finish > 0 and
+            if (current_run is not None and current_run.finish > 0 and
                     0 < current_run.total == current_run.completed + current_run.suspended):
                 break
             else:
                 sys.stdout.write(
-                    "\rExperiment {0} ({1} total jobs) status {2}/{3}/{4}/{5}/{6}".format(start_after,
-                                                                                          current_run.total,
-                                                                                          current_run.completed,
-                                                                                          current_run.queuing,
-                                                                                          current_run.running,
-                                                                                          current_run.suspended,
-                                                                                          current_run.failed))
+                    f"\rExperiment {start_after} ({current_run.total} total jobs) status {current_run.completed}/"
+                    f"{current_run.queuing}/{current_run.running}/{current_run.suspended}/{current_run.failed}")
                 sys.stdout.flush()
             # Update every 60 seconds
             sleep(60)
