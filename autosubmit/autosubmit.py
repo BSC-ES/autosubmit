@@ -97,17 +97,29 @@ sys.path.insert(0, os.path.abspath('.'))
 # noinspection PyUnusedLocal
 
 
-def signal_handler():
+def signal_handler(signal_received, frame):
+    # Disable all the no-member violations in this function
+    # pylint: disable=W0613
     """
     Used to handle interrupt signals, allowing autosubmit to clean before exit
+
+    :param signal_received:
+    :param frame:
+    :return:
     """
     Log.info('Autosubmit will interrupt at the next safe occasion')
     Autosubmit.exit = True
 
 
-def signal_handler_create():
+def signal_handler_create(signal_received, frame):
+    # Disable all the no-member violations in this function
+    # pylint: disable=W0613
     """
     Used to handle KeyboardInterrupt signals while the create method is being executed
+
+    :param signal_received:
+    :param frame:
+    :return:
     """
     raise AutosubmitCritical(
         'Autosubmit has been closed in an unexpected way. Killed or control + c.', 7010)
@@ -120,7 +132,7 @@ class MyParser(argparse.ArgumentParser):
         sys.exit(2)
 
 class CancelAction(argparse.Action):
-    def __call__(self, parser, namespace, values):
+    def __call__(self, parser, namespace, values, option_string=None): # pylint: disable=no-member
         setattr(namespace, self.dest, True)
         if namespace.filter_status.upper() == "SUBMITTED, QUEUING, RUNNING " or namespace.target.upper() == "FAILED":
             pass
