@@ -97,21 +97,27 @@ sys.path.insert(0, os.path.abspath('.'))
 # noinspection PyUnusedLocal
 
 
-def signal_handler(signal_received, frame):
+def signal_handler(signal_received, frame):  # noqa: F841
+    # Disable all the no-member violations in this function
+    # pylint: disable=W0613
     """
     Used to handle interrupt signals, allowing autosubmit to clean before exit
     :param signal_received:
     :param frame:
+    :return:
     """
     Log.info('Autosubmit will interrupt at the next safe occasion')
     Autosubmit.exit = True
 
 
-def signal_handler_create(signal_received, frame):
+def signal_handler_create(signal_received, frame):  # noqa: F841
+    # Disable all the no-member violations in this function
+    # pylint: disable=W0613
     """
     Used to handle KeyboardInterrupt signals while the create method is being executed
     :param signal_received:
     :param frame:
+    :return:
     """
     raise AutosubmitCritical(
         'Autosubmit has been closed in an unexpected way. Killed or control + c.', 7010)
@@ -124,7 +130,7 @@ class MyParser(argparse.ArgumentParser):
         sys.exit(2)
 
 class CancelAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
+    def __call__(self, parser, namespace, values, option_string=None):  # noqa: F841
         setattr(namespace, self.dest, True)
         if namespace.filter_status.upper() == "SUBMITTED, QUEUING, RUNNING " or namespace.target.upper() == "FAILED":
             pass
@@ -2770,7 +2776,7 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def statistics(expid, filter_type, filter_period, file_format, section_summary, jobs_summary, hide, notransitive=False, db = False):
+    def statistics(expid, filter_type, filter_period, file_format, section_summary, jobs_summary, hide, notransitive=False):
         """
         Plots statistics graph for a given experiment.
         Plot is created in experiment's plot folder with name <expid>_<date>_<time>.<file_format>
@@ -2789,8 +2795,6 @@ class Autosubmit:
         :type hide: bool
         :param notransitive: Reduces workflow linkage complexity
         :type hide: bool
-        :param db: Use database to get the statistics
-        :type db: bool
         """
         from .monitor.monitor import Monitor
 
