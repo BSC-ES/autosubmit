@@ -18,25 +18,28 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """ Test file for autosubmit/autosubmit.py """
-from typing import Callable
 
-import pytest
 from mock.mock import MagicMock, patch
-
 from autosubmit.autosubmit import Autosubmit
 
 def build_db_mock(current_experiment_id, mock_db_common):
+    """
+    function to help to connect with the database
+
+    :param current_experiment_id:
+    :param mock_db_common:
+    :return:
+    """
     mock_db_common.last_name_used = MagicMock(return_value=current_experiment_id)
     mock_db_common.check_experiment_exists = MagicMock(return_value=False)
 
 
 @patch('autosubmit.experiment.experiment_common.db_common')
-def test_expid(db_common_mock, autosubmit_config: Callable, tmp_path) -> None:
+def test_expid(db_common_mock, tmp_path) -> None:
     """
     Function to test if the autosubmit().expid generates the paths and expid properly
 
     :param db_common_mock: Mock of the db_common
-    :param autosubmit_config: autosubmit_config
     :param tmp_path: Path
     :return: None
     """
