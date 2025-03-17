@@ -25,16 +25,23 @@ from mock.mock import MagicMock, patch
 
 from autosubmit.autosubmit import Autosubmit
 
+def build_db_mock(current_experiment_id, mock_db_common):
+    mock_db_common.last_name_used = MagicMock(return_value=current_experiment_id)
+    mock_db_common.check_experiment_exists = MagicMock(return_value=False)
 
 
-def test_expid(autosubmit_config: Callable, tmp_path) -> None:
+@patch('autosubmit.experiment.experiment_common.db_common')
+def test_expid(db_common_mock, autosubmit_config: Callable, tmp_path) -> None:
     """
     Function to test if the autosubmit().expid generates the paths and expid properly
 
+    :param db_common_mock: Mock of the db_common
     :param autosubmit_config: autosubmit_config
     :param tmp_path: Path
     :return: None
     """
+    current_experiment_id = "empty"
+    build_db_mock(current_experiment_id, db_common_mock)
     with patch('autosubmit.autosubmit.BasicConfig', MagicMock()) as fake_basic_config:
         # act
         fake_basic_config.STRUCTURES_DIR = fake_basic_config.LOCAL_ROOT_DIR = str(tmp_path)
