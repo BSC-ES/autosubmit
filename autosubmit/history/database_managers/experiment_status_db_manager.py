@@ -180,7 +180,7 @@ class ExperimentStatusDatabaseManager(Protocol):
 
 
 def create_experiment_status_db_manager(
-    db_engine: str, **options # noqa: F841
+        db_engine: str, **options  # noqa: F841
 ) -> ExperimentStatusDatabaseManager:
     # pylint: disable=W0613
     """
