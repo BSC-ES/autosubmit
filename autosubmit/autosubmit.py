@@ -97,7 +97,7 @@ sys.path.insert(0, os.path.abspath('.'))
 # noinspection PyUnusedLocal
 
 
-def signal_handler(signal_received, frame): # noqa: F841
+def signal_handler(signal_received, frame):  # noqa: F841
     # Disable all the no-member violations in this function
     # pylint: disable=W0613
     """
@@ -111,7 +111,7 @@ def signal_handler(signal_received, frame): # noqa: F841
     Autosubmit.exit = True
 
 
-def signal_handler_create(signal_received, frame): # noqa: F841
+def signal_handler_create(signal_received, frame):  # noqa: F841
     # Disable all the no-member violations in this function
     # pylint: disable=W0613
     """
@@ -132,7 +132,7 @@ class MyParser(argparse.ArgumentParser):
         sys.exit(2)
 
 class CancelAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None): # noqa: F841
+    def __call__(self, parser, namespace, values, option_string=None):  # noqa: F841
         setattr(namespace, self.dest, True)
         if namespace.filter_status.upper() == "SUBMITTED, QUEUING, RUNNING " or namespace.target.upper() == "FAILED":
             pass
