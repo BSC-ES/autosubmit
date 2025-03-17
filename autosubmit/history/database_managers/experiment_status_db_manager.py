@@ -162,8 +162,9 @@ class ExperimentStatusDatabaseManager(Protocol):
 
 
 def create_experiment_status_db_manager(
-    **options
+    db_engine: str, **options # noqa: F841
 ) -> ExperimentStatusDatabaseManager:
+    # pylint: disable=W0613
     """
     Creates a Postgres or SQLite database manager based on the Autosubmit configuration.
     Note that you must provide the options even if they are optional, in which case
