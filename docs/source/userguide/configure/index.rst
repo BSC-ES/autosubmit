@@ -352,6 +352,8 @@ There are some other parameters that you may need to specify:
 
 * TOTAL_JOBS: maximum number of jobs to be running at the same time in this platform.
 
+* LOG_RECOVERY_QUEUE_SIZE: A memory-consumption optimization for the recovery of logs. If not specified, defaults to max(100,TOTAL_JOBS) * 2, in case of issues with the recovery of logs, you can increase this value.
+
 * CUSTOM_DIRECTIVES: Custom directives for the resource manager of this platform.
 
 

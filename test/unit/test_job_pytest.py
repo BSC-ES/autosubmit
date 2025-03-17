@@ -28,8 +28,8 @@ def create_job_and_update_parameters(autosubmit_config, experiment_data, platfor
         platform = SlurmPlatform(expid='test-expid', name='DUMMY_PLATFORM', config=as_conf.experiment_data)
     job.section = 'RANDOM-SECTION'
     job.platform = platform
-    job.update_parameters(as_conf, as_conf.load_parameters())
-    return job, as_conf
+    parameters = job.update_parameters(as_conf, set_attributes=True)
+    return job, as_conf, parameters
 
 
 @pytest.mark.parametrize('experiment_data, expected_data', [(
@@ -64,9 +64,9 @@ def create_job_and_update_parameters(autosubmit_config, experiment_data, platfor
     }
 )])
 def test_update_parameters_current_variables(autosubmit_config, experiment_data, expected_data):
-    job,_ = create_job_and_update_parameters(autosubmit_config, experiment_data)
+    _,_, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data)
     for key, value in expected_data.items():
-        assert job.parameters[key] == value
+        assert parameters[key] == value
 
 
 @pytest.mark.parametrize('test_with_file, file_is_empty, last_line_empty', [
@@ -154,36 +154,10 @@ def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greate
     {'notify_on': ['COMPLETED']}
 )])
 def test_update_parameters_attributes(autosubmit_config, experiment_data, attributes_to_check):
-    job, _ = create_job_and_update_parameters(autosubmit_config, experiment_data)
+    job, _, _ = create_job_and_update_parameters(autosubmit_config, experiment_data)
     for attr in attributes_to_check:
         assert hasattr(job, attr)
         assert getattr(job, attr) == attributes_to_check[attr]
-
-
-@pytest.mark.parametrize('test_packed', [
-    False,
-    True,
-], ids=["Simple job", "Wrapped job"])
-def test_adjust_new_parameters(test_packed):
-    job = Job('dummy', '1', 0, 1)
-    stored_log_path = job._log_path
-    job.wallclock = "00:01"
-    del job.is_wrapper
-    del job.wrapper_name
-    del job._wallclock_in_seconds
-    del job._log_path
-    del job.ready_date
-    job.packed = test_packed
-    job._adjust_new_parameters()
-    assert job.ready_date is None
-    assert job.is_wrapper == test_packed
-    assert int(job._wallclock_in_seconds) == int(60*1.3)
-    if test_packed:
-        assert job.wrapper_name == "wrapped"
-    else:
-        assert job.wrapper_name == "dummy"
-    assert job._log_path == stored_log_path
-
 
 @pytest.mark.parametrize('custom_directives, test_type, result_by_lines', [
     ("test_str a", "platform", ["test_str a"]),
@@ -246,9 +220,9 @@ def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines
     elif test_type == "current_directive":
         experiment_data['PLATFORMS']['dummy_platform']['APP_CUSTOM_DIRECTIVES'] = custom_directives
         experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = "%CURRENT_APP_CUSTOM_DIRECTIVES%"
-    job, as_conf = create_job_and_update_parameters(autosubmit_config, experiment_data, "slurm")
+    job, as_conf, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data, "slurm")
     mocker.patch('autosubmitconfigparser.config.configcommon.AutosubmitConfig.reload')
-    template_content, _ = job.update_content(as_conf)
+    template_content, _ = job.update_content(as_conf, parameters)
     for directive in result_by_lines:
         pattern = r'^\s*' + re.escape(directive) + r'\s*$' # Match Start line, match directive, match end line
         assert re.search(pattern, template_content, re.MULTILINE) is not None
@@ -278,11 +252,11 @@ def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines
     }
 )], ids=["Simple job"])
 def test_no_start_time(autosubmit_config, experiment_data):
-    job, as_conf = create_job_and_update_parameters(autosubmit_config, experiment_data)
+    job, as_conf, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data)
     del job.start_time
     as_conf.force_load = False
     as_conf.data_changed = False
-    job.update_parameters(as_conf, job.parameters)
+    job.update_parameters(as_conf, set_attributes=True)
     assert isinstance(job.start_time, datetime)
 
 
@@ -371,4 +345,3 @@ def test_sub_job_manager(current_structure):
     assert job_manager.subjobfixes is not None and type(job_manager.subjobfixes) is dict
     assert (job_manager.get_collection_of_fixes_applied() is not None
             and type(job_manager.get_collection_of_fixes_applied()) is dict)
-

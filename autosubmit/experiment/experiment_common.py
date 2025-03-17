@@ -25,7 +25,7 @@ import autosubmit.database.db_common as db_common
 from log.log import Log,AutosubmitCritical
 Log.get_logger("Autosubmit")
 
-def new_experiment(description, version, test=False, operational=False):
+def new_experiment(description, version, test=False, operational=False, evaluation=False):
     """
     Stores a new experiment on the database and generates its identifier
 
@@ -44,6 +44,8 @@ def new_experiment(description, version, test=False, operational=False):
         last_exp_name = db_common.last_name_used(True)
     elif operational:
         last_exp_name = db_common.last_name_used(False, True)
+    elif evaluation:
+        last_exp_name = db_common.last_name_used(False, False, True)
     else:
         last_exp_name = db_common.last_name_used()
     if last_exp_name == '':
@@ -55,6 +57,9 @@ def new_experiment(description, version, test=False, operational=False):
         elif operational:
             # operational identifier restricted also to 4 characters.
             new_name = 'o000'
+        elif evaluation:
+            # evaluation identifier restricted also to 4 characters.
+            new_name = 'e000'
         else:
             new_name = 'a000'
     else:
@@ -71,7 +76,7 @@ def new_experiment(description, version, test=False, operational=False):
     return new_name
 
 
-def copy_experiment(experiment_id, description, version, test=False, operational=False):
+def copy_experiment(experiment_id, description, version, test=False, operational=False, evaluation=False):
     """
     Creates a new experiment by copying an existing experiment
 
@@ -85,12 +90,14 @@ def copy_experiment(experiment_id, description, version, test=False, operational
     :type test: bool
     :param operational: specifies if it is an operational experiment
     :type operational: bool
+    :param evaluation: specifies if it is an evaluation experiment
+    :type evaluation: bool
     :return: experiment id for the new experiment
     :rtype: str
     """
     if not db_common.check_experiment_exists(experiment_id):
         return ''
-    new_name = new_experiment(description, version, test, operational)
+    new_name = new_experiment(description, version, test, operational, evaluation)
     return new_name
 
 

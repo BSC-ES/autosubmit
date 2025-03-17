@@ -230,7 +230,7 @@ def get_autosubmit_version(expid):
         proc.terminate()
     return result
 
-def last_name_used(test=False, operational=False):
+def last_name_used(test=False, operational=False, evaluation=False):
     """
     Gets last experiment identifier used. Anti-lock version.  
 
@@ -238,11 +238,13 @@ def last_name_used(test=False, operational=False):
     :type test: bool
     :param operational: flag for operational experiments
     :type test: bool
+    :param evaluation: flag for evaluation experiments
+    :type test: bool
     :return: last experiment identifier used, 'empty' if there is none
     :rtype: str
     """
     queue = multiprocessing.Queue(1)
-    proc = multiprocessing.Process(target=fn_wrapper, args=(_last_name_used, queue, test, operational))
+    proc = multiprocessing.Process(target=fn_wrapper, args=(_last_name_used, queue, test, operational, evaluation))
     proc.start()
 
     try:
@@ -451,13 +453,15 @@ def _get_autosubmit_version(expid):
 
 
 
-def _last_name_used(test=False, operational=False):
+def _last_name_used(test=False, operational=False, evaluation=False):
     """
     Gets last experiment identifier used
 
     :param test: flag for test experiments
     :type test: bool
     :param operational: flag for operational experiments
+    :type test: bool
+    :param evaluation: flag for evaluation experiments
     :type test: bool
     :return: last experiment identifier used, 'empty' if there is none
     :rtype: str
@@ -482,11 +486,17 @@ def _last_name_used(test=False, operational=False):
                        'WHERE rowid=(SELECT max(rowid) FROM experiment WHERE name LIKE "o%" AND '
                        'autosubmit_version IS NOT NULL AND '
                        'NOT (autosubmit_version LIKE "%3.0.0b%"))')
+    elif evaluation:
+        cursor.execute('SELECT name '
+                       'FROM experiment '
+                       'WHERE rowid=(SELECT max(rowid) FROM experiment WHERE name LIKE "e%" AND '
+                       'autosubmit_version IS NOT NULL AND '
+                       'NOT (autosubmit_version LIKE "%3.0.0b%"))')
     else:
         cursor.execute('SELECT name '
                        'FROM experiment '
                        'WHERE rowid=(SELECT max(rowid) FROM experiment WHERE name NOT LIKE "t%" AND '
-                       'name NOT LIKE "o%" AND autosubmit_version IS NOT NULL AND '
+                       'name NOT LIKE "o%" AND name NOT LIKE "e%" AND autosubmit_version IS NOT NULL AND '
                        'NOT (autosubmit_version LIKE "%3.0.0b%"))')
     row = cursor.fetchone()
     close_conn(conn, cursor)

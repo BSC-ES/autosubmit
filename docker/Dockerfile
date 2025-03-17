@@ -136,7 +136,7 @@ RUN micromamba install --yes --name base --channel conda-forge \
 ARG GIT_REF
 ARG AUTOSUBMIT_VERSION
 RUN if [ -n "${GIT_REF}" ] ; then \
-      pip install git+https://earth.bsc.es/gitlab/es/autosubmit.git@${GIT_REF}; \
+      pip install git+https://github.com/BSC-ES/autosubmit.git@${GIT_REF}; \
     elif [ -n "${AUTOSUBMIT_VERSION}" ] ; then \
       pip install autosubmit==${AUTOSUBMIT_VERSION}; \
     else \

@@ -24,7 +24,7 @@ class SlurmHeader(object):
     """Class to handle the SLURM headers of a job"""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_queue_directive(self, job, het=-1):
+    def get_queue_directive(self, job, parameters, het=-1):
         """
         Returns queue directive for the specified job
 
@@ -38,10 +38,11 @@ class SlurmHeader(object):
             if job.het['CURRENT_QUEUE'][het] != '':
                 return "SBATCH --qos={0}".format(job.het['CURRENT_QUEUE'][het])
         else:
-            if job.parameters['CURRENT_QUEUE'] != '':
-                return "SBATCH --qos={0}".format(job.parameters['CURRENT_QUEUE'])
+            if parameters['CURRENT_QUEUE'] != '':
+                return "SBATCH --qos={0}".format(parameters['CURRENT_QUEUE'])
         return ""
-    def get_proccesors_directive(self, job, het=-1):
+
+    def get_proccesors_directive(self, job, parameters, het=-1):
         """
         Returns processors directive for the specified job
 
@@ -55,7 +56,8 @@ class SlurmHeader(object):
                 job_nodes = 0
             else:
                 job_nodes = job.het['NODES'][het]
-            if len(job.het['PROCESSORS']) == 0 or job.het['PROCESSORS'][het] == '' or job.het['PROCESSORS'][het] == '1' and int(job_nodes) > 0:
+            if len(job.het['PROCESSORS']) == 0 or job.het['PROCESSORS'][het] == '' or job.het['PROCESSORS'][
+                het] == '1' and int(job_nodes) > 0:
                 return ""
             else:
                 return "SBATCH -n {0}".format(job.het['PROCESSORS'][het])
@@ -68,8 +70,7 @@ class SlurmHeader(object):
         else:
             return "SBATCH -n {0}".format(job.processors)
 
-
-    def get_tasks_directive(self,job, het=-1):
+    def get_tasks_directive(self, job, parameters, het=-1):
         """
         Returns tasks directive for the specified job
         :param job: job to create tasks directive for
@@ -80,10 +81,11 @@ class SlurmHeader(object):
             if job.het['TASKS'][het] != '':
                 return "SBATCH --ntasks-per-node={0}".format(job.het['TASKS'][het])
         else:
-            if job.parameters['TASKS'] != '':
-                return "SBATCH --ntasks-per-node={0}".format(job.parameters['TASKS'])
+            if parameters['TASKS'] != '':
+                return "SBATCH --ntasks-per-node={0}".format(parameters['TASKS'])
         return ""
-    def get_partition_directive(self, job, het=-1):
+
+    def get_partition_directive(self, job, parameters, het=-1):
         """
         Returns partition directive for the specified job
 
@@ -99,8 +101,9 @@ class SlurmHeader(object):
             if job.partition != '':
                 return "SBATCH --partition={0}".format(job.partition)
         return ""
+
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_account_directive(self, job, het=-1):
+    def get_account_directive(self, job, parameters, het=-1):
         """
         Returns account directive for the specified job
 
@@ -113,11 +116,11 @@ class SlurmHeader(object):
             if job.het['CURRENT_PROJ'][het] != '':
                 return "SBATCH -A {0}".format(job.het['CURRENT_PROJ'][het])
         else:
-            if job.parameters['CURRENT_PROJ'] != '':
-                return "SBATCH -A {0}".format(job.parameters['CURRENT_PROJ'])
+            if parameters['CURRENT_PROJ'] != '':
+                return "SBATCH -A {0}".format(parameters['CURRENT_PROJ'])
         return ""
 
-    def get_exclusive_directive(self, job, het=-1):
+    def get_exclusive_directive(self, job, parameters, het=-1):
         """
         Returns account directive for the specified job
 
@@ -127,14 +130,14 @@ class SlurmHeader(object):
         :rtype: str
         """
         if het > -1 and len(job.het['EXCLUSIVE']) > 0:
-            if str(job.parameters['EXCLUSIVE']).lower() == 'true':
+            if str(parameters['EXCLUSIVE']).lower() == 'true':
                 return "SBATCH --exclusive"
         else:
-            if str(job.parameters['EXCLUSIVE']).lower() == 'true':
+            if str(parameters['EXCLUSIVE']).lower() == 'true':
                 return "SBATCH --exclusive"
         return ""
 
-    def get_nodes_directive(self, job, het=-1):
+    def get_nodes_directive(self, job, parameters, het=-1):
         """
         Returns nodes directive for the specified job
         :param job: job to create nodes directive for
@@ -146,11 +149,12 @@ class SlurmHeader(object):
             if job.het['NODES'][het] != '':
                 return "SBATCH --nodes={0}".format(job.het['NODES'][het])
         else:
-            if job.parameters['NODES'] != '':
-                return "SBATCH --nodes={0}".format(job.parameters['NODES'])
+            if parameters['NODES'] != '':
+                return "SBATCH --nodes={0}".format(parameters['NODES'])
         return ""
+
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_memory_directive(self, job, het=-1):
+    def get_memory_directive(self, job, parameters, het=-1):
         """
         Returns memory directive for the specified job
 
@@ -163,12 +167,12 @@ class SlurmHeader(object):
             if job.het['MEMORY'][het] != '':
                 return "SBATCH --mem={0}".format(job.het['MEMORY'][het])
         else:
-            if job.parameters['MEMORY'] != '':
-                return "SBATCH --mem={0}".format(job.parameters['MEMORY'])
+            if parameters['MEMORY'] != '':
+                return "SBATCH --mem={0}".format(parameters['MEMORY'])
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_memory_per_task_directive(self, job, het=-1):
+    def get_memory_per_task_directive(self, job, parameters, het=-1):
         """
         Returns memory per task directive for the specified job
 
@@ -181,10 +185,11 @@ class SlurmHeader(object):
             if job.het['MEMORY_PER_TASK'][het] != '':
                 return "SBATCH --mem-per-cpu={0}".format(job.het['MEMORY_PER_TASK'][het])
         else:
-            if job.parameters['MEMORY_PER_TASK'] != '':
-                return "SBATCH --mem-per-cpu={0}".format(job.parameters['MEMORY_PER_TASK'])
+            if parameters['MEMORY_PER_TASK'] != '':
+                return "SBATCH --mem-per-cpu={0}".format(parameters['MEMORY_PER_TASK'])
         return ""
-    def get_threads_per_task(self, job, het=-1):
+
+    def get_threads_per_task(self, job, parameters, het=-1):
         """
         Returns threads per task directive for the specified job
 
@@ -198,13 +203,13 @@ class SlurmHeader(object):
             if job.het['NUMTHREADS'][het] != '':
                 return f"SBATCH --cpus-per-task={job.het['NUMTHREADS'][het]}"
         else:
-            if job.parameters['NUMTHREADS'] != '':
-                return "SBATCH --cpus-per-task={0}".format(job.parameters['NUMTHREADS'])
+            if parameters['NUMTHREADS'] != '':
+                return "SBATCH --cpus-per-task={0}".format(parameters['NUMTHREADS'])
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
 
-    def get_reservation_directive(self, job, het=-1):
+    def get_reservation_directive(self, job, parameters, het=-1):
         """
         Returns reservation directive for the specified job
         :param job:
@@ -216,11 +221,11 @@ class SlurmHeader(object):
             if job.het['RESERVATION'][het] != '':
                 return "SBATCH --reservation={0}".format(job.het['RESERVATION'][het])
         else:
-            if job.parameters['RESERVATION'] != '':
-                return "SBATCH --reservation={0}".format(job.parameters['RESERVATION'])
+            if parameters['RESERVATION'] != '':
+                return "SBATCH --reservation={0}".format(parameters['RESERVATION'])
         return ""
 
-    def get_custom_directives(self, job, het=-1):
+    def get_custom_directives(self, job, parameters, het=-1):
         """
         Returns custom directives for the specified job
 
@@ -234,13 +239,11 @@ class SlurmHeader(object):
             if job.het['CUSTOM_DIRECTIVES'][het] != '':
                 return '\n'.join(str(s) for s in job.het['CUSTOM_DIRECTIVES'][het])
         else:
-            if job.parameters['CUSTOM_DIRECTIVES'] != '':
-                return '\n'.join(str(s) for s in job.parameters['CUSTOM_DIRECTIVES'])
+            if parameters['CUSTOM_DIRECTIVES'] != '':
+                return '\n'.join(str(s) for s in parameters['CUSTOM_DIRECTIVES'])
         return ""
 
-
-
-    def get_tasks_per_node(self, job, het=-1):
+    def get_tasks_per_node(self, job, parameters, het=-1):
         """
         Returns memory per task directive for the specified job
 
@@ -253,8 +256,8 @@ class SlurmHeader(object):
             if int(job.het['TASKS'][het]):
                 return "SBATCH --ntasks-per-node={0}".format(job.het['TASKS'][het])
         else:
-            if int(job.parameters['TASKS']) > 1:
-                return "SBATCH --ntasks-per-node={0}".format(job.parameters['TASKS'])
+            if int(parameters['TASKS']) > 1:
+                return "SBATCH --ntasks-per-node={0}".format(parameters['TASKS'])
         return ""
 
     def wrapper_header(self, **kwargs):
@@ -264,7 +267,7 @@ class SlurmHeader(object):
 #              {kwargs["name"].split("_")[0] + "_Wrapper"}
 ###############################################################################
 """
-        if kwargs["wrapper_data"].het.get("HETSIZE",1) <= 1:
+        if kwargs["wrapper_data"].het.get("HETSIZE", 1) <= 1:
             wr_header += f"""
 #SBATCH -J {kwargs["name"]}
 {kwargs["queue"]}
@@ -280,7 +283,7 @@ class SlurmHeader(object):
 {kwargs["tasks"]}
 {kwargs["exclusive"]}
 {kwargs["custom_directives"]}
-{kwargs.get("reservation","#")}
+{kwargs.get("reservation", "#")}
 #
     """
         else:
@@ -295,7 +298,8 @@ class SlurmHeader(object):
             if language is None or len(language) == 0 or "bash" in language:
                 language = "#!/usr/bin/env python3"
             return language + wr_header
-    def hetjob_common_header(self,hetsize,wrapper=None):
+
+    def hetjob_common_header(self, hetsize, wrapper=None):
         if not wrapper:
             header = textwrap.dedent("""\
                     
@@ -346,7 +350,7 @@ class SlurmHeader(object):
 
     def calculate_wrapper_het_header(self, wr_job):
         hetsize = wr_job.het["HETSIZE"]
-        header = self.hetjob_common_header(hetsize,wr_job)
+        header = self.hetjob_common_header(hetsize, wr_job)
         for components in range(hetsize):
             header = header.replace(
                 f'%QUEUE_DIRECTIVE_{components}%', self.get_queue_directive(wr_job, components))
@@ -374,7 +378,7 @@ class SlurmHeader(object):
 
         return header
 
-    def calculate_het_header(self, job):
+    def calculate_het_header(self, job, parameters):
         header = self.hetjob_common_header(hetsize=job.het["HETSIZE"])
         header = header.replace("%TASKTYPE%", job.section)
         header = header.replace("%DEFAULT.EXPID%", job.expid)
@@ -389,31 +393,31 @@ class SlurmHeader(object):
 
         for components in range(job.het['HETSIZE']):
             header = header.replace(
-                f'%QUEUE_DIRECTIVE_{components}%', self.get_queue_directive(job, components))
+                f'%QUEUE_DIRECTIVE_{components}%', self.get_queue_directive(job, parameters, components))
             header = header.replace(
-                f'%PARTITION_DIRECTIVE_{components}%', self.get_partition_directive(job, components))
+                f'%PARTITION_DIRECTIVE_{components}%', self.get_partition_directive(job, parameters, components))
             header = header.replace(
-                f'%ACCOUNT_DIRECTIVE_{components}%', self.get_account_directive(job, components))
+                f'%ACCOUNT_DIRECTIVE_{components}%', self.get_account_directive(job, parameters, components))
             header = header.replace(
-                f'%MEMORY_DIRECTIVE_{components}%', self.get_memory_directive(job, components))
+                f'%MEMORY_DIRECTIVE_{components}%', self.get_memory_directive(job, parameters, components))
             header = header.replace(
-                f'%MEMORY_PER_TASK_DIRECTIVE_{components}%', self.get_memory_per_task_directive(job, components))
+                f'%MEMORY_PER_TASK_DIRECTIVE_{components}%',
+                self.get_memory_per_task_directive(job, parameters, components))
             header = header.replace(
-                f'%THREADS_PER_TASK_DIRECTIVE_{components}%', self.get_threads_per_task(job, components))
+                f'%THREADS_PER_TASK_DIRECTIVE_{components}%', self.get_threads_per_task(job, parameters, components))
             header = header.replace(
-                f'%NODES_DIRECTIVE_{components}%', self.get_nodes_directive(job, components))
+                f'%NODES_DIRECTIVE_{components}%', self.get_nodes_directive(job, parameters, components))
             header = header.replace(
-                f'%NUMPROC_DIRECTIVE_{components}%', self.get_proccesors_directive(job, components))
+                f'%NUMPROC_DIRECTIVE_{components}%', self.get_proccesors_directive(job, parameters, components))
             header = header.replace(
-                f'%RESERVATION_DIRECTIVE_{components}%', self.get_reservation_directive(job, components))
+                f'%RESERVATION_DIRECTIVE_{components}%', self.get_reservation_directive(job, parameters, components))
             header = header.replace(
-                f'%TASKS_PER_NODE_DIRECTIVE_{components}%', self.get_tasks_per_node(job, components))
+                f'%TASKS_PER_NODE_DIRECTIVE_{components}%', self.get_tasks_per_node(job, parameters, components))
             header = header.replace(
-                f'%CUSTOM_DIRECTIVES_{components}%', self.get_custom_directives(job, components))
+                f'%CUSTOM_DIRECTIVES_{components}%', self.get_custom_directives(job, parameters, components))
         header = header[:-len("#SBATCH hetjob\n")]  # last element
 
         return header
-
 
     SERIAL = textwrap.dedent("""\
 ###############################################################################
@@ -465,4 +469,3 @@ class SlurmHeader(object):
 #
 ###############################################################################
     """)
-
