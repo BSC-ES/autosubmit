@@ -20,12 +20,12 @@
 Test file for autosubmit/monitor/diagram.py
 """
 import datetime
+from test.unit.test_statistics import jobs
 
 import pytest
 from mock.mock import patch
 
 from autosubmit.job.job import Job
-from test.unit.test_statistics import jobs
 from autosubmit.monitor import diagram
 from autosubmit.monitor.diagram import JobData, JobAggData
 
@@ -56,8 +56,23 @@ def test_seq():
         assert value is not None
         assert isinstance(value, int)
 
+
 def test_populate_statistics(jobs):
     """ function to test the Class JobData inside autosubmit/monitor/diagram.py """
+
+    date_ini = datetime.datetime.now()
+    date_fin = date_ini + datetime.timedelta(10.10)
+    queue_time_fixes = {'test': 5,'test1': 50,'test2': 500,'test3': 5000,'test4': 50000}
+
+    statistics = diagram.populate_statistics(jobs,date_ini,date_fin, queue_time_fixes)
+    for job_stat in statistics.jobs_stat:
+        assert ('example_name_' in job_stat.name and
+                'example_member_' in job_stat.member)
+    assert len(statistics.summary.get_as_list()) == 13
+    assert statistics.failed_jobs_dict == {'example_name_0': 1, 'example_name_1': 1,
+                                           'example_name_2': 1, 'example_name_3': 1,
+                                           'example_name_4': 1}
+
 
 def test_create_csv_stats(tmpdir):
     """ function to test the Function create_csv_stats inside autosubmit/monitor/diagram.py """
@@ -163,19 +178,3 @@ def test_create_bar_diagram(job_stats, failed_jobs, failed_jobs_dict, num_plots,
 
     with patch('autosubmit.monitor.diagram.MAX_NUM_PLOTS', num_plots):  # 1
         assert result == diagram.create_bar_diagram("a000", statistics, jobs_data, status)
-
-
-def test_populate_statistics(jobs):
-    """ function to test the Class JobData inside autosubmit/monitor/diagram.py """
-
-    date_ini = datetime.datetime.now()
-    date_fin = date_ini + datetime.timedelta(10.10)
-    queue_time_fixes = {'test': 5,'test1': 50,'test2': 500,'test3': 5000,'test4': 50000}
-
-    statistics = diagram.populate_statistics(jobs,date_ini,date_fin, queue_time_fixes)
-    for job_stat in statistics.jobs_stat:
-        assert ('example_name_' in job_stat.name and
-                'example_member_' in job_stat.member)
-    assert len(statistics.summary.get_as_list()) == 13
-    assert statistics.failed_jobs_dict == {'example_name_0': 1, 'example_name_1': 1,
-                                    'example_name_2': 1, 'example_name_3': 1, 'example_name_4': 1}
