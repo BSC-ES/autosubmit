@@ -170,6 +170,8 @@ def check_db_fields(run_tmpdir, expected_entries, final_status) -> dict:
             row_dict["finish"] > 0 and row_dict["finish"] != 1970010101
         db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["status"] = \
             row_dict["status"] == final_status
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
+            "workflow_commit"] = row_dict["workflow_commit"] == "debug-commit-hash"
         empty_fields = []
         for key in [key for key in row_dict.keys() if
                     key not in ["status", "finish", "submit", "start", "extra_data", "children", "platform_output"]]:
