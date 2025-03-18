@@ -36,12 +36,24 @@ class SlurmPlatform(ParamikoPlatform):
     """
     Class to manage jobs to host using SLURM scheduler
 
-    :param expid: experiment's identifier
-    :type expid: str
+    :param ParamikoPlatform: A inherited class ParamikoPlatform
+    :type ParamikoPlatform: ParamikoPlatform
     """
 
+    def __init__(self, expid: str, name: str, config: dict, auth_password: str=None):
+        """
+        Initialization of the Class SlurmPlatform
 
-    def __init__(self, expid, name, config, auth_password=None):
+        :param expid: ID of the experiment which will instantiate the SlurmPlatform.
+        :type expid: str
+        :param name: Name of the platform to be instantiated.
+        :type name: str
+        :param config: Configuration of the platform, PATHS to Files and DB.
+        :type config: dict
+        :param auth_password: Authenticator's password.
+        :type auth_password: str
+        :return: None
+        """
         ParamikoPlatform.__init__(self, expid, name, config, auth_password = auth_password)
         self.mkdir_cmd = None
         self.get_cmd = None
@@ -599,7 +611,6 @@ class SlurmPlatform(ParamikoPlatform):
 
     def get_jobid_by_jobname_cmd(self, job_name):
         return 'squeue -o %A,%.50j -n {0}'.format(job_name)
-
 
     def cancel_job(self, job_id):
         return 'scancel {0}'.format(job_id)
