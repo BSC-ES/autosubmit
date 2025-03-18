@@ -1,35 +1,55 @@
-from unittest.mock import patch
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import mock
-from bscearth.utils.date import sum_str_hours
-from operator import attrgetter
-
+import copy
+import inspect
 import shutil
 import tempfile
-import inspect
+from collections import OrderedDict
+from pathlib import Path
+from random import randrange
 
-from unittest import TestCase
+import mock
+import pytest
 from mock import MagicMock
 
 import log.log
-from autosubmit.job.job_packager import JobPackager
-from autosubmit.job.job_packages import JobPackageVertical, JobPackageHorizontal, JobPackageHorizontalVertical, \
-    JobPackageVerticalHorizontal, JobPackageSimple
 from autosubmit.job.job import Job
-from autosubmit.job.job_list import JobList
-from autosubmit.job.job_dict import DicJobs
-from autosubmit.job.job_utils import Dependency
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
-from autosubmit.job.job_list_persistence import JobListPersistenceDb
 from autosubmit.job.job_common import Status
-from random import randrange
-from collections import OrderedDict
+from autosubmit.job.job_dict import DicJobs
+from autosubmit.job.job_list import JobList
+from autosubmit.job.job_list_persistence import JobListPersistenceDb
+from autosubmit.job.job_list_persistence import JobListPersistencePkl
+from autosubmit.job.job_packager import JobPackager
+from autosubmit.job.job_packages import JobPackageHorizontal, JobPackageHorizontalVertical, \
+    JobPackageVerticalHorizontal, JobPackageSimple
+from autosubmit.job.job_packages import JobPackageVertical
+from autosubmit.job.job_utils import Dependency
+from autosubmit.platforms.slurmplatform import SlurmPlatform
+from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from log.log import AutosubmitCritical
+
+"""Tests for wrappers."""
 
 
-class TestWrappers(TestCase):
+class TestWrappers:
 
     @classmethod
-    def setUpClass(cls):
+    def setup_class(cls):
         # set up different unused_figs to be used in the test methods
         cls.workflows = dict()
         cls.workflows['basic'] = dict()
@@ -161,7 +181,7 @@ class TestWrappers(TestCase):
         cls.workflows['running_once']['sections']["s5"]["WALLCLOCK"] = '00:30'
         cls.workflows['running_once']['sections']["s5"]["DEPENDENCIES"] = "s2"
 
-    def setUp(self):
+    def setup_method(self):
         self.experiment_id = 'random-id'
         self._wrapper_factory = MagicMock()
 
@@ -208,7 +228,7 @@ class TestWrappers(TestCase):
         self.job_list._ordered_jobs_by_date_member["WRAPPERS"] = dict()
         self.wrapper_info = ['vertical', 'flexible', 'asthread', ['SIM'], 0, self.as_conf]
 
-    def tearDown(self) -> None:
+    def teardown_method(self) -> None:
         shutil.rmtree(self.temp_directory)
 
     ### ONE SECTION WRAPPER ###
@@ -302,7 +322,7 @@ class TestWrappers(TestCase):
 
             # returned_packages = returned_packages[]
             for i in range(0, len(returned_packages)):
-                self.assertListEqual(returned_packages[i]._jobs, packages[i]._jobs)
+                assert returned_packages[i]._jobs == packages[i]._jobs
 
     def test_returned_packages_max_jobs(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -394,7 +414,7 @@ class TestWrappers(TestCase):
                 JobPackageVertical(package_m2_s2, configuration=self.as_conf, wrapper_info=self.wrapper_info)]
 
             for i in range(0, len(returned_packages)):
-                self.assertListEqual(returned_packages[i]._jobs, packages[i]._jobs)
+                assert returned_packages[i]._jobs == packages[i]._jobs
 
     def test_returned_packages_max_wrapped_jobs(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -470,7 +490,7 @@ class TestWrappers(TestCase):
 
             # returned_packages = returned_packages[0]
             for i in range(0, len(returned_packages)):
-                self.assertListEqual(returned_packages[i]._jobs, packages[i]._jobs)
+                assert returned_packages[i]._jobs == packages[i]._jobs
 
     def test_returned_packages_max_wallclock(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -546,7 +566,7 @@ class TestWrappers(TestCase):
 
             # returned_packages = returned_packages[0]
             for i in range(0, len(returned_packages)):
-                self.assertListEqual(returned_packages[i]._jobs, packages[i]._jobs)
+                assert returned_packages[i]._jobs == packages[i]._jobs
 
     def test_returned_packages_section_not_self_dependent(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -617,7 +637,7 @@ class TestWrappers(TestCase):
 
             # returned_packages = returned_packages[0]
             for i in range(0, len(returned_packages)):
-                self.assertListEqual(returned_packages[i]._jobs, packages[i]._jobs)
+                assert returned_packages[i]._jobs == packages[i]._jobs
 
     ### MIXED WRAPPER ###
     def test_returned_packages_mixed_wrapper(self):
@@ -707,7 +727,7 @@ class TestWrappers(TestCase):
 
             # returned_packages = returned_packages[0]
             for i in range(0, len(returned_packages)):
-                self.assertListEqual(returned_packages[i]._jobs, packages[i]._jobs)
+                assert returned_packages[i]._jobs == packages[i]._jobs
 
     def test_returned_packages_parent_failed_mixed_wrapper(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -791,7 +811,7 @@ class TestWrappers(TestCase):
 
             # returned_packages = returned_packages[0]
             for i in range(0, len(returned_packages)):
-                self.assertListEqual(returned_packages[i]._jobs, packages[i]._jobs)
+                assert returned_packages[i]._jobs == packages[i]._jobs
 
     def test_returned_packages_max_jobs_mixed_wrapper(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -888,7 +908,7 @@ class TestWrappers(TestCase):
                 # print("Build for test")
                 # for _job in packages[i]._jobs:
                 #     print(_job.name)
-                self.assertListEqual(returned_packages[i]._jobs, packages[i]._jobs)
+                assert returned_packages[i]._jobs == packages[i]._jobs
 
     def test_returned_packages_max_wrapped_jobs_mixed_wrapper(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -977,7 +997,7 @@ class TestWrappers(TestCase):
 
             # returned_packages = returned_packages[0]
             for i in range(0, len(returned_packages)):
-                self.assertListEqual(returned_packages[i]._jobs, packages[i]._jobs)
+                assert returned_packages[i]._jobs == packages[i]._jobs
 
     def test_returned_packages_max_wallclock_mixed_wrapper(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1064,7 +1084,7 @@ class TestWrappers(TestCase):
 
             # returned_packages = returned_packages[0]
             for i in range(0, len(returned_packages)):
-                self.assertListEqual(returned_packages[i]._jobs, packages[i]._jobs)
+                assert returned_packages[i]._jobs == packages[i]._jobs
 
     def test_returned_packages_first_chunks_completed_mixed_wrapper(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1167,7 +1187,7 @@ class TestWrappers(TestCase):
 
             # returned_packages = returned_packages[0]
             for i in range(0, len(returned_packages)):
-                self.assertListEqual(returned_packages[i]._jobs, packages[i]._jobs)
+                assert returned_packages[i]._jobs == packages[i]._jobs
 
     def test_ordered_dict_jobs_simple_workflow_mixed_wrapper(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1217,8 +1237,8 @@ class TestWrappers(TestCase):
             ordered_jobs_by_date_member["d1"]["m2"] = [d1_m2_1_s2, d1_m2_1_s3, d1_m2_2_s2, d1_m2_2_s3, d1_m2_3_s2,
                                                        d1_m2_3_s3, d1_m2_4_s2, d1_m2_4_s3]
 
-            self.assertDictEqual(self.job_list._create_sorted_dict_jobs(
-                "s2 s3"), ordered_jobs_by_date_member)
+            assert self.job_list._create_sorted_dict_jobs(
+                "s2 s3") == ordered_jobs_by_date_member
 
     def test_ordered_dict_jobs_running_date_mixed_wrapper(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1288,8 +1308,8 @@ class TestWrappers(TestCase):
             ordered_jobs_by_date_member["d2"]["m2"] = [d2_m2_1_s2, d2_m2_1_s3, d2_m2_2_s2, d2_m2_2_s3, d2_m2_3_s2,
                                                        d2_m2_3_s3, d2_m2_4_s2, d2_m2_4_s3, d2_s5]
 
-            self.assertDictEqual(self.job_list._create_sorted_dict_jobs(
-                "s2 s3 s5"), ordered_jobs_by_date_member)
+            assert self.job_list._create_sorted_dict_jobs(
+                "s2 s3 s5") == ordered_jobs_by_date_member
 
     def test_ordered_dict_jobs_running_once_mixed_wrapper(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1357,8 +1377,8 @@ class TestWrappers(TestCase):
             ordered_jobs_by_date_member["d2"]["m2"] = [d2_m2_1_s2, d2_m2_1_s3, d2_m2_2_s2, d2_m2_2_s3, d2_m2_3_s2,
                                                        d2_m2_3_s3, d2_m2_4_s2, d2_m2_4_s3, s5]
 
-            self.assertDictEqual(self.job_list._create_sorted_dict_jobs(
-                "s2 s3 s5"), ordered_jobs_by_date_member)
+            assert self.job_list._create_sorted_dict_jobs(
+                "s2 s3 s5") == ordered_jobs_by_date_member
 
     def test_ordered_dict_jobs_synchronize_date_mixed_wrapper(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1431,8 +1451,8 @@ class TestWrappers(TestCase):
                                                        d2_m2_3_s2,
                                                        d2_m2_3_s3, _3_s5, d2_m2_4_s2, d2_m2_4_s3, _4_s5]
 
-            self.assertDictEqual(self.job_list._create_sorted_dict_jobs(
-                "s2 s3 s5"), ordered_jobs_by_date_member)
+            assert self.job_list._create_sorted_dict_jobs(
+                "s2 s3 s5") == ordered_jobs_by_date_member
 
     def test_ordered_dict_jobs_synchronize_member_mixed_wrapper(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1510,8 +1530,8 @@ class TestWrappers(TestCase):
                                                        d2_m2_3_s2,
                                                        d2_m2_3_s3, d2_3_s5, d2_m2_4_s2, d2_m2_4_s3, d2_4_s5]
 
-            self.assertDictEqual(self.job_list._create_sorted_dict_jobs(
-                "s2 s3 s5"), ordered_jobs_by_date_member)
+            assert self.job_list._create_sorted_dict_jobs(
+                "s2 s3 s5") == ordered_jobs_by_date_member
 
     def test_check_real_package_wrapper_limits(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1582,9 +1602,9 @@ class TestWrappers(TestCase):
 
             for package in packages_v:
                 min_v, min_h, balanced = self.job_packager.check_real_package_wrapper_limits(package)
-                self.assertTrue(balanced)
-                self.assertEqual(min_v, 4)
-                self.assertEqual(min_h, 1)
+                assert balanced
+                assert min_v == 4
+                assert min_h == 1
             # test horizontal-wrapper
 
             self.job_packager.wrapper_type["WRAPPER_H"] = 'horizontal'
@@ -1598,9 +1618,9 @@ class TestWrappers(TestCase):
                 JobPackageHorizontal(package_m2_s2_s3, configuration=self.as_conf)]
             for package in packages_h:
                 min_v, min_h, balanced = self.job_packager.check_real_package_wrapper_limits(package)
-                self.assertTrue(balanced)
-                self.assertEqual(min_v, 1)
-                self.assertEqual(min_h, 4)
+                assert balanced
+                assert min_v == 1
+                assert min_h == 4
             # test horizontal-vertical
             self.job_packager.wrapper_type["WRAPPER_HV"] = 'horizontal-vertical'
             self.job_packager.current_wrapper_section = "WRAPPER_HV"
@@ -1623,9 +1643,9 @@ class TestWrappers(TestCase):
 
             for package in packages_hv:
                 min_v, min_h, balanced = self.job_packager.check_real_package_wrapper_limits(package)
-                self.assertTrue(balanced)
-                self.assertEqual(min_v, 2)
-                self.assertEqual(min_h, 4)
+                assert balanced
+                assert min_v == 2
+                assert min_h == 4
             # unbalanced package
             unbalanced_package = [d1_m2_1_s2, d1_m2_1_s3, d1_m2_2_s2]
             current_package = [package_m1_s2_s3, unbalanced_package, package_m2_s2_s3]
@@ -1635,9 +1655,9 @@ class TestWrappers(TestCase):
                                              wrapper_section=self.job_packager.current_wrapper_section)]
             for package in packages_hv_unbalanced:
                 min_v, min_h, balanced = self.job_packager.check_real_package_wrapper_limits(package)
-                self.assertFalse(balanced)
-                self.assertEqual(min_v, 3)
-                self.assertEqual(min_h, 3)
+                assert not balanced
+                assert min_v == 3
+                assert min_h == 3
             # test vertical-horizontal
             self.job_packager.wrapper_type["WRAPPER_VH"] = 'vertical-horizontal'
             self.job_packager.current_wrapper_section = "WRAPPER_VH"
@@ -1652,18 +1672,18 @@ class TestWrappers(TestCase):
                 wrapper_section=self.job_packager.current_wrapper_section)]
             for package in packages_vh:
                 min_v, min_h, balanced = self.job_packager.check_real_package_wrapper_limits(package)
-                self.assertTrue(balanced)
-                self.assertEqual(min_v, 4)
-                self.assertEqual(min_h, 2)
+                assert balanced
+                assert min_v == 4
+                assert min_h == 2
             current_package = [package_m1_s2_s3, unbalanced_package, package_m2_s2_s3]
             packages_vh_unbalanced = [JobPackageVerticalHorizontal(
                 current_package, max_procs, total_wallclock, jobs_resources=jobs_resources, configuration=self.as_conf,
                 wrapper_section=self.job_packager.current_wrapper_section)]
             for package in packages_vh_unbalanced:
                 min_v, min_h, balanced = self.job_packager.check_real_package_wrapper_limits(package)
-                self.assertFalse(balanced)
-                self.assertEqual(min_v, 3)
-                self.assertEqual(min_h, 3)
+                assert not balanced
+                assert min_v == 3
+                assert min_h == 3
 
     def test_check_jobs_to_run_first(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1731,13 +1751,13 @@ class TestWrappers(TestCase):
             self.job_packager._jobs_list.jobs_to_run_first = []
             for p in packages_v:
                 p2, run_first = self.job_packager.check_jobs_to_run_first(p)
-                self.assertEqual(p2.jobs, p.jobs)
-                self.assertEqual(run_first, False)
+                assert p2.jobs == p.jobs
+                assert run_first == False
             self.job_packager._jobs_list.jobs_to_run_first = [d1_m1_1_s2, d1_m1_1_s3]
             for p in packages_v:
                 p2, run_first = self.job_packager.check_jobs_to_run_first(p)
-                self.assertEqual(p2.jobs, [d1_m1_1_s2, d1_m1_1_s3])
-                self.assertEqual(run_first, True)
+                assert p2.jobs == [d1_m1_1_s2, d1_m1_1_s3]
+                assert run_first == True
 
     def test_calculate_wrapper_bounds(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1760,7 +1780,7 @@ class TestWrappers(TestCase):
                               'real_min': 2
                               }
             returned_wrapper_limits = self.job_packager.calculate_wrapper_bounds(section_list)
-            self.assertDictEqual(returned_wrapper_limits, wrapper_limits)
+            assert returned_wrapper_limits == wrapper_limits
             self.job_packager._as_config.experiment_data["WRAPPERS"]["MIN_WRAPPED"] = 3
             self.job_packager._as_config.experiment_data["WRAPPERS"]["MAX_WRAPPED"] = 5
             self.job_packager._as_config.experiment_data["WRAPPERS"]["MIN_WRAPPED_H"] = 2
@@ -1778,7 +1798,7 @@ class TestWrappers(TestCase):
                               'real_min': 3
                               }
             returned_wrapper_limits = self.job_packager.calculate_wrapper_bounds(section_list)
-            self.assertDictEqual(returned_wrapper_limits, wrapper_limits)
+            assert returned_wrapper_limits == wrapper_limits
 
             self.job_packager._as_config.experiment_data["WRAPPERS"][self.job_packager.current_wrapper_section][
                 "TYPE"] = "horizontal"
@@ -1792,7 +1812,7 @@ class TestWrappers(TestCase):
                               'real_min': 3,
                               }
             returned_wrapper_limits = self.job_packager.calculate_wrapper_bounds(section_list)
-            self.assertDictEqual(returned_wrapper_limits, wrapper_limits)
+            assert returned_wrapper_limits == wrapper_limits
 
             self.job_packager._as_config.experiment_data["WRAPPERS"][self.job_packager.current_wrapper_section][
                 "TYPE"] = "horizontal-vertical"
@@ -1806,7 +1826,7 @@ class TestWrappers(TestCase):
                               'real_min': 3
                               }
             returned_wrapper_limits = self.job_packager.calculate_wrapper_bounds(section_list)
-            self.assertDictEqual(returned_wrapper_limits, wrapper_limits)
+            assert returned_wrapper_limits == wrapper_limits
 
             self.job_packager._as_config.experiment_data["WRAPPERS"][self.job_packager.current_wrapper_section][
                 "TYPE"] = "vertical-horizontal"
@@ -1820,7 +1840,7 @@ class TestWrappers(TestCase):
                               'real_min': 3
                               }
             returned_wrapper_limits = self.job_packager.calculate_wrapper_bounds(section_list)
-            self.assertDictEqual(returned_wrapper_limits, wrapper_limits)
+            assert returned_wrapper_limits == wrapper_limits
 
             self.job_packager._as_config.experiment_data["WRAPPERS"][self.job_packager.current_wrapper_section][
                 "MIN_WRAPPED"] = 3
@@ -1836,7 +1856,7 @@ class TestWrappers(TestCase):
                 "MAX_WRAPPED_V"] = 5
 
             returned_wrapper_limits = self.job_packager.calculate_wrapper_bounds(section_list)
-            self.assertDictEqual(returned_wrapper_limits, wrapper_limits)
+            assert returned_wrapper_limits == wrapper_limits
 
             del self.job_packager._as_config.experiment_data["WRAPPERS"]["MIN_WRAPPED"]
             del self.job_packager._as_config.experiment_data["WRAPPERS"]["MAX_WRAPPED"]
@@ -1845,7 +1865,7 @@ class TestWrappers(TestCase):
             del self.job_packager._as_config.experiment_data["WRAPPERS"]["MAX_WRAPPED_H"]
             del self.job_packager._as_config.experiment_data["WRAPPERS"]["MAX_WRAPPED_V"]
             returned_wrapper_limits = self.job_packager.calculate_wrapper_bounds(section_list)
-            self.assertDictEqual(returned_wrapper_limits, wrapper_limits)
+            assert returned_wrapper_limits == wrapper_limits
 
             wrapper_limits = {'max': 5 * 4,
                               'max_by_section': {'S2': 5 * 4, 'S3': 5 * 4},
@@ -1857,7 +1877,7 @@ class TestWrappers(TestCase):
                               'real_min': 3
                               }
             returned_wrapper_limits = self.job_packager.calculate_wrapper_bounds(section_list)
-            self.assertDictEqual(returned_wrapper_limits, wrapper_limits)
+            assert returned_wrapper_limits == wrapper_limits
 
     def test_check_packages_respect_wrapper_policy(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1939,8 +1959,8 @@ class TestWrappers(TestCase):
             packages_to_submit2, max_jobs_to_submit2 = self.job_packager.check_packages_respect_wrapper_policy(
                 packages_h, packages_to_submit,
                 max_jobs_to_submit, wrapper_limits)
-            self.assertEqual(max_jobs_to_submit2, max_jobs_to_submit - 1)
-            self.assertEqual(packages_to_submit2, packages_h)
+            assert max_jobs_to_submit2 == max_jobs_to_submit - 1
+            assert packages_to_submit2 == packages_h
 
             wrapper_limits = {'max': 2,
                               'max_by_section': {'S2': 2, 'S3': 2},
@@ -1956,19 +1976,19 @@ class TestWrappers(TestCase):
             packages_to_submit2, max_jobs_to_submit2 = self.job_packager.check_packages_respect_wrapper_policy(
                 packages_h, packages_to_submit,
                 max_jobs_to_submit, wrapper_limits)
-            self.assertEqual(max_jobs_to_submit2, 0)
-            self.assertEqual(len(packages_to_submit2), 2)
+            assert max_jobs_to_submit2 == 0
+            assert len(packages_to_submit2) == 2
             for p in packages_to_submit2:
-                self.assertEqual(type(p), JobPackageSimple)
+                assert type(p) == JobPackageSimple
 
             self.job_packager.wrapper_policy["WRAPPER_V"] = "mixed"
             packages_to_submit = []
-            with self.assertRaises(log.log.AutosubmitCritical):
+            with pytest.raises(log.log.AutosubmitCritical):
                 self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit,
                                                                         max_jobs_to_submit, wrapper_limits)
             self.job_packager.wrapper_policy["WRAPPER_V"] = "strict"
             packages_to_submit = []
-            with self.assertRaises(log.log.AutosubmitCritical):
+            with pytest.raises(log.log.AutosubmitCritical):
                 self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit,
                                                                         max_jobs_to_submit, wrapper_limits)
 
@@ -2088,6 +2108,7 @@ class TestWrappers(TestCase):
         return job
 
 
+# TODO: remove this, and use pytest fixtures.
 class FakeBasicConfig:
     def __init__(self):
         pass
@@ -2108,3 +2129,168 @@ class FakeBasicConfig:
     LOCAL_PROJ_DIR = '/dummy/local/proj/dir'
     DEFAULT_PLATFORMS_CONF = ''
     DEFAULT_JOBS_CONF = ''
+
+
+@pytest.fixture(scope='function')
+def setup(autosubmit_config, tmpdir, prepare_basic_config):
+    experiment_id = 'random-id'
+    as_conf = autosubmit_config(experiment_id, {})
+    as_conf.experiment_data = dict()
+    as_conf.experiment_data["JOBS"] = dict()
+    as_conf.experiment_data["PLATFORMS"] = dict()
+    as_conf.experiment_data["LOCAL_ROOT_DIR"] = tmpdir
+    as_conf.experiment_data["LOCAL_TMP_DIR"] = ""
+    as_conf.experiment_data["LOCAL_ASLOG_DIR"] = ""
+    as_conf.experiment_data["LOCAL_PROJ_DIR"] = ""
+    as_conf.experiment_data["WRAPPERS"] = dict()
+    as_conf.experiment_data["WRAPPERS"]["WRAPPERS"] = dict()
+    as_conf.experiment_data["WRAPPERS"]["WRAPPERS"]["JOBS_IN_WRAPPER"] = "SECTION1"
+    as_conf.experiment_data["WRAPPERS"]["WRAPPERS"]["TYPE"] = "vertical"
+    Path(tmpdir / experiment_id / "tmp").mkdir(parents=True, exist_ok=True)
+    job_list = JobList(experiment_id, as_conf, YAMLParserFactory(),
+                       JobListPersistencePkl())
+
+    platform = SlurmPlatform(experiment_id, 'dummy-platform', as_conf.experiment_data)
+
+    job_list._platforms = [platform]
+    # add some jobs to the job list
+    job = Job("job1", "1", Status.COMPLETED, 0)
+    job._init_runtime_parameters()
+    job.wallclock = "00:20"
+    job.section = "SECTION1"
+    job.platform = platform
+    job_list._job_list.append(job)
+    job = Job("job2", "2", Status.SUBMITTED, 0)
+    job._init_runtime_parameters()
+    job.wallclock = "00:20"
+    job.section = "SECTION1"
+    job.platform = platform
+    job_list._job_list.append(job)
+    wrapper_jobs = copy.deepcopy(job_list.get_job_list())
+    for job in wrapper_jobs:
+        job.platform = platform
+    job_packager = JobPackager(as_conf, platform, job_list)
+    vertical_package = JobPackageVertical(wrapper_jobs, configuration=as_conf)
+    yield job_packager, vertical_package
+
+
+@pytest.mark.parametrize("any_simple_packages, not_wrappeable_package_info, built_packages_tmp, expected", [
+    (False, ["dummy-1", "dummy-2", "dummy-3"], ["dummy-1", "dummy-2", "dummy-3"], False),
+    (True, ["dummy-1", "dummy-2", "dummy-3"], ["dummy-1", "dummy-2", "dummy-3"], False),
+    (False, ["dummy-1", "dummy-2", "dummy-3"], ["dummy-1", "dummy-2"], False),
+], ids=["no_simple_packages", "simple_packages_exist", "mismatch_in_package_info"])
+def test_is_deadlock_jobs_in_queue(setup, any_simple_packages, not_wrappeable_package_info, built_packages_tmp,
+                                   expected):
+    job_packager, _ = setup
+    deadlock = job_packager.is_deadlock(any_simple_packages, not_wrappeable_package_info, built_packages_tmp)
+    assert deadlock == expected
+
+
+@pytest.mark.parametrize("any_simple_packages, not_wrappeable_package_info, built_packages_tmp, expected", [
+    (False, ["dummy-1", "dummy-2", "dummy-3"], ["dummy-1", "dummy-2", "dummy-3"], True),
+    (True, ["dummy-1", "dummy-2", "dummy-3"], ["dummy-1", "dummy-2", "dummy-3"], False),
+    (False, ["dummy-1", "dummy-2", "dummy-3"], ["dummy-1", "dummy-2"], False),
+], ids=["no_simple_packages", "simple_packages_exist", "mismatch_in_package_info"])
+def test_is_deadlock_no_jobs_in_queue(setup, any_simple_packages, not_wrappeable_package_info, built_packages_tmp,
+                                      expected):
+    job_packager, _ = setup
+    for job in job_packager._jobs_list._job_list:
+        job.status = Status.COMPLETED
+    deadlock = job_packager.is_deadlock(any_simple_packages, not_wrappeable_package_info, built_packages_tmp)
+    assert deadlock == expected
+
+
+wrapper_limits = {
+    "min": 1,
+    "min_h": 1,
+    "min_v": 1,
+    "max": 99,
+    "max_h": 99,
+    "max_v": 99,
+    "real_min": 2
+}
+
+
+@pytest.mark.parametrize(
+    "not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, expected, unparsed_policy", [
+        ([["_", 1, 1, True]], [], 100, 99, "strict"),
+        ([["_", 1, 1, False]], [], 100, 99, "mixed"),
+        ([["_", 1, 1, True]], [], 100, 99, "flexible"),
+        ([["_", 1, 1, True]], [], 100, 99, "strict_one_job"),
+        ([["_", 1, 1, True]], [], 100, 99, "mixed_one_job"),
+        ([["_", 1, 1, True]], [], 100, 99, "flexible_one_job"),
+    ], ids=["strict_policy", "mixed_policy", "flexible_policy", "strict_one_job", "mixed_one_job", "flexible_one_job"])
+def test_process_not_wrappeable_packages_no_more_remaining_jobs(setup, not_wrappeable_package_info, packages_to_submit,
+                                                                max_jobs_to_submit, expected, unparsed_policy):
+    job_packager, vertical_package = setup
+    if unparsed_policy == "mixed_failed":
+        policy = "mixed"
+    elif unparsed_policy.endswith("_one_job"):
+        policy = unparsed_policy.split("_")[0]
+        job_packager._jobs_list._job_list = [job for job in job_packager._jobs_list._job_list if job.name == "job1"]
+        vertical_package = JobPackageVertical([vertical_package.jobs[0]], configuration=job_packager._as_config)
+    else:
+        policy = unparsed_policy
+    job_packager._as_config.experiment_data["WRAPPERS"]["WRAPPERS"]["POLICY"] = policy
+    job_packager.wrapper_policy = {'WRAPPERS': policy}
+    vertical_package.wrapper_policy = policy
+    not_wrappeable_package_info[0][0] = vertical_package
+    for job in vertical_package.jobs:
+        job.status = Status.READY
+    result = job_packager.process_not_wrappeable_packages(not_wrappeable_package_info, packages_to_submit,
+                                                          max_jobs_to_submit, wrapper_limits)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, expected, unparsed_policy ", [
+        ([["_", 1, 1, True]], [], 100, 100, "strict"),
+        ([["_", 1, 1, False]], [], 100, 100, "mixed"),
+        ([["_", 1, 1, True]], [], 100, 98, "flexible"),
+        ([["_", 1, 1, True]], [], 100, 99, "mixed_failed"),
+        ([["_", 1, 1, True]], [], 100, 98, "default"),
+        ([["_", 1, 1, True]], [], 100, 100, "strict_one_job"),
+        ([["_", 1, 1, True]], [], 100, 100, "mixed_one_job"),
+        ([["_", 1, 1, True]], [], 100, 99, "flexible_one_job"),
+
+    ], ids=["strict_policy", "mixed_policy", "flexible_policy", "mixed_policy_failed_job", "default_policy",
+            "strict_one_job", "mixed_one_job", "flexible_one_job"])
+def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wrappeable_package_info,
+                                                                   packages_to_submit, max_jobs_to_submit, expected,
+                                                                   unparsed_policy):
+    job_packager, vertical_package = setup
+    if unparsed_policy == "mixed_failed":
+        policy = "mixed"
+    elif unparsed_policy.endswith("_one_job"):
+        policy = unparsed_policy.split("_")[0]
+        vertical_package = JobPackageVertical([vertical_package.jobs[0]], configuration=job_packager._as_config)
+    else:
+        policy = unparsed_policy
+    if "default" not in unparsed_policy:
+        job_packager._as_config.experiment_data["WRAPPERS"]["WRAPPERS"]["POLICY"] = policy
+        job_packager.wrapper_policy = {'WRAPPERS': policy}
+        vertical_package.wrapper_policy = policy
+    not_wrappeable_package_info[0][0] = vertical_package
+
+    for job in vertical_package.jobs:
+        job.status = Status.READY
+    if unparsed_policy == "mixed_failed":
+        vertical_package.jobs[0].fail_count = 1
+    job = Job("job3", "3", Status.WAITING, 0)
+    job._init_runtime_parameters()
+    job.wallclock = "00:20"
+    job.section = "SECTION1"
+    job.platform = job_packager._platform
+    job_packager._jobs_list._job_list.append(job)
+    if unparsed_policy in ["flexible", "mixed_failed", "flexible_one_job"]:
+        result = job_packager.process_not_wrappeable_packages(not_wrappeable_package_info, packages_to_submit,
+                                                              max_jobs_to_submit, wrapper_limits)
+    elif unparsed_policy in ["strict", "mixed", "strict_one_job", "mixed_one_job"]:
+        with pytest.raises(AutosubmitCritical):
+            job_packager.process_not_wrappeable_packages(not_wrappeable_package_info, packages_to_submit,
+                                                         max_jobs_to_submit, wrapper_limits)
+        result = 100
+    else:
+        result = job_packager.process_not_wrappeable_packages(not_wrappeable_package_info, packages_to_submit,
+                                                              max_jobs_to_submit, wrapper_limits)
+    assert result == expected

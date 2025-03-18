@@ -14,20 +14,20 @@
 
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-"""
-File to create a test for the profiling
-"""
-from test.unit.utils.common import create_database, init_expid
-from pathlib import Path
+
+"""File to create a test for the profiling."""
 
 import os
 import pwd
-import pytest
+from pathlib import Path
 
+import pytest
 from _pytest._py.path import LocalPath
 from _pytest.legacypath import TempdirFactory
 
 from autosubmit.autosubmit import Autosubmit
+from test.unit.utils.common import create_database, init_expid
+
 
 @pytest.fixture
 def run_tmpdir(tmpdir_factory: TempdirFactory) -> LocalPath:
@@ -71,6 +71,7 @@ def run_tmpdir(tmpdir_factory: TempdirFactory) -> LocalPath:
     assert "t000" in [Path(f).name for f in folder.listdir()]
     return folder
 
+
 def init_run(run_tmpdir, jobs_data):
     """
     Initialize the run, writing the jobs.yml file and creating the experiment.
@@ -109,7 +110,7 @@ def check_profile(run_tmpdir) -> bool:
 
 
 @pytest.mark.parametrize("jobs_data, profiler", [
-        ("""
+    ("""
             CONFIG:
                 SAFETYSLEEPTIME: 0
             EXPERIMENT:
@@ -119,10 +120,10 @@ def check_profile(run_tmpdir) -> bool:
                     SCRIPT: |
                         echo "Hello World with id=Success"
             """,
-            True
-        ),
-    ], ids=['profile experiment']
- )
+     True
+     ),
+], ids=['profile experiment']
+                         )
 def test_run_profile(run_tmpdir, jobs_data, profiler):
     """
     tester function of the run_profile function

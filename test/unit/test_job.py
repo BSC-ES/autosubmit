@@ -1,44 +1,56 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+import builtins
+import datetime
 import inspect
 import os
+import pwd
+import re
 import sys
 import tempfile
-from pathlib import Path
-
-
 from contextlib import suppress
-
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
-import datetime
-
-# compatibility with both versions (2 & 3)
-from sys import version_info
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from textwrap import dedent
-from unittest import TestCase
-from autosubmit.job.job_utils import calendar_chunk_section
 
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
-from autosubmitconfigparser.config.configcommon import BasicConfig, YAMLParserFactory
+import pytest
 from mock import Mock, MagicMock
-from mock import patch
+from mock.mock import patch
 
-import log.log
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
+from autosubmit.job.job_list_persistence import JobListPersistencePkl
+from autosubmit.job.job_utils import calendar_chunk_section
+from autosubmit.job.job_utils import get_job_package_code, SubJob, SimpleJob, SubJobManager
 from autosubmit.platforms.platform import Platform
-
-if version_info.major == 2:
-    import builtins as builtins
-else:
-    import builtins
-
-# import the exception. Three dots means two folders up the hierarchy
-# reference: https://peps.python.org/pep-0328/
+from autosubmit.platforms.psplatform import PsPlatform
+from autosubmit.platforms.slurmplatform import SlurmPlatform
+from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from autosubmitconfigparser.config.configcommon import BasicConfig, YAMLParserFactory
 from log.log import AutosubmitCritical
 
-class TestJob(TestCase):
-    def setUp(self):
+"""Tests for the Autosubmit ``Job`` class."""
+
+
+class TestJob:
+    def setup_method(self):
         self.experiment_id = 'random-id'
         self.job_name = 'random-name'
         self.job_id = 999
@@ -52,7 +64,6 @@ class TestJob(TestCase):
         self.job.processors = 2
         self.as_conf.load_project_parameters = Mock(return_value=dict())
 
-
     def test_when_the_job_has_more_than_one_processor_returns_the_parallel_platform(self):
         platform = Platform(self.experiment_id, 'parallel-platform', FakeBasicConfig().props())
         platform.serial_platform = 'serial-platform'
@@ -62,7 +73,7 @@ class TestJob(TestCase):
 
         returned_platform = self.job.platform
 
-        self.assertEqual(platform, returned_platform)
+        assert platform == returned_platform
 
     def test_when_the_job_has_only_one_processor_returns_the_serial_platform(self):
         platform = Platform(self.experiment_id, 'parallel-platform', FakeBasicConfig().props())
@@ -73,15 +84,15 @@ class TestJob(TestCase):
 
         returned_platform = self.job.platform
 
-        self.assertEqual('serial-platform', returned_platform)
+        assert 'serial-platform' == returned_platform
 
     def test_set_platform(self):
         dummy_platform = Platform('whatever', 'rand-name', FakeBasicConfig().props())
-        self.assertNotEqual(dummy_platform, self.job.platform)
+        assert dummy_platform != self.job.platform
 
         self.job.platform = dummy_platform
 
-        self.assertEqual(dummy_platform, self.job.platform)
+        assert dummy_platform == self.job.platform
 
     def test_when_the_job_has_a_queue_returns_that_queue(self):
         dummy_queue = 'whatever'
@@ -89,7 +100,7 @@ class TestJob(TestCase):
 
         returned_queue = self.job.queue
 
-        self.assertEqual(dummy_queue, returned_queue)
+        assert dummy_queue == returned_queue
 
     def test_when_the_job_has_not_a_queue_and_some_processors_returns_the_queue_of_the_platform(self):
         dummy_queue = 'whatever-parallel'
@@ -97,12 +108,12 @@ class TestJob(TestCase):
         dummy_platform.queue = dummy_queue
         self.job.platform = dummy_platform
 
-        self.assertIsNone(self.job._queue)
+        assert self.job._queue is None
 
         returned_queue = self.job.queue
 
-        self.assertIsNotNone(returned_queue)
-        self.assertEqual(dummy_queue, returned_queue)
+        assert returned_queue is not None
+        assert dummy_queue == returned_queue
 
     def test_when_the_job_has_not_a_queue_and_one_processor_returns_the_queue_of_the_serial_platform(self):
         serial_queue = 'whatever-serial'
@@ -115,33 +126,32 @@ class TestJob(TestCase):
         dummy_platform.serial_platform = dummy_serial_platform
         dummy_platform.queue = parallel_queue
         dummy_platform.processors_per_node = "1"
-        #dummy_platform.hyperthreading = "false"
 
         self.job._platform = dummy_platform
         self.job.processors = '1'
 
-        self.assertIsNone(self.job._queue)
+        assert self.job._queue is None
 
         returned_queue = self.job.queue
 
-        self.assertIsNotNone(returned_queue)
-        self.assertEqual(serial_queue, returned_queue)
-        self.assertNotEqual(parallel_queue, returned_queue)
+        assert returned_queue is not None
+        assert serial_queue == returned_queue
+        assert parallel_queue != returned_queue
 
     def test_set_queue(self):
         dummy_queue = 'whatever'
-        self.assertNotEqual(dummy_queue, self.job._queue)
+        assert dummy_queue != self.job._queue
 
         self.job.queue = dummy_queue
 
-        self.assertEqual(dummy_queue, self.job.queue)
+        assert dummy_queue == self.job.queue
 
     def test_that_the_increment_fails_count_only_adds_one(self):
         initial_fail_count = self.job.fail_count
         self.job.inc_fail_count()
         incremented_fail_count = self.job.fail_count
 
-        self.assertEqual(initial_fail_count + 1, incremented_fail_count)
+        assert initial_fail_count + 1 == incremented_fail_count
 
     def test_parents_and_children_management(self):
         random_job1 = Job('dummy-name', 111, Status.WAITING, 0)
@@ -153,30 +163,30 @@ class TestJob(TestCase):
                             random_job3)
 
         # assert added
-        self.assertEqual(3, len(self.job.parents))
-        self.assertEqual(1, len(random_job1.children))
-        self.assertEqual(1, len(random_job2.children))
-        self.assertEqual(1, len(random_job3.children))
+        assert 3 == len(self.job.parents)
+        assert 1 == len(random_job1.children)
+        assert 1 == len(random_job2.children)
+        assert 1 == len(random_job3.children)
 
         # assert contains
-        self.assertTrue(self.job.parents.__contains__(random_job1))
-        self.assertTrue(self.job.parents.__contains__(random_job2))
-        self.assertTrue(self.job.parents.__contains__(random_job3))
+        assert self.job.parents.__contains__(random_job1)
+        assert self.job.parents.__contains__(random_job2)
+        assert self.job.parents.__contains__(random_job3)
 
-        self.assertTrue(random_job1.children.__contains__(self.job))
-        self.assertTrue(random_job2.children.__contains__(self.job))
-        self.assertTrue(random_job3.children.__contains__(self.job))
+        assert random_job1.children.__contains__(self.job)
+        assert random_job2.children.__contains__(self.job)
+        assert random_job3.children.__contains__(self.job)
 
         # assert has
-        self.assertFalse(self.job.has_children())
-        self.assertTrue(self.job.has_parents())
+        assert not self.job.has_children()
+        assert self.job.has_parents()
 
         # assert deletions
         self.job.delete_parent(random_job3)
-        self.assertEqual(2, len(self.job.parents))
+        assert 2 == len(self.job.parents)
 
         random_job1.delete_child(self.job)
-        self.assertEqual(0, len(random_job1.children))
+        assert 0 == len(random_job1.children)
 
     @patch('autosubmitconfigparser.config.basicconfig.BasicConfig')
     def test_header_tailer(self, mocked_global_basic_config: Mock):
@@ -204,115 +214,117 @@ class TestJob(TestCase):
                 for extended_position in ["header", "tailer", "header tailer", "neither"]:
                     # loop over the extended type
                     for extended_type in ["Bash", "Python", "Rscript", "Bad1", "Bad2", "FileNotFound"]:
-                            BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
+                        BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
 
-                            header_file_name = ""
-                            # this is the part of the script that executes
-                            header_content = ""
-                            tailer_file_name = ""
-                            tailer_content = ""
+                        header_file_name = ""
+                        # this is the part of the script that executes
+                        header_content = ""
+                        tailer_file_name = ""
+                        tailer_content = ""
 
-                            # create the extended header and tailer scripts
-                            if "header" in extended_position:
-                                if extended_type == "Bash":
-                                    header_content = 'echo "header bash"'
-                                    full_header_content = dedent(f'''\
+                        # create the extended header and tailer scripts
+                        if "header" in extended_position:
+                            if extended_type == "Bash":
+                                header_content = 'echo "header bash"'
+                                full_header_content = dedent(f'''\
                                                                     #!/usr/bin/bash
                                                                     {header_content}
                                                                     ''')
-                                    header_file_name = "header.sh"
-                                elif extended_type == "Python":
-                                    header_content = 'print("header python")'
-                                    full_header_content = dedent(f'''\
+                                header_file_name = "header.sh"
+                            elif extended_type == "Python":
+                                header_content = 'print("header python")'
+                                full_header_content = dedent(f'''\
                                                                     #!/usr/bin/python
                                                                     {header_content}
                                                                     ''')
-                                    header_file_name = "header.py"
-                                elif extended_type == "Rscript":
-                                    header_content = 'print("header R")'
-                                    full_header_content = dedent(f'''\
+                                header_file_name = "header.py"
+                            elif extended_type == "Rscript":
+                                header_content = 'print("header R")'
+                                full_header_content = dedent(f'''\
                                                                     #!/usr/bin/env Rscript
                                                                     {header_content}
                                                                     ''')
-                                    header_file_name = "header.R"
-                                elif extended_type == "Bad1":
-                                    header_content = 'this is a script without #!'
-                                    full_header_content = dedent(f'''\
+                                header_file_name = "header.R"
+                            elif extended_type == "Bad1":
+                                header_content = 'this is a script without #!'
+                                full_header_content = dedent(f'''\
                                                                     {header_content}
                                                                     ''')
-                                    header_file_name = "header.bad1"
-                                elif extended_type == "Bad2":
-                                    header_content = 'this is a header with a bath executable'
-                                    full_header_content = dedent(f'''\
+                                header_file_name = "header.bad1"
+                            elif extended_type == "Bad2":
+                                header_content = 'this is a header with a bath executable'
+                                full_header_content = dedent(f'''\
                                                                     #!/does/not/exist
                                                                     {header_content}
                                                                     ''')
-                                    header_file_name = "header.bad2"
-                                else:  # file not found case
-                                    header_file_name = "non_existent_header"
+                                header_file_name = "header.bad2"
+                            else:  # file not found case
+                                header_file_name = "non_existent_header"
 
-                                if extended_type != "FileNotFound":
-                                    # build the header script if we need to
-                                    with open(Path(temp_dir, f'{expid}/proj/project_files/{header_file_name}'), 'w+') as header:
-                                        header.write(full_header_content)
-                                        header.flush()
-                                else:
-                                    # make sure that the file does not exist
-                                    for file in os.listdir(Path(temp_dir, f'{expid}/proj/project_files/')):
-                                        os.remove(Path(temp_dir, f'{expid}/proj/project_files/{file}'))
+                            if extended_type != "FileNotFound":
+                                # build the header script if we need to
+                                with open(Path(temp_dir, f'{expid}/proj/project_files/{header_file_name}'),
+                                          'w+') as header:
+                                    header.write(full_header_content)
+                                    header.flush()
+                            else:
+                                # make sure that the file does not exist
+                                for file in os.listdir(Path(temp_dir, f'{expid}/proj/project_files/')):
+                                    os.remove(Path(temp_dir, f'{expid}/proj/project_files/{file}'))
 
-                            if "tailer" in extended_position:
-                                if extended_type == "Bash":
-                                    tailer_content = 'echo "tailer bash"'
-                                    full_tailer_content = dedent(f'''\
+                        if "tailer" in extended_position:
+                            if extended_type == "Bash":
+                                tailer_content = 'echo "tailer bash"'
+                                full_tailer_content = dedent(f'''\
                                                                     #!/usr/bin/bash
                                                                     {tailer_content}
                                                                     ''')
-                                    tailer_file_name = "tailer.sh"
-                                elif extended_type == "Python":
-                                    tailer_content = 'print("tailer python")'
-                                    full_tailer_content = dedent(f'''\
+                                tailer_file_name = "tailer.sh"
+                            elif extended_type == "Python":
+                                tailer_content = 'print("tailer python")'
+                                full_tailer_content = dedent(f'''\
                                                                     #!/usr/bin/python
                                                                     {tailer_content}
                                                                     ''')
-                                    tailer_file_name = "tailer.py"
-                                elif extended_type == "Rscript":
-                                    tailer_content = 'print("header R")'
-                                    full_tailer_content = dedent(f'''\
+                                tailer_file_name = "tailer.py"
+                            elif extended_type == "Rscript":
+                                tailer_content = 'print("header R")'
+                                full_tailer_content = dedent(f'''\
                                                                     #!/usr/bin/env Rscript
                                                                     {tailer_content}
                                                                     ''')
-                                    tailer_file_name = "tailer.R"
-                                elif extended_type == "Bad1":
-                                    tailer_content = 'this is a script without #!'
-                                    full_tailer_content = dedent(f'''\
+                                tailer_file_name = "tailer.R"
+                            elif extended_type == "Bad1":
+                                tailer_content = 'this is a script without #!'
+                                full_tailer_content = dedent(f'''\
                                                                     {tailer_content}
                                                                     ''')
-                                    tailer_file_name = "tailer.bad1"
-                                elif extended_type == "Bad2":
-                                    tailer_content = 'this is a tailer with a bath executable'
-                                    full_tailer_content = dedent(f'''\
+                                tailer_file_name = "tailer.bad1"
+                            elif extended_type == "Bad2":
+                                tailer_content = 'this is a tailer with a bath executable'
+                                full_tailer_content = dedent(f'''\
                                                                     #!/does/not/exist
                                                                     {tailer_content}
                                                                     ''')
-                                    tailer_file_name = "tailer.bad2"
-                                else:  # file not found case
-                                    tailer_file_name = "non_existent_tailer"
+                                tailer_file_name = "tailer.bad2"
+                            else:  # file not found case
+                                tailer_file_name = "non_existent_tailer"
 
-                                if extended_type != "FileNotFound":
-                                    # build the tailer script if we need to
-                                    with open(Path(temp_dir, f'{expid}/proj/project_files/{tailer_file_name}'), 'w+') as tailer:
-                                        tailer.write(full_tailer_content)
-                                        tailer.flush()
-                                else:
-                                    # clear the content of the project file
-                                    for file in os.listdir(Path(temp_dir, f'{expid}/proj/project_files/')):
-                                        os.remove(Path(temp_dir, f'{expid}/proj/project_files/{file}'))
+                            if extended_type != "FileNotFound":
+                                # build the tailer script if we need to
+                                with open(Path(temp_dir, f'{expid}/proj/project_files/{tailer_file_name}'),
+                                          'w+') as tailer:
+                                    tailer.write(full_tailer_content)
+                                    tailer.flush()
+                            else:
+                                # clear the content of the project file
+                                for file in os.listdir(Path(temp_dir, f'{expid}/proj/project_files/')):
+                                    os.remove(Path(temp_dir, f'{expid}/proj/project_files/{file}'))
 
-                            # configuration file
+                        # configuration file
 
-                            with open(Path(temp_dir, f'{expid}/conf/configuration.yml'), 'w+') as configuration:
-                                configuration.write(dedent(f'''\
+                        with open(Path(temp_dir, f'{expid}/conf/configuration.yml'), 'w+') as configuration:
+                            configuration.write(dedent(f'''\
 DEFAULT:
     EXPID: {expid}
     HPCARCH: local
@@ -339,113 +351,114 @@ CONFIG:
     RETRIALS: 0
                                 '''))
 
-                                configuration.flush()
+                            configuration.flush()
 
-                            mocked_basic_config = FakeBasicConfig
-                            mocked_basic_config.read = MagicMock()
+                        mocked_basic_config = FakeBasicConfig
+                        mocked_basic_config.read = MagicMock()
 
-                            mocked_basic_config.LOCAL_ROOT_DIR = str(temp_dir)
-                            mocked_basic_config.STRUCTURES_DIR = '/dummy/structures/dir'
+                        mocked_basic_config.LOCAL_ROOT_DIR = str(temp_dir)
+                        mocked_basic_config.STRUCTURES_DIR = '/dummy/structures/dir'
 
-                            mocked_global_basic_config.LOCAL_ROOT_DIR.return_value = str(temp_dir)
+                        mocked_global_basic_config.LOCAL_ROOT_DIR.return_value = str(temp_dir)
 
-                            config = AutosubmitConfig(expid, basic_config=mocked_basic_config, parser_factory=YAMLParserFactory())
-                            config.reload(True)
+                        config = AutosubmitConfig(expid, basic_config=mocked_basic_config,
+                                                  parser_factory=YAMLParserFactory())
+                        config.reload(True)
 
-                            # act
+                        # act
 
-                            parameters = config.load_parameters()
-                            joblist_persistence = JobListPersistencePkl()
+                        parameters = config.load_parameters()
+                        joblist_persistence = JobListPersistencePkl()
 
-                            job_list_obj = JobList(expid, config, YAMLParserFactory(),joblist_persistence)
+                        job_list_obj = JobList(expid, config, YAMLParserFactory(), joblist_persistence)
 
-                            job_list_obj.generate(
-                                as_conf=config,
-                                date_list=[],
-                                member_list=[],
-                                num_chunks=1,
-                                chunk_ini=1,
-                                parameters=parameters,
-                                date_format='M',
-                                default_retrials=config.get_retrials(),
-                                default_job_type=config.get_default_job_type(),
-                                wrapper_jobs={},
-                                new=True,
-                                run_only_members=config.get_member_list(run_only=True),
-                                show_log=True,
-                            )
-                            job_list = job_list_obj.get_job_list()
+                        job_list_obj.generate(
+                            as_conf=config,
+                            date_list=[],
+                            member_list=[],
+                            num_chunks=1,
+                            chunk_ini=1,
+                            parameters=parameters,
+                            date_format='M',
+                            default_retrials=config.get_retrials(),
+                            default_job_type=config.get_default_job_type(),
+                            wrapper_jobs={},
+                            new=True,
+                            run_only_members=config.get_member_list(run_only=True),
+                            show_log=True,
+                        )
+                        job_list = job_list_obj.get_job_list()
 
-                            submitter = Autosubmit._get_submitter(config)
-                            submitter.load_platforms(config)
+                        submitter = Autosubmit._get_submitter(config)
+                        submitter.load_platforms(config)
 
-                            hpcarch = config.get_platform()
-                            for job in job_list:
-                                if job.platform_name == "" or job.platform_name is None:
-                                    job.platform_name = hpcarch
-                                job.platform = submitter.platforms[job.platform_name]
+                        hpcarch = config.get_platform()
+                        for job in job_list:
+                            if job.platform_name == "" or job.platform_name is None:
+                                job.platform_name = hpcarch
+                            job.platform = submitter.platforms[job.platform_name]
 
-                            # pick ur single job
-                            job = job_list[0]
+                        # pick ur single job
+                        job = job_list[0]
 
-                            if extended_position == "header" or extended_position == "tailer" or extended_position == "header tailer":
-                                if extended_type == script_type:
-                                    # load the parameters
-                                    job.check_script(config, parameters)
-                                    # create the script
-                                    job.create_script(config)
-                                    with open(Path(temp_dir, f'{expid}/tmp/zzyy_A.cmd'), 'r') as file:
-                                        full_script = file.read()
-                                        if "header" in extended_position:
-                                            self.assertTrue(header_content in full_script)
-                                        if "tailer" in extended_position:
-                                            self.assertTrue(tailer_content in full_script)
-                                else:  # extended_type != script_type
-                                    if extended_type == "FileNotFound":
-                                        with self.assertRaises(AutosubmitCritical) as context:
-                                            job.check_script(config, parameters)
-                                        self.assertEqual(context.exception.code, 7014)
-                                        if extended_position == "header tailer" or extended_position == "header":
-                                            self.assertEqual(context.exception.message,
-                                                             f"Extended header script: failed to fetch [Errno 2] No such file or directory: '{temp_dir}/{expid}/proj/project_files/{header_file_name}' \n")
-                                        else:  # extended_position == "tailer":
-                                            self.assertEqual(context.exception.message,
-                                                             f"Extended tailer script: failed to fetch [Errno 2] No such file or directory: '{temp_dir}/{expid}/proj/project_files/{tailer_file_name}' \n")
-                                    elif extended_type == "Bad1" or extended_type == "Bad2":
-                                        # we check if a script without hash bang fails or with a bad executable
-                                        with self.assertRaises(AutosubmitCritical) as context:
-                                            job.check_script(config, parameters)
-                                        self.assertEqual(context.exception.code, 7011)
-                                        if extended_position == "header tailer" or extended_position == "header":
-                                            self.assertEqual(context.exception.message,
-                                                             f"Extended header script: couldn't figure out script {header_file_name} type\n")
-                                        else:
-                                            self.assertEqual(context.exception.message,
-                                                             f"Extended tailer script: couldn't figure out script {tailer_file_name} type\n")
-                                    else:  # if extended type is any but the script_type and the malformed scripts
-                                        with self.assertRaises(AutosubmitCritical) as context:
-                                            job.check_script(config, parameters)
-                                        self.assertEqual(context.exception.code, 7011)
-                                        # if we have both header and tailer, it will fail at the header first
-                                        if extended_position == "header tailer" or extended_position == "header":
-                                            self.assertEqual(context.exception.message,
-                                                             f"Extended header script: script {header_file_name} seems "
-                                                             f"{extended_type} but job zzyy_A.cmd isn't\n")
-                                        else:  # extended_position == "tailer"
-                                            self.assertEqual(context.exception.message,
-                                                             f"Extended tailer script: script {tailer_file_name} seems "
-                                                             f"{extended_type} but job zzyy_A.cmd isn't\n")
-                            else: # extended_position == "neither"
-                                # assert it doesn't exist
+                        if extended_position == "header" or extended_position == "tailer" or extended_position == "header tailer":
+                            if extended_type == script_type:
                                 # load the parameters
                                 job.check_script(config, parameters)
                                 # create the script
                                 job.create_script(config)
-                                # finally, if we don't have scripts, check if the placeholders have been removed
                                 with open(Path(temp_dir, f'{expid}/tmp/zzyy_A.cmd'), 'r') as file:
-                                    final_script = file.read()
-                                    self.assertFalse("%EXTENDED_HEADER%" in final_script)
-                                    self.assertFalse("%EXTENDED_TAILER%" in final_script)
+                                    full_script = file.read()
+                                    if "header" in extended_position:
+                                        assert header_content in full_script
+                                    if "tailer" in extended_position:
+                                        assert tailer_content in full_script
+                            else:  # extended_type != script_type
+                                if extended_type == "FileNotFound":
+                                    with pytest.raises(AutosubmitCritical) as context:
+                                        job.check_script(config, parameters)
+                                    assert context.value.code == 7014
+                                    if extended_position == "header tailer" or extended_position == "header":
+                                        assert context.value.message == \
+                                               f"Extended header script: failed to fetch [Errno 2] No such file or directory: '{temp_dir}/{expid}/proj/project_files/{header_file_name}' \n"
+                                    else:  # extended_position == "tailer":
+                                        assert context.value.message == \
+                                               f"Extended tailer script: failed to fetch [Errno 2] No such file or directory: '{temp_dir}/{expid}/proj/project_files/{tailer_file_name}' \n"
+                                elif extended_type == "Bad1" or extended_type == "Bad2":
+                                    # we check if a script without hash bang fails or with a bad executable
+                                    with pytest.raises(AutosubmitCritical) as context:
+                                        job.check_script(config, parameters)
+                                    assert context.value.code == 7011
+                                    if extended_position == "header tailer" or extended_position == "header":
+                                        assert context.value.message == \
+                                               f"Extended header script: couldn't figure out script {header_file_name} type\n"
+                                    else:
+                                        assert context.value.message == \
+                                               f"Extended tailer script: couldn't figure out script {tailer_file_name} type\n"
+                                else:  # if extended type is any but the script_type and the malformed scripts
+                                    with pytest.raises(AutosubmitCritical) as context:
+                                        job.check_script(config, parameters)
+                                    assert context.value.code == 7011
+                                    # if we have both header and tailer, it will fail at the header first
+                                    if extended_position == "header tailer" or extended_position == "header":
+                                        assert context.value.message == \
+                                               f"Extended header script: script {header_file_name} seems " \
+                                               f"{extended_type} but job zzyy_A.cmd isn't\n"
+                                    else:  # extended_position == "tailer"
+                                        assert context.value.message == \
+                                               f"Extended tailer script: script {tailer_file_name} seems " \
+                                               f"{extended_type} but job zzyy_A.cmd isn't\n"
+                        else:  # extended_position == "neither"
+                            # assert it doesn't exist
+                            # load the parameters
+                            job.check_script(config, parameters)
+                            # create the script
+                            job.create_script(config)
+                            # finally, if we don't have scripts, check if the placeholders have been removed
+                            with open(Path(temp_dir, f'{expid}/tmp/zzyy_A.cmd'), 'r') as file:
+                                final_script = file.read()
+                                assert "%EXTENDED_HEADER%" not in final_script
+                                assert "%EXTENDED_TAILER%" not in final_script
 
     @patch('autosubmitconfigparser.config.basicconfig.BasicConfig')
     def test_hetjob(self, mocked_global_basic_config: Mock):
@@ -530,13 +543,13 @@ CONFIG:
                 wrapper_jobs={},
                 new=True,
                 run_only_members=[],
-                #config.get_member_list(run_only=True),
+                # config.get_member_list(run_only=True),
                 show_log=True,
                 create=True,
             )
 
             job_list = job_list_obj.get_job_list()
-            self.assertEqual(1, len(job_list))
+            assert 1 == len(job_list)
 
             submitter = Autosubmit._get_submitter(config)
             submitter.load_platforms(config)
@@ -555,7 +568,7 @@ CONFIG:
 
             # Asserts the script is valid. There shouldn't be variables in the script that aren't in the parameters.
             checked = job.check_script(config, parameters)
-            self.assertTrue(checked)
+            assert checked
 
     @patch('autosubmitconfigparser.config.basicconfig.BasicConfig')
     def test_header_tailer(self, mocked_global_basic_config: Mock):
@@ -583,115 +596,117 @@ CONFIG:
                 for extended_position in ["header", "tailer", "header tailer", "neither"]:
                     # loop over the extended type
                     for extended_type in ["Bash", "Python", "Rscript", "Bad1", "Bad2", "FileNotFound"]:
-                            BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
+                        BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
 
-                            header_file_name = ""
-                            # this is the part of the script that executes
-                            header_content = ""
-                            tailer_file_name = ""
-                            tailer_content = ""
+                        header_file_name = ""
+                        # this is the part of the script that executes
+                        header_content = ""
+                        tailer_file_name = ""
+                        tailer_content = ""
 
-                            # create the extended header and tailer scripts
-                            if "header" in extended_position:
-                                if extended_type == "Bash":
-                                    header_content = 'echo "header bash"'
-                                    full_header_content = dedent(f'''\
+                        # create the extended header and tailer scripts
+                        if "header" in extended_position:
+                            if extended_type == "Bash":
+                                header_content = 'echo "header bash"'
+                                full_header_content = dedent(f'''\
                                                                     #!/usr/bin/bash
                                                                     {header_content}
                                                                     ''')
-                                    header_file_name = "header.sh"
-                                elif extended_type == "Python":
-                                    header_content = 'print("header python")'
-                                    full_header_content = dedent(f'''\
+                                header_file_name = "header.sh"
+                            elif extended_type == "Python":
+                                header_content = 'print("header python")'
+                                full_header_content = dedent(f'''\
                                                                     #!/usr/bin/python
                                                                     {header_content}
                                                                     ''')
-                                    header_file_name = "header.py"
-                                elif extended_type == "Rscript":
-                                    header_content = 'print("header R")'
-                                    full_header_content = dedent(f'''\
+                                header_file_name = "header.py"
+                            elif extended_type == "Rscript":
+                                header_content = 'print("header R")'
+                                full_header_content = dedent(f'''\
                                                                     #!/usr/bin/env Rscript
                                                                     {header_content}
                                                                     ''')
-                                    header_file_name = "header.R"
-                                elif extended_type == "Bad1":
-                                    header_content = 'this is a script without #!'
-                                    full_header_content = dedent(f'''\
+                                header_file_name = "header.R"
+                            elif extended_type == "Bad1":
+                                header_content = 'this is a script without #!'
+                                full_header_content = dedent(f'''\
                                                                     {header_content}
                                                                     ''')
-                                    header_file_name = "header.bad1"
-                                elif extended_type == "Bad2":
-                                    header_content = 'this is a header with a bath executable'
-                                    full_header_content = dedent(f'''\
+                                header_file_name = "header.bad1"
+                            elif extended_type == "Bad2":
+                                header_content = 'this is a header with a bath executable'
+                                full_header_content = dedent(f'''\
                                                                     #!/does/not/exist
                                                                     {header_content}
                                                                     ''')
-                                    header_file_name = "header.bad2"
-                                else:  # file not found case
-                                    header_file_name = "non_existent_header"
+                                header_file_name = "header.bad2"
+                            else:  # file not found case
+                                header_file_name = "non_existent_header"
 
-                                if extended_type != "FileNotFound":
-                                    # build the header script if we need to
-                                    with open(Path(temp_dir, f'{expid}/proj/project_files/{header_file_name}'), 'w+') as header:
-                                        header.write(full_header_content)
-                                        header.flush()
-                                else:
-                                    # make sure that the file does not exist
-                                    for file in os.listdir(Path(temp_dir, f'{expid}/proj/project_files/')):
-                                        os.remove(Path(temp_dir, f'{expid}/proj/project_files/{file}'))
+                            if extended_type != "FileNotFound":
+                                # build the header script if we need to
+                                with open(Path(temp_dir, f'{expid}/proj/project_files/{header_file_name}'),
+                                          'w+') as header:
+                                    header.write(full_header_content)
+                                    header.flush()
+                            else:
+                                # make sure that the file does not exist
+                                for file in os.listdir(Path(temp_dir, f'{expid}/proj/project_files/')):
+                                    os.remove(Path(temp_dir, f'{expid}/proj/project_files/{file}'))
 
-                            if "tailer" in extended_position:
-                                if extended_type == "Bash":
-                                    tailer_content = 'echo "tailer bash"'
-                                    full_tailer_content = dedent(f'''\
+                        if "tailer" in extended_position:
+                            if extended_type == "Bash":
+                                tailer_content = 'echo "tailer bash"'
+                                full_tailer_content = dedent(f'''\
                                                                     #!/usr/bin/bash
                                                                     {tailer_content}
                                                                     ''')
-                                    tailer_file_name = "tailer.sh"
-                                elif extended_type == "Python":
-                                    tailer_content = 'print("tailer python")'
-                                    full_tailer_content = dedent(f'''\
+                                tailer_file_name = "tailer.sh"
+                            elif extended_type == "Python":
+                                tailer_content = 'print("tailer python")'
+                                full_tailer_content = dedent(f'''\
                                                                     #!/usr/bin/python
                                                                     {tailer_content}
                                                                     ''')
-                                    tailer_file_name = "tailer.py"
-                                elif extended_type == "Rscript":
-                                    tailer_content = 'print("header R")'
-                                    full_tailer_content = dedent(f'''\
+                                tailer_file_name = "tailer.py"
+                            elif extended_type == "Rscript":
+                                tailer_content = 'print("header R")'
+                                full_tailer_content = dedent(f'''\
                                                                     #!/usr/bin/env Rscript
                                                                     {tailer_content}
                                                                     ''')
-                                    tailer_file_name = "tailer.R"
-                                elif extended_type == "Bad1":
-                                    tailer_content = 'this is a script without #!'
-                                    full_tailer_content = dedent(f'''\
+                                tailer_file_name = "tailer.R"
+                            elif extended_type == "Bad1":
+                                tailer_content = 'this is a script without #!'
+                                full_tailer_content = dedent(f'''\
                                                                     {tailer_content}
                                                                     ''')
-                                    tailer_file_name = "tailer.bad1"
-                                elif extended_type == "Bad2":
-                                    tailer_content = 'this is a tailer with a bath executable'
-                                    full_tailer_content = dedent(f'''\
+                                tailer_file_name = "tailer.bad1"
+                            elif extended_type == "Bad2":
+                                tailer_content = 'this is a tailer with a bath executable'
+                                full_tailer_content = dedent(f'''\
                                                                     #!/does/not/exist
                                                                     {tailer_content}
                                                                     ''')
-                                    tailer_file_name = "tailer.bad2"
-                                else:  # file not found case
-                                    tailer_file_name = "non_existent_tailer"
+                                tailer_file_name = "tailer.bad2"
+                            else:  # file not found case
+                                tailer_file_name = "non_existent_tailer"
 
-                                if extended_type != "FileNotFound":
-                                    # build the tailer script if we need to
-                                    with open(Path(temp_dir, f'{expid}/proj/project_files/{tailer_file_name}'), 'w+') as tailer:
-                                        tailer.write(full_tailer_content)
-                                        tailer.flush()
-                                else:
-                                    # clear the content of the project file
-                                    for file in os.listdir(Path(temp_dir, f'{expid}/proj/project_files/')):
-                                        os.remove(Path(temp_dir, f'{expid}/proj/project_files/{file}'))
+                            if extended_type != "FileNotFound":
+                                # build the tailer script if we need to
+                                with open(Path(temp_dir, f'{expid}/proj/project_files/{tailer_file_name}'),
+                                          'w+') as tailer:
+                                    tailer.write(full_tailer_content)
+                                    tailer.flush()
+                            else:
+                                # clear the content of the project file
+                                for file in os.listdir(Path(temp_dir, f'{expid}/proj/project_files/')):
+                                    os.remove(Path(temp_dir, f'{expid}/proj/project_files/{file}'))
 
-                            # configuration file
+                        # configuration file
 
-                            with open(Path(temp_dir, f'{expid}/conf/configuration.yml'), 'w+') as configuration:
-                                configuration.write(dedent(f'''\
+                        with open(Path(temp_dir, f'{expid}/conf/configuration.yml'), 'w+') as configuration:
+                            configuration.write(dedent(f'''\
 DEFAULT:
     EXPID: {expid}
     HPCARCH: local
@@ -718,116 +733,118 @@ CONFIG:
     RETRIALS: 0
                                 '''))
 
-                                configuration.flush()
+                            configuration.flush()
 
-                            mocked_basic_config = FakeBasicConfig
-                            mocked_basic_config.read = MagicMock()
+                        mocked_basic_config = FakeBasicConfig
+                        mocked_basic_config.read = MagicMock()
 
-                            mocked_basic_config.LOCAL_ROOT_DIR = str(temp_dir)
-                            mocked_basic_config.STRUCTURES_DIR = '/dummy/structures/dir'
+                        mocked_basic_config.LOCAL_ROOT_DIR = str(temp_dir)
+                        mocked_basic_config.STRUCTURES_DIR = '/dummy/structures/dir'
 
-                            mocked_global_basic_config.LOCAL_ROOT_DIR.return_value = str(temp_dir)
+                        mocked_global_basic_config.LOCAL_ROOT_DIR.return_value = str(temp_dir)
 
-                            config = AutosubmitConfig(expid, basic_config=mocked_basic_config, parser_factory=YAMLParserFactory())
-                            config.reload(True)
+                        config = AutosubmitConfig(expid, basic_config=mocked_basic_config,
+                                                  parser_factory=YAMLParserFactory())
+                        config.reload(True)
 
-                            # act
+                        # act
 
-                            parameters = config.load_parameters()
-                            joblist_persistence = JobListPersistencePkl()
+                        parameters = config.load_parameters()
+                        joblist_persistence = JobListPersistencePkl()
 
-                            job_list_obj = JobList(expid, config, YAMLParserFactory(),joblist_persistence)
+                        job_list_obj = JobList(expid, config, YAMLParserFactory(), joblist_persistence)
 
-                            job_list_obj.generate(
-                                as_conf=config,
-                                date_list=[],
-                                member_list=[],
-                                num_chunks=1,
-                                chunk_ini=1,
-                                parameters=parameters,
-                                date_format='M',
-                                default_retrials=config.get_retrials(),
-                                default_job_type=config.get_default_job_type(),
-                                wrapper_jobs={},
-                                new=True,
-                                run_only_members=config.get_member_list(run_only=True),
-                                show_log=True,
-                                create=True,
-                            )
-                            job_list = job_list_obj.get_job_list()
+                        job_list_obj.generate(
+                            as_conf=config,
+                            date_list=[],
+                            member_list=[],
+                            num_chunks=1,
+                            chunk_ini=1,
+                            parameters=parameters,
+                            date_format='M',
+                            default_retrials=config.get_retrials(),
+                            default_job_type=config.get_default_job_type(),
+                            wrapper_jobs={},
+                            new=True,
+                            run_only_members=config.get_member_list(run_only=True),
+                            show_log=True,
+                            create=True,
+                        )
+                        job_list = job_list_obj.get_job_list()
 
-                            submitter = Autosubmit._get_submitter(config)
-                            submitter.load_platforms(config)
+                        submitter = Autosubmit._get_submitter(config)
+                        submitter.load_platforms(config)
 
-                            hpcarch = config.get_platform()
-                            for job in job_list:
-                                if job.platform_name == "" or job.platform_name is None:
-                                    job.platform_name = hpcarch
-                                job.platform = submitter.platforms[job.platform_name]
+                        hpcarch = config.get_platform()
+                        for job in job_list:
+                            if job.platform_name == "" or job.platform_name is None:
+                                job.platform_name = hpcarch
+                            job.platform = submitter.platforms[job.platform_name]
 
-                            # pick ur single job
-                            job = job_list[0]
-                            with suppress(Exception):
-                                job.update_parameters(config, set_attributes=True) # TODO quick fix. This sets some attributes and eventually fails, should be fixed in the future
+                        # pick ur single job
+                        job = job_list[0]
+                        with suppress(Exception):
+                            job.update_parameters(config,
+                                                  set_attributes=True)  # TODO quick fix. This sets some attributes and eventually fails, should be fixed in the future
 
-                            if extended_position == "header" or extended_position == "tailer" or extended_position == "header tailer":
-                                if extended_type == script_type:
-                                    # load the parameters
-                                    job.check_script(config, parameters)
-                                    # create the script
-                                    job.create_script(config)
-                                    with open(Path(temp_dir, f'{expid}/tmp/zzyy_A.cmd'), 'r') as file:
-                                        full_script = file.read()
-                                        if "header" in extended_position:
-                                            self.assertTrue(header_content in full_script)
-                                        if "tailer" in extended_position:
-                                            self.assertTrue(tailer_content in full_script)
-                                else:  # extended_type != script_type
-                                    if extended_type == "FileNotFound":
-                                        with self.assertRaises(AutosubmitCritical) as context:
-                                            job.check_script(config, parameters)
-                                        self.assertEqual(context.exception.code, 7014)
-                                        if extended_position == "header tailer" or extended_position == "header":
-                                            self.assertEqual(context.exception.message,
-                                                             f"Extended header script: failed to fetch [Errno 2] No such file or directory: '{temp_dir}/{expid}/proj/project_files/{header_file_name}' \n")
-                                        else:  # extended_position == "tailer":
-                                            self.assertEqual(context.exception.message,
-                                                             f"Extended tailer script: failed to fetch [Errno 2] No such file or directory: '{temp_dir}/{expid}/proj/project_files/{tailer_file_name}' \n")
-                                    elif extended_type == "Bad1" or extended_type == "Bad2":
-                                        # we check if a script without hash bang fails or with a bad executable
-                                        with self.assertRaises(AutosubmitCritical) as context:
-                                            job.check_script(config, parameters)
-                                        self.assertEqual(context.exception.code, 7011)
-                                        if extended_position == "header tailer" or extended_position == "header":
-                                            self.assertEqual(context.exception.message,
-                                                             f"Extended header script: couldn't figure out script {header_file_name} type\n")
-                                        else:
-                                            self.assertEqual(context.exception.message,
-                                                             f"Extended tailer script: couldn't figure out script {tailer_file_name} type\n")
-                                    else:  # if extended type is any but the script_type and the malformed scripts
-                                        with self.assertRaises(AutosubmitCritical) as context:
-                                            job.check_script(config, parameters)
-                                        self.assertEqual(context.exception.code, 7011)
-                                        # if we have both header and tailer, it will fail at the header first
-                                        if extended_position == "header tailer" or extended_position == "header":
-                                            self.assertEqual(context.exception.message,
-                                                             f"Extended header script: script {header_file_name} seems "
-                                                             f"{extended_type} but job zzyy_A.cmd isn't\n")
-                                        else:  # extended_position == "tailer"
-                                            self.assertEqual(context.exception.message,
-                                                             f"Extended tailer script: script {tailer_file_name} seems "
-                                                             f"{extended_type} but job zzyy_A.cmd isn't\n")
-                            else: # extended_position == "neither"
-                                # assert it doesn't exist
+                        if extended_position == "header" or extended_position == "tailer" or extended_position == "header tailer":
+                            if extended_type == script_type:
                                 # load the parameters
                                 job.check_script(config, parameters)
                                 # create the script
                                 job.create_script(config)
-                                # finally, if we don't have scripts, check if the placeholders have been removed
                                 with open(Path(temp_dir, f'{expid}/tmp/zzyy_A.cmd'), 'r') as file:
-                                    final_script = file.read()
-                                    self.assertFalse("%EXTENDED_HEADER%" in final_script)
-                                    self.assertFalse("%EXTENDED_TAILER%" in final_script)
+                                    full_script = file.read()
+                                    if "header" in extended_position:
+                                        assert header_content in full_script
+                                    if "tailer" in extended_position:
+                                        assert tailer_content in full_script
+                            else:  # extended_type != script_type
+                                if extended_type == "FileNotFound":
+                                    with pytest.raises(AutosubmitCritical) as context:
+                                        job.check_script(config, parameters)
+                                    assert context.value.code == 7014
+                                    if extended_position == "header tailer" or extended_position == "header":
+                                        assert context.value.message == \
+                                               f"Extended header script: failed to fetch [Errno 2] No such file or directory: '{temp_dir}/{expid}/proj/project_files/{header_file_name}' \n"
+                                    else:  # extended_position == "tailer":
+                                        assert context.value.message == \
+                                               f"Extended tailer script: failed to fetch [Errno 2] No such file or directory: '{temp_dir}/{expid}/proj/project_files/{tailer_file_name}' \n"
+                                elif extended_type == "Bad1" or extended_type == "Bad2":
+                                    # we check if a script without hash bang fails or with a bad executable
+                                    with pytest.raises(AutosubmitCritical) as context:
+                                        job.check_script(config, parameters)
+                                    assert context.value.code == 7011
+                                    if extended_position == "header tailer" or extended_position == "header":
+                                        assert context.value.message == \
+                                               f"Extended header script: couldn't figure out script {header_file_name} type\n"
+                                    else:
+                                        assert context.value.message == \
+                                               f"Extended tailer script: couldn't figure out script {tailer_file_name} type\n"
+                                else:  # if extended type is any but the script_type and the malformed scripts
+                                    with pytest.raises(AutosubmitCritical) as context:
+                                        job.check_script(config, parameters)
+                                    assert context.value.code == 7011
+                                    # if we have both header and tailer, it will fail at the header first
+                                    if extended_position == "header tailer" or extended_position == "header":
+                                        assert context.value.message == \
+                                               f"Extended header script: script {header_file_name} seems " \
+                                               f"{extended_type} but job zzyy_A.cmd isn't\n"
+                                    else:  # extended_position == "tailer"
+                                        assert context.value.message == \
+                                               f"Extended tailer script: script {tailer_file_name} seems " \
+                                               f"{extended_type} but job zzyy_A.cmd isn't\n"
+                        else:  # extended_position == "neither"
+                            # assert it doesn't exist
+                            # load the parameters
+                            job.check_script(config, parameters)
+                            # create the script
+                            job.create_script(config)
+                            # finally, if we don't have scripts, check if the placeholders have been removed
+                            with open(Path(temp_dir, f'{expid}/tmp/zzyy_A.cmd'), 'r') as file:
+                                final_script = file.read()
+                                assert "%EXTENDED_HEADER%" not in final_script
+                                assert "%EXTENDED_TAILER%" not in final_script
 
     @patch('autosubmitconfigparser.config.basicconfig.BasicConfig')
     def test_job_parameters(self, mocked_global_basic_config: Mock):
@@ -902,7 +919,7 @@ CONFIG:
                     create=True,
                 )
                 job_list = job_list_obj.get_job_list()
-                self.assertEqual(1, len(job_list))
+                assert 1 == len(job_list)
 
                 submitter = Autosubmit._get_submitter(config)
                 submitter.load_platforms(config)
@@ -917,22 +934,22 @@ CONFIG:
                 parameters = job.update_parameters(config, set_attributes=True)
                 # Asserts the script is valid.
                 checked = job.check_script(config, parameters)
-                self.assertTrue(checked)
+                assert checked
 
                 # Asserts the configuration value is propagated as-is to the job parameters.
                 # Finally, asserts the header created is correct.
                 if not reservation:
-                    self.assertTrue('JOBS.A.RESERVATION' not in parameters)
+                    assert 'JOBS.A.RESERVATION' not in parameters
                     template_content, additional_templates = job.update_content(config, parameters)
-                    self.assertFalse(additional_templates)
+                    assert not additional_templates
 
-                    self.assertFalse(f'#SBATCH --reservation' in template_content)
+                    assert not f'#SBATCH --reservation' in template_content
                 else:
-                    self.assertEqual(reservation, parameters['JOBS.A.RESERVATION'])
+                    assert reservation == parameters['JOBS.A.RESERVATION']
 
                     template_content, additional_templates = job.update_content(config, parameters)
-                    self.assertFalse(additional_templates)
-                    self.assertTrue(f'#SBATCH --reservation={reservation}' in template_content)
+                    assert not additional_templates
+                    assert f'#SBATCH --reservation={reservation}' in template_content
 
     # def test_exists_completed_file_then_sets_status_to_completed(self):
     #     # arrange
@@ -983,7 +1000,7 @@ CONFIG:
         ]:
             self.job.processors = test['processors']
             self.job.nodes = test['nodes']
-            self.assertEqual(self.job.total_processors, test['expected'])
+            assert self.job.total_processors == test['expected']
 
     def test_job_script_checking_contains_the_right_variables(self):
         # This test (and feature) was implemented in order to avoid
@@ -1000,7 +1017,7 @@ CONFIG:
         tasks = 16
         memory = 80
         wallclock = "00:30"
-        self.as_conf.get_member_list = Mock(return_value = [])
+        self.as_conf.get_member_list = Mock(return_value=[])
         custom_directives = '["whatever"]'
         options = {
             'PROCESSORS': processors,
@@ -1023,7 +1040,7 @@ CONFIG:
 
         self.as_conf.substitute_dynamic_variables = MagicMock()
         default = {'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%',
-                                              'M': '%M%', 'M_': '%M_%', 'm': '%m%', 'm_': '%m_%'}
+                   'M': '%M%', 'M_': '%M_%', 'm': '%m%', 'm_': '%m_%'}
         self.as_conf.substitute_dynamic_variables.return_value = default
         dummy_platform.custom_directives = '["whatever"]'
         self.as_conf.dynamic_variables = {}
@@ -1032,89 +1049,85 @@ CONFIG:
         self.as_conf.normalize_parameters_keys = MagicMock()
         self.as_conf.normalize_parameters_keys.return_value = default
         self.job._platform = dummy_platform
-        self.as_conf.platforms_data = { "DUMMY_PLATFORM":{ "whatever":"dummy_value", "whatever2":"dummy_value2"} }
+        self.as_conf.platforms_data = {"DUMMY_PLATFORM": {"whatever": "dummy_value", "whatever2": "dummy_value2"}}
 
-        parameters = {}
         # Act
         parameters = self.job.update_parameters(self.as_conf, set_attributes=True)
         # Assert
-        self.assertTrue('CURRENT_WHATEVER' in parameters)
-        self.assertTrue('CURRENT_WHATEVER2' in parameters)
+        assert 'CURRENT_WHATEVER' in parameters
+        assert 'CURRENT_WHATEVER2' in parameters
 
-        self.assertEqual('dummy_value', parameters['CURRENT_WHATEVER'])
-        self.assertEqual('dummy_value2', parameters['CURRENT_WHATEVER2'])
-        self.assertTrue('d' in parameters)
-        self.assertTrue('d_' in parameters)
-        self.assertTrue('Y' in parameters)
-        self.assertTrue('Y_' in parameters)
-        self.assertEqual('%d%', parameters['d'])
-        self.assertEqual('%d_%', parameters['d_'])
-        self.assertEqual('%Y%', parameters['Y'])
-        self.assertEqual('%Y_%', parameters['Y_'])
+        assert 'dummy_value' == parameters['CURRENT_WHATEVER']
+        assert 'dummy_value2' == parameters['CURRENT_WHATEVER2']
+        assert 'd' in parameters
+        assert 'd_' in parameters
+        assert 'Y' in parameters
+        assert 'Y_' in parameters
+        assert '%d%' == parameters['d']
+        assert '%d_%' == parameters['d_']
+        assert '%Y%' == parameters['Y']
+        assert '%Y_%' == parameters['Y_']
         # update parameters when date is not none and chunk is none
-        self.job.date = datetime.datetime(1975, 5, 25, 22, 0, 0, 0, datetime.timezone.utc)
+        self.job.date = datetime(1975, 5, 25, 22, 0, 0, 0, timezone.utc)
         self.job.chunk = None
         parameters = self.job.update_parameters(self.as_conf, set_attributes=True)
-        self.assertEqual(1,parameters['CHUNK'])
+        assert 1 == parameters['CHUNK']
         # update parameters when date is not none and chunk is not none
-        self.job.date = datetime.datetime(1975, 5, 25, 22, 0, 0, 0, datetime.timezone.utc)
+        self.job.date = datetime(1975, 5, 25, 22, 0, 0, 0, timezone.utc)
         self.job.chunk = 1
         self.job.date_format = 'H'
         parameters = self.job.update_parameters(self.as_conf, set_attributes=True)
-        self.assertEqual(1, parameters['CHUNK'])
-        self.assertEqual("TRUE", parameters['CHUNK_FIRST'])
-        self.assertEqual("TRUE", parameters['CHUNK_LAST'])
-        self.assertEqual("1975", parameters['CHUNK_START_YEAR'])
-        self.assertEqual("05", parameters['CHUNK_START_MONTH'])
-        self.assertEqual("25", parameters['CHUNK_START_DAY'])
-        self.assertEqual("22", parameters['CHUNK_START_HOUR'])
-        self.assertEqual("1975", parameters['CHUNK_END_YEAR'])
-        self.assertEqual("05", parameters['CHUNK_END_MONTH'])
-        self.assertEqual("26", parameters['CHUNK_END_DAY'])
-        self.assertEqual("22", parameters['CHUNK_END_HOUR'])
-        self.assertEqual("1975", parameters['CHUNK_SECOND_TO_LAST_YEAR'])
+        assert 1 == parameters['CHUNK']
+        assert "TRUE" == parameters['CHUNK_FIRST']
+        assert "TRUE" == parameters['CHUNK_LAST']
+        assert "1975" == parameters['CHUNK_START_YEAR']
+        assert "05" == parameters['CHUNK_START_MONTH']
+        assert "25" == parameters['CHUNK_START_DAY']
+        assert "22" == parameters['CHUNK_START_HOUR']
+        assert "1975" == parameters['CHUNK_END_YEAR']
+        assert "05" == parameters['CHUNK_END_MONTH']
+        assert "26" == parameters['CHUNK_END_DAY']
+        assert "22" == parameters['CHUNK_END_HOUR']
+        assert "1975" == parameters['CHUNK_SECOND_TO_LAST_YEAR']
 
-        self.assertEqual("05", parameters['CHUNK_SECOND_TO_LAST_MONTH'])
-        self.assertEqual("25", parameters['CHUNK_SECOND_TO_LAST_DAY'])
-        self.assertEqual("22", parameters['CHUNK_SECOND_TO_LAST_HOUR'])
-        self.assertEqual('1975052522', parameters['CHUNK_START_DATE'])
-        self.assertEqual('1975052622', parameters['CHUNK_END_DATE'])
-        self.assertEqual('1975052522', parameters['CHUNK_SECOND_TO_LAST_DATE'])
-        self.assertEqual('1975052422', parameters['DAY_BEFORE'])
-        self.assertEqual('1', parameters['RUN_DAYS'])
+        assert "05" == parameters['CHUNK_SECOND_TO_LAST_MONTH']
+        assert "25" == parameters['CHUNK_SECOND_TO_LAST_DAY']
+        assert "22" == parameters['CHUNK_SECOND_TO_LAST_HOUR']
+        assert '1975052522' == parameters['CHUNK_START_DATE']
+        assert '1975052622' == parameters['CHUNK_END_DATE']
+        assert '1975052522' == parameters['CHUNK_SECOND_TO_LAST_DATE']
+        assert '1975052422' == parameters['DAY_BEFORE']
+        assert '1' == parameters['RUN_DAYS']
 
         self.job.chunk = 2
-        parameters = {"EXPERIMENT.NUMCHUNKS": 3, "EXPERIMENT.CHUNKSIZEUNIT": "hour"}
         parameters = self.job.update_parameters(self.as_conf, set_attributes=True)
-        self.assertEqual(2, parameters['CHUNK'])
-        self.assertEqual("FALSE", parameters['CHUNK_FIRST'])
-        self.assertEqual("FALSE", parameters['CHUNK_LAST'])
-
-
+        assert 2 == parameters['CHUNK']
+        assert "FALSE" == parameters['CHUNK_FIRST']
+        assert "FALSE" == parameters['CHUNK_LAST']
 
     def test_sdate(self):
         """Test that the property getter for ``sdate`` works as expected."""
         for test in [
             [None, None, ''],
-            [datetime.datetime(1975, 5, 25, 22, 0, 0, 0, datetime.timezone.utc), 'H', '1975052522'],
-            [datetime.datetime(1975, 5, 25, 22, 30, 0, 0, datetime.timezone.utc), 'M', '197505252230'],
-            [datetime.datetime(1975, 5, 25, 22, 30, 0, 0, datetime.timezone.utc), 'S', '19750525223000'],
-            [datetime.datetime(1975, 5, 25, 22, 30, 0, 0, datetime.timezone.utc), None, '19750525']
+            [datetime(1975, 5, 25, 22, 0, 0, 0, timezone.utc), 'H', '1975052522'],
+            [datetime(1975, 5, 25, 22, 30, 0, 0, timezone.utc), 'M', '197505252230'],
+            [datetime(1975, 5, 25, 22, 30, 0, 0, timezone.utc), 'S', '19750525223000'],
+            [datetime(1975, 5, 25, 22, 30, 0, 0, timezone.utc), None, '19750525']
         ]:
             self.job.date = test[0]
             self.job.date_format = test[1]
-            self.assertEqual(test[2], self.job.sdate)
+            assert test[2] == self.job.sdate
 
     def test__repr__(self):
         self.job.name = "dummy-name"
         self.job.status = "dummy-status"
-        self.assertEqual("dummy-name STATUS: dummy-status", self.job.__repr__())
+        assert "dummy-name STATUS: dummy-status" == self.job.__repr__()
 
     def test_add_child(self):
         child = Job("child", 1, Status.WAITING, 0)
         self.job.add_children([child])
-        self.assertEqual(1, len(self.job.children))
-        self.assertEqual(child, list(self.job.children)[0])
+        assert 1 == len(self.job.children)
+        assert child == list(self.job.children)[0]
 
     def test_auto_calendar_split(self):
         self.experiment_data = {
@@ -1142,33 +1155,29 @@ CONFIG:
                     'SPLITSIZE': 2
                 }
             }
-            }
+        }
         section = "A"
-        date = datetime.datetime.strptime("20000101", "%Y%m%d")
+        date = datetime.strptime("20000101", "%Y%m%d")
         chunk = 1
         splits = calendar_chunk_section(self.experiment_data, section, date, chunk)
-        self.assertEqual(splits, 24)
+        assert splits == 24
         splits = calendar_chunk_section(self.experiment_data, "B", date, chunk)
-        self.assertEqual(splits, 12)
+        assert splits == 12
         self.experiment_data['EXPERIMENT']['CHUNKSIZEUNIT'] = 'hour'
-        with self.assertRaises(AutosubmitCritical):
+        with pytest.raises(AutosubmitCritical):
             calendar_chunk_section(self.experiment_data, "A", date, chunk)
 
         self.experiment_data['EXPERIMENT']['CHUNKSIZEUNIT'] = 'month'
         splits = calendar_chunk_section(self.experiment_data, "A", date, chunk)
-        self.assertEqual(splits, 31)
+        assert splits == 31
         splits = calendar_chunk_section(self.experiment_data, "B", date, chunk)
-        self.assertEqual(splits, 16)
+        assert splits == 16
 
         self.experiment_data['EXPERIMENT']['CHUNKSIZEUNIT'] = 'year'
         splits = calendar_chunk_section(self.experiment_data, "A", date, chunk)
-        self.assertEqual(splits, 31)
+        assert splits == 31
         splits = calendar_chunk_section(self.experiment_data, "B", date, chunk)
-        self.assertEqual(splits, 16)
-
-
-
-
+        assert splits == 16
 
     def test_calendar(self):
         split = 12
@@ -1234,10 +1243,10 @@ CONFIG:
             parameters = config.load_parameters()
 
             job_list = JobList(expid, config, YAMLParserFactory(),
-                                   Autosubmit._get_job_list_persistence(expid, config))
+                               Autosubmit._get_job_list_persistence(expid, config))
             job_list.generate(
                 as_conf=config,
-                date_list=[datetime.datetime.strptime("20000101", "%Y%m%d")],
+                date_list=[datetime.strptime("20000101", "%Y%m%d")],
                 member_list=["fc0"],
                 num_chunks=2,
                 chunk_ini=1,
@@ -1252,7 +1261,7 @@ CONFIG:
                 create=True,
             )
             job_list = job_list.get_job_list()
-            self.assertEqual(24, len(job_list))
+            assert 24 == len(job_list)
 
             submitter = Autosubmit._get_submitter(config)
             submitter.load_platforms(config)
@@ -1268,76 +1277,77 @@ CONFIG:
             # Assert general
             job = job_list[0]
             parameters = job.update_parameters(config, set_attributes=True)
-            self.assertEqual(job.splits, 12)
-            self.assertEqual(job.running, 'chunk')
+            assert job.splits == 12
+            assert job.running == 'chunk'
 
-            self.assertEqual(parameters['SPLIT'], 1)
-            self.assertEqual(parameters['SPLITSIZE'], splitsize)
-            self.assertEqual(parameters['SPLITSIZEUNIT'], 'hour')
-            self.assertEqual(parameters['SPLITSCALENDAR'], 'standard')
+            assert parameters['SPLIT'] == 1
+            assert parameters['SPLITSIZE'] == splitsize
+            assert parameters['SPLITSIZEUNIT'] == 'hour'
+            assert parameters['SPLITSCALENDAR'] == 'standard'
             # assert parameters
             next_start = "00"
-            for i,job in enumerate(job_list[0:12]):
+            for i, job in enumerate(job_list[0:12]):
                 parameters = job.update_parameters(config, set_attributes=True)
-                end_hour = str(parameters['SPLIT'] * splitsize ).zfill(2)
+                end_hour = str(parameters['SPLIT'] * splitsize).zfill(2)
                 if end_hour == "24":
                     end_hour = "00"
-                self.assertEqual(parameters['SPLIT'], i+1)
-                self.assertEqual(parameters['SPLITSIZE'], splitsize)
-                self.assertEqual(parameters['SPLITSIZEUNIT'], 'hour')
-                self.assertEqual(parameters['SPLIT_START_DATE'], '20000101')
-                self.assertEqual(parameters['SPLIT_START_YEAR'], '2000')
-                self.assertEqual(parameters['SPLIT_START_MONTH'], '01')
-                self.assertEqual(parameters['SPLIT_START_DAY'], '01')
-                self.assertEqual(parameters['SPLIT_START_HOUR'], next_start)
+                assert parameters['SPLIT'] == i + 1
+                assert parameters['SPLITSIZE'] == splitsize
+                assert parameters['SPLITSIZEUNIT'] == 'hour'
+                assert parameters['SPLIT_START_DATE'] == '20000101'
+                assert parameters['SPLIT_START_YEAR'] == '2000'
+                assert parameters['SPLIT_START_MONTH'] == '01'
+                assert parameters['SPLIT_START_DAY'] == '01'
+                assert parameters['SPLIT_START_HOUR'] == next_start
                 if parameters['SPLIT'] == 12:
-                    self.assertEqual(parameters['SPLIT_END_DATE'], '20000102')
-                    self.assertEqual(parameters['SPLIT_END_DAY'], '02')
-                    self.assertEqual(parameters['SPLIT_END_DATE'], '20000102')
-                    self.assertEqual(parameters['SPLIT_END_DAY'], '02')
-                    self.assertEqual(parameters['SPLIT_END_YEAR'], '2000')
-                    self.assertEqual(parameters['SPLIT_END_MONTH'], '01')
-                    self.assertEqual(parameters['SPLIT_END_HOUR'], end_hour)
+                    assert parameters['SPLIT_END_DATE'] == '20000102'
+                    assert parameters['SPLIT_END_DAY'] == '02'
+                    assert parameters['SPLIT_END_DATE'] == '20000102'
+                    assert parameters['SPLIT_END_DAY'] == '02'
+                    assert parameters['SPLIT_END_YEAR'] == '2000'
+                    assert parameters['SPLIT_END_MONTH'] == '01'
+                    assert parameters['SPLIT_END_HOUR'] == end_hour
                 else:
-                    self.assertEqual(parameters['SPLIT_END_DATE'], '20000101')
-                    self.assertEqual(parameters['SPLIT_END_DAY'], '01')
-                    self.assertEqual(parameters['SPLIT_END_YEAR'], '2000')
-                    self.assertEqual(parameters['SPLIT_END_MONTH'], '01')
-                    self.assertEqual(parameters['SPLIT_END_HOUR'], end_hour)
+                    assert parameters['SPLIT_END_DATE'] == '20000101'
+                    assert parameters['SPLIT_END_DAY'] == '01'
+                    assert parameters['SPLIT_END_YEAR'] == '2000'
+                    assert parameters['SPLIT_END_MONTH'] == '01'
+                    assert parameters['SPLIT_END_HOUR'] == end_hour
                 next_start = parameters['SPLIT_END_HOUR']
             next_start = "00"
-            for i,job in enumerate(job_list[12:24]):
+            for i, job in enumerate(job_list[12:24]):
                 parameters = job.update_parameters(config, set_attributes=True)
-                end_hour = str(parameters['SPLIT'] * splitsize ).zfill(2)
+                end_hour = str(parameters['SPLIT'] * splitsize).zfill(2)
                 if end_hour == "24":
                     end_hour = "00"
-                self.assertEqual(parameters['SPLIT'], i+1)
-                self.assertEqual(parameters['SPLITSIZE'], splitsize)
-                self.assertEqual(parameters['SPLITSIZEUNIT'], 'hour')
-                self.assertEqual(parameters['SPLIT_START_DATE'], '20000105')
-                self.assertEqual(parameters['SPLIT_START_YEAR'], '2000')
-                self.assertEqual(parameters['SPLIT_START_MONTH'], '01')
-                self.assertEqual(parameters['SPLIT_START_DAY'], '05')
-                self.assertEqual(parameters['SPLIT_START_HOUR'], next_start)
+                assert parameters['SPLIT'] == i + 1
+                assert parameters['SPLITSIZE'] == splitsize
+                assert parameters['SPLITSIZEUNIT'] == 'hour'
+                assert parameters['SPLIT_START_DATE'] == '20000105'
+                assert parameters['SPLIT_START_YEAR'] == '2000'
+                assert parameters['SPLIT_START_MONTH'] == '01'
+                assert parameters['SPLIT_START_DAY'] == '05'
+                assert parameters['SPLIT_START_HOUR'] == next_start
                 if parameters['SPLIT'] == 12:
-                    self.assertEqual(parameters['SPLIT_END_DATE'], '20000106')
-                    self.assertEqual(parameters['SPLIT_END_DAY'], '06')
-                    self.assertEqual(parameters['SPLIT_END_YEAR'], '2000')
-                    self.assertEqual(parameters['SPLIT_END_MONTH'], '01')
-                    self.assertEqual(parameters['SPLIT_END_HOUR'], end_hour)
+                    assert parameters['SPLIT_END_DATE'] == '20000106'
+                    assert parameters['SPLIT_END_DAY'] == '06'
+                    assert parameters['SPLIT_END_YEAR'] == '2000'
+                    assert parameters['SPLIT_END_MONTH'] == '01'
+                    assert parameters['SPLIT_END_HOUR'] == end_hour
                 else:
-                    self.assertEqual(parameters['SPLIT_END_DATE'], '20000105')
-                    self.assertEqual(parameters['SPLIT_END_DAY'], '05')
-                    self.assertEqual(parameters['SPLIT_END_YEAR'], '2000')
-                    self.assertEqual(parameters['SPLIT_END_MONTH'], '01')
-                    self.assertEqual(parameters['SPLIT_END_HOUR'], end_hour)
+                    assert parameters['SPLIT_END_DATE'] == '20000105'
+                    assert parameters['SPLIT_END_DAY'] == '05'
+                    assert parameters['SPLIT_END_YEAR'] == '2000'
+                    assert parameters['SPLIT_END_MONTH'] == '01'
+                    assert parameters['SPLIT_END_HOUR'] == end_hour
                 next_start = parameters['SPLIT_END_HOUR']
 
 
-
+# TODO: remove this and use pytest fixtures.
 class FakeBasicConfig:
     def __init__(self):
         pass
+
     def props(self):
         pr = {}
         for name in dir(self):
@@ -1345,6 +1355,7 @@ class FakeBasicConfig:
             if not name.startswith('__') and not inspect.ismethod(value) and not inspect.isfunction(value):
                 pr[name] = value
         return pr
+
     def read(self):
         FakeBasicConfig.DB_DIR = '/dummy/db/dir'
         FakeBasicConfig.DB_FILE = '/dummy/db/file'
@@ -1355,6 +1366,7 @@ class FakeBasicConfig:
         FakeBasicConfig.DEFAULT_PLATFORMS_CONF = ''
         FakeBasicConfig.DEFAULT_JOBS_CONF = ''
         FakeBasicConfig.STRUCTURES_DIR = '/dummy/structures/dir'
+
     DB_DIR = '/dummy/db/dir'
     DB_FILE = '/dummy/db/file'
     DB_PATH = '/dummy/db/path'
@@ -1378,7 +1390,6 @@ def test_update_stat_file():
     assert job.stat_file == "dummyname_STAT_"
 
 
-
 def test_pytest_check_script(mocker):
     job = Job("job1", "1", Status.READY, 0)
     # arrange
@@ -1388,7 +1399,7 @@ def test_pytest_check_script(mocker):
     parameters['NUMTASK'] = 666
     parameters['RESERVATION'] = "random-string"
     mocker.patch("autosubmit.job.job.Job.update_content", return_value=(
-    'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK%', 'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK%'))
+        'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK%', 'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK%'))
     mocker.patch("autosubmit.job.job.Job.update_parameters", return_value=parameters)
     job._init_runtime_parameters()
 
@@ -1407,7 +1418,7 @@ def test_pytest_check_script(mocker):
     assert checked
 
 
-def test_pytest_create_script(mocker):
+def test_create_script(mocker):
     # arrange
     job = Job("job1", "1", Status.READY, 0)
     # arrange
@@ -1419,8 +1430,8 @@ def test_pytest_create_script(mocker):
     job._tmp_path = '/dummy/tmp/path'
     job.additional_files = '/dummy/tmp/path_additional_file'
     mocker.patch("autosubmit.job.job.Job.update_content", return_value=(
-    'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK% %% %%',
-    ['some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK% %% %%']))
+        'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK% %% %%',
+        ['some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK% %% %%']))
     mocker.patch("autosubmit.job.job.Job.update_parameters", return_value=parameters)
 
     config = Mock(spec=AutosubmitConfig)
@@ -1459,6 +1470,7 @@ def test_reset_logs(autosubmit_config):
     assert job.updated_log is False
     assert job.packed_during_building is False
 
+
 def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_template_variable(mocker):
     job = Job("job1", "1", Status.READY, 0)
     # arrange
@@ -1480,3 +1492,424 @@ def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_templat
     # update_parameters_mock.assert_called_with(config, parameters)
     # update_content_mock.assert_called_with(config)
     assert checked is False
+
+
+def create_job_and_update_parameters(autosubmit_config, experiment_data, platform_type="ps"):
+    as_conf = autosubmit_config("test-expid", experiment_data)
+    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
+    as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
+    # Create some jobs
+    job = Job('A', '1', 0, 1)
+    if platform_type == "ps":
+        platform = PsPlatform(expid='test-expid', name='DUMMY_PLATFORM', config=as_conf.experiment_data)
+    else:
+        platform = SlurmPlatform(expid='test-expid', name='DUMMY_PLATFORM', config=as_conf.experiment_data)
+    job.section = 'RANDOM-SECTION'
+    job.platform = platform
+    parameters = job.update_parameters(as_conf, set_attributes=True)
+    return job, as_conf, parameters
+
+
+@pytest.mark.parametrize('experiment_data, expected_data', [(
+        {
+            'JOBS': {
+                'RANDOM-SECTION': {
+                    'FILE': "test.sh",
+                    'PLATFORM': 'DUMMY_PLATFORM',
+                    'TEST': "%other%",
+                },
+            },
+            'PLATFORMS': {
+                'dummy_platform': {
+                    'type': 'ps',
+                    'whatever': 'dummy_value',
+                    'whatever2': 'dummy_value2',
+                    'CUSTOM_DIRECTIVES': ['$SBATCH directive1', '$SBATCH directive2'],
+                },
+            },
+            'OTHER': "%CURRENT_WHATEVER%/%CURRENT_WHATEVER2%",
+            'ROOTDIR': 'dummy_rootdir',
+            'LOCAL_TMP_DIR': 'dummy_tmpdir',
+            'LOCAL_ROOT_DIR': 'dummy_rootdir',
+        },
+        {
+            'CURRENT_FILE': "test.sh",
+            'CURRENT_PLATFORM': 'DUMMY_PLATFORM',
+            'CURRENT_WHATEVER': 'dummy_value',
+            'CURRENT_WHATEVER2': 'dummy_value2',
+            'CURRENT_TEST': 'dummy_value/dummy_value2',
+
+        }
+)])
+def test_update_parameters_current_variables(autosubmit_config, experiment_data, expected_data):
+    _, _, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data)
+    for key, value in expected_data.items():
+        assert parameters[key] == value
+
+
+@pytest.mark.parametrize('test_with_file, file_is_empty, last_line_empty', [
+    (False, False, False),
+    (True, True, False),
+    (True, False, False),
+    (True, False, True)
+], ids=["no file", "file is empty", "file is correct", "file last line is empty"])
+def test_recover_last_ready_date(tmpdir, test_with_file, file_is_empty, last_line_empty):
+    job = Job('dummy', '1', 0, 1)
+    job._tmp_path = Path(tmpdir)
+    stat_file = job._tmp_path.joinpath(f'{job.name}_TOTAL_STATS')
+    ready_time = datetime.now() + timedelta(minutes=5)
+    ready_date = int(ready_time.strftime("%Y%m%d%H%M%S"))
+    expected_date = None
+    if test_with_file:
+        if file_is_empty:
+            stat_file.touch()
+            expected_date = datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
+        else:
+            if last_line_empty:
+                with stat_file.open('w') as f:
+                    f.write(" ")
+                expected_date = datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
+            else:
+                with stat_file.open('w') as f:
+                    f.write(f"{ready_date} {ready_date} {ready_date} COMPLETED")
+                expected_date = str(ready_date)
+    job.ready_date = None
+    job.recover_last_ready_date()
+    assert job.ready_date == expected_date
+
+
+@pytest.mark.parametrize('test_with_logfiles, file_timestamp_greater_than_ready_date', [
+    (False, False),
+    (True, True),
+    (True, False),
+], ids=["no file", "log timestamp >= ready_date", "log timestamp < ready_date"])
+def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greater_than_ready_date):
+    job = Job('dummy', '1', 0, 1)
+    job._log_path = Path(tmpdir)
+    expected_local_logs = (f"{job.name}.out.0", f"{job.name}.err.0")
+    if test_with_logfiles:
+        if file_timestamp_greater_than_ready_date:
+            ready_time = datetime.now() - timedelta(minutes=5)
+            job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
+            log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
+            expected_update_log = True
+            expected_local_logs = (log_name.with_suffix('.out').name, log_name.with_suffix('.err').name)
+        else:
+            expected_update_log = False
+            ready_time = datetime.now() + timedelta(minutes=5)
+            job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
+            log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
+        log_name.with_suffix('.out').touch()
+        log_name.with_suffix('.err').touch()
+    else:
+        expected_update_log = False
+
+    job.updated_log = False
+    job.recover_last_log_name()
+    assert job.updated_log == expected_update_log
+    assert job.local_logs[0] == str(expected_local_logs[0])
+    assert job.local_logs[1] == str(expected_local_logs[1])
+
+
+@pytest.mark.parametrize('experiment_data, attributes_to_check', [(
+        {
+            'JOBS': {
+                'RANDOM-SECTION': {
+                    'FILE': "test.sh",
+                    'PLATFORM': 'DUMMY_PLATFORM',
+                    'NOTIFY_ON': 'COMPLETED',
+                },
+            },
+            'PLATFORMS': {
+                'dummy_platform': {
+                    'type': 'ps',
+                },
+            },
+            'ROOTDIR': 'dummy_rootdir',
+            'LOCAL_TMP_DIR': 'dummy_tmpdir',
+            'LOCAL_ROOT_DIR': 'dummy_rootdir',
+        },
+        {'notify_on': ['COMPLETED']}
+)])
+def test_update_parameters_attributes(autosubmit_config, experiment_data, attributes_to_check):
+    job, _, _ = create_job_and_update_parameters(autosubmit_config, experiment_data)
+    for attr in attributes_to_check:
+        assert hasattr(job, attr)
+        assert getattr(job, attr) == attributes_to_check[attr]
+
+
+@pytest.mark.parametrize('custom_directives, test_type, result_by_lines', [
+    ("test_str a", "platform", ["test_str a"]),
+    (['test_list', 'test_list2'], "platform", ['test_list', 'test_list2']),
+    (['test_list', 'test_list2'], "job", ['test_list', 'test_list2']),
+    ("test_str", "job", ["test_str"]),
+    (['test_list', 'test_list2'], "both", ['test_list', 'test_list2']),
+    ("test_str", "both", ["test_str"]),
+    (['test_list', 'test_list2'], "current_directive", ['test_list', 'test_list2']),
+    ("['test_str_list', 'test_str_list2']", "job", ['test_str_list', 'test_str_list2']),
+], ids=["Test str - platform", "test_list - platform", "test_list - job", "test_str - job", "test_list - both",
+        "test_str - both", "test_list - job - current_directive", "test_str_list - current_directive"])
+def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines, mocker, autosubmit_config):
+    file_stat = os.stat(f"{tmpdir.strpath}")
+    file_owner_id = file_stat.st_uid
+    tmpdir.owner = pwd.getpwuid(file_owner_id).pw_name
+    tmpdir_path = Path(tmpdir.strpath)
+    project = "whatever"
+    user = tmpdir.owner
+    scratch_dir = f"{tmpdir.strpath}/scratch"
+    full_path = f"{scratch_dir}/{project}/{user}"
+    experiment_data = {
+        'JOBS': {
+            'RANDOM-SECTION': {
+                'SCRIPT': "echo 'Hello World!'",
+                'PLATFORM': 'DUMMY_PLATFORM',
+            },
+        },
+        'PLATFORMS': {
+            'dummy_platform': {
+                "type": "slurm",
+                "host": "127.0.0.1",
+                "user": f"{user}",
+                "project": f"{project}",
+                "scratch_dir": f"{scratch_dir}",
+                "QUEUE": "gp_debug",
+                "ADD_PROJECT_TO_HOST": False,
+                "MAX_WALLCLOCK": "48:00",
+                "TEMP_DIR": "",
+                "MAX_PROCESSORS": 99999,
+                "PROCESSORS_PER_NODE": 123,
+                "DISABLE_RECOVERY_THREADS": True
+            },
+        },
+        'ROOTDIR': f"{full_path}",
+        'LOCAL_TMP_DIR': f"{full_path}",
+        'LOCAL_ROOT_DIR': f"{full_path}",
+        'LOCAL_ASLOG_DIR': f"{full_path}",
+    }
+    tmpdir_path.joinpath(f"{scratch_dir}/{project}/{user}").mkdir(parents=True)
+    tmpdir_path.joinpath("test-expid").mkdir(parents=True)
+    tmpdir_path.joinpath("test-expid/tmp/LOG_test-expid").mkdir(parents=True)
+
+    if test_type == "platform":
+        experiment_data['PLATFORMS']['dummy_platform']['CUSTOM_DIRECTIVES'] = custom_directives
+    elif test_type == "job":
+        experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = custom_directives
+    elif test_type == "both":
+        experiment_data['PLATFORMS']['dummy_platform']['CUSTOM_DIRECTIVES'] = custom_directives
+        experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = custom_directives
+    elif test_type == "current_directive":
+        experiment_data['PLATFORMS']['dummy_platform']['APP_CUSTOM_DIRECTIVES'] = custom_directives
+        experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = "%CURRENT_APP_CUSTOM_DIRECTIVES%"
+    job, as_conf, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data, "slurm")
+    mocker.patch('autosubmitconfigparser.config.configcommon.AutosubmitConfig.reload')
+    template_content, _ = job.update_content(as_conf, parameters)
+    for directive in result_by_lines:
+        pattern = r'^\s*' + re.escape(directive) + r'\s*$'  # Match Start line, match directive, match end line
+        assert re.search(pattern, template_content, re.MULTILINE) is not None
+
+
+@pytest.mark.parametrize('experiment_data', [(
+        {
+            'JOBS': {
+                'RANDOM-SECTION': {
+                    'FILE': "test.sh",
+                    'PLATFORM': 'DUMMY_PLATFORM',
+                    'TEST': "rng",
+                },
+            },
+            'PLATFORMS': {
+                'dummy_platform': {
+                    'type': 'ps',
+                    'whatever': 'dummy_value',
+                    'whatever2': 'dummy_value2',
+                    'CUSTOM_DIRECTIVES': ['$SBATCH directive1', '$SBATCH directive2'],
+                },
+            },
+            'ROOTDIR': "asd",
+            'LOCAL_TMP_DIR': "asd",
+            'LOCAL_ROOT_DIR': "asd",
+            'LOCAL_ASLOG_DIR': "asd",
+        }
+)], ids=["Simple job"])
+def test_no_start_time(autosubmit_config, experiment_data):
+    job, as_conf, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data)
+    del job.start_time
+    as_conf.force_load = False
+    as_conf.data_changed = False
+    job.update_parameters(as_conf, set_attributes=True)
+    assert isinstance(job.start_time, datetime)
+
+
+def test_get_job_package_code(autosubmit_config):
+    autosubmit_config('dummy', {})
+    experiment_id = 'dummy'
+    job = Job(experiment_id, '1', 0, 1)
+
+    with patch("autosubmit.job.job_utils.JobPackagePersistence") as mock_persistence:
+        mock_persistence.return_value.load.return_value = [
+            ['dummy', '0005_job_packages', 'dummy']
+        ]
+        code = get_job_package_code(job.expid, job.name)
+
+        assert code == 5
+
+
+def test_simple_job_instantiation(tmp_path, autosubmit_config):
+    job = SimpleJob("dummy", tmp_path, 100)
+
+    assert job.name == "dummy"
+    assert job._tmp_path == tmp_path
+    assert job.status == 100
+
+
+def test_sub_job_instantiation(tmp_path, autosubmit_config):
+    job = SubJob("dummy", package=None, queue=0, run=0, total=0, status="UNKNOWN")
+
+    assert job.name == "dummy"
+    assert job.package is None
+    assert job.queue == 0
+    assert job.run == 0
+    assert job.total == 0
+    assert job.status == "UNKNOWN"
+
+
+@pytest.mark.parametrize("current_structure",
+                         [
+                             ({
+                                 'dummy2':
+                                     {'dummy', 'dummy1', 'dummy4'},
+                                 'dummy3':
+                                     'dummy'
+                             }),
+                             ({}),
+                         ],
+                         ids=["Current structure of the Job Manager with multiple values",
+                              "Current structure of the Job Manager without values"]
+                         )
+def test_sub_job_manager(current_structure):
+    """
+    tester of the function _sub_job_manager
+    """
+    jobs = {
+        SubJob("dummy", package="test2", queue=0, run=1, total=30, status="UNKNOWN"),
+        SubJob("dummy", package=["test4", "test1", "test2", "test3"], queue=1,
+               run=2, total=10, status="UNKNOWN"),
+        SubJob("dummy2", package="test2", queue=2, run=3, total=100, status="UNKNOWN"),
+        SubJob("dummy", package="test3", queue=3, run=4, total=1000, status="UNKNOWN"),
+    }
+
+    job_to_package = {
+        'dummy test'
+    }
+
+    package_to_job = {
+        'test':
+            {'dummy', 'dummy2'},
+        'test2':
+            {'dummy', 'dummy2'},
+        'test3':
+            {'dummy', 'dummy2'}
+    }
+
+    job_manager = SubJobManager(jobs, job_to_package, package_to_job, current_structure)
+    job_manager.process_index()
+    job_manager.process_times()
+
+    print(type(job_manager.get_subjoblist()))
+
+    assert job_manager is not None and type(job_manager) is SubJobManager
+    assert job_manager.get_subjoblist() is not None and type(job_manager.get_subjoblist()) is set
+    assert job_manager.subjobindex is not None and type(job_manager.subjobindex) is dict
+    assert job_manager.subjobfixes is not None and type(job_manager.subjobfixes) is dict
+    assert (job_manager.get_collection_of_fixes_applied() is not None
+            and type(job_manager.get_collection_of_fixes_applied()) is dict)
+
+
+def test_update_parameters_reset_logs(autosubmit_config, tmpdir):
+    # TODO This experiment_data (aside from WORKFLOW_COMMIT and maybe JOBS) could be a good candidate for a fixture in the conf_test. "basic functional configuration"
+    as_conf = autosubmit_config(
+        expid='a000',
+        experiment_data={
+            'AUTOSUBMIT': {'WORKFLOW_COMMIT': 'dummy'},
+            'PLATFORMS': {'DUMMY_P': {'TYPE': 'ps'}},
+            'JOBS': {'DUMMY_S': {'FILE': 'dummy.sh', 'PLATFORM': 'DUMMY_P'}},
+            'DEFAULT': {'HPCARCH': 'DUMMY_P'},
+        }
+    )
+    job = Job('DUMMY', '1', 0, 1)
+    job.section = 'DUMMY_S'
+    job.log_recovered = True
+    job.packed_during_building = True
+    job.workflow_commit = "incorrect"
+    job.update_parameters(as_conf, set_attributes=True, reset_logs=True)
+    assert job.workflow_commit == "dummy"
+
+
+# NOTE: These tests were migrated from ``test/integration/test_job.py``.
+
+def _create_relationship(parent, child):
+    parent.children.add(child)
+    child.parents.add(parent)
+
+
+@pytest.fixture
+def integration_jobs():
+    """The name of this function has "integration" because it was in the folder of integration tests."""
+    jobs = list()
+    jobs.append(Job('whatever', 0, Status.UNKNOWN, 0))
+    jobs.append(Job('whatever', 1, Status.UNKNOWN, 0))
+    jobs.append(Job('whatever', 2, Status.UNKNOWN, 0))
+    jobs.append(Job('whatever', 3, Status.UNKNOWN, 0))
+    jobs.append(Job('whatever', 4, Status.UNKNOWN, 0))
+
+    _create_relationship(jobs[0], jobs[1])
+    _create_relationship(jobs[0], jobs[2])
+    _create_relationship(jobs[1], jobs[3])
+    _create_relationship(jobs[1], jobs[4])
+    _create_relationship(jobs[2], jobs[3])
+    _create_relationship(jobs[2], jobs[4])
+    return jobs
+
+
+def test_is_ancestor_works_well(integration_jobs):
+    check_ancestors_array(integration_jobs[0], [False, False, False, False, False], integration_jobs)
+    check_ancestors_array(integration_jobs[1], [False, False, False, False, False], integration_jobs)
+    check_ancestors_array(integration_jobs[2], [False, False, False, False, False], integration_jobs)
+    check_ancestors_array(integration_jobs[3], [True, False, False, False, False], integration_jobs)
+    check_ancestors_array(integration_jobs[4], [True, False, False, False, False], integration_jobs)
+
+
+def test_is_parent_works_well(integration_jobs):
+    _check_parents_array(integration_jobs[0], [False, False, False, False, False], integration_jobs)
+    _check_parents_array(integration_jobs[1], [True, False, False, False, False], integration_jobs)
+    _check_parents_array(integration_jobs[2], [True, False, False, False, False], integration_jobs)
+    _check_parents_array(integration_jobs[3], [False, True, True, False, False], integration_jobs)
+    _check_parents_array(integration_jobs[4], [False, True, True, False, False], integration_jobs)
+
+
+def test_remove_redundant_parents_works_well(integration_jobs):
+    # Adding redundant relationships
+    _create_relationship(integration_jobs[0], integration_jobs[3])
+    _create_relationship(integration_jobs[0], integration_jobs[4])
+    # Checking there are redundant parents
+    assert len(integration_jobs[3].parents) == 3
+    assert len(integration_jobs[4].parents) == 3
+    # Treating the redundant parents
+    integration_jobs[3].remove_redundant_parents()
+    integration_jobs[4].remove_redundant_parents()
+    # Checking there aren't redundant parents
+    assert len(integration_jobs[3].parents) == 2
+    assert len(integration_jobs[4].parents) == 2
+
+
+def check_ancestors_array(job, assertions, jobs):
+    for assertion, jobs_job in zip(assertions, jobs):
+        assert assertion == job.is_ancestor(jobs_job)
+
+
+def _check_parents_array(job, assertions, jobs):
+    for assertion, jobs_job in zip(assertions, jobs):
+        assert assertion == job.is_parent(jobs_job)
