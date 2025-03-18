@@ -83,6 +83,11 @@ class SlurmPlatform(ParamikoPlatform):
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
 
     def create_a_new_copy(self):
+        """
+        Return a copy of a SlurmPlatform object with the same
+        SlurmPlatform.expid, SlurmPlatform.name and SlurmPlatofrm.cofig
+        as the original
+        """
         return SlurmPlatform(self.expid, self.name, self.config)
 
     def get_submit_cmd_x11(self, args, script_name, job):
@@ -345,6 +350,11 @@ class SlurmPlatform(ParamikoPlatform):
         self._submit_cmd_x11 = f'{self.remote_log_dir}'
 
     def hold_job(self, job):
+        """
+        Input: job to hold
+
+        Returns a boolean indicating whether the job is being held
+        """
         try:
             cmd = "scontrol release {0} ; sleep 2 ; scontrol hold {0} ".format(job.id)
             self.send_command(cmd)
