@@ -26,6 +26,7 @@ from time import time
 from typing import List, Union
 from xml.dom.minidom import parseString
 
+from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status, parse_output_number
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
@@ -83,6 +84,10 @@ class SlurmPlatform(ParamikoPlatform):
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
 
     def create_a_new_copy(self):
+        """
+
+        :return:
+        """
         return SlurmPlatform(self.expid, self.name, self.config)
 
     def get_submit_cmd_x11(self, args, script_name, job):
@@ -95,6 +100,10 @@ class SlurmPlatform(ParamikoPlatform):
         return cmd
 
     def generate_new_name_submit_script_file(self):
+        """
+
+        :return:
+        """
         if os.path.exists(self._submit_script_path):
             os.remove(self._submit_script_path)
         self._submit_script_path = self._submit_script_base_name + os.urandom(16).hex() + ".sh"
@@ -102,6 +111,7 @@ class SlurmPlatform(ParamikoPlatform):
     def process_batch_ready_jobs(self,valid_packages_to_submit,failed_packages,error_message="",hold=False):
         """
         Retrieve multiple jobs identifiers.
+
         :param valid_packages_to_submit:
         :param failed_packages:
         :param error_message:
@@ -226,16 +236,24 @@ class SlurmPlatform(ParamikoPlatform):
         return save,valid_packages_to_submit
 
     def generate_submit_script(self):
+        """
+
+        :return:
+        """
         # remove file
         with suppress(FileNotFoundError):
             os.remove(self._submit_script_path)
         self.generate_new_name_submit_script_file()
 
-    def get_submit_script(self):
+    def get_submit_script(self) -> str:
+        """
+
+        :return:
+        """
         os.chmod(self._submit_script_path, 0o750)
         return self._submit_script_path
 
-    def submit_job(self, job, script_name, hold=False, export="none"):
+    def submit_job(self, job, script_name, hold=False, export="none") -> int:
         """
         Submit a job from a given job object.
 
@@ -268,8 +286,7 @@ class SlurmPlatform(ParamikoPlatform):
             else:
                 return None
 
-    def submit_Script(self, hold=False):
-        # type: (bool) -> Union[List[str], str]
+    def submit_Script(self, hold:bool =False) -> Union[List[str], str]:
         """
         Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once.
 
@@ -304,7 +321,7 @@ class SlurmPlatform(ParamikoPlatform):
         except Exception as e:
             raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e))
 
-    def check_remote_log_dir(self):
+    def check_remote_log_dir(self) -> None:
         """
         Creates log dir on remote host
         """
@@ -324,7 +341,7 @@ class SlurmPlatform(ParamikoPlatform):
                 raise AutosubmitError(
                     "SFTP session not active ", 6007, str(e))
 
-    def update_cmds(self):
+    def update_cmds(self) -> None:
         """
         Updates commands for platforms
         """
@@ -344,7 +361,13 @@ class SlurmPlatform(ParamikoPlatform):
         self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
         self._submit_cmd_x11 = f'{self.remote_log_dir}'
 
-    def hold_job(self, job):
+    def hold_job(self, job: Job) -> bool:
+        """
+
+        :param job: Job to be held
+        :type job: Job
+        :return:
+        """
         try:
             cmd = "scontrol release {0} ; sleep 2 ; scontrol hold {0} ".format(job.id)
             self.send_command(cmd)
@@ -657,7 +680,7 @@ class SlurmPlatform(ParamikoPlatform):
         return self._header.wrapper_header(**kwargs)
 
     @staticmethod
-    def allocated_nodes():
+    def allocated_nodes() -> str:
         return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
 
     def check_file_exists(self, filename: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3) -> bool:
