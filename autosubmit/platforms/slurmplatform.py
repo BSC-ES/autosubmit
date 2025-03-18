@@ -294,6 +294,7 @@ class SlurmPlatform(ParamikoPlatform):
             raise
         except Exception as e:
             raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e))
+
     def check_remote_log_dir(self):
         """
         Creates log dir on remote host
@@ -333,7 +334,6 @@ class SlurmPlatform(ParamikoPlatform):
         self.get_cmd = "scp"
         self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
         self._submit_cmd_x11 = f'{self.remote_log_dir}'
-
 
     def hold_job(self, job):
         try:
@@ -590,6 +590,7 @@ class SlurmPlatform(ParamikoPlatform):
 
     def get_checkAlljobs_cmd(self, jobs_id):
         return "sacct -n -X --jobs {1} -o jobid,State".format(self.host, jobs_id)
+
     def get_estimated_queue_time_cmd(self, job_id):
         return f"scontrol -o show JobId {job_id} | grep -Po '(?<=EligibleTime=)[0-9-:T]*'"
 
