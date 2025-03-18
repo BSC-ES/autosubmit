@@ -113,6 +113,8 @@ project:
     PROJECT_TYPE: None
     # Folder to hold the project sources.
     PROJECT_DESTINATION: local_project
+AUTOSUBMIT:
+    WORKFLOW_COMMIT: "debug-commit-hash"
 """)
     expid_dir = Path(f"{run_tmpdir.strpath}/scratch/whatever/{run_tmpdir.owner}/t000")
     dummy_dir = Path(f"{run_tmpdir.strpath}/scratch/whatever/{run_tmpdir.owner}/t000/dummy_dir")
@@ -160,16 +162,23 @@ def check_db_fields(run_tmpdir, expected_entries, final_status) -> dict:
         if row_dict["job_name"] not in db_check_list["JOB_DATA_FIELDS"]:
             db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]] = {}
         db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])] = {}
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["submit"] = row_dict["submit"] > 0 and row_dict["submit"] != 1970010101
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["start"] = row_dict["start"] > 0 and row_dict["start"] != 1970010101
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["finish"] = row_dict["finish"] > 0 and row_dict["finish"] != 1970010101
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["status"] = row_dict["status"] == final_status
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["submit"] = \
+            row_dict["submit"] > 0 and row_dict["submit"] != 1970010101
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["start"] = \
+            row_dict["start"] > 0 and row_dict["start"] != 1970010101
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["finish"] = \
+            row_dict["finish"] > 0 and row_dict["finish"] != 1970010101
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["status"] = \
+            row_dict["status"] == final_status
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
+            "workflow_commit"] = row_dict["workflow_commit"] == "debug-commit-hash"
         empty_fields = []
         for key in [key for key in row_dict.keys() if
                     key not in ["status", "finish", "submit", "start", "extra_data", "children", "platform_output"]]:
             if str(row_dict[key]) == str(""):
                 empty_fields.append(key)
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["empty_fields"] = " ".join(empty_fields)
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
+            "empty_fields"] = " ".join(empty_fields)
         counter_by_name[row_dict["job_name"]] += 1
     print_db_results(db_check_list, rows_as_dicts, run_tmpdir)
     c.close()
@@ -240,6 +249,7 @@ def assert_exit_code(final_status, exit_code):
     else:
         assert exit_code == 0
 
+
 def check_files_recovered(run_tmpdir, log_dir, expected_files) -> dict:
     """
     Check that all files are recovered after a run.
@@ -250,7 +260,8 @@ def check_files_recovered(run_tmpdir, log_dir, expected_files) -> dict:
     retrials = as_conf.experiment_data['JOBS']['JOB'].get('RETRIALS', 0)
     files_check_list = {}
     for f in log_dir.glob('*'):
-        files_check_list[f.name] = not any(str(f).endswith(f".{i}.err") or str(f).endswith(f".{i}.out") for i in range(retrials + 1))
+        files_check_list[f.name] = not any(
+            str(f).endswith(f".{i}.err") or str(f).endswith(f".{i}.out") for i in range(retrials + 1))
     stat_files = [str(f).split("_")[-1] for f in log_dir.glob('*') if "STAT" in str(f)]
     for i in range(retrials + 1):
         files_check_list[f"STAT_{i}"] = str(i) in stat_files
@@ -265,7 +276,9 @@ def check_files_recovered(run_tmpdir, log_dir, expected_files) -> dict:
         print("All log files downloaded are renamed correctly.")
     else:
         print("Some log files are not renamed correctly.")
-    files_err_out_found = [f for f in log_dir.glob('*') if (str(f).endswith(".err") or str(f).endswith(".out") or "retrial" in str(f).lower()) and "ASThread" not in str(f)]
+    files_err_out_found = [f for f in log_dir.glob('*') if (
+            str(f).endswith(".err") or str(f).endswith(".out") or "retrial" in str(
+        f).lower()) and "ASThread" not in str(f)]
     files_check_list["EXPECTED_FILES"] = len(files_err_out_found) == expected_files
     if not files_check_list["EXPECTED_FILES"]:
         print(f"Expected number of log files: {expected_files}. Found: {len(files_err_out_found)}")
@@ -368,7 +381,7 @@ def init_run(run_tmpdir, jobs_data):
             RUNNING: chunk
             wallclock: 00:01
             retrials: 2  # In local, it started to fail at 18 retrials.
-    """, (2+1)*3, "FAILED"),  # Retries set (N + 1) * number of jobs to run
+    """, (2 + 1) * 3, "FAILED"),  # Retries set (N + 1) * number of jobs to run
     # Failure wrappers
     ("""
     JOBS:
@@ -384,7 +397,7 @@ def init_run(run_tmpdir, jobs_data):
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
-    """, (2+1)*1, "FAILED"),   # Retries set (N + 1) * job chunk 1 ( the rest shouldn't run )
+    """, (2 + 1) * 1, "FAILED"),  # Retries set (N + 1) * job chunk 1 ( the rest shouldn't run )
 ], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
 def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries, final_status):
     log_dir = init_run(run_tmpdir, jobs_data)
@@ -393,13 +406,14 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
 
     # Check and display results
     db_check_list = check_db_fields(run_tmpdir, expected_db_entries, final_status)
-    files_check_list = check_files_recovered(run_tmpdir, log_dir, expected_files=expected_db_entries*2)
+    files_check_list = check_files_recovered(run_tmpdir, log_dir, expected_files=expected_db_entries * 2)
 
     # Assert
     assert_db_fields(db_check_list)
     assert_files_recovered(files_check_list)
     # TODO: GITLAB pipeline is not returning 0 or 1 for check_exit_code(final_status, exit_code)
     # assert_exit_code(final_status, exit_code)
+
 
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status", [
     # Success
@@ -451,7 +465,7 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
             RUNNING: chunk
             wallclock: 00:01
             retrials: 2  # In local, it started to fail at 18 retrials.
-    """, (2+1)*3, "FAILED"),  # Retries set (N + 1) * number of jobs to run
+    """, (2 + 1) * 3, "FAILED"),  # Retries set (N + 1) * number of jobs to run
     # Failure wrappers
     ("""
     JOBS:
@@ -467,7 +481,7 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
-    """, (2+1)*1, "FAILED"),   # Retries set (N + 1) * job chunk 1 ( the rest shouldn't run )
+    """, (2 + 1) * 1, "FAILED"),  # Retries set (N + 1) * job chunk 1 ( the rest shouldn't run )
 ], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
 def test_run_interrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries, final_status):
     from time import sleep
@@ -480,7 +494,7 @@ def test_run_interrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries
     Autosubmit.run_experiment(expid='t000')
     # Check and display results
     db_check_list = check_db_fields(run_tmpdir, expected_db_entries, final_status)
-    files_check_list = check_files_recovered(run_tmpdir, log_dir, expected_files=expected_db_entries*2)
+    files_check_list = check_files_recovered(run_tmpdir, log_dir, expected_files=expected_db_entries * 2)
 
     # Assert
     assert_db_fields(db_check_list)

@@ -222,6 +222,7 @@ class JobPackageBase(object):
             job.hold = hold
             job.id = str(job_id)
             job.status = Status.SUBMITTED
+            Log.result(f"Job: {job.name} submitted with job_id: {job.id.strip()} and workflow commit: {job.workflow_commit}")
             if hasattr(self, "name"): # TODO change this check for a property that checks if it is a wrapper or not, the same change has to be done in other parts of the code
                 job.wrapper_name = self.name
 
