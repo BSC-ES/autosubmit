@@ -84,7 +84,7 @@ tests = [
     "pytest>=8.2,<8.4",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.9.10"
+    "ruff==0.11.0"
     # 'testcontainers'  # TODO: pending Postgres MR
 ]
 docs = [
@@ -99,7 +99,7 @@ all = ["psycopg2",
     "pytest>=8.2,<8.4",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.9.10",
+    "ruff==0.11.0",
     "livereload",
     "pydata-sphinx-theme==0.15.*",
     "sphinx>=5,<9",
