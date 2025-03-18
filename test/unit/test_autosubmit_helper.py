@@ -92,22 +92,29 @@ def teste_handle_start_after(autosubmit_helper, mock_experiment_history,
     expid = 'a000'
     autosubmit_config(expid, experiment_data={})
 
-    experiment_history = experiment_history2 = MagicMock(spec='experiment_history')
+    experiment_history = MagicMock()
+    experiment_history2 = MagicMock()
 
-    experiment_history.finish = experiment_history.total = experiment_history.completed = (
-        experiment_history).suspended = experiment_history.queuing = experiment_history.running = (
-        experiment_history).failed = 0
+    attr: str
+    for attr in ['finish', 'total', 'completed', 'suspended', 'queuing', 'running', 'failed']:
+        setattr(experiment_history, attr, 0)
+        setattr(experiment_history2, attr, 1)
 
-    experiment_history2.finish = experiment_history2.total = experiment_history2.completed = (
-        experiment_history2).suspended = experiment_history2.queuing = experiment_history2.running \
-        = experiment_history2.failed = 1
+    experiment_history.total = 1
+    experiment_history.__bool__ = lambda _: True
 
-    experiment_history.total = experiment_history2.total = 2
+    experiment_history2.total = 2
+    experiment_history2.__bool__ = lambda _: True
 
-    mock_experiment_history.return_value.manager.get_experiment_run_dc_with_max_id.side_effect = \
-        [experiment_history, experiment_history2]
-    mock_experiment_history.return_value.is_header_ready.return_value = header_skip
+    mocked_exp_history = MagicMock()
+    mocked_exp_history.manager.get_experiment_run_dc_with_max_id.side_effect = [experiment_history, experiment_history2,
+                                                                                None]
+    mocked_exp_history.is_header_ready.return_value = header_skip
+    mock_experiment_history.return_value = mocked_exp_history
+
     autosubmit_helper.return_value = experiment_exists
     mocked_sleep.return_value = 0
 
     assert helper.handle_start_after(time, expid) is None
+    if header_skip == True and experiment_exists == True:
+        assert mocked_exp_history.manager.get_experiment_run_dc_with_max_id.called
