@@ -26,7 +26,6 @@ from time import time
 from typing import List, Union
 from xml.dom.minidom import parseString
 
-from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status, parse_output_number
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
@@ -362,7 +361,7 @@ class SlurmPlatform(ParamikoPlatform):
         self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
         self._submit_cmd_x11 = f'{self.remote_log_dir}'
 
-    def hold_job(self, job: Job) -> bool:
+    def hold_job(self, job) -> bool:
         """
 
         :param job: Job to be held
