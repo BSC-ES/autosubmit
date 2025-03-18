@@ -18,13 +18,11 @@
 import copy
 import datetime
 import os
-import pickle
 import re
 import traceback
 from contextlib import suppress
 from shutil import move
-from threading import Thread
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Optional
 from pathlib import Path
 
 from time import strftime, localtime, mktime
@@ -46,15 +44,6 @@ from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency, _get_submitter
 import autosubmit.database.db_structure as DbStructure
 
-
-def threaded(fn):
-    def wrapper(*args, **kwargs):
-        thread = Thread(target=fn, args=args, kwargs=kwargs)
-        thread.name = "data_processing"
-        thread.start()
-        return thread
-
-    return wrapper
 
 
 class JobList(object):
@@ -504,22 +493,6 @@ class JobList(object):
             else:
                 dependencies_keys.pop(key)
         return dependencies
-
-    @staticmethod
-    def _calculate_splits_dependencies(section, max_splits):
-        splits_list = section[section.find("[") + 1:section.find("]")]
-        splits = []
-        for str_split in splits_list.split(","):
-            if str_split.find(":") != -1:
-                numbers = str_split.split(":")
-                # change this to be checked in job_common.py
-                max_splits = min(int(numbers[1]), max_splits)
-                for count in range(int(numbers[0]), max_splits + 1):
-                    splits.append(int(str(count).zfill(len(numbers[0]))))
-            else:
-                if int(str_split) <= max_splits:
-                    splits.append(int(str_split))
-        return splits
 
     @staticmethod
     def _parse_filters_to_check(list_of_values_to_check, value_list=[],
@@ -1888,24 +1861,6 @@ class JobList(object):
             return [job for job in uncompleted_jobs if job.packed is False]
         return uncompleted_jobs
 
-    def get_uncompleted_and_not_waiting(self, platform=None, wrapper=False):
-        """
-        Returns a list of completed jobs and waiting
-
-        :param wrapper:
-        :param platform: job platform
-        :type platform: HPCPlatform
-        :return: completed jobs
-        :rtype: list
-        """
-        uncompleted_jobs = [job for job in self._job_list if
-                            (platform is None or job.platform.name == platform.name) and
-                            job.status != Status.COMPLETED and job.status != Status.WAITING]
-
-        if wrapper:
-            return [job for job in uncompleted_jobs if job.packed is False]
-        return uncompleted_jobs
-
     def get_submitted(self, platform=None, hold=False, wrapper=False):
         """
         Returns a list of submitted jobs
@@ -2012,24 +1967,6 @@ class JobList(object):
             return [job for job in all_jobs if job.packed is False]
         else:
             return all_jobs
-
-    def get_job_names(self, lower_case=False):
-        """
-        Returns a list of all job names
-        :param: lower_case: if true, returns lower case job names
-        :type: lower_case: bool
-
-
-        :return: all job names
-        :rtype: list
-
-        """
-        if lower_case:
-            all_jobs = [job.name.lower() for job in self._job_list]
-        else:
-            all_jobs = [job.name for job in self._job_list]
-
-        return all_jobs
 
     def update_two_step_jobs(self):
         prev_jobs_to_run_first = self.jobs_to_run_first
@@ -2166,30 +2103,6 @@ class JobList(object):
                   format([job.name for job in ultimate_jobs_list]))
         return ultimate_jobs_list
 
-    def get_logs(self):
-        """
-        Returns a dict of logs by jobs_name jobs
-
-        :return: logs
-        :rtype: dict(tuple)
-        """
-        logs = dict()
-        for job in self._job_list:
-            logs[job.name] = (job.local_logs, job.remote_logs)
-        return logs
-
-    def add_logs(self, logs):
-        """
-        add logs to the current job_list
-        :return: logs
-        :rtype: dict(tuple)
-        """
-
-        for job in self._job_list:
-            if job.name in logs:
-                job.local_logs = logs[job.name][0]
-                job.remote_logs = logs[job.name][1]
-
     def get_ready(self, platform=None, hold=False, wrapper=False):
         """
         Returns a list of ready jobs
@@ -2234,19 +2147,6 @@ class JobList(object):
         delayed = [job for job in self._job_list if (platform is None or
                     job.platform.name == platform.name) and job.status == Status.DELAYED]
         return delayed
-
-    def get_skipped(self, platform=None):
-        """
-        Returns a list of skipped jobs
-
-        :param platform: job platform
-        :type platform: HPCPlatform
-        :return: skipped jobs
-        :rtype: list
-        """
-        skipped = [job for job in self._job_list if (platform is None or
-                    job.platform.name == platform.name) and job.status == Status.SKIPPED]
-        return skipped
 
     def get_waiting(self, platform=None, wrapper=False):
         """
@@ -2305,22 +2205,6 @@ class JobList(object):
             return [job for job in submitted if job.packed is False]
         return submitted
 
-    def get_suspended(self, platform=None, wrapper=False):
-        """
-        Returns a list of jobs on unknown state
-
-        :param wrapper:
-        :param platform: job platform
-        :type platform: HPCPlatform
-        :return: unknown state jobs
-        :rtype: list
-        """
-        suspended = [job for job in self._job_list if (platform is None or
-                    job.platform.name == platform.name) and job.status == Status.SUSPENDED]
-        if wrapper:
-            return [job for job in suspended if job.packed is False]
-        return suspended
-
     def get_in_queue(self, platform=None, wrapper=False):
         """
         Returns a list of jobs in the platforms (Submitted, Running, Queuing, Unknown,Held)
@@ -2337,37 +2221,6 @@ class JobList(object):
         if wrapper:
             return [job for job in in_queue if job.packed is False]
         return in_queue
-
-    def get_not_in_queue(self, platform=None, wrapper=False):
-        """
-        Returns a list of jobs NOT in the platforms (Ready, Waiting)
-
-        :param wrapper:
-        :param platform: job platform
-        :type platform: HPCPlatform
-        :return: jobs not in platforms
-        :rtype: list
-        """
-        not_queued = self.get_ready(platform) + self.get_waiting(platform)
-        if wrapper:
-            return [job for job in not_queued if job.packed is False]
-        return not_queued
-
-    def get_finished(self, platform=None, wrapper=False):
-        """
-        Returns a list of jobs finished (Completed, Failed)
-
-
-        :param wrapper:
-        :param platform: job platform
-        :type platform: HPCPlatform
-        :return: finished jobs
-        :rtype: list
-        """
-        finished = self.get_completed(platform) + self.get_failed(platform)
-        if wrapper:
-            return [job for job in finished if job.packed is False]
-        return finished
 
     def get_active(self, platform=None, wrapper=False):
         """
@@ -2394,7 +2247,7 @@ class JobList(object):
             active = []
         return active
 
-    def get_job_by_name(self, name):
+    def get_job_by_name(self, name: str) -> Optional[Job]:
         """
         Returns the job that its name matches parameter name
 
@@ -2406,6 +2259,7 @@ class JobList(object):
         for job in self._job_list:
             if job.name == name:
                 return job
+        return None
 
     def get_jobs_by_section(self, section_list: list, banned_jobs: list = None,
                             get_only_non_completed: bool = False) -> list:
@@ -2451,18 +2305,6 @@ class JobList(object):
                 jobs_by_id[job_id] = jobs_by_id[job_id][0]
         return jobs_by_id
 
-    def get_in_ready_grouped_id(self, platform):
-        jobs = []
-        [jobs.append(job) for job in jobs if (
-                platform is None or job.platform.name is platform.name)]
-
-        jobs_by_id = dict()
-        for job in jobs:
-            if job.id not in jobs_by_id:
-                jobs_by_id[job.id] = list()
-            jobs_by_id[job.id].append(job)
-        return jobs_by_id
-
     def sort_by_name(self):
         """
         Returns a list of jobs sorted by name
@@ -2498,27 +2340,6 @@ class JobList(object):
         :rtype: list
         """
         return sorted(self._job_list, key=lambda k: k.status)
-
-    @staticmethod
-    def load_file(filename):
-        """
-        Recreates a stored joblist from the pickle file
-
-        :param filename: pickle file to load
-        :type filename: str
-        :return: loaded joblist object
-        :rtype: JobList
-        """
-        try:
-            if os.path.exists(filename):
-                fd = open(filename, 'rb')
-                return pickle.load(fd)
-            else:
-                return list()
-        except IOError:
-            Log.printlog(
-                "Autosubmit will use a backup for recover the job_list", 6010)
-            return list()
 
     def load(self, create=False, backup=False):
         """
@@ -3092,23 +2913,6 @@ class JobList(object):
         except Exception as exp:
             Log.warning(str(exp))
 
-    @threaded
-    def check_scripts_threaded(self, as_conf):
-        """
-        When we have created the scripts, all parameters should have been substituted.
-        %PARAMETER% handlers not allowed (thread test)
-
-        :param as_conf: experiment configuration
-        :type as_conf: AutosubmitConfig
-        """
-        as_conf.reload(force_load=True)
-        out = True
-        for job in self._job_list:
-            show_logs = job.check_warnings
-            if not job.check_script(as_conf, show_logs):
-                out = False
-        return out
-
     def save_wrappers(self, packages_to_save, failed_packages, as_conf, packages_persistence,
                       hold=False, inspect=False):
         for package in packages_to_save:
@@ -3261,36 +3065,35 @@ class JobList(object):
             self.update_genealogy()
         del self._dic_jobs
 
-    def print_with_status(self, statusChange=None, nocolor=False, existingList=None):
+    def print_with_status(self, status_change=None, nocolor=False, existing_list=None) -> str:
         """
-        Returns the string representation of the dependency tree of
-        the Job List
+        Returns the string representation of the dependency tree of the Job List
 
-        :param statusChange: List of changes in the list, supplied in set status
-        :type statusChange: List of strings
+        :param status_change: List of changes in the list, supplied in set status
+        :type status_change: List of strings
         :param nocolor: True if the result should not include color codes
         :type nocolor: Boolean
-        :param existingList: External List of Jobs that will be printed,
-        this excludes the inner list of jobs.
-        :type existingList: List of Job Objects
-        :return: String representation
-        :rtype: String
+        :param existing_list: External List of Jobs that will be printed, this excludes the inner list of jobs.
+        :type existing_list: List of Job Objects
+        :return: String representing the Job_List
+        :rtype: str
         """
+
         # nocolor = True
-        allJobs = self.get_all() if existingList is None else existingList
+        all_jobs = self.get_all() if existing_list is None else existing_list
         # Header
         result = (bcolors.BOLD if nocolor is False else '') + \
-                 "## String representation of Job List [" + str(len(allJobs)) + "] "
-        if statusChange is not None and len(str(statusChange)) > 0:
+                 "## String representation of Job List [" + str(len(all_jobs)) + "] "
+        if status_change is not None and len(str(status_change)) > 0:
             result += ("with " + (bcolors.OKGREEN if nocolor is False else '') +
-                       str(len(list(statusChange.keys()))) + " Change(s) ##" +
+                       str(len(list(status_change.keys()))) + " Change(s) ##" +
                        (bcolors.ENDC + bcolors.ENDC if nocolor is False else ''))
         else:
             result += " ## "
 
         # Find root
         roots = []
-        for job in allJobs:
+        for job in all_jobs:
             if len(job.parents) == 0:
                 roots.append(job)
         visited = list()
@@ -3299,7 +3102,7 @@ class JobList(object):
         for root in roots:
             if root is not None and len(str(root)) > 0:
                 result += self._recursion_print(root, 0, visited,
-                                                statusChange=statusChange, nocolor=nocolor)
+                                                statusChange=status_change, nocolor=nocolor)
             else:
                 result += "\nCannot find root."
 
@@ -3385,8 +3188,7 @@ class JobList(object):
 
     @staticmethod
     def retrieve_packages(BasicConfig, expid, current_jobs=None):
-        """
-        Retrieves dictionaries that map the collection of packages in the experiment
+        """Retrieves dictionaries that map the collection of packages in the experiment
 
         :param BasicConfig: Basic configuration
         :type BasicConfig: Configuration Object
@@ -3396,19 +3198,17 @@ class JobList(object):
         :type current_jobs: list
         :return: job to package, package to job, package to package_id, package to symbol
         :rtype: Dictionary(Job Object, Package), Dictionary(Package, List of Job Objects),
-        Dictionary(String, String), Dictionary(String, String)
+         Dictionary(String, String), Dictionary(String, String)
         """
         # monitor = Monitor()
         packages = None
         try:
-            packages = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                             "job_packages_" + expid).load(wrapper=False)
+            packages = JobPackagePersistence(expid).load(wrapper=False)
         except Exception as ex:
             print("Wrapper table not found, trying packages.")
             packages = None
             try:
-                packages = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid,
-                                                "pkl"), "job_packages_" + expid).load(wrapper=True)
+                packages = JobPackagePersistence(expid).load(wrapper=True)
             except Exception as exp2:
                 packages = None
                 pass

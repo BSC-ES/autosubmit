@@ -1,6 +1,7 @@
 ###############
 Experiment ID's
 ###############
+.. _expids:
 
 Autosubmit 4 uses a SQLite database to automatically generate unique
 experiment ID’s. The ID’s of Autosubmit experiments start from ``a000``

@@ -143,7 +143,6 @@ class Autosubmit:
     """
 
     def __init__(self):
-        self._experiment_data = {}
         self.command = None
 
     @property
@@ -158,7 +157,7 @@ class Autosubmit:
         script_dir = os.path.join(script_dir, os.path.pardir)
 
     version_path = os.path.join(script_dir, 'VERSION')
-    readme_path = os.path.join(script_dir, 'README')
+    readme_path = os.path.join(script_dir, 'README.md')
     changes_path = os.path.join(script_dir, 'CHANGELOG')
     if os.path.isfile(version_path):
         with open(version_path) as f:
@@ -1539,8 +1538,7 @@ class Autosubmit:
             safetysleeptime = as_conf.get_safetysleeptime()
             Log.debug("The Experiment name is: {0}", expid)
             Log.debug("Sleep: {0}", safetysleeptime)
-            packages_persistence = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                                         "job_packages_" + expid)
+            packages_persistence = JobPackagePersistence(expid)
             os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid,
                                   "pkl", "job_packages_" + expid + ".db"), 0o644)
 
@@ -2034,8 +2032,7 @@ class Autosubmit:
         Log.debug("Loading job packages")
         # Packages == wrappers and jobs inside wrappers. Name is also misleading.
         try:
-            packages_persistence = JobPackagePersistence(os.path.join(
-                BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"), "job_packages_" + expid)
+            packages_persistence = JobPackagePersistence(expid)
         except IOError as e:
             raise AutosubmitError(
                 "job_packages not found", 6016, str(e))
@@ -2709,8 +2706,7 @@ class Autosubmit:
         try:
             if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrapper:
                 # Class constructor creates table if it does not exist
-                packages_persistence = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                                             "job_packages_" + expid)
+                packages_persistence = JobPackagePersistence(expid)
                 # Permissions
                 os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl", "job_packages_" + expid + ".db"), 0o644)
                 # Database modification
@@ -2722,11 +2718,9 @@ class Autosubmit:
                                                            packages_persistence, True)
 
                 packages = packages_persistence.load(True)
-                packages += JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                                  "job_packages_" + expid).load()
+                packages += JobPackagePersistence(expid).load()
             else:
-                packages = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                                 "job_packages_" + expid).load()
+                packages = JobPackagePersistence(expid).load()
         except BaseException as e:
             if profile:
                 profiler.stop()
@@ -3020,15 +3014,10 @@ class Autosubmit:
                     job.recover_last_ready_date()
                     job.recover_last_log_name()
                 elif job.status != Status.SUSPENDED:
-                    job.update_parameters(as_conf, set_attributes=True)
                     job.status = Status.WAITING
                     job._fail_count = 0
-                    # Log.info("CHANGED job '{0}' status to WAITING".format(job.name))
-                    # Log.status("CHANGED job '{0}' status to WAITING".format(job.name))
-
-                if save and job.status != Status.COMPLETED:
-                    job.update_parameters(as_conf, set_attributes=True)
-
+                    Log.info("CHANGED job '{0}' status to WAITING".format(job.name))
+                # Update parameters with attributes is called in: build_packages, submit wrappers, and for every ready job. It shouldn't be necessary here.
             end = datetime.datetime.now()
             Log.info("Time spent: '{0}'".format(end - start))
             Log.info("Updating the jobs list")
@@ -3045,8 +3034,7 @@ class Autosubmit:
             raise AutosubmitCritical("Couldn't restore the experiment workflow", 7040, str(e))
 
         try:
-            packages = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                             "job_packages_" + expid).load()
+            packages = JobPackagePersistence(expid).load()
 
             groups_dict = dict()
             if group_by:
@@ -3175,14 +3163,6 @@ class Autosubmit:
             raise AutosubmitCritical("Checking incomplete due an unknown error. Please check the trace", 7070, str(e))
 
         return job_list.check_scripts(as_conf)
-
-    @staticmethod
-    def capitalize_keys(dictionary):
-        upper_dictionary = defaultdict()
-        for key in list(dictionary.keys()):
-            upper_key = key.upper()
-            upper_dictionary[upper_key] = dictionary[key]
-        return upper_dictionary
 
     @staticmethod
     def report(expid, template_file_path="", show_all_parameters=False, folder_path="", placeholders=False):
@@ -3576,10 +3556,6 @@ class Autosubmit:
         Can be configured at system, user or local levels. Local level configuration precedes user level and user level
         precedes system configuration.
         """
-
-        not_enough_screen_size_msg = 'The size of your terminal is not enough to draw the configuration wizard,\n' \
-                                     'so we\'ve closed it to prevent errors. Resize it and then try it again.'
-
         home_path = Path("~").expanduser().resolve()
 
         try:
@@ -4125,7 +4101,6 @@ class Autosubmit:
         corrupted_db_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}_corrupted.db".format(expid))
 
         database_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}.db".format(expid))
-        database_backup_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}.sql".format(expid))
         dump_file_name = 'job_data_{0}.sql'.format(expid, current_time)
         dump_file_path = os.path.join(BasicConfig.JOBDATA_DIR, dump_file_name)
         bash_command = 'cat {1} | sqlite3 {0}'.format(database_path, dump_file_path)
@@ -4462,13 +4437,13 @@ class Autosubmit:
         """
         Creates job list for given experiment. Configuration files must be valid before executing this process.
 
-        :param detail:
-        :param check_wrappers:
-        :param notransitive:
-        :param expand_status:
-        :param expand:
-        :param group_by:
-        :param expid: experiment identifier
+        :param detail: Show Job List view in terminal
+        :param check_wrappers: Generate possible wrapper in the current workflow
+        :param notransitive: Disable transitive reduction
+        :param expand_status: Select the statuses to be expanded
+        :param expand: Supply the list of dates/members/chunks to filter the list of jobs.
+        :param group_by: Groups the jobs automatically by date, member, chunk or split
+        :param expid: Experiment identifier
         :type expid: str
         :param noplot: if True, method omits final plotting of the jobs list. Only needed on large experiments when
             plotting time can be much larger than creation time.
@@ -4579,8 +4554,7 @@ class Autosubmit:
                     job_list.save()
                     as_conf.save()
                     try:
-                        packages_persistence = JobPackagePersistence(
-                            os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"), "job_packages_" + expid)
+                        packages_persistence = JobPackagePersistence(expid)
                         packages_persistence.reset_table()
                         packages_persistence.reset_table(True)
                     except Exception:
@@ -5247,7 +5221,6 @@ class Autosubmit:
                 #### Starts the filtering process ####
                 final_list = []
                 jobs_filtered = []
-                jobs_left_to_be_filtered = True
                 final_status = Autosubmit._get_status(final)
                 # I have the impression that whoever did this function thought about the possibility of having multiple filters at the same time
                 # But, as it was, it is not possible to have multiple filters at the same time due to the way the code is written
@@ -5397,9 +5370,7 @@ class Autosubmit:
                 if not noplot:
                     from .monitor.monitor import Monitor
                     if as_conf.get_wrapper_type() != 'none' and check_wrapper:
-                        packages_persistence = JobPackagePersistence(
-                            os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                            "job_packages_" + expid)
+                        packages_persistence = JobPackagePersistence(expid)
                         os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR,
                                               expid, "pkl", "job_packages_" + expid + ".db"), 0o775)
                         packages_persistence.reset_table(True)
@@ -5411,8 +5382,7 @@ class Autosubmit:
 
                         packages = packages_persistence.load(True)
                     else:
-                        packages = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                                         "job_packages_" + expid).load()
+                        packages = JobPackagePersistence(expid).load()
                     groups_dict = dict()
                     if group_by:
                         status = list()
@@ -5570,8 +5540,7 @@ class Autosubmit:
         if storage_type == 'pkl':
             return JobListPersistencePkl()
         elif storage_type == 'db':
-            return JobListPersistenceDb(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                        "job_list_" + expid)
+            return JobListPersistenceDb(expid)
         raise AutosubmitCritical('Storage type not known', 7014)
 
     @staticmethod
@@ -5799,65 +5768,6 @@ class Autosubmit:
         else:
             job_list.remove_rerun_only_jobs(notransitive)
 
-        return job_list
-
-    @staticmethod
-    def rerun_recovery(expid, job_list, rerun_list, as_conf):
-        """
-        Method to check all active jobs. If COMPLETED file is found, job status will be changed to COMPLETED,
-        otherwise it will be set to WAITING. It will also update the jobs list.
-
-        :param expid: identifier of the experiment to recover
-        :type expid: str
-        :param job_list: job list to update
-        :type job_list: JobList
-        :param rerun_list: list of jobs to rerun
-        :type rerun_list: list
-        :param as_conf: AutosubmitConfig object
-        :type as_conf: AutosubmitConfig
-        :return:
-
-
-        """
-
-        hpcarch = as_conf.get_platform()
-        submitter = Autosubmit._get_submitter(as_conf)
-        try:
-            submitter.load_platforms(as_conf)
-            if submitter.platforms is None:
-                raise AutosubmitCritical("platforms couldn't be loaded", 7014)
-        except Exception as e:
-            raise AutosubmitCritical("platforms couldn't be loaded", 7014)
-        platforms = submitter.platforms
-
-        platforms_to_test = set()
-        for job in job_list.get_job_list():
-            if job.platform_name is None:
-                job.platform_name = hpcarch
-            # noinspection PyTypeChecker
-            job.platform = platforms[job.platform_name]
-            # noinspection PyTypeChecker
-            platforms_to_test.add(platforms[job.platform_name])
-        rerun_names = []
-
-        [rerun_names.append(job.name) for job in rerun_list.get_job_list()]
-        jobs_to_recover = [
-            i for i in job_list.get_job_list() if i.name not in rerun_names]
-
-        Log.info("Looking for COMPLETED files")
-        start = datetime.datetime.now()
-        for job in jobs_to_recover:
-            if job.platform_name is None:
-                job.platform_name = hpcarch
-            # noinspection PyTypeChecker
-            job.platform = platforms[job.platform_name.upper()]
-
-            if job.platform.get_completed_files(job.name, 0):
-                job.status = Status.COMPLETED
-                Log.info(
-                    "CHANGED job '{0}' status to COMPLETED".format(job.name))
-
-            job.platform.get_logs_files(expid, job.remote_logs)
         return job_list
 
     @staticmethod

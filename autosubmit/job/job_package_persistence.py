@@ -17,7 +17,9 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from autosubmit.database.db_manager import DbManager
+from autosubmit.database.db_manager import create_db_manager
+from autosubmitconfigparser.config.basicconfig import BasicConfig
+from pathlib import Path
 from log.log import AutosubmitCritical
 from typing import Any, List
 
@@ -39,8 +41,14 @@ class JobPackagePersistence(object):
     WRAPPER_JOB_PACKAGES_TABLE = 'wrapper_job_package'
     TABLE_FIELDS = ['exp_id', 'package_name', 'job_name', 'wallclock' ]  # new field, needs a new autosubmit create
 
-    def __init__(self, persistence_path, persistence_file):
-        self.db_manager = DbManager(persistence_path, persistence_file, self.VERSION)
+    def __init__(self, expid: str):
+        options = {
+            'root_path': str(Path(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")),
+            'db_name': f"job_packages_{expid}",
+            'db_version': self.VERSION,
+            'schema': expid
+        }
+        self.db_manager = create_db_manager(BasicConfig.DATABASE_BACKEND, **options)
         self.db_manager.create_table(self.JOB_PACKAGES_TABLE, self.TABLE_FIELDS)
         self.db_manager.create_table(self.WRAPPER_JOB_PACKAGES_TABLE, self.TABLE_FIELDS)
 

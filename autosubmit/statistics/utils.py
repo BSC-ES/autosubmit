@@ -5,9 +5,8 @@
 import math
 from datetime import datetime, timedelta
 from typing import List, Union
-from autosubmit.job.job import Job
-from autosubmit.job.job_common import Status
 
+from autosubmit.job.job import Job
 from log.log import AutosubmitCritical
 
 
@@ -20,17 +19,6 @@ def filter_by_section(jobs: List[Job], section: str) -> List[Job]:
     """
     if section and section != "Any":
         return [job for job in jobs if job.section == section]
-    return jobs
-
-
-def discard_ready_and_waiting(jobs: List[Job]) -> List[Job]:
-    """
-    discard_ready_and_waiting from Statistics Utils
-    :param jobs: List[Job]
-    :return: List[Job]
-    """
-    if jobs and len(jobs) > 0:
-        return [job for job in jobs if job.status not in [Status.READY, Status.WAITING]]
     return jobs
 
 
