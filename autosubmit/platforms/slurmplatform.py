@@ -35,9 +35,6 @@ from log.log import AutosubmitCritical, AutosubmitError, Log
 class SlurmPlatform(ParamikoPlatform):
     """
     Class to manage jobs to host using SLURM scheduler
-
-    :param ParamikoPlatform: A inherited class ParamikoPlatform
-    :type ParamikoPlatform: ParamikoPlatform
     """
 
     def __init__(self, expid: str, name: str, config: dict, auth_password: str=None):
