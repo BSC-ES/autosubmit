@@ -124,5 +124,9 @@ package-data = { "autosubmit" = [
 ] }
 include-package-data = true
 
+[tool.vulture]
+exclude = ["*/build/*", "*/.venv/*", "*/docs/*"]
+min_confidence = 70
+
 [project.entry-points.console_scripts]
 autosubmit = "autosubmit.scripts.autosubmit:main"
