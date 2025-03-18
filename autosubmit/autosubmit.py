@@ -2008,6 +2008,9 @@ class Autosubmit:
             as_conf, job_list, submitter.platforms)
         Log.debug("Checking experiment templates...")
         platforms_to_test = set()
+        for p in submitter.platforms.values():
+            platforms_to_test.add(p)
+        Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf)
         hpcarch = as_conf.get_platform()
         # Load only platforms used by the experiment, by looking at JOBS.$JOB.PLATFORM. So Autosubmit only establishes connections to the machines that are used.
         # Also, it ignores platforms used by "COMPLETED/FAILED" jobs as they are no need any more. ( in case of recovery or run a workflow that were already running )
@@ -2021,9 +2024,7 @@ class Autosubmit:
                 raise AutosubmitCritical(
                     "hpcarch={0} not found in the platforms configuration file".format(job.platform_name),
                     7014)
-            # noinspection PyTypeChecker
-            if job.status not in (Status.COMPLETED, Status.SUSPENDED):
-                platforms_to_test.add(job.platform)
+
         # This function, looks at %JOBS.$JOB.FILE% ( mandatory ) and %JOBS.$JOB.CHECK% ( default True ).
         # Checks the contents of the .sh/.py/r files and looks for AS placeholders.
         try:
@@ -2094,7 +2095,6 @@ class Autosubmit:
             exp_history = Autosubmit.get_historical_database(expid, job_list,as_conf)
             # establish the connection to all platforms
             # Restore is a misleading, it is actually a "connect" function when the recover flag is not set.
-            Autosubmit.restore_platforms(platforms_to_test,as_conf=as_conf)
             return job_list, submitter , exp_history, host , as_conf, platforms_to_test, packages_persistence, False
         else:
             return job_list, submitter, None, None, as_conf, platforms_to_test, packages_persistence, True
