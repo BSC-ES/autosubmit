@@ -21,24 +21,23 @@ Test file for autosubmit_help.py
 """
 import datetime
 from datetime import timedelta
-from unittest.mock import patch
 
 from typing import Callable
 import pytest
+from mock.mock import patch, MagicMock
 
 import autosubmit.helpers.autosubmit_helper as helper
 from log.log import AutosubmitCritical
 
 
 @pytest.mark.parametrize('time',[
-        '04-00-00',
-        '04:00:00',
-        '2020:01:01 04:00:00',
-        '2020-01-01 04:00:00',
-        datetime.datetime.now() + timedelta(seconds=5),
-],ids=['wrong format hours','right format hours','fulldate wrong format','fulldate right format',
-       'execute in 5 seconds']
-)
+    '04-00-00',
+    '04:00:00',
+    '2020:01:01 04:00:00',
+    '2020-01-01 04:00:00',
+    datetime.datetime.now() + timedelta(seconds=5),
+], ids=['wrong format hours', 'right format hours', 'fulldate wrong format', 'fulldate right format',
+        'execute in 5 seconds'])
 def teste_handle_start_time(time):
     """
     function to test the function handle_start_time inside autosubmit_helper
@@ -49,15 +48,15 @@ def teste_handle_start_time(time):
 
 
 @pytest.mark.parametrize('ids, return_list_value, result',[
-        (None, [''], []),
-        ('', [''], ''),
-        ('a000', ['a001'], ''),
-        ('a000', ['a000'], ['a000']),
-        ('a000 a001', ['a000', 'a001'], ['a000', 'a001']),
-        ('a000 a001', ['a000', 'a001', 'a002'], ['a000', 'a001']),
-],ids=['None','expected AScritical members','expected AScritical rmembers',
-       'one ids','multiple sent ids','multiple return ids']
-)
+    (None, [''], []),
+    ('', [''], ''),
+    ('a000', ['a001'], ''),
+    ('a000', ['a000'], ['a000']),
+    ('a000 a001', ['a000', 'a001'], ['a000', 'a001']),
+    ('a000 a001', ['a000', 'a001', 'a002'], ['a000', 'a001']),
+], ids=['None', 'expected AScritical members', 'expected AScritical rmembers',
+        'one ids', 'multiple sent ids', 'multiple return ids']
+                         )
 @patch('autosubmit.helpers.autosubmit_helper.AutosubmitConfig.get_member_list')
 @pytest.mark.xfail(raise_stmt=AutosubmitCritical)
 def test_get_allowed_members(as_member_list, ids, return_list_value, result,
@@ -71,3 +70,51 @@ def test_get_allowed_members(as_member_list, ids, return_list_value, result,
     as_member_list.return_value = return_list_value
 
     assert helper.get_allowed_members(ids, as_config) == result
+
+
+@patch('autosubmit.helpers.autosubmit_helper.sleep')
+@patch('autosubmit.helpers.autosubmit_helper.ExperimentHistory')
+@patch('autosubmit.helpers.autosubmit_helper.check_experiment_exists')
+@pytest.mark.parametrize('time, header_skip, experiment_exists', [
+    ('a000', False, False),
+    ('04-00-00', False, False),
+    ('04-00-00', False, True),
+    ('04:00:00', True, False),
+    ('04:00:00', True, True),
+], ids=['expid instead of time', 'wrong format hours', 'right format hours', 'fulldate wrong format',
+        'fulldate wrong format false'])
+def teste_handle_start_after(autosubmit_helper, mock_experiment_history,
+                             mocked_sleep, autosubmit_config: Callable, time: str,
+                             header_skip: bool, experiment_exists: bool):
+    """
+    function to test the function handle_start_time inside autosubmit_helper
+    """
+    expid = 'a000'
+    autosubmit_config(expid, experiment_data={})
+
+    experiment_history = MagicMock()
+    experiment_history2 = MagicMock()
+
+    attr: str
+    for attr in ['finish', 'total', 'completed', 'suspended', 'queuing', 'running', 'failed']:
+        setattr(experiment_history, attr, 0)
+        setattr(experiment_history2, attr, 1)
+
+    experiment_history.total = 1
+    experiment_history.__bool__ = lambda _: True
+
+    experiment_history2.total = 2
+    experiment_history2.__bool__ = lambda _: True
+
+    mocked_exp_history = MagicMock()
+    mocked_exp_history.manager.get_experiment_run_dc_with_max_id.side_effect = [experiment_history, experiment_history2,
+                                                                                None]
+    mocked_exp_history.is_header_ready.return_value = header_skip
+    mock_experiment_history.return_value = mocked_exp_history
+
+    autosubmit_helper.return_value = experiment_exists
+    mocked_sleep.return_value = 0
+
+    assert helper.handle_start_after(time, expid) is None
+    if header_skip == True and experiment_exists == True:
+        assert mocked_exp_history.manager.get_experiment_run_dc_with_max_id.called
