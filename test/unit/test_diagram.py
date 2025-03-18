@@ -20,6 +20,7 @@
 """ Test file for autosubmit/monitor/diagram.py """
 import datetime
 
+from test.unit.test_statistics import jobs
 import pytest
 from mock.mock import patch
 
@@ -44,6 +45,23 @@ def test_job_agg_data():
     assert job_agg.values() == [{}, 0, datetime.timedelta(0), datetime.timedelta(0),
                                 datetime.timedelta(0), datetime.timedelta(0)]
     assert job_agg.number_of_columns() == 6
+
+
+def test_create_stats_report(jobs, tmp_path):
+    """ function to test the function create_stats_report inside autosubmit/monitor/diagram.py """
+
+    expid = "a000"
+    period_ini = datetime.datetime.now()
+    period_fi = period_ini+ datetime.timedelta(10)
+    tmp_path_pdf = tmp_path / "report.pdf"
+    tmp_path_csv = tmp_path / "report.csv"
+
+    with patch('autosubmit.monitor.diagram._create_table'):
+        diagram.create_stats_report(expid, jobs, [], str(tmp_path_pdf),True,True,
+        False,period_ini, period_fi, {'test':1, 'test1':5, 'test2':50, 'test3':500, 'test4':5000})
+        assert tmp_path.exists()
+        assert tmp_path_pdf.exists()
+        assert tmp_path_csv.exists()
 
 
 def test_create_csv_stats(tmpdir):
@@ -139,8 +157,7 @@ def test_create_bar_diagram(job_stats, failed_jobs, failed_jobs_dict, num_plots,
     ]
     date_ini = datetime.datetime.now()
     date_fin = date_ini + datetime.timedelta(0.10)
-
-    queue_time_fixes = {'test', 5}
+    queue_time_fixes = {'test': 5}
 
     status = ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED"]
     statistics = diagram.populate_statistics(jobs_data, date_ini, date_fin, queue_time_fixes)
