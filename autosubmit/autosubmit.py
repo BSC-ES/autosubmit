@@ -2012,11 +2012,11 @@ class Autosubmit:
         # Load only platforms used by the experiment, by looking at JOBS.$JOB.PLATFORM. So Autosubmit only establishes connections to the machines that are used.
         # Also, it ignores platforms used by "COMPLETED/FAILED" jobs as they are no need any more. ( in case of recovery or run a workflow that were already running )
         for job in job_list.get_job_list():
-            if job.platform_name is None or job.platform_name == "":
+            if not job.platform_name:
                 job.platform_name = hpcarch
             # noinspection PyTypeChecker
             try:
-                 job.platform = submitter.platforms[job.platform_name.upper()]
+                job.platform = submitter.platforms[job.platform_name.upper()]
             except Exception as e:
                 raise AutosubmitCritical(
                     "hpcarch={0} not found in the platforms configuration file".format(job.platform_name),
@@ -2240,6 +2240,7 @@ class Autosubmit:
                                     Autosubmit.job_notify(as_conf,expid,job,job_prev_status,job_changes_tracker)
                         # Updates all workflow status with the new information.
                         job_list.update_list(as_conf, submitter=submitter)
+                        Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                         job_list.save()
                         # Submit jobs that are ready to run
                         #Log.debug(f"FD submit: {fd_show.fd_table_status_str()}")

@@ -2792,16 +2792,20 @@ class JobList(object):
         Returns:
             Path: The path to the recovered log file if found, otherwise None.
         """
-        job.new_run = new_run
-        if not new_run and not job.updated_log:
-            job.platform.get_log_name_queue.choose_action(requested_name=job.name)
-        elif new_run and not job.updated_log:
-            for log_recovered in self.path_to_logs.glob(f"{job.name}.*.out"):
-                file_timestamp = int(
-                    datetime.datetime.fromtimestamp(log_recovered.stat().st_mtime).
-                    strftime("%Y%m%d%H%M%S"))
-                if job.ready_date and file_timestamp >= int(job.ready_date):
-                    return log_recovered
+        if not job.updated_log:
+            if not new_run:
+                log_info = job.platform.logs_queue.choose_action(requested_name=job.name)
+                if log_info:
+                    return Path(log_info[1])
+                else:
+                    return None
+            else:
+                for log_recovered in self.path_to_logs.glob(f"{job.name}.*.out"):
+                    file_timestamp = int(
+                        datetime.datetime.fromtimestamp(log_recovered.stat().st_mtime).
+                        strftime("%Y%m%d%H%M%S"))
+                    if job.ready_date and file_timestamp >= int(job.ready_date):
+                        return log_recovered
         return None
 
     def update_list(self, as_conf: AutosubmitConfig, store_change: bool = True,

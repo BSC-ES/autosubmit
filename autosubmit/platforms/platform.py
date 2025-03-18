@@ -1,8 +1,6 @@
 import atexit
 import multiprocessing
 import queue  # only for the exception
-from collections import deque
-from copy import copy
 from os import _exit
 import setproctitle
 import locale
@@ -18,13 +16,14 @@ from multiprocessing.queues import Queue
 import time
 
 
-
-def recover_platform_job_logs_wrapper(platform, recovery_queue, worker_event, cleanup_event):
+def recover_platform_job_logs_wrapper(platform, recovery_queue, logs_queue, worker_event, cleanup_event):
     platform.recovery_queue = recovery_queue
+    platform.logs_queue = logs_queue
     platform.work_event = worker_event
     platform.cleanup_event = cleanup_event
     platform.recover_platform_job_logs()
     _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
+
 
 class CopyQueue(Queue):
     """
@@ -62,10 +61,11 @@ class LookupQueue(Queue):
     """
     A queue to check if a job log is recovered.
     """
+    lock = multiprocessing.Lock()
 
     def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, ctx: Any = None) -> None:
         """
-        Initializes the UniqueQueue.
+        Initializes the LookupQueue.
 
         Args:
             maxsize (int): Maximum size of the queue. Defaults to -1 (infinite size).
@@ -75,7 +75,6 @@ class LookupQueue(Queue):
         """
         self.block = block
         self.timeout = timeout
-        self.lock = multiprocessing.Lock()
         super().__init__(maxsize, ctx=ctx)
 
     def put(self, log_info: Tuple[str, str] = (None, None), block: bool = True, timeout: float = None) -> None:
@@ -83,13 +82,14 @@ class LookupQueue(Queue):
         Puts a log_info into the queue
 
         Args:
-            log_info (Tuple[str, str]): The log_name to be added to the queue.
+            log_info (Tuple[str, str, str]): The log_name to be added to the queue.
             block (bool): Whether to block when the queue is full. Defaults to True.
             timeout (float): Timeout for blocking operations. Defaults to None.
         """
         super().put(log_info, block, timeout)
 
-    def choose_action(self, requested_name: str = "", log_info: tuple[None, None] = "", block: bool = False, timeout: float = None) -> Any:
+    def choose_action(self, requested_name: str = "", log_info: (Tuple[str, str]) = None, block: bool = False,
+                      timeout: float = None) -> Any:
         """
         Gets or add the log_name from or to the queue.
 
@@ -101,8 +101,10 @@ class LookupQueue(Queue):
         Returns:
             Any: The job recovered from the queue.
         """
+
         with self.lock:
-            if log_info[0] and log_info[1]:
+            log_gathered = None
+            if not requested_name:
                 self.put(log_info, block, timeout)
             else:
                 stack = {}  # We want the last log_name not in between
@@ -114,10 +116,9 @@ class LookupQueue(Queue):
                     if job_name != requested_name:
                         super().put((job_name, log_name), block, timeout)
                     else:
-                        log_info = (job_name, log_name)
+                        log_gathered = (job_name, log_name)
 
-        return log_info
-
+        return log_gathered
 
 
 class Platform(object):
@@ -126,8 +127,7 @@ class Platform(object):
     """
     # This is a list of the keep_alive events, used to send the signal outside the main loop of Autosubmit
     worker_events = list()
-    # Shared lock between the main process and a retrieval log process
-    lock = multiprocessing.Lock()
+
 
     def __init__(self, expid, name, config, auth_password=None):
         """
@@ -211,7 +211,7 @@ class Platform(object):
             platform_total_jobs = self.config.get("PLATFORMS", {}).get('TOTAL_JOBS', config_total_jobs)
             log_queue_size = int(platform_total_jobs) * 2
         self.log_queue_size = log_queue_size
-        self.get_log_name_queue = None
+        self.logs_queue = None
 
     @classmethod
     def update_workers(cls, event_worker):
@@ -949,6 +949,7 @@ class Platform(object):
             self.log_recovery_process.join(timeout=60)
         # Resets everything related to the log recovery process.
         self.recovery_queue = None
+        self.logs_queue = None
         self.log_retrieval_process_active = False
         self.remove_workers(self.work_event)
         self.work_event = None
@@ -992,9 +993,10 @@ class Platform(object):
         self.load_process_info(new_platform)
         if self.recovery_queue:
             del self.recovery_queue
+        if self.logs_queue:
+            del self.logs_queue
         # Retrieval log process variables
-        self.recovery_queue = UniqueQueue(max_items=self.log_queue_size, ctx=ctx)
-        self.get_log_name_queue = LookupQueue(ctx=ctx)
+        self.logs_queue = LookupQueue(ctx=ctx)
         self.recovery_queue = CopyQueue(ctx=ctx)
         # Cleanup will be automatically prompt on control + c or a normal exit
         atexit.register(self.send_cleanup_signal)
@@ -1004,7 +1006,7 @@ class Platform(object):
     def create_new_process(self, ctx, new_platform) -> None:
         self.log_recovery_process = ctx.Process(
             target=recover_platform_job_logs_wrapper,
-            args=(new_platform, self.recovery_queue, self.work_event, self.cleanup_event),
+            args=(new_platform, self.recovery_queue, self.logs_queue, self.work_event, self.cleanup_event),
             name=f"{self.name}_log_recovery")
         self.log_recovery_process.daemon = True
         self.log_recovery_process.start()
@@ -1122,14 +1124,15 @@ class Platform(object):
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
                 try:
                     job.retrieve_logfiles(raise_error=True)
-                except Exception:
+                    self.logs_queue.choose_action(log_info=(job.name, job.local_logs[0]))
+                except Exception as e:
                     jobs_pending_to_process.add(job)
                     job._log_recovery_retries += 1
                     Log.warning(f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry:'{job.fail_count}'.")
             except queue.Empty:
                 pass
 
-        if len(jobs_pending_to_process) > 0: # Restore the connection if there was an issue with one or more jobs.
+        if len(jobs_pending_to_process) > 0:  # Restore the connection if there was an issue with one or more jobs.
             self.restore_connection(None)
 
         # This second while is to keep retring the failed jobs.
@@ -1139,6 +1142,7 @@ class Platform(object):
             job._log_recovery_retries += 1
             try:
                 job.retrieve_logfiles(raise_error=True)
+                self.logs_queue.put(job.local_logs)
                 job._log_recovery_retries += 1
             except:
                 if job._log_recovery_retries < 5:
