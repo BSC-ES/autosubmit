@@ -17,6 +17,7 @@ build/
 # Coverage files
 coverage/
 .coverage
+.coverage.*
 test/coverage.xml
 coverage.xml
 test/htmlcov

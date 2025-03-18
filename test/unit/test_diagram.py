@@ -1,23 +1,20 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-""" Test file for autosubmit/monitor/diagram.py """
 import datetime
 
 import pytest
@@ -26,6 +23,8 @@ from mock.mock import patch
 from autosubmit.job.job import Job
 from autosubmit.monitor import diagram
 from autosubmit.monitor.diagram import JobData, JobAggData
+
+""" Test file for autosubmit/monitor/diagram.py """
 
 
 def test_job_data():
@@ -127,7 +126,7 @@ def test_build_legends(mocker):
             True
     ),
 ],
-ids=['all run', 'divided by zero', 'run with continue', 'fail job_dict', 'no run'])
+                         ids=['all run', 'divided by zero', 'run with continue', 'fail job_dict', 'no run'])
 def test_create_bar_diagram(job_stats, failed_jobs, failed_jobs_dict, num_plots, result):
     """ function to test the function create_bar_diagram inside autosubmit/monitor/diagram.py """
 

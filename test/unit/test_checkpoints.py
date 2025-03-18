@@ -1,39 +1,36 @@
-import pytest
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import shutil
 from random import randrange
+
+import pytest
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistenceDb
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-
-
-@pytest.fixture
-def prepare_basic_config(tmpdir):
-    basic_conf = BasicConfig()
-    BasicConfig.DB_DIR = (tmpdir / "exp_root")
-    BasicConfig.DB_FILE = "debug.db"
-    BasicConfig.LOCAL_ROOT_DIR = (tmpdir / "exp_root")
-    BasicConfig.LOCAL_TMP_DIR = "tmp"
-    BasicConfig.LOCAL_ASLOG_DIR = "ASLOGS"
-    BasicConfig.LOCAL_PROJ_DIR = "proj"
-    BasicConfig.DEFAULT_PLATFORMS_CONF = ""
-    BasicConfig.CUSTOM_PLATFORMS_PATH = ""
-    BasicConfig.DEFAULT_JOBS_CONF = ""
-    BasicConfig.SMTP_SERVER = ""
-    BasicConfig.MAIL_FROM = ""
-    BasicConfig.ALLOWED_HOSTS = ""
-    BasicConfig.DENIED_HOSTS = ""
-    BasicConfig.CONFIG_FILE_FOUND = False
-    return basic_conf
 
 
 @pytest.fixture(scope='function')
 def setup_job_list(autosubmit_config, tmpdir, mocker, prepare_basic_config):
     experiment_id = 'random-id'
-    as_conf = autosubmit_config(experiment_id, {})
+    as_conf = autosubmit_config(experiment_id)
     as_conf.experiment_data = dict()
     as_conf.experiment_data["JOBS"] = dict()
     as_conf.experiment_data["PLATFORMS"] = dict()
@@ -58,7 +55,8 @@ def setup_job_list(autosubmit_config, tmpdir, mocker, prepare_basic_config):
 
     job_list._job_list = [job for job_list in jobs.values() for job in job_list]
     waiting_job = jobs["waiting"][0]
-    waiting_job.parents.update(jobs["ready"] + jobs["completed"] + jobs["failed"] + jobs["submitted"] + jobs["running"] + jobs["queuing"])
+    waiting_job.parents.update(
+        jobs["ready"] + jobs["completed"] + jobs["failed"] + jobs["submitted"] + jobs["running"] + jobs["queuing"])
 
     yield job_list, waiting_job, jobs
     shutil.rmtree(tmpdir)
@@ -79,7 +77,8 @@ def test_add_edge_job(setup_job_list):
     for p in waiting_job.parents:
         waiting_job.add_edge_info(p, special_variables)
     for parent in waiting_job.parents:
-        assert waiting_job.edge_info[special_variables["STATUS"]][parent.name] == (parent, special_variables.get("FROM_STEP", 0))
+        assert waiting_job.edge_info[special_variables["STATUS"]][parent.name] == (
+            parent, special_variables.get("FROM_STEP", 0))
 
 
 def test_add_edge_info_joblist(setup_job_list):
@@ -101,11 +100,14 @@ def test_check_special_status(setup_job_list):
     job_c.parents.add(job_a)
     job_c.parents.add(job_b)
     # C can start when A is completed and B is running
-    job_c.edge_info = {Status.VALUE_TO_KEY[Status.COMPLETED]: {job_a.name: (job_a, 0)}, Status.VALUE_TO_KEY[Status.RUNNING]: {job_b.name: (job_b, 0)}}
+    job_c.edge_info = {Status.VALUE_TO_KEY[Status.COMPLETED]: {job_a.name: (job_a, 0)},
+                       Status.VALUE_TO_KEY[Status.RUNNING]: {job_b.name: (job_b, 0)}}
     special_conditions = {"STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0}
     # Test: { A: COMPLETED, B: RUNNING }
     job_list._add_edges_map_info(job_c, special_conditions["STATUS"])
-    assert job_c in job_list.check_special_status()  # This function should return the jobs that can start ( they will be put in Status.ready in the update_list funtion )
+    # This function should return the jobs that can start
+    # (they will be put in Status.ready in the update_list function)
+    assert job_c in job_list.check_special_status()
     # Test: { A: RUNNING, B: RUNNING }, A condition is default ( completed ) and B is running
     job_a.status = Status.RUNNING
     assert job_c not in job_list.check_special_status()
