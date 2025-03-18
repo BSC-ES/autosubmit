@@ -172,6 +172,9 @@ def autosubmit_config(
         if experiment_data is not None:
             config.experiment_data = experiment_data
 
+        for k, v in BasicConfig.__dict__.items():
+            config.experiment_data[k] = v
+
         for arg, value in kwargs.items():
             setattr(config, arg, value)
         config.current_loaded_files[str(conf_dir / 'dummy-so-it-doesnt-force-reload.yml')] = time()
