@@ -1091,39 +1091,48 @@ CONFIG:
         self.assertEqual("FALSE", parameters['CHUNK_LAST'])
 
     def test_get_from_total_stats(self):
-        # arrange
-        with tempfile.TemporaryDirectory() as temp_dir:
-            mocked_basic_config = FakeBasicConfig
-            mocked_basic_config.read = MagicMock()
-            mocked_basic_config.LOCAL_ROOT_DIR = str(temp_dir)
+        """
+        test of the function get_from_total_stats validating the file generation
+        :return:
+        """
+        for creation_file in [False, True]:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                mocked_basic_config = FakeBasicConfig
+                mocked_basic_config.read = MagicMock()
+                mocked_basic_config.LOCAL_ROOT_DIR = str(temp_dir)
 
-            self.job._tmp_path = str(temp_dir)
+                self.job._tmp_path = str(temp_dir)
 
-            log_name = Path(f"{mocked_basic_config.LOCAL_ROOT_DIR}/{self.job.name}_TOTAL_STATS")
-            Path(mocked_basic_config.LOCAL_ROOT_DIR).mkdir(parents=True, exist_ok=True)
+                log_name = Path(f"{mocked_basic_config.LOCAL_ROOT_DIR}/{self.job.name}_TOTAL_STATS")
+                Path(mocked_basic_config.LOCAL_ROOT_DIR).mkdir(parents=True, exist_ok=True)
 
-            with open(log_name, 'w+') as f:
-                f.write(dedent('''\
-                    DEFAULT:
-                        DATE: 1998
-                        EXPID: 199803
-                        HPCARCH: 19980324
-                    '''))
-                f.flush()
+                if creation_file:
+                    with open(log_name, 'w+') as f:
+                        f.write(dedent('''\
+                            DEFAULT:
+                                DATE: 1998
+                                EXPID: 199803
+                                HPCARCH: 19980324
+                            '''))
+                        f.flush()
 
-            lst = self.job._get_from_total_stats(1)
+                lst = self.job._get_from_total_stats(1)
 
-        assert len(lst) == 3
+            if creation_file:
+                assert len(lst) == 3
 
-        fmt = '%Y-%m-%d %H:%M'
-        expected = [
-            datetime.datetime(1998, 1, 1, 0, 0),
-            datetime.datetime(1998, 3, 1, 0, 0),
-            datetime.datetime(1998, 3, 24, 0, 0)
-        ]
+                fmt = '%Y-%m-%d %H:%M'
+                expected = [
+                    datetime.datetime(1998, 1, 1, 0, 0),
+                    datetime.datetime(1998, 3, 1, 0, 0),
+                    datetime.datetime(1998, 3, 24, 0, 0)
+                ]
 
-        for left, right in zip(lst, expected):
-            assert left.strftime(fmt) == right.strftime(fmt)
+                for left, right in zip(lst, expected):
+                    assert left.strftime(fmt) == right.strftime(fmt)
+            else:
+                assert lst == []
+                assert not log_name.exists()
 
     def test_sdate(self):
         """Test that the property getter for ``sdate`` works as expected."""
