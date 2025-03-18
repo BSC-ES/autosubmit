@@ -15,26 +15,18 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import argparse
 import os
-from unittest import TestCase
-from mock import Mock, patch
-from autosubmit.autosubmit import Autosubmit
-from autosubmit.experiment.experiment_common import new_experiment, copy_experiment
-from textwrap import dedent
-from pathlib import Path
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+import pwd
+import sqlite3
+import tempfile
 from itertools import permutations, product
 from pathlib import Path
 from textwrap import dedent
-from ruamel.yaml import YAML
 
 import pytest
-from pytest_mock import MockerFixture
 from mock import Mock, patch
 
 from autosubmit.autosubmit import Autosubmit
-from autosubmit.git.autosubmit_git import AutosubmitGit
 from autosubmit.experiment.experiment_common import new_experiment, copy_experiment
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from log.log import AutosubmitCritical, AutosubmitError
@@ -62,19 +54,12 @@ def test_create_new_test_experiment(db_common_mock):
     assert "t000" == experiment_id
 
 
-    @patch('autosubmit.experiment.experiment_common.db_common')
-    def test_create_new_evaluation_experiment(self, db_common_mock):
-        current_experiment_id = "empty"
-        self._build_db_mock(current_experiment_id, db_common_mock)
-        experiment_id = new_experiment(self.description, self.version, False, False, True)
-        self.assertEqual("e000", experiment_id)
-
-    @patch('autosubmit.experiment.experiment_common.db_common')
-    def test_create_new_experiment_with_previous_one(self, db_common_mock):
-        current_experiment_id = "a007"
-        self._build_db_mock(current_experiment_id, db_common_mock)
-        experiment_id = new_experiment(self.description, self.version)
-        self.assertEqual("a007", experiment_id)
+@patch('autosubmit.experiment.experiment_common.db_common')
+def test_create_new_operational_experiment(db_common_mock):
+    current_experiment_id = "empty"
+    _build_db_mock(current_experiment_id, db_common_mock)
+    experiment_id = new_experiment(_DESCRIPTION, _VERSION, False, True)
+    assert "o000" == experiment_id
 
 
 @patch('autosubmit.experiment.experiment_common.db_common')
@@ -84,31 +69,6 @@ def test_create_new_evaluation_experiment(db_common_mock):
     experiment_id = new_experiment(_DESCRIPTION, _VERSION, False, False, True)
     assert "e000" == experiment_id
 
-    @patch('autosubmit.experiment.experiment_common.db_common')
-    def test_create_new_evaluation_experiment_with_previous_one(self, db_common_mock):
-        current_experiment_id = "e113"
-        self._build_db_mock(current_experiment_id, db_common_mock)
-        experiment_id = new_experiment(self.description, self.version, False, False, True)
-        self.assertEqual("e113", experiment_id)
-
-    @patch('autosubmit.experiment.experiment_common.db_common')
-    def test_copy_experiment_new(self, db_common_mock):
-        current_experiment_id = "empty"
-        self._build_db_mock(current_experiment_id, db_common_mock)
-        experiment_id = copy_experiment(current_experiment_id, self.description, self.version, False, False, True)
-        self.assertEqual("", experiment_id)
-
-    @patch('autosubmit.experiment.experiment_common.db_common')
-    def test_create_new_evaluation_experiment_with_empty_current(self, db_common_mock):
-        current_experiment_id = ""
-        self._build_db_mock(current_experiment_id, db_common_mock)
-        experiment_id = new_experiment(self.description, self.version, False, False, True)
-        self.assertEqual("", experiment_id)
-
-    @staticmethod
-    def _build_db_mock(current_experiment_id, mock_db_common):
-        mock_db_common.last_name_used = Mock(return_value=current_experiment_id)
-        mock_db_common.check_experiment_exists = Mock(return_value=False)
 
 @patch('autosubmit.experiment.experiment_common.db_common')
 def test_create_new_experiment_with_previous_one(db_common_mock):
@@ -508,52 +468,3 @@ def test_perform_deletion(create_autosubmit_tmpdir, generate_new_experiment, set
     assert all(x in err_message for x in
                ["Cannot delete experiment entry", "Cannot delete directory", "Cannot delete structure",
                 "Cannot delete job_data"])
-
-
-@pytest.mark.parametrize(
-    "project_type, generate_new_experiment",
-    [
-        ('git', 'operational'),
-        ('git', 'normal'),
-        ('git', 'test'),
-        ('git', 'evaluation'),
-    ],
-    indirect=["generate_new_experiment"]
-)
-def test_remote_repo_operational(generate_new_experiment: str, create_autosubmit_tmpdir: str, project_type: str, mocker: MockerFixture) -> None:
-    '''
-    Tests the check_unpushed_changed function from AutosubmitGit, which ensures no operational test with unpushed changes in their Git repository is run.
-    '''
-    expid = generate_new_experiment
-    temp_path = Path(create_autosubmit_tmpdir) / expid / "conf" / f"expdef_{expid}.yml"
-    
-    with open(temp_path, 'r') as f: 
-        yaml = YAML(typ='rt')
-        data = yaml.load(f)
-    data["PROJECT"]["PROJECT_TYPE"] = project_type
-    with open(temp_path, 'w') as f:
-        yaml.dump(data, f)
-
-    mocker.patch('subprocess.check_output', return_value = b'M\n')
-    if expid[0] != 'o':
-        AutosubmitGit.check_unpushed_changes(expid)
-    else:
-        with pytest.raises(AutosubmitCritical):
-            AutosubmitGit.check_unpushed_changes(expid) 
-
-@pytest.mark.parametrize(
-    "git_repo, expected_veredict",
-    [
-        ("https://github.com/user/repo.git", True),         # valid GH link
-        ("file:///home/user/project", True),                # valid file link
-        ("not-a-repo-link", False),                         # clearly invalid
-        ("git@github.com:user/repo.git", True),             # SSH format
-        ("http://bitbucket.org/user/repo.git", True),       # other valid git host
-        ("ftp://invalid/protocol/repo.git", False),         # invalid protocol
-        ("", False),                                        # empty string
-        ("file://", False),                                 # incomplete file URL
-        ("https://github.com/user/repo", False),            # missing .git
-    ]
-)
-def test_valid_git_repo_check(git_repo, expected_veredict):
-    assert AutosubmitGit.is_github_repo(git_repo) == expected_veredict

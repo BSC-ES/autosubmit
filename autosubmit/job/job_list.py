@@ -23,8 +23,7 @@ import re
 import traceback
 from contextlib import suppress
 from shutil import move
-from threading import Thread
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Optional
 from pathlib import Path
 
 from time import strftime, localtime, mktime
@@ -2394,7 +2393,7 @@ class JobList(object):
             active = []
         return active
 
-    def get_job_by_name(self, name):
+    def get_job_by_name(self, name: str) -> Optional[Job]:
         """
         Returns the job that its name matches parameter name
 
@@ -2406,6 +2405,7 @@ class JobList(object):
         for job in self._job_list:
             if job.name == name:
                 return job
+        return None
 
     def get_jobs_by_section(self, section_list: list, banned_jobs: list = None,
                             get_only_non_completed: bool = False) -> list:

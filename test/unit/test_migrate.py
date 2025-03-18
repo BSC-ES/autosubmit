@@ -1,14 +1,31 @@
-import pytest
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+import os
+import pwd
 from pathlib import Path
+
+import pytest
+
 from autosubmit.migrate.migrate import Migrate
+from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-import os
-
-import pwd
 from log.log import AutosubmitCritical
-
 from test.unit.utils.common import create_database, init_expid
 
 
@@ -54,7 +71,7 @@ path = {folder}
         os.environ['AUTOSUBMIT_CONFIGURATION'] = str(folder.join('autosubmitrc'))
         create_database(str(folder.join('autosubmitrc')))
         assert "tests.db" in [Path(f).name for f in folder.listdir()]
-        init_expid(str(folder.join('autosubmitrc')), platform='pytest-local',create=False)
+        init_expid(str(folder.join('autosubmitrc')), platform='pytest-local', create=False)
         assert "t000" in [Path(f).name for f in folder.listdir()]
         return folder
 
