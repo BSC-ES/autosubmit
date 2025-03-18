@@ -85,8 +85,9 @@ class SlurmPlatform(ParamikoPlatform):
 
     def create_a_new_copy(self):
         """
-
-        :return:
+        Return a copy of a SlurmPlatform object with the same
+        SlurmPlatform.expid, SlurmPlatform.name and SlurmPlatofrm.cofig
+        as the original
         """
         return SlurmPlatform(self.expid, self.name, self.config)
 
@@ -366,7 +367,7 @@ class SlurmPlatform(ParamikoPlatform):
 
         :param job: Job to be held
         :type job: Job
-        :return:
+        :return: A boolean indicating whether the job is being held
         """
         try:
             cmd = "scontrol release {0} ; sleep 2 ; scontrol hold {0} ".format(job.id)
