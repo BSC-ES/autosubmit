@@ -25,6 +25,7 @@ import autosubmit.database.db_common as db_common
 from log.log import Log,AutosubmitCritical
 Log.get_logger("Autosubmit")
 
+
 def new_experiment(description, version, test=False, operational=False, evaluation=False):
     """
     Stores a new experiment on the database and generates its identifier

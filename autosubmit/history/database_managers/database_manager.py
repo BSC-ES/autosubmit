@@ -122,18 +122,6 @@ class DatabaseManager(metaclass=ABCMeta):
         conn.close()
         return statement_rows
 
-    def insert_statement(self, path, statement):
-        # type : (str, str) -> int
-        """ Insert statement into path """
-        conn = self.get_connection(path)
-        conn.text_factory = str
-        cursor = conn.cursor()
-        cursor.execute(statement)
-        lastrow_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        return lastrow_id
-
     def insert_statement_with_arguments(self, path, statement, arguments):
         # type : (str, str, Tuple) -> int
         """ Insert statement with arguments into path """

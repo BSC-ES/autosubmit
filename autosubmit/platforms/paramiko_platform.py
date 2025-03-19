@@ -1068,15 +1068,6 @@ class ParamikoPlatform(Platform):
                 retries = retries - 1
         if retries <= 0:
             return False , False, False
-    def exec_command_x11(self, command, bufsize=-1, timeout=0, get_pty=False,retries=3, x11=False):
-        session = self.transport.open_session()
-        session.request_x11(handler=self.x11_handler)
-        session.exec_command(command + " ; sleep infinity")
-        session_fileno = session.fileno()
-        self.poller.register(session_fileno, select.POLLIN)
-        self.x11_status_checker(session, session_fileno)
-        pass
-
 
     def send_command_non_blocking(self, command, ignore_log):
         thread = threading.Thread(target=self.send_command, args=(command, ignore_log))
@@ -1453,18 +1444,6 @@ class ParamikoPlatform(Platform):
                 self.transport.close()
                 self.transport.stop_thread()
 
-    def check_tmp_exists(self):
-        try:
-            if self.send_command("ls {0}".format(self.temp_dir)):
-                if "no such file or directory" in str(self.get_ssh_output_err()).lower():
-                    return False
-                else:
-                    return True
-            else:
-                return False
-        except Exception as e:
-            return False
-    
     def check_remote_permissions(self):
         try:
             path = os.path.join(self.scratch, self.project_dir, self.user, "permission_checker_azxbyc")

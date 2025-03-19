@@ -143,7 +143,6 @@ class Autosubmit:
     """
 
     def __init__(self):
-        self._experiment_data = {}
         self.command = None
 
     @property
@@ -3172,14 +3171,6 @@ class Autosubmit:
         return job_list.check_scripts(as_conf)
 
     @staticmethod
-    def capitalize_keys(dictionary):
-        upper_dictionary = defaultdict()
-        for key in list(dictionary.keys()):
-            upper_key = key.upper()
-            upper_dictionary[upper_key] = dictionary[key]
-        return upper_dictionary
-
-    @staticmethod
     def report(expid, template_file_path="", show_all_parameters=False, folder_path="", placeholders=False):
         """
         Show report for specified experiment
@@ -3571,10 +3562,6 @@ class Autosubmit:
         Can be configured at system, user or local levels. Local level configuration precedes user level and user level
         precedes system configuration.
         """
-
-        not_enough_screen_size_msg = 'The size of your terminal is not enough to draw the configuration wizard,\n' \
-                                     'so we\'ve closed it to prevent errors. Resize it and then try it again.'
-
         home_path = Path("~").expanduser().resolve()
 
         try:
@@ -4120,7 +4107,6 @@ class Autosubmit:
         corrupted_db_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}_corrupted.db".format(expid))
 
         database_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}.db".format(expid))
-        database_backup_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}.sql".format(expid))
         dump_file_name = 'job_data_{0}.sql'.format(expid, current_time)
         dump_file_path = os.path.join(BasicConfig.JOBDATA_DIR, dump_file_name)
         bash_command = 'cat {1} | sqlite3 {0}'.format(database_path, dump_file_path)
@@ -5242,7 +5228,6 @@ class Autosubmit:
                 #### Starts the filtering process ####
                 final_list = []
                 jobs_filtered = []
-                jobs_left_to_be_filtered = True
                 final_status = Autosubmit._get_status(final)
                 # I have the impression that whoever did this function thought about the possibility of having multiple filters at the same time
                 # But, as it was, it is not possible to have multiple filters at the same time due to the way the code is written
@@ -5794,65 +5779,6 @@ class Autosubmit:
         else:
             job_list.remove_rerun_only_jobs(notransitive)
 
-        return job_list
-
-    @staticmethod
-    def rerun_recovery(expid, job_list, rerun_list, as_conf):
-        """
-        Method to check all active jobs. If COMPLETED file is found, job status will be changed to COMPLETED,
-        otherwise it will be set to WAITING. It will also update the jobs list.
-
-        :param expid: identifier of the experiment to recover
-        :type expid: str
-        :param job_list: job list to update
-        :type job_list: JobList
-        :param rerun_list: list of jobs to rerun
-        :type rerun_list: list
-        :param as_conf: AutosubmitConfig object
-        :type as_conf: AutosubmitConfig
-        :return:
-
-
-        """
-
-        hpcarch = as_conf.get_platform()
-        submitter = Autosubmit._get_submitter(as_conf)
-        try:
-            submitter.load_platforms(as_conf)
-            if submitter.platforms is None:
-                raise AutosubmitCritical("platforms couldn't be loaded", 7014)
-        except Exception as e:
-            raise AutosubmitCritical("platforms couldn't be loaded", 7014)
-        platforms = submitter.platforms
-
-        platforms_to_test = set()
-        for job in job_list.get_job_list():
-            if job.platform_name is None:
-                job.platform_name = hpcarch
-            # noinspection PyTypeChecker
-            job.platform = platforms[job.platform_name]
-            # noinspection PyTypeChecker
-            platforms_to_test.add(platforms[job.platform_name])
-        rerun_names = []
-
-        [rerun_names.append(job.name) for job in rerun_list.get_job_list()]
-        jobs_to_recover = [
-            i for i in job_list.get_job_list() if i.name not in rerun_names]
-
-        Log.info("Looking for COMPLETED files")
-        start = datetime.datetime.now()
-        for job in jobs_to_recover:
-            if job.platform_name is None:
-                job.platform_name = hpcarch
-            # noinspection PyTypeChecker
-            job.platform = platforms[job.platform_name.upper()]
-
-            if job.platform.get_completed_files(job.name, 0):
-                job.status = Status.COMPLETED
-                Log.info(
-                    "CHANGED job '{0}' status to COMPLETED".format(job.name))
-
-            job.platform.get_logs_files(expid, job.remote_logs)
         return job_list
 
     @staticmethod

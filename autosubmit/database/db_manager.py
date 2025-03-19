@@ -122,16 +122,6 @@ class DbManager(object):
         cursor = self._select_with_all_fields(table_name)
         return cursor.fetchall()
 
-    def select_all_where(self, table_name, where):
-        """
-        Returns all the rows of the given table that matches the given where conditions
-        :param table_name: str
-        :param where: [str]
-        :return rows: [[]]
-        """
-        cursor = self._select_with_all_fields(table_name, where)
-        return cursor.fetchall()
-
     def count(self, table_name):
         """
         Returns the number of rows of the given table

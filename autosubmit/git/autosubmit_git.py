@@ -86,42 +86,6 @@ class AutosubmitGit:
         return True
 
     @staticmethod
-    def check_commit(as_conf):
-        """
-        Function to check uncommitted changes
-
-        :param as_conf: experiment configuration
-        :type as_conf: autosubmitconfigparser.config.AutosubmitConfig
-        """
-        dirname_path = as_conf.get_project_dir()
-        if path.isdir(dirname_path):
-            Log.debug("Checking git directory status...")
-            if path.isdir(os.path.join(dirname_path, '.git')):
-                try:
-                    output = subprocess.check_output("cd {0}; git diff-index HEAD --".format(dirname_path),
-                                                     shell=True)
-                except subprocess.CalledProcessError:
-                    Log.info("This is not a git experiment")
-                    return True
-
-                if output:
-                    Log.printlog(
-                        "There are local changes not committed to git", 3000)
-                    return True
-                else:
-                    output = subprocess.check_output("cd {0}; git log --branches --not --remotes".format(dirname_path),
-                                                     shell=True)
-                    if output:
-                        Log.printlog(
-                            "There are local changes not pushed to git", 3000)
-                        return True
-                    else:
-                        Log.info("Model Git repository is updated")
-                        Log.result("Model Git repository is updated")
-
-        return True
-
-    @staticmethod
     def clone_repository(as_conf, force, hpcarch):
         """
         Clones a specified git repository on the project folder
