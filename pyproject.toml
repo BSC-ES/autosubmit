@@ -62,7 +62,7 @@ dependencies = [
     "py3dotplus==1.1.0",
     "numpy<2",
     "rocrate==0.*",
-    "autosubmitconfigparser==1.0.78rc2",
+    "autosubmitconfigparser==1.0.78",
     "configparser",
     "setproctitle",
     "invoke>=2.0"
