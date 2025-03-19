@@ -1113,16 +1113,6 @@ class Job(object):
         """
         self.parents.remove(parent)
 
-    def delete_child(self, child):
-        """
-        Removes a child from the job
-
-        :param child: child to remove
-        :type child: Job
-        """
-        # careful it is only possible to remove one child at a time
-        self.children.remove(child)
-
     def has_children(self):
         """
         Returns true if job has any children, else return false
@@ -2587,43 +2577,6 @@ class Job(object):
             thread_write_finish.name = "JOB_data_{}".format(self.name)
             thread_write_finish.start()
 
-
-    def write_total_stat_by_retries(self, total_stats, first_retrial = False):
-        """
-        Writes all data to TOTAL_STATS file
-        :param total_stats: data gathered by the wrapper
-        :type total_stats: dict
-        :param first_retrial: True if this is the first retry, False otherwise
-        :type first_retrial: bool
-
-        """
-        path = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
-        f = open(path, 'a')
-        if first_retrial:
-            f.write(" " + date2str(datetime.datetime.fromtimestamp(total_stats[0]), 'S') + ' ' + date2str(datetime.datetime.fromtimestamp(total_stats[1]), 'S') + ' ' + total_stats[2])
-        else:
-            f.write('\n' + date2str(datetime.datetime.fromtimestamp(total_stats[0]), 'S') + ' ' + date2str(datetime.datetime.fromtimestamp(total_stats[0]), 'S') + ' ' + date2str(datetime.datetime.fromtimestamp(total_stats[1]), 'S') + ' ' + total_stats[2])
-        out, err = self.local_logs
-        path_out = os.path.join(self._tmp_path, 'LOG_' + str(self.expid), out)
-        # Launch first as simple non-threaded function
-
-        exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-        exp_history.write_start_time(self.name, start=total_stats[0], status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), qos=self.queue, job_id=self.id, wrapper_queue=self._wrapper_queue, wrapper_code=get_job_package_code(self.expid, self.name),
-                                    children=self.children_names_str)
-        if not first_retrial:
-            exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-            exp_history.write_submit_time(self.name, submit=total_stats[0], status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), ncpus=self.processors,
-                                        wallclock=self.wallclock, qos=self.queue, date=self.date, member=self.member, section=self.section, chunk=self.chunk,
-                                        platform=self.platform_name, job_id=self.id, wrapper_queue=self._wrapper_queue, wrapper_code=get_job_package_code(self.expid, self.name),
-                                        children=self.children_names_str)
-        exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-        job_data_dc = exp_history.write_finish_time(self.name, finish=total_stats[1], status=total_stats[2], job_id=self.id, out_file=out, err_file=err)
-         # Launch second as threaded function only for slurm
-        if job_data_dc and type(self.platform) is not str and self.platform.type == "slurm":
-            thread_write_finish = Thread(target=ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR).write_platform_data_after_finish, args=(job_data_dc, self.platform))
-            thread_write_finish.name = "JOB_data_{}".format(self.name)
-            thread_write_finish.start()
-
     def check_started_after(self, date_limit):
         """
         Checks if the job started after the given date
@@ -2672,16 +2625,6 @@ class Job(object):
             elif parent.is_ancestor(job):
                 return True
         return False
-
-    def remove_redundant_parents(self):
-        """
-        Checks if a parent is also an ancestor, if true, removes the link in both directions.
-        Useful to remove redundant dependencies.
-        """
-        for parent in list(self.parents):
-            if self.is_ancestor(parent):
-                parent.children.remove(self)
-                self.parents.remove(parent)
 
     def synchronize_logs(self, platform, remote_logs, local_logs, last = True):
         platform.move_file(remote_logs[0], local_logs[0], True)  # .out
