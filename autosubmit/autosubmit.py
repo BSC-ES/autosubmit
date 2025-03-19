@@ -3020,15 +3020,10 @@ class Autosubmit:
                     job.recover_last_ready_date()
                     job.recover_last_log_name()
                 elif job.status != Status.SUSPENDED:
-                    job.update_parameters(as_conf, set_attributes=True)
                     job.status = Status.WAITING
                     job._fail_count = 0
-                    # Log.info("CHANGED job '{0}' status to WAITING".format(job.name))
-                    # Log.status("CHANGED job '{0}' status to WAITING".format(job.name))
-
-                if save and job.status != Status.COMPLETED:
-                    job.update_parameters(as_conf, set_attributes=True)
-
+                    Log.info("CHANGED job '{0}' status to WAITING".format(job.name))
+                # Update parameters with attributes is called in: build_packages, submit wrappers, and for every ready job. It shouldn't be necessary here.
             end = datetime.datetime.now()
             Log.info("Time spent: '{0}'".format(end - start))
             Log.info("Updating the jobs list")
