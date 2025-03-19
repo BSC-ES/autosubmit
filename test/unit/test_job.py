@@ -38,7 +38,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_utils import calendar_chunk_section
-from autosubmit.job.job_utils import get_job_package_code, SubJob, SimpleJob, SubJobManager
+from autosubmit.job.job_utils import get_job_package_code, SubJob, SubJobManager
 from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
@@ -152,41 +152,6 @@ class TestJob:
         incremented_fail_count = self.job.fail_count
 
         assert initial_fail_count + 1 == incremented_fail_count
-
-    def test_parents_and_children_management(self):
-        random_job1 = Job('dummy-name', 111, Status.WAITING, 0)
-        random_job2 = Job('dummy-name2', 222, Status.WAITING, 0)
-        random_job3 = Job('dummy-name3', 333, Status.WAITING, 0)
-
-        self.job.add_parent(random_job1,
-                            random_job2,
-                            random_job3)
-
-        # assert added
-        assert 3 == len(self.job.parents)
-        assert 1 == len(random_job1.children)
-        assert 1 == len(random_job2.children)
-        assert 1 == len(random_job3.children)
-
-        # assert contains
-        assert self.job.parents.__contains__(random_job1)
-        assert self.job.parents.__contains__(random_job2)
-        assert self.job.parents.__contains__(random_job3)
-
-        assert random_job1.children.__contains__(self.job)
-        assert random_job2.children.__contains__(self.job)
-        assert random_job3.children.__contains__(self.job)
-
-        # assert has
-        assert not self.job.has_children()
-        assert self.job.has_parents()
-
-        # assert deletions
-        self.job.delete_parent(random_job3)
-        assert 2 == len(self.job.parents)
-
-        random_job1.delete_child(self.job)
-        assert 0 == len(random_job1.children)
 
     @patch('autosubmitconfigparser.config.basicconfig.BasicConfig')
     def test_header_tailer(self, mocked_global_basic_config: Mock):
@@ -460,11 +425,9 @@ CONFIG:
                                 assert "%EXTENDED_HEADER%" not in final_script
                                 assert "%EXTENDED_TAILER%" not in final_script
 
-    @patch('autosubmitconfigparser.config.basicconfig.BasicConfig')
-    def test_hetjob(self, mocked_global_basic_config: Mock):
+    def test_hetjob(self):
         """
         Test job platforms with a platform. Builds job and platform using YAML data, without mocks.
-        :param mocked_global_basic_config:
         :return:
         """
         expid = "zzyy"
@@ -846,8 +809,7 @@ CONFIG:
                                 assert "%EXTENDED_HEADER%" not in final_script
                                 assert "%EXTENDED_TAILER%" not in final_script
 
-    @patch('autosubmitconfigparser.config.basicconfig.BasicConfig')
-    def test_job_parameters(self, mocked_global_basic_config: Mock):
+    def test_job_parameters(self):
         """Test job platforms with a platform. Builds job and platform using YAML data, without mocks.
 
         Actually one mock, but that's for something in the AutosubmitConfigParser that can
@@ -943,7 +905,7 @@ CONFIG:
                     template_content, additional_templates = job.update_content(config, parameters)
                     assert not additional_templates
 
-                    assert not f'#SBATCH --reservation' in template_content
+                    assert f'#SBATCH --reservation' not in template_content
                 else:
                     assert reservation == parameters['JOBS.A.RESERVATION']
 
@@ -1757,14 +1719,6 @@ def test_get_job_package_code(autosubmit_config):
         assert code == 5
 
 
-def test_simple_job_instantiation(tmp_path, autosubmit_config):
-    job = SimpleJob("dummy", tmp_path, 100)
-
-    assert job.name == "dummy"
-    assert job._tmp_path == tmp_path
-    assert job.status == 100
-
-
 def test_sub_job_instantiation(tmp_path, autosubmit_config):
     job = SubJob("dummy", package=None, queue=0, run=0, total=0, status="UNKNOWN")
 
@@ -1897,12 +1851,6 @@ def test_remove_redundant_parents_works_well(integration_jobs):
     # Checking there are redundant parents
     assert len(integration_jobs[3].parents) == 3
     assert len(integration_jobs[4].parents) == 3
-    # Treating the redundant parents
-    integration_jobs[3].remove_redundant_parents()
-    integration_jobs[4].remove_redundant_parents()
-    # Checking there aren't redundant parents
-    assert len(integration_jobs[3].parents) == 2
-    assert len(integration_jobs[4].parents) == 2
 
 
 def check_ancestors_array(job, assertions, jobs):

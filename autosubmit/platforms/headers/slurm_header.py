@@ -70,21 +70,6 @@ class SlurmHeader(object):
         else:
             return "SBATCH -n {0}".format(job.processors)
 
-    def get_tasks_directive(self, job, parameters, het=-1):
-        """
-        Returns tasks directive for the specified job
-        :param job: job to create tasks directive for
-        :return: tasks directive
-        :rtype: str
-        """
-        if het > -1 and len(job.het['TASKS']) > 0:
-            if job.het['TASKS'][het] != '':
-                return "SBATCH --ntasks-per-node={0}".format(job.het['TASKS'][het])
-        else:
-            if parameters['TASKS'] != '':
-                return "SBATCH --ntasks-per-node={0}".format(parameters['TASKS'])
-        return ""
-
     def get_partition_directive(self, job, parameters, het=-1):
         """
         Returns partition directive for the specified job

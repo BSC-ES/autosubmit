@@ -64,20 +64,6 @@ class ExperimentStatusDbManager(DatabaseManager):
                    str(self.current_experiment_status_row.exp_id) +
                    "\n\t" + self.current_experiment_status_row.status))
 
-    def is_running(self, time_condition=600):
-        # type : (int) -> bool
-        """ True if experiment is running, False otherwise. """
-        if os.path.exists(self._pkl_file_path):
-            current_stat = os.stat(self._pkl_file_path)
-            timest = int(current_stat.st_mtime)
-            timesys = int(time.time())
-            time_diff = int(timesys - timest)
-            if time_diff < time_condition:
-                return True
-            else:
-                return False
-        return False
-
     def set_existing_experiment_status_as_running(self, expid):
         """ Set the experiment_status row as running. """
         self.update_exp_status(expid, Models.RunningStatus.RUNNING)

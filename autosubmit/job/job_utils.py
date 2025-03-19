@@ -293,17 +293,6 @@ class Dependency(object):
         self.relationships = relationships
 
 
-class SimpleJob(object):
-    """
-    A simple replacement for jobs
-    """
-
-    def __init__(self, name, tmppath, statuscode) -> None:
-        self.name = name
-        self._tmp_path = tmppath
-        self.status = statuscode
-
-
 class SubJob(object):
     """
     Class to manage package times
