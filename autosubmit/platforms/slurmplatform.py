@@ -35,13 +35,22 @@ from log.log import AutosubmitCritical, AutosubmitError, Log
 class SlurmPlatform(ParamikoPlatform):
     """
     Class to manage jobs to host using SLURM scheduler
-
-    :param expid: experiment's identifier
-    :type expid: str
     """
 
+    def __init__(self, expid: str, name: str, config: dict, auth_password: str=None):
+        """
+        Initialization of the Class SlurmPlatform
 
-    def __init__(self, expid, name, config, auth_password=None):
+        :param expid: ID of the experiment which will instantiate the SlurmPlatform.
+        :type expid: str
+        :param name: Name of the platform to be instantiated.
+        :type name: str
+        :param config: Configuration of the platform, PATHS to Files and DB.
+        :type config: dict
+        :param auth_password: Authenticator's password.
+        :type auth_password: str
+        :return: None
+        """
         ParamikoPlatform.__init__(self, expid, name, config, auth_password = auth_password)
         self.mkdir_cmd = None
         self.get_cmd = None
@@ -74,6 +83,11 @@ class SlurmPlatform(ParamikoPlatform):
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
 
     def create_a_new_copy(self):
+        """
+        Return a copy of a SlurmPlatform object with the same
+        SlurmPlatform.expid, SlurmPlatform.name and SlurmPlatofrm.cofig
+        as the original
+        """
         return SlurmPlatform(self.expid, self.name, self.config)
 
     def get_submit_cmd_x11(self, args, script_name, job):
@@ -294,6 +308,7 @@ class SlurmPlatform(ParamikoPlatform):
             raise
         except Exception as e:
             raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e))
+
     def check_remote_log_dir(self):
         """
         Creates log dir on remote host
@@ -334,8 +349,12 @@ class SlurmPlatform(ParamikoPlatform):
         self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
         self._submit_cmd_x11 = f'{self.remote_log_dir}'
 
-
     def hold_job(self, job):
+        """
+        Input: job to hold
+
+        Returns a boolean indicating whether the job is being held
+        """
         try:
             cmd = "scontrol release {0} ; sleep 2 ; scontrol hold {0} ".format(job.id)
             self.send_command(cmd)
@@ -590,6 +609,7 @@ class SlurmPlatform(ParamikoPlatform):
 
     def get_checkAlljobs_cmd(self, jobs_id):
         return "sacct -n -X --jobs {1} -o jobid,State".format(self.host, jobs_id)
+
     def get_estimated_queue_time_cmd(self, job_id):
         return f"scontrol -o show JobId {job_id} | grep -Po '(?<=EligibleTime=)[0-9-:T]*'"
 
@@ -598,7 +618,6 @@ class SlurmPlatform(ParamikoPlatform):
 
     def get_jobid_by_jobname_cmd(self, job_name):
         return 'squeue -o %A,%.50j -n {0}'.format(job_name)
-
 
     def cancel_job(self, job_id):
         return 'scancel {0}'.format(job_id)
