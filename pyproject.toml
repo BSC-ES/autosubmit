@@ -54,7 +54,7 @@ dependencies = [
     "portalocker<=2.7.0",
     "paramiko>=3.5.0",
     "pyparsing==3.2.1",
-    "matplotlib<=3.8.3",
+    "matplotlib<=3.10.1",
     "packaging<=24.2",
     "typing_extensions==4.*",
     "typing<=3.7.4.3",
