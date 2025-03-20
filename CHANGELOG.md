@@ -1,4 +1,60 @@
-4.1.12 - TODO
+### 4.1.12: Logs, Memory, DB fixes. Enhancements, new features, and overall bug fixes.
+
+**Mem fixes:** [PR](https://github.com/BSC-ES/autosubmit/pull/2130)
+- Memory problems when running Autosubmit experiments on ClimateDT VM [#2122](https://github.com/BSC-ES/autosubmit/issues/2122)
+  - Reduced job\_list, imports, log processors memory usage.
+  - Memory leaks. [#2160](https://github.com/BSC-ES/autosubmit/issues/2160)
+
+**Logs and db fixes:**
+- Revive log process while Autosubmit is running [#2097](https://github.com/BSC-ES/autosubmit/pull/2097)
+- CPU consumption fix [#1472](https://github.com/BSC-ES/autosubmit/issues/1472)
+- Platforms don't recover logs and process exit prematurely [#1470](https://github.com/BSC-ES/autosubmit/issues/1470)
+- Autosubmit remote log processes orphans [#1390](https://github.com/BSC-ES/autosubmit/issues/1390), [#1381](https://github.com/BSC-ES/autosubmit/issues/1381)
+- Improve the log from log recovery processors [#2035](https://github.com/BSC-ES/autosubmit/issues/2035)
+
+**Enhancements and new features:**
+- Better log output on crash showing the command args and expid. [#2083](https://github.com/BSC-ES/autosubmit/issues/2083)
+- Mail notifier now has the path to the logs and, optionally, the log attached [#1434](https://github.com/BSC-ES/autosubmit/issues/1434)
+- Changed pip installation method from setup.py to pyproject.toml [#2180](https://github.com/BSC-ES/autosubmit/issues/2180), [#1384](https://github.com/BSC-ES/autosubmit/issues/1384)
+- Autosubmit has a new entry point: autosubmit/scripts/autosubmit.py [#2182](https://github.com/BSC-ES/autosubmit/issues/2182)
+- Fix typos in messages shown to users [#1469](https://github.com/BSC-ES/autosubmit/issues/1469)
+- Each workflow change is tracked as long as it is committed and pushed. [#2213](https://github.com/BSC-ES/autosubmit/pull/2213), [#2179](https://github.com/BSC-ES/autosubmit/issues/2179)
+- User mapping aka running under one robot account [#2009](https://github.com/BSC-ES/autosubmit/pull/2009)
+- Allow pipeline commands by correcting the Autosubmit commands return values [#2124](https://github.com/BSC-ES/autosubmit/issues/2124)
+- Allow users to create RO-Crate archives without archiving experiments [#1412](https://github.com/BSC-ES/autosubmit/issues/1412)
+
+**Bug fixes:**
+- autosubmit stop reworked to work with long names [#2104](https://github.com/BSC-ES/autosubmit/issues/2104)
+- e-mail notification not working [#1483](https://github.com/BSC-ES/autosubmit/issues/1483)
+- Weak dependencies in splits [#2067](https://github.com/BSC-ES/autosubmit/issues/2067)
+- Current variables [#2004](https://github.com/BSC-ES/autosubmit/issues/2004)
+- Recovery command issues [#1480](https://github.com/BSC-ES/autosubmit/issues/1480)
+- Pip installation fixes [#1460](https://github.com/BSC-ES/autosubmit/issues/1460)
+- Variable parsing fixes [#1466](https://github.com/BSC-ES/autosubmit/issues/1466), [#2065](https://github.com/BSC-ES/autosubmit/issues/2065)
+- Splits="auto" fixes. [#1464](https://github.com/BSC-ES/autosubmit/issues/1464)
+- Fugaku Header fixes [#1459](https://github.com/BSC-ES/autosubmit/issues/1459)
+- Custom directives [#1457](https://github.com/BSC-ES/autosubmit/issues/1457)
+- Job submission error handle changed from Critical -> Error [#2102](https://github.com/BSC-ES/autosubmit/issues/2102)
+- Wrapper deadlock fixes.
+- Fixed an issue with Autosubmit expid -y \$expid not copying 3.1X experiments. [#2073](https://github.com/BSC-ES/autosubmit/issues/2073)
+
+**Autosubmit tests:**
+- Multiple pull requests for unit tests, lint, vulture, and coverage improvements.
+- Added integration tests for DB, logs, and autosubmit run.
+- Improved the performance of the tests.
+
+**Autosubmit config parser:**
+- Updated ruamel.yaml to 0.18.8.
+- Track workflow commits [#74](https://github.com/BSC-ES/autosubmit-config-parser/pull/74)
+- Optimized the memory usage of the autosubmit config parser. [#70](https://github.com/BSC-ES/autosubmit-config-parser/pull/70)
+- Export hpcarch parameters for the templates. [function](https://github.com/BSC-ES/autosubmit-config-parser/blob/fbd1f388ce57bd5d17f76bccea2aa02b0e2ab09a/autosubmitconfigparser/config/configcommon.py#L1876)
+- Wallclock normalization and max\_wallclock > job wallclock error. [#67](https://github.com/BSC-ES/autosubmit-config-parser/pull/67)
+- Added support for environment variables. These must be named as "AS\_ENV\_<VAR>" [#54](https://github.com/BSC-ES/autosubmit-config-parser/pull/54)
+- Notify\_on, dependencies, "current\_" variables fixes. [#58](https://github.com/BSC-ES/autosubmit-config-parser/pull/58), [#53](https://github.com/BSC-ES/autosubmit-config-parser/pull/53), [#59](https://github.com/BSC-ES/autosubmit-config-parser/pull/59)
+
+**Others:**
+- All autosubmit projects moved to Github.
+- Added Github actions for CI/CD.
 
 4.1.11 - Enhancements, New Features, Documentation, and Bug Fixes
 =================================================================
