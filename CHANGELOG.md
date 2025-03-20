@@ -56,7 +56,7 @@
 - All autosubmit projects moved to Github.
 - Added Github actions for CI/CD.
 
-- 4.1.11 - Enhancements, New Features, Documentation, and Bug Fixes
+4.1.11 - Enhancements, New Features, Documentation, and Bug Fixes
 =================================================================
 
 Enhancements and new features:
