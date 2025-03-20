@@ -201,7 +201,6 @@ class Job(object):
             priority = loaded_data['priority']
 
         self.rerun_only = False
-        self.script_name_wrapper = None
         self.delay_end = None
         self.wrapper_type = None
         self._wrapper_queue = None
@@ -247,7 +246,6 @@ class Job(object):
         self._status = None
         self.status = status
         self.prev_status = status
-        self.old_status = self.status
         self.new_status = status
         self.priority = priority
         self._parents = set()
@@ -258,7 +256,6 @@ class Job(object):
         self._tmp_path = os.path.join(
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
         self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
-        self.write_start = False
         self._platform = None
         self.check = 'true'
         self.check_warnings = False
@@ -289,7 +286,6 @@ class Job(object):
         self.log_recovered = False
         self.submit_time_timestamp = None # for wrappers, all jobs inside a wrapper are submitted at the same time
         self.start_time_timestamp = None
-        self.finish_time_timestamp = None # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
         self._script = None # Inline code to be executed
         self._log_recovery_retries = None
         self.ready_date = None
@@ -1467,7 +1463,6 @@ class Job(object):
         :param failed_file: boolean, if True, checks if the job failed
         :return:
         """
-        self.log_avaliable = False
         previous_status = self.status
         self.prev_status = previous_status
         new_status = self.new_status
@@ -1814,8 +1809,7 @@ class Job(object):
                     self.het['CUSTOM_DIRECTIVES'].append(json.loads(custom_directive))
                 self.custom_directives = self.het['CUSTOM_DIRECTIVES'][0]
             else:
-                if type(self.custom_directives) is str:  # TODO This is a workaround for the time being, just defined for tests passing without more issues
-                    self.custom_directives = json.loads(self.custom_directives)
+                self.custom_directives = json.loads(self.custom_directives)
             if len(self.het['CUSTOM_DIRECTIVES']) < self.het['HETSIZE']:
                 for x in range(self.het['HETSIZE'] - len(self.het['CUSTOM_DIRECTIVES'])):
                     self.het['CUSTOM_DIRECTIVES'].append(self.custom_directives )
@@ -2430,7 +2424,6 @@ class Job(object):
                 '%(?<!%%)' + variable + '%(?!%%)', '', template_content,flags=re.I)
         template_content = template_content.replace("%%", "%")
         script_name = '{0}.{1}.cmd'.format(self.name, wrapper_tag)
-        self.script_name_wrapper = '{0}.{1}.cmd'.format(self.name, wrapper_tag)
         open(os.path.join(self._tmp_path, script_name),
              'w').write(template_content)
         os.chmod(os.path.join(self._tmp_path, script_name), 0o755)
@@ -2562,12 +2555,10 @@ class Job(object):
         if end_time > 0:
             # noinspection PyTypeChecker
             f.write(date2str(datetime.datetime.fromtimestamp(float(end_time)), 'S'))
-            self.finish_time_timestamp = date2str(datetime.datetime.fromtimestamp(end_time),'S')
             # date2str(datetime.datetime.fromtimestamp(end_time), 'S')
             finish_time = end_time
         else:
             f.write(date2str(datetime.datetime.now(), 'S'))
-            self.finish_time_timestamp = date2str(datetime.datetime.now(), 'S')
             finish_time = time.time()
         f.write(' ')
         if completed:
@@ -2587,42 +2578,6 @@ class Job(object):
             thread_write_finish.name = "JOB_data_{}".format(self.name)
             thread_write_finish.start()
 
-
-    def write_total_stat_by_retries(self, total_stats, first_retrial = False):
-        """
-        Writes all data to TOTAL_STATS file
-        :param total_stats: data gathered by the wrapper
-        :type total_stats: dict
-        :param first_retrial: True if this is the first retry, False otherwise
-        :type first_retrial: bool
-
-        """
-        path = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
-        f = open(path, 'a')
-        if first_retrial:
-            f.write(" " + date2str(datetime.datetime.fromtimestamp(total_stats[0]), 'S') + ' ' + date2str(datetime.datetime.fromtimestamp(total_stats[1]), 'S') + ' ' + total_stats[2])
-        else:
-            f.write('\n' + date2str(datetime.datetime.fromtimestamp(total_stats[0]), 'S') + ' ' + date2str(datetime.datetime.fromtimestamp(total_stats[0]), 'S') + ' ' + date2str(datetime.datetime.fromtimestamp(total_stats[1]), 'S') + ' ' + total_stats[2])
-        out, err = self.local_logs
-        path_out = os.path.join(self._tmp_path, 'LOG_' + str(self.expid), out)
-        # Launch first as simple non-threaded function
-
-        exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-        exp_history.write_start_time(self.name, start=total_stats[0], status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), qos=self.queue, job_id=self.id, wrapper_queue=self._wrapper_queue, wrapper_code=get_job_package_code(self.expid, self.name),
-                                    children=self.children_names_str)
-        if not first_retrial:
-            exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-            exp_history.write_submit_time(self.name, submit=total_stats[0], status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), ncpus=self.processors,
-                                        wallclock=self.wallclock, qos=self.queue, date=self.date, member=self.member, section=self.section, chunk=self.chunk,
-                                        platform=self.platform_name, job_id=self.id, wrapper_queue=self._wrapper_queue, wrapper_code=get_job_package_code(self.expid, self.name),
-                                        children=self.children_names_str)
-        exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-        job_data_dc = exp_history.write_finish_time(self.name, finish=total_stats[1], status=total_stats[2], job_id=self.id, out_file=out, err_file=err)
-         # Launch second as threaded function only for slurm
-        if job_data_dc and type(self.platform) is not str and self.platform.type == "slurm":
-            thread_write_finish = Thread(target=ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR).write_platform_data_after_finish, args=(job_data_dc, self.platform))
-            thread_write_finish.name = "JOB_data_{}".format(self.name)
-            thread_write_finish.start()
 
     def check_started_after(self, date_limit):
         """
