@@ -84,8 +84,9 @@ tests = [
     "pytest>=8.2,<8.4",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.11.0"
-    # 'testcontainers'  # TODO: pending Postgres MR
+    "ruff==0.11.0",
+    "pytest-xdist",
+    "testcontainers"
 ]
 docs = [
     "livereload",
@@ -95,17 +96,10 @@ docs = [
     "sphinx_rtd_theme",
     "sphinx-reredirects==0.1.*"
 ]
-all = ["psycopg2",
-    "pytest>=8.2,<8.4",
-    "pytest-cov",
-    "pytest-mock",
-    "ruff==0.11.0",
-    "livereload",
-    "pydata-sphinx-theme==0.15.*",
-    "sphinx>=5,<9",
-    "sphinx-autobuild>=2021.3,<2024.11",
-    "sphinx_rtd_theme",
-    "sphinx-reredirects==0.1.*"
+all = [
+    "autosubmit[tests]",
+    "autosubmit[docs]"
+    # "autosubmit[postgres]"
 ]
 
 [tool.setuptools.packages.find]

@@ -57,9 +57,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .[all]
 
-      - name: Run tests
+      - name: Unit tests
         run: |
-          pytest
+          pytest --cov=autosubmit --cov-config=.coveragerc --cov-report=xml:test/coverage.xml --cov-append test/unit
+
+      - name: Integration tests
+        run: |
+          pytest --cov=autosubmit --cov-config=.coveragerc --cov-report=xml:test/coverage.xml --cov-append test/integration
 
       - name: Coverage report
         run: |

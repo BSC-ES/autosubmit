@@ -1,13 +1,33 @@
-import pytest
-from pathlib import Path
-from autosubmit.autosubmit import Autosubmit
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import os
 import pwd
+from pathlib import Path
 
+import pytest
+
+from autosubmit.autosubmit import Autosubmit
 from test.unit.utils.common import create_database, init_expid
+
 
 def _get_script_files_path() -> Path:
     return Path(__file__).resolve().parent / 'files'
+
 
 # Maybe this should be a regression test
 
@@ -53,6 +73,7 @@ path = {folder}
     init_expid(str(folder.join('autosubmitrc')), platform='local', create=False, test_type='test')
     assert "t000" in [Path(f).name for f in folder.listdir()]
     return folder
+
 
 @pytest.fixture
 def prepare_scheduler(scheduler_tmpdir):
@@ -183,11 +204,14 @@ EXPERIMENT:
     (real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
     return scheduler_tmpdir
 
+
 @pytest.fixture
 def generate_cmds(prepare_scheduler):
     init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid='t000', create=True)
-    Autosubmit.inspect(expid='t000', check_wrapper=True, force=True, lst=None, filter_chunks=None, filter_status=None, filter_section=None)
+    Autosubmit.inspect(expid='t000', check_wrapper=True, force=True, lst=None, filter_chunks=None, filter_status=None,
+                       filter_section=None)
     return prepare_scheduler
+
 
 @pytest.mark.parametrize("scheduler, job_type", [
     ('pjm', 'DEFAULT'),
@@ -201,7 +225,6 @@ def generate_cmds(prepare_scheduler):
     ('slurm', 'horizontal_vertical'),
     ('slurm', 'vertical_horizontal')
 ])
-
 def test_scheduler_job_types(scheduler, job_type, generate_cmds):
     # Test code that uses scheduler and job_typedef test_default_parameters(scheduler: str, job_type: str, generate_cmds):
     """
@@ -227,7 +250,8 @@ def test_scheduler_job_types(scheduler, job_type, generate_cmds):
                 expected_data = Path(nodes_f).read_text()
                 break
     else:
-        expected_data = (Path(_get_script_files_path()) / Path(f"base_{job_type.lower()}_{scheduler.lower()}.cmd")).read_text()
+        expected_data = (Path(_get_script_files_path()) / Path(
+            f"base_{job_type.lower()}_{scheduler.lower()}.cmd")).read_text()
     if not expected_data:
         assert False, f"Could not find the expected data for {scheduler} and {job_type}"
 
@@ -249,11 +273,11 @@ def test_scheduler_job_types(scheduler, job_type, generate_cmds):
     actual = actual.split('\n')[:len(expected_lines)]
     actual = '\n'.join(actual)
     for i, (line1, line2) in enumerate(zip(expected_data.split('\n'), actual.split('\n'))):
-        if "PJM -o" in line1 or "PJM -e" in line1 or "#SBATCH --output" in line1 or "#SBATCH --error" in line1 or "#SBATCH -J" in line1: # output error will be different
+        if "PJM -o" in line1 or "PJM -e" in line1 or "#SBATCH --output" in line1 or "#SBATCH --error" in line1 or "#SBATCH -J" in line1:  # output error will be different
             continue
-        elif "##" in line1 or "##" in line2: # comment line
+        elif "##" in line1 or "##" in line2:  # comment line
             continue
-        elif "header" in line1 or "header" in line2: # header line
+        elif "header" in line1 or "header" in line2:  # header line
             continue
         else:
             assert line1 == line2
