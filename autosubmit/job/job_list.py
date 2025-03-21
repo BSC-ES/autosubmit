@@ -374,26 +374,6 @@ class JobList(object):
                                                     jobs_data, option, set(), strip_keys=False)
             self.dependency_map_with_distances[section].remove(section)
 
-        changes = False
-        if len(self.graph.out_edges) > 0:
-            sections_gen = (section for section in jobs_data.keys())
-            # Room for improvement: Do changes only to jobs affected by the yaml changes
-            for job_section in sections_gen:
-                if (dic_jobs.changes.get(job_section, None) or
-                        dic_jobs.changes.get("EXPERIMENT", None) or
-                        dic_jobs.changes.get("NEWJOBS", False)):
-                    changes = True
-                    break
-            Log.debug("Looking if there are changes in the workflow")
-            if changes:
-                Log.debug("Changes detected, removing all dependencies")
-                self.graph.clear_edges()  # reset edges of all jobs as they need to be recalculated
-                Log.debug("Dependencies deleted, recalculating dependencies")
-            else:
-                Log.debug("No changes detected, keeping edges")
-        else:
-            changes = True
-            Log.debug("Changes detected, calculating dependencies")
         # Generate all graph before adding dependencies.
         for job_section in (section for section in jobs_data.keys()):
             for job in (job for job in dic_jobs.get_jobs(job_section, sort_string=True)):
@@ -421,7 +401,7 @@ class JobList(object):
             self.job_names = set()
             for job in (job for job in dic_jobs.get_jobs(job_section, sort_string=True)):
                 self.actual_job_depends_on_special_chunk = False
-                if dependencies and changes:
+                if dependencies:
                     job = self.graph.nodes.get(job.name)['job']
                     # Adds the dependencies to the job, and if not possible,
                     # adds the job to the problematic_dependencies
@@ -432,8 +412,8 @@ class JobList(object):
                         if job_section not in problematic_jobs.keys():
                             problematic_jobs[job_section] = {}
                         problematic_jobs[job_section].update({job.name: problematic_dependencies})
-        if changes:
-            self.find_and_delete_redundant_relations(problematic_jobs)
+
+        self.find_and_delete_redundant_relations(problematic_jobs)
         self._add_all_jobs_edge_info(dic_jobs, option)
 
     def find_and_delete_redundant_relations(self, problematic_jobs: dict) -> None:
@@ -1133,6 +1113,12 @@ class JobList(object):
                             graph.add_edge(parent.name, job.name)
         JobList.handle_frequency_interval_dependencies(chunk, chunk_list, date, date_list,
                     dic_jobs, job, member, member_list, dependency.section, natural_parents)
+        # check if job has edges
+        if len(self.graph.pred[job.name]) == 0:
+            for parent in natural_parents:
+                problematic_dependencies.add(parent.name)
+                graph.add_edge(parent.name, job.name)
+
         return problematic_dependencies
 
     def _calculate_filter_dependencies(self, filters_to_apply, dic_jobs, job, dependency, date,
