@@ -80,6 +80,7 @@ def ps_platform(tmpdir):
     yield platform, tmpdir
 
 
+@pytest.mark.docker
 @pytest.mark.parametrize('filename, check', [
     ('test1', True),
     ('sub/test2', True)

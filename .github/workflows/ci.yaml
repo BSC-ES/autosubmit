@@ -54,16 +54,26 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -e .[all]
+          python -m pip install --upgrade pip packaging setuptools twine
+          pip install --upgrade -e .[all]
 
       - name: Unit tests
         run: |
-          pytest --cov=autosubmit --cov-config=.coveragerc --cov-report=xml:test/coverage.xml --cov-append test/unit
+          pytest \
+            --cov=autosubmit --cov-config=.coveragerc \
+            --cov-report=xml:test/coverage.xml --cov-append \
+            test/unit
 
+      # In GitHub Actions we run all the integration tests, including those that require
+      # dependencies such as Docker (see `-m ''`, which means all markers). Read the
+      # CONTRIBUTING.md file for details how to set up your environment to run these.
       - name: Integration tests
         run: |
-          pytest --cov=autosubmit --cov-config=.coveragerc --cov-report=xml:test/coverage.xml --cov-append test/integration
+          pytest \
+            --cov=autosubmit --cov-config=.coveragerc \
+            --cov-report=xml:test/coverage.xml --cov-append \
+            test/integration \
+            -m ''
 
       - name: Coverage report
         run: |
