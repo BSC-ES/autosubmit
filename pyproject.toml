@@ -47,7 +47,7 @@ classifiers = [
 
 dependencies = [
     "xlib==0.21",
-    "setuptools<=76.0.0",
+    "setuptools<=77.0.3",
     "bscearth.utils<=0.5.2",
     "requests<=2.32.3",
     "networkx<=2.6.3",
