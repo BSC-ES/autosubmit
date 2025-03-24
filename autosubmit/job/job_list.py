@@ -3263,19 +3263,16 @@ class JobList(object):
 
     def print_with_status(self, statusChange=None, nocolor=False, existingList=None):
         """
-        Returns the string representation of the dependency tree of
-        the Job List
+        Returns the string representation of the dependency tree of the Job List
 
         :param statusChange: List of changes in the list, supplied in set status
         :type statusChange: List of strings
         :param nocolor: True if the result should not include color codes
         :type nocolor: Boolean
-        :param existingList: External List of Jobs that will be printed,
-        this excludes the inner list of jobs.
+        :param existingList: External List of Jobs that will be printed, this excludes the inner list of jobs.
         :type existingList: List of Job Objects
-        :return: String representation
-        :rtype: String
         """
+
         # nocolor = True
         allJobs = self.get_all() if existingList is None else existingList
         # Header
@@ -3385,8 +3382,7 @@ class JobList(object):
 
     @staticmethod
     def retrieve_packages(BasicConfig, expid, current_jobs=None):
-        """
-        Retrieves dictionaries that map the collection of packages in the experiment
+        """Retrieves dictionaries that map the collection of packages in the experiment
 
         :param BasicConfig: Basic configuration
         :type BasicConfig: Configuration Object
@@ -3396,7 +3392,7 @@ class JobList(object):
         :type current_jobs: list
         :return: job to package, package to job, package to package_id, package to symbol
         :rtype: Dictionary(Job Object, Package), Dictionary(Package, List of Job Objects),
-        Dictionary(String, String), Dictionary(String, String)
+         Dictionary(String, String), Dictionary(String, String)
         """
         # monitor = Monitor()
         packages = None
