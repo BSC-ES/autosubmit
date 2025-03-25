@@ -146,7 +146,8 @@ class JobListPersistenceDb(JobListPersistence):
         options = {
             "root_path": str(Path(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")),
             "db_name": f"job_list_{expid}",
-            "db_version": self.VERSION
+            "db_version": self.VERSION,
+            "schema": expid
         }
         self.expid = expid
         self.db_manager = create_db_manager(BasicConfig.DATABASE_BACKEND, **options)
