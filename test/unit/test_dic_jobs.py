@@ -16,9 +16,8 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import math
-from datetime import datetime
-
 import pytest
+from datetime import datetime
 from mock import Mock
 
 from autosubmit.job.job import Job

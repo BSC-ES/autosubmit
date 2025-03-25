@@ -106,7 +106,7 @@ def create_job_package_wrapper(jobs, as_conf):
 @pytest.fixture
 def joblist(tmp_path, as_conf):
     job_list = JobList('a000', as_conf, YAMLParserFactory(),
-                       JobListPersistenceDb(str(tmp_path), 'db'))
+                       JobListPersistenceDb(str(tmp_path)))
     job_list._ordered_jobs_by_date_member["WRAPPERS"] = dict()
     return job_list
 

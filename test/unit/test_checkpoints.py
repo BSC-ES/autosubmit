@@ -17,6 +17,8 @@
 
 import shutil
 from random import randrange
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -34,8 +36,21 @@ def setup_job_list(autosubmit_config, tmpdir, mocker, prepare_basic_config):
     as_conf.experiment_data = dict()
     as_conf.experiment_data["JOBS"] = dict()
     as_conf.experiment_data["PLATFORMS"] = dict()
-    job_list = JobList(experiment_id, as_conf, YAMLParserFactory(),
-                       JobListPersistenceDb(tmpdir, 'db'))
+
+    prepare_basic_config.DB_DIR = tmpdir
+    prepare_basic_config.DB_FILE = Path(tmpdir, 'test-db.db')
+    prepare_basic_config.DB_PATH = prepare_basic_config.DB_FILE
+    prepare_basic_config.LOCAL_PROJ_DIR = tmpdir
+    prepare_basic_config.LOCAL_ROOT_DIR = tmpdir
+    prepare_basic_config.LOCAL_TMP_DIR = tmpdir
+
+    Path(prepare_basic_config.DB_FILE).touch()
+    Path(prepare_basic_config.LOCAL_ROOT_DIR, experiment_id, 'pkl').mkdir(parents=True, exist_ok=True)
+
+    with patch('autosubmit.job.job_list_persistence.BasicConfig', prepare_basic_config):
+        job_list = JobList(experiment_id, prepare_basic_config, YAMLParserFactory(),
+                            JobListPersistenceDb(experiment_id))
+
     dummy_serial_platform = mocker.MagicMock()
     dummy_serial_platform.name = 'serial'
     dummy_platform = mocker.MagicMock()

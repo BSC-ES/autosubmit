@@ -1,7 +1,6 @@
-from datetime import datetime
-
 import mock
 import pytest
+from datetime import datetime
 from mock.mock import MagicMock
 from networkx import DiGraph  # type: ignore
 
@@ -19,6 +18,13 @@ _CHUNK_LIST = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 _SPLIT_LIST = [1, 2, 3, 4, 5]
 _DATE_LIST = ["20020201", "20020202", "20020203", "20020204", "20020205", "20020206", "20020207",
               "20020208", "20020209", "20020210"]
+
+_EXPID = 'a000'
+
+
+@pytest.fixture(autouse=True)
+def as_conf(autosubmit_config):
+    return autosubmit_config(_EXPID, experiment_data={})
 
 
 @pytest.fixture
@@ -124,7 +130,7 @@ def joblist(tmp_path):
     as_conf.experiment_data["JOBS"] = dict()
     as_conf.jobs_data = as_conf.experiment_data["JOBS"]
     as_conf.experiment_data["PLATFORMS"] = dict()
-    job_list_persistence = JobListPersistenceDb(str(tmp_path), 'db')
+    job_list_persistence = JobListPersistenceDb(_EXPID)
     joblist = JobList(experiment_id, as_conf, YAMLParserFactory(), job_list_persistence)
     joblist._date_list = _DATE_LIST
     joblist._member_list = _MEMBER_LIST
@@ -684,7 +690,7 @@ def test_add_special_conditions_chunks_to_once(mocker, joblist):
 
 def test_job_dict_get_jobs_filtered(mocker, joblist):
     # Test the get_jobs_filtered function
-    as_conf = mock.Mock()
+    as_conf = mocker.Mock()
     as_conf.experiment_data = dict()
     as_conf.experiment_data = {
         'CONFIG': {'AUTOSUBMIT_VERSION': '4.1.2', 'MAXWAITINGJOBS': 20, 'TOTALJOBS': 20, 'SAFETYSLEEPTIME': 10,
@@ -756,10 +762,7 @@ def test_job_dict_get_jobs_filtered(mocker, joblist):
     assert expected_output == result
 
 
-def test_normalize_auto_keyword(autosubmit_config, mocker):
-    as_conf = autosubmit_config('a000', experiment_data={
-
-    })
+def test_normalize_auto_keyword(as_conf, mocker):
     job_list = JobList(
         as_conf.expid,
         as_conf,
@@ -768,21 +771,21 @@ def test_normalize_auto_keyword(autosubmit_config, mocker):
     )
     dependency = Dependency("test")
 
-    job = Job("a000_20001010_fc1_2_1_test", 1, Status.READY, 1)
+    job = Job(f"{_EXPID}_20001010_fc1_2_1_test", 1, Status.READY, 1)
     job.running = "chunk"
     job.section = "test"
     job.date = "20001010"
     job.member = "fc1"
     job.splits = 5
 
-    job_minus = Job("a000_20001010_fc1_1_1_minus", 1, Status.READY, 1)
+    job_minus = Job(f"{_EXPID}_20001010_fc1_1_1_minus", 1, Status.READY, 1)
     job_minus.running = "chunk"
     job_minus.section = "minus"
     job_minus.date = "20001010"
     job_minus.member = "fc1"
     job_minus.splits = 40
 
-    job_plus = Job("a000_20001010_fc1_3_1_plus", 1, Status.READY, 1)
+    job_plus = Job(f"{_EXPID}_20001010_fc1_3_1_plus", 1, Status.READY, 1)
     job_plus.running = "chunk"
     job_plus.section = "plus"
     job_plus.date = "20001010"

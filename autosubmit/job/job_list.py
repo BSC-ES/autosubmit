@@ -3205,14 +3205,12 @@ class JobList(object):
         # monitor = Monitor()
         packages = None
         try:
-            packages = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                             "job_packages_" + expid).load(wrapper=False)
+            packages = JobPackagePersistence(expid).load(wrapper=False)
         except Exception as ex:
             print("Wrapper table not found, trying packages.")
             packages = None
             try:
-                packages = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid,
-                                                "pkl"), "job_packages_" + expid).load(wrapper=True)
+                packages = JobPackagePersistence(expid).load(wrapper=True)
             except Exception as exp2:
                 packages = None
                 pass

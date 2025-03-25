@@ -47,7 +47,7 @@ def job_list(autosubmit_config, tmp_path):
         'JOBS': {},
         'PLATFORMS': {},
     })
-    job_list_persistence = JobListPersistenceDb(str(tmp_path), 'db')
+    job_list_persistence = JobListPersistenceDb(_EXPID)
     job_list = JobList(_EXPID, as_conf, YAMLParserFactory(), job_list_persistence)
     # Basic workflow with SETUP, INI, SIM, POST, CLEAN
     setup_job = _create_dummy_job('expid_SETUP', Status.READY)

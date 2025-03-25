@@ -1525,8 +1525,7 @@ class Autosubmit:
             safetysleeptime = as_conf.get_safetysleeptime()
             Log.debug("The Experiment name is: {0}", expid)
             Log.debug("Sleep: {0}", safetysleeptime)
-            packages_persistence = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                                         "job_packages_" + expid)
+            packages_persistence = JobPackagePersistence(expid)
             os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid,
                                   "pkl", "job_packages_" + expid + ".db"), 0o644)
 
@@ -2020,8 +2019,7 @@ class Autosubmit:
         Log.debug("Loading job packages")
         # Packages == wrappers and jobs inside wrappers. Name is also misleading.
         try:
-            packages_persistence = JobPackagePersistence(os.path.join(
-                BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"), "job_packages_" + expid)
+            packages_persistence = JobPackagePersistence(expid)
         except IOError as e:
             raise AutosubmitError(
                 "job_packages not found", 6016, str(e))
@@ -2695,8 +2693,7 @@ class Autosubmit:
         try:
             if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrapper:
                 # Class constructor creates table if it does not exist
-                packages_persistence = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                                             "job_packages_" + expid)
+                packages_persistence = JobPackagePersistence(expid)
                 # Permissions
                 os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl", "job_packages_" + expid + ".db"), 0o644)
                 # Database modification
@@ -2708,11 +2705,9 @@ class Autosubmit:
                                                            packages_persistence, True)
 
                 packages = packages_persistence.load(True)
-                packages += JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                                  "job_packages_" + expid).load()
+                packages += JobPackagePersistence(expid).load()
             else:
-                packages = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                                 "job_packages_" + expid).load()
+                packages = JobPackagePersistence(expid).load()
         except BaseException as e:
             if profile:
                 profiler.stop()
@@ -3026,8 +3021,7 @@ class Autosubmit:
             raise AutosubmitCritical("Couldn't restore the experiment workflow", 7040, str(e))
 
         try:
-            packages = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                             "job_packages_" + expid).load()
+            packages = JobPackagePersistence(expid).load()
 
             groups_dict = dict()
             if group_by:
@@ -4547,8 +4541,7 @@ class Autosubmit:
                     job_list.save()
                     as_conf.save()
                     try:
-                        packages_persistence = JobPackagePersistence(
-                            os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"), "job_packages_" + expid)
+                        packages_persistence = JobPackagePersistence(expid)
                         packages_persistence.reset_table()
                         packages_persistence.reset_table(True)
                     except Exception:
@@ -5364,9 +5357,7 @@ class Autosubmit:
                 if not noplot:
                     from .monitor.monitor import Monitor
                     if as_conf.get_wrapper_type() != 'none' and check_wrapper:
-                        packages_persistence = JobPackagePersistence(
-                            os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                            "job_packages_" + expid)
+                        packages_persistence = JobPackagePersistence(expid)
                         os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR,
                                               expid, "pkl", "job_packages_" + expid + ".db"), 0o775)
                         packages_persistence.reset_table(True)
@@ -5378,8 +5369,7 @@ class Autosubmit:
 
                         packages = packages_persistence.load(True)
                     else:
-                        packages = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                                         "job_packages_" + expid).load()
+                        packages = JobPackagePersistence(expid).load()
                     groups_dict = dict()
                     if group_by:
                         status = list()
@@ -5537,8 +5527,7 @@ class Autosubmit:
         if storage_type == 'pkl':
             return JobListPersistencePkl()
         elif storage_type == 'db':
-            return JobListPersistenceDb(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                        "job_list_" + expid)
+            return JobListPersistenceDb(expid)
         raise AutosubmitCritical('Storage type not known', 7014)
 
     @staticmethod
