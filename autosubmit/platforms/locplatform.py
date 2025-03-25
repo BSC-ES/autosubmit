@@ -262,6 +262,8 @@ class LocalPlatform(ParamikoPlatform):
         :param must_exist: ignore if file exist or not
         :type dest: str
         """
+        src = str(src)
+        dest = str(dest)
         path_root = ""
         try:
             path_root = self.get_files_path()

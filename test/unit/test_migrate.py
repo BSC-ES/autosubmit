@@ -11,13 +11,14 @@ from log.log import AutosubmitCritical
 
 from test.unit.utils.common import create_database, init_expid
 
-
-@pytest.mark.skip('This test requires a running SSH server, with password-less authentication')
+# TODO: Write the tests without the class and self ( to do after the transition to github)
+# TODO: Isolate the tests ( to do after the transition to github) rsync one works if only it is launched
+@pytest.mark.skip("Pipeline needs to allow to connect to itself through ssh")
 class TestMigrate:
 
     @pytest.fixture(scope='class')
     def migrate_tmpdir(self, tmpdir_factory):
-        folder = tmpdir_factory.mktemp(f'migrate_tests')
+        folder = tmpdir_factory.mktemp('migrate_tests')
         os.mkdir(folder.join('scratch'))
         os.mkdir(folder.join('migrate_tmp_dir'))
         file_stat = os.stat(f"{folder.strpath}")
@@ -54,7 +55,7 @@ path = {folder}
         os.environ['AUTOSUBMIT_CONFIGURATION'] = str(folder.join('autosubmitrc'))
         create_database(str(folder.join('autosubmitrc')))
         assert "tests.db" in [Path(f).name for f in folder.listdir()]
-        init_expid(str(folder.join('autosubmitrc')), platform='pytest-local',create=False)
+        init_expid(str(folder.join('autosubmitrc')), platform='pytest-local', create=False, test_type='test')
         assert "t000" in [Path(f).name for f in folder.listdir()]
         return folder
 
@@ -124,56 +125,72 @@ PLATFORMS:
 
     def test_migrate_conf_good_config(self, migrate_prepare_test_conf):
         # Test OK
-        as_conf, original, platforms, migrate_remote_only = migrate_prepare_test_conf
+        as_conf, _, platforms, migrate_remote_only = migrate_prepare_test_conf
         migrate_remote_only.check_migrate_config(as_conf, platforms, as_conf.misc_data["PLATFORMS"])
         as_conf.misc_data["PLATFORMS"]["PYTEST-LOCAL"]["TEMP_DIR"] = ""
         migrate_remote_only.check_migrate_config(as_conf, platforms, as_conf.misc_data["PLATFORMS"])
 
     def test_migrate_no_platforms(self, migrate_prepare_test_conf):
-        as_conf, original, platforms, migrate_remote_only = migrate_prepare_test_conf
+        as_conf, _, platforms, migrate_remote_only = migrate_prepare_test_conf
         as_conf.misc_data["PLATFORMS"] = {}
         with pytest.raises(AutosubmitCritical):
             migrate_remote_only.check_migrate_config(as_conf, platforms, as_conf.misc_data["PLATFORMS"])
 
     def test_migrate_no_scratch_dir(self, migrate_prepare_test_conf):
-        as_conf, original, platforms, migrate_remote_only = migrate_prepare_test_conf
+        as_conf, _, platforms, migrate_remote_only = migrate_prepare_test_conf
         as_conf.misc_data["PLATFORMS"]["PYTEST-LOCAL"]["SCRATCH_DIR"] = ""
         with pytest.raises(AutosubmitCritical):
             migrate_remote_only.check_migrate_config(as_conf, platforms, as_conf.misc_data["PLATFORMS"])
 
     def test_migrate_no_project(self, migrate_prepare_test_conf):
-        as_conf, original, platforms, migrate_remote_only = migrate_prepare_test_conf
+        as_conf, _, platforms, migrate_remote_only = migrate_prepare_test_conf
         as_conf.misc_data["PLATFORMS"]["PYTEST-LOCAL"]["PROJECT"] = ""
         with pytest.raises(AutosubmitCritical):
             migrate_remote_only.check_migrate_config(as_conf, platforms, as_conf.misc_data["PLATFORMS"])
 
     def test_migrate_no_same_user(self, migrate_prepare_test_conf):
-        as_conf, original, platforms, migrate_remote_only = migrate_prepare_test_conf
+        as_conf, _, platforms, migrate_remote_only = migrate_prepare_test_conf
         as_conf.misc_data["PLATFORMS"]["PYTEST-LOCAL"]["SAME_USER"] = False
         with pytest.raises(AutosubmitCritical):
             migrate_remote_only.check_migrate_config(as_conf, platforms, as_conf.misc_data["PLATFORMS"])
 
     def test_migrate_no_user(self, migrate_prepare_test_conf):
-        as_conf, original, platforms, migrate_remote_only = migrate_prepare_test_conf
+        as_conf, _, platforms, migrate_remote_only = migrate_prepare_test_conf
         as_conf.misc_data["PLATFORMS"]["PYTEST-LOCAL"]["USER"] = ""
         with pytest.raises(AutosubmitCritical):
             migrate_remote_only.check_migrate_config(as_conf, platforms, as_conf.misc_data["PLATFORMS"])
 
     def test_migrate_no_host(self, migrate_prepare_test_conf):
-        as_conf, original, platforms, migrate_remote_only = migrate_prepare_test_conf
+        as_conf, _, platforms, migrate_remote_only = migrate_prepare_test_conf
         as_conf.misc_data["PLATFORMS"]["PYTEST-LOCAL"]["HOST"] = ""
         with pytest.raises(AutosubmitCritical):
             migrate_remote_only.check_migrate_config(as_conf, platforms, as_conf.misc_data["PLATFORMS"])
 
+    # TODO: parametrize the test with the one below, but right now it's not working due not being well isolated ( to do after the transition to github)
     def test_migrate_remote(self, migrate_remote_only, migrate_tmpdir):
         # Expected behavior: migrate everything from scratch/whatever to scratch/whatever_new
         assert migrate_tmpdir.join(f'scratch/whatever/{migrate_tmpdir.owner}/t000').check(dir=True)
         assert migrate_tmpdir.join(f'scratch/whatever_new/{migrate_tmpdir.owner}/t000').check(dir=False)
         assert "dummy data" == migrate_tmpdir.join(
             f'scratch/whatever/{migrate_tmpdir.owner}/t000/real_data/dummy_symlink').read()
-
         migrate_remote_only.migrate_offer_remote()
-        assert migrate_tmpdir.join(f'migrate_tmp_dir/t000').check(dir=True)
+        assert migrate_tmpdir.join('migrate_tmp_dir/t000').check(dir=True)
+        migrate_remote_only.migrate_pickup()
+        assert migrate_tmpdir.join(f'scratch/whatever/{migrate_tmpdir.owner}/t000').check(dir=False)
+        assert migrate_tmpdir.join(f'scratch/whatever_new/{migrate_tmpdir.owner}/t000').check(dir=True)
+        assert "dummy data" == migrate_tmpdir.join(
+            f'scratch/whatever_new/{migrate_tmpdir.owner}/t000/real_data/dummy_symlink').read()
+
+    def test_migrate_remote_rsync(self, migrate_remote_only, migrate_tmpdir, mocker):
+        # Expected behavior: migrate everything from scratch/whatever to scratch/whatever_new
+        assert migrate_tmpdir.join(f'scratch/whatever/{migrate_tmpdir.owner}/t000').check(dir=True)
+        assert migrate_tmpdir.join(f'scratch/whatever_new/{migrate_tmpdir.owner}/t000').check(dir=False)
+        assert "dummy data" == migrate_tmpdir.join(
+            f'scratch/whatever/{migrate_tmpdir.owner}/t000/real_data/dummy_symlink').read()
+        mocker.patch('autosubmit.platforms.paramiko_platform.ParamikoPlatform.move_file', return_value=False)
+        migrate_remote_only.migrate_offer_remote()
+        assert migrate_tmpdir.join('migrate_tmp_dir/t000').check(dir=True)
+        assert not migrate_tmpdir.join(f'scratch/whatever/{migrate_tmpdir.owner}/t000').check(dir=True)
         migrate_remote_only.migrate_pickup()
         assert migrate_tmpdir.join(f'scratch/whatever/{migrate_tmpdir.owner}/t000').check(dir=False)
         assert migrate_tmpdir.join(f'scratch/whatever_new/{migrate_tmpdir.owner}/t000').check(dir=True)

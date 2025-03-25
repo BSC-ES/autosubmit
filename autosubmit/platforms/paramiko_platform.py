@@ -515,6 +515,8 @@ class ParamikoPlatform(Platform):
         :param must_exist: ignore if file exist or not
         :type dest: str
         """
+        src = str(src)
+        dest = str(dest)
         path_root=""
         try:
             path_root = self.get_files_path()
@@ -546,6 +548,61 @@ class ParamikoPlatform(Platform):
                 Log.printlog("Log file couldn't be moved: {0}".format(
                     os.path.join(self.get_files_path(), src)), 5001)
                 return False
+
+    def move_folder_rsync(self, src: str, dest: str, retries_limit: int = 25) -> bool:
+        """
+        Perform a remote rsync operation with retries.
+
+        :param src: Source directory to sync from.
+        :param dest: Destination directory to sync to.
+        :param retries_limit: Maximum number of retries to perform. If it keeps failing, user can prompt the command again.
+        :return: True if the rsync operation is successful, False otherwise.
+        """
+        finished = False
+        rsync_retries = 0
+        if not Path(src).parent:
+            src = Path(f"{self.get_files_path()}/{src}")
+
+        while not finished and rsync_retries < retries_limit:
+            Log.info(
+                f"Rsync launched {rsync_retries + 1} times. Can take up to 150 retrials or until all data is transferred")
+            finished = self._attempt_rsync(src, dest)
+            if not finished:
+                rsync_retries += 1
+                self._handle_rsync_failure(src)
+
+        if not finished or rsync_retries >= retries_limit:
+            Log.error(f"Rsync operation failed after {rsync_retries} retries")
+        return finished
+
+    def _attempt_rsync(self, src: str, dest: str) -> bool:
+        """
+        Attempt to perform rsync and check for errors.
+
+        :param src: Source directory to sync from.
+        :param dest: Destination directory to sync to.
+        :return: True if rsync is successful, False otherwise.
+        """
+        try:
+            self.send_command(f"rsync --timeout=3600 --bwlimit=20000 -aqz --remove-source-files {src} {dest}")
+            self.send_command(f"find {src} -type d -empty -delete")
+            if self.get_ssh_output_err() == "" or "no such file or directory" not in self.get_ssh_output_err().lower():
+                return True
+        except BaseException as e:
+            Log.debug(f"{str(e)}")
+        return False
+
+    def _handle_rsync_failure(self, src: str):
+        """
+        Handle rsync failure by checking for specific error messages and cleaning up.
+
+        :param src: Source directory to sync from.
+        """
+        if self.get_ssh_output_err() == "" or any(keyword in self.get_ssh_output_err().lower() for keyword in
+                                                  ["warning: rsync", "closed", "broken pipe", "directory has vanished"]):
+            return
+        self.send_command(f"find {src} -depth -type d -empty -delete")
+        Log.result(f"Empty dirs on {src} have been successfully deleted")
 
     def submit_job(self, job, script_name, hold=False, export="none"):
         """
@@ -1496,12 +1553,13 @@ class ParamikoPlatform(Platform):
 
     def check_absolute_file_exists(self, src):
         try:
-            if self._ftpChannel.stat(src):
+            if self._ftpChannel.stat(str(src)):
                 return True
             else:
                 return False
         except:
             return False
+
 class ParamikoPlatformException(Exception):
     """
     Exception raised from HPC queues

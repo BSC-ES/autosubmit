@@ -3104,15 +3104,14 @@ class Autosubmit:
         if offer:
             Autosubmit._check_ownership(experiment_id, raise_error=True)
             migrate.migrate_offer_remote()
-            if not only_remote: # Local migrate
+            if not only_remote:  # Local migrate
                 try:
                     if not Autosubmit.archive(experiment_id, True, True):
                         raise AutosubmitCritical(f"Error archiving the experiment", 7014)
                     Log.result("The experiment has been successfully offered.")
                 except Exception as e:
-                    # todo put the IO error code
                     raise AutosubmitCritical(f"[LOCAL] Error offering the experiment: {str(e)}\n"
-                                             f"Please, try again", 7000)
+                                             f"Please, try again", 7075)
             migrate.migrate_offer_jobdata()
         elif pickup:
             Log.info(f'Pickup experiment {experiment_id}')
