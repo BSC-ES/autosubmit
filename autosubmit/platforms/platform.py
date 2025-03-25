@@ -669,20 +669,6 @@ class Platform(object):
             return True
         return False
 
-    def remove_stat_file_by_retrials(self, job_name):
-        """
-        Removes *STAT* files from remote
-
-        :param job_name: name of job to check
-        :type job_name: str
-        :return: True if successful, False otherwise
-        :rtype: bool
-        """
-        filename = job_name
-        if self.delete_file(filename):
-            return True
-        return False
-
     def remove_completed_file(self, job_name):
         """
         Removes *COMPLETED* files from remote
@@ -820,33 +806,6 @@ class Platform(object):
 
         except Exception as ex:
             Log.error("Writing Job Id Failed : " + str(ex))
-
-    def write_job_extrainfo(self, job_hdata, complete_path):
-        """[summary]
-
-        :param job_hdata: job extra data 
-        :type job_hdata: str 
-        :param complete_path: complete path to the file, includes filename 
-        :type complete_path: str 
-        :return: Modifies file and returns True, False if file could not be modified 
-        :rtype: Boolean 
-        """
-        try:
-            # footer = "extra_data = {0}".format()
-            # print("Complete path {0}".format(complete_path))
-            if os.path.exists(complete_path):
-                file_type = complete_path[-3:]
-                # print("Detected file type {0}".format(file_type))
-                if file_type == "out" or file_type == "err":
-                    with open(complete_path, "ab") as f:
-                        job_footer_info = "[INFO] HDATA={0}".format(job_hdata)
-                        f.write(job_footer_info)
-                        f.close()
-        except Exception as ex:
-            Log.debug(traceback.format_exc())
-            Log.warning(
-                "Autosubmit has not written extra information into the .out log.")
-            pass
 
     def generate_submit_script(self):
         # type: () -> None

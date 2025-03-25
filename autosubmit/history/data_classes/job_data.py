@@ -240,39 +240,6 @@ class JobData(object):
         return None
 
     @property
-    def submit_datetime_str(self):
-        """
-        Returns to submit datetime as a string with format %Y-%m-%d-%H:%M:%S
-        """
-        o_datetime = self.submit_datetime
-        if o_datetime:
-            return o_datetime.strftime(HUtils.DATETIME_FORMAT)
-        else:
-            return None
-
-    @property
-    def start_datetime_str(self):
-        """
-        Returns the start datetime as a string with format %Y-%m-%d-%H:%M:%S
-        """
-        o_datetime = self.start_datetime
-        if o_datetime:
-            return o_datetime.strftime(HUtils.DATETIME_FORMAT)
-        else:
-            return None
-
-    @property
-    def finish_datetime_str(self):
-        """
-        Returns the finish datetime as a string with format %Y-%m-%d-%H:%M:%S
-        """
-        o_datetime = self.finish_datetime
-        if o_datetime:
-            return o_datetime.strftime(HUtils.DATETIME_FORMAT)
-        else:
-            return None
-
-    @property
     def running_time(self):
         """
         Calculates and returns the running time of the job, in seconds.
@@ -295,29 +262,3 @@ class JobData(object):
         if self.status in ["SUBMITTED", "QUEUING", "RUNNING", "COMPLETED", "HELD", "PREPARED", "FAILED", "SKIPPED"]:
             return HUtils.calculate_queue_time_in_seconds(self.submit, self.start)
         return 0
-
-    def get_hdata(self):
-        """
-        Get the job data as an ordered dict into a JSON object.  
-        :return: Job data as an ordered dict into a JSON object.  
-        :rtype: JSON object.
-        """
-        hdata = collections.OrderedDict()
-        hdata["name"] = self.job_name
-        hdata["date"] = self.date
-        hdata["section"] = self.section
-        hdata["member"] = self.member
-        hdata["chunk"] = self.chunk
-        hdata["submit"] = self.submit_datetime_str
-        hdata["start"] = self.start_datetime_str
-        hdata["finish"] = self.finish_datetime_str
-        hdata["queue_time"] = self.delta_queue_time
-        hdata["run_time"] = self.delta_running_time
-        hdata["wallclock"] = self.wallclock
-        hdata["ncpus"] = self.ncpus
-        hdata["nnodes"] = self.nnodes
-        hdata["energy"] = self.energy
-        hdata["platform"] = self.platform
-        hdata["MaxRSS"] = self.MaxRSS
-        hdata["AveRSS"] = self.AveRSS
-        return dumps(hdata)
