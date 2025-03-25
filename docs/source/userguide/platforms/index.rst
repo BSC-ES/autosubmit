@@ -33,14 +33,17 @@ Once the new folder and file are created, open the file ``config/jobs_<expid>.ym
         AUTOSUBMIT_VERSION: "4.1.12"
         TOTALJOBS: 20
         MAXWAITINGJOBS: 20
+
     DEFAULT:
         EXPID: <EXPID> # ID of the experiment
         HPCARCH: "MARENOSTRUM5"
         #hint: use %PROJDIR% to point to the project folder (where the project is cloned)
         CUSTOM_CONFIG: "%PROJDIR%/"
+
     PROJECT:
-        PROJECT_TYPE: git
-        PROJECT_DESTINATION: git_project
+        PROJECT_TYPE: local
+        PROJECT_DESTINATION: local_project
+
     GIT:
         PROJECT_ORIGIN: ""
         PROJECT_BRANCH: ""
@@ -56,7 +59,7 @@ You should add the ``CUSTOM_TAG`` adding the following information at the top of
         JOB: &job
             SCRIPT: test
         PLATFORM: &platform
-            USER: edoria
+            USER: <user> # User that have access to the platform
             PROJECT: bsc32
 
 You can configure the experiment adding the following information under ``DEFAULT``
@@ -81,6 +84,7 @@ You can add the following tag after the TAG ``PROJECT``
       PROJECT_PATH: ~/autosubmit/project
 
 Adding configuration and adding the platforms will allow you to connect and execute the jobs
+
 .. code-block:: yaml
 
     PLATFORMS:
@@ -89,7 +93,7 @@ Adding configuration and adding the platforms will allow you to connect and exec
         TYPE: slurm
         HOST: glogin1.bsc.es, glogin2.bsc.es
         QUEUE: gp_debug
-        SCRATCH_DIR: /tmp/scratch
+        SCRATCH_DIR: /gpfs/scratch
         ADD_PROJECT_TO_HOST: false
         MAX_WALLCLOCK: 02:00
         TEMP_DIR: ''
@@ -100,7 +104,7 @@ Adding configuration and adding the platforms will allow you to connect and exec
         <<: *platform
         TYPE: slurm
         HOST: glogin1.bsc.es, glogin2.bsc.es
-        SCRATCH_DIR: /tmp/scratch
+        SCRATCH_DIR: /gpfs/scratch
         ADD_PROJECT_TO_HOST: false
         MAX_WALLCLOCK: 02:00
         TEMP_DIR: ''
@@ -127,8 +131,8 @@ Now you can add jobs at the end of the file to see the execution
 
 After setting up all the new configuration you can run the following command to create the plots
 
-``autosubmit create -np -f -v a043``
+``autosubmit create -np -f -v <EXPID>``
 
 At the end you can run the last command to execute the experiment and check its behaviour
 
-``autosubmit run a043``
+``autosubmit run <EXPID>``
