@@ -48,7 +48,7 @@ dependencies = [
     "bscearth.utils<=0.5.2",
     "requests<=2.32.3",
     "networkx<=2.6.3",
-    "portalocker<=2.7.0",
+    "portalocker<=3.1.1",
     "paramiko>=3.5.0",
     "pyparsing==3.2.1",
     "matplotlib<=3.8.3",
