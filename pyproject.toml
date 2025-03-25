@@ -60,8 +60,8 @@ dependencies = [
     "autosubmitconfigparser==1.0.78",
     "configparser",
     "setproctitle",
-    "invoke>=2.0"
-    # 'sqlalchemy[mypy]' # TODO: pending Postgres MR
+    "invoke>=2.0",
+    "SQLAlchemy~=2.0.23",
 ]
 
 [project.urls]

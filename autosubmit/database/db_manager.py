@@ -19,7 +19,11 @@
 
 import sqlite3
 import os
-from typing import Any, Dict, Iterable, List, Protocol, Union, cast
+from typing import Any, Dict, Iterable, List, Protocol, Union, cast, Optional
+from sqlalchemy import Connection, Engine, delete, insert, select, text
+from autosubmit.database import session
+from autosubmit.database.tables import get_table_from_name
+from sqlalchemy.schema import CreateTable, CreateSchema,  DropTable
 
 class DbManager(object):
     """
@@ -269,6 +273,148 @@ class DatabaseManager(Protocol):
     def count(self, table_name: str) -> int: ...
     def drop(self): ...
 
+class SqlAlchemyDbManager:
+    """A database manager using SQLAlchemy.
+    It contains the same public functions as ``DbManager``
+    (SQLite only), but uses SQLAlchmey instead of calling database
+    driver functions directly.
+    It can be used with any engine supported by SQLAlchemy, such
+    as Postgres, Mongo, MySQL, etc.
+    Static functions from ``DbManager`` were skipped, as those are
+    similar to what SQLAlchemy already provides for creating and
+    queries.
+    Some operations here may raise ``NotImplemented``, as they existed in
+    the ``DbManager`` but were never used in Autosubmit (i.e. we can
+    delete that code -- for later).
+    TODO: At some point in the future, we can drop ``DbManager`` and
+          replace it with this one (or rename this to DbManager), as
+          SQLAlchemy should be able to handle SQLite too.
+    """
+
+    def __init__(self, schema: Optional[str] = None) -> None:
+        self.engine: Engine = session.create_engine()
+        self.schema = schema
+        # Each time we self.engine.connect(),
+        # the engine will create or reuse a connection from the pool
+        # Using the connection as a context (with) will safely release it
+        self.connection: Connection = None 
+
+    def backup(self):
+        pass
+
+    def restore(self):
+        pass
+
+    def disconnect(self):
+        if self.connection and not self.connection.closed:
+            self.connection.close()
+
+    def create_table(self, table_name: str, fields: List[str]):
+        # NOTE: ``fields`` is ignored as they are defined in the SQLAlchemy
+        #       tables definitions (see ``.database.tables``). Kept for
+        #       backward compatibility with the old API for SQLite.
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        with self.engine.connect() as conn:
+            if self.schema:
+                conn.execute(CreateSchema(self.schema, if_not_exists=True))
+            conn.execute(CreateTable(table, if_not_exists=True))
+            conn.commit()
+
+    def drop_table(self, table_name: str):
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        with self.engine.connect() as conn:
+            conn.execute(DropTable(table, if_exists=True))
+            conn.commit()
+
+    def insert(self, table_name: str, columns: List[str], values: List[str]):
+        """Not implemented.
+        In the original ``DbManager`` (SQLite), this function is used
+        only to initialize the SQLite database (i.e. no external users).
+        """
+        raise NotImplementedError()
+
+    def insertMany(self, table_name: str, data: List[Union[Iterable, Dict]]):
+        """
+        N.B.: One difference between SQLite and SQLAlchemy here;
+              whereas with SQLite you insert a list of values
+              matching the columns, for SQLAlchemy you provide
+              a dictionary. For backward-compatibility, we risk
+              accepting a list or dictionary here. If a list
+              is provided, then we will use the Table metadata
+              to fetch the columns. Not the safest approach, so
+              prefer to send a dictionary!
+        :type table_name: str
+        :type data: List[Union[Iterable, Dict]]
+        """
+        if len(data) == 0:
+            return 0
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        if type(data[0]) is list or type(data[0]) is tuple:
+            # Convert into a dictionary; we know the keys from the
+            # table metadata columns.
+            columns = [column.name for column in cast(list, table.columns)]
+            data = map(lambda values: {
+                key: value
+                for key, value in
+                zip(columns, values)
+            }, cast(list, data))
+            data = list(data)
+
+        with self.engine.connect() as conn:
+            result = conn.execute(insert(table), data)
+            conn.commit()
+
+        return cast(int, result.rowcount)
+
+    def delete_where(self, table_name: str, where: List[str]):
+        command = DbManager.generate_delete_command(table_name, where)
+        with self.engine.connect() as conn:
+            result = conn.execute(text(command))
+            conn.commit()
+        return cast(int, result.rowcount)
+
+    def select_first(self, table_name: str):
+        """Not used in the original ``DbManager``!"""
+        raise NotImplementedError()
+
+    def select_first_where(self, table_name: str, where: List[str]):
+        command = DbManager.generate_select_command(table_name, where)
+        with self.engine.connect() as conn:
+            row = conn.execute(text(command)).first()
+        return row.tuple()
+
+    def select_all(self, table_name: str):
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        with self.engine.connect() as conn:
+            rows = conn.execute(select(table)).all()
+        return [row.tuple() for row in rows]
+
+    def select_all_where(self, table_name: str, where: List[str]):
+        """Not used in the original ``DbManager``!"""
+        raise NotImplementedError()
+
+    def count(self, table_name: str):
+        """Not used in the original ``DbManager``!"""
+        raise NotImplementedError()
+
+    def drop(self):
+        """Not used in the original ``DbManager``!"""
+        raise NotImplementedError()
+
+    # New! Used for testing...
+
+    def delete_all(self, table_name: str) -> int:
+        """Deletes all the rows of the table.
+        :params table_name: The name of the table.
+        :return: number of tables modified.
+        """
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        with self.engine.connect() as conn:
+            result = conn.execute(delete(table))
+            conn.commit()
+        return cast(int, result.rowcount)
+
+
 
 def create_db_manager(db_engine: str, **options) -> DatabaseManager:
     """
@@ -299,5 +445,9 @@ def create_db_manager(db_engine: str, **options) -> DatabaseManager:
     :raises ValueError: If the database engine type is not valid.
     :raises KeyError: If the ``options`` dictionary is missing a required parameter for an engine.
     """
-    # TODO Create SqlAlchemyDbManager and add it to the if/else
-    return cast(DatabaseManager, DbManager(options['root_path'], options['db_name'], options['db_version']))
+    if db_engine == "postgres":
+        return cast(DatabaseManager, SqlAlchemyDbManager(options.get('schema', None)))
+    elif db_engine == "sqlite":
+        return cast(DatabaseManager, DbManager(options['root_path'], options['db_name'], options['db_version']))
+    else:
+        raise ValueError(f"Invalid database engine: {db_engine}")
