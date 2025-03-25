@@ -102,13 +102,13 @@ This is the minimum job definition and usually is not enough. You usually will n
     * - PARAMETERS
       - Description
     * - PLATFORM
-      - allows you to execute the job in a platform of your choice. It must be defined in the experiment's
+      - Allows you to execute the job in a platform of your choice. It must be defined in the experiment's
         platforms.yml file or to have the value 'LOCAL' that always refer to the machine running Autosubmit.
     * - RUNNING
-      - defines if jobs runs only once or once per start-date, member or chunk. Options are:
+      - Defines if jobs runs only once or once per start-date, member or chunk. Options are:
         once, date, member, chunk
     * - DEPENDENCIES
-      - defines dependencies from job as a list of parents jobs separated by spaces. For example, if
+      - Defines dependencies from job as a list of parents jobs separated by spaces. For example, if
         'new_job' has to wait for "old_job" to finish, you must add the line "DEPENDENCIES: old_job".
 
 .. note::
@@ -119,23 +119,42 @@ This is the minimum job definition and usually is not enough. You usually will n
 For jobs running in HPC platforms, usually you have to provide information about processors, wallclock times and more.
 To do this use:
 
-* WALLCLOCK: wallclock time to be submitted to the HPC queue in format HH:MM
+.. list-table::
+    :widths: 25 75
+    :header-rows: 1
 
-* PROCESSORS: processors number to be submitted to the HPC. If not specified, defaults to 1.
+    * - PARAMETERS
+      - Description
+    * - WALLCLOCK
+      - Wallclock time to be submitted to the HPC queue in format HH:MM.
+    * - PROCESSORS
+      - Processors number to be submitted to the HPC. If not specified, defaults to 1.
+    * - THREADS
+      - Threads number to be submitted to the HPC. If not specified, defaults to 1.
+    * - TASKS
+      - Tasks number to be submitted to the HPC. If not specified, defaults to 1.
+    * - NODES
+      - Nodes number to be submitted to the HPC. If not specified, the directive is not added.
+    * - HYPERTHREADING
+      - Enables Hyper-threading, this will double the max amount of threads. defaults to false. ( Not available on slurm platforms ).
+    * - QUEUE
+      - queue to add the job to. If not specified, uses PLATFORM default.
+    * - RETRIALS
+      - Number of retrials if job fails.
+    * - DELAY_RETRY_TIME
+      - Allows to put a delay between retries.
+        Triggered when a job fails. If not specified, Autosubmit will retry the job as soon as possible.
+        Accepted formats are:
 
-* THREADS:  threads number to be submitted to the HPC. If not specified, defaults to 1.
+        #. plain number (specify a constant delay between retrials),
 
-* TASKS:  tasks number to be submitted to the HPC. If not specified, defaults to 1.
+        #. plus (+) sign followed by a number (the delay will steadily increase by the addition of these number of seconds)
 
-* NODES:  nodes number to be submitted to the HPC. If not specified, the directive is not added.
+        #. multiplication (*) sign follows by a number (the delay after n retries will be the number multiplied by 10*n).
 
+        Having this in mind, the ideal scenario is to use +(number) or plain(number) in case that the HPC has little
+        issues or the experiment will run for a little time. Otherwise, is better to use the \*(number) approach.
 
-* HYPERTHREADING: Enables Hyper-threading, this will double the max amount of threads. defaults to false. ( Not available on slurm platforms )
-* QUEUE: queue to add the job to. If not specified, uses PLATFORM default.
-
-* RETRIALS: Number of retrials if job fails
-
-* DELAY_RETRY_TIME: Allows to put a delay between retries. Triggered when a job fails. If not specified, Autosubmit will retry the job as soon as possible. Accepted formats are: plain number (there will be a constant delay between retrials, of as many seconds as specified), plus (+) sign followed by a number (the delay will steadily increase by the addition of these number of seconds), or multiplication (*) sign follows by a number (the delay after n retries will be the number multiplied by 10*n). Having this in mind, the ideal scenario is to use +(number) or plain(number) in case that the HPC has little issues or the experiment will run for a little time. Otherwise, is better to use the \*(number) approach.
 
 .. code-block:: yaml
 
@@ -146,28 +165,38 @@ To do this use:
 
 There are also other, less used features that you can use:
 
-* FREQUENCY: specifies that a job has only to be run after X dates, members or chunk. A job will always be created for
-  the last one. If not specified, defaults to 1
+.. list-table::
+    :widths: 25 75
+    :header-rows: 1
 
-* SYNCHRONIZE: specifies that a job with RUNNING: chunk, has to synchronize its dependencies chunks at a 'date' or
-  'member' level, which means that the jobs will be unified: one per chunk for all members or dates.
-  If not specified, the synchronization is for each chunk of all the experiment.
-
-* RERUN_ONLY: determines if a job is only to be executed in reruns. If not specified, defaults to false.
-
-* CUSTOM_DIRECTIVES: Custom directives for the HPC resource manager headers of the platform used for that job.
-
-* SKIPPABLE: When this is true, the job will be able to skip it work if there is an higher chunk or member already ready, running, queuing or in complete status.
-
-* EXPORT: Allows to run an env script or load some modules before running this job.
-
-* EXECUTABLE: Allows to wrap a job for be launched with a set of env variables.
-
-* QUEUE: queue to add the job to. If not specified, uses PLATFORM default.
-
-* EXTENDED_HEADER_PATH: specify the path relative to the project folder where the extension to the autosubmit's header is
-
-* EXTENDED_TAILER_PATH: specify the path relative to the project folder where the extension to the autosubmit's tailer is
+    * - PARAMETERS
+      - Description
+    * - FREQUENCY
+      - A job has only to be run after X dates, members or chunk. A job will always be created for the last one.
+        If not specified, defaults to 1.
+    * - SYNCHRONIZE
+      - A job with ``RUNNING`` chunk, has to synchronize its dependencies chunks at a 'date' or
+        'member' level, which means that the jobs will be unified: one per chunk for all members or dates.
+        If not specified, the synchronization is for each chunk of all the experiment.
+    * - RERUN_ONLY
+      - Determines if a job is only to be executed in reruns. If not specified, defaults to false.
+    * - CUSTOM_DIRECTIVES
+      - Custom directives for the HPC resource manager headers of the platform used for that job.
+    * - SKIPPABLE
+      - In the case of a higher chunk or member ``READY``, ``RUNNING``, ``QUEUING``, or ``COMPLETED``
+        The job will be able to be skipped ready.
+    * - EXPORT
+      - Allows to run an env script or load some modules before running this job.
+    * - EXECUTABLE
+      - Allows to wrap a job for be launched with a set of env variables.
+    * - QUEUE
+      - Queue to add the job to a platform. If not specified, uses PLATFORM default.
+    * - EXTENDED_HEADER_PATH
+      - Autosubmit allows users to customize the header and the tailer by pointing towards the relative path to the
+        project folder where the header is located.
+    * - EXTENDED_TAILER_PATH
+      - Autosubmit allows users to customize the header and the tailer by pointing towards the relative path to the
+        project folder where the tailer is located.
 
 How to add a new heterogeneous job (hetjob)
 -------------------------------------------
