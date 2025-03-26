@@ -105,11 +105,11 @@ This is the minimum job definition and usually is not enough. You usually will n
       - Allows you to execute the job in a platform of your choice. It must be defined in the experiment's
         platforms.yml file or to have the value 'LOCAL' that always refer to the machine running Autosubmit.
     * - RUNNING
-      - Defines if jobs runs only once or once per start-date, member or chunk. Options are:
-        once, date, member, chunk
+      - Defines if jobs runs only once or once per start-date, member or chunk.
+        Options are: once, date, member, chunk
     * - DEPENDENCIES
-      - Defines dependencies from job as a list of parents jobs separated by spaces. For example, if
-        'new_job' has to wait for "old_job" to finish, you must add the line "DEPENDENCIES: old_job".
+      - Defines dependencies from job as a list of parents jobs separated by spaces.
+        If 'new_job' has to wait for "old_job" to finish, you must add the line "DEPENDENCIES: old_job".
 
 .. note::
     * For dependencies to jobs running in previous chunks, members or start-dates, use -(DISTANCE). For example, for a job "SIM" waiting for the previous "SIM" job to finish, you have to add "DEPENDENCIES: SIM-1".
@@ -128,22 +128,22 @@ To do this use:
     * - WALLCLOCK
       - Wallclock time to be submitted to the HPC queue in format HH:MM.
     * - PROCESSORS
-      - Processors number to be submitted to the HPC. If not specified, defaults to 1.
+      - Processors number to be submitted to the HPC. (Default: 1)
     * - THREADS
-      - Threads number to be submitted to the HPC. If not specified, defaults to 1.
+      - Threads number to be submitted to the HPC. (Default: 1)
     * - TASKS
-      - Tasks number to be submitted to the HPC. If not specified, defaults to 1.
+      - Tasks number to be submitted to the HPC. (Default: 1)
     * - NODES
-      - Nodes number to be submitted to the HPC. If not specified, the directive is not added.
+      - Nodes number to be submitted to the HPC. (Default: directive is not added)
     * - HYPERTHREADING
-      - Enables Hyper-threading, this will double the max amount of threads. defaults to false. ( Not available on slurm platforms ).
+      - Enables Hyper-threading, this will double the max amount of threads. (Default: False)
+        # Not available on slurm platforms
     * - QUEUE
-      - queue to add the job to. If not specified, uses PLATFORM default.
+      - If given, Autosubmit will add jobs to the given queue instead of platform's default queue
     * - RETRIALS
-      - Number of retrials if job fails.
+      - Number of retrials if a job fails. Defaults to the value given on experiment's autosubmit.yml
     * - DELAY_RETRY_TIME
-      - Allows to put a delay between retries.
-        Triggered when a job fails. If not specified, Autosubmit will retry the job as soon as possible.
+      - Allows to put a delay between retries. Autosubmit will retry the job as soon as possible.
         Accepted formats are:
 
         #. plain number (specify a constant delay between retrials),
@@ -173,13 +173,13 @@ There are also other, less used features that you can use:
       - Description
     * - FREQUENCY
       - A job has only to be run after X dates, members or chunk. A job will always be created for the last one.
-        If not specified, defaults to 1.
+        (Default: 1)
     * - SYNCHRONIZE
       - A job with ``RUNNING`` chunk, has to synchronize its dependencies chunks at a 'date' or
         'member' level, which means that the jobs will be unified: one per chunk for all members or dates.
         If not specified, the synchronization is for each chunk of all the experiment.
     * - RERUN_ONLY
-      - Determines if a job is only to be executed in reruns. If not specified, defaults to false.
+      - Determines if a job is only to be executed in reruns. (Default: False)
     * - CUSTOM_DIRECTIVES
       - Custom directives for the HPC resource manager headers of the platform used for that job.
     * - SKIPPABLE
@@ -189,8 +189,6 @@ There are also other, less used features that you can use:
       - Allows to run an env script or load some modules before running this job.
     * - EXECUTABLE
       - Allows to wrap a job for be launched with a set of env variables.
-    * - QUEUE
-      - Queue to add the job to a platform. If not specified, uses PLATFORM default.
     * - EXTENDED_HEADER_PATH
       - Autosubmit allows users to customize the header and the tailer by pointing towards the relative path to the
         project folder where the header is located.
@@ -226,10 +224,6 @@ To add a new hetjob, open the <experiments_directory>/cxxx/conf/jobs_cxxx.yml fi
             TASKS: 128 # Determines the amount of tasks that will be used by each component
 
 This will create a new job named "new_hetjob" with two components that will be executed once.
-
-* EXTENDED_HEADER_PATH: specify the path relative to the project folder where the extension to the autosubmit's header is
-
-* EXTENDED_TAILER_PATH: specify the path relative to the project folder where the extension to the autosubmit's tailer is
 
 How to configure email notifications
 ------------------------------------
@@ -337,35 +331,56 @@ identifier and add this text:
 
 This will create a platform named "new_platform". The options specified are all mandatory:
 
-* TYPE: queue type for the platform. Options supported are PBS, SGE, PS, ecaccess and SLURM.
+.. list-table::
+    :widths: 25 75
+    :header-rows: 1
 
-* HOST: hostname of the platform
-
-* PROJECT: project for the machine scheduler
-
-* USER: user for the machine scheduler
-
-* SCRATCH_DIR: path to the scratch directory of the machine
-
-* MAX_WALLCLOCK: maximum wallclock time allowed for a job in the platform
-
-* MAX_PROCESSORS: maximum number of processors allowed for a job in the platform
-
-* EC_QUEUE: queue for the ecaccess platform. ( hpc, ecs )
+    * - PARAMETERS
+      - Description
+    * - TYPE
+      - Queue type for the platform. Options supported are PBS, SGE, PS, ecaccess and SLURM.
+    * - HOST
+      - Hostname of the platform.
+    * - PROJECT
+      - Project for the machine scheduler.
+    * - USER
+      - User for the machine scheduler.
+    * - SCRATCH_DIR
+      - Path to the scratch directory of the machine.
+    * - MAX_WALLCLOCK
+      - Maximum wallclock time allowed for a job in the platform.
+    * - MAX_PROCESSORS
+      - Maximum number of processors allowed for a job in the platform.
+    * - EC_QUEUE
+      - Queue for the ecaccess platform. ( hpc, ecs ).
 
 .. warning:: With some platform types, Autosubmit may also need the version, forcing you to add the parameter
     VERSION. These platforms are PBS (options: 10, 11, 12) and ecaccess (options: pbs, loadleveler, slurm).
 
-* VERSION: determines de version of the platform type
+.. list-table::
+    :widths: 25 75
+    :header-rows: 1
+
+    * - PARAMETERS
+      - Description
+    * - VERSION
+      - Determines de version of the platform type.
 
 .. warning:: With some platforms, 2FA authentication is required. If this is the case, you have to add the parameter
     2FA. These platforms are ecaccess (options: True, False). There may be some autosubmit functions that are not avaliable when using an interactive auth method.
 
-* 2FA: determines if the platform requires 2FA authentication. ( default: False)
+.. list-table::
+    :widths: 25 75
+    :header-rows: 1
 
-* 2FA_TIMEOUT: determines the timeout for the 2FA authentication. ( default: 300 )
-
-* 2FA_METHOD: determines the method for the 2FA authentication. ( default: token )
+    * - PARAMETERS
+      - Description
+    * - 2FA
+      - Determines if the platform requires 2FA authentication. (Default: False)
+    * - 2FA_TIMEOUT
+      - Determines the timeout for the 2FA authentication. (Default: 300)
+    * - 2FA_METHOD
+      - Determines the method for the 2FA authentication. (Default: token)
 
 Some platforms may require to run serial jobs in a different queue or platform. To avoid changing the job
 configuration, you can specify what platform or queue to use to run serial jobs assigned to this platform:
@@ -377,21 +392,25 @@ configuration, you can specify what platform or queue to use to run serial jobs 
 
 There are some other parameters that you may need to specify:
 
-* BUDGET: budget account for the machine scheduler. If omitted, takes the value defined in PROJECT
+.. list-table::
+    :widths: 25 75
+    :header-rows: 1
 
-* ADD_PROJECT_TO_HOST: option to add project name to host. This is required for some HPCs
-
-* QUEUE: if given, Autosubmit will add jobs to the given queue instead of platform's default queue
-
-* TEST_SUITE: if true, autosubmit test command can use this queue as a main queue. Defaults to false
-
-* MAX_WAITING_JOBS: maximum number of jobs to be waiting in this platform.
-
-* TOTAL_JOBS: maximum number of jobs to be running at the same time in this platform.
-
-* LOG_RECOVERY_QUEUE_SIZE: A memory-consumption optimization for the recovery of logs. If not specified, defaults to max(100,TOTAL_JOBS) * 2, in case of issues with the recovery of logs, you can increase this value.
-
-* CUSTOM_DIRECTIVES: Custom directives for the resource manager of this platform.
+    * - PARAMETERS
+      - Description
+    * - BUDGET
+      - Budget account for the machine scheduler. If omitted, takes the value defined in PROJECT
+    * - ADD_PROJECT_TO_HOST
+      - Option to add project name to host. This is required for some HPCs
+    * - TEST_SUITE
+      - If true, autosubmit test command can use this queue as a main queue. (Default: False)
+    * - MAX_WAITING_JOBS
+      - Maximum number of jobs to be waiting in this platform.
+    * - TOTAL_JOBS
+      - Maximum number of jobs to be running at the same time in this platform.
+    * - LOG_RECOVERY_QUEUE_SIZE
+      - A memory-consumption optimization for the recovery of logs.
+         Default: max(100,TOTAL_JOBS) * 2, in case of issues with the recovery of logs, you can increase this value.
 
 
 How to request exclusivity or reservation
@@ -461,87 +480,40 @@ In the file:
        Note: The post processed additional_files will be sent to %HPCROOT%/LOG_%EXPID%Path relative to the project
        directory
      -
-   * - PLATFORM
-     - Platform to execute the job. If not specified, defaults to HPCARCH in expdef file.
-       LOCAL is always defined and refers to current machine.
-     -
-   * - QUEUE
-     - Defines dependencies from job as a list of parents jobs separated by spaces.
-     -
-   * - DEPENDENCIES
-     - Dependencies to jobs in previous chunk, member o startdate, use -(DISTANCE).
-     - INI
-
-       SIM-1
-
-       CLEAN-2
-   * - RUNNING
-     - Define if jobs runs once, once per stardate, once per member or once per chunk. Options: once, date, member, chunk.
-       (If not specified, defaults to once.)
-     - once
    * - DATA_DEPENDENCIES
      - Job in which this will be dependent and waiting for the results to start performing.
      -
-   * - FREQUENCY
-     - Specifies that job has only to be run after X dates, members or chunk.
-       A job will always be created for the last. If not specified, defaults to 1
-     -
    * - WAIT
-     - If not specified, defaults to True
+     - Default: True
      - False
-   * - RERUN_ONLY
-     - Defines if job is only to be executed in reruns. If not specified, defaults to false.
-     - False
-   * - WALLCLOCK
-     - Wallclock to be submitted to the HPC queue in format HH:MM
-     - 00:05
    * - WCHUNKINC (Wallclock chunk increase)
-     - Processors number to be submitted to the HPC. If not specified, defaults to 1.
+     - Processors number to be submitted to the HPC. (Default: 1)
        WALLCLOCK will be increased according to the formula (WALLCLOCK + WCHUNKINC * (chunk - 1)).
        Ideal for sequences of jobs that change their expected running time according to the current chunk.
      - 00:01
    * - PROCESSORS
      - Number of processors to be used in the Job
      - 1
-   * - THREADS
-     - Threads number to be submitted to the HPC. If not specified, defaults to 1.
-     - 1
-   * - HYPERTHREADING
-     - Enables hyper-threading. If not specified, defaults to false.
-     - false
-   * - Tasks
-     - Tasks number to be submitted to the HPC. If not specified, defaults to 1.
-     - 1
    * - MEMORY
      - Memory requirements for the job in MB
      - 4096
-   * - RETRIALS
-     - Number of retrials if a job fails. If not specified, defaults to the value given on experiment's autosubmit.yml
-     - 4
-   * - DELAY_RETRY_TIME
-     - Allows to put a delay between retries, of retrials if a job fails. If not specified, it will be static
-     - 11
-
-       +11 # will wait 11,22,33,44...
-
-       \*11 # will wait 11,110,1110,11110...
    * - CHECK
      - Some jobs can not be checked before running previous jobs. Set this option to false if that is the case
      - False
    * - TYPE
-     - Select the interpreter that will run the job. Options: bash, python, r Default: bash
+     - Select the interpreter that will run the job. Options: bash, python, r. (Default: bash)
      - bash
    * - EXECUTABLE
-     - Specify the path to the interpreter. If empty, use system default based on job type. Default: empty
+     - Specify the path to the interpreter. If empty, use system default based on job type. (Default: empty)
      - /my_python_env/python3
    * - Splits
-     - Split the job in N jobs. If not specified, defaults to None
+     - Split the job in N jobs. (Default: None)
      - 2
    * - SPLITSIZEUNIT
-     - Size unit of the split. Options: hour, day, month, year. Defaults to EXPERIMENT.CHUNKSIZEUNIT-1
+     - Size unit of the split. Options: hour, day, month, year. (Default: EXPERIMENT.CHUNKSIZEUNIT-1)
      - day
    * - SPLITSIZE
-     - Size of the split. If not specified, defaults to 1
+     - Size of the split. (Default: 1)
      - 1
 
 
