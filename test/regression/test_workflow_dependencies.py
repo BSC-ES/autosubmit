@@ -55,9 +55,6 @@ def prepare_basic_config(current_tmpdir):
     BasicConfig.CONFIG_FILE_FOUND = False
     return basic_conf
 
-def check_differences(parameters: Dict[str, Any], parameters_ref: Dict[str, Any]) -> Dict[str, Any]:
-    return []
-
 
 @pytest.fixture
 def prepare_workflow_runs(current_tmpdir: Path) -> Path:
@@ -98,13 +95,14 @@ def prepare_workflow_runs(current_tmpdir: Path) -> Path:
     shutil.copytree(experiments_root, current_tmpdir_experiments_root)
     # create basic structure
     for experiment in current_tmpdir_experiments_root.iterdir():
-        experiment.joinpath("proj").mkdir(parents=True, exist_ok=True)
-        experiment.joinpath("conf").mkdir(parents=True, exist_ok=True)
-        experiment.joinpath("pkl").mkdir(parents=True, exist_ok=True)
-        experiment.joinpath("plot").mkdir(parents=True, exist_ok=True)
-        experiment.joinpath("status").mkdir(parents=True, exist_ok=True)
-        as_tmp = experiment.joinpath("tmp")
-        as_tmp.joinpath("ASLOGS").mkdir(parents=True, exist_ok=True)
+        if not experiment.is_file():
+            experiment.joinpath("proj").mkdir(parents=True, exist_ok=True)
+            experiment.joinpath("conf").mkdir(parents=True, exist_ok=True)
+            experiment.joinpath("pkl").mkdir(parents=True, exist_ok=True)
+            experiment.joinpath("plot").mkdir(parents=True, exist_ok=True)
+            experiment.joinpath("status").mkdir(parents=True, exist_ok=True)
+            as_tmp = experiment.joinpath("tmp")
+            as_tmp.joinpath("ASLOGS").mkdir(parents=True, exist_ok=True)
 
 
 @pytest.mark.parametrize("expid", ["automatic_performance_profiling"])
