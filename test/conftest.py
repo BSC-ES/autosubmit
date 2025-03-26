@@ -382,12 +382,12 @@ def autosubmit_config(
             basic_config=BasicConfig
         )
 
+        config.experiment_data = {**config.experiment_data, **experiment_data}
         # Populate the configuration object's ``experiment_data`` dictionary with the values
         # in ``BasicConfig``. For some reason, some platforms use variables like ``LOCAL_ROOT_DIR``
         # from the configuration object, instead of using ``BasicConfig``.
         for k, v in {k: v for k, v in basic_config.__class__.__dict__.items() if not k.startswith('__')}.items():
             config.experiment_data[k] = v
-        config.experiment_data.update(experiment_data)
 
         # Default values for experiment data
         # TODO: This probably has a way to be initialized in config-parser?
@@ -397,6 +397,8 @@ def autosubmit_config(
                 config.experiment_data[must_exist] = {}
 
         config.experiment_data['CONFIG']['SAFETYSLEEPTIME'] = 0
+        # TODO: one test failed while moving things from unit to integration, but this shouldn't be
+        #       needed, especially if the disk has the valid value?
         config.experiment_data['DEFAULT']['EXPID'] = expid
 
         if 'HPCARCH' not in config.experiment_data['DEFAULT']:
@@ -492,7 +494,7 @@ def _identity_value(value=None):
 
 
 @pytest.fixture
-def as_db_sqlite(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Type[BasicConfig]:
+def as_db_sqlite(monkeypatch: pytest.MonkeyPatch, tmp_path: "LocalPath") -> Type[BasicConfig]:
     """Overwrites the BasicConfig to use SQLite database for testing.
     Args:
         monkeypatch: Monkey Patcher.
