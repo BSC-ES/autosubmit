@@ -19,28 +19,10 @@
 
 import pytest
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.git.autosubmit_git import AutosubmitGit
 from log.log import AutosubmitCritical
 
 _EXPID = 'a000'
-
-
-# def setup_method(self) -> None:
-#     self.exp_dir = Path(self.temp_dir.name, f'{_EXPID}')
-#     self.conf_dir = self.exp_dir / 'conf'
-#     self.conf_dir.mkdir(parents=True)
-#     self.MockBasicConfig.LOCAL_ROOT_DIR = self.temp_dir.name
-#     self.MockBasicConfig.LOCAL_PROJ_DIR = self.exp_dir / 'proj'
-#     self.MockBasicConfig.LOCAL_PROJ_DIR.mkdir(parents=True)
-#
-#     self.hpcarch = MagicMock()
-#
-#     def mocked_git_subprocess(*args):
-#         if args[0] == 'git --version':
-#             return "2251"
-#
-#     self.mock_subprocess.check_output.side_effect = mocked_git_subprocess
 
 
 def test_submodules_fails_with_invalid_as_conf(mocker):
@@ -60,6 +42,9 @@ def test_submodules_empty_string(mocker, autosubmit_config):
             'PROJECT_COMMIT': '123',
             'REMOTE_CLONE_ROOT': 'workflow',
             'PROJECT_SUBMODULES': ''
+        },
+        'PROJECT': {
+            'PROJECT_DESTINATION': 'git_project'
         }
     })
 
@@ -86,6 +71,9 @@ def test_submodules_list_not_empty(mocker, autosubmit_config):
             'PROJECT_COMMIT': '123',
             'REMOTE_CLONE_ROOT': 'workflow',
             'PROJECT_SUBMODULES': 'clone_me_a clone_me_b'
+        },
+        'PROJECT': {
+            'PROJECT_DESTINATION': 'git_project'
         }
     })
 
@@ -109,6 +97,9 @@ def test_submodules_falsey_disables_submodules(mocker, autosubmit_config):
             'PROJECT_COMMIT': '123',
             'REMOTE_CLONE_ROOT': 'workflow',
             'PROJECT_SUBMODULES': False
+        },
+        'PROJECT': {
+            'PROJECT_DESTINATION': 'git_project'
         }
     })
 
@@ -131,6 +122,9 @@ def test_submodules_falsey_disables_submodules(mocker, autosubmit_config):
         },
         "LOCAL_ROOT_DIR": "blabla",
         "LOCAL_TMP_DIR": 'tmp',
+        "PROJECT": {
+            "PROJECT_DESTINATION": "git_project"
+        },
         "PLATFORMS": {
             "PYTEST-UNDEFINED": {
                 "host": "",
@@ -154,6 +148,9 @@ def test_submodules_falsey_disables_submodules(mocker, autosubmit_config):
         },
         "LOCAL_ROOT_DIR": "blabla",
         "LOCAL_TMP_DIR": 'tmp',
+        "PROJECT": {
+            "PROJECT_DESTINATION": "git_project"
+        },
         "PLATFORMS": {
             "PYTEST-PS": {
                 "TYPE": "ps",
@@ -172,8 +169,8 @@ def test_submodules_falsey_disables_submodules(mocker, autosubmit_config):
             },
         }
     }], ids=["Git clone without type defined", "Git clone with the correct type defined"])
-def test_copy_code(autosubmit_config, config, mocker):
+def test_copy_code(autosubmit_config, config, mocker, autosubmit):
     expid = 'random-id'
     as_conf = autosubmit_config(expid, config)
     mocker.patch('autosubmit.git.autosubmit_git.AutosubmitGit.clone_repository', return_value=True)
-    assert Autosubmit._copy_code(as_conf, expid, "git", True)
+    assert autosubmit._copy_code(as_conf, expid, "git", True)

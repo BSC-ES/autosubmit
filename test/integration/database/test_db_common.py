@@ -1,7 +1,7 @@
 import locale
 import pytest
 from pathlib import Path
-from pkg_resources import resource_string
+from importlib.resources import files
 
 from autosubmit.database import db_common
 from autosubmitconfigparser.config.basicconfig import BasicConfig
@@ -40,9 +40,7 @@ def test_db_common(tmp_path: Path, db_engine: str, request):
     is_sqlite = db_engine == "sqlite"
     if is_sqlite:
         # Code copied from ``autosubmit.py``.
-        create_db_query = resource_string(
-            "autosubmit.database", "data/autosubmit.sql"
-        ).decode(locale.getlocale()[1])
+        create_db_query = (files("autosubmit.database") / "data/autosubmit.sql").read_text(locale.getlocale()[1]) # .decode(locale.getlocale()[1])
 
     assert db_common.create_db(create_db_query)
 

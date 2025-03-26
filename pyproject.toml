@@ -93,8 +93,8 @@ docs = [
 ]
 all = [
     "autosubmit[tests]",
-    "autosubmit[docs]"
-    # "autosubmit[postgres]"
+    "autosubmit[docs]",
+    "autosubmit[postgres]"
 ]
 
 [tool.setuptools.packages.find]

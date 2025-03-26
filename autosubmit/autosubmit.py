@@ -2133,7 +2133,7 @@ class Autosubmit:
             p.work_event.set()
 
     @staticmethod
-    def run_experiment(expid, notransitive=False, start_time=None, start_after=None, run_only_members=None, profile=False):
+    def run_experiment(expid, notransitive=False, start_time=None, start_after=None, run_only_members=None, profile=False) -> int:
         """
         Runs and experiment (submitting all the jobs properly and repeating its execution in case of failure).
         :param expid: the experiment id
@@ -2142,7 +2142,7 @@ class Autosubmit:
         :param start_after: the expid after which the experiment should start
         :param run_only_members: the members to run
         :param profile: if True, the function will be profiled
-        :return: None
+        :return: exit status
 
         """
         # Start profiling if the flag has been used
@@ -3488,7 +3488,10 @@ class Autosubmit:
                 rc_path = '.'
             else:
                 rc_path = home_path
-            rc_path = rc_path.joinpath('.autosubmitrc')
+            if 'AUTOSUBMIT_CONFIGURATION' in os.environ:
+                rc_path = os.environ['AUTOSUBMIT_CONFIGURATION']
+            else:
+                rc_path = rc_path.joinpath('.autosubmitrc')
 
             config_file = open(rc_path, 'w')
             Log.info("Writing configuration file...")

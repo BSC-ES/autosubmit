@@ -20,24 +20,22 @@ from textwrap import dedent
 
 import pytest
 
-from autosubmit.autosubmit import Autosubmit
-
 
 @pytest.mark.parametrize('suffix', [
     (''),
     ('/'),
     ('//')
 ])
-def test_configure(mocker, tmp_path, suffix: str) -> None:
+def test_configure(mocker, tmp_path, suffix: str, autosubmit) -> None:
     # To update ``Path.home`` appending the provided suffix.
     mocker.patch('pathlib.Path.home').return_value = Path(str(tmp_path) + suffix)
 
-    # asign values that will be passed on cmd
+    # assign values that will be passed on cmd
     database_filename = "autosubmit.db"
     db_path = Path.home() / 'database'
     lr_path = Path.home() / 'experiments'
 
-    Autosubmit.configure(
+    autosubmit.configure(
         advanced=False,
         database_path=str(db_path),
         database_filename=database_filename,

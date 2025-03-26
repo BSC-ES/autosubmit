@@ -2137,7 +2137,7 @@ class FakeBasicConfig:
 
 
 @pytest.fixture(scope='function')
-def setup(autosubmit_config, tmpdir, prepare_basic_config):
+def setup(autosubmit_config, tmpdir):
     experiment_id = 'random-id'
     as_conf = autosubmit_config(experiment_id, {})
     as_conf.experiment_data = dict()
