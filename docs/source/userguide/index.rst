@@ -18,6 +18,7 @@ User Guide
    /userguide/traceability
    /userguide/user_mapping
    /userguide/templates
+   /userguide/platforms/index
 
 Command list
 ============
