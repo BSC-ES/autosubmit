@@ -50,7 +50,7 @@ dependencies = [
     "networkx<=2.6.3",
     "portalocker<=3.1.1",
     "paramiko>=3.5.0",
-    "pyparsing==3.2.1",
+    "pyparsing==3.2.3",
     "matplotlib<=3.8.3",
     "typing_extensions==4.*",
     "psutil<=7.0.0",
