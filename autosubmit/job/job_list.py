@@ -1007,6 +1007,8 @@ class JobList(object):
         Check if all filters are 'NONE'
         :return: bool
         """
+        if not filters_to_apply:
+            return False
         for value in filters_to_apply.values():
             if str(value).upper() != "NONE":
                 return False
