@@ -1001,10 +1001,31 @@ class JobList(object):
                     return distance
         return distance
 
+    @staticmethod
+    def are_all_filters_none(filters_to_apply):
+        """
+        Check if all filters are 'NONE'
+        :return: bool
+        """
+        for value in filters_to_apply.values():
+            if str(value).upper() != "NONE":
+                return False
+        return True
+
+    def is_parent_skippable(self, parent, filters_to_apply):
+        """
+        Check if the special filter is not in the list of special filters
+        :return: bool
+        """
+        if filters_to_apply:
+            if self.are_all_filters_none(filters_to_apply):
+                return True
+        return False
+
     def _calculate_natural_dependencies(self, dic_jobs, job, dependency, date, member, chunk,
             graph, dependencies_keys_without_special_chars, distances_of_current_section,
             distances_of_current_section_members, key, dependencies_of_that_section, chunk_list,
-            date_list, member_list, special_dependencies, max_distance, problematic_dependencies):
+            date_list, member_list, special_dependencies, max_distance, problematic_dependencies, filters_to_apply):
         """
         Calculate natural dependencies and add them to the graph if they're necessary.
         :param dic_jobs: JobList
@@ -1053,6 +1074,8 @@ class JobList(object):
                                natural_parent.name != job.name]
         # Natural jobs, no filters to apply we can safely add the edge
         for parent in natural_parents:
+            if self.is_parent_skippable(parent, filters_to_apply) :
+                continue
             if parent.name in special_dependencies:
                 continue
             if dependency.relationships:  # If this section has filter, selects..
@@ -1287,21 +1310,14 @@ class JobList(object):
         :return: problematic_dependencies
         """
         # Initialize variables
-        depends_on_previous_section = set()
         distances_of_current_section = {}
         distances_of_current_section_member = {}
         problematic_dependencies = set()
         special_dependencies = set()
         dependencies_to_del = set()
-        dependencies_non_natural_to_del = set()
-        max_distance = 0
         dependencies_keys_aux = []
         dependencies_keys_without_special_chars = []
         depends_on_itself = None
-        if not job.splits:
-            child_splits = 0
-        elif job.splits != "auto":
-            child_splits = int(job.splits)
         parsed_date_list = []
         for dat in date_list:
             parsed_date_list.append(date2str(dat))
@@ -1403,7 +1419,6 @@ class JobList(object):
         ### Adding the dependency to the graph if possible
         sections_to_calculate = [key for key in dependencies_keys_aux
                                  if key not in dependencies_to_del]
-        natural_sections = list()
         # Parse first sections with special filters if any
         for key in sections_to_calculate:
             dependency = dependencies[key]
@@ -1413,43 +1428,41 @@ class JobList(object):
                 continue
             self._normalize_auto_keyword(job, dependency)
             filters_to_apply = self.get_filters_to_apply(job, dependency)
+            dependencies_of_that_section = (dic_jobs.as_conf.jobs_data[dependency.section].
+                                            get("DEPENDENCIES", {}))
+            if not self.are_all_filters_none(filters_to_apply):
+                if len(filters_to_apply) > 0:
+                    # Adds the dependencies to the job, and if not possible, adds the job to the
+                    # problematic_dependencies
+                    special_dependencies, problematic_dependencies = (
+                        self._calculate_filter_dependencies(filters_to_apply, dic_jobs, job, dependency,
+                            date, member, chunk, graph, dependencies_keys_without_special_chars,
+                            distances_of_current_section, distances_of_current_section_member, key,
+                            dependencies_of_that_section, chunk_list, date_list, member_list,
+                            special_dependencies, problematic_dependencies))
+                dependency = dependencies[key]
+                skip, (chunk, member, date) = JobList._calculate_dependency_metadata(
+                    job.chunk, chunk_list, job.member, member_list, job.date, date_list, dependency)
 
-            if len(filters_to_apply) > 0:
-                dependencies_of_that_section = (dic_jobs.as_conf.jobs_data[dependency.section].
-                                                get("DEPENDENCIES", {}))
+                dependencies_of_that_section_stripped = []
+                for key_aux_stripped in dependencies_of_that_section.keys():
+                    if "-" in key_aux_stripped:
+                        key_aux_stripped = key_aux_stripped.split("-")[0]
+                    elif "+" in key_aux_stripped:
+                        key_aux_stripped = key_aux_stripped.split("+")[0]
+
+                    dependencies_of_that_section_stripped.append(key_aux_stripped)
                 # Adds the dependencies to the job, and if not possible, adds the job to the
                 # problematic_dependencies
-                special_dependencies, problematic_dependencies = (
-                    self._calculate_filter_dependencies(filters_to_apply, dic_jobs, job, dependency,
-                        date, member, chunk, graph, dependencies_keys_without_special_chars,
-                        distances_of_current_section, distances_of_current_section_member, key,
-                        dependencies_of_that_section, chunk_list, date_list, member_list,
-                        special_dependencies, problematic_dependencies))
-            if key in dependencies_non_natural_to_del:
-                continue
-            natural_sections.append(key)
-        for key in natural_sections:
-            dependency = dependencies[key]
-            skip, (chunk, member, date) = JobList._calculate_dependency_metadata(
-                job.chunk, chunk_list, job.member, member_list, job.date, date_list, dependency)
-            if skip:
-                continue
-            aux = dic_jobs.as_conf.jobs_data[dependency.section].get("DEPENDENCIES", {})
-            dependencies_of_that_section = []
-            for key_aux_stripped in aux.keys():
-                if "-" in key_aux_stripped:
-                    key_aux_stripped = key_aux_stripped.split("-")[0]
-                elif "+" in key_aux_stripped:
-                    key_aux_stripped = key_aux_stripped.split("+")[0]
-
-                dependencies_of_that_section.append(key_aux_stripped)
-            # Adds the dependencies to the job, and if not possible, adds the job to the
-            # problematic_dependencies
-            problematic_dependencies = self._calculate_natural_dependencies(dic_jobs, job,
-                dependency, date, member, chunk, graph, dependencies_keys_without_special_chars,
-                distances_of_current_section, distances_of_current_section_member, key,
-                dependencies_of_that_section, chunk_list, date_list, member_list,
-                special_dependencies, max_distance, problematic_dependencies)
+                problematic_dependencies = self._calculate_natural_dependencies(dic_jobs, job,
+                                                                                dependency, date, member, chunk, graph,
+                                                                                dependencies_keys_without_special_chars,
+                                                                                distances_of_current_section,
+                                                                                distances_of_current_section_member, key,
+                                                                                dependencies_of_that_section_stripped,
+                                                                                chunk_list, date_list, member_list,
+                                                                                special_dependencies, max_distance,
+                                                                                problematic_dependencies, filters_to_apply)
         return problematic_dependencies
 
     @staticmethod
