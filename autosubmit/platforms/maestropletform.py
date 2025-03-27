@@ -17,20 +17,10 @@ from contextlib import suppress
 
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-import locale
-import os
-from datetime import datetime
-from time import mktime
-from time import sleep
-from time import time
-from typing import List, Union
-from xml.dom.minidom import parseString
 
-from autosubmit.job.job_common import Status, parse_output_number
-from autosubmit.platforms.headers.slurm_header import SlurmHeader
+from typing import Union
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from autosubmit.platforms.wrappers.wrapper_factory import SlurmWrapperFactory
-from log.log import AutosubmitCritical, AutosubmitError, Log
+from log.log import Log
 
 class MaestroPlatform(SlurmPlatform):
     """
@@ -53,3 +43,26 @@ class MaestroPlatform(SlurmPlatform):
         """
         SlurmPlatform.__init__(self, expid, name, config, auth_password = auth_password)
         # other
+
+
+    def submit_job(self, job, script_name: str, hold: bool=False, export: str="none") -> Union[int, None]:
+        """
+        Submit a job from a given job object.
+
+        :param job: Job object
+        :type job: autosubmit.job.job.Job
+        :param script_name: Name of the script of the job.
+        :type script_name: str
+        :param hold: Send job hold.
+        :type hold: bool
+        :param export: Set within the jobs.yaml, used to export environment script to use before the job is launched.
+        :type export: str
+
+        :return: job id for the submitted job.
+        :rtype: int
+        """
+        Log.result(f"Job: {job.name}")
+        Log.result(f"script_name: {script_name}")
+        Log.result(f"hold: {hold}")
+        Log.result(f"export: {export}")
+        return None

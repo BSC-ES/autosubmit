@@ -96,9 +96,12 @@ You can add the following PARAMETER after ``PROJECT``, this will point towards t
 Adding configuration and adding the platforms will allow you to connect and execute the jobs, be mindful of using
 your own user in this step and make sure you have a folder for your user.
 
-.. hint::
-    In case of not connecting it can be because your user dont have access to the host
-    ``SCRATCH_DIR`` might be pointing to a non existing folder inside the host
+.. warning::
+    In case of not being able to connect it can be either because your user don't have access to the host
+    or the PARAMETER ``SCRATCH_DIR`` might be pointing to a non existing folder inside the host.
+
+    Make sure to have created the folder with your USERNAME inside the path you input
+    (e.g.: /gpfs/scratch/<USER>)
 
 .. code-block:: yaml
 
@@ -143,10 +146,17 @@ Now you can add jobs at the end of the file to see the execution
             PLATFORM: MARENOSTRUM5
             RUNNING: once
 
-After setting up all the new configuration you can run the following command to create the plots
+As you finish to set up all the new configuration you can run the following command to generate the experiment
+that was just created
 
 ``autosubmit create -np -f -v <EXPID>``
 
-At the end you can run the last command to execute the experiment and check its behaviour
+Once the experiment is generated we can execute it and check its results by running the command bellow to execute
+the experiment and check if its behaviour is as expected
 
 ``autosubmit run <EXPID>``
+
+
+.. hint::
+    To make sure the experiment is running properly you can access the platform making use of the ssh command line and
+    executing the ``sacct`` command in the SLURM platform in order to print all the jobs that were executed

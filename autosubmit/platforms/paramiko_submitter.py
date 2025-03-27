@@ -24,6 +24,8 @@ from collections import defaultdict
 from log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+
+from .maestropletform import MaestroPlatform
 from .submitter import Submitter
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.pbsplatform import PBSPlatform
@@ -142,6 +144,9 @@ class ParamikoSubmitter(Submitter):
                         asconf.expid, section, exp_data, platform_version)
                 elif platform_type == 'slurm':
                     remote_platform = SlurmPlatform(
+                        asconf.expid, section, exp_data, auth_password = auth_password)
+                elif platform_type == 'maestro':
+                    remote_platform = MaestroPlatform(
                         asconf.expid, section, exp_data, auth_password = auth_password)
                 elif platform_type == 'pjm':
                     remote_platform = PJMPlatform(
