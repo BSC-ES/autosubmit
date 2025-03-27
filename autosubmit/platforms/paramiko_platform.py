@@ -5,6 +5,7 @@ from time import sleep
 import sys
 import socket
 import os
+from typing import List, TYPE_CHECKING, Union
 import paramiko
 import datetime
 import select
@@ -22,6 +23,11 @@ import threading
 import getpass
 from paramiko.agent import Agent
 import time
+
+if TYPE_CHECKING:
+    # Avoid circular imports
+    from autosubmit.job.job import Job
+
 
 def threaded(fn):
     def wrapper(*args, **kwargs):
@@ -746,7 +752,7 @@ class ParamikoPlatform(Platform):
             if job not in ssh_output:
                 return False
         return True
-    def parse_joblist(self, job_list):
+    def parse_joblist(self, job_list: List[List['Job']]):
         """
         Convert a list of job_list to job_list_cmd
         :param job_list: list of jobs
@@ -767,7 +773,7 @@ class ParamikoPlatform(Platform):
             job_list_cmd=job_list_cmd[:-1]
 
         return job_list_cmd
-    def check_Alljobs(self, job_list, as_conf, retries=5):
+    def check_Alljobs(self, job_list: List[List['Job']], as_conf, retries=5):
         """
         Checks jobs running status
         :param job_list: list of jobs
@@ -1481,6 +1487,32 @@ class ParamikoPlatform(Platform):
                 return False
         except:
             return False
+
+    def get_file_size(self, src: str) -> Union[int, None]:
+        """
+        Get file size in bytes
+        :param src: file path
+        """
+        try:
+            return self._ftpChannel.stat(str(src)).st_size
+        except Exception:
+            Log.debug(f"Error getting file size for {src}")
+            return None
+
+    def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
+        """
+        Read file content as bytes. If max_size is set, only the first max_size bytes are read.
+        :param src: file path
+        :param max_size: maximum size to read
+        """
+        try:
+            with self._ftpChannel.file(str(src), "r") as file:
+                return file.read(size=max_size)
+        except Exception:
+            Log.debug(f"Error reading file {src}")
+            return None
+
+
 class ParamikoPlatformException(Exception):
     """
     Exception raised from HPC queues
