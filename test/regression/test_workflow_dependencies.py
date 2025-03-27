@@ -105,7 +105,9 @@ def prepare_workflow_runs(current_tmpdir: Path) -> Path:
             as_tmp.joinpath("ASLOGS").mkdir(parents=True, exist_ok=True)
 
 
-@pytest.mark.parametrize("expid", ["automatic_performance_profiling"])
+# By default, the test will be performed on all the workflows in the 'workflows' directory
+workflow_folders = [f.name for f in Path('./workflows').iterdir() if f.is_dir()]
+@pytest.mark.parametrize("expid", workflow_folders)
 def test_workflows_dependencies(prepare_workflow_runs, expid, current_tmpdir: Path, mocker, prepare_basic_config: Any) -> None:
     """
     Compare current workflow dependencies with the reference ones.
