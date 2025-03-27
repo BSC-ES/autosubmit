@@ -187,6 +187,7 @@ def test_workflows_dependencies(prepare_workflow_runs, expid, current_tmpdir: Pa
     """
     Compare current workflow dependencies with the reference ones.
     """
+    banned_plots = ["destine_24_01_2024"]  # Too big to be visualized and see anything.
     profiler = cProfile.Profile()
     # Allows to have any name for the configuration folder
     mocker.patch.object(BasicConfig, 'read', return_value=True)
@@ -219,7 +220,7 @@ def test_workflows_dependencies(prepare_workflow_runs, expid, current_tmpdir: Pa
             differences.extend(compare_and_print_differences(new_root, ref_root))
 
     if differences:
-        if SHOW_WORKFLOW_PLOT:
+        if SHOW_WORKFLOW_PLOT and expid not in banned_plots:
             init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, create=True, test_type='test', plot=SHOW_WORKFLOW_PLOT)
         pytest.fail("\n".join(differences))
 
