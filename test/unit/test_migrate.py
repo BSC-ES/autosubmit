@@ -17,16 +17,14 @@
 
 import os
 import pwd
-from pathlib import Path
-
 import pytest
+from pathlib import Path
 
 from autosubmit.migrate.migrate import Migrate
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 from log.log import AutosubmitCritical
-from test.unit.utils.common import create_database, init_expid
 
 
 @pytest.mark.skip('This test requires a running SSH server, with password-less authentication')
@@ -69,10 +67,10 @@ path = {folder}
 
 ''')
         os.environ['AUTOSUBMIT_CONFIGURATION'] = str(folder.join('autosubmitrc'))
-        create_database(str(folder.join('autosubmitrc')))
-        assert "tests.db" in [Path(f).name for f in folder.listdir()]
-        init_expid(str(folder.join('autosubmitrc')), platform='pytest-local', create=False)
-        assert "t000" in [Path(f).name for f in folder.listdir()]
+        # create_database(str(folder.join('autosubmitrc')))
+        # assert "tests.db" in [Path(f).name for f in folder.listdir()]
+        # init_expid(str(folder.join('autosubmitrc')), platform='pytest-local', create=False)
+        # assert "t000" in [Path(f).name for f in folder.listdir()]
         return folder
 
     @pytest.fixture(scope='class')

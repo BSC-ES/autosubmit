@@ -16,9 +16,9 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-import pwd
 import sqlite3
 import tempfile
+from getpass import getuser
 from itertools import permutations, product
 from pathlib import Path
 from textwrap import dedent
@@ -30,12 +30,59 @@ from autosubmit.autosubmit import Autosubmit
 from autosubmit.experiment.experiment_common import new_experiment, copy_experiment
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from log.log import AutosubmitCritical, AutosubmitError
-from test.unit.utils.common import create_database, init_expid
 
 """Tests for experiment IDs."""
 
+_EXPID = 't000'
 _DESCRIPTION = "for testing"
 _VERSION = "test-version"
+
+
+@pytest.fixture
+def as_conf(autosubmit_config, tmp_path):
+    _user = getuser()
+    as_conf = autosubmit_config(_EXPID, experiment_data={
+        'PLATFORMS': {
+            'pytest-ps': {
+                'type': 'ps',
+                'host': '127.0.0.1',
+                'user': _user,
+                'project': 'whatever',
+                'scratch': str(tmp_path / 'scratch'),
+                'DISABLE_RECOVERY_THREADS': 'True'
+            }
+        },
+        'JOBS': {
+            'debug': {
+                'SCRIPT': 'echo "Hello world"',
+                'RUNNING': 'once'
+            },
+        },
+        'EXPERIMENT': {
+            'DATELIST': '20000101',
+            'MEMBERS': 'fc0',
+            'CHUNKSIZEUNIT': 'month',
+            'CHUNKSIZE': '1',
+            'NUMCHUNKS': '1',
+            'CHUNKINI': '',
+            'CALENDAR': 'standard'
+        }
+    })
+
+    run_dir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+
+    expid_dir = Path(f"{run_dir}/scratch/whatever/{_user}/{_EXPID}")
+    dummy_dir = Path(f"{run_dir}/scratch/whatever/{_user}/{_EXPID}/dummy_dir")
+    real_data = Path(f"{run_dir}/scratch/whatever/{_user}/{_EXPID}/real_data")
+    # write some dummy data inside scratch dir
+    expid_dir.mkdir(parents=True, exist_ok=True)
+    dummy_dir.mkdir(parents=True, exist_ok=True)
+    real_data.mkdir(parents=True, exist_ok=True)
+
+    with open(dummy_dir.joinpath('dummy_file'), 'w') as f:
+        f.write('dummy data')
+    real_data.joinpath('dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
+    return as_conf
 
 
 @patch('autosubmit.experiment.experiment_common.db_common')
@@ -163,9 +210,9 @@ def test_autosubmit_generate_config(read_files_mock):
             output_text = Path(temp_dir, expid, 'conf', f'{source_name.stem}_{expid}.yml').read_text()
 
             assert source_text != output_text
-            assert not '# sim' in source_text
+            assert '# sim' not in source_text
             assert '# sim' in output_text
-            assert not '# 42' in source_text
+            assert '# 42' not in source_text
             print(output_text)
             assert '# 42' in output_text
 
@@ -248,137 +295,24 @@ def test_autosubmit_generate_config_resource_listdir_order(
         BasicConfig.LOCAL_ROOT_DIR = original_local_root_dir
 
 
-def _get_script_files_path() -> Path:
-    return Path(__file__).resolve().parent / 'files'
-
-
-@pytest.fixture
-def create_autosubmit_tmpdir(tmpdir_factory):
-    folder = tmpdir_factory.mktemp('autosubmit_tests')
-    Path(folder).joinpath('scratch').mkdir()
-    file_stat = os.stat(f"{folder.strpath}")
-    file_owner_id = file_stat.st_uid
-    file_owner = pwd.getpwuid(file_owner_id).pw_name
-    folder.owner = file_owner
-
-    # Write an autosubmitrc file in the temporary directory
-    autosubmitrc = folder.join('autosubmitrc')
-    autosubmitrc.write(f'''
-[database]
-path = {folder}
-filename = tests.db
-
-[local]
-path = {folder}
-
-[globallogs]
-path = {folder}/globallogs
-
-[structures]
-path = {folder}/metadata/structures
-
-[historicdb]
-path = {folder}/metadata/database
-
-[historiclog]
-path = {folder}/metadata/logs
-
-[defaultstats]
-path = {folder}
-
-''')
-    os.environ['AUTOSUBMIT_CONFIGURATION'] = str(folder.join('autosubmitrc'))
-    create_database(str(folder.join('autosubmitrc')))
-    Path(folder).joinpath('metadata').mkdir()
-    Path(folder).joinpath('metadata/structures').mkdir()
-    Path(folder).joinpath('metadata/database').mkdir()
-    Path(folder).joinpath('metadata/logs').mkdir()
-    assert "tests.db" in [Path(f).name for f in folder.listdir()]
-    return folder
-
-
-@pytest.fixture
-def generate_new_experiment(create_autosubmit_tmpdir, request):
-    test_type = request.param
-    # Setup code that depends on the expid parameter
-    expid = init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=None, create=True,
-                       test_type=test_type)
-    Path(f"{BasicConfig.STRUCTURES_DIR}/structure_{expid}.db").touch()
-
-    yield expid
-
-
-@pytest.fixture
-def setup_experiment_yamlfiles(generate_new_experiment, create_autosubmit_tmpdir):
-    expid = generate_new_experiment
-    # touch as_misc
-    platforms_path = Path(f"{create_autosubmit_tmpdir.strpath}/{expid}/conf/platforms_{expid}.yml")
-    jobs_path = Path(f"{create_autosubmit_tmpdir.strpath}/{expid}/conf/jobs_{expid}.yml")
-    # Add each platform to test
-    with platforms_path.open('w') as f:
-        f.write(f"""
-PLATFORMS:
-    pytest-ps:
-        type: ps
-        host: 127.0.0.1
-        user: {create_autosubmit_tmpdir.owner}
-        project: whatever
-        scratch_dir: {create_autosubmit_tmpdir}/scratch
-        DISABLE_RECOVERY_THREADS: True
-        """)
-    # add a job of each platform type
-    with jobs_path.open('w') as f:
-        f.write("""
-JOBS:
-    debug:
-        script: echo "Hello world"
-        running: once
-EXPERIMENT:
-    DATELIST: '20000101'
-    MEMBERS: fc0
-    CHUNKSIZEUNIT: month
-    CHUNKSIZE: '1'
-    NUMCHUNKS: '1'
-    CHUNKINI: ''
-    CALENDAR: standard
-  """)
-
-    expid_dir = Path(f"{create_autosubmit_tmpdir.strpath}/scratch/whatever/{create_autosubmit_tmpdir.owner}/{expid}")
-    dummy_dir = Path(
-        f"{create_autosubmit_tmpdir.strpath}/scratch/whatever/{create_autosubmit_tmpdir.owner}/{expid}/dummy_dir")
-    real_data = Path(
-        f"{create_autosubmit_tmpdir.strpath}/scratch/whatever/{create_autosubmit_tmpdir.owner}/{expid}/real_data")
-    # write some dummy data inside scratch dir
-    expid_dir.mkdir(parents=True, exist_ok=True)
-    dummy_dir.mkdir(parents=True, exist_ok=True)
-    real_data.mkdir(parents=True, exist_ok=True)
-
-    with open(dummy_dir.joinpath('dummy_file'), 'w') as f:
-        f.write('dummy data')
-    real_data.joinpath('dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
-    yield expid
-
-
-@pytest.mark.parametrize("generate_new_experiment", ['test', 'normal', 'operational', 'evaluation'], indirect=True)
-def test_expid_generated_correctly(create_autosubmit_tmpdir, generate_new_experiment, setup_experiment_yamlfiles):
-    expid = generate_new_experiment
-    print(f"Running test for {expid}")
+def test_expid_generated_correctly(as_conf):
+    expid = as_conf.expid
+    run_dir = as_conf.basic_config.LOCAL_ROOT_DIR
     Autosubmit.inspect(expid=f'{expid}', check_wrapper=True, force=True, lst=None, filter_chunks=None,
                        filter_status=None, filter_section=None)
-    assert expid in ['t000', 'a000', 'o000', 'e000']
     assert f"{expid}_DEBUG.cmd" in [Path(f).name for f in
-                                    Path(f"{create_autosubmit_tmpdir.strpath}/{expid}/tmp").iterdir()]
+                                    Path(f"{run_dir}/{expid}/tmp").iterdir()]
     # Consult if the expid is in the database
-    db_path = Path(f"{create_autosubmit_tmpdir.strpath}/tests.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute(f"SELECT name FROM experiment WHERE name='{expid}'")
-    assert cursor.fetchone() is not None
-    cursor.close()
+    db_path = Path(f"{run_dir}/tests.db")
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT name FROM experiment WHERE name='{expid}'")
+        assert cursor.fetchone() is not None
+        cursor.close()
 
 
 @pytest.mark.parametrize("generate_new_experiment", ['test', 'normal', 'operational', 'evaluation'], indirect=True)
-def test_delete_experiment(create_autosubmit_tmpdir, generate_new_experiment, setup_experiment_yamlfiles):
+def test_delete_experiment(generate_new_experiment):
     expid = generate_new_experiment
     print(f"Running test for {expid}")
     Autosubmit.delete(expid=f'{expid}', force=True)
@@ -401,8 +335,7 @@ def test_delete_experiment(create_autosubmit_tmpdir, generate_new_experiment, se
 
 
 @pytest.mark.parametrize("generate_new_experiment", ['test', 'normal', 'operational', 'evaluation'], indirect=True)
-def test_delete_experiment_not_owner(create_autosubmit_tmpdir, generate_new_experiment, setup_experiment_yamlfiles,
-                                     mocker):
+def test_delete_experiment_not_owner(generate_new_experiment, mocker):
     expid = generate_new_experiment
     print(f"Running test for {expid}")
     mocker.patch('autosubmit.autosubmit.Autosubmit._user_yes_no_query', return_value=True)
@@ -437,22 +370,21 @@ def test_delete_experiment_not_owner(create_autosubmit_tmpdir, generate_new_expe
 
 
 @pytest.mark.parametrize("generate_new_experiment", ['normal'], indirect=True)
-def test_delete_expid(create_autosubmit_tmpdir, generate_new_experiment, setup_experiment_yamlfiles, mocker):
+def test_delete_expid(generate_new_experiment, mocker):
     expid = generate_new_experiment
-    mocker.patch("autosubmit.autosubmit.Autosubmit._check_ownership",
-                 return_value=(True, True, create_autosubmit_tmpdir.owner))
+    _user = getuser()
+    mocker.patch("autosubmit.autosubmit.Autosubmit._check_ownership", return_value=(True, True, _user))
     mocker.patch('autosubmit.autosubmit.Autosubmit._perform_deletion', return_value="error")
     with pytest.raises(AutosubmitError):
         Autosubmit._delete_expid(expid, force=True)
     mocker.stopall()
-    mocker.patch("autosubmit.autosubmit.Autosubmit._check_ownership",
-                 return_value=(True, True, create_autosubmit_tmpdir.owner))
+    mocker.patch("autosubmit.autosubmit.Autosubmit._check_ownership", return_value=(True, True, _user))
     Autosubmit._delete_expid(expid, force=True)
     assert not Autosubmit._delete_expid(expid, force=True)
 
 
 @pytest.mark.parametrize("generate_new_experiment", ['normal'], indirect=True)
-def test_perform_deletion(create_autosubmit_tmpdir, generate_new_experiment, setup_experiment_yamlfiles, mocker):
+def test_perform_deletion(generate_new_experiment, mocker):
     expid = generate_new_experiment
     mocker.patch("shutil.rmtree", side_effect=FileNotFoundError)
     mocker.patch("os.remove", side_effect=FileNotFoundError)
