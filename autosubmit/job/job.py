@@ -2814,7 +2814,7 @@ class WrapperJob(Job):
 
     def _check_inner_jobs_queue(self, prev_status):
         reason = str()
-        if self._platform.type == 'slurm' or self._platform.type == 'maestro' :
+        if self._platform.type == 'slurm':
             self._platform.send_command(
                 self._platform.get_queue_status_cmd(self.id))
             reason = self._platform.parse_queue_reason(
