@@ -16,11 +16,9 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import pytest
 from pathlib import Path
 
-import pytest
-
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal
@@ -108,7 +106,7 @@ def create_packages(as_conf, pjm_platform):
 
 
 @pytest.fixture
-def remote_platform(autosubmit_config):
+def remote_platform(autosubmit_config, autosubmit):
     as_conf = autosubmit_config("a000", {
         'DEFAULT': {
             'HPCARCH': 'ARM'
@@ -126,7 +124,7 @@ def remote_platform(autosubmit_config):
     parser.data = parser.load(yml_file)
     as_conf.experiment_data.update(parser.data)
 
-    submitter = Autosubmit._get_submitter(as_conf)
+    submitter = autosubmit._get_submitter(as_conf)
     submitter.load_platforms(as_conf)
     return submitter.platforms['ARM']
 

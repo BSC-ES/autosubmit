@@ -181,7 +181,7 @@ def autosubmit_exp(
             basic_config=BasicConfig
         )
 
-        experiment_data = {**config.experiment_data, **experiment_data}
+        config.experiment_data = {**config.experiment_data, **experiment_data}
 
         key_file = {
             'JOBS': 'jobs',
@@ -361,12 +361,8 @@ def autosubmit_config(
             basic_config=BasicConfig
         )
 
-        config.experiment_data = {**config.experiment_data, **experiment_data}
-        for k, v in {
-            k1: v1
-            for k1, v1 in BasicConfig.__class__.__dict__.items()
-            if k1[:2] != '__'
-        }.items():
+        # FIXME: not getting the right values here
+        for k, v in basic_config.__dict__.items():
             config.experiment_data[k] = v
 
         # Default values for experiment data
