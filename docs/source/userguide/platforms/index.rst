@@ -1,5 +1,10 @@
-Configure Platforms
+Platforms
 =====================
+
+Extend an existing platform
+------------------------------------
+
+Platforms are defined under python classes. To extend an existing platofrm, ...
 
 How to configure SLURM Platforms
 ------------------------------------

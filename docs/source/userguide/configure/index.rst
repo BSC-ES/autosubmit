@@ -1,6 +1,9 @@
 Configure Experiments
 =====================
 
+This page covers some of the basics for defining experiment parameters, as well as some references to the files where such information is stored. Locally, you can find them under ``autosubmit/expid/conf`` where ``expid`` is the experiment ID. See :doc:`../expids` for more information regarding experiment IDs.
+
+
 How to configure experiments
 ----------------------------
 
@@ -291,8 +294,8 @@ Example:
                 - FAILED
                 - COMPLETED
 
-How to add a new platform
--------------------------
+How to add a new platform to the experiment configuration
+---------------------------------------------------------
 
 .. hint::
     If you are interested in changing the communications library, go to the section below.
