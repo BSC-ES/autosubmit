@@ -3104,7 +3104,7 @@ class Autosubmit:
                                             job_list_object=job_list)
 
             if detail:
-                Autosubmit.detail(job_list)
+                Autosubmit.detail(job_list, expid)
             # Warnings about precedence completion
             # time_0 = time.time()
             notcompleted_parents_completed_jobs = [job for job in job_list.get_job_list(
@@ -4654,7 +4654,7 @@ class Autosubmit:
                     fh.flush()
                     os.fsync(fh.fileno())
                     if detail:
-                        Autosubmit.detail(job_list)
+                        Autosubmit.detail(job_list, expid)
                     return True
                 # catching Exception
                 except KeyboardInterrupt:
@@ -4670,7 +4670,7 @@ class Autosubmit:
                 profiler.stop()
 
     @staticmethod
-    def detail(job_list):
+    def detail(job_list, expid=None):
         current_length = len(job_list.get_job_list())
         if current_length > 1000:
             Log.warning(
@@ -4679,6 +4679,10 @@ class Autosubmit:
         else:
             Log.info(job_list.print_with_status())
             Log.status(job_list.print_with_status(nocolor=True))
+            root_folder = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(f"{expid}").joinpath("tmp").joinpath("ASLOGS").joinpath("jobs_active_status.log")
+            with open(root_folder, "w") as f:
+                f.write(job_list.print_with_status(nocolor=True))
+
 
 
     @staticmethod

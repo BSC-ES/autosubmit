@@ -187,6 +187,7 @@ def test_workflows_dependencies(prepare_workflow_runs, expid, current_tmpdir: Pa
     """
     Compare current workflow dependencies with the reference ones.
     """
+    mocker.patch('autosubmit.job.job_list.JobList.save', return_value=None)
     banned_plots = ["destine_24_01_2024"]  # Too big to be visualized and see anything.
     profiler = cProfile.Profile()
     # Allows to have any name for the configuration folder
