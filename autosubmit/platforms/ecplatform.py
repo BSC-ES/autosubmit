@@ -56,7 +56,7 @@ class EcPlatform(ParamikoPlatform):
             self._header = EcCcaHeader()
         elif scheduler == 'loadleveler':
             self._header = EcHeader()
-        elif scheduler == 'slurm' or scheduler == 'maestro':
+        elif scheduler == 'slurm':
             self._header = SlurmHeader()
         else:
             raise ParamikoPlatformException('ecaccess scheduler {0} not supported'.format(scheduler))
