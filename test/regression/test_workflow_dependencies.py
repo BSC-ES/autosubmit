@@ -106,7 +106,9 @@ def prepare_workflow_runs(current_tmpdir: Path) -> Path:
 
 
 # By default, the test will be performed on all the workflows in the 'workflows' directory
-workflow_folders = [f.name for f in Path('./workflows').iterdir() if f.is_dir()]
+workflow_folders = [f.name for f in Path('./workflows').iterdir() if f.is_dir() and "pycache" not in f.name]
+
+
 @pytest.mark.parametrize("expid", workflow_folders)
 def test_workflows_dependencies(prepare_workflow_runs, expid, current_tmpdir: Path, mocker, prepare_basic_config: Any) -> None:
     """
