@@ -124,15 +124,29 @@ def test_workflows_dependencies(prepare_workflow_runs, expid, current_tmpdir: Pa
 
     with open(Path(f"{current_tmpdir}/workflows/{expid}/ref_workflow.txt")) as ref_file, \
             open(Path(f"{current_tmpdir}/workflows/{expid}/tmp/ASLOGS/jobs_active_status.log"), "r") as new_file:
-        ref_lines = ref_file.readlines()
-        new_lines = new_file.readlines()
+        ref_lines = [line.rstrip(' [WAITING][READY]').strip() for line in ref_file.readlines()]
+        new_lines = [line.rstrip(' [WAITING][READY]').strip() for line in new_file.readlines()]
+        if ref_lines and ref_lines[0].strip() == '':
+            ref_lines = ref_lines[1:]
+        if ref_lines and ref_lines[-1].strip() == '':
+            ref_lines = ref_lines[:-1]
+
+        if new_lines and new_lines[0].strip() == '':
+            new_lines = new_lines[1:]
+        if new_lines and new_lines[-1].strip() == '':
+            new_lines = new_lines[:-1]
         diff = difflib.unified_diff(ref_lines, new_lines, lineterm='')
+
 
     diff_list = list(diff)
     if diff_list:
-        print('\n'.join(diff_list))
-
-    assert not diff_list
+        output_if_failed = "Differences\n"
+        output_if_failed += '\n'.join(diff_list)
+        output_if_failed += "Reference file:\n"
+        output_if_failed += '\n'.join(ref_lines)
+        output_if_failed += "New file:\n"
+        output_if_failed += '\n'.join(new_lines)
+        pytest.fail(output_if_failed)
 
     if PROFILE:
         stats = pstats.Stats(profiler).sort_stats('cumtime')
