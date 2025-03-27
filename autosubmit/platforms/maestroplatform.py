@@ -21,13 +21,16 @@ from contextlib import suppress
 from typing import Union
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from log.log import Log
+from autosubmit.platforms.wrappers.wrapper_factory import SlurmWrapperFactory
+# from autosubmitconfigparser.config.basicconfig import BasicConfig
+from log.log import AutosubmitCritical, AutosubmitError, Log
 
 class MaestroPlatform(SlurmPlatform):
     """
     Class to manage jobs to host using Maestro framework
     """
     
-    def __init__(self, expid: str, name: str, config: dict, auth_password: str=None):
+    def __init__(self, expid: str, name: str, config: BasicConfig, auth_password: str=None):
         """
         Initialization of the Class MaestroPlatform
 
@@ -43,7 +46,6 @@ class MaestroPlatform(SlurmPlatform):
         """
         SlurmPlatform.__init__(self, expid, name, config, auth_password = auth_password)
         # other
-
 
     def submit_job(self, job, script_name: str, hold: bool=False, export: str="none") -> Union[int, None]:
         """
