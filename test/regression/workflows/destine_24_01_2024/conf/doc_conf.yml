@@ -1,0 +1,144 @@
+# Francesc app workflow example, ask Francesc for the last version, this one is from 24-01-2024
+
+experiment:
+  DATELIST: 20000101
+  MEMBERS: "fc0"
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '4'
+  NUMCHUNKS: '1'
+  CALENDAR: standard
+RUN:
+  OPA_NAMES: ["wildfires_fwi_1","wildfires_fwi_2","wildfires_fwi_3","wildfires_fwi_4","wildfires_fwi_5", "mhm_1", "mhm_2","aqua_1", "urban_1"]
+  APP_NAMES: ["WILDFIRES_FWI","MHM","AQUA","URBAN"]
+JOBS:
+  LOCAL_SETUP:
+    FILE: templates/local_setup.sh
+    PLATFORM: LOCAL
+    RUNNING: once
+  SYNCHRONIZE:
+    FILE: templates/synchronize.sh
+    PLATFORM: LOCAL
+    DEPENDENCIES: LOCAL_SETUP
+    RUNNING: once
+  REMOTE_SETUP:
+    FILE: templates/remote_setup.sh,templates/fdb/config.yaml
+    # Compilation needs to be done in the login node for being able to clone packages
+    PLATFORM: "%DEFAULT.HPCARCH%-login"
+    DEPENDENCIES: SYNCHRONIZE
+    RUNNING: once
+    WALLCLOCK: '02:00'
+  INI:
+    FILE: templates/ini.sh
+    PLATFORM: "%DEFAULT.HPCARCH%-login"
+    DEPENDENCIES: REMOTE_SETUP
+    RUNNING: member
+    WALLCLOCK: '00:30'
+  SIM:
+    FILE: <to-be-replaced-by-user-conf>
+    PLATFORM: "%DEFAULT.HPCARCH%"
+    DEPENDENCIES: INI SIM-1
+    running: chunk
+    WALLCLOCK: '00:30'
+  DN:
+    FILE: "templates/dn.sh,conf/mother_request.yml"
+    DEPENDENCIES:
+      SIM:
+        STATUS: "RUNNING"
+      DN:
+        SPLITS_FROM:
+          'all':
+            SPLITS_TO: 'previous'
+    RUNNING: chunk
+    WALLCLOCK: '00:15'
+    PLATFORM: "%DEFAULT.HPCARCH%-login"
+    SPLITS: 31
+  OPA:
+    FOR:
+      NAME: "%RUN.OPA_NAMES%" #"%OPA_NAMES"
+      SPLITS: "[31,31,31,31,31,31,31,31,31]" #"%OPA_SPLITS%"
+      DEPENDENCIES:
+        - DN:
+            SPLITS_FROM: # From OPA
+              "all":
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1" #To DN
+        - DN:
+            SPLITS_FROM: # From OPA
+              "all":
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1" #To DN
+        - DN:
+            SPLITS_FROM: # From OPA
+              "all":
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1" #To DN
+        - DN:
+            SPLITS_FROM: # From OPA
+              "all":
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1" #To DN
+        - DN:
+            SPLITS_FROM: # From OPA
+              "all":
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1" #To DN
+        - DN:
+            SPLITS_FROM: # From OPA
+              "all":
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1" #To DN
+        - DN:
+            SPLITS_FROM: # From OPA
+              "all":
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1" #To DN
+        - DN:
+            SPLITS_FROM: # From OPA
+              "all":
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1" #To DN
+        - DN:
+            SPLITS_FROM: # From OPA
+              "all":
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1" #To DN
+    FILE: templates/opa.sh
+    PLATFORM: "%DEFAULT.HPCARCH%"
+    RUNNING: chunk
+  APP:
+    FOR:
+      NAME: "%RUN.APP_NAMES%"
+      SPLITS: "[31,31,31,31]"
+      DEPENDENCIES:
+        - OPA_WILDFIRES_FWI_1:
+            SPLITS_FROM:
+              'all':
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+          OPA_WILDFIRES_FWI_2:
+            SPLITS_FROM:
+              'all':
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+          OPA_WILDFIRES_FWI_3:
+            SPLITS_FROM:
+              'all':
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+          OPA_WILDFIRES_FWI_4:
+            SPLITS_FROM:
+              'all':
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+          OPA_WILDFIRES_FWI_5:
+            SPLITS_FROM:
+              'all':
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+        - OPA_MHM_1:
+            SPLITS_FROM:
+              'all':
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+          OPA_MHM_2:
+            SPLITS_FROM:
+              'all':
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+        - OPA_AQUA_1:
+            SPLITS_FROM:
+              'all':
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+        - OPA_URBAN_1:
+            SPLITS_FROM:
+              'all':
+                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+    FILE: "templates/application.sh,templates/only_lra.yaml"
+    DEPENDENCIES: OPA
+    RUNNING: chunk
+    WALLCLOCK: '00:05'
+    PLATFORM: "%DEFAULT.HPCARCH%"
