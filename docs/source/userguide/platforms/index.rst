@@ -101,7 +101,7 @@ your own user in this step and make sure you have a folder for your user.
     or the PARAMETER ``SCRATCH_DIR`` might be pointing to a non existing folder inside the host.
 
     Make sure to have created the folder with your USERNAME inside the path you input
-    (e.g.: /gpfs/scratch/<USER>)
+    (e.g.: /gpfs/scratch/<PROJECT>/<USER>)
 
 .. code-block:: yaml
 
