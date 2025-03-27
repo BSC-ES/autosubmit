@@ -4678,7 +4678,7 @@ class Autosubmit:
                     current_length) + " jobs.")
         else:
             Log.info(job_list.print_with_status())
-            Log.status(job_list.print_with_status())
+            Log.status(job_list.print_with_status(nocolor=True))
 
 
     @staticmethod

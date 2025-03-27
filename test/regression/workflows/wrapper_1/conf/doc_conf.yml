@@ -1,0 +1,60 @@
+# WRAPPER #1 example https://autosubmit.readthedocs.io/en/master/userguide/wrappers/index.html
+
+WRAPPERS:
+  WRAPPER_H:
+    TYPE: "horizontal"
+    JOBS_IN_WRAPPER: "SIM"
+  WRAPPER_V:
+    TYPE: "vertical"
+    JOBS_IN_WRAPPER: "SIM2"
+  WRAPPER_VH:
+    TYPE: "vertical-horizontal"
+    JOBS_IN_WRAPPER: "SIM3 SIM4"
+  WRAPPER_HV:
+    TYPE: "horizontal-vertical"
+    JOBS_IN_WRAPPER: "SIM5 SIM6"
+
+experiment:
+  DATELIST: 20220101
+  MEMBERS: "fc0 fc1"
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '4'
+  CALENDAR: standard
+JOBS:
+    SIM:
+      FILE: sim.sh
+      RUNNING: chunk
+      QUEUE: debug
+      DEPENDENCIES: SIM-1
+      WALLCLOCK: 00:15
+    SIM2:
+      FILE: sim.sh
+      RUNNING: chunk
+      QUEUE: debug
+      DEPENDENCIES: SIM2-1
+      WALLCLOCK: 00:15
+    SIM3:
+      FILE: sim.sh
+      RUNNING: chunk
+      QUEUE: debug
+      DEPENDENCIES: SIM3-1
+      WALLCLOCK: 00:15
+    SIM4:
+      FILE: sim.sh
+      RUNNING: chunk
+      QUEUE: debug
+      DEPENDENCIES: SIM4-1
+      WALLCLOCK: 00:15
+    SIM5:
+      FILE: sim.sh
+      RUNNING: chunk
+      QUEUE: debug
+      DEPENDENCIES: SIM5-1
+      WALLCLOCK: 00:15
+    SIM6:
+      FILE: sim.sh
+      RUNNING: chunk
+      QUEUE: debug
+      DEPENDENCIES: SIM6-1
+      WALLCLOCK: 00:15

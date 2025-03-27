@@ -1,0 +1,24 @@
+experiment:
+  DATELIST: 20200101
+  MEMBERS: "Member1"
+  CHUNKSIZEUNIT: hour
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '3'
+  CALENDAR: standard
+JOBS:
+  FILE_CHECKER:
+    FILE: file_checker.sh
+    RUNNING: chunk
+
+  FILE_CREATOR:
+    FILE: file_creator.sh
+    RUNNING: chunk
+    DEPENDENCIES:
+      FILE_CHECKER:
+
+  RUN:
+    FILE: run.sh
+    RUNNING: chunk
+    DEPENDENCIES:
+      FILE_CREATOR:
+      RUN-1:
