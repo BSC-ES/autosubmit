@@ -21,9 +21,6 @@ from contextlib import suppress
 from typing import Union
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from log.log import Log
-from autosubmit.platforms.wrappers.wrapper_factory import SlurmWrapperFactory
-# from autosubmitconfigparser.config.basicconfig import BasicConfig
-from log.log import AutosubmitCritical, AutosubmitError, Log
 
 class MaestroPlatform(SlurmPlatform):
     """
