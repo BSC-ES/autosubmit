@@ -1,29 +1,30 @@
 Platforms
 =====================
 
-Extend an existing platform
+Extending an existing platform
 ------------------------------------
 
 Platforms are defined under python classes inside the platform folder. To extend an existing platform first you need
-to understand which platform is the most suitable for your project, in the scenario we will be following here we will
-be extending the SLURM platform but any platform can be extended by following the same steps
+to understand which platform is the most suitable for your project, in the scenario we will be following here the SLURM
+platform is going to be extended, but any platform can be extended by following the same steps.
+
+The slurm platform is a platform the allow executing operations using SLURM commands and prepare your
+experiments to be executed as such.
 
 First to start a new class we should create a new file in the ``~/autosubmit/platforms/``
-we are going to call it ``example_platform.py``, once the file is create in the place we can start coding.
+we are going to call it ``example_platform.py``, once the file is create we can start coding.
 
 .. code-block:: python
 
-    from typing import Union
     from autosubmit.platforms.slurmplatform import SlurmPlatform
-    from log.log import Log
 
     class ExamplePlatform(SlurmPlatform):
     """ Class to manage slurm jobs """
 
-This will Create a class in which the ``Slurm Platform`` will be used as its parent class allowing ``ExamplePlatform``
-inherit all its methods.
+This will Create a class in which the ``SlurmPlatform`` will be associated as its parent class allowing
+``ExamplePlatform`` inherit all its characteristics.
 
-We create an initialization of the class with the needed parameters for a class to be executed
+We create an initialization method with the needed parameters for the class to be properly.
 
 .. code-block:: python
 
@@ -31,9 +32,8 @@ We create an initialization of the class with the needed parameters for a class 
         """ Initialization of the Class ExamplePlatform """
         SlurmPlatform.__init__(self, expid, name, config, auth_password = auth_password)
 
-As you can see the parent class has an initialization as well in order initialize all the parent`s methods and
-attributes into the child, as well as, allowing for overriding of the methods, in which can be done as instructed in
-the following code snippet.
+As you can see the parent class has an initialization in order invoke all the parent`s methods and attributes into the
+child, as well as, allowing for overriding of the methods, in which can be done as instructed.
 
 .. code-block:: python
 
@@ -42,17 +42,14 @@ the following code snippet.
         Log.result(f"Job: {job.name}")
         return None
 
-The class ``submit_job`` is a existing class in SlurmPlatform that was overwritten to have a new behaviour
+The class ``submit_job`` is a existing class in SlurmPlatform that was overwritten to have a new behaviour.
 
-
-At the end your file should be looking like this
-
+At the end your file should be looking like this:
 
 .. code-block:: python
 
     from typing import Union
     from autosubmit.platforms.slurmplatform import SlurmPlatform
-    from log.log import Log
 
     class ExamplePlatform(SlurmPlatform):
         """Class to manage slurm jobs"""
@@ -64,6 +61,39 @@ At the end your file should be looking like this
             """Submit a job from a given job object."""
             Log.result(f"Job: {job.name}")
             return None
+
+Now for ensuring that the platform will be created as expected we need to make some changes in 4 different files:
+
+``autosubmit/autosubmit.py`` in ``line 2537`` add a new ``String`` making sure the new platform type is considered
+the same as SLURM platform, as we expect a similar behaviour.
+.. code-block:: python
+
+    if platform.type.lower() in [ "slurm" , "pjm", "example" ] and not inspect and not only_wrappers:
+
+``autosubmit/job/job.py`` in ``line 2575`` making sure each Job writes
+end timestamp to TOTAL_STATS file and jobs_data.db properly.
+.. code-block:: python
+
+    if job_data_dc and type(self.platform) is not str and (self.platform.type == "slurm" or self.platform.type == "example"):
+
+``autosubmit/job/job.py`` in ``line 2817`` add a new validation for the validation of the queue
+creation where the platform type
+.. code-block:: python
+
+    if self._platform.type == 'slurm' or self._platform.type == 'example':
+
+``autosubmit/platforms/ecplatform.py`` in ``line 59`` add a new validation for the header command
+creation where the platform type
+.. code-block:: python
+
+    elif scheduler == 'slurm' or scheduler == 'example':
+
+``autosubmit/platforms/paramiko_submitter.py`` in ``line 144`` add a new validation for the header command
+creation where the platform type
+.. code-block:: python
+
+    elif platform_type == 'slurm' or platform_type == 'example':
+
 
 How to configure a Platforms
 ------------------------------------
