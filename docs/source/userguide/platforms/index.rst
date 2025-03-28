@@ -14,30 +14,40 @@ minimal version of a experiment and configure the experiment platform to Marenos
 
 ``autosubmit expid -H MARENOSTRUM5 -d "SLURM test" --minimal``
 
-You'll have to insert the **PARAMETERS** to make you experiment work properly as an exemple the following
-instruction are thought to execute a small job in **MN5** through Autosubmit.
+You'll have to insert the **PARAMETERS** to make your experiment work properly as an exemple the following
+instruction are thought to execute a small job through Autosubmit explaining how to configure a platform.
 
 First create a new folder at the root ``~/Autosubmit`` called project executing the following command:
 
 ``mkdir -p ~/autosubmit/project``
 
 .. hint::
-    The naming of the folder can be any given as long as the ``Local`` Parameter, explained bellow, change in
-    accordance to the name
+    The given name of the folder can be any as long as it matches the ``Local`` Parameter, the change in name
+    needs to take this into account
 
-And create a new file called ``test.sh`` within the new folder, this file will have the SLURM commands to be executed
+For the execution of this test a few files will need to be created within the new folder,
+this file will have the SLURM commands to be executed
 
 .. code-block:: yaml
 
-    #! /usr/bin/bash
-    #SBATCH --account=bsc32
-    #SBATCH --qos=gp_debug
-    #SBATCH --nodes=2
-    #SBATCH --time=00:30:00
+    LOCAL_SETUP.sh
+    SYNCHRONIZE.sh
+    REMOTE_SETUP.sh
+    INI.sh
+    DATA_NOTIFIER.sh
+    SIM.sh
+    STATISTICS.sh
+    APP.sh
+    CLEAN.sh
+
+For sake of keeping and concise and clear exemple of how AutoSubmit works a simple instruction can be executed.
+For full developed experiments this will be the instructions used in your experiment.
+
+.. code-block:: yaml
 
     sleep 5
 
-Once the new folder and file are created, open the file ``<expid>/config/jobs_<expid>.yml`` and you'll have a
+Once the new folder and files were created, open the file ``<expid>/config/jobs_<expid>.yml`` and you'll have a
 file as shown below.
 
 .. code-block:: yaml
@@ -64,20 +74,8 @@ file as shown below.
         PROJECT_SUBMODULES: ''
         FETCH_SINGLE_BRANCH: true
 
-Once you confirm the file is properly structure try add the ``CUSTOM_TAG`` at the top of the file
-The PARAMETER created will later embody the job and platform configuration, simplifying future fixes
-and tests in multiple platforms
-
-.. code-block:: yaml
-
-    TEST:
-        JOB: &job
-            SCRIPT: test
-        PLATFORM: &platform
-            USER: <user> # User that have access to the platform
-            PROJECT: bsc32
-
-You can configure the experiment adding the following information under ``DEFAULT``
+Now we start configuring the experiment adding the additional ``PARAMETERS`` as shown bellow
+to create a simple executable experiment
 
 .. code-block:: yaml
 
@@ -87,46 +85,47 @@ You can configure the experiment adding the following information under ``DEFAUL
         CHUNKSIZEUNIT: month
         SPLITSIZEUNIT: day
         CHUNKSIZE: 1
-        NUMCHUNKS: 1
+        NUMCHUNKS: 2
         CALENDAR: standard
 
 
-You can add the following PARAMETER after ``PROJECT``, this will point towards the file with SLURM instructions
+Add the following PARAMETER after, this will point towards the folder containing all the Platform instructions
 
 .. code-block:: yaml
 
     LOCAL:
         PROJECT_PATH: ~/autosubmit/project
 
-Adding configuration and adding the platforms will allow you to connect and execute the jobs, be mindful of using
-your own user in this step and make sure you have a folder for your user.
+The following setting are used towards creating a connection with a platform to execute the jobs,
+you have to input the information suitable for your project. (e.g.: user, host, platform)
 
 .. warning::
     In case of not being able to connect it can be either because your user don't have access to the host
     or the PARAMETER ``SCRATCH_DIR`` might be pointing to a non existing folder inside the host.
 
-    Make sure to have created the folder with your USERNAME inside the path you input
-    (e.g.: /gpfs/scratch/<PROJECT>/<USER>)
+    Make sure to have created the folder with your USERNAME inside the proper path you pointed to
+    (e.g.: <Project_Dir>/<Project_Name_Folder>/<USER>)
 
 .. code-block:: yaml
 
     PLATFORMS:
         MARENOSTRUM5:
-            <<: *platform
-            TYPE: slurm
-            HOST: glogin1.bsc.es, glogin2.bsc.es
+            TYPE: <Platform_Type>
+            HOST: <Host>
+            PROJECT: <Project_Name_Folder>
+            USER: <User>
             QUEUE: gp_debug
-            SCRATCH_DIR: /gpfs/scratch
+            SCRATCH_DIR: <Project_Dir>
             ADD_PROJECT_TO_HOST: false
             MAX_WALLCLOCK: 02:00
             TEMP_DIR: ''
-            MAX_PROCESSORS: 99999
 
-        MARENOSTRUM5-login:
-            <<: *platform
-            TYPE: slurm
-            HOST: glogin1.bsc.es, glogin2.bsc.es
-            SCRATCH_DIR: /gpfs/scratch
+        MARENOSTRUM_ARCHIVE:
+            TYPE: <Platform_Type>
+            HOST: <Host>
+            PROJECT: <Project_Name_Folder>
+            USER: <User>
+            SCRATCH_DIR: <Project_Dir>
             ADD_PROJECT_TO_HOST: false
             MAX_WALLCLOCK: 02:00
             TEMP_DIR: ''
@@ -137,19 +136,61 @@ Now you can add jobs at the end of the file to see the execution
 
     JOBS:
         LOCAL_SETUP:
-            <<: *job
-            CHECK: on_submission
-            PLATFORM: MARENOSTRUM5
+            FILE: LOCAL_SETUP.sh
+            PLATFORM: LOCAL
+            RUNNING: once
+
+        SYNCHRONIZE:
+            FILE: SYNCHRONIZE.sh
+            PLATFORM: LOCAL
+            DEPENDENCIES: LOCAL_SETUP
             RUNNING: once
             WALLCLOCK: 00:05
 
-        SYNCHRONIZE:
-            <<: *job
-            CHECK: on_submission
-            DEPENDENCIES:
-                LOCAL_SETUP: {}
-            PLATFORM: MARENOSTRUM5
+        REMOTE_SETUP:
+            FILE: REMOTE_SETUP.sh
+            PLATFORM: LOCAL
+            DEPENDENCIES: SYNCHRONIZE
+            WALLCLOCK: 00:05
             RUNNING: once
+
+        INI:
+            FILE: INI.sh
+            PLATFORM: LOCAL
+            DEPENDENCIES: REMOTE_SETUP
+            RUNNING: once
+            WALLCLOCK: 00:05
+
+        DATA_NOTIFIER:
+            FILE: DATA_NOTIFIER.sh
+            PLATFORM: LOCAL
+            DEPENDENCIES: INI
+            RUNNING: chunk
+
+        SIM:
+            FILE: SIM.sh
+            PLATFORM: LOCAL
+            DEPENDENCIES: DATA_NOTIFIER
+            RUNNING: chunk
+
+        STATISTICS:
+            FILE: STATISTICS.sh
+            PLATFORM: LOCAL
+            DEPENDENCIES: SIM
+            RUNNING: chunk
+
+        APP:
+            FILE: APP.sh
+            PLATFORM: LOCAL
+            DEPENDENCIES: STATISTICS
+            RUNNING: chunk
+
+        CLEAN:
+            FILE: CLEAN.sh
+            PLATFORM: LOCAL
+            DEPENDENCIES: APP SIM STATISTICS
+            RUNNING: once
+            WALLCLOCK: 00:05
 
 As you finish to set up all the new configuration you can run the following command to generate the experiment
 that was just created
@@ -160,8 +201,3 @@ Once the experiment is generated we can execute it and check its results by runn
 the experiment and check if its behaviour is as expected
 
 ``autosubmit run <EXPID>``
-
-
-.. hint::
-    To make sure the experiment is running properly you can access the platform making use of the ssh command line and
-    executing the ``sacct`` command in the SLURM platform in order to print all the jobs that were executed
