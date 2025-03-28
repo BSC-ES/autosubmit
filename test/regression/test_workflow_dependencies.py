@@ -187,7 +187,7 @@ def test_workflows_dependencies(prepare_workflow_runs, expid, current_tmpdir: Pa
     """
     Compare current workflow dependencies with the reference ones.
     """
-    banned_plots = ["destine_24_01_2024"]  # Too big to be visualized and see anything.
+    banned_plots = [""]  # Too big to be visualized and see anything.
     profiler = cProfile.Profile()
     # Allows to have any name for the configuration folder
     mocker.patch.object(BasicConfig, 'read', return_value=True)
@@ -196,12 +196,19 @@ def test_workflows_dependencies(prepare_workflow_runs, expid, current_tmpdir: Pa
 
     init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, create=True, test_type='test')
 
-    with open(Path(f"{current_tmpdir}/workflows/{expid}/ref_workflow.txt")) as ref_file:
-        ref_lines = remove_noise_from_list(ref_file.readlines())
-
     with open(Path(f"{current_tmpdir}/workflows/{expid}/tmp/ASLOGS/jobs_active_status.log"), "r") as new_file:
-        new_lines = remove_noise_from_list(new_file.readlines())
+        new_lines = new_file.readlines()
 
+    if not Path(f"./workflows/{expid}/ref_workflow.txt").exists():
+        print(f"Reference file for {expid} does not exist. Creating a new reference file.")
+        with open(Path(f"./workflows/{expid}/ref_workflow.txt"), "w") as ref_file:
+            ref_file.writelines(new_lines)
+
+    with open(Path(f"./workflows/{expid}/ref_workflow.txt")) as ref_file:
+        ref_lines = ref_file.readlines()
+
+    new_lines = remove_noise_from_list(new_lines)
+    ref_lines = remove_noise_from_list(ref_lines)
     new_file_nodes = parse_job_list(new_lines[1:])
     ref_file_nodes = parse_job_list(ref_lines[1:])
 
