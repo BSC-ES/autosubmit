@@ -4,42 +4,40 @@ Configure Experiments
 This page covers some of the basics for defining experiment parameters, as well as some references to the files where such information is stored. Locally, you can find them under ``autosubmit/expid/conf`` where ``expid`` is the experiment ID. See :doc:`../expids` for more information regarding experiment IDs.
 
 
-How to configure experiments
-----------------------------
+Configuration files
+-------------------
 
-Edit ``expdef_cxxx.yml``, ``jobs_cxxx.yml`` and ``platforms_cxxx.yml`` in the ``conf`` folder of the experiment.
+Experiment configuration files are stored under each experiment's configuration directory. You should adjust all parameters to your needs in this files before creating the experiment. 
+The files follow the naming schema *type_expid.yml* where *type* is either **expdef**, **jobs**, **platforms** or **autosubmit**.
 
-*expdef_cxxx.yml* contains:
+*expdef_expid.yml* contains:
     - Start dates, members and chunks (number and length).
     - Experiment project source: origin (version control system or path)
     - Project configuration file path.
 
-*jobs_cxxx.yml* contains the workflow to be run:
+*jobs_expid.yml* contains the workflow to be run:
     - Scripts to execute.
     - Dependencies between tasks.
     - Task requirements (processors, wallclock time...).
     - Platform to use.
 
-*platforms_cxxx.yml* contains:
+For more information on adding jobs see :ref:`add-new-job` and :ref:`add-het-job`.
+
+*platforms_expid.yml* contains:
     - HPC, fat-nodes and supporting computers configuration.
 
-.. note:: *platforms_cxxx.yml* is usually provided by technicians, users will only have to change login and accounting options for HPCs.
+For more information on adding a new platofrm to the experiment configuration, see :ref:`add-new-plat-exp`.
 
-You may want to configure Autosubmit parameters for the experiment. Just edit ``autosubmit_cxxx.yml``.
+.. note:: *platforms_expid.yml* is usually provided by technicians, users will only have to change login and accounting options for HPCs.
 
-*autosubmit_cxxx.yml* contains:
+*autosubmit_expid.yml* contains:
     - Maximum number of jobs to be running at the same time at the HPC.
     - Time (seconds) between connections to the HPC queue scheduler to poll already submitted jobs status.
     - Number of retrials if a job fails.
 
-Then, Autosubmit *create* command uses the ``expdef_cxxx.yml`` and generates the experiment:
-After editing the files you can proceed to the experiment workflow creation.
-Experiment workflow, which contains all the jobs and its dependencies, will be saved as a *pkl* file:
-::
 
-    autosubmit create EXPID
+Once all file parameters have been tuned, an experiment can be created. Refer to the method page :meth:`autosubmit.autosubmit.Autosubmit.create` for syntax details. In sumamry, ``asutosubmit create`` uses the ``expdef_expid.yml`` file to generate the experiment and related workfow. The experiment workflow, which contains all the jobs and its dependencies, will be saved as a *pkl* file.
 
-*EXPID* is the experiment identifier.
 
 Options:
 ::
@@ -72,14 +70,11 @@ Options:
       -p, --profile         Prints performance parameters of the execution of this command.
       -f, --force           force regenerate job_list
 
-Example:
-::
-
-    autosubmit create cxxx
-
 In order to understand more the grouping options, which are used for visualization purposes, please check :ref:`grouping`.
 
 More info on pickle can be found at http://docs.python.org/library/pickle.html
+
+.. _add-new-job:
 
 How to add a new job
 --------------------
@@ -199,6 +194,8 @@ There are also other, less used features that you can use:
       - Autosubmit allows users to customize the header and the tailer by pointing towards the relative path to the
         project folder where the tailer is located.
 
+.. _add-het-job:
+      
 How to add a new heterogeneous job (hetjob)
 -------------------------------------------
 
@@ -293,6 +290,8 @@ Example:
             NOTIFY_ON:
                 - FAILED
                 - COMPLETED
+
+.. _add-new-plat-exp:
 
 How to add a new platform to the experiment configuration
 ---------------------------------------------------------
