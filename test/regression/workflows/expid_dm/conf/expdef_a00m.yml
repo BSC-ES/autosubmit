@@ -1,0 +1,43 @@
+DEFAULT:
+  # Job experiment ID.
+  EXPID: "a00m"
+  # Default HPC platform name.
+  HPCARCH: "local"
+EXPERIMENT:
+  # List of start dates
+  DATELIST: '20000101'
+  # List of members.
+  MEMBERS: fc0
+  # Unit of the chunk size. Can be hour, day, month, or year.
+  CHUNKSIZEUNIT: month
+  # Size of each chunk.
+  CHUNKSIZE: '4'
+  # Number of chunks of the experiment.
+  NUMCHUNKS: '2'
+  CHUNKINI: ''
+  # Calendar used for the experiment. Can be standard or noleap.
+  CALENDAR: standard
+PROJECT:
+  # Type of the project.
+  PROJECT_TYPE: none
+  # Folder to hold the project sources.
+  PROJECT_DESTINATION: ''
+GIT:
+  PROJECT_ORIGIN: ''
+  PROJECT_BRANCH: ''
+  PROJECT_COMMIT: ''
+  PROJECT_SUBMODULES: ''
+  FETCH_SINGLE_BRANCH: true
+SVN:
+  PROJECT_URL: ''
+  PROJECT_REVISION: ''
+LOCAL:
+  PROJECT_PATH: ''
+PROJECT_FILES:
+  FILE_PROJECT_CONF: ''
+  FILE_JOBS_CONF: ''
+  JOB_SCRIPTS_TYPE: ''
+RERUN:
+  RERUN: false
+  RERUN_JOBLIST: ''
+

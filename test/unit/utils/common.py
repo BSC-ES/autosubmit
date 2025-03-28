@@ -27,7 +27,7 @@ def create_database(env):
     Autosubmit.install()
 
 
-def init_expid(env, platform="local", expid=None, create=True, test_type="normal"):
+def init_expid(env, platform="local", expid=None, create=True, test_type="normal", plot=False):
     os.environ['AUTOSUBMIT_CONFIGURATION'] = env
     if not expid:
         if test_type == "normal":
@@ -47,5 +47,5 @@ def init_expid(env, platform="local", expid=None, create=True, test_type="normal
                                      git_repo="", git_branch="", git_as_conf="", operational=False, testcase=False,
                                      evaluation=True, use_local_minimal=False)
     if create:
-        Autosubmit.create(expid, True, False, force=True)
+        Autosubmit.create(expid, not plot, False, force=True, detail=True)
     return expid
