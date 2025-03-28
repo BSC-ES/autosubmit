@@ -22,8 +22,8 @@ into `id_rsa.pub`. Also copy the public key into `authorized_keys`.
 ## Build
 
 ```bash
-$ export AUTOSUBMIT_VERSION=4.1.9
-$ docker build \
+$ export AUTOSUBMIT_VERSION=4.1.12
+$ docker build load \
   --build-arg AUTOSUBMIT_VERSION=${AUTOSUBMIT_VERSION} \
   -t ${USER}/autosubmit:${AUTOSUBMIT_VERSION}-bullseye-slim \
   -t ${USER}/autosubmit:latest \
