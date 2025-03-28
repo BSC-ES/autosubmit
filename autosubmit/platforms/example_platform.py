@@ -22,14 +22,14 @@ from typing import Union
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from log.log import Log
 
-class MaestroPlatform(SlurmPlatform):
+class ExamplePlatform(SlurmPlatform):
     """
-    Class to manage jobs to host using Maestro framework
+    Class to manage slurm jobs
     """
-    
-    def __init__(self, expid: str, name: str, config: BasicConfig, auth_password: str=None):
+
+    def __init__(self, expid: str, name: str, config: dict, auth_password: str=None):
         """
-        Initialization of the Class MaestroPlatform
+        Initialization of the Class ExamplePlatform
 
         :param expid: ID of the experiment which will instantiate the MaestroPlatform.
         :type expid: str

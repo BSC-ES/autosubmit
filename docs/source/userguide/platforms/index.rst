@@ -4,17 +4,76 @@ Platforms
 Extend an existing platform
 ------------------------------------
 
-Platforms are defined under python classes. To extend an existing platofrm, ...
+Platforms are defined under python classes inside the platform folder. To extend an existing platform first you need
+to understand which platform is the most suitable for your project, in the scenario we will be following here we will
+be extending the SLURM platform but any platform can be extended by following the same steps
 
-How to configure SLURM Platforms
+First to start a new class we should create a new file in the ``~/autosubmit/platforms/``
+we are going to call it ``example_platform.py``, once the file is create in the place we can start coding.
+
+.. code-block:: python
+
+    from typing import Union
+    from autosubmit.platforms.slurmplatform import SlurmPlatform
+    from log.log import Log
+
+    class ExamplePlatform(SlurmPlatform):
+    """ Class to manage slurm jobs """
+
+This will Create a class in which the ``Slurm Platform`` will be used as its parent class allowing ``ExamplePlatform``
+inherit all its methods.
+
+We create an initialization of the class with the needed parameters for a class to be executed
+
+.. code-block:: python
+
+    def __init__(self, expid: str, name: str, config: dict, auth_password: str=None):
+        """ Initialization of the Class ExamplePlatform """
+        SlurmPlatform.__init__(self, expid, name, config, auth_password = auth_password)
+
+As you can see the parent class has an initialization as well in order initialize all the parent`s methods and
+attributes into the child, as well as, allowing for overriding of the methods, in which can be done as instructed in
+the following code snippet.
+
+.. code-block:: python
+
+    def submit_job(self, job, script_name: str, hold: bool=False, export: str="none") -> Union[int, None]:
+        """Submit a job from a given job object."""
+        Log.result(f"Job: {job.name}")
+        return None
+
+The class ``submit_job`` is a existing class in SlurmPlatform that was overwritten to have a new behaviour
+
+
+At the end your file should be looking like this
+
+
+.. code-block:: python
+
+    from typing import Union
+    from autosubmit.platforms.slurmplatform import SlurmPlatform
+    from log.log import Log
+
+    class ExamplePlatform(SlurmPlatform):
+        """Class to manage slurm jobs"""
+        def __init__(self, expid: str, name: str, config: dict, auth_password: str=None):
+            """Initialization of the Class ExamplePlatform"""
+            SlurmPlatform.__init__(self, expid, name, config, auth_password = auth_password)
+
+        def submit_job(self, job, script_name: str, hold: bool=False, export: str="none") -> Union[int, None]:
+            """Submit a job from a given job object."""
+            Log.result(f"Job: {job.name}")
+            return None
+
+How to configure a Platforms
 ------------------------------------
 
-To set up your SLURM platform you first have to create a new experiment by running the following command creating a
+To set up your platform you first have to create a new experiment by running the following command creating a
 minimal version of a experiment and configure the experiment platform to Marenostrum.
 
-``autosubmit expid -H MARENOSTRUM5 -d "SLURM test" --minimal``
+``autosubmit expid -H MARENOSTRUM5 -d "platform test" --minimal``
 
-You'll have to insert the **PARAMETERS** to make your experiment work properly as an exemple the following
+You'll have to insert the **PARAMETERS** to make your experiment work properly as an example the following
 instruction are thought to execute a small job through Autosubmit explaining how to configure a platform.
 
 First create a new folder at the root ``~/Autosubmit`` called project executing the following command:
@@ -26,7 +85,7 @@ First create a new folder at the root ``~/Autosubmit`` called project executing 
     needs to take this into account
 
 For the execution of this test a few files will need to be created within the new folder,
-this file will have the SLURM commands to be executed
+this file will have the Platform commands to be executed
 
 .. code-block:: yaml
 
@@ -40,7 +99,7 @@ this file will have the SLURM commands to be executed
     APP.sh
     CLEAN.sh
 
-For sake of keeping and concise and clear exemple of how AutoSubmit works a simple instruction can be executed.
+For sake of keeping and concise and clear example of how AutoSubmit works a simple instruction can be executed.
 For full developed experiments this will be the instructions used in your experiment.
 
 .. code-block:: yaml
