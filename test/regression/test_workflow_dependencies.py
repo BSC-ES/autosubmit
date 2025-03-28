@@ -188,7 +188,7 @@ def test_workflows_dependencies(prepare_workflow_runs, expid, current_tmpdir: Pa
     """
     show_workflow_plot = False  # Enable only for debugging purposes
     expids_to_plot = []
-    if expid.startswith("destine"):  # Modify only for debugging purposes
+    if expid.startswith("automatic"):  # Modify only for debugging purposes
         expids_to_plot.append(expid)
     profiler = cProfile.Profile()
 
@@ -229,9 +229,9 @@ def test_workflows_dependencies(prepare_workflow_runs, expid, current_tmpdir: Pa
         else:
             differences.extend(compare_and_print_differences(new_root, ref_root))
 
+    if show_workflow_plot and expid in expids_to_plot:
+        init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, create=True, test_type='test', plot=show_workflow_plot)
     if differences:
-        if show_workflow_plot and expid in expids_to_plot:
-            init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, create=True, test_type='test', plot=show_workflow_plot)
         pytest.fail("\n".join(differences))
 
     if PROFILE:
