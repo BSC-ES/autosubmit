@@ -1258,13 +1258,14 @@ class JobList(object):
             # Get first split of the given chunk
             auto_job_name = ("_".join(job_name_separated[:3]) +
                              f"_{auto_chunk}_1_{dependency.section}")
-            auto_splits = str(self.graph.nodes[auto_job_name]['job'].splits)
-            for filters_to_keys, filters_to in (
-                    dependency.relationships.get("SPLITS_FROM", {}).items()):
-                if "auto" in filters_to.get("SPLITS_TO", "").lower():
-                    filters_to["SPLITS_TO"] = filters_to["SPLITS_TO"].lower()
-                    filters_to["SPLITS_TO"] = filters_to["SPLITS_TO"].replace("auto", auto_splits)
-            job.splits = auto_splits
+            if auto_job_name in self.graph.nodes:
+                auto_splits = str(self.graph.nodes[auto_job_name]['job'].splits)
+                for filters_to_keys, filters_to in (
+                        dependency.relationships.get("SPLITS_FROM", {}).items()):
+                    if "auto" in filters_to.get("SPLITS_TO", "").lower():
+                        filters_to["SPLITS_TO"] = filters_to["SPLITS_TO"].lower()
+                        filters_to["SPLITS_TO"] = filters_to["SPLITS_TO"].replace("auto", auto_splits)
+                job.splits = auto_splits
         return dependency
 
     def _manage_job_dependencies(self, dic_jobs, job, date_list, member_list, chunk_list,
@@ -1400,9 +1401,9 @@ class JobList(object):
                                                                                  dependency)
             if skip:
                 continue
-            filters_to_apply = self._filter_current_job(job, copy.deepcopy(dependency.relationships))
-            filters_to_apply.pop("STATUS", None)
-            filters_to_apply.pop("FROM_STEP", None)
+            self._normalize_auto_keyword(job, dependency)
+            filters_to_apply = self.get_filters_to_apply(job, dependency)
+
             if len(filters_to_apply) > 0:
                 dependencies_of_that_section = dic_jobs.as_conf.jobs_data[dependency.section].get("DEPENDENCIES", {})
                 ## Adds the dependencies to the job, and if not possible, adds the job to the problematic_dependencies
@@ -1428,6 +1429,7 @@ class JobList(object):
                     natural_sections.append(key)
         for key in natural_sections:
             dependency = dependencies[key]
+            self._normalize_auto_keyword(job, dependency)
             skip, (chunk, member, date) = JobList._calculate_dependency_metadata(job.chunk, chunk_list,
                                                                                  job.member, member_list,
                                                                                  job.date, date_list,
