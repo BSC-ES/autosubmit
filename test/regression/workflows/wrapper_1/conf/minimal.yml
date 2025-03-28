@@ -9,7 +9,7 @@ DEFAULT:
   # Job experiment ID.
   EXPID: "a00e"
   # Default HPC platform name.
-  HPCARCH: "marenostrum4"
+  HPCARCH: "local"
   #hint: use %PROJDIR% to point to the project folder (where the project is cloned)
   # Custom configuration location.
   CUSTOM_CONFIG:

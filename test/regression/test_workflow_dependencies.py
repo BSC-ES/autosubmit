@@ -10,7 +10,6 @@ from test.unit.utils.common import create_database, init_expid
 import difflib
 
 PROFILE = False  # Enable/disable profiling ( speed up the tests )
-SHOW_WORKFLOW_PLOT = True  # Enable only for debugging purposes
 
 def prepare_custom_config_tests(default_yaml_file: Dict[str, Any], project_yaml_files: Dict[str, Dict[str, str]], current_tmpdir: Path) -> Dict[str, Any]:
     """
@@ -187,8 +186,12 @@ def test_workflows_dependencies(prepare_workflow_runs, expid, current_tmpdir: Pa
     """
     Compare current workflow dependencies with the reference ones.
     """
-    banned_plots = [""]  # Too big to be visualized and see anything.
+    show_workflow_plot = False  # Enable only for debugging purposes
+    expids_to_plot = []
+    if expid.startswith("destine"):  # Modify only for debugging purposes
+        expids_to_plot.append(expid)
     profiler = cProfile.Profile()
+
     # Allows to have any name for the configuration folder
     mocker.patch.object(BasicConfig, 'read', return_value=True)
     if PROFILE:
@@ -227,8 +230,8 @@ def test_workflows_dependencies(prepare_workflow_runs, expid, current_tmpdir: Pa
             differences.extend(compare_and_print_differences(new_root, ref_root))
 
     if differences:
-        if SHOW_WORKFLOW_PLOT and expid not in banned_plots:
-            init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, create=True, test_type='test', plot=SHOW_WORKFLOW_PLOT)
+        if show_workflow_plot and expid in expids_to_plot:
+            init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, create=True, test_type='test', plot=show_workflow_plot)
         pytest.fail("\n".join(differences))
 
     if PROFILE:
