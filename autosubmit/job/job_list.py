@@ -1107,6 +1107,11 @@ class JobList(object):
         JobList.handle_frequency_interval_dependencies(chunk, chunk_list, date, date_list, dic_jobs, job,
                                                        member,
                                                        member_list, dependency.section, natural_parents)
+        # check if job has edges
+        if len(self.graph.pred[job.name]) == 0:
+            for parent in natural_parents:
+                problematic_dependencies.add(parent.name)
+                graph.add_edge(parent.name, job.name)
         return problematic_dependencies
 
     def _calculate_filter_dependencies(self, filters_to_apply, dic_jobs, job, dependency, date, member, chunk, graph,
