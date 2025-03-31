@@ -60,7 +60,8 @@ dependencies = [
     "autosubmitconfigparser==1.0.78",
     "configparser",
     "setproctitle",
-    "invoke>=2.0"
+    "invoke>=2.0",
+    "PyGithub",
     # 'sqlalchemy[mypy]' # TODO: pending Postgres MR
 ]
 

@@ -700,6 +700,11 @@ class Autosubmit:
                                 help='Select the status (one or more) to filter the list of jobs.')
             subparser.add_argument('-t', '--target', type=str, default="FAILED", metavar='STATUS',
                                 help='Final status of killed jobs. Default is FAILED.')
+            # uploadworkflow
+            subparser = subparsers.add_parser(
+                'uploadworkflow', description="Uploads a workflow to the server")
+            subparser.add_argument('expid', help='experiment identifier')
+            subparser.add_argument('-name', '--conf_name', type=str, help='auto descriptive workflow name')
             args, unknown = parser.parse_known_args()
             if args.version:
                 Log.info(Autosubmit.autosubmit_version)
@@ -810,6 +815,9 @@ class Autosubmit:
             return Autosubmit.cat_log(args.ID, args.file, args.mode, args.inspect)
         elif args.command == 'stop':
             return Autosubmit.stop(args.expid, args.force, args.all, args.force_all, args.cancel, args.filter_status, args.target)
+        elif args.command == 'uploadworkflow':
+            return Autosubmit.upload_workflow(args.expid, args.conf_name)
+
     @staticmethod
     def _init_logs(args, console_level='INFO', log_level='DEBUG', expid='None'):
         Log.set_console_level(console_level)
@@ -5971,3 +5979,11 @@ class Autosubmit:
             if cancel:
                 job_list, _, _, _, _, _, _, _ = Autosubmit.prepare_run(expid, check_scripts=False)
                 cancel_jobs(job_list, active_jobs_filter=current_status, target_status=status)
+
+    @staticmethod
+    def upload_workflow(expid, conf_name):
+        """
+        Method to upload a workflow to the autosubmit repo.
+        """
+        from autosubmit.git.upload_workflow import upload_workflow
+        upload_workflow(expid, conf_name)
