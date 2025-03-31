@@ -1,13 +1,12 @@
 import pytest
 from pathlib import Path
 from autosubmitconfigparser.config.basicconfig import BasicConfig
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional, Tuple
 import shutil
 import cProfile
 import pstats
 import os
 from test.unit.utils.common import create_database, init_expid
-import difflib
 
 PROFILE = False  # Enable/disable profiling ( speed up the tests )
 
@@ -117,9 +116,17 @@ class SimpleJoblist:
         return self.name
 
 
-def parse_job_list(lines):
+def parse_job_list(lines: List[str]) -> List[SimpleJoblist]:
+    """
+    Parse a list of lines representing a job list and return a list of root nodes.
+
+    :param lines: List of lines to parse.
+    :type lines: List[str]
+    :return: List of root nodes.
+    :rtype: List[SimpleJoblist]
+    """
     roots = []
-    stack = []
+    stack: List[SimpleJoblist] = []
 
     for line in lines:
         indent_level = line.count('|  ')
@@ -140,10 +147,20 @@ def parse_job_list(lines):
     return sorted(roots, key=lambda x: x.name)
 
 
-def compare_and_print_differences(node1, node2):
+def compare_and_print_differences(node1: Optional[SimpleJoblist], node2: Optional[SimpleJoblist]) -> List[str]:
+    """
+    Compare two job list nodes and return a list of differences.
+
+    :param node1: The first job list node to compare.
+    :type node1: Optional[SimpleJoblist]
+    :param node2: The second job list node to compare.
+    :type node2: Optional[SimpleJoblist]
+    :return: A list of differences between the two nodes.
+    :rtype: List[str]
+    """
     differences = []
     path = ""
-    stack = [(node1, node2, path)]
+    stack: List[Tuple[Optional[SimpleJoblist], Optional[SimpleJoblist], str]] = [(node1, node2, path)]
 
     while stack:
         n1, n2, current_path = stack.pop()
@@ -168,7 +185,15 @@ def compare_and_print_differences(node1, node2):
     return differences
 
 
-def remove_noise_from_list(lines):
+def remove_noise_from_list(lines: List[str]) -> List[str]:
+    """
+    Remove noise from a list of lines by stripping whitespace and specific substrings.
+
+    :param lines: List of lines to process.
+    :type lines: List[str]
+    :return: List of cleaned lines.
+    :rtype: List[str]
+    """
     lines = [line.strip().rstrip(' [WAITING]').rstrip(' [READY]').strip() for line in lines]
     lines = [line.replace("child", "children") if "child" in line and "children" not in line else line for line in lines]
     if lines and lines[0].strip() == '':
@@ -177,14 +202,49 @@ def remove_noise_from_list(lines):
     return lines
 
 
-# By default, the test will be performed on all the workflows in the 'workflows' directory
-workflow_folders = sorted([f.name for f in Path('./workflows').iterdir() if f.is_dir() and "pycache" not in f.name])
+def get_project_root() -> Path:
+    """
+    Find the autosubmit project root.
+
+    :return: The project root path.
+    :rtype: Path
+    :raises FileNotFoundError: If the project root directory is not found.
+    """
+    project_root = Path(__file__).resolve().parent
+    while not project_root.joinpath("autosubmit").exists() and project_root.name:
+        project_root = project_root.parent
+    if not project_root.name:
+        raise FileNotFoundError("Could not find the Autosubmit root directory.")
+    return project_root
 
 
-@pytest.mark.parametrize("expid", workflow_folders)
-def test_workflows_dependencies(prepare_workflow_runs, expid, current_tmpdir: Path, mocker, prepare_basic_config: Any) -> None:
+def get_workflow_folder() -> List[str]:
+    """
+    Get a sorted list of workflow folder names in the 'test/regression/workflows' directory.
+
+    :return: A sorted list of workflow folder names.
+    :rtype: List[str]
+    """
+    workflow_dir = get_project_root() / 'test' / 'regression' / 'workflows'
+    # The test will be performed on all the workflows in the 'workflows' directory
+    return sorted([f.name for f in Path(workflow_dir).iterdir() if f.is_dir() and "pycache" not in f.name])
+
+
+@pytest.mark.parametrize("expid", get_workflow_folder())
+def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_tmpdir: Path, mocker: Any, prepare_basic_config: Any) -> None:
     """
     Compare current workflow dependencies with the reference ones.
+
+    :param prepare_workflow_runs: Fixture to prepare workflow runs.
+    :type prepare_workflow_runs: Any
+    :param expid: Experiment ID.
+    :type expid: str
+    :param current_tmpdir: Temporary directory for the current test.
+    :type current_tmpdir: Path
+    :param mocker: Mocking object for patching.
+    :type mocker: Any
+    :param prepare_basic_config: Fixture to prepare basic configuration.
+    :type prepare_basic_config: Any
     """
     show_workflow_plot = False  # Enable only for debugging purposes
     expids_to_plot = []
