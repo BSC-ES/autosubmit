@@ -627,6 +627,7 @@ class SlurmPlatform(ParamikoPlatform):
         :return: All status related to a Job.
         :rtype: Union[list[str], str]
         """
+
     def parse_Alljobs_output(self, output, job_id):
         status = ""
         try:
