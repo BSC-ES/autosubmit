@@ -246,6 +246,7 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
     :param prepare_basic_config: Fixture to prepare basic configuration.
     :type prepare_basic_config: Any
     """
+    add_new_test = False  # Enable when adding a new test
     workflow_dir = get_project_root() / 'test' / 'regression' / 'workflows'
     show_workflow_plot = False  # Enable only for debugging purposes
     expids_to_plot = []
@@ -264,6 +265,9 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
         new_lines = new_file.readlines()
 
     if not Path(f"{workflow_dir}/{expid}/ref_workflow.txt").exists():
+        if not add_new_test:
+            pytest.fail(f"Reference file for {expid} does not exist. Please create it using the following command:\n"
+                        f"python <autosubmit_git_root>/test/resources/upload_workflow_config.py <autosubmit_path>/<target_expid>/conf/metadata/experiment_data.yml {workflow_dir}/{expid}/conf")
         print(f"Reference file for {expid} does not exist. Creating a new reference file.")
         with open(Path(f"{workflow_dir}/{expid}/ref_workflow.txt"), "w") as ref_file:
             ref_file.writelines(new_lines)
