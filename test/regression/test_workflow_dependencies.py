@@ -246,13 +246,16 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
     :param prepare_basic_config: Fixture to prepare basic configuration.
     :type prepare_basic_config: Any
     """
+    # Modify this section to add a new test, debugging...
     add_new_test = False  # Enable when adding a new test
-    workflow_dir = get_project_root() / 'test' / 'regression' / 'workflows'
     show_workflow_plot = False  # Enable only for debugging purposes
     expids_to_plot = []
     if expid.startswith("automatic"):  # Modify only for debugging purposes
         expids_to_plot.append(expid)
     profiler = cProfile.Profile()
+
+    # Running section
+    workflow_dir = get_project_root() / 'test' / 'regression' / 'workflows'
 
     # Allows to have any name for the configuration folder
     mocker.patch.object(BasicConfig, 'read', return_value=True)
