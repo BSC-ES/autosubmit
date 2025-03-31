@@ -1,16 +1,20 @@
-import pytest
-from pathlib import Path
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from typing import Dict, Any, List, Optional, Tuple
-import shutil
 import cProfile
-import pstats
 import os
+import pstats
+import shutil
+from pathlib import Path
+from typing import Dict, Any, List, Optional, Tuple
+
+import pytest
+
+from autosubmitconfigparser.config.basicconfig import BasicConfig
 from test.unit.utils.common import create_database, init_expid
 
 PROFILE = False  # Enable/disable profiling ( speed up the tests )
 
-def prepare_custom_config_tests(default_yaml_file: Dict[str, Any], project_yaml_files: Dict[str, Dict[str, str]], current_tmpdir: Path) -> Dict[str, Any]:
+
+def prepare_custom_config_tests(default_yaml_file: Dict[str, Any], project_yaml_files: Dict[str, Dict[str, str]],
+                                current_tmpdir: Path) -> Dict[str, Any]:
     """
     Prepare custom configuration tests by creating necessary YAML files.
 
@@ -195,7 +199,8 @@ def remove_noise_from_list(lines: List[str]) -> List[str]:
     :rtype: List[str]
     """
     lines = [line.strip().rstrip(' [WAITING]').rstrip(' [READY]').strip() for line in lines]
-    lines = [line.replace("child", "children") if "child" in line and "children" not in line else line for line in lines]
+    lines = [line.replace("child", "children") if "child" in line and "children" not in line else line for line in
+             lines]
     if lines and lines[0].strip() == '':
         lines = lines[1:]
 
@@ -231,7 +236,8 @@ def get_workflow_folder() -> List[str]:
 
 
 @pytest.mark.parametrize("expid", get_workflow_folder())
-def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_tmpdir: Path, mocker: Any, prepare_basic_config: Any) -> None:
+def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_tmpdir: Path, mocker: Any,
+                                prepare_basic_config: Any) -> None:
     """
     Compare current workflow dependencies with the reference ones.
 
@@ -298,7 +304,8 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
             differences.extend(compare_and_print_differences(new_root, ref_root))
 
     if show_workflow_plot and expid in expids_to_plot:
-        init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, create=True, test_type='test', plot=show_workflow_plot)
+        init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, create=True, test_type='test',
+                   plot=show_workflow_plot)
     if differences:
         pytest.fail("\n".join(differences))
 
