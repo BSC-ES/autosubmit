@@ -954,12 +954,26 @@ class ParamikoPlatform(Platform):
                 self._ssh_output_err += errorLineCase
             self._ssh_output = self._ssh_output.replace(self.bashrc_output, "")
             self._ssh_output_err = self._ssh_output_err.replace(self.bashrc_err, "")
+            self._ssh_output = self._ssh_output.lower()
+            self._ssh_output_err = self._ssh_output_err.lower()
 
             if "not active" in self._ssh_output_err:
                 raise AutosubmitError(
                     'SSH Session not active, will restart the platforms', 6005)
-            if self._ssh_output_err.find("command not found") != -1:
-                raise AutosubmitCritical("scheduler is not installed.",7052,self._ssh_output_err)
+            if (
+                    self._ssh_output_err.find("command not found") != -1 or
+                    self._ssh_output_err.find("slurm controller") != -1 or
+                    self._ssh_output_err.find("connect failure") != -1 or
+                    self._ssh_output.find("command not found") != -1 or
+                    self._ssh_output.find("slurm controller") != -1 or
+                    self._ssh_output.find("connect failure") != -1
+            ):
+                raise AutosubmitError(
+                    "Issues with the scheduler commands. Please check manually the avaliability of the sbatch commands. Error details: {0}".format(
+                        self._ssh_output_err),
+                    7052,
+                    self._ssh_output_err
+                )
             elif self._ssh_output_err.find("refused") != -1 or self._ssh_output_err.find("slurm_persist_conn_open_without_init") != -1 or self._ssh_output_err.find("slurmdbd") != -1 or self._ssh_output_err.find("submission failed") != -1 or self._ssh_output_err.find("git clone") != -1 or self._ssh_output_err.find("sbatch: error: ") != -1 or self._ssh_output_err.find("not submitted") != -1 or self._ssh_output_err.find("invalid") != -1:
                 if (self._submit_command_name == "sbatch" and (self._ssh_output_err.find("policy") != -1 or self._ssh_output_err.find("invalid") != -1) ) or (self._submit_command_name == "sbatch" and self._ssh_output_err.find("argument") != -1) or (self._submit_command_name == "bsub" and self._ssh_output_err.find("job not submitted") != -1) or self._submit_command_name == "ecaccess-job-submit" or self._submit_command_name == "qsub ":
                     raise AutosubmitError(self._ssh_output_err, 7014, "Bad Parameters.")
