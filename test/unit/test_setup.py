@@ -9,7 +9,7 @@ class TestSetup(TestCase):
 
 
 def run_setup_check():
-    return os.system('python ' + get_directory_of_this_file() + '/../../setup.py check')
+    return os.system('python2.7 ' + get_directory_of_this_file() + '/../../setup.py check')
 
 
 def get_directory_of_this_file():
