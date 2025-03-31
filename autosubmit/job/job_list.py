@@ -1008,7 +1008,7 @@ class JobList(object):
                                         chunk_list, date_list, member_list, special_dependencies, max_distance,
                                         problematic_dependencies):
         """
-        Calculate natural dependencies and add them to the graph if they're neccesary.
+        Calculate natural dependencies and add them to the graph if they're necessary.
         :param dic_jobs: JobList
         :param job: Current job
         :param dependency: Dependency
@@ -1121,7 +1121,7 @@ class JobList(object):
                                        chunk_list, date_list, member_list, special_dependencies,
                                        problematic_dependencies):
         """
-        Calculate dependencies that has any kind of filter set and add them to the graph if they're neccesary.
+        Calculate dependencies that has any kind of filter set and add them to the graph if they're necessary.
         :param filters_to_apply: Filters to apply
         :param dic_jobs: JobList
         :param job: Current job
