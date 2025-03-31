@@ -41,6 +41,7 @@ def process_yaml(input_file_path, output_file_path):
         yaml.dump(extracted_data, file)
 
 
+# TODO change output_yaml_file to conf_name and set the path to the test automatically
 if __name__ == "__main__":
     if len(sys.argv) != 3:
         print("Usage: python script.py <input_yaml_file> <output_yaml_file>")
