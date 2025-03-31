@@ -246,6 +246,7 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
     :param prepare_basic_config: Fixture to prepare basic configuration.
     :type prepare_basic_config: Any
     """
+    project_root = get_project_root()
     show_workflow_plot = False  # Enable only for debugging purposes
     expids_to_plot = []
     if expid.startswith("automatic"):  # Modify only for debugging purposes
@@ -262,12 +263,12 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
     with open(Path(f"{current_tmpdir}/workflows/{expid}/tmp/ASLOGS/jobs_active_status.log"), "r") as new_file:
         new_lines = new_file.readlines()
 
-    if not Path(f"./workflows/{expid}/ref_workflow.txt").exists():
+    if not Path(f"{project_root}/test/regression/workflows/{expid}/ref_workflow.txt").exists():
         print(f"Reference file for {expid} does not exist. Creating a new reference file.")
-        with open(Path(f"./workflows/{expid}/ref_workflow.txt"), "w") as ref_file:
+        with open(Path(f"{project_root}/test/regression/workflows/{expid}/ref_workflow.txt"), "w") as ref_file:
             ref_file.writelines(new_lines)
 
-    with open(Path(f"./workflows/{expid}/ref_workflow.txt")) as ref_file:
+    with open(Path(f"{project_root}/test/regression/workflows/{expid}/ref_workflow.txt")) as ref_file:
         ref_lines = ref_file.readlines()
 
     new_lines = remove_noise_from_list(new_lines)
