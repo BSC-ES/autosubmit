@@ -111,19 +111,6 @@ class PJMHeader(object):
             return '\n'.join(str(s) for s in parameters['CUSTOM_DIRECTIVES'])
         return ""
 
-    def get_tasks_directive(self, job, het=-1):
-        """
-        Returns tasks per node directive for the specified job
-
-        :param job: job to create tasks per node directive for
-        :type job: Job
-        :return: tasks per node directive
-        :rtype: str
-        """
-        if int(parameters['TASKS']) > 1:
-            return "max-proc-per-node={0}".format(parameters['TASKS'])
-        return ""
-
     def get_shape_directive(self, job, parameters):
         """
         Returns shape directive for the specified job

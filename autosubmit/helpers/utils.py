@@ -1,8 +1,6 @@
-import locale
 import os
 import pwd
 import re
-import subprocess
 from itertools import zip_longest
 
 from autosubmitconfigparser.config.basicconfig import BasicConfig
@@ -35,30 +33,6 @@ def check_jobs_file_exists(as_conf, current_section_name=None):
         if missing_files:
             raise AutosubmitCritical(f"Templates not found:\n{missing_files}", 7011)
 
-
-def proccess_id(expid=None, command="run", single_instance=True, platform=None):
-    # Retrieve the process id of the autosubmit process
-    # Bash command: ps -ef | grep "$(whoami)" | grep "autosubmit" | grep "run" | grep "expid" | awk '{print $2}'
-    try:
-        if not platform:
-            command = f'ps -ef | grep "$(whoami)" | grep "autosubmit" | grep "{command}" | grep "{expid}" '
-        else:
-            command = f'ps -ef | grep "$(whoami)" | grep "autosubmit" | grep "{command}" | grep "{expid}" | grep " {platform.lower()} " '
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
-        output, error = process.communicate()
-        output = output.decode(locale.getlocale()[1])
-        output = output.split('\n')
-        # delete noise
-        if output:
-            output = [int(x.split()[1]) for x in output if x and "grep" not in x]
-
-    except Exception as e:
-        raise AutosubmitCritical(
-            "An error occurred while retrieving the process id", 7011, str(e))
-    if single_instance:
-        return output[0] if output else ""
-    else:
-        return output if output else ""
 
 def check_experiment_ownership(expid, basic_config, raise_error=False, logger=None):
     # [A-Za-z09]+ variable is not needed, LOG is global thus it will be read if available

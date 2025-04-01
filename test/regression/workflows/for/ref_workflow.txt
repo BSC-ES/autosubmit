@@ -1,0 +1,13 @@
+## String representation of Job List [12]  ##
+a00d_19600101_00_1_SIM_20 ~ [2 children]
+|  a00d_19600101_00_1_POST_20
+|  a00d_19600101_00_2_SIM_20 ~ [1 child]
+|  |  a00d_19600101_00_2_POST_20
+a00d_19600101_00_1_SIM_40 ~ [2 children]
+|  a00d_19600101_00_1_POST_40
+|  a00d_19600101_00_2_SIM_40 ~ [1 child]
+|  |  a00d_19600101_00_2_POST_40
+a00d_19600101_00_1_SIM_80 ~ [2 children]
+|  a00d_19600101_00_1_POST_80
+|  a00d_19600101_00_2_SIM_80 ~ [1 child]
+|  |  a00d_19600101_00_2_POST_80

@@ -1,0 +1,189 @@
+DEFAULT:
+  EXPID: t03i
+  HPCARCH: local
+  CUSTOM_CONFIG: hidden
+JOBS:
+  LOCAL_SETUP:
+    FILE: hidden
+    PLATFORM: local
+    RUNNING: once
+    CHECK: on_submission
+    DEPENDENCIES: {}
+  SYNCHRONIZE:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+    RUNNING: once
+    CHECK: on_submission
+  REMOTE_SETUP:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      SYNCHRONIZE: {}
+    RUNNING: once
+    WALLCLOCK: 02:00
+    CHECK: on_submission
+  INI:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      REMOTE_SETUP: {}
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: on_submission
+  SIM:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      INI: {}
+      SIM-1: {}
+      DQC_BASIC-10: {}
+    RUNNING: chunk
+    WALLCLOCK: 02:00
+    CHECK: on_submission
+    NODES: 4
+    PARTITION: small
+  DN:
+    FILE: hidden
+    DEPENDENCIES:
+      SIM:
+        STATUS: RUNNING
+        ANY_FINAL_STATUS_IS_VALID: true
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+      APP_ENERGY_ONSHORE-1:
+        STATUS: FAILED
+        ANY_FINAL_STATUS_IS_VALID: false
+    RUNNING: chunk
+    WALLCLOCK: 02:00
+    PLATFORM: local
+    SPLITS: auto
+    TOTALJOBS: 1
+    CHECK: on_submission
+    RETRIALS: 1
+  APP_ENERGY_ONSHORE:
+    FILE: hidden
+    DEPENDENCIES:
+      OPA_ENERGY_ONSHORE:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+            STATUS: FAILED
+      APP_ENERGY_ONSHORE:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+            STATUS: FAILED
+    RUNNING: chunk
+    WALLCLOCK: 00:20
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    NODES: 1
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    NAME: ENERGY_ONSHORE
+    SPLITS: auto
+  OPA_ENERGY_ONSHORE:
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+      OPA_ENERGY_ONSHORE:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+            STATUS: FAILED
+    FILE: hidden
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    RUNNING: chunk
+    NODES: 1
+    PROCESSORS: '%CURRENT_OPA_PROCESSORS%'
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    CUSTOM_DIRECTIVES: '%CURRENT_OPA_CUSTOM_DIRECTIVES%'
+    EXCLUSIVE: '%CURRENT_OPA_EXCLUSIVE%'
+    RETRIALS: '1'
+    NAME: energy_onshore
+    SPLITS: auto
+  CHECK_MEM:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      SIM:
+        STATUS: RUNNING
+        ANY_FINAL_STATUS_IS_VALID: true
+    RUNNING: chunk
+    WALLCLOCK: 00:30
+    CHECK: on_submission
+  DQC_BASIC:
+    FILE: hidden
+    WALLCLOCK: 00:30
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: local
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 16
+    RUNNING: chunk
+    CHECK: on_submission
+    NAME: BASIC
+    DEPENDENCIES:
+      SIM: {}
+    CHECK_STANDARD_COMPLIANCE: 'False'
+    CHECK_SPATIAL_COMPLETENESS: 'True'
+    CHECK_SPATIAL_CONSISTENCY: 'True'
+    CHECK_PHYSICAL_PLAUSIBILITY: 'True'
+  DQC_FULL:
+    FILE: hidden
+    WALLCLOCK: 00:30
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: local
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 16
+    RUNNING: chunk
+    CHECK: on_submission
+    NAME: FULL
+    DEPENDENCIES:
+      DQC_BASIC: {}
+    CHECK_STANDARD_COMPLIANCE: 'True'
+    CHECK_SPATIAL_COMPLETENESS: 'True'
+    CHECK_SPATIAL_CONSISTENCY: 'True'
+    CHECK_PHYSICAL_PLAUSIBILITY: 'True'
+  CLEAN:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      SIM: {}
+    RUNNING: chunk
+    WALLCLOCK: 00:30
+    TASKS: 1
+    THREADS: 1
+    NODES: 1
+    CHECK: on_submission
+EXPERIMENT:
+  DATELIST: 19900101
+  MEMBERS: fc0
+  CHUNKSIZEUNIT: month
+  CHUNKSIZE: 1
+  NUMCHUNKS: 1
+  CALENDAR: standard
+  SPLITSIZEUNIT: day
+PROJECT:
+  PROJECT_TYPE: none
+  PROJECT_DESTINATION: git_project
+GIT:
+  PROJECT_ORIGIN: hidden
+  PROJECT_BRANCH: main
+  PROJECT_COMMIT: ''
+  PROJECT_SUBMODULES: data-portfolio dvc-cache-de340
+  FETCH_SINGLE_BRANCH: true

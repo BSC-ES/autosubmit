@@ -1,0 +1,30 @@
+# FOR example https://autosubmit.readthedocs.io/en/master/userguide/defining_workflows/index.html
+
+# TODO CHANGE
+
+experiment:
+  DATELIST: 19600101
+  MEMBERS: "00"
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '2'
+  CALENDAR: standard
+JOBS:
+  SIM:
+    FOR:
+      NAME: [ 20,40,80 ]
+      PROCESSORS: [ 20,40,80 ]
+      THREADS: [ 1,1,1 ]
+      DEPENDENCIES: [ SIM_20-1,SIM_40-1,SIM_80-1 ]
+    FILE: POST.sh
+    RUNNING: chunk
+    WALLCLOCK: '00:05'
+  POST:
+      FOR:
+        NAME: [ 20,40,80 ]
+        PROCESSORS: [ 20,40,80 ]
+        THREADS: [ 1,1,1 ]
+        DEPENDENCIES: [ SIM_20 POST_20,SIM_40 POST_40,SIM_80 POST_80 ]
+      FILE: POST.sh
+      RUNNING: chunk
+      WALLCLOCK: '00:05'

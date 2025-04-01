@@ -1,41 +1,35 @@
 #!/usr/bin/env python
 
 # Copyright 2015 Earth Sciences Department, BSC-CNS
-
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Script for handling experiment monitoring"""
 import argparse
-import sys
-from typing import Optional, Union
-from pathlib import Path
-from contextlib import suppress
 import traceback
 from contextlib import suppress
 from os import _exit  # type: ignore
-
-# noinspection PyUnresolvedReferences
-from log.log import Log, AutosubmitCritical, AutosubmitError  # noqa: E402
-
-from autosubmit.autosubmit import Autosubmit  # noqa: E402
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig  # noqa: E402
+from pathlib import Path
+from typing import Optional, Union
 
 from portalocker.exceptions import BaseLockException
 
-from log.log import Log, AutosubmitCritical, AutosubmitError
+from autosubmit.autosubmit import Autosubmit  # noqa: E402
+from autosubmitconfigparser.config.configcommon import AutosubmitConfig  # noqa: E402
+from log.log import Log, AutosubmitCritical, AutosubmitError  # noqa: E402
 
 
 def delete_lock_file(base_path: str = Log.file_path, lock_file: str = 'autosubmit.lock') -> None:
@@ -101,9 +95,10 @@ def exit_from_error(e: BaseException) -> int:
     Log.info("More info at https://autosubmit.readthedocs.io/en/master/troubleshooting/error-codes.html")
     return err_code
 
+
 # noinspection PyProtectedMember
 def main():
-    args = Optional[argparse.Namespace]
+    args: Optional[argparse.Namespace] = None
     try:
         return_value, args = Autosubmit.parse_args()
         if args:
@@ -126,9 +121,7 @@ def main():
         Log.error(f"Arguments provided: {str(args)}")
         Log.error(f"This is the experiment: {expid} which had an issue with the command: {command} and it is currently using the Autosubmit Version: {version}.")
         return_value = exit_from_error(e)
+    # TODO: we need to define whether the function called here will return an int or bool
+    if type(return_value) is bool:
+        return_value = 0 if return_value else 1
     return return_value
-
-
-if __name__ == "__main__":
-    exit_code = main()
-    sys.exit(exit_code)  # Sys.exit ensures a proper cleanup of the program, while os._exit() does not.

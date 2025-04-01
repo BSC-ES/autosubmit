@@ -1,24 +1,23 @@
-#!/usr/bin/env python
-
 # Copyright 2015-2020 Earth Sciences Department, BSC-CNS
-
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import collections
 import locale
 import platform
-# You should have received a copy of the GNU General Public License
-# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from bscearth.utils.date import date2str
 from configparser import ConfigParser
@@ -80,7 +79,7 @@ from .history.experiment_history import ExperimentHistory
 import autosubmit.history.utils as HUtils
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 import autosubmit.statistics.utils as StatisticsUtils
-from autosubmit.helpers.utils import proccess_id, check_jobs_file_exists
+from autosubmit.helpers.utils import check_jobs_file_exists
 
 from contextlib import suppress
 
@@ -96,23 +95,29 @@ sys.path.insert(0, os.path.abspath('.'))
 # noinspection PyUnusedLocal
 
 
-def signal_handler(signal_received, frame):
+def signal_handler(signal_received, frame):  # noqa: F841
+    # Disable all the no-member violations in this function
+    # pylint: disable=W0613
     """
     Used to handle interrupt signals, allowing autosubmit to clean before exit
 
     :param signal_received:
     :param frame:
+    :return:
     """
     Log.info('Autosubmit will interrupt at the next safe occasion')
     Autosubmit.exit = True
 
 
-def signal_handler_create(signal_received, frame):
+def signal_handler_create(signal_received, frame):  # noqa: F841
+    # Disable all the no-member violations in this function
+    # pylint: disable=W0613
     """
     Used to handle KeyboardInterrupt signals while the create method is being executed
 
     :param signal_received:
     :param frame:
+    :return:
     """
     raise AutosubmitCritical(
         'Autosubmit has been closed in an unexpected way. Killed or control + c.', 7010)
@@ -125,7 +130,7 @@ class MyParser(argparse.ArgumentParser):
         sys.exit(2)
 
 class CancelAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
+    def __call__(self, parser, namespace, values, option_string=None):  # noqa: F841
         setattr(namespace, self.dest, True)
         if namespace.filter_status.upper() == "SUBMITTED, QUEUING, RUNNING " or namespace.target.upper() == "FAILED":
             pass
@@ -138,7 +143,6 @@ class Autosubmit:
     """
 
     def __init__(self):
-        self._experiment_data = {}
         self.command = None
 
     @property
@@ -153,7 +157,7 @@ class Autosubmit:
         script_dir = os.path.join(script_dir, os.path.pardir)
 
     version_path = os.path.join(script_dir, 'VERSION')
-    readme_path = os.path.join(script_dir, 'README')
+    readme_path = os.path.join(script_dir, 'README.md')
     changes_path = os.path.join(script_dir, 'CHANGELOG')
     if os.path.isfile(version_path):
         with open(version_path) as f:
@@ -301,7 +305,7 @@ class Autosubmit:
                                    default=False, help='Update experiment version')
             subparser.add_argument('-p', '--profile', action='store_true', default=False, required=False,
                                    help='Prints performance parameters of the execution of this command.')
-            
+
             # Stats
             subparser = subparsers.add_parser(
                 'stats', description="plots statistics for specified experiment")
@@ -1534,8 +1538,7 @@ class Autosubmit:
             safetysleeptime = as_conf.get_safetysleeptime()
             Log.debug("The Experiment name is: {0}", expid)
             Log.debug("Sleep: {0}", safetysleeptime)
-            packages_persistence = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                                         "job_packages_" + expid)
+            packages_persistence = JobPackagePersistence(expid)
             os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid,
                                   "pkl", "job_packages_" + expid + ".db"), 0o644)
 
@@ -2029,8 +2032,7 @@ class Autosubmit:
         Log.debug("Loading job packages")
         # Packages == wrappers and jobs inside wrappers. Name is also misleading.
         try:
-            packages_persistence = JobPackagePersistence(os.path.join(
-                BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"), "job_packages_" + expid)
+            packages_persistence = JobPackagePersistence(expid)
         except IOError as e:
             raise AutosubmitError(
                 "job_packages not found", 6016, str(e))
@@ -2704,8 +2706,7 @@ class Autosubmit:
         try:
             if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrapper:
                 # Class constructor creates table if it does not exist
-                packages_persistence = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                                             "job_packages_" + expid)
+                packages_persistence = JobPackagePersistence(expid)
                 # Permissions
                 os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl", "job_packages_" + expid + ".db"), 0o644)
                 # Database modification
@@ -2717,11 +2718,9 @@ class Autosubmit:
                                                            packages_persistence, True)
 
                 packages = packages_persistence.load(True)
-                packages += JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                                  "job_packages_" + expid).load()
+                packages += JobPackagePersistence(expid).load()
             else:
-                packages = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                                 "job_packages_" + expid).load()
+                packages = JobPackagePersistence(expid).load()
         except BaseException as e:
             if profile:
                 profiler.stop()
@@ -2782,7 +2781,7 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def statistics(expid, filter_type, filter_period, file_format, section_summary, jobs_summary, hide, notransitive=False, db = False):
+    def statistics(expid, filter_type, filter_period, file_format, section_summary, jobs_summary, hide, notransitive=False):
         """
         Plots statistics graph for a given experiment.
         Plot is created in experiment's plot folder with name <expid>_<date>_<time>.<file_format>
@@ -2801,8 +2800,6 @@ class Autosubmit:
         :type hide: bool
         :param notransitive: Reduces workflow linkage complexity
         :type hide: bool
-        :param db: Use database to get the statistics
-        :type db: bool
         """
         from .monitor.monitor import Monitor
 
@@ -3017,15 +3014,10 @@ class Autosubmit:
                     job.recover_last_ready_date()
                     job.recover_last_log_name()
                 elif job.status != Status.SUSPENDED:
-                    job.update_parameters(as_conf, set_attributes=True)
                     job.status = Status.WAITING
                     job._fail_count = 0
-                    # Log.info("CHANGED job '{0}' status to WAITING".format(job.name))
-                    # Log.status("CHANGED job '{0}' status to WAITING".format(job.name))
-
-                if save and job.status != Status.COMPLETED:
-                    job.update_parameters(as_conf, set_attributes=True)
-
+                    Log.info("CHANGED job '{0}' status to WAITING".format(job.name))
+                # Update parameters with attributes is called in: build_packages, submit wrappers, and for every ready job. It shouldn't be necessary here.
             end = datetime.datetime.now()
             Log.info("Time spent: '{0}'".format(end - start))
             Log.info("Updating the jobs list")
@@ -3042,8 +3034,7 @@ class Autosubmit:
             raise AutosubmitCritical("Couldn't restore the experiment workflow", 7040, str(e))
 
         try:
-            packages = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                             "job_packages_" + expid).load()
+            packages = JobPackagePersistence(expid).load()
 
             groups_dict = dict()
             if group_by:
@@ -3172,14 +3163,6 @@ class Autosubmit:
             raise AutosubmitCritical("Checking incomplete due an unknown error. Please check the trace", 7070, str(e))
 
         return job_list.check_scripts(as_conf)
-
-    @staticmethod
-    def capitalize_keys(dictionary):
-        upper_dictionary = defaultdict()
-        for key in list(dictionary.keys()):
-            upper_key = key.upper()
-            upper_dictionary[upper_key] = dictionary[key]
-        return upper_dictionary
 
     @staticmethod
     def report(expid, template_file_path="", show_all_parameters=False, folder_path="", placeholders=False):
@@ -3486,7 +3469,7 @@ class Autosubmit:
             global_logs_path = local_root_path / 'logs'
             structures_path = local_root_path / 'metadata/structures'
             historicdb_path = local_root_path / 'metadata/data'
-            historiclog_path = local_root_path / 'metadata/logs'           
+            historiclog_path = local_root_path / 'metadata/logs'
 
             if platforms_conf_path is not None and len(str(platforms_conf_path)) > 0:
                 platforms_conf_path = Path(platforms_conf_path).expanduser().resolve()
@@ -3573,10 +3556,6 @@ class Autosubmit:
         Can be configured at system, user or local levels. Local level configuration precedes user level and user level
         precedes system configuration.
         """
-
-        not_enough_screen_size_msg = 'The size of your terminal is not enough to draw the configuration wizard,\n' \
-                                     'so we\'ve closed it to prevent errors. Resize it and then try it again.'
-
         home_path = Path("~").expanduser().resolve()
 
         try:
@@ -4122,7 +4101,6 @@ class Autosubmit:
         corrupted_db_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}_corrupted.db".format(expid))
 
         database_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}.db".format(expid))
-        database_backup_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}.sql".format(expid))
         dump_file_name = 'job_data_{0}.sql'.format(expid, current_time)
         dump_file_path = os.path.join(BasicConfig.JOBDATA_DIR, dump_file_name)
         bash_command = 'cat {1} | sqlite3 {0}'.format(database_path, dump_file_path)
@@ -4231,7 +4209,7 @@ class Autosubmit:
 
         from autosubmit.provenance.rocrate import create_rocrate_archive
         return create_rocrate_archive(as_conf, rocrate_json, jobs, start_time, end_time, path)
-    
+
     @staticmethod
     def provenance(expid: str, rocrate: bool = False) -> None:
         """
@@ -4242,7 +4220,7 @@ class Autosubmit:
         :param rocrate: flag to enable RO-Crate
         :type rocrate: bool
         """
-        
+
         if not rocrate:
             msg = "Can not create RO-Crate ZIP file. Argument '--rocrate' required"
             raise AutosubmitCritical(msg, 7012)
@@ -4259,7 +4237,7 @@ class Autosubmit:
             Log.info('RO-Crate ZIP file created!')
         except Exception as e:
             raise AutosubmitCritical(f"Error creating RO-Crate ZIP file: {str(e)}", 7012)
-    
+
     @staticmethod
     def archive(expid, noclean=True, uncompress=True, rocrate=False):
         """
@@ -4576,8 +4554,7 @@ class Autosubmit:
                     job_list.save()
                     as_conf.save()
                     try:
-                        packages_persistence = JobPackagePersistence(
-                            os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"), "job_packages_" + expid)
+                        packages_persistence = JobPackagePersistence(expid)
                         packages_persistence.reset_table()
                         packages_persistence.reset_table(True)
                     except Exception:
@@ -4671,7 +4648,7 @@ class Autosubmit:
                     current_length) + " jobs.")
         else:
             Log.info(job_list.print_with_status())
-            Log.status(job_list.print_with_status())
+            Log.status(job_list.print_with_status(nocolor=True))
 
 
     @staticmethod
@@ -5244,7 +5221,6 @@ class Autosubmit:
                 #### Starts the filtering process ####
                 final_list = []
                 jobs_filtered = []
-                jobs_left_to_be_filtered = True
                 final_status = Autosubmit._get_status(final)
                 # I have the impression that whoever did this function thought about the possibility of having multiple filters at the same time
                 # But, as it was, it is not possible to have multiple filters at the same time due to the way the code is written
@@ -5394,9 +5370,7 @@ class Autosubmit:
                 if not noplot:
                     from .monitor.monitor import Monitor
                     if as_conf.get_wrapper_type() != 'none' and check_wrapper:
-                        packages_persistence = JobPackagePersistence(
-                            os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                            "job_packages_" + expid)
+                        packages_persistence = JobPackagePersistence(expid)
                         os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR,
                                               expid, "pkl", "job_packages_" + expid + ".db"), 0o775)
                         packages_persistence.reset_table(True)
@@ -5408,8 +5382,7 @@ class Autosubmit:
 
                         packages = packages_persistence.load(True)
                     else:
-                        packages = JobPackagePersistence(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                                         "job_packages_" + expid).load()
+                        packages = JobPackagePersistence(expid).load()
                     groups_dict = dict()
                     if group_by:
                         status = list()
@@ -5567,8 +5540,7 @@ class Autosubmit:
         if storage_type == 'pkl':
             return JobListPersistencePkl()
         elif storage_type == 'db':
-            return JobListPersistenceDb(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"),
-                                        "job_list_" + expid)
+            return JobListPersistenceDb(expid)
         raise AutosubmitCritical('Storage type not known', 7014)
 
     @staticmethod
@@ -5799,65 +5771,6 @@ class Autosubmit:
         return job_list
 
     @staticmethod
-    def rerun_recovery(expid, job_list, rerun_list, as_conf):
-        """
-        Method to check all active jobs. If COMPLETED file is found, job status will be changed to COMPLETED,
-        otherwise it will be set to WAITING. It will also update the jobs list.
-
-        :param expid: identifier of the experiment to recover
-        :type expid: str
-        :param job_list: job list to update
-        :type job_list: JobList
-        :param rerun_list: list of jobs to rerun
-        :type rerun_list: list
-        :param as_conf: AutosubmitConfig object
-        :type as_conf: AutosubmitConfig
-        :return:
-
-
-        """
-
-        hpcarch = as_conf.get_platform()
-        submitter = Autosubmit._get_submitter(as_conf)
-        try:
-            submitter.load_platforms(as_conf)
-            if submitter.platforms is None:
-                raise AutosubmitCritical("platforms couldn't be loaded", 7014)
-        except Exception as e:
-            raise AutosubmitCritical("platforms couldn't be loaded", 7014)
-        platforms = submitter.platforms
-
-        platforms_to_test = set()
-        for job in job_list.get_job_list():
-            if job.platform_name is None:
-                job.platform_name = hpcarch
-            # noinspection PyTypeChecker
-            job.platform = platforms[job.platform_name]
-            # noinspection PyTypeChecker
-            platforms_to_test.add(platforms[job.platform_name])
-        rerun_names = []
-
-        [rerun_names.append(job.name) for job in rerun_list.get_job_list()]
-        jobs_to_recover = [
-            i for i in job_list.get_job_list() if i.name not in rerun_names]
-
-        Log.info("Looking for COMPLETED files")
-        start = datetime.datetime.now()
-        for job in jobs_to_recover:
-            if job.platform_name is None:
-                job.platform_name = hpcarch
-            # noinspection PyTypeChecker
-            job.platform = platforms[job.platform_name.upper()]
-
-            if job.platform.get_completed_files(job.name, 0):
-                job.status = Status.COMPLETED
-                Log.info(
-                    "CHANGED job '{0}' status to COMPLETED".format(job.name))
-
-            job.platform.get_logs_files(expid, job.remote_logs)
-        return job_list
-
-    @staticmethod
     def cat_log(exp_or_job_id: str, file: Union[None, str], mode: Union[None, str], inspect:bool=False) -> bool:
         """The cat-log command allows users to view Autosubmit logs using the command-line.
 
@@ -5986,15 +5899,16 @@ class Autosubmit:
             return view_file(workflow_log_file, mode) == 0
 
     @staticmethod
-    def stop(expids, force=False, all=False, force_all=False, cancel=False, current_status="", status='FAILED'):
-        """
-        The stop command allows users to stop the desired experiments.
+    def stop(expids: str, force=False, all_expids=False, force_all=False, cancel=False,
+             current_status="", status="FAILED") -> None:
+        """The stop command allows users to stop the desired experiments.
+
         :param expids: expids to stop
         :type expids: str
         :param force: force the stop of the experiment
         :type force: bool
-        :param all: stop all experiments
-        :type all: bool
+        :param all_expids: stop all experiments
+        :type all_expids: bool
         :param force_all: force the stop of all experiments
         :type force_all: bool
         :param cancel: cancel the jobs of the experiment
@@ -6003,110 +5917,57 @@ class Autosubmit:
         :type current_status: str
         :param status: status to change the active jobs to
         :type status: str
-        :return:
         """
-        def retrieve_expids():
-            # Retrieve all expids in use by autosubmit attached to my current user
-            expids = []
-            try:
-                command = 'ps -ef | grep "$(whoami)" | grep -oP "(?<=run )\w{4}" | sort -u'
+        from autosubmit.helpers.processes import process_id, retrieve_expids
+        from autosubmit.job.job_utils import cancel_jobs
 
-                process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
-                output, error = process.communicate()
-                output = output.decode(locale.getlocale()[1])
-                #delete -u from output
-                output = output.replace("-u", "")
-                expids = output.split('\n')
-                # delete empty strings
-                expids = [x for x in expids if x]
-            except Exception as e:
-                raise AutosubmitCritical(
-                    "An error occurred while retrieving the expids", 7011, str(e))
-            return expids
-
-        # Starts there
         if status not in Status.VALUE_TO_KEY.values():
-            raise AutosubmitCritical("Invalid status. Expected one of {0}".format(Status.VALUE_TO_KEY.keys()), 7011)
-        if "," in current_status:
-            current_status = current_status.upper().split(",")
-        else:
-            current_status = current_status.upper().split(" ")
+            raise AutosubmitCritical(f"Invalid status. Expected one of {Status.VALUE_TO_KEY.keys()}", 7011)
+
         try:
+            current_status = current_status.replace(',', ' ').split(' ')
+            current_status = [status.upper() for status in filter(lambda x: x, current_status)]
             current_status = [Status.KEY_TO_VALUE[x.strip()] for x in current_status]
-        except Exception as e:
-            raise AutosubmitCritical("Invalid status -fs. All values must match one of {0}".format(Status.VALUE_TO_KEY.keys()), 7011)
+        except KeyError:
+            raise AutosubmitCritical(f"Invalid status -fs. All values must match one "
+                                     f"of {Status.VALUE_TO_KEY.keys()}", 7011)
 
-
-        # First retrieve expids
-        if force_all:
-            all=True
-        if all:
+        if all_expids:
             expids = retrieve_expids()
-            if not force_all:
-                expids = [expid.lower() for expid in expids if input(f"Do you really want to stop the experiment: {expid} (y/n)[enter=y]? ").lower() in ["true","yes","y","1",""]]
         else:
-            expids = expids.lower()
-            if "," in expids:
-                expids = expids.split(",")
-            else:
-                expids = expids.split(" ")
+            expids = expids.replace(',', ' ').split(' ')
+            expids = [expid.lower() for expid in filter(lambda x: x, expids)]
 
-        expids = [x.strip() for x in expids]
-        # Obtain the proccess id
-        errors = ""
-        valid_expids = []
+        truthy_values = ["true", "yes", "y", "1", ""]
+        if not force_all:
+            expids = [
+                expid
+                for expid in expids
+                if input(f"Confirm stopping the experiment: {expid} (y/n)[enter=y]? ").lower() in truthy_values
+            ]
+
+        sig_to_process = signal.SIGKILL if force else signal.SIGINT
+        killed_expids = []
         for expid in expids:
-            process_id_ = proccess_id(expid)
-            if not process_id_:
+            pid: int = process_id(expid)
+            if not pid or pid <= 1:
                 Log.info(f"Expid {expid} was not running")
-                valid_expids.append(expid)
-            elif process_id_:
-                # Send the signal to stop the autosubmit process
-                try:
-                    if force:
-                        try:
-                            os.kill(int(process_id_), signal.SIGKILL) # don't wait for logs
-                        except Exception:
-                            continue
-                    else:
-                        try:
-                            os.kill(int(process_id_), signal.SIGINT) # wait for logs
-                        except Exception:
-                            continue
-                    valid_expids.append(expid)
-                except Exception as e:
-                    Log.warning(f"An error occurred while stopping the autosubmit process for expid:{expid}: {str(e)}")
-        for expid in valid_expids:
+                continue
+            try:
+                os.kill(pid, sig_to_process)
+                killed_expids.append(expid)
+            except Exception as e:
+                Log.warning(f"An error occurred while stopping the autosubmit process for expid '{expid}': {str(e)}")
+
+        for expid in killed_expids:
             if not force:
                 Log.info(f"Checking the status of the expid: {expid}")
-                process_end = False
-                while (not process_end):
-                    if not proccess_id(expid):
+                while True:
+                    if not process_id(expid):
                         Log.info(f"Expid {expid} is stopped")
-                        process_end = True
-                    else:
-                        Log.info(f"Waiting for the autosubmit run to safety stop: {expid}")
-                        sleep(5)
+                        break
+                    Log.info(f"Waiting for the autosubmit run to safety stop: {expid}")
+                    sleep(5)
             if cancel:
-                # call prepare_run to obtain the platforms and as_conf
-                job_list, _, _, _, as_conf, _, _, _ = Autosubmit.prepare_run(
-                    expid,check_scripts=False)
-                # get active jobs
-                active_jobs = [job for job in job_list.get_job_list() if
-                               job.status in current_status]
-                # change status of active jobs
-                status = status.upper()
-                if not active_jobs:
-                    Log.info(f"No active jobs found for expid {expid}")
-                    return
-                for job in active_jobs:
-                    # Cancel from the remote platform
-                    Log.info(f'Cancelling job {job.name} on platform {job.platform.name}')
-                    try:
-                        job.platform.send_command(job.platform.cancel_cmd + " " + str(job.id), ignore_log=True)
-                    except Exception as e:
-                        Log.warning(f"{str(e)}")
-                    Log.info(f"Changing status of job {job.name} to {status}")
-                    if status in Status.VALUE_TO_KEY.values():
-                        job.status = Status.KEY_TO_VALUE[status]
-                job_list.save()
+                job_list, _, _, _, _, _, _, _ = Autosubmit.prepare_run(expid, check_scripts=False)
+                cancel_jobs(job_list, active_jobs_filter=current_status, target_status=status)

@@ -165,7 +165,7 @@ class Job(object):
         'log_avaliable', 'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        'end_time_timestamp', '_log_recovered', 'packed_during_building'
+        'end_time_timestamp', '_log_recovered', 'packed_during_building', 'workflow_commit'
     )
 
     def __setstate__(self, state):
@@ -312,6 +312,7 @@ class Job(object):
         self._custom_directives = None
         self.end_time_timestamp = None
         self.packed_during_building = False
+        self.workflow_commit = None
         if loaded_data:
             self.__setstate__(loaded_data)
             self.status = Status.WAITING if self.status in [Status.DELAYED,
@@ -1112,16 +1113,6 @@ class Job(object):
         """
         self.parents.remove(parent)
 
-    def delete_child(self, child):
-        """
-        Removes a child from the job
-
-        :param child: child to remove
-        :type child: Job
-        """
-        # careful it is only possible to remove one child at a time
-        self.children.remove(child)
-
     def has_children(self):
         """
         Returns true if job has any children, else return false
@@ -1582,27 +1573,27 @@ class Job(object):
 
         return parameters
 
-    def update_platform_parameters(self, as_conf, parameters, job_platform, set_attributes):
-        if set_attributes and not job_platform:
+    def update_platform_parameters(self, as_conf, parameters):
+        if not self.platform:
             submitter = job_utils._get_submitter(as_conf)
             submitter.load_platforms(as_conf)
             if not self.platform_name:
                 self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
             job_platform = submitter.platforms.get(self.platform_name)
             self.platform = job_platform
-        parameters['CURRENT_ARCH'] = job_platform.name
-        parameters['CURRENT_HOST'] = job_platform.host
-        parameters['CURRENT_USER'] = job_platform.user
-        parameters['CURRENT_PROJ'] = job_platform.project
-        parameters['CURRENT_BUDG'] = job_platform.budget
-        parameters['CURRENT_RESERVATION'] = job_platform.reservation
-        parameters['CURRENT_EXCLUSIVITY'] = job_platform.exclusivity
-        parameters['CURRENT_HYPERTHREADING'] = job_platform.hyperthreading
-        parameters['CURRENT_TYPE'] = job_platform.type
-        parameters['CURRENT_SCRATCH_DIR'] = job_platform.scratch
-        parameters['CURRENT_PROJ_DIR'] = job_platform.project_dir
-        parameters['CURRENT_ROOTDIR'] = job_platform.root_dir
-        parameters['CURRENT_LOGDIR'] = job_platform.get_files_path()
+        parameters['CURRENT_ARCH'] = self.platform.name
+        parameters['CURRENT_HOST'] = self.platform.host
+        parameters['CURRENT_USER'] = self.platform.user
+        parameters['CURRENT_PROJ'] = self.platform.project
+        parameters['CURRENT_BUDG'] = self.platform.budget
+        parameters['CURRENT_RESERVATION'] = self.platform.reservation
+        parameters['CURRENT_EXCLUSIVITY'] = self.platform.exclusivity
+        parameters['CURRENT_HYPERTHREADING'] = self.platform.hyperthreading
+        parameters['CURRENT_TYPE'] = self.platform.type
+        parameters['CURRENT_SCRATCH_DIR'] = self.platform.scratch
+        parameters['CURRENT_PROJ_DIR'] = self.platform.project_dir
+        parameters['CURRENT_ROOTDIR'] = self.platform.root_dir
+        parameters['CURRENT_LOGDIR'] = self.platform.get_files_path()
         return parameters
 
     def process_scheduler_parameters(self, job_platform, chunk):
@@ -1835,15 +1826,15 @@ class Job(object):
         self.wallclock = increase_wallclock_by_chunk(
             self.wallclock, self.wchunkinc, chunk)
 
-    def update_platform_associated_parameters(self, as_conf, parameters, job_platform, chunk, set_attributes):
+    def update_platform_associated_parameters(self, as_conf, parameters: dict, chunk, set_attributes):
         if set_attributes:
             self.x11_options = str(parameters.get("CURRENT_X11_OPTIONS", ""))
             self.ec_queue = str(parameters.get("CURRENT_EC_QUEUE", ""))
             self.executable = parameters.get("CURRENT_EXECUTABLE", "")
             self.total_jobs = parameters.get("CURRENT_TOTALJOBS",
-                                             parameters.get("CURRENT_TOTAL_JOBS", job_platform.total_jobs))
+                                             parameters.get("CURRENT_TOTAL_JOBS", self.platform.total_jobs))
             self.max_waiting_jobs = parameters.get("CURRENT_MAXWAITINGJOBS", parameters.get("CURRENT_MAX_WAITING_JOBS",
-                                                                                            job_platform.max_waiting_jobs))
+                                                                                            self.platform.max_waiting_jobs))
             self.processors = parameters.get("CURRENT_PROCESSORS", "1")
             self.shape = parameters.get("CURRENT_SHAPE", "")
             self.processors_per_node = parameters.get("CURRENT_PROCESSORS_PER_NODE", "1")
@@ -1860,7 +1851,7 @@ class Job(object):
             self.memory_per_task = parameters.get("CURRENT_MEMORY_PER_TASK", parameters.get("CURRENT_MEMORY_PER_TASK", ""))
             self.wallclock = parameters.get("CURRENT_WALLCLOCK", parameters.get("CURRENT_MAX_WALLCLOCK", parameters.get("CONFIG.JOB_WALLCLOCK", "24:00")))
             self.custom_directives = parameters.get("CURRENT_CUSTOM_DIRECTIVES", "")
-            self.process_scheduler_parameters(job_platform, chunk)
+            self.process_scheduler_parameters(self.platform, chunk)
             if self.het.get('HETSIZE', 1) > 1:
                 for name, components_value in self.het.items():
                     if name != "HETSIZE":
@@ -2186,11 +2177,12 @@ class Job(object):
         self.retrials = parameters["RETRIALS"]
         self.reservation = parameters["RESERVATION"]
 
-    def reset_logs(self):
+    def reset_logs(self, as_conf: AutosubmitConfig) -> None:
         self.log_recovered = False
         self.packed_during_building = False
+        self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT", {}).get("WORKFLOW_COMMIT", "")
 
-    def update_parameters(self, as_conf: AutosubmitConfig, set_attributes: bool = False, reset_logs: bool = False) -> None:
+    def update_parameters(self, as_conf: AutosubmitConfig, set_attributes: bool = False, reset_logs: bool = False) -> dict:
         """
         Refresh the job's parameters value.
 
@@ -2211,7 +2203,7 @@ class Job(object):
         if set_attributes:
             as_conf.reload()
             if reset_logs:
-                self.reset_logs()
+                self.reset_logs(as_conf)
             self._init_runtime_parameters()
             if not hasattr(self, "start_time"):
                 self.start_time = datetime.datetime.now()
@@ -2220,12 +2212,12 @@ class Job(object):
         parameters = as_conf.load_parameters()
         parameters.update(as_conf.default_parameters)
         parameters = as_conf.substitute_dynamic_variables(parameters, 25)
-        parameters = self.update_platform_parameters(as_conf, parameters, self._platform, set_attributes)
+        parameters = self.update_platform_parameters(as_conf, parameters)
         parameters = self.update_current_parameters(as_conf, parameters)
         parameters = as_conf.deep_read_loops(parameters)
         parameters = as_conf.substitute_dynamic_variables(parameters, 25)
         parameters = self.update_job_parameters(as_conf, parameters, set_attributes)
-        parameters = self.update_platform_associated_parameters(as_conf, parameters, self._platform, parameters['CHUNK'], set_attributes)
+        parameters = self.update_platform_associated_parameters(as_conf, parameters, parameters['CHUNK'], set_attributes)
         parameters = self.update_wrapper_parameters(as_conf, parameters)
         if set_attributes:
             self.update_job_variables_final_values(parameters)
@@ -2500,10 +2492,13 @@ class Job(object):
 
         # Writing database
         exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-        exp_history.write_submit_time(self.name, submit=data_time[1], status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), ncpus=self.processors,
-                                    wallclock=self.wallclock, qos=self.queue, date=self.date, member=self.member, section=self.section, chunk=self.chunk,
-                                    platform=self.platform_name, job_id=self.id, wrapper_queue=self._wrapper_queue, wrapper_code=get_job_package_code(self.expid, self.name),
-                                    children=self.children_names_str)
+        exp_history.write_submit_time(self.name, submit=data_time[1],
+                                      status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), ncpus=self.processors,
+                                      wallclock=self.wallclock, qos=self.queue, date=self.date, member=self.member,
+                                      section=self.section, chunk=self.chunk,
+                                      platform=self.platform_name, job_id=self.id, wrapper_queue=self._wrapper_queue,
+                                      wrapper_code=get_job_package_code(self.expid, self.name),
+                                      children=self.children_names_str, workflow_commit=self.workflow_commit)
 
     def update_start_time(self, count=-1):
         start_time_ = self.check_start_time(count) # last known start time from the .cmd file
@@ -2582,43 +2577,6 @@ class Job(object):
             thread_write_finish.name = "JOB_data_{}".format(self.name)
             thread_write_finish.start()
 
-
-    def write_total_stat_by_retries(self, total_stats, first_retrial = False):
-        """
-        Writes all data to TOTAL_STATS file
-        :param total_stats: data gathered by the wrapper
-        :type total_stats: dict
-        :param first_retrial: True if this is the first retry, False otherwise
-        :type first_retrial: bool
-
-        """
-        path = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
-        f = open(path, 'a')
-        if first_retrial:
-            f.write(" " + date2str(datetime.datetime.fromtimestamp(total_stats[0]), 'S') + ' ' + date2str(datetime.datetime.fromtimestamp(total_stats[1]), 'S') + ' ' + total_stats[2])
-        else:
-            f.write('\n' + date2str(datetime.datetime.fromtimestamp(total_stats[0]), 'S') + ' ' + date2str(datetime.datetime.fromtimestamp(total_stats[0]), 'S') + ' ' + date2str(datetime.datetime.fromtimestamp(total_stats[1]), 'S') + ' ' + total_stats[2])
-        out, err = self.local_logs
-        path_out = os.path.join(self._tmp_path, 'LOG_' + str(self.expid), out)
-        # Launch first as simple non-threaded function
-
-        exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-        exp_history.write_start_time(self.name, start=total_stats[0], status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), qos=self.queue, job_id=self.id, wrapper_queue=self._wrapper_queue, wrapper_code=get_job_package_code(self.expid, self.name),
-                                    children=self.children_names_str)
-        if not first_retrial:
-            exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-            exp_history.write_submit_time(self.name, submit=total_stats[0], status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), ncpus=self.processors,
-                                        wallclock=self.wallclock, qos=self.queue, date=self.date, member=self.member, section=self.section, chunk=self.chunk,
-                                        platform=self.platform_name, job_id=self.id, wrapper_queue=self._wrapper_queue, wrapper_code=get_job_package_code(self.expid, self.name),
-                                        children=self.children_names_str)
-        exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-        job_data_dc = exp_history.write_finish_time(self.name, finish=total_stats[1], status=total_stats[2], job_id=self.id, out_file=out, err_file=err)
-         # Launch second as threaded function only for slurm
-        if job_data_dc and type(self.platform) is not str and self.platform.type == "slurm":
-            thread_write_finish = Thread(target=ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR).write_platform_data_after_finish, args=(job_data_dc, self.platform))
-            thread_write_finish.name = "JOB_data_{}".format(self.name)
-            thread_write_finish.start()
-
     def check_started_after(self, date_limit):
         """
         Checks if the job started after the given date
@@ -2667,16 +2625,6 @@ class Job(object):
             elif parent.is_ancestor(job):
                 return True
         return False
-
-    def remove_redundant_parents(self):
-        """
-        Checks if a parent is also an ancestor, if true, removes the link in both directions.
-        Useful to remove redundant dependencies.
-        """
-        for parent in list(self.parents):
-            if self.is_ancestor(parent):
-                parent.children.remove(self)
-                self.parents.remove(parent)
 
     def synchronize_logs(self, platform, remote_logs, local_logs, last = True):
         platform.move_file(remote_logs[0], local_logs[0], True)  # .out

@@ -574,9 +574,7 @@ class ParamikoPlatform(Platform):
             x11 = False if job is None else job.x11
             job_id = self.get_submitted_job_id(self.get_ssh_output(), x11 )
             if job:
-                Log.result(f"Job: {job.name} submitted with job_id: {job_id}")
-            else:
-                Log.result(f"Job submitted with job_id: {job_id}")
+                Log.result(f"Job: {job.name} submitted with job_id: {str(job_id).strip()} and workflow commit: {job.workflow_commit}")
             return int(job_id)
         else:
             return None
@@ -1070,15 +1068,6 @@ class ParamikoPlatform(Platform):
                 retries = retries - 1
         if retries <= 0:
             return False , False, False
-    def exec_command_x11(self, command, bufsize=-1, timeout=0, get_pty=False,retries=3, x11=False):
-        session = self.transport.open_session()
-        session.request_x11(handler=self.x11_handler)
-        session.exec_command(command + " ; sleep infinity")
-        session_fileno = session.fileno()
-        self.poller.register(session_fileno, select.POLLIN)
-        self.x11_status_checker(session, session_fileno)
-        pass
-
 
     def send_command_non_blocking(self, command, ignore_log):
         thread = threading.Thread(target=self.send_command, args=(command, ignore_log))
@@ -1179,7 +1168,12 @@ class ParamikoPlatform(Platform):
                     raise AutosubmitError(
                         'SSH Session not active, will restart the platforms', 6005)
                 if errorLine.find("command not found") != -1:
-                    raise AutosubmitCritical("scheduler is not installed.",7052,self._ssh_output_err)
+                    raise AutosubmitError(
+                        f"A platform command was not found. This may be a temporary issue. "
+                        f"Please verify that the correct scheduler is specified for this platform: '{self.name}.{self.type}'.",
+                        7052,
+                        self._ssh_output_err
+                    )
                 elif errorLine.find("syntax error") != -1:
                     raise AutosubmitCritical("Syntax error",7052,self._ssh_output_err)
                 elif errorLine.find("refused") != -1 or errorLine.find("slurm_persist_conn_open_without_init") != -1 or errorLine.find("slurmdbd") != -1 or errorLine.find("submission failed") != -1 or errorLine.find("git clone") != -1 or errorLine.find("sbatch: error: ") != -1 or errorLine.find("not submitted") != -1 or errorLine.find("invalid") != -1 or "[ERR.] PJM".lower() in errorLine:
@@ -1450,18 +1444,6 @@ class ParamikoPlatform(Platform):
                 self.transport.close()
                 self.transport.stop_thread()
 
-    def check_tmp_exists(self):
-        try:
-            if self.send_command("ls {0}".format(self.temp_dir)):
-                if "no such file or directory" in str(self.get_ssh_output_err()).lower():
-                    return False
-                else:
-                    return True
-            else:
-                return False
-        except Exception as e:
-            return False
-    
     def check_remote_permissions(self):
         try:
             path = os.path.join(self.scratch, self.project_dir, self.user, "permission_checker_azxbyc")
