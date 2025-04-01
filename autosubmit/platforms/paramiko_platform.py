@@ -230,12 +230,6 @@ class ParamikoPlatform(Platform):
                     if twofactor_nonpush is None:
                         twofactor_nonpush = input("Please type the 2FA/OTP/token code: ")
                     answers.append(twofactor_nonpush)
-        # This is done from the server
-        # if self.two_factor_method == "push":
-        #     try:
-        #         inputimeout(prompt='Press enter to complete the 2FA PUSH authentication', timeout=self.otp_timeout)
-        #     except:
-        #         pass
         return tuple(answers)
 
     def map_user_config_file(self, as_conf) -> None:
@@ -1192,7 +1186,6 @@ class ParamikoPlatform(Platform):
                     Log.printlog(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6006)
                 else:
                     pass
-                    #Log.debug('Command {0} in {1} successful without message: {2}', command, self.host, self._ssh_output)
             return True
         except AttributeError as e:
             raise AutosubmitError(f'Session not active: {str(e)}', 6005)
