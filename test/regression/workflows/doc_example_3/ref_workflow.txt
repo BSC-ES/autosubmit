@@ -1,0 +1,16 @@
+## String representation of Job List [15]  ##
+a002_ONCE ~ [2 children]
+|  a002_20000101_DATE ~ [2 children]
+|  |  a002_20000101_Member1_MEMBER ~ [2 children]
+|  |  |  a002_20000101_Member1_1_CHUNK
+|  |  |  a002_20000101_Member1_2_CHUNK
+|  |  a002_20000101_Member2_MEMBER ~ [2 children]
+|  |  |  a002_20000101_Member2_1_CHUNK
+|  |  |  a002_20000101_Member2_2_CHUNK
+|  a002_20000201_DATE ~ [2 children]
+|  |  a002_20000201_Member1_MEMBER ~ [2 children]
+|  |  |  a002_20000201_Member1_1_CHUNK
+|  |  |  a002_20000201_Member1_2_CHUNK
+|  |  a002_20000201_Member2_MEMBER ~ [2 children]
+|  |  |  a002_20000201_Member2_1_CHUNK
+|  |  |  a002_20000201_Member2_2_CHUNK
