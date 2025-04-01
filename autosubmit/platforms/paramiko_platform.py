@@ -1218,6 +1218,9 @@ class ParamikoPlatform(Platform):
         """
         raise NotImplementedError
 
+    def generate_submit_script(self):
+        pass
+
     def get_submit_cmd(self, job_script, job, hold=False, export=""):
         """
         Get command to add job to scheduler
