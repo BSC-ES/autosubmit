@@ -64,6 +64,43 @@ jobs:
             --cov-report=xml:test/coverage.xml --cov-append \
             test/unit
 
+      - name: Coverage report
+        run: |
+          coverage xml
+          coverage report
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage_unit_py-${{ matrix.python-version }}
+          path: coverage.xml
+          retention-days: 7
+
+  test-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies
+        run: sudo apt-get install -y graphviz rsync curl
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip packaging setuptools twine
+          pip install --upgrade -e .[all]
+
       # In GitHub Actions we run all the integration tests, including those that require
       # dependencies such as Docker (see `-m ''`, which means all markers). Read the
       # CONTRIBUTING.md file for details how to set up your environment to run these.
@@ -92,12 +129,58 @@ jobs:
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coverage_${{ matrix.os }}_py-${{ matrix.python-version }}
+          name: coverage_integration_py-${{ matrix.python-version }}
+          path: coverage.xml
+          retention-days: 7
+
+  test-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies
+        run: sudo apt-get install -y graphviz rsync curl
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip packaging setuptools twine
+          pip install --upgrade -e .[all]
+
+      # Run regression tests
+      - name: Regression tests
+        run: |
+          pytest \
+            --cov=autosubmit --cov-config=.coveragerc \
+            --cov-report=xml:test/coverage.xml --cov-append \
+            test/regression \
+            -m ''
+
+      - name: Coverage report
+        run: |
+          coverage xml
+          coverage report
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage_regression_py-${{ matrix.python-version }}
           path: coverage.xml
           retention-days: 7
 
   coverage:
-    needs: test
+    needs: [test, test-integration, test-regression]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
