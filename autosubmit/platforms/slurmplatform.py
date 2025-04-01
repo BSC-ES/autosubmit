@@ -93,6 +93,7 @@ class SlurmPlatform(ParamikoPlatform):
     def process_batch_ready_jobs(self,valid_packages_to_submit,failed_packages,error_message="",hold=False):
         """
         Retrieve multiple jobs identifiers.
+
         :param valid_packages_to_submit:
         :param failed_packages:
         :param error_message:
@@ -465,6 +466,7 @@ class SlurmPlatform(ParamikoPlatform):
     def parse_queue_reason(self, output, job_id):
         """
         Parses the queue reason from the output of the command
+
         :param output: output of the command
         :param job_id: job id
         :return: queue reason
@@ -511,14 +513,16 @@ class SlurmPlatform(ParamikoPlatform):
         """
         Checks if a file exists on the FTP server.
 
-        Args:
-            filename (str): The name of the file to check.
-            wrapper_failed (bool): Whether the wrapper has failed. Defaults to False.
-            sleeptime (int): Time to sleep between retries in seconds. Defaults to 5.
-            max_retries (int): Maximum number of retries. Defaults to 3.
-
-        Returns:
-            bool: True if the file exists, False otherwise.
+        :param filename: The name of the file to check.
+        :type filename: str
+        :param wrapper_failed: Whether the wrapper has failed. Defaults to False.
+        :type wrapper_failed: bool
+        :param sleeptime: Time to sleep between retries in seconds. Defaults to 5.
+        :type sleeptime: int
+        :param max_retries: Maximum number of retries. Defaults to 3.
+        :type max_retries: int
+        :return: True if the file exists, False otherwise.
+        :rtype: bool
         """
         # Todo in a future refactor, check the sleeptime retrials of these function, previously it was waiting a lot of time
         file_exist = False

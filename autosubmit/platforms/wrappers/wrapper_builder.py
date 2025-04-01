@@ -449,13 +449,15 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
         """
         Builds a part of the vertical wrapper cmd launcher script.
         This script writes the start and finish time of each inner_job.
-        Args:
-            jobs_list (List[str]): List of job scripts.
-            thread (str): inner_job to be executed.
-            footer (bool): If True, includes the footer in the script. Defaults to True.
 
-        Returns:
-            str: Part of the final vertical wrapper script.
+        :param jobs_list: List of job scripts.
+        :type jobs_list: List[str]
+        :param thread: inner_job to be executed.
+        :type thread: str
+        :param footer: If True, includes the footer in the script. Defaults to True.
+        :type footer: bool
+        :return: Part of the final vertical wrapper script.
+        :rtype: str
         """
         sequential_threads_launcher = textwrap.dedent("""
         failed_wrapper = os.path.join(os.getcwd(),wrapper_id)
