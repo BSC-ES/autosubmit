@@ -1502,9 +1502,16 @@ class Job(object):
 
             # Read and store metrics here
             try:
-                metric_procesor = UserMetricProcessor(as_conf, self)
-                metrics_specs = metric_procesor.read_metrics_specs()
-                metric_procesor.process_metrics_specs(metrics_specs)
+                exp_history = ExperimentHistory(
+                    self.expid,
+                    jobdata_dir_path=BasicConfig.JOBDATA_DIR,
+                    historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR,
+                )
+                last_run_id = (
+                    exp_history.manager.get_experiment_run_dc_with_max_id().run_id
+                )
+                metric_procesor = UserMetricProcessor(as_conf, self, last_run_id)
+                metric_procesor.process_metrics()
             except Exception as exc:
                 # Warn if metrics are not processed
                 Log.warning(f"Error processing metrics for job {self.name}: {exc}")
