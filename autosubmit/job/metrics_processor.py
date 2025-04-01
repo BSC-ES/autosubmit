@@ -15,7 +15,8 @@ if TYPE_CHECKING:
     # Avoid circular imports
     from autosubmit.job.job import Job
 
-MAX_FILE_SIZE = 4 * 1024 * 1024  # Default 4MB max file size
+# Default 16MB max file size
+MAX_FILE_SIZE = 16 * 1024 * 1024
 
 
 class MetricSpecSelectorType(Enum):
@@ -68,6 +69,7 @@ class MetricSpec:
     path: str
     filename: str
     selector: MetricSpecSelector
+    max_read_size: int = MAX_FILE_SIZE
 
     @staticmethod
     def load(data: Dict[str, Any]) -> "MetricSpec":
@@ -81,10 +83,18 @@ class MetricSpec:
         _path = data["PATH"]
         _filename = data["FILENAME"]
 
+        _max_read_size = data.get("MAX_READ_SIZE", MAX_FILE_SIZE)
+
         _selector = data.get("SELECTOR", None)
         selector = MetricSpecSelector.load(_selector)
 
-        return MetricSpec(name=_name, path=_path, filename=_filename, selector=selector)
+        return MetricSpec(
+            name=_name,
+            path=_path,
+            filename=_filename,
+            max_read_size=_max_read_size,
+            selector=selector,
+        )
 
 
 class UserMetricRepository:
@@ -99,6 +109,7 @@ class UserMetricRepository:
                 """
                 CREATE TABLE IF NOT EXISTS user_metrics (
                     user_metric_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id INTEGER,
                     job_name TEXT,
                     metric_name TEXT,
                     metric_value TEXT,
@@ -108,7 +119,9 @@ class UserMetricRepository:
             )
             conn.commit()
 
-    def store_metric(self, job_name: str, metric_name: str, metric_value: Any):
+    def store_metric(
+        self, run_id: int, job_name: str, metric_name: str, metric_value: Any
+    ):
         """
         Store the metric value in the database. Will overwrite the value if it already exists.
         """
@@ -116,16 +129,17 @@ class UserMetricRepository:
             conn.execute(
                 """
                 DELETE FROM user_metrics
-                WHERE job_name = ? AND metric_name = ?;
+                WHERE run_id = ? AND job_name = ? AND metric_name = ?;
                 """,
-                (job_name, metric_name),
+                (run_id, job_name, metric_name),
             )
             conn.execute(
                 """
-                INSERT INTO user_metrics (job_name, metric_name, metric_value, modified)
-                VALUES (?, ?, ?, ?);
+                INSERT INTO user_metrics (run_id, job_name, metric_name, metric_value, modified)
+                VALUES (?, ?, ?, ?, ?);
                 """,
                 (
+                    run_id,
                     job_name,
                     metric_name,
                     str(metric_value),
@@ -136,10 +150,14 @@ class UserMetricRepository:
 
 
 class UserMetricProcessor:
-    def __init__(self, as_conf: AutosubmitConfig, job: "Job"):
+    def __init__(
+        self, as_conf: AutosubmitConfig, job: "Job", run_id: Optional[int] = None
+    ):
         self.as_conf = as_conf
         self.job = job
+        self.run_id = run_id
         self.user_metric_repository = UserMetricRepository(job.expid)
+        self._processed_metrics = {}
 
     def read_metrics_specs(self) -> List[MetricSpec]:
         try:
@@ -149,10 +167,10 @@ class UserMetricProcessor:
 
             # Normalize the parameters keys
             raw_metrics = [
-                self.as_conf.normalize_parameters_keys(metric) for metric in raw_metrics
+                self.as_conf.deep_normalize(metric) for metric in raw_metrics
             ]
-        except Exception:
-            raise ValueError("Invalid or missing metrics section")
+        except Exception as exc:
+            raise ValueError(f"Invalid or missing metrics section: {str(exc)}")
 
         metrics_specs: List[MetricSpec] = []
         for raw_metric in raw_metrics:
@@ -167,100 +185,64 @@ class UserMetricProcessor:
 
         return metrics_specs
 
-    def _group_metrics_by_path_selector_type(
-        self,
-        metrics_specs: List[MetricSpec],
-    ) -> Dict[str, Dict[str, List[MetricSpec]]]:
-        """
-        Group all metrics by file path and selector type.
-        First level key is the file path, second level key is the selector type.
-        """
-        metrics_by_path_selector_type: Dict[str, Dict[str, List[MetricSpec]]] = {}
-        for metric_spec in metrics_specs:
-            spec_path = str(
-                Path(metric_spec.path).joinpath(self.job.name, metric_spec.filename)
-            )
-
-            # If the path is not in the dictionary, add it
-            if spec_path not in metrics_by_path_selector_type:
-                metrics_by_path_selector_type[spec_path] = {}
-
-            # If the selector type is not in the dictionary, add it
-            if (
-                metric_spec.selector.type.value
-                not in metrics_by_path_selector_type[spec_path]
-            ):
-                metrics_by_path_selector_type[spec_path][
-                    metric_spec.selector.type.value
-                ] = []
-
-            metrics_by_path_selector_type[spec_path][
-                metric_spec.selector.type.value
-            ].append(metric_spec)
-
-        return metrics_by_path_selector_type
-
     def store_metric(self, metric_name: str, metric_value: Any):
         """
         Store the metric value in the database
         """
         self.user_metric_repository.store_metric(
-            self.job.name, metric_name, metric_value
+            self.run_id, self.job.name, metric_name, metric_value
         )
+        self._processed_metrics[metric_name] = metric_value
 
-    def process_metrics_specs(self, metrics_specs: List[MetricSpec]):
+    def process_metrics(self):
         """
-        Process the metrics specs of the job
+        Process the metrics of the job
         """
+        # Read the metrics specs from the config
+        metrics_specs = self.read_metrics_specs()
 
-        metrics_by_path_selector_type = self._group_metrics_by_path_selector_type(
-            metrics_specs
-        )
+        # Process the metrics specs
+        for metric_spec in metrics_specs:
+            # Path to the metric file
+            spec_path = str(
+                Path(metric_spec.path).joinpath(self.job.name, metric_spec.filename)
+            )
 
-        # For each file path, read the content of the file
-        for path, metrics_by_selector_type in metrics_by_path_selector_type.items():
             # Read the file from remote platform, it will replace the decoding errors.
             try:
-                content = self.job.platform.read_file(path, max_size=MAX_FILE_SIZE)
-                Log.debug(f"Read file {path}")
+                content = self.job.platform.read_file(
+                    spec_path, max_size=metric_spec.max_read_size
+                )
+                Log.debug(f"Read file {spec_path}")
                 content = content.decode(
                     encoding=locale.getlocale()[1], errors="replace"
                 ).strip()
             except Exception as exc:
-                Log.warning(f"Error reading metric file at {path}: {str(exc)}")
+                Log.warning(f"Error reading metric file at {spec_path}: {str(exc)}")
                 continue
 
             # Process the content based on the selector type
-
-            # Text selector metrics
-            text_selector_metrics = metrics_by_selector_type.get(
-                MetricSpecSelectorType.TEXT.value, []
-            )
-            if text_selector_metrics:
-                for metric in text_selector_metrics:
-                    self.store_metric(metric.name, content)
-
-            # JSON selector metrics
-            json_selector_metrics = metrics_by_selector_type.get(
-                MetricSpecSelectorType.JSON.value, []
-            )
-            if json_selector_metrics:
+            if metric_spec.selector.type == MetricSpecSelectorType.TEXT:
+                # Store the content as a metric
+                self.store_metric(metric_spec.name, content)
+            elif metric_spec.selector.type == MetricSpecSelectorType.JSON:
+                # Parse the JSON content and store the metrics
                 try:
                     json_content = json.loads(content)
-                    for metric in json_selector_metrics:
-                        # Get the value based on the key
-                        try:
-                            key = metric.selector.key
-                            value = copy.deepcopy(json_content)
-                            if key:
-                                for k in key:
-                                    value = value[k]
-                            self.store_metric(metric.name, value)
-                        except Exception:
-                            Log.warning(
-                                f"Error processing JSON content in file {path} for metric {metric.name}"
-                            )
+                    # Get the value based on the key
+                    key = metric_spec.selector.key
+                    value = copy.deepcopy(json_content)
+                    if key:
+                        for k in key:
+                            value = value[k]
+                    self.store_metric(metric_spec.name, value)
                 except json.JSONDecodeError:
-                    Log.warning(f"Invalid JSON content in file {path}")
+                    Log.warning(f"Invalid JSON content in file {spec_path}")
                 except Exception:
-                    Log.warning(f"Error processing JSON content in file {path}")
+                    Log.warning(f"Error processing JSON content in file {spec_path}")
+            else:
+                Log.warning(
+                    f"Unsupported selector type {metric_spec.selector.type} for metric {metric_spec.name}"
+                )
+
+        return self._processed_metrics

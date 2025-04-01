@@ -183,7 +183,7 @@ def test_read_metrics_specs(disable_metric_repository):
             "SELECTOR": {"TYPE": "JSON", "KEY": "key1.key2.key3"},
         },
     ]
-    as_conf.normalize_parameters_keys = lambda x: x
+    as_conf.deep_normalize = lambda x: x
 
     # Do the read test
     user_metric_processor = UserMetricProcessor(as_conf, job)
@@ -202,91 +202,3 @@ def test_read_metrics_specs(disable_metric_repository):
     assert metric_specs[1].filename == "file2"
     assert metric_specs[1].selector.type == MetricSpecSelectorType.JSON
     assert metric_specs[1].selector.key == ["key1", "key2", "key3"]
-
-
-@pytest.mark.parametrize(
-    "metrics_specs, job_name, expected",
-    [
-        (
-            [
-                MetricSpec(
-                    name="metric1",
-                    path="/path/to/",
-                    filename="file1",
-                    selector=MetricSpecSelector(
-                        type=MetricSpecSelectorType.TEXT, key=None
-                    ),
-                ),
-                MetricSpec(
-                    name="metric2",
-                    path="/path/to/",
-                    filename="file1",
-                    selector=MetricSpecSelector(
-                        type=MetricSpecSelectorType.JSON, key=["key1"]
-                    ),
-                ),
-                MetricSpec(
-                    name="metric3",
-                    path="/path/to/",
-                    filename="file2",
-                    selector=MetricSpecSelector(
-                        type=MetricSpecSelectorType.TEXT, key=None
-                    ),
-                ),
-            ],
-            "job1",
-            {
-                "/path/to/job1/file1": {
-                    "TEXT": [
-                        MetricSpec(
-                            name="metric1",
-                            path="/path/to/",
-                            filename="file1",
-                            selector=MetricSpecSelector(
-                                type=MetricSpecSelectorType.TEXT, key=None
-                            ),
-                        )
-                    ],
-                    "JSON": [
-                        MetricSpec(
-                            name="metric2",
-                            path="/path/to/",
-                            filename="file1",
-                            selector=MetricSpecSelector(
-                                type=MetricSpecSelectorType.JSON, key=["key1"]
-                            ),
-                        )
-                    ],
-                },
-                "/path/to/job1/file2": {
-                    "TEXT": [
-                        MetricSpec(
-                            name="metric3",
-                            path="/path/to/",
-                            filename="file2",
-                            selector=MetricSpecSelector(
-                                type=MetricSpecSelectorType.TEXT, key=None
-                            ),
-                        )
-                    ],
-                },
-            },
-        ),
-        (
-            [],
-            "job2",
-            {},
-        ),
-    ],
-)
-def test_group_metrics_by_path_selector_type(
-    disable_metric_repository, metrics_specs: dict, job_name: str, expected: dict
-):
-    as_conf = MagicMock()
-    job = MagicMock()
-    job.name = job_name
-    user_metric_processor = UserMetricProcessor(as_conf, job)
-
-    result = user_metric_processor._group_metrics_by_path_selector_type(metrics_specs)
-
-    assert result == expected
