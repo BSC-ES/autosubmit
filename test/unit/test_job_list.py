@@ -804,10 +804,6 @@ def test_get_jobs_by_section(setup_job_list, section_list, banned_jobs, get_only
 )
 def test_retrieve_times(job_list, jobs_as_dict, tmp_path, make_exception, seconds):
     """testing function retrieve_times from job_list."""
-    #
-    # completed_jobs = jobs_as_dict[Status.COMPLETED]
-    # completed_job = completed_jobs[0]
-    # job = job_list.get_job_by_name(completed_job.name)
 
     for completed_jobs in jobs_as_dict.values():
         for job in completed_jobs:

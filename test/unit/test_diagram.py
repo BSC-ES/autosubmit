@@ -17,7 +17,6 @@
 import datetime
 
 import pytest
-from mock.mock import patch
 
 from autosubmit.job.job import Job
 from autosubmit.monitor import diagram
@@ -70,6 +69,24 @@ def test_populate_statistics(create_jobs):
     assert statistics.failed_jobs_dict == {'example_name_0': 1, 'example_name_1': 1,
                                            'example_name_2': 1, 'example_name_3': 1,
                                            'example_name_4': 1}
+
+
+@pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
+def test_create_stats_report(create_jobs, tmp_path, mocker):
+    """ function to test the function create_stats_report inside autosubmit/monitor/diagram.py """
+
+    expid = "a000"
+    period_ini = datetime.datetime.now()
+    period_fi = period_ini + datetime.timedelta(10)
+    tmp_path_pdf = tmp_path / "report.pdf"
+    tmp_path_csv = tmp_path / "report.csv"
+
+    mocker.patch('autosubmit.monitor.diagram._create_table')
+    diagram.create_stats_report(expid, create_jobs, [], str(tmp_path_pdf), True, True, False, period_ini, period_fi, {
+        'test': 1, 'test1': 5, 'test2': 50, 'test3': 500, 'test4': 5000})
+    assert tmp_path.exists()
+    assert tmp_path_pdf.exists()
+    assert tmp_path_csv.exists()
 
 
 def test_create_csv_stats(tmpdir):
@@ -154,7 +171,7 @@ def test_build_legends(mocker):
     ),
 ],
                          ids=['all run', 'divided by zero', 'run with continue', 'fail job_dict', 'no run'])
-def test_create_bar_diagram(job_stats, failed_jobs, failed_jobs_dict, num_plots, result):
+def test_create_bar_diagram(job_stats, failed_jobs, failed_jobs_dict, num_plots, result, mocker):
     """ function to test the function create_bar_diagram inside autosubmit/monitor/diagram.py """
 
     jobs_data = [
@@ -174,5 +191,5 @@ def test_create_bar_diagram(job_stats, failed_jobs, failed_jobs_dict, num_plots,
     statistics.failed_jobs = failed_jobs
     statistics.failed_jobs_dict = failed_jobs_dict
 
-    with patch('autosubmit.monitor.diagram.MAX_NUM_PLOTS', num_plots):  # 1
-        assert result == diagram.create_bar_diagram("a000", statistics, jobs_data, status)
+    mocker.patch('autosubmit.monitor.diagram.MAX_NUM_PLOTS', num_plots)
+    assert result == diagram.create_bar_diagram("a000", statistics, jobs_data, status)
