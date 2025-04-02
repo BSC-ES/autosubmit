@@ -23,20 +23,15 @@ This Files is responsible to generate the interactions between Autosubmit and a 
 being responsible for executing them as needed but the Jobs.
 """
 import contextlib
-from contextlib import suppress
-
 import locale
 import os
-from datetime import datetime
-from time import mktime
 from time import sleep
-from time import time
 from typing import List, Union, Any
 from xml.dom.minidom import parseString
 
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
-from autosubmit.job.job_common import Status, parse_output_number
+from autosubmit.job.job_common import Status
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.wrappers.wrapper_factory import SlurmWrapperFactory
@@ -147,7 +142,7 @@ class SlurmPlatform(ParamikoPlatform):
         :rtype: tuple[bool, list[JobPackageBase]]
         """
         try:
-            valid_packages_to_submit = [ package for package in valid_packages_to_submit if not package.x11]
+            valid_packages_to_submit = [ package for package in valid_packages_to_submit if package.x11 is not True]
             if len(valid_packages_to_submit) > 0:
                 duplicated_jobs_already_checked = False
                 platform = valid_packages_to_submit[0].jobs[0].platform
@@ -168,7 +163,7 @@ class SlurmPlatform(ParamikoPlatform):
                             #cancel bad submitted job if jobid is encountered
                             for id_ in jobid:
                                 self.send_command(self.cancel_job(id_))
-                    except contextlib.suppress:
+                    except:
                         pass
                     jobs_id = None
                     self.connected = False
