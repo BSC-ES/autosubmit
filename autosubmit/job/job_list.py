@@ -417,7 +417,7 @@ class JobList(object):
 
     def find_and_delete_redundant_relations(self, problematic_jobs: dict) -> None:
         """
-        Jobs with intrisic rules than can't be safelty not added without messing other workflows.
+        Jobs with intrinsic rules than can't be safety not added without messing other workflows.
         The graph will have the least amount of edges added as much as safely possible
         before this function.
         Structure:
@@ -885,7 +885,7 @@ class JobList(object):
         filters_to_apply = {}
         # Check if filter_from-filter_to relationship is set
         if relationships is not None and len(relationships) > 0:
-            # Look for a starting point, this can be if else becasue they're exclusive as a
+            # Look for a starting point, this can be if else because they're exclusive as a
             # DATE_FROM can't be in a MEMBER_FROM and so on
             if "DATES_FROM" in relationships:
                 filters_to_apply = self._check_dates(relationships, current_job)
@@ -1312,7 +1312,7 @@ class JobList(object):
             dependencies_keys_without_special_chars.append(key_aux_stripped)
         self.dependency_map[job.section] = self.dependency_map[job.section].difference(set(dependencies_keys_aux))
         # If parent already has defined that dependency, skip it to reduce the transitive reduction complexity
-        # Calcule distances ( SIM-1, ClEAN-2..)
+        # Calculate distances ( SIM-1, ClEAN-2..)
         for dependency_key in dependencies_keys_aux:
             if "-" in dependency_key:
                 aux_key = dependency_key.split("-")[0]
@@ -3162,7 +3162,7 @@ class JobList(object):
                                if job.name in statusChange else "")
                     result += (bcolors.ENDC +
                                bcolors.ENDC if nocolor is False else "")
-                # order by name, this is for compare 4.0 with 4.1 as the children orden is different
+                # order by name, this is for compare 4.0 with 4.1 as the children order is different
                 for child in sorted(children, key=lambda x: x.name):
                     # Continues recursion
                     result += self._recursion_print(
@@ -3261,12 +3261,9 @@ class JobList(object):
         energy = 0
         seconds_queued = 0
         seconds_running = 0
-        queue_time = running_time = 0
         submit_time = datetime.timedelta()
         start_time = datetime.timedelta()
         finish_time = datetime.timedelta()
-        running_for_min = datetime.timedelta()
-        queuing_for_min = datetime.timedelta()
 
         try:
             # Getting data from new job database
