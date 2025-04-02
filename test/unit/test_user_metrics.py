@@ -202,3 +202,54 @@ def test_read_metrics_specs(disable_metric_repository):
     assert metric_specs[1].filename == "file2"
     assert metric_specs[1].selector.type == MetricSpecSelectorType.JSON
     assert metric_specs[1].selector.key == ["key1", "key2", "key3"]
+
+
+def test_process_metrics(disable_metric_repository):
+    # Mocking the AutosubmitConfig and Job objects
+    as_conf = MagicMock()
+    job = MagicMock()
+    job.name = "test_job"
+    job.platform = MagicMock()
+    job.platform.read_file = MagicMock()
+    job.platform.read_file.return_value = b'{"key1": "value1", "key2": "value2"}'
+
+    with patch(
+        "autosubmit.job.metrics_processor.UserMetricProcessor.read_metrics_specs"
+    ) as mock_read_metrics_specs:
+        mock_read_metrics_specs.return_value = [
+            # The first metric is a text file
+            MetricSpec(
+                name="metric1",
+                path="/path/to/",
+                filename="file1",
+                selector=MetricSpecSelector(type=MetricSpecSelectorType.TEXT, key=None),
+            ),
+            # The second metric is a JSON file
+            MetricSpec(
+                name="metric2",
+                path="/path/to/",
+                filename="file2",
+                selector=MetricSpecSelector(
+                    type=MetricSpecSelectorType.JSON, key=["key2"]
+                ),
+            ),
+        ]
+
+        with patch(
+            "autosubmit.job.metrics_processor.UserMetricProcessor.store_metric"
+        ) as mock_store_metric:
+            user_metric_processor = UserMetricProcessor(as_conf, job)
+            user_metric_processor.process_metrics()
+
+            assert mock_read_metrics_specs.call_count == 1
+
+            assert job.platform.read_file.call_count == 2
+
+            assert mock_store_metric.call_count == 2
+            assert mock_store_metric.call_args_list[0][0][0] == "metric1"
+            assert (
+                mock_store_metric.call_args_list[0][0][1]
+                == '{"key1": "value1", "key2": "value2"}'
+            )
+            assert mock_store_metric.call_args_list[1][0][0] == "metric2"
+            assert mock_store_metric.call_args_list[1][0][1] == "value2"
