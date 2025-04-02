@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from autosubmit.job.job import Job
 
 # Default 16MB max file size
-MAX_FILE_SIZE = 16 * 1024 * 1024
+MAX_FILE_SIZE_MB = 16
 
 
 class MetricSpecSelectorType(Enum):
@@ -69,7 +69,7 @@ class MetricSpec:
     path: str
     filename: str
     selector: MetricSpecSelector
-    max_read_size: int = MAX_FILE_SIZE
+    max_read_size_mb: int = MAX_FILE_SIZE_MB
 
     @staticmethod
     def load(data: Dict[str, Any]) -> "MetricSpec":
@@ -83,7 +83,7 @@ class MetricSpec:
         _path = data["PATH"]
         _filename = data["FILENAME"]
 
-        _max_read_size = data.get("MAX_READ_SIZE", MAX_FILE_SIZE)
+        _max_read_size = data.get("MAX_READ_SIZE_MB", MAX_FILE_SIZE_MB)
 
         _selector = data.get("SELECTOR", None)
         selector = MetricSpecSelector.load(_selector)
@@ -92,7 +92,7 @@ class MetricSpec:
             name=_name,
             path=_path,
             filename=_filename,
-            max_read_size=_max_read_size,
+            max_read_size_mb=_max_read_size,
             selector=selector,
         )
 
@@ -211,7 +211,7 @@ class UserMetricProcessor:
             # Read the file from remote platform, it will replace the decoding errors.
             try:
                 content = self.job.platform.read_file(
-                    spec_path, max_size=metric_spec.max_read_size
+                    spec_path, max_size=(metric_spec.max_read_size_mb * 1024 * 1024)
                 )
                 Log.debug(f"Read file {spec_path}")
                 content = content.decode(
