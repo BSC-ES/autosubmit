@@ -1,6 +1,7 @@
 from typing import Any
 import pytest
 from autosubmit.job.metrics_processor import (
+    MAX_FILE_SIZE_MB,
     MetricSpecSelector,
     MetricSpecSelectorType,
     MetricSpec,
@@ -78,7 +79,12 @@ def test_spec_selector_load_invalid(metric_selector_spec: Any):
     "metric_specs, expected",
     [
         (
-            {"NAME": "metric1", "PATH": "/path/to/", "FILENAME": "file1"},
+            {
+                "NAME": "metric1",
+                "PATH": "/path/to/",
+                "FILENAME": "file1",
+                "MAX_READ_SIZE_MB": MAX_FILE_SIZE_MB,
+            },
             MetricSpec(
                 name="metric1",
                 path="/path/to/",
@@ -91,12 +97,14 @@ def test_spec_selector_load_invalid(metric_selector_spec: Any):
                 "NAME": "metric2",
                 "PATH": "/path/to/",
                 "FILENAME": "file2",
+                "MAX_READ_SIZE_MB": 10,
                 "SELECTOR": {"TYPE": "TEXT"},
             },
             MetricSpec(
                 name="metric2",
                 path="/path/to/",
                 filename="file2",
+                max_read_size_mb=10,
                 selector=MetricSpecSelector(type=MetricSpecSelectorType.TEXT, key=None),
             ),
         ),
@@ -105,12 +113,14 @@ def test_spec_selector_load_invalid(metric_selector_spec: Any):
                 "NAME": "metric3",
                 "PATH": "/path/to/",
                 "FILENAME": "file3",
+                "MAX_READ_SIZE_MB": 1,
                 "SELECTOR": {"TYPE": "JSON", "KEY": "key1.key2.key3"},
             },
             MetricSpec(
                 name="metric3",
                 path="/path/to/",
                 filename="file3",
+                max_read_size_mb=1,
                 selector=MetricSpecSelector(
                     type=MetricSpecSelectorType.JSON, key=["key1", "key2", "key3"]
                 ),
@@ -141,6 +151,8 @@ def test_metric_spec_load_valid(metric_specs: Any, expected: MetricSpec):
     assert metric_spec.name == expected.name
     assert metric_spec.path == expected.path
     assert metric_spec.selector.type == expected.selector.type
+    assert metric_spec.filename == expected.filename
+    assert metric_spec.max_read_size_mb == expected.max_read_size_mb
     assert metric_spec.selector.key == expected.selector.key
 
 
