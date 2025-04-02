@@ -25,7 +25,7 @@ and we are going to call it ``example_platform.py``.
 
     from autosubmit.platforms.slurmplatform import SlurmPlatform
 
-    class ExamplePlatform(SlurmPlatform):
+    class Slurm_ExamplePlatform(SlurmPlatform):
         """ Class to manage slurm jobs """
 
 This will Create a class in which the ``SlurmPlatform`` will be associated as its parent class allowing
@@ -63,7 +63,7 @@ After all needed modifications and expansions, the ``ExamplePlatform`` class cou
     from typing import Union
     from autosubmit.platforms.slurmplatform import SlurmPlatform
 
-    class ExamplePlatform(SlurmPlatform):
+    class Slurm_ExamplePlatform(SlurmPlatform):
         """Class to manage slurm jobs"""
         def __init__(self, expid: str, name: str, config: dict, auth_password: str=None):
             """Initialization of the Class ExamplePlatform"""

@@ -22,7 +22,7 @@ from typing import Union
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from log.log import Log
 
-class ExamplePlatform(SlurmPlatform):
+class Slurm_ExamplePlatform(SlurmPlatform):
     """
     Class to manage slurm jobs
     """
