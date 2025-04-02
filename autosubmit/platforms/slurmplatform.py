@@ -22,6 +22,7 @@ Slurm Platform File
 This Files is responsible to generate the interactions between Autosubmit and a Slurm Platform creating commands
 being responsible for executing them as needed but the Jobs.
 """
+import contextlib
 from contextlib import suppress
 
 import locale
@@ -146,7 +147,7 @@ class SlurmPlatform(ParamikoPlatform):
         :rtype: tuple[bool, list[JobPackageBase]]
         """
         try:
-            valid_packages_to_submit = [ package for package in valid_packages_to_submit if package.x11 is not True]
+            valid_packages_to_submit = [ package for package in valid_packages_to_submit if not package.x11]
             if len(valid_packages_to_submit) > 0:
                 duplicated_jobs_already_checked = False
                 platform = valid_packages_to_submit[0].jobs[0].platform
@@ -167,7 +168,7 @@ class SlurmPlatform(ParamikoPlatform):
                             #cancel bad submitted job if jobid is encountered
                             for id_ in jobid:
                                 self.send_command(self.cancel_job(id_))
-                    except BaseException:
+                    except contextlib.suppress:
                         pass
                     jobs_id = None
                     self.connected = False
@@ -328,7 +329,8 @@ class SlurmPlatform(ParamikoPlatform):
 
     def submit_Script(self, hold: bool=False) -> Union[List[int], int]:
         """
-        Sends a Submit file Script, execute it in the platform and retrieves the Jobs_ID of all jobs at once.
+        Sends a Submit file Script with sbatch instructions, execute it in the platform and
+        retrieves the Jobs_ID of all jobs at once.
 
         :param hold: Deprecated.
         :type hold: bool
@@ -344,12 +346,8 @@ class SlurmPlatform(ParamikoPlatform):
             cmd = f"{cmd} ; rm {cmd}"
             try:
                 self.send_command(cmd)
-            except AutosubmitError as as_err:
-                raise as_err
-            except AutosubmitCritical as as_critcal:
-                raise as_critcal
-            except Exception as e:
-                raise e
+            except Exception:
+                raise
             jobs_id = self.get_submitted_job_id(self.get_ssh_output())
 
             return jobs_id

@@ -416,6 +416,9 @@ In the file ``jos_expid.yml``:
    * - Parameters
      - Description
      - Exemple
+   * - ``JOBNAME``
+     - Job Name
+     -
    * - ``FILE``
      - Script to execute. If not specified, job will be omitted from workflow.
        You can also specify additional files separated by a ",".
