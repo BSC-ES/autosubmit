@@ -245,8 +245,7 @@ class JobList(object):
         if len(run_only_members) > 0:
             # Found
             if show_log:
-                Log.info("Considering only members {0}".format(
-                    str(run_only_members)))
+                Log.info(f"Considering only members {str(run_only_members)}")
             old_job_list = [job for job in self._job_list]
             self._job_list = [
                 job for job in old_job_list if
@@ -282,9 +281,8 @@ class JobList(object):
                 else:
                     self._ordered_jobs_by_date_member[wrapper_section] = {}
             except BaseException as e:
-                raise AutosubmitCritical(
-                    "Some section jobs of the wrapper:{0} are missing from your "
-                    "JOBS definition in YAML".format(wrapper_section), 7014, str(e))
+                raise AutosubmitCritical(f"Some section jobs of the wrapper:{wrapper_section} are missing from your "
+                    "JOBS definition in YAML", 7014, str(e))
         # divide job_list per platform name
         job_list_per_platform = self.split_by_platform()
         submitter = _get_submitter(as_conf)
@@ -390,7 +388,7 @@ class JobList(object):
             self.actual_job_depends_on_previous_chunk = False
             self.actual_job_depends_on_previous_member = False
             # No changes, no need to recalculate dependencies
-            Log.debug("Adding dependencies for {0} jobs".format(job_section))
+            Log.debug(f"Adding dependencies for {job_section} jobs")
             # If it does not have dependencies, just append it to job_list and continue
             dependencies_keys = jobs_data.get(job_section, {}).get(option, None)
             # call function if dependencies_key is not None
@@ -1549,7 +1547,7 @@ class JobList(object):
     @staticmethod
     def _create_jobs(dic_jobs, priority, default_job_type):
         for section in (job for job in dic_jobs.experiment_data.get("JOBS", {}).keys()):
-            Log.debug("Creating {0} jobs".format(section))
+            Log.debug(f"Creating {section} jobs")
             dic_jobs.read_section(section, priority, default_job_type)
             priority += 1
 
@@ -2006,10 +2004,10 @@ class JobList(object):
                     select_all_jobs_by_section=select_all_jobs_by_section,
                     filter_jobs_by_section=filter_jobs_by_section)
             except Exception as e:
-                raise AutosubmitCritical("Check the {0} format."
+                raise AutosubmitCritical(f"Check the {unparsed_jobs} format."
                                          "\nFirst filter is optional ends with '&'."
                                          "\nSecond filter ends with ';'."
-                                         "\nThird filter must contain '['. ".format(unparsed_jobs))
+                                         "\nThird filter must contain '['. ")
         else:
             try:
                 self.rerun_job_list = self.get_job_related(select_jobs_by_name=select_jobs_by_name,
@@ -2017,10 +2015,10 @@ class JobList(object):
                                                            filter_jobs_by_section=filter_jobs_by_section,
                                                            two_step_start=two_step_start)
             except Exception as e:
-                raise AutosubmitCritical("Check the {0} format."
+                raise AutosubmitCritical(f"Check the {unparsed_jobs} format."
                                          "\nFirst filter is optional ends with '&'."
                                          "\nSecond filter ends with ';'."
-                                         "\nThird filter must contain '['. ".format(unparsed_jobs))
+                                         "\nThird filter must contain '['. ")
 
     def get_job_related(self, select_jobs_by_name="", select_all_jobs_by_section="",
                         filter_jobs_by_section="", two_step_start=True):
@@ -2096,8 +2094,7 @@ class JobList(object):
                 ultimate_jobs_list.extend(jobs_final)
         # Duplicates out
         ultimate_jobs_list = list(set(ultimate_jobs_list))
-        Log.debug("List of jobs filtered by TWO_STEP_START parameter:\n{0}".
-                  format([job.name for job in ultimate_jobs_list]))
+        Log.debug(f"List of jobs filtered by TWO_STEP_START parameter:\n{[job.name for job in ultimate_jobs_list]}")
         return ultimate_jobs_list
 
     def get_ready(self, platform=None, hold=False, wrapper=False):
@@ -2442,7 +2439,7 @@ class JobList(object):
                 Log.status("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job_id, Status(
                 ).VALUE_TO_KEY[job.status], platform_name, queue)
             except Exception:
-                Log.debug("Couldn't print job status for job {0}".format(job.name))
+                Log.debug(f"Couldn't print job status for job {job.name}")
         for job in failed_job_list:
             if len(job.queue) < 1:
                 queue = "no-scheduler"
@@ -2458,8 +2455,7 @@ class JobList(object):
         file to avoid reloading it at the next iteration
         """
         if os.path.exists(os.path.join(self._persistence_path, self._update_file)):
-            Log.info("Loading updated list: {0}".format(
-                os.path.join(self._persistence_path, self._update_file)))
+            Log.info(f"Loading updated list: {os.path.join(self._persistence_path, self._update_file)}")
             for line in open(os.path.join(self._persistence_path, self._update_file)):
                 if line.strip() == '':
                     continue
@@ -2678,8 +2674,7 @@ class JobList(object):
                             job.status = Status.DELAYED
                             job.delay_end = (datetime.datetime.now() +
                                              datetime.timedelta(seconds=retry_delay))
-                            Log.debug("Resetting job: {0} status to: DELAYED for retrial...".
-                                      format(job.name))
+                            Log.debug(f"Resetting job: {job.name} status to: DELAYED for retrial...")
                         else:
                             job.status = Status.READY
                             Log.debug(f"Resetting job: {job.name} status to: READY for retrial...")
@@ -2723,14 +2718,14 @@ class JobList(object):
                             if () and parent.status != Status.COMPLETED:
                                 job.status = Status.WAITING
                                 save = True
-                                Log.debug("Resetting sync job: {0} status to: WAITING "
-                                          "for parents completion...".format(job.name))
+                                Log.debug(f"Resetting sync job: {job.name} status to: WAITING "
+                                          "for parents completion...")
                                 break
                     else:
                         job.status = Status.WAITING
                         save = True
-                        Log.debug("Resetting sync job: {0} status to: WAITING "
-                                  "for parents completion...".format(job.name))
+                        Log.debug(f"Resetting sync job: {job.name} status to: WAITING "
+                                  "for parents completion...")
         Log.debug('Updating WAITING jobs')
         if not fromSetStatus:
             all_parents_completed = []
@@ -2749,8 +2744,7 @@ class JobList(object):
                 if job.parents is None or len(tmp) == len(job.parents):
                     job.status = Status.READY
                     job.hold = False
-                    Log.debug("Setting job: {0} status to: READY "
-                              "(all parents completed)...".format(job.name))
+                    Log.debug(f"Setting job: {job.name} status to: READY (all parents completed)...")
                     if as_conf.get_remote_dependencies() == "true":
                         all_parents_completed.append(job.name)
                 if job.status != Status.READY:
@@ -2769,8 +2763,8 @@ class JobList(object):
                             if not strong_dependencies_failure and weak_dependencies_failure:
                                 job.status = Status.READY
                                 job.hold = False
-                                Log.debug("Setting job: {0} status to: READY "
-                                          "(conditional jobs are completed/failed)...".format(job.name))
+                                Log.debug(f"Setting job: {job.name} status to: READY "
+                                          "(conditional jobs are completed/failed)...")
                                 break
                             if as_conf.get_remote_dependencies() == "true":
                                 all_parents_completed.append(job.name)
@@ -2781,8 +2775,8 @@ class JobList(object):
                                         get('optional', False)):
                                     job.status = Status.READY
                                     job.hold = False
-                                    Log.debug("Setting job: {0} status to: READY"
-                                              " (conditional jobs are completed/failed)...".format(job.name))
+                                    Log.debug(f"Setting job: {job.name} status to: READY"
+                                              " (conditional jobs are completed/failed)...")
                                     break
             if as_conf.get_remote_dependencies() == "true":
                 for job in self.get_prepared():
@@ -2799,7 +2793,7 @@ class JobList(object):
                         job.hold = False
                         save = True
                         Log.debug("A job in prepared status has all parent completed, job:"
-                                  "{0} status set to: READY ...".format(job.name))
+                                  f"{job.name} status set to: READY ...")
                 Log.debug('Updating WAITING jobs eligible for be prepared')
                 # Setup job name should be a variable
                 for job in self.get_waiting_remote_dependencies('slurm'):
@@ -2812,8 +2806,8 @@ class JobList(object):
                             job.status = Status.PREPARED
                             job.hold = True
                             Log.debug(
-                                "Setting job: {0} status to: Prepared for be held ("
-                                "all parents queuing, running or completed)...".format(job.name))
+                                f"Setting job: {job.name} status to: Prepared for be held ("
+                                "all parents queuing, running or completed)...")
 
                 Log.debug('Updating Held jobs')
                 if self.job_package_map:
@@ -2840,16 +2834,13 @@ class JobList(object):
                             for inner_job in job.job_list:
                                 inner_job.hold = False
                             Log.debug(
-                                "Setting job: {0} status to: Queuing (all parents completed)...".
-                                format(job.name))
+                                f"Setting job: {job.name} status to: Queuing (all parents completed)...")
                     else:  # Non-wrapped jobs
                         tmp = [
                             parent for parent in job.parents if parent.status == Status.COMPLETED]
                         if len(tmp) == len(job.parents):
                             job.hold = False
-                            Log.debug(
-                                "Setting job: {0} status to: Queuing (all parents completed)...".
-                                format(job.name))
+                            Log.debug(f"Setting job: {job.name} status to: Queuing (all parents completed)...")
                         else:
                             job.hold = True
             jobs_to_skip = self.get_skippable_jobs(
@@ -2944,7 +2935,7 @@ class JobList(object):
             count += 1
             if (count >= len(self._job_list) / 4 * (stage + 1)) or count == len(self._job_list):
                 stage += 1
-                Log.info("{} of {} checked".format(count, len(self._job_list)))
+                Log.info(f"{count} of {len(self._job_list)} checked")
 
             show_logs = str(job.check_warnings).lower()
             if str(job.check).lower() in ['on_submission', 'false']:
@@ -3017,8 +3008,7 @@ class JobList(object):
         dependencies = dict()
 
         for job_section in job_sections:
-            Log.debug(
-                "Reading rerun dependencies for {0} jobs".format(job_section))
+            Log.debug(f"Reading rerun dependencies for {job_section} jobs")
             if as_conf.jobs_data[job_section].get('DEPENDENCIES', None) is not None:
                 dependencies_keys = as_conf.jobs_data[job_section].get('DEPENDENCIES', {})
                 if type(dependencies_keys) is str:
