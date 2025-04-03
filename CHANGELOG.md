@@ -1,3 +1,8 @@
+### 4.1.13: Dependencies bug fixes, regression tests
+
+- Fixed issues with dependencies not being correctly set or not being pruned. [#2184](https://github.com/BSC-ES/autosubmit/issues/2184) [PR](https://github.com/BSC-ES/autosubmit/pull/2241)
+- Added dependencies regression test [PR](https://github.com/BSC-ES/autosubmit/pull/2241)
+
 ### 4.1.12: Logs, Memory, DB fixes. Enhancements, new features, and overall bug fixes.
 
 **Mem fixes:** [PR](https://github.com/BSC-ES/autosubmit/pull/2130)

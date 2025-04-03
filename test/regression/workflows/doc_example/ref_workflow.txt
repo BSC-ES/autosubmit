@@ -1,0 +1,10 @@
+## String representation of Job List [9]  ##
+a00l_2020010100_Member1_1_FILE_CHECKER ~ [1 child]
+|  a00l_2020010100_Member1_1_FILE_CREATOR ~ [1 child]
+|  |  a00l_2020010100_Member1_1_RUN ~ [1 child]
+|  |  |  a00l_2020010100_Member1_2_RUN ~ [1 child]
+|  |  |  |  a00l_2020010100_Member1_3_RUN
+a00l_2020010100_Member1_2_FILE_CHECKER ~ [1 child]
+|  a00l_2020010100_Member1_2_FILE_CREATOR ~ [1 child]
+a00l_2020010100_Member1_3_FILE_CHECKER ~ [1 child]
+|  a00l_2020010100_Member1_3_FILE_CREATOR ~ [1 child]

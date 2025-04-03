@@ -1,0 +1,19 @@
+## String representation of Job List [18]  ##
+a005_19900101_Member1_INI ~ [1 child]
+|  a005_19900101_Member1_1_SIM ~ [1 child]
+|  |  a005_19900101_Member1_2_SIM ~ [1 child]
+|  |  |  a005_19900101_Member1_3_SIM ~ [2 children]
+|  |  |  |  a005_19900101_Member1_3_POSTPROCESS ~ [1 child]
+|  |  |  |  |  a005_19900101_Member1_COMBINE
+|  |  |  |  a005_19900101_Member1_4_SIM ~ [1 child]
+|  |  |  |  |  a005_19900101_Member1_5_SIM ~ [1 child]
+|  |  |  |  |  |  a005_19900101_Member1_5_POSTPROCESS ~ [1 child]
+a005_19900101_Member2_INI ~ [1 child]
+|  a005_19900101_Member2_1_SIM ~ [1 child]
+|  |  a005_19900101_Member2_2_SIM ~ [1 child]
+|  |  |  a005_19900101_Member2_3_SIM ~ [2 children]
+|  |  |  |  a005_19900101_Member2_3_POSTPROCESS ~ [1 child]
+|  |  |  |  |  a005_19900101_Member2_COMBINE
+|  |  |  |  a005_19900101_Member2_4_SIM ~ [1 child]
+|  |  |  |  |  a005_19900101_Member2_5_SIM ~ [1 child]
+|  |  |  |  |  |  a005_19900101_Member2_5_POSTPROCESS ~ [1 child]
