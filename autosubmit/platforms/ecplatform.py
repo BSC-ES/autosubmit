@@ -37,18 +37,6 @@ class EcPlatform(ParamikoPlatform):
     :type scheduler: str (pbs, loadleveler)
     """
 
-    def parse_Alljobs_output(self, output, job_id):
-        pass
-
-    def parse_queue_reason(self, output, job_id):
-        pass
-
-    def get_checkAlljobs_cmd(self, jobs_id):
-        pass
-
-    def submit_Script(self, hold=False):
-        pass
-
     def __init__(self, expid, name, config, scheduler):
         ParamikoPlatform.__init__(self, expid, name, config)
         #version=scheduler

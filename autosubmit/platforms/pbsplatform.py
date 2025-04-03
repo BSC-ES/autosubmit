@@ -37,15 +37,6 @@ class PBSPlatform(ParamikoPlatform):
     :type version: str
     """
 
-    def submit_Script(self, hold=False):
-        pass
-
-    def get_checkAlljobs_cmd(self, jobs_id):
-        pass
-
-    def parse_Alljobs_output(self, output, job_id):
-        pass
-
     def __init__(self, expid, name, config, version):
         ParamikoPlatform.__init__(self, expid, name, config)
         self._checkjob_cmd = None
@@ -77,9 +68,6 @@ class PBSPlatform(ParamikoPlatform):
 
     def create_a_new_copy(self):
         return PBSPlatform(self.expid, self.name, self.config, self.config[self.name.upper()].get('VERSION', ''))
-
-    def parse_queue_reason(self, output, job_id):
-        pass
 
     def update_cmds(self):
         """

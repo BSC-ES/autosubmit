@@ -36,18 +36,6 @@ class LocalPlatform(ParamikoPlatform):
     :type expid: str
     """
 
-    def submit_Script(self, hold=False):
-        pass
-
-    def parse_Alljobs_output(self, output, job_id):
-        pass
-
-    def parse_queue_reason(self, output, job_id):
-        pass
-
-    def get_checkAlljobs_cmd(self, jobs_id):
-        pass
-
     def __init__(self, expid, name, config, auth_password = None):
         ParamikoPlatform.__init__(self, expid, name, config, auth_password= auth_password)
         self.cancel_cmd = None
