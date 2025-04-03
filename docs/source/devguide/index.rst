@@ -1,23 +1,9 @@
-##########
-User Guide
-##########
+################
+Developers Guide
+################
 
 .. toctree::
-   /userguide/create/index
-   /userguide/configure/index
-   /userguide/defining_workflows/index
-   /userguide/wrappers/index
-   /userguide/run/index
-   /userguide/modifying_workflow/index
-   /userguide/manage/index
-   /userguide/monitor_and_check/index
-   /userguide/set_and_share_the_configuration/index
-   /userguide/variables
-   /userguide/expids
-   /userguide/provenance
-   /userguide/traceability
-   /userguide/user_mapping
-   /userguide/templates
+   /devguide/platforms/index
 
 Command list
 ============
@@ -52,21 +38,5 @@ Command list
 Tutorials (How to)
 ------------------
 
-* :doc:`create/index`
+* :doc:`platforms/index`
 
-* :doc:`configure/index`
-
-* :ref:`run_modes`
-
-* :ref:`workflow_recovery`
-
-TODO add ``workflow_validation``.
-
-..
-  * :ref:`workflow_validation`
-
-* :ref:`autoStatistics`
-
-* :ref:`archive`
-
-* :ref:`advanced_features`
