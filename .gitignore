@@ -27,3 +27,5 @@ dockerfiles/id_rsa*
 dockerfiles/authorized_keys
 
 venv/
+
+whitelist.py
