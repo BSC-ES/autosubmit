@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from contextlib import suppress
 
 # Copyright 2017-2020 Earth Sciences Department, BSC-CNS
 
