@@ -36,14 +36,23 @@ We create an initialization method with the required parameters.
 .. code-block:: python
     :linenos:
 
-    def __init__(self, expid: str, name: str, config: dict, auth_password: str=None):
-        """ Initialization of the Class ExamplePlatform """
+    def __init__(self, expid: str, name: str, config: dict):
+        """ Initialization of the Class ExamplePlatform
+
+        :param expid: Id of the experiment.
+        :type expid: str
+        :param name: Name of the platform.
+        :type name: str
+        :param config: A dictionary containing all the Experiment parameters.
+        :type config: dict
+        """
         SlurmPlatform.__init__(self, expid, name, config, auth_password = auth_password)
         self.example_platform_parameter = ... # add any platform specific parameters
 
 As you can see the parent class has an initialization in order invoke all the parent`s methods and attributes into the
 child (``Slurm_ExamplePlatform``).
-In order to override methods from the parent class, we can simply redefine them.
+In order to override methods from the parent class, we can simply redefine them as shown below, this way we can add
+new Parameters and/or behaviours, making it possible to add flexibility and restructure a platform for the new needs.
 
 .. code-block:: python
     :linenos:
@@ -78,12 +87,16 @@ After all needed modifications and expansions, the ``Slurm_ExamplePlatform`` cla
 Integrating the extended platform into the module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In order to ensure that the platform will be created as expected we need to make some changes in 4 different files ``autosubmit/autosubmit.py`` -see in GitHub `autosubmit.py <https://github.com/BSC-ES/autosubmit/blob/a92396f894806b418e2208bf2733758d507a91b2/autosubmit/autosubmit.py>`_ -, ``autosubmit/job/job.py`` - see in GitHub `job.py <https://github.com/BSC-ES/autosubmit/blob/a92396f894806b418e2208bf2733758d507a91b2/autosubmit/job/job.py>`_ -, ``autosubmit/platforms/ecplatform.py`` - see in GitHub `ecplatform.py <https://github.com/BSC-ES/autosubmit/blob/a92396f894806b418e2208bf2733758d507a91b2/autosubmit/platforms/ecplatform.py>`_ - and ``atuosubmit/platforms/paramiko_submitter.py`` - see in GitHub `paramiko_submitter.py <https://github.com/BSC-ES/autosubmit/blob/a92396f894806b418e2208bf2733758d507a91b2/autosubmit/platforms/paramiko_submitter.py>`_ -:
+In order to ensure that the platform will be created as expected we need to make some changes in 4 different files
+``autosubmit/autosubmit.py`` -see in GitHub `autosubmit.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/autosubmit.py>`_ -,
+``autosubmit/job/job.py`` - see in GitHub `job.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/job/job.py>`_ -,
+``autosubmit/platforms/ecplatform.py`` - see in GitHub `ecplatform.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/platforms/ecplatform.py>`_ - and
+``atuosubmit/platforms/paramiko_submitter.py`` - see in GitHub `paramiko_submitter.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/platforms/paramiko_submitter.py>`_ -:
 
 .. warning::
    Line numbers might differ from the ones listed in this page
 
-``autosubmit/autosubmit.py`` in `line 2537 <https://github.com/BSC-ES/autosubmit/blob/53b2a142fee5c8d8ac169547528c768c93e02a4a/autosubmit/autosubmit.py#L2537>`_  add a new ``String`` making sure the new platform type is considered
+``autosubmit/autosubmit.py`` in `line 2537 <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/autosubmit.py#L2537>`_  add a new ``String`` making sure the new platform type is considered
 the same as SLURM platform, as we expect a similar behaviour.
 
 .. code-block:: python
@@ -95,7 +108,7 @@ the same as SLURM platform, as we expect a similar behaviour.
                                                                                          failed_packages,
                                                                                          error_message="", hold=hold)
 
-``autosubmit/job/job.py`` in `line 2575 <https://github.com/BSC-ES/autosubmit/blob/53b2a142fee5c8d8ac169547528c768c93e02a4a/autosubmit/job/job.py#L2575>`_ making sure each Job writes
+``autosubmit/job/job.py`` in `line 2575 <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/job/job.py#L2575>`_ making sure each Job writes
 end timestamp to TOTAL_STATS file and jobs_data.db properly.
 
 .. code-block:: python
@@ -106,7 +119,7 @@ end timestamp to TOTAL_STATS file and jobs_data.db properly.
             thread_write_finish.name = "JOB_data_{}".format(self.name)
             thread_write_finish.start()
 
-``autosubmit/job/job.py`` in `line 2817 <https://github.com/BSC-ES/autosubmit/blob/53b2a142fee5c8d8ac169547528c768c93e02a4a/autosubmit/job/job.py#L2817>`_ add a new validation for the validation of the queue
+``autosubmit/job/job.py`` in `line 2817 <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/job/job.py#L2817>`_ add a new validation for the validation of the queue
 creation where the platform type
 
 .. code-block:: python
@@ -118,7 +131,7 @@ creation where the platform type
         reason = self._platform.parse_queue_reason(
             self._platform._ssh_output, self.id)
 
-``autosubmit/platforms/ecplatform.py`` in `line 59 <https://github.com/BSC-ES/autosubmit/blob/53b2a142fee5c8d8ac169547528c768c93e02a4a/autosubmit/platforms/ecplatform.py#L59>`_ add a new validation for the header command
+``autosubmit/platforms/ecplatform.py`` in `line 59 <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/platforms/ecplatform.py#L59>`_ add a new validation for the header command
 creation where the platform type
 
 .. code-block:: python
@@ -127,7 +140,7 @@ creation where the platform type
     elif scheduler == 'slurm' or scheduler == 'example':
         self._header = SlurmHeader()
 
-``autosubmit/platforms/paramiko_submitter.py`` in `line 143 <https://github.com/BSC-ES/autosubmit/blob/53b2a142fee5c8d8ac169547528c768c93e02a4a/autosubmit/platforms/paramiko_submitter.py#L143>`_ add a new validation for the header command
+``autosubmit/platforms/paramiko_submitter.py`` in `line 143 <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/platforms/paramiko_submitter.py#L143>`_ add a new validation for the header command
 creation where the platform type
 
 .. code-block:: python

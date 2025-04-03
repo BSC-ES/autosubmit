@@ -155,7 +155,6 @@ Jobs configuration
 
 .. code-block:: yaml
 
-    # Example job with all options specified
     JOBS:
         LOCAL_SETUP:
             FILE: LOCAL_SETUP.sh
