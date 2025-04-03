@@ -5,7 +5,7 @@ Extending an existing platform
 ------------------------------
 
 Platforms are defined under python classes. The source files for such classes are stored inside ``autosubmit/platforms/`` directory. To extend an existing platform we will create a child class from an existing platform class, for which first we need
-to identify which existing platform is the most suitable for out project. 
+to identify which existing platform is the most suitable for out project.
 
 Composing the extended platform class
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -18,7 +18,7 @@ and connection to SLURM and its commands, prepare your experiments to be execute
 into executable function.
 
 We will create a new file in ``/autosubmit/platforms/``
-and we are going to call it ``slurm_example.py``. 
+and we are going to call it ``slurm_example.py``.
 
 .. code-block:: python
     :linenos:
@@ -100,7 +100,7 @@ In order to ensure that the platform will be created as expected we need to make
 the same as SLURM platform, as we expect a similar behaviour.
 
 .. code-block:: python
-   :emphasize-lines: 1 
+   :emphasize-lines: 1
 
     if platform.type.lower() in [ "slurm" , "pjm", "example" ] and not inspect and not only_wrappers:
                     # Process the script generated in submit_ready_jobs
@@ -154,15 +154,17 @@ creation where the platform type
 How to configure a Platforms
 ------------------------------------
 
-To set up your platform you first have to create a new experiment by running the following command creating a
-minimal version of a experiment and configure the experiment platform to Marenostrum.
+To set up your platform, you first have to create a new experiment by running the following command:
 
 ``autosubmit expid -H MARENOSTRUM5 -d "platform test" --minimal``
 
-You'll have to insert the **PARAMETERS** to make your experiment work properly as an example the following
-instruction are thought to execute a small job through Autosubmit explaining how to configure a platform.
+This will generate a minimal version of an experiment and configure the experiment to make use of Marenostrum5.
 
-First create a new folder at the root ``~/Autosubmit`` called project executing the following command:
+You'll have to change the configurations of your experiment to make it work properly, and the following instructions are
+thought out to execute a small job through Autosubmit explaining how to configure a new platform.
+
+First create a new folder at the root ``~/Autosubmit`` called project executing the following command this folder will
+maintain all the batch files to be used to execute in an experiment:
 
 ``mkdir -p ~/autosubmit/project``
 
@@ -170,7 +172,7 @@ First create a new folder at the root ``~/Autosubmit`` called project executing 
     The given name of the folder can be any as long as it matches the ``Local`` Parameter, the change in name
     needs to take this into account
 
-For the execution of this test a few files will need to be created within the new folder,
+For the execution of this test, a few files will need to be created within the new folder,
 this file will have the Platform commands to be executed
 
 .. code-block:: yaml
@@ -186,7 +188,7 @@ this file will have the Platform commands to be executed
     CLEAN.sh
 
 For sake of keeping and concise and clear example of how Autosubmit works a simple instruction can be executed.
-For full developed experiments this will be the instructions used in your experiment.
+For full developed experiments, these files will contain the set of instructions to be used in your experiment.
 
 .. code-block:: yaml
 
@@ -234,12 +236,17 @@ to create a simple executable experiment
         CALENDAR: standard
 
 
-Add the following PARAMETER after, this will point towards the folder containing all the Platform instructions
+Add the following PARAMETER after, this will point towards the folder containing all the scripts instructions to be
+used to execute the experiment in the platform
 
 .. code-block:: yaml
 
     LOCAL:
-        PROJECT_PATH: ~/autosubmit/project
+        PROJECT_PATH: ~/autosubmit/project # path to your project sources
+
+
+Autosubmit will copy your sources to the ``$autosubmit_installation/$expid/proj/%PROJECT.PROJECT_DESTINATION%``.
+
 
 The following settings are used towards creating a connection with a platform to execute the jobs,
 you have to input the information suitable for your project. (e.g.: user, host, platform)
@@ -255,25 +262,17 @@ you have to input the information suitable for your project. (e.g.: user, host, 
 
     PLATFORMS:
         MARENOSTRUM5:
-            TYPE: <Platform_Type>
+            TYPE: <Scheduler> [pytest-pjm, pytest-slurm, pytest-ecaccess, pytest-ps]
             HOST: <Host>
             PROJECT: <Project_Name_Folder>
             USER: <User>
-            QUEUE: gp_debug
-            SCRATCH_DIR: <Project_Dir>
-            ADD_PROJECT_TO_HOST: false
-            MAX_WALLCLOCK: 02:00
-            TEMP_DIR: ''
+            QUEUE: [dummy, gp_debug, nf, hpc]
 
         MARENOSTRUM_ARCHIVE:
-            TYPE: <Platform_Type>
+            TYPE: <Scheduler> [pytest-pjm, pytest-slurm, pytest-ecaccess, pytest-ps]
             HOST: <Host>
             PROJECT: <Project_Name_Folder>
             USER: <User>
-            SCRATCH_DIR: <Project_Dir>
-            ADD_PROJECT_TO_HOST: false
-            MAX_WALLCLOCK: 02:00
-            TEMP_DIR: ''
 
 Now you can add jobs at the end of the file to see the execution
 
