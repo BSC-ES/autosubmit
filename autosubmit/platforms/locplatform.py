@@ -157,12 +157,12 @@ class LocalPlatform(ParamikoPlatform):
         """
         Sends a file to a specified location using a command.
 
-        Args:
-            filename (str): The name of the file to send.
-            check (bool): Unused in this platform
-
-        Returns:
-            bool: True if the file was sent successfully.
+        :param filenames: The name of the file to send.
+        :type filenames: str
+        :param check: Unused in this platform.
+        :type check: bool
+        :return: True if the file was sent successfully.
+        :rtype: bool
         """
         command = f'{self.put_cmd} {os.path.join(self.tmp_path, Path(filename).name)} {os.path.join(self.tmp_path, "LOG_" + self.expid, Path(filename).name)}; chmod 770 {os.path.join(self.tmp_path, "LOG_" + self.expid, Path(filename).name)}'
         try:
@@ -178,11 +178,10 @@ class LocalPlatform(ParamikoPlatform):
         """
         Creates a shell script to remove multiple files in the remote and sets the appropriate permissions.
 
-        Args:
-            filenames (str): A string containing the filenames to be removed.
-
-        Returns:
-            str: An empty string.
+        :param filenames: A string containing the filenames to be removed.
+        :type filenames: str
+        :return: An empty string.
+        :rtype: str
         """
         # This function is a copy of the slurm one
         log_dir = os.path.join(self.tmp_path, 'LOG_{0}'.format(self.expid))
@@ -222,14 +221,16 @@ class LocalPlatform(ParamikoPlatform):
         """
         Checks if a file exists in the platform.
 
-        Args:
-            src (str): Source name.
-            wrapper_failed (bool): Checks inner jobs files. Defaults to False.
-            sleeptime (int): Time to sleep between retries. Defaults to 1.
-            max_retries (int): Maximum number of retries. Defaults to 1.
-
-        Returns:
-            bool: True if the file exists, False otherwise.
+        :param src: source name.
+        :type src: str
+        :param wrapper_failed: Checks inner jobs files. Defaults to False.
+        :type wrapper_failed: bool
+        :param sleeptime: Time to sleep between retries. Defaults to 1.
+        :type sleeptime: int
+        :param max_retries: Maximum number of retries. Defaults to 1.
+        :type max_retries: int
+        :return: True if the file exists, False otherwise.
+        :rtype: bool
         """
         # This function has a short sleep as the files are locally
         sleeptime = 1
@@ -256,11 +257,13 @@ class LocalPlatform(ParamikoPlatform):
     def move_file(self, src, dest, must_exist=False):
         """
         Moves a file on the platform (includes .err and .out)
-        :param src: source name
+
+        :param src: source name.
         :type src: str
-        :param dest: destination name
-        :param must_exist: ignore if file exist or not
+        :param dest: destination name.
         :type dest: str
+        :param must_exist: ignore if file exist or not.
+        :type must_exist: bool
         """
         path_root = ""
         try:
@@ -306,11 +309,10 @@ class LocalPlatform(ParamikoPlatform):
         Checks for completed files in the remote log directory.
         This function is used to check inner_jobs of a wrapper.
 
-        Args:
-            sections[str]: Space-separated string of sections to check for completed files. Defaults to None.
-
-        Returns:
-            str: The output if the command is successful, None otherwise.
+        :param sections: Space-separated string of sections to check for completed files. Defaults to None.
+        :type sections: str
+        :return: The output if the command is successful, None otherwise.
+        :rtype: str
         """
         # Clone of the slurm one.
         command = "find %s " % self.remote_log_dir
