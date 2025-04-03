@@ -10,7 +10,7 @@ to identify which existing platform is the most suitable for out project.
 Composing the extended platform class
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In this page we will be extedning the SLURM
+In this page we will be extending the SLURM
 platform - source file ``autosubmit/platforms/slurmplatform.py``, see in GitHub `slurmplatform.py <https://github.com/BSC-ES/autosubmit/blob/53b2a142fee5c8d8ac169547528c768c93e02a4a/autosubmit/platforms/slurmplatform.py#L35>`_ -, but any platform can be extended by following the same steps.
 
 The platform will be transcribing the files and configurations you set manually to allow operations,
@@ -18,7 +18,7 @@ and connection to SLURM and its commands, prepare your experiments to be execute
 into executable function.
 
 We will create a new file in ``/autosubmit/platforms/``
-and we are going to call it ``example_platform.py``. 
+and we are going to call it ``slurm_example.py``. 
 
 .. code-block:: python
     :linenos:
@@ -28,8 +28,8 @@ and we are going to call it ``example_platform.py``.
     class Slurm_ExamplePlatform(SlurmPlatform):
         """ Class to manage slurm jobs """
 
-This will Create a class in which the ``SlurmPlatform`` will be associated as its parent class allowing
-``ExamplePlatform`` inherit all its characteristics.
+This will create a class in which the ``Slurm_ExamplePlatform`` will be associated as its parent class allowing
+``Slurm_ExamplePlatform`` inherit all its characteristics.
 
 We create an initialization method with the required parameters.
 
@@ -42,8 +42,8 @@ We create an initialization method with the required parameters.
         self.example_platform_parameter = ...
 
 As you can see the parent class has an initialization in order invoke all the parent`s methods and attributes into the
-child (``ExamplePlatform``).
-In oder to override methods from the parent class, we cna simply redefine them.
+child (``Slurm_ExamplePlatform``).
+In order to override methods from the parent class, we can simply redefine them.
 
 .. code-block:: python
     :linenos:
@@ -55,7 +55,7 @@ In oder to override methods from the parent class, we cna simply redefine them.
 
 The class ``submit_job`` is a existing class in ``SlurmPlatform`` that was overwritten to have a new behaviour.
 
-After all needed modifications and expansions, the ``ExamplePlatform`` class could look similar to the following example code.
+After all needed modifications and expansions, the ``Slurm_ExamplePlatform`` class could look similar to the following example code.
 
 .. code-block:: python
     :linenos:
