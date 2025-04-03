@@ -39,7 +39,7 @@ We create an initialization method with the required parameters.
     def __init__(self, expid: str, name: str, config: dict, auth_password: str=None):
         """ Initialization of the Class ExamplePlatform """
         SlurmPlatform.__init__(self, expid, name, config, auth_password = auth_password)
-        self.example_platform_parameter = ...
+        self.example_platform_parameter = ... # add any platform specific parameters
 
 As you can see the parent class has an initialization in order invoke all the parent`s methods and attributes into the
 child (``Slurm_ExamplePlatform``).
@@ -78,7 +78,7 @@ After all needed modifications and expansions, the ``Slurm_ExamplePlatform`` cla
 Integrating the extended platform into the module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In order to ensure that the platform will be created as expected we need to make some changes in 4 different files ``autosubmit/autosubmit.py``, ``autosubmit/job/job.py``, ``autosubmit/platforms/ecplatform.py`` and ``atuosubmit/platforms/paramiko_submitter.py``:
+In order to ensure that the platform will be created as expected we need to make some changes in 4 different files ``autosubmit/autosubmit.py`` -see in GitHub `autosubmit.py <https://github.com/BSC-ES/autosubmit/blob/a92396f894806b418e2208bf2733758d507a91b2/autosubmit/autosubmit.py>`_ -, ``autosubmit/job/job.py`` - see in GitHub `job.py <https://github.com/BSC-ES/autosubmit/blob/a92396f894806b418e2208bf2733758d507a91b2/autosubmit/job/job.py>`_ -, ``autosubmit/platforms/ecplatform.py`` - see in GitHub `ecplatform.py <https://github.com/BSC-ES/autosubmit/blob/a92396f894806b418e2208bf2733758d507a91b2/autosubmit/platforms/ecplatform.py>`_ - and ``atuosubmit/platforms/paramiko_submitter.py`` - see in GitHub `paramiko_submitter.py <https://github.com/BSC-ES/autosubmit/blob/a92396f894806b418e2208bf2733758d507a91b2/autosubmit/platforms/paramiko_submitter.py>`_ -:
 
 .. warning::
    Line numbers might differ from the ones listed in this page
@@ -172,7 +172,7 @@ this file will have the Platform commands to be executed
     APP.sh
     CLEAN.sh
 
-For sake of keeping and concise and clear example of how AutoSubmit works a simple instruction can be executed.
+For sake of keeping and concise and clear example of how Autosubmit works a simple instruction can be executed.
 For full developed experiments this will be the instructions used in your experiment.
 
 .. code-block:: yaml
@@ -228,7 +228,7 @@ Add the following PARAMETER after, this will point towards the folder containing
     LOCAL:
         PROJECT_PATH: ~/autosubmit/project
 
-The following setting are used towards creating a connection with a platform to execute the jobs,
+The following settings are used towards creating a connection with a platform to execute the jobs,
 you have to input the information suitable for your project. (e.g.: user, host, platform)
 
 .. warning::
