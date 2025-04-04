@@ -256,12 +256,15 @@ you have to input the information suitable for your project. (e.g.: user, host, 
             USER: <User>
 
 Now you can add jobs at the end of the file to see the execution
+Each job will point to one of the ``batch`` files that will be created in the next step, which means that autosubmit
+will look for the instruction of the experiment in the ``~/autosubmit/<expid>/proj/local_project/`` if none is found
+autosubmit will look at ``LOCAL.PROJECT_PATH`` set earlier in order to look and if they exist copy to the new project.
 
 .. code-block:: yaml
 
     JOBS:
         LOCAL_SETUP:
-            FILE: LOCAL_SETUP.sh
+            FILE: LOCAL_SETUP.sh # ~/autosubmit/<expid>/proj/local_project/LOCAL_SETUP.sh
             PLATFORM: LOCAL
             RUNNING: once
 
