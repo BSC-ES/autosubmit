@@ -52,7 +52,7 @@ can be used to submit jobs to the other nodes (as it is normally
 configured with VM's submitting jobs to remote Slurm, PBS, etc.).
 
 ```bash
-$ docker run --rm --init ${USER}/autosubmit:latest \
+$ docker run --rm ${USER}/autosubmit:latest \
   autosubmit --version
 ```
 
@@ -113,7 +113,7 @@ or remote hosts (always via `ssh`).
 To start with SSH (see prerequisites note about SSH keys):
 
 ```bash
-$ docker run --rm --init \
+$ docker run --rm \
   -ti \
   -p 2222:22 \
   -e DISPLAY=$DISPLAY \
@@ -138,7 +138,7 @@ $ autosubmit create a000
 $ autosubmit run a000
 ```
 
-It is important to remember to start the container with `--init`
+It is important to know that this container uses `tini` as the init process
 so that Autosubmit jobs do not become defunct (zombie) processes
 inside the container.
 
