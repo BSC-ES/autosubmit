@@ -37,7 +37,7 @@ class PBSPlatform(ParamikoPlatform):
     :type version: str
     """
 
-    def submit_Script(self, hold=False):
+    def submit_script_sbatch(self, hold=False):
         pass
 
     def get_checkAlljobs_cmd(self, jobs_id):

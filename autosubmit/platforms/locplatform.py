@@ -36,7 +36,7 @@ class LocalPlatform(ParamikoPlatform):
     :type expid: str
     """
 
-    def submit_Script(self, hold=False):
+    def submit_script_sbatch(self, hold=False):
         pass
 
     def parse_Alljobs_output(self, output, job_id):

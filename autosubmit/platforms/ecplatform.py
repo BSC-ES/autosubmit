@@ -46,7 +46,7 @@ class EcPlatform(ParamikoPlatform):
     def get_checkAlljobs_cmd(self, jobs_id):
         pass
 
-    def submit_Script(self, hold=False):
+    def submit_script_sbatch(self, hold=False):
         pass
 
     def __init__(self, expid, name, config, scheduler):

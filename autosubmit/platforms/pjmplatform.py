@@ -99,7 +99,7 @@ class PJMPlatform(ParamikoPlatform):
             valid_packages_to_submit = [ package for package in valid_packages_to_submit ]
             if len(valid_packages_to_submit) > 0:
                 try:
-                    jobs_id = self.submit_Script(hold=hold)
+                    jobs_id = self.submit_script_sbatch(hold=hold)
                 except AutosubmitError as e:
                     jobnames = [job.name for job in valid_packages_to_submit[0].jobs]
                     for jobname in jobnames:
@@ -189,7 +189,7 @@ class PJMPlatform(ParamikoPlatform):
         return None
 
 
-    def submit_Script(self, hold=False):
+    def submit_script_sbatch(self, hold=False):
         # type: (bool) -> Union[List[str], str]
         """
         Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once.

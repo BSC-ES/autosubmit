@@ -105,7 +105,7 @@ class SlurmPlatform(ParamikoPlatform):
                 duplicated_jobs_already_checked = False
                 platform = valid_packages_to_submit[0].jobs[0].platform
                 try:
-                    jobs_id = self.submit_Script(hold=hold)
+                    jobs_id = self.submit_script_sbatch(hold=hold)
                 except AutosubmitError as e:
                     jobnames = []
                     duplicated_jobs_already_checked = True
@@ -259,7 +259,7 @@ class SlurmPlatform(ParamikoPlatform):
             else:
                 return None
 
-    def submit_Script(self, hold=False):
+    def submit_script_sbatch(self, hold=False):
         # type: (bool) -> Union[List[str], str]
         """
         Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once.
