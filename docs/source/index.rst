@@ -31,6 +31,13 @@ Autosubmit Workflow Manager
    /userguide/index
 
 .. toctree::
+   :caption: Developer's Guide
+   :maxdepth: 1
+   :hidden:
+
+   /devguide/index
+
+.. toctree::
    :caption: Database Documentation
    :maxdepth: 1
    :hidden:

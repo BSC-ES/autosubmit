@@ -4412,13 +4412,13 @@ class Autosubmit:
         """
         Creates job list for given experiment. Configuration files must be valid before executing this process.
 
-        :param detail:
-        :param check_wrappers:
-        :param notransitive:
-        :param expand_status:
-        :param expand:
-        :param group_by:
-        :param expid: experiment identifier
+        :param detail: Show Job List view in terminal
+        :param check_wrappers: Generate possible wrapper in the current workflow
+        :param notransitive: Disable transitive reduction
+        :param expand_status: Select the statuses to be expanded
+        :param expand: Supply the list of dates/members/chunks to filter the list of jobs.
+        :param group_by: Groups the jobs automatically by date, member, chunk or split
+        :param expid: Experiment identifier
         :type expid: str
         :param noplot: if True, method omits final plotting of the jobs list. Only needed on large experiments when
             plotting time can be much larger than creation time.

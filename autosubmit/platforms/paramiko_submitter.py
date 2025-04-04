@@ -24,6 +24,7 @@ from collections import defaultdict
 from log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+
 from .submitter import Submitter
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.pbsplatform import PBSPlatform
