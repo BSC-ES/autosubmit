@@ -218,13 +218,13 @@ Now we start configuring the experiment adding the additional ``PARAMETERS`` to 
         CALENDAR: standard
 
 
-Add the following PARAMETER after, this will point towards the folder containing all the scripts instructions to be
+Add the following PARAMETER will point towards the folder containing all the scripts and instructions to be
 used to execute the experiment in the platform
 
 .. code-block:: yaml
 
     LOCAL:
-        PROJECT_PATH: ~/autosubmit/project # path to your project sources
+        PROJECT_PATH: /home/user/experiment_example # path to your project sources
 
 
 Autosubmit will copy your sources to the ``$autosubmit_installation/$expid/proj/%PROJECT.PROJECT_DESTINATION%``.
@@ -261,7 +261,7 @@ you have to input the information suitable for your project. (e.g.: user, host, 
             USER: <User>
 
 Now you can add jobs at the end of the file to see the execution
-Each job will point to one of the ``batch`` files that will be created in the next step, which means that autosubmit
+Each job will point to one of the ``Bash`` files that will be created in the next step, which means that autosubmit
 will look for the instruction of the experiment in the ``~/autosubmit/<expid>/proj/local_project/`` if none is found
 autosubmit will look at ``LOCAL.PROJECT_PATH`` set earlier in order to look and if they exist copy to the new project.
 
@@ -326,11 +326,10 @@ autosubmit will look at ``LOCAL.PROJECT_PATH`` set earlier in order to look and 
             WALLCLOCK: 00:05
 
 As you finish to set up all the new configuration you can run the following command to generate the experiment
-that was just created we need to create a new folder at the root ``~/autosubmit`` called project.
+that was just created we need to create a new folder that will keep all the instructions for the experiment to be
+executed in the platform.
 
-This folder will keep all the instructions for the experiment to be executed in the platform.
-
-``mkdir -p ~/autosubmit/project``
+``mkdir -p /home/user/experiment_example``
 
 .. hint::
     The given name of the folder can be any as long as it matches the ``Local`` Parameter pointed out in the
