@@ -155,16 +155,16 @@ creation where the platform type
 How to configure a Platforms
 ------------------------------------
 
-To set up your platform, you first have to create a new experiment by running the following command:
+To set up your platform, you first have to create a new experiment by running the following command - change the platform from Marenostrum to whichever you will use -:
 
 ``autosubmit expid -H MARENOSTRUM5 -d "platform test" --minimal``
 
-This will generate a minimal version of an experiment and configure the experiment to make use of Marenostrum5.
+This will generate a minimal version of an experiment.
 
-You'll have to change the configurations of your experiment to make it work properly, and the following instructions are
+To change the configuration of your experiment to make it work properly, you can create a project and customize tis parameters. The following instructions are
 thought out to execute a small job through Autosubmit explaining how to configure a new platform.
 
-First create a new folder at the root ``~/Autosubmit`` called project executing the following command this folder will
+First create a new folder at the root ``~/autosubmit`` called project executing the following command this folder will
 maintain all the batch files to be used to execute in an experiment:
 
 ``mkdir -p ~/autosubmit/project``
