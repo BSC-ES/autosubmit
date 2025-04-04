@@ -91,7 +91,8 @@ In order to ensure that the platform will be created as expected we need to make
 ``autosubmit/autosubmit.py`` -see in GitHub `autosubmit.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/autosubmit.py>`_ -,
 ``autosubmit/job/job.py`` - see in GitHub `job.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/job/job.py>`_ -,
 ``autosubmit/platforms/ecplatform.py`` - see in GitHub `ecplatform.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/platforms/ecplatform.py>`_ - and
-``atuosubmit/platforms/paramiko_submitter.py`` - see in GitHub `paramiko_submitter.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/platforms/paramiko_submitter.py>`_ -:
+``atuosubmit/platforms/paramiko_submitter.py`` - see in GitHub `paramiko_submitter.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/platforms/paramiko_submitter.py>`_ -.
+The ``platform.type`` attribute indicates whether a platform is local or not. The ``type`` is also used to determine the scheduler.
 
 .. warning::
    Line numbers might differ from the ones listed in this page
