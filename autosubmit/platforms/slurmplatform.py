@@ -327,7 +327,7 @@ class SlurmPlatform(ParamikoPlatform):
         Sends a Submit file Script with sbatch instructions, execute it in the platform and
         retrieves the Jobs_ID of all jobs at once.
 
-        :param hold: Deprecated.
+        :param hold: Deprecated. Feature could be used in other platforms but has no use for current ones
         :type hold: bool
 
         :return: job id for submitted jobs.
