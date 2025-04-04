@@ -92,16 +92,21 @@ Integrating the extended platform into the module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In order to ensure that the platform will be created as expected we need to make some changes in 4 different files
-|br| ``autosubmit/job/job.py`` - see in GitHub `job.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/job/job.py>`_.
-|br| ``autosubmit/autosubmit.py`` - see in GitHub `autosubmit.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/autosubmit.py>`_.
-|br| ``autosubmit/platforms/ecplatform.py`` - see in GitHub `ecplatform.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/platforms/ecplatform.py>`_.
-|br| ``autosubmit/platforms/paramiko_submitter.py`` - see in GitHub `paramiko_submitter.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/platforms/paramiko_submitter.py>`_.
+|br| ``autosubmit/job/job.py`` - see in GitHub `job.py <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py>`_.
+|br| ``autosubmit/autosubmit.py`` - see in GitHub `autosubmit.py <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/autosubmit.py>`_.
+|br| ``autosubmit/platforms/ecplatform.py`` - see in GitHub `ecplatform.py <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/platforms/ecplatform.py>`_.
+|br| ``autosubmit/platforms/paramiko_submitter.py`` - see in GitHub `paramiko_submitter.py <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/platforms/paramiko_submitter.py>`_.
 
 The ``platform.type`` attribute indicates whether a platform is local or not.
 The ``type`` is also used to determine the scheduler.
 |br| ``type`` is defined in the yaml file that configures a platform as it's shown :ref:`here <TargetPlatform>`
 
-``autosubmit/autosubmit.py`` in `line 2537 <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/autosubmit.py#L2537>`_  add a new ``String`` making sure the new platform type is considered
+.. warning::
+    The number written down to each of the files could become obsolete locally as files get updated so they should be
+    seen more as a reference
+
+
+``autosubmit/autosubmit.py`` in `line 2537 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/autosubmit.py#L2537>`_  add a new ``String`` making sure the new platform type is considered
 the same as SLURM platform, as we expect a similar behaviour.
 
 .. code-block:: python
@@ -113,7 +118,7 @@ the same as SLURM platform, as we expect a similar behaviour.
                                                                                          failed_packages,
                                                                                          error_message="", hold=hold)
 
-``autosubmit/job/job.py`` in `line 2575 <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/job/job.py#L2575>`_ making sure each Job writes
+``autosubmit/job/job.py`` in `line 2575 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py#L2575>`_ making sure each Job writes
 end timestamp to TOTAL_STATS file and jobs_data.db properly.
 
 .. code-block:: python
@@ -124,7 +129,7 @@ end timestamp to TOTAL_STATS file and jobs_data.db properly.
             thread_write_finish.name = "JOB_data_{}".format(self.name)
             thread_write_finish.start()
 
-``autosubmit/job/job.py`` in `line 2817 <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/job/job.py#L2817>`_ add a new validation for the validation of the queue
+``autosubmit/job/job.py`` in `line 2817 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py#L2817>`_ add a new validation for the validation of the queue
 creation where the platform type
 
 .. code-block:: python
@@ -136,7 +141,7 @@ creation where the platform type
         reason = self._platform.parse_queue_reason(
             self._platform._ssh_output, self.id)
 
-``autosubmit/platforms/ecplatform.py`` in `line 59 <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/platforms/ecplatform.py#L59>`_ add a new validation for the header command
+``autosubmit/platforms/ecplatform.py`` in `line 59 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/platforms/ecplatform.py#L59>`_ add a new validation for the header command
 creation where the platform type
 
 .. code-block:: python
@@ -149,7 +154,7 @@ creation where the platform type
     This would only be useful if extending ecplatform, and you need a platform that can change the header
     and adapt to other platforms
 
-``autosubmit/platforms/paramiko_submitter.py`` in `line 143 <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/platforms/paramiko_submitter.py#L143>`_ add a new validation for the header command
+``autosubmit/platforms/paramiko_submitter.py`` in `line 143 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/platforms/paramiko_submitter.py#L143>`_ add a new validation for the header command
 creation where the platform type
 
 .. code-block:: python
