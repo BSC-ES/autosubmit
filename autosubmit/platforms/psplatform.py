@@ -61,7 +61,7 @@ class PsPlatform(ParamikoPlatform):
     def create_a_new_copy(self):
         return PsPlatform(self.expid, self.name, self.config)
 
-    def submit_Script(self, hold=False):
+    def submit_script_sbatch(self, hold=False):
         pass
 
     def update_cmds(self):

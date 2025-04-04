@@ -593,7 +593,7 @@ class ParamikoPlatform(Platform):
         self.send_command(check_energy_cmd)
         return self.get_ssh_output()
 
-    def submit_Script(self, hold=False):
+    def submit_script_sbatch(self, hold=False):
         """
         Sends a Submitfile Script, exec in platform and retrieve the Jobs_ID.
         :param hold: send job hold

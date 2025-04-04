@@ -812,7 +812,7 @@ class Platform(object):
         """ Opens Submit script file """
         raise NotImplementedError
 
-    def submit_Script(self, hold=False):
+    def submit_script_sbatch(self, hold=False):
         # type: (bool) -> Union[List[str], str]
         """
         Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once.

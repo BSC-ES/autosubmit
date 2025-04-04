@@ -174,9 +174,9 @@ def test_process_batch_ready_jobs_valid_packages_to_submit(mocker, pjm_platform,
     failed_packages = []
     pjm_platform.get_jobid_by_jobname = mocker.MagicMock()
     pjm_platform.send_command = mocker.MagicMock()
-    pjm_platform.submit_Script = mocker.MagicMock()
+    pjm_platform.submit_script_sbatch = mocker.MagicMock()
     jobs_id = [1, 2, 3]
-    pjm_platform.submit_Script.return_value = jobs_id
+    pjm_platform.submit_script_sbatch.return_value = jobs_id
     pjm_platform.process_batch_ready_jobs(valid_packages_to_submit, failed_packages)
     for i, package in enumerate(valid_packages_to_submit):
         for job in package.jobs:
