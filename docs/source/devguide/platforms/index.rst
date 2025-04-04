@@ -9,6 +9,10 @@ to identify which existing platform is the most suitable for out project.
 
 Composing the extended platform class
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. |br| raw:: html
+
+    <br />
+
 
 In this page we will be extending the SLURM
 platform - source file ``autosubmit/platforms/slurmplatform.py``, see in GitHub `slurmplatform.py <https://github.com/BSC-ES/autosubmit/blob/53b2a142fee5c8d8ac169547528c768c93e02a4a/autosubmit/platforms/slurmplatform.py#L35>`_ -, but any platform can be extended by following the same steps.
@@ -88,14 +92,14 @@ Integrating the extended platform into the module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In order to ensure that the platform will be created as expected we need to make some changes in 4 different files
-``autosubmit/autosubmit.py`` -see in GitHub `autosubmit.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/autosubmit.py>`_ -,
-``autosubmit/job/job.py`` - see in GitHub `job.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/job/job.py>`_ -,
-``autosubmit/platforms/ecplatform.py`` - see in GitHub `ecplatform.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/platforms/ecplatform.py>`_ - and
-``atuosubmit/platforms/paramiko_submitter.py`` - see in GitHub `paramiko_submitter.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/platforms/paramiko_submitter.py>`_ -.
-The ``platform.type`` attribute indicates whether a platform is local or not. The ``type`` is also used to determine the scheduler.
+|br| ``autosubmit/job/job.py`` - see in GitHub `job.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/job/job.py>`_.
+|br| ``autosubmit/autosubmit.py`` - see in GitHub `autosubmit.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/autosubmit.py>`_.
+|br| ``autosubmit/platforms/ecplatform.py`` - see in GitHub `ecplatform.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/platforms/ecplatform.py>`_.
+|br| ``atuosubmit/platforms/paramiko_submitter.py`` - see in GitHub `paramiko_submitter.py <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/platforms/paramiko_submitter.py>`_.
 
-.. warning::
-   Line numbers might differ from the ones listed in this page
+The ``platform.type`` attribute indicates whether a platform is local or not.
+The ``type`` is also used to determine the scheduler.
+|br| ``type`` is defined in the yaml file that configures a platform as it's shown :ref:`here <TargetPlatform>`
 
 ``autosubmit/autosubmit.py`` in `line 2537 <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/autosubmit.py#L2537>`_  add a new ``String`` making sure the new platform type is considered
 the same as SLURM platform, as we expect a similar behaviour.
@@ -140,6 +144,10 @@ creation where the platform type
 
     elif scheduler == 'slurm' or scheduler == 'example':
         self._header = SlurmHeader()
+
+.. hint::
+    This would only be useful if extending ecplatform, and you need a platform that can change the header
+    and adapt to other platforms
 
 ``autosubmit/platforms/paramiko_submitter.py`` in `line 143 <https://github.com/BSC-ES/autosubmit/blob/44345d039eb075f366cc01804d27e45fa4c1574d/autosubmit/platforms/paramiko_submitter.py#L143>`_ add a new validation for the header command
 creation where the platform type
@@ -259,18 +267,23 @@ you have to input the information suitable for your project. (e.g.: user, host, 
     Make sure to have created the folder with your USERNAME inside the proper path you pointed to
     (e.g.: <Project_Dir>/<Project_Name_Folder>/<USER>)
 
+
+.. _TargetPlatform:
+
+---------
+
 .. code-block:: yaml
 
     PLATFORMS:
         MARENOSTRUM5:
-            TYPE: <Scheduler> [pytest-pjm, pytest-slurm, pytest-ecaccess, pytest-ps]
+            TYPE: <Scheduler> [pjm, slurm, ecaccess, ps, exemple]
             HOST: <Host>
             PROJECT: <Project_Name_Folder>
             USER: <User>
             QUEUE: [dummy, gp_debug, nf, hpc]
 
         MARENOSTRUM_ARCHIVE:
-            TYPE: <Scheduler> [pytest-pjm, pytest-slurm, pytest-ecaccess, pytest-ps]
+            TYPE: <Scheduler> [pjm, slurm, ecaccess, ps, exemple]
             HOST: <Host>
             PROJECT: <Project_Name_Folder>
             USER: <User>
