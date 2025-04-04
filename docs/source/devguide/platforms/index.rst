@@ -160,10 +160,11 @@ creation where the platform type
             asconf.expid, section, exp_data, auth_password = auth_password)
 
 
-How to configure a Platforms
+How to configure a Platform
 ------------------------------------
 
-To set up your platform, you first have to create a new experiment by running the following command - change the platform from Marenostrum to whichever you will use -:
+To set up your platform, you first have to create a new experiment by running the following command:
+|br| *change the platform from MARENOSTRUM5 to whichever you will use*
 
 ``autosubmit expid -H MARENOSTRUM5 -d "platform test" --minimal``
 
@@ -172,39 +173,7 @@ This will generate a minimal version of an experiment.
 To change the configuration of your experiment to make it work properly, you can create a project and customize tis parameters. The following instructions are
 thought out to execute a small job through Autosubmit explaining how to configure a new platform.
 
-First create a new folder at the root ``~/autosubmit`` called project executing the following command this folder will
-maintain all the batch files to be used to execute in an experiment:
-
-``mkdir -p ~/autosubmit/project``
-
-.. hint::
-    The given name of the folder can be any as long as it matches the ``Local`` Parameter, the change in name
-    needs to take this into account
-
-For the execution of this test, a few files will need to be created within the new folder,
-this file will have the Platform commands to be executed
-
-.. code-block:: yaml
-
-    LOCAL_SETUP.sh
-    SYNCHRONIZE.sh
-    REMOTE_SETUP.sh
-    INI.sh
-    DATA_NOTIFIER.sh
-    SIM.sh
-    STATISTICS.sh
-    APP.sh
-    CLEAN.sh
-
-For sake of keeping and concise and clear example of how Autosubmit works a simple instruction can be executed.
-For full developed experiments, these files will contain the set of instructions to be used in your experiment.
-
-.. code-block:: yaml
-
-    sleep 5
-
-Once the new folder and files were created, open the file ``<expid>/config/jobs_<expid>.yml`` and you'll have a
-file as shown below.
+Open the file ``~/autosubmit/<expid>/config/minimal.yml`` and you'll have a file as shown below.
 
 .. code-block:: yaml
 
@@ -230,8 +199,7 @@ file as shown below.
         PROJECT_SUBMODULES: ''
         FETCH_SINGLE_BRANCH: true
 
-Now we start configuring the experiment adding the additional ``PARAMETERS`` as shown bellow
-to create a simple executable experiment
+Now we start configuring the experiment adding the additional ``PARAMETERS`` to create a simple executable experiment
 
 .. code-block:: yaml
 
@@ -255,7 +223,6 @@ used to execute the experiment in the platform
 
 
 Autosubmit will copy your sources to the ``$autosubmit_installation/$expid/proj/%PROJECT.PROJECT_DESTINATION%``.
-
 
 The following settings are used towards creating a connection with a platform to execute the jobs,
 you have to input the information suitable for your project. (e.g.: user, host, platform)
@@ -351,7 +318,37 @@ Now you can add jobs at the end of the file to see the execution
             WALLCLOCK: 00:05
 
 As you finish to set up all the new configuration you can run the following command to generate the experiment
-that was just created
+that was just created we need to create a new folder at the root ``~/autosubmit`` called project.
+
+This folder will keep all the instructions for the experiment to be executed in the platform.
+
+``mkdir -p ~/autosubmit/project``
+
+.. hint::
+    The given name of the folder can be any as long as it matches the ``Local`` Parameter pointed out in the
+    configuration file, the change in name needs to take this into account
+
+For the execution of this test, a few files will need to be created within the new folder,
+this file will have the Platform commands to be executed
+
+.. code-block:: yaml
+
+    LOCAL_SETUP.sh
+    SYNCHRONIZE.sh
+    REMOTE_SETUP.sh
+    INI.sh
+    DATA_NOTIFIER.sh
+    SIM.sh
+    STATISTICS.sh
+    APP.sh
+    CLEAN.sh
+
+For sake of keeping and concise and clear example of how Autosubmit works a simple instruction can be executed as a test.
+
+.. code-block:: yaml
+
+    sleep 5
+
 
 ``autosubmit create -np -f -v <EXPID>``
 
