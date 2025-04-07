@@ -348,7 +348,7 @@ contain proj-associated-code that will be executed in the job-specified platform
     CLEAN.sh
 
 For sake of keeping and concise and clear example of how Autosubmit works a simple instruction can be executed as a test.
-So add the following the instruction bellow to one or more ``Bash`` file(s) created in the previous instruction.
+So add the following the instruction below to one or more ``Bash`` file(s) created in the previous instruction.
 
 .. code-block:: yaml
 
@@ -359,9 +359,14 @@ How to run the experiment
 
 ``autosubmit create -np -f -v <EXPID>``
 
-Once the experiment is generated we can execute it and check its results by running the command bellow to execute
-the experiment and check if its behaviour is as expected
+Once the experiment is generated we can execute it and check if by running the command below the experiment
+
+    #. Submit the job to the specified platform
+    #. monitor the status of them
+    #. transfers logs to $expid/tmp/Log_$expid
 
 ``autosubmit run <EXPID>``
 
-For more examples on how to create and share configurations you can visit this :ref:`page <create_and_share_config>`
+.. note::
+    For more examples on how to create and share configurations of experiments and platform
+    you can visit this :ref:`page <create_and_share_config>`
