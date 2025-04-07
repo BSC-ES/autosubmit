@@ -156,19 +156,10 @@ class RunCmdDirective(code.CodeBlock):
         syntax = self.options.get("syntax", "bash")
         replace = self.options.get("replace", '')
         reader = csv.reader([replace], delimiter=",", escapechar="\\")
-        # prompt = "prompt" in self.options
-        # We patched this so that the prompt is displayed by default, similar
-        # to how ``{code-block} console`` works.
-        prompt = True
-        dedent_output = self.options.get("dedent-output", 0)
+        # # prompt = "prompt" in self.options
+        # # We patched this so that the prompt is displayed by default, similar
+        # # to how ``{code-block} console`` works.
 
-        # Dedent the output if required
-        if dedent_output > 0:
-            output = "\n\nOutput:\n".join([x[dedent_output:] for x in output.split("\n")])
-
-        # Add the prompt to our output if required
-        if prompt:
-            output = f"$ {command}\n\nOutput:\n{output}"
 
         # Do our "replace" syntax on the command output
         for items in reader:
@@ -182,8 +173,7 @@ class RunCmdDirective(code.CodeBlock):
                     output = re.sub(p, r, output)
 
         # Note: Sphinx's CodeBlock directive expects an array of command-line
-        #       output lines:
-        # https://github.com/sphinx-doc/sphinx/blob/c51a88da8b7b40e8d8cbdb1fce85ca2346b2b59a/sphinx/directives/code.py#L114
+        #       output lines: https://github.com/sphinx-doc/sphinx/blob/c51a88da8b7b40e8d8cbdb1fce85ca2346b2b59a/sphinx/directives/code.py#L114
         #       But the runcmd original code was simply wrapping a string
         #       containing \n in the text as a one-element array, e.g.
         #       ["cwltool --debug ...\ncwltool Version..."].
@@ -191,17 +181,15 @@ class RunCmdDirective(code.CodeBlock):
         #       emphasize-lines directive parameter to fail if the lines were
         #       anything greater than 0 (as the self.content array had 1 elem).
         #       See: https://github.com/common-workflow-language/user_guide/issues/269
-        output = output.split("\n")
 
         # Set up our arguments to run the CodeBlock parent run function
         self.arguments[0] = syntax
-        self.content = output
         node = super(RunCmdDirective, self).run()
 
         return node
 
 
 def setup(app):
-    app.add_directive("runcmd", RunCmdDirective)
+    app.add_directive("runcmdquiet", RunCmdDirective)
 
     return {"version": __version__}

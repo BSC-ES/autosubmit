@@ -30,7 +30,7 @@ Unable to recover remote logs files.
 ========================================================
 
 *Explanation*: If there are limitations on the remote platform regarding multiple connections,
-*Solution*:  You can try DISABLE_RECOVERY_THREADS: TRUE under the platform_name: section in the platform.yml.
+*Solution*:  You can try DISABLE_RECOVERY_THREADS: TRUE under the platform_name: section in the platform_<EXPID>.yml.
 
 Error on create caused by a configuration parsing error
 =======================================================
@@ -51,11 +51,11 @@ Other possible errors
 
 *Explanation*: The latest version of autosubmit uses a database to efficiently track changes in the jobs of your experiment. It could have happened that this small database got corrupted.
 
-*Solution*: run `autosubmit dbfix expid` where `expid` is the identifier of your experiment. This function will rebuild the database saving as much information as possible (usually all of it).
+*Solution*: run `autosubmit dbfix <EXPID>` where `<EXPID>` is the identifier of your experiment. This function will rebuild the database saving as much information as possible (usually all of it).
 
-**The pkl file of my experiment is empty but there is a job_list_%expid%_backup.pkl file that seems to be the real one.**
+**The pkl file of my experiment is empty but there is a job_list_%<EXPID>%_backup.pkl file that seems to be the real one.**
 
-*Solution*: run `autosubmit pklfix expid`, it will restore the `backup` file if possible.
+*Solution*: run `autosubmit pklfix <EXPID>`, it will restore the `backup` file if possible.
 
 Error codes
 ===========

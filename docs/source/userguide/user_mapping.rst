@@ -34,9 +34,9 @@ How it works
 
 The idea is to map two different things depending on the user logged in to the shared account to ensure the correct Autosubmit behavior.
 
-* Platform.yml file that contains the personal user for each platform.
+* Platform_<EXPID>.yml file that contains the personal user for each platform.
 
-(Personal user action): The user must set the environment variable "AS_ENV_PLATFORMS_PATH" to point to the file that contains the personal platforms.yml file.
+(Personal user action): The user must set the environment variable "AS_ENV_PLATFORMS_PATH" to point to the file that contains the personal platforms_<EXPID>.yml file.
 
 Defaults to: None
 
@@ -103,7 +103,7 @@ Tip: Add it to the shared account .bashrc file.
 
 .. code-block:: bash
 
-    cat $autosubmit_data/$expid/conf/minimal.yml
+    cat $autosubmit_data/$expid/conf/minimal_<EXPID>.yml
 
 .. code-block:: yaml
 
