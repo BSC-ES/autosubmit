@@ -155,7 +155,71 @@ Jobs configuration
 
 .. code-block:: yaml
 
+    # Example job with all options specified
     JOBS:
+        ## Job name
+        # JOBNAME:
+            ## Script to execute. If not specified, job will be omitted from workflow. "You can also specify additional files separated by a ",".
+            # Note: The post-processed additional_files will be sent to %HPCROOT%/LOG_%EXPID%
+            ## Path relative to the project directory
+            # FILE:
+            ## Platform to execute the job. If not specified, defaults to HPCARCH in expdef file.
+            ## LOCAL is always defined and refers to current machine
+            # PLATFORM:
+            ## Queue to add the job to. If not specified, uses PLATFORM default.
+            # QUEUE:
+            ## Defines dependencies from job as a list of parents jobs separated by spaces.
+            ## Dependencies to jobs in previous chunk, member o startdate, use -(DISTANCE)
+            # DEPENDENCIES:INI SIM-1 CLEAN-2
+            ## Define if jobs runs once, once per stardate, once per member or once per chunk. Options: once, date, member, chunk.
+            ## If not specified, defaults to once
+            # RUNNING:once
+            ## Specifies that job has only to be run after X dates, members or chunk. A job will always be created for the last
+            ## If not specified, defaults to 1
+            # FREQUENCY:3
+            ## On a job with FREQUENCY > 1, if True, the dependencies are evaluated against all
+            ## jobs in the frequency interval, otherwise only evaluate dependencies against current
+            ## iteration.
+            ## If not specified, defaults to True
+            # WAIT:False
+            ## Defines if job is only to be executed in reruns. If not specified, defaults to false.
+            # RERUN_ONLY:False
+            ## Wallclock to be submitted to the HPC queue in format HH:MM
+            # WALLCLOCK:00:05
+
+            ## Processors number to be submitted to the HPC. If not specified, defaults to 1.
+            ## Wallclock chunk increase (WALLCLOCK will be increased according to the formula WALLCLOCK + WCHUNKINC * (chunk - 1)).
+            ## Ideal for sequences of jobs that change their expected running time according to the current chunk.
+            # WCHUNKINC: 00:01
+            # PROCESSORS: 1
+            ## Threads number to be submitted to the HPC. If not specified, defaults to 1.
+            # THREADS: 1
+            ## Enables hyper-threading. If not specified, defaults to false.
+            # HYPERTHREADING: false
+            ## Tasks number to be submitted to the HPC. If not specified, defaults to 1.
+            # Tasks: 1
+            ## Memory requirements for the job in MB
+            # MEMORY: 4096
+            ##  Number of retrials if a job fails. If not specified, defaults to the value given on experiment's autosubmit.yml
+            # RETRIALS: 4
+            ##  Allows to put a delay between retries, of retrials if a job fails. If not specified, it will be static
+            # DELAY_RETRY_TIME: 11
+            # DELAY_RETRY_TIME: +11 # will wait 11,22,33,44...
+            # DELAY_RETRY_TIME: *11 # will wait 11,110,1110,11110...
+            ## Some jobs can not be checked before running previous jobs. Set this option to false if that is the case
+            # CHECK: False
+            ## Select the interpreter that will run the job. Options: bash, python, r Default: bash
+            # TYPE: bash
+            ## Specify the path to the interpreter. If empty, use system default based on job type  . Default: empty
+            # EXECUTABLE: /my_python_env/python3
+
+            # Split the job in N jobs. If not specified, defaults to None
+            # Splits = 2
+            # Size unit of the split. Options: hour, day, month, year. Defaults to EXPERIMENT.CHUNKSIZEUNIT-1
+            # SPLITSIZEUNIT: day
+            # Size of the split. If not specified, defaults to 1
+            # SPLITSIZE: 1
+
         LOCAL_SETUP:
             FILE: LOCAL_SETUP.sh
             PLATFORM: LOCAL
