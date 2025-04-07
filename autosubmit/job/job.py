@@ -1143,10 +1143,10 @@ class Job(object):
             int: Value in the index position, or 0 if the file or index does not exist.
         """
         if fail_count == -1:
-            logname = os.path.join(self._tmp_path, self.stat_file)
+            logname = os.path.join(self._tmp_path, f"{self.stat_file}0")
         else:
             fail_count = str(fail_count)
-            logname = os.path.join(self._tmp_path, self.name + '_STAT_' + fail_count)
+            logname = os.path.join(self._tmp_path, f"{self.stat_file}{fail_count}")
         if os.path.exists(logname):
             lines = open(logname).readlines()
             if len(lines) >= index + 1:
@@ -1154,6 +1154,7 @@ class Job(object):
             else:
                 return 0
         else:
+            Log.warning(f"Log file {logname} does not exist")
             return 0
 
     def _get_from_total_stats(self, index):
