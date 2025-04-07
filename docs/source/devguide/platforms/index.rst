@@ -293,13 +293,13 @@ if they exist.
 
         DATA_NOTIFIER:
             FILE: DATA_NOTIFIER.sh
-            PLATFORM: MARENOSTRUM5
+            PLATFORM: MARENOSTRUM_ARCHIVE
             DEPENDENCIES: INI
             RUNNING: chunk
 
         SIM:
             FILE: SIM.sh
-            PLATFORM: MARENOSTRUM5
+            PLATFORM: MARENOSTRUM_ARCHIVE
             DEPENDENCIES: DATA_NOTIFIER
             RUNNING: chunk
 
