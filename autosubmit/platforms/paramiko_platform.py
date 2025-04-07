@@ -144,8 +144,7 @@ class ParamikoPlatform(Platform):
 
         except EOFError as e:
             self.connected = False
-            raise AutosubmitError("[{0}] not alive. Host: {1}".format(
-                self.name, self.host), 6002, str(e))
+            raise AutosubmitError(f"[{self.name}] not alive. Host: {self.host}", 6002, str(e))
         except (AutosubmitError,AutosubmitCritical,IOError):
             self.connected = False
             raise
@@ -164,11 +163,10 @@ class ParamikoPlatform(Platform):
                 self.connect(as_conf)
             except Exception as e:
                 if ',' in self.host:
-                    Log.printlog("Connection Failed to {0}, will test another host".format(
-                        self.host.split(',')[0]), 6002)
+                    Log.printlog(f"Connection Failed to {self.host.split(',')[0]}, will test another host", 6002)
                 else:
-                    raise AutosubmitCritical(
-                        "First connection to {0} is failed, check host configuration or try another login node ".format(self.host), 7050,str(e))
+                    raise AutosubmitCritical(f"First connection to {self.host} is failed, check host configuration"
+                                             f" or try another login node ", 7050,str(e))
             while self.connected is False and retry < retries:
                 try:
                     self.connect(as_conf,True)
@@ -176,8 +174,11 @@ class ParamikoPlatform(Platform):
                     pass
                 retry += 1
             if not self.connected:
-                trace = 'Can not create ssh or sftp connection to {0}: Connection could not be established to platform {1}\n Please, check your expid on the PLATFORMS definition in YAML to see if there are mistakes in the configuration\n Also Ensure that the login node listed on HOST parameter is available(try to connect via ssh on a terminal)\n Also you can put more than one host using a comma as separator'.format(
-                    self.host, self.name)
+                trace = ('Can not create ssh or sftp connection to {self.host}: Connection could not be established to'
+                         ' platform {self.name}\n Please, check your expid on the PLATFORMS definition in YAML to see'
+                         ' if there are mistakes in the configuration\n Also Ensure that the login node listed on HOST'
+                         ' parameter is available(try to connect via ssh on a terminal)\n Also you can put more than'
+                         ' one host using a comma as separator')
                 raise AutosubmitCritical(
                     'Experiment cant no continue without unexpected behaviour, Stopping Autosubmit', 7050, trace)
 
@@ -326,7 +327,7 @@ class ParamikoPlatform(Platform):
                 Log.warning("nohup can't be used as the password will be asked")
                 Log.warning("If you are using a token, please type the token code when asked")
                 if self.pw is None:
-                    self.pw = getpass.getpass("Password for {0}: ".format(self.name))
+                    self.pw = getpass.getpass(f"Password for {self.name}: ")
                 if self.two_factor_method == "push":
                     Log.warning("Please check your phone to complete the 2FA PUSH authentication")
                 self.transport = paramiko.Transport((self._host_config['hostname'], port))
@@ -352,16 +353,18 @@ class ParamikoPlatform(Platform):
             raise
         except IOError as e:
             if "refused" in str(e.strerror).lower():
-                raise SSHException(" {0} doesn't accept remote connections. Check if there is an typo in the hostname".format(self.host))
+                raise SSHException(f" {self.host} doesn't accept remote connections. "
+                                   f"Check if there is an typo in the hostname")
             elif "name or service not known" in str(e.strerror).lower():
-                raise SSHException(" {0} doesn't accept remote connections. Check if there is an typo in the hostname".format(self.host))
+                raise SSHException(f" {self.host} doesn't accept remote connections. "
+                                   f"Check if there is an typo in the hostname")
             else:
                 raise AutosubmitError("File can't be located due an slow or timeout connection", 6016, str(e))
         except BaseException as e:
             self.connected = False
             if "Authentication failed." in str(e):
-                raise AutosubmitCritical("Authentication Failed, please check the definition of PLATFORMS in YAML of {0}".format(
-                    self._host_config['hostname']), 7050, str(e))
+                raise AutosubmitCritical(f"Authentication Failed, please check the definition of PLATFORMS in YAML of "
+                                         f"{self._host_config['hostname']}", 7050, str(e))
             if not reconnect and "," in self._host_config['hostname']:
                 self.restore_connection(as_conf)
             else:
@@ -370,10 +373,10 @@ class ParamikoPlatform(Platform):
     def check_completed_files(self, sections=None):
         if self.host == 'localhost':
             return None
-        command = "find %s " % self.remote_log_dir
+        command = f"find {self.remote_log_dir} "
         if sections:
             for i, section in enumerate(sections.split()):
-                command += " -name *%s_COMPLETED" % section
+                command += f" -name {section}_COMPLETED"
                 if i < len(sections.split()) - 1:
                     command += " -o "
         else:
@@ -386,7 +389,7 @@ class ParamikoPlatform(Platform):
 
     def remove_multiple_files(self, filenames):
         #command = "rm"
-        log_dir = os.path.join(self.tmp_path, 'LOG_{0}'.format(self.expid))
+        log_dir = os.path.join(self.tmp_path, f'LOG_{self.expid}')
         multiple_delete_previous_run = os.path.join(
             log_dir, "multiple_delete_previous_run.sh")
         if os.path.exists(log_dir):
@@ -425,8 +428,8 @@ class ParamikoPlatform(Platform):
             self._ftpChannel.chmod(remote_path, os.stat(local_path).st_mode)
             return True
         except IOError as e:
-            raise AutosubmitError('Can not send file {0} to {1}'.format(os.path.join(
-                self.tmp_path, filename), os.path.join(self.get_files_path(), filename)), 6004, str(e))
+            raise AutosubmitError(f'Can not send file {os.path.join(self.tmp_path, filename)} to '
+                                  f'{os.path.join(self.get_files_path(), filename)}', 6004, str(e))
         except BaseException as e:
             raise AutosubmitError(
                 'Send file failed. Connection seems to no be active', 6004)
@@ -470,17 +473,14 @@ class ParamikoPlatform(Platform):
                 pass
             if str(e) in "Garbage":
                 if not ignore_log:
-                    Log.printlog(
-                        "File {0} seems to no exists (skipping)".format(filename), 5004)
+                    Log.printlog(f"File {filename} seems to no exists (skipping)", 5004)
             if must_exist:
                 if not ignore_log:
-                    Log.printlog(
-                        "File {0} does not exists".format(filename), 6004)
+                    Log.printlog(f"File {filename} does not exists", 6004)
                 return False
             else:
                 if not ignore_log:
-                    Log.printlog(
-                        "Log file couldn't be retrieved: {0}".format(filename), 5000)
+                    Log.printlog(f"Log file couldn't be retrieved: {filename}", 5000)
                 return False
 
     def delete_file(self, filename):
@@ -500,8 +500,8 @@ class ParamikoPlatform(Platform):
         except IOError as e:
             return False
         except BaseException as e:
-            Log.error('Could not remove file {0} due a wrong configuration'.format(
-                os.path.join(self.get_files_path(), filename)))
+            Log.error(f'Could not remove file {os.path.join(self.get_files_path(), filename)} due a '
+                      f'wrong configuration')
             if str(e).lower().find("garbage") != -1:
                 raise AutosubmitCritical(
                     "Wrong User or invalid .ssh/config. Or invalid user in the definition of PLATFORMS in YAML or public key not set ", 7051, str(e))
@@ -528,23 +528,20 @@ class ParamikoPlatform(Platform):
 
         except IOError as e:
             if str(e) in "Garbage":
-                raise AutosubmitError('File {0} does not exists, something went wrong with the platform'.format(os.path.join(path_root,src)), 6004, str(e))
+                raise AutosubmitError(f'File {os.path.join(path_root,src)} does not exists, something went '
+                                      f'wrong with the platform', 6004, str(e))
             if must_exist:
-                raise AutosubmitError("File {0} does not exists".format(
-                    os.path.join(path_root,src)), 6004, str(e))
+                raise AutosubmitError(f"File {os.path.join(path_root,src)} does not exists", 6004, str(e))
             else:
-                Log.debug("File {0} doesn't exists ".format(path_root))
+                Log.debug(f"File {path_root} doesn't exists ")
                 return False
         except Exception as e:
             if str(e) in "Garbage":
-                raise AutosubmitError('File {0} does not exists'.format(
-                    os.path.join(self.get_files_path(), src)), 6004, str(e))
+                raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exists', 6004, str(e))
             if must_exist:
-                raise AutosubmitError("File {0} does not exists".format(
-                    os.path.join(self.get_files_path(), src)), 6004, str(e))
+                raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exists", 6004, str(e))
             else:
-                Log.printlog("Log file couldn't be moved: {0}".format(
-                    os.path.join(self.get_files_path(), src)), 5001)
+                Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
                 return False
 
     def submit_job(self, job, script_name, hold=False, export="none"):
@@ -1050,7 +1047,7 @@ class ParamikoPlatform(Platform):
                     try:
                         chan.exec_command(command)
                     except BaseException as e:
-                        raise AutosubmitCritical("Failed to execute command: %s" % e)
+                        raise AutosubmitCritical(f"Failed to execute command: {e}")
                     chan_fileno = chan.fileno()
                     self.poller.register(chan_fileno, select.POLLIN)
                     self.x11_status_checker(chan, chan_fileno)
@@ -1179,18 +1176,17 @@ class ParamikoPlatform(Platform):
                 elif errorLine.find("refused") != -1 or errorLine.find("slurm_persist_conn_open_without_init") != -1 or errorLine.find("slurmdbd") != -1 or errorLine.find("submission failed") != -1 or errorLine.find("git clone") != -1 or errorLine.find("sbatch: error: ") != -1 or errorLine.find("not submitted") != -1 or errorLine.find("invalid") != -1 or "[ERR.] PJM".lower() in errorLine:
                     if "salloc: error" in errorLine or "salloc: unrecognized option" in errorLine or "[ERR.] PJM".lower() in errorLine or (self._submit_command_name == "sbatch" and (errorLine.find("policy") != -1 or errorLine.find("invalid") != -1) ) or (self._submit_command_name == "sbatch" and errorLine.find("argument") != -1) or (self._submit_command_name == "bsub" and errorLine.find("job not submitted") != -1) or self._submit_command_name == "ecaccess-job-submit" or self._submit_command_name == "qsub ":
                         raise AutosubmitError(errorLine, 7014, "Bad Parameters.")
-                    raise AutosubmitError('Command {0} in {1} warning: {2}'.format(command, self.host,self._ssh_output_err, 6005))
+                    raise AutosubmitError(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6005)
 
             if not ignore_log:
                 if len(stderr_readlines) > 0:
-                    Log.printlog('Command {0} in {1} warning: {2}'.format(command, self.host,self._ssh_output_err, 6006))
+                    Log.printlog(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6006)
                 else:
                     pass
-                    #Log.debug('Command {0} in {1} successful with out message: {2}', command, self.host, self._ssh_output)
+                    #Log.debug('Command {0} in {1} successful without message: {2}', command, self.host, self._ssh_output)
             return True
         except AttributeError as e:
-            raise AutosubmitError(
-                'Session not active: {0}'.format(str(e)), 6005)
+            raise AutosubmitError(f'Session not active: {str(e)}', 6005)
         except AutosubmitCritical as e:
             raise
         except AutosubmitError as e:
@@ -1200,8 +1196,7 @@ class ParamikoPlatform(Platform):
         except BaseException as e:
             if type(stderr_readlines) is str:
                 stderr_readlines = '\n'.join(stderr_readlines)
-            raise AutosubmitError('Command {0} in {1} warning: {2}'.format(
-                command, self.host, stderr_readlines), 6005, str(e))
+            raise AutosubmitError(f'Command {command} in {self.host} warning: {stderr_readlines}', 6005, str(e))
 
     def parse_job_output(self, output):
         """
@@ -1307,17 +1302,15 @@ class ParamikoPlatform(Platform):
             remote_logs = (f"{job_script}.out", f"{job_script}.err")
 
         if timeout < 1:
-            command = export + ' nohup ' + executable + ' {0} > {1} 2> {2} & echo $!'.format(
-                os.path.join(self.remote_log_dir, job_script),
-                os.path.join(self.remote_log_dir, remote_logs[0]),
-                os.path.join(self.remote_log_dir, remote_logs[1]),
-            )
+            command = export + ' nohup ' + executable + (f' {os.path.join(self.remote_log_dir, job_script)} > '
+                                                         f'{os.path.join(self.remote_log_dir, remote_logs[0])} 2> '
+                                                         f'{os.path.join(self.remote_log_dir, remote_logs[1])} & '
+                                                         f'echo $!')
         else:
-            command = export + "timeout {0}".format(timeout) + ' nohup ' + executable + ' {0} > {1} 2> {2} & echo $!'.format(
-                os.path.join(self.remote_log_dir, job_script),
-                os.path.join(self.remote_log_dir, remote_logs[0]),
-                os.path.join(self.remote_log_dir, remote_logs[1]),
-            )
+            command = (export + f"timeout {timeout}" + ' nohup ' + executable +
+                       f' {os.path.join(self.remote_log_dir, job_script)} > '
+                       f'{os.path.join(self.remote_log_dir, remote_logs[0])} 2> '
+                       f'{os.path.join(self.remote_log_dir, remote_logs[1])} & echo $!')
         return command
 
 
@@ -1331,7 +1324,7 @@ class ParamikoPlatform(Platform):
         :return: command to check job status script
         :rtype: str
         """
-        return 'nohup kill -0 {0} > /dev/null 2>&1; echo $?'.format(job_id)
+        return f'nohup kill -0 {job_id} > /dev/null 2>&1; echo $?'
 
 
     def get_submitted_job_id(self, output, x11 = False):
@@ -1355,11 +1348,11 @@ class ParamikoPlatform(Platform):
         :rtype: str
         """
         if not job.packed or str(job.wrapper_type).lower() != "vertical":
-            out_filename = "{0}.cmd.out.{1}".format(job.name,job.fail_count)
-            err_filename = "{0}.cmd.err.{1}".format(job.name,job.fail_count)
+            out_filename = f"{job.name}.cmd.out.{job.fail_count}"
+            err_filename = f"{job.name}.cmd.err.{job.fail_count}"
         else:
-            out_filename = "{0}.cmd.out".format(job.name)
-            err_filename = "{0}.cmd.err".format(job.name)
+            out_filename = f"{job.name}.cmd.out"
+            err_filename = f"{job.name}.cmd.err"
 
         if len(job.het) > 0:
             header = self.header.calculate_het_header(job, parameters)
@@ -1464,14 +1457,11 @@ class ParamikoPlatform(Platform):
         """
         try:
             if self.send_command(self.get_mkdir_cmd()):
-                Log.debug('{0} has been created on {1} .',
-                          self.remote_log_dir, self.host)
+                Log.debug(f'{self.remote_log_dir} has been created on {self.host} .')
             else:
-                Log.debug('Could not create the DIR {0} to HPC {1}'.format(
-                    self.remote_log_dir, self.host))
+                Log.debug(f'Could not create the DIR {self.remote_log_dir} to HPC {self.host}')
         except BaseException as e:
-            raise AutosubmitError("Couldn't send the file {0} to HPC {1}".format(
-                self.remote_log_dir, self.host), 6004, str(e))
+            raise AutosubmitError(f"Couldn't send the file {self.remote_log_dir} to HPC {self.host}", 6004, str(e))
 
     def check_absolute_file_exists(self, src):
         try:

@@ -1,0 +1,27 @@
+CONFIG:
+  # Current version of Autosubmit.
+  AUTOSUBMIT_VERSION: "4.1.0"
+  # Total number of jobs in the workflow.
+  TOTALJOBS: 20
+  # Maximum number of jobs permitted in the waiting status.
+  MAXWAITINGJOBS: 20
+DEFAULT:
+  # Job experiment ID.
+  EXPID: "a001"
+  # Default HPC platform name.
+  HPCARCH: "marenostrum4"
+  #hint: use %PROJDIR% to point to the project folder (where the project is cloned)
+  # Custom configuration location.
+  CUSTOM_CONFIG:
+    POST: "~/platforms.yml"
+PROJECT:
+  # Type of the project.
+  PROJECT_TYPE: none
+  # Folder to hold the project sources.
+  PROJECT_DESTINATION: git_project
+GIT:
+  PROJECT_ORIGIN: ""
+  PROJECT_BRANCH: ""
+  PROJECT_COMMIT: ''
+  PROJECT_SUBMODULES: ''
+  FETCH_SINGLE_BRANCH: true

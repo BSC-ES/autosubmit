@@ -1,0 +1,25 @@
+# Synchronize example https://autosubmit.readthedocs.io/en/master/userguide/defining_workflows/index.html
+
+experiment:
+  DATELIST: 20000101 20010101
+  MEMBERS: "fc0 fc1"
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '3'
+  CALENDAR: standard
+JOBS:
+    ini:
+        FILE: ini.sh
+        RUNNING: member
+
+    sim:
+        FILE: sim.sh
+        DEPENDENCIES: INI SIM-1
+        RUNNING: chunk
+
+    ASIM:
+        FILE: asim.sh
+        DEPENDENCIES: SIM
+        RUNNING: chunk
+        #SYNCHRONIZE: member
+        SYNCHRONIZE: date
