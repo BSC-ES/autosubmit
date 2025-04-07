@@ -1108,6 +1108,11 @@ class JobList(object):
         # check if job has edges
         if len(self.graph.pred[job.name]) == 0:
             for parent in natural_parents:
+                if dependency.relationships:  # If this section has filter, selects..
+                    found = [aux for aux in dic_jobs.as_conf.jobs_data[parent.section].get("DEPENDENCIES", {}).keys() if
+                             job.section == aux]
+                    if found:
+                        continue
                 problematic_dependencies.add(parent.name)
                 graph.add_edge(parent.name, job.name)
         return problematic_dependencies
