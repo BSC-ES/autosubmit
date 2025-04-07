@@ -267,57 +267,57 @@ if they exist.
     JOBS:
         LOCAL_SETUP:
             FILE: LOCAL_SETUP.sh # ~/autosubmit/<expid>/proj/local_project/LOCAL_SETUP.sh
-            PLATFORM: LOCAL
+            PLATFORM: MARENOSTRUM5
             RUNNING: once
 
         SYNCHRONIZE:
             FILE: SYNCHRONIZE.sh
-            PLATFORM: LOCAL
+            PLATFORM: MARENOSTRUM5
             DEPENDENCIES: LOCAL_SETUP
             RUNNING: once
             WALLCLOCK: 00:05
 
         REMOTE_SETUP:
             FILE: REMOTE_SETUP.sh
-            PLATFORM: LOCAL
+            PLATFORM: MARENOSTRUM5
             DEPENDENCIES: SYNCHRONIZE
             WALLCLOCK: 00:05
             RUNNING: once
 
         INI:
             FILE: INI.sh
-            PLATFORM: LOCAL
+            PLATFORM: MARENOSTRUM5
             DEPENDENCIES: REMOTE_SETUP
             RUNNING: once
             WALLCLOCK: 00:05
 
         DATA_NOTIFIER:
             FILE: DATA_NOTIFIER.sh
-            PLATFORM: LOCAL
+            PLATFORM: MARENOSTRUM5
             DEPENDENCIES: INI
             RUNNING: chunk
 
         SIM:
             FILE: SIM.sh
-            PLATFORM: LOCAL
+            PLATFORM: MARENOSTRUM5
             DEPENDENCIES: DATA_NOTIFIER
             RUNNING: chunk
 
         STATISTICS:
             FILE: STATISTICS.sh
-            PLATFORM: LOCAL
+            PLATFORM: MARENOSTRUM5
             DEPENDENCIES: SIM
             RUNNING: chunk
 
         APP:
             FILE: APP.sh
-            PLATFORM: LOCAL
+            PLATFORM: MARENOSTRUM5
             DEPENDENCIES: STATISTICS
             RUNNING: chunk
 
         CLEAN:
             FILE: CLEAN.sh
-            PLATFORM: LOCAL
+            PLATFORM: MARENOSTRUM5
             DEPENDENCIES: APP SIM STATISTICS
             RUNNING: once
             WALLCLOCK: 00:05
