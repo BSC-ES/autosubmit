@@ -79,7 +79,15 @@ After all needed modifications and expansions, the ``Slurm_ExamplePlatform`` cla
     class Slurm_ExamplePlatform(SlurmPlatform):
         """Class to manage slurm jobs"""
         def __init__(self, expid: str, name: str, config: dict, auth_password: str=None):
-            """Initialization of the Class ExamplePlatform"""
+            """ Initialization of the Class ExamplePlatform
+
+            :param expid: Id of the experiment.
+            :type expid: str
+            :param name: Name of the platform.
+            :type name: str
+            :param config: A dictionary containing all the Experiment parameters.
+            :type config: dict
+            """
             SlurmPlatform.__init__(self, expid, name, config, auth_password = auth_password)
 
         def submit_job(self, job, script_name: str, hold: bool=False, export: str="none") -> Union[int, None]:
@@ -104,7 +112,7 @@ to determine the scheduler.
     seen more as a reference
 
 
-``autosubmit/autosubmit.py`` in `line 2537 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/autosubmit.py#L2537>`_  add a new ``String`` making sure the new platform type is considered
+``autosubmit/autosubmit.py`` in `line 2538 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/autosubmit.py#L2537>`_  add a new ``String`` making sure the new platform type is considered
 the same as SLURM platform, as we expect a similar behaviour.
 
 .. code-block:: python
