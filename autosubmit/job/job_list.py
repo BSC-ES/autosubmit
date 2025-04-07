@@ -3062,8 +3062,7 @@ class JobList(object):
         :type statusChange: List of strings
         :param nocolor: True if the result should not include color codes
         :type nocolor: Boolean
-        :param existingList: External List of Jobs that will be printed,
-        this excludes the inner list of jobs.
+        :param existingList: External List of Jobs that will be printed, this excludes the inner list of jobs.
         :type existingList: List of Job Objects
         :return: String representation
         :rtype: String
@@ -3094,8 +3093,8 @@ class JobList(object):
                                                 statusChange=statusChange, nocolor=nocolor)
             else:
                 result += "\nCannot find root."
-
         return result
+
 
     def __repr__(self):
         """
@@ -3188,7 +3187,7 @@ class JobList(object):
         :type current_jobs: list
         :return: job to package, package to job, package to package_id, package to symbol
         :rtype: Dictionary(Job Object, Package), Dictionary(Package, List of Job Objects),
-        Dictionary(String, String), Dictionary(String, String)
+            Dictionary(String, String), Dictionary(String, String)
         """
         # monitor = Monitor()
         packages = None
