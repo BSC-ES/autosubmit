@@ -10,12 +10,12 @@ Configuration files
 Experiment configuration files are stored under each experiment's configuration directory. You should adjust all parameters to your needs in this files before creating the experiment. 
 The files follow the naming schema *type_expid.yml* where *type* is either **expdef**, **jobs**, **platforms** or **autosubmit**.
 
-*expdef_expid.yml* contains:
+*expdef_<EXPID>.yml* contains:
     - Start dates, members and chunks (number and length).
     - Experiment project source: origin (version control system or path)
     - Project configuration file path.
 
-*jobs_expid.yml* contains the workflow to be run:
+*jobs_<EXPID>.yml* contains the workflow to be run:
     - Scripts to execute.
     - Dependencies between tasks.
     - Task requirements (processors, wallclock time...).
@@ -23,21 +23,21 @@ The files follow the naming schema *type_expid.yml* where *type* is either **exp
 
 For more information on adding jobs see :ref:`add-new-job` and :ref:`add-het-job`.
 
-*platforms_expid.yml* contains:
+*platforms_<EXPID>.yml* contains:
     - HPC, fat-nodes and supporting computers configuration.
 
 For more information on adding a new platform to the experiment configuration, see :ref:`add-new-plat-exp`.
 
-.. note:: *platforms_expid.yml* is usually provided by technicians, users will only have to change login and accounting options for HPCs.
+.. note:: *platforms_<EXPID>.yml* is usually provided by technicians, users will only have to change login and accounting options for HPCs.
 
-*autosubmit_expid.yml* contains:
+*autosubmit_<EXPID>.yml* contains:
     - Maximum number of jobs to be running at the same time at the HPC.
     - Time (seconds) between connections to the HPC queue scheduler to poll already submitted jobs status.
     - Number of retrials if a job fails.
 
 
-Once all file parameters have been tuned, an experiment can be created. Refer to the method page :meth:`autosubmit.autosubmit.Autosubmit.create` for syntax details. 
-In sumamry, ``autosubmit create`` uses the ``expdef_expid.yml`` file to generate the experiment and related workfow. The experiment workflow, which contains all the jobs and its dependencies, will be saved as a *pkl* file. More info on pickle can be found at http://docs.python.org/library/pickle.html.
+Once all file parameters have been tuned, an experiment can be created. Refer to the method page :meth:`autosubmit.autosubmit.Autosubmit.create` for syntax details.
+In sumamry, ``autosubmit create`` uses the ``expdef_<EXPID>.yml`` file to generate the experiment and related workfow. The experiment workflow, which contains all the jobs and its dependencies, will be saved as a *pkl* file. More info on pickle can be found at http://docs.python.org/library/pickle.html.
 
 In order to understand more the grouping options, which are used for visualization purposes, please check :ref:`grouping`.
 
@@ -47,7 +47,7 @@ In order to understand more the grouping options, which are used for visualizati
 How to add a new job
 --------------------
 
-To add a new job from a template file, open the ``jobs_expid.yml`` file and add this text:
+To add a new job from a template file, open the ``jobs_<EXPID>.yml`` file and add this text:
 
 .. code-block:: yaml
 
@@ -69,7 +69,7 @@ This is the minimum job definition and usually is not enough. Typically, you usu
       - File where the job template is stored.
     * - ``PLATFORM``
       - Allows you to execute the job in a platform of your choice. It must be defined in the experiment's
-        ``platforms.yml`` file or to have the value ``LOCAL`` that always refers to the machine running Autosubmit.
+        ``platforms_<EXPID>.yml`` file or to have the value ``LOCAL`` that always refers to the machine running Autosubmit.
     * - ``RUNNING``
       - Defines if jobs runs only once or once per start-date, member or chunk.
         Options are: ``once``, ``date``, ``member``, ``chunk``
@@ -105,7 +105,7 @@ For jobs running in HPC platforms, usually you have to provide information about
     * - ``QUEUE``
       - If given, Autosubmit will add jobs to the given queue instead of platform's default queue
     * - ``RETRIALS``
-      - Number of retrials if a job fails. Defaults to the value given on experiment's autosubmit.yml
+      - Number of retrials if a job fails. Defaults to the value given on experiment's autosubmit_<EXPID>.yml
     * - ``DELAY_RETRY_TIME``
       - Allows to put a delay between retries. Autosubmit will retry the job as soon as possible.
         Accepted formats are:
@@ -161,7 +161,7 @@ There are also other, less used features that you can use:
         project folder where the tailer is located.
 
 .. _add-het-job:
-      
+
 How to add a new heterogeneous job
 ----------------------------------
 
@@ -172,7 +172,7 @@ An heterogeneous job or hetjob is a job for whcih each component has virtually a
 
 
 
-To add a new hetjob, open the ``jobs_expid.yml``. 
+To add a new hetjob, open the ``jobs_<EXPID>.yml``.
 
 .. code-block:: yaml
 
@@ -197,7 +197,7 @@ This will create a new job named *new_hetjob* with two components that will be e
 How to configure email notifications
 ------------------------------------
 
-**1.** Enable email notifications and set the accounts where you will receive it. For this, edit ``autosubmit_expid.yml``. More than one address can be defined.
+**1.** Enable email notifications and set the accounts where you will receive it. For this, edit ``autosubmit_<EXPID>.yml``. More than one address can be defined.
 
 Example:
 
@@ -216,7 +216,7 @@ Example:
             - rlewis@example.com
 
 
-**2.** Define for which jobs you want to be notified. Edit ``jobs_expid.yml``.  You will be notified every time the job changes its status to one of the statuses defined on the parameter ``NOTIFY_ON``. You can define more than one job status separated by a whitespace, a comma (`,`), or using a list.
+**2.** Define for which jobs you want to be notified. Edit ``jobs_<EXPID>.yml``.  You will be notified every time the job changes its status to one of the statuses defined on the parameter ``NOTIFY_ON``. You can define more than one job status separated by a whitespace, a comma (`,`), or using a list.
 
 Example:
 
@@ -246,7 +246,7 @@ How to add a new platform to the experiment configuration
 .. hint::
     If you are interested in changing the communications library, go to :ref:`request-exclusivity-reservation`.
 
-To add a new platform, open the ``platforms_expid.yml`` file and add:
+To add a new platform, open the ``platforms_<EXPID>.yml`` file and add:
 
 .. code-block:: yaml
 
@@ -368,7 +368,7 @@ How to request exclusivity or reservation
 .. important::
     Until now, it is only available for Marenostrum.
 
-To request exclusivity or reservation for your jobs, you can configure two platform variables. Edit ``platforms_expid.yml``.
+To request exclusivity or reservation for your jobs, you can configure two platform variables. Edit ``platforms_<EXPID>.yml``.
 
 
 .. hint::
@@ -406,7 +406,7 @@ How to set a custom interpreter for your job
 
 If the remote platform does not implement the interpreter you need, you can customize the ``shebang`` of your job script so it points to the relative path of the interpreter you want.
 
-In the file ``jos_expid.yml``:
+In the file ``jos_<EXPID>.yml``:
 
 
 .. list-table:: Parameters Description
@@ -497,7 +497,7 @@ The result is a ``shebang`` line ``#!/esarchive/autosubmit/my_python_env/python3
 How to create and run only selected members
 -------------------------------------------
 
-Your experiment is defined and correctly configured, but you want to create it only considering some selected members, and also to avoid creating the whole experiment to run only the members you want. Then, you can do it by configuring the setting ``RUN_ONLY_MEMBERS`` in the ``expdef_expid.yml`` file:
+Your experiment is defined and correctly configured, but you want to create it only considering some selected members, and also to avoid creating the whole experiment to run only the members you want. Then, you can do it by configuring the setting ``RUN_ONLY_MEMBERS`` in the ``expdef_<EXPID>.yml`` file:
 
 .. code-block:: yaml
 
@@ -551,20 +551,3 @@ priority (and the scheduler understands the dependencies set between the submitt
 created as long as the total number of jobs are below than the number defined in the ``TOTALJOBS`` variable.
 
 The jobs that are waiting in the remote platform, will be marked as ``HOLD``.
-
-How to configure
-~~~~~~~~~~~~~~~~
-
-In ``autosubmit_expid.yml``, regardless of the how your workflow is configured.
-
-For example:
-
-.. code-block:: yaml
-
-    config:
-        EXPID: ....
-        AUTOSUBMIT_VERSION: 4.0.0
-        ...
-        MAXWAITINGJOBS: 100
-        TOTALJOBS: 100
-        ...

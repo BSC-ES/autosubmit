@@ -37,7 +37,7 @@ extensions = [
     'sphinx_reredirects',
     'sphinx.ext.graphviz',
     'autosubmit_variables',
-    'helloworld',
+    'runcmdquiet',
     'runcmd'
 ]
 
@@ -123,9 +123,9 @@ pygments_style = 'sphinx'
 todo_include_todos = False
 
 autodoc_mock_imports = ["portalocker", "argparse", "python-dateutil", "py3dotplus", "pyparsing",
-                        'numpy', 'matplotlib', 'matplotlib.pyplot', 'matplotlib.gridspec', 'matplotlib.patches', 'paramiko',
-                        'mock', "networkx", 'networkx.algorithms.dag', 'bscearth.utils', 'bscearth.utils.config_parser',
-                        'bscearth.utils.date']
+                        'numpy', 'matplotlib', 'matplotlib.pyplot', 'matplotlib.gridspec', 'matplotlib.patches',
+                        'paramiko', 'mock', "networkx", 'networkx.algorithms.dag', 'bscearth.utils',
+                        'bscearth.utils.config_parser', 'bscearth.utils.date']
 
 redirects = {
     'devguide/variables': '../userguide/variables.html'

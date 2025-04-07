@@ -9,7 +9,7 @@ memory metrics which will be displayed in your console after the command finishe
    :align: center
    :alt: Screenshot of the header of the profiler's output
 
-The profiler output is also saved in ``<EXPID>/tmp/profile``. There you will find two files, the 
+The profiler output is also saved in ``<EXPID>/tmp/profile``. There you will find two files, the
 report in plain text format and a ``.prof`` binary which contains the CPU metrics. We highly recommend 
 using `SnakeViz <https://jiffyclub.github.io/snakeviz/>`_ to visualize this file, as follows:
 

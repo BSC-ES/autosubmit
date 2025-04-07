@@ -24,64 +24,37 @@ Examples:
 
 ::
     # check locally for completion files, do not kill running tasks, and do not commit changes
-    autosubmit recovery cxxx
+    autosubmit recovery <EXPID>
     # commit to the previous states
-    autosubmit recovery cxxx -s
+    autosubmit recovery <EXPID> -s
     # check locally for completion file AND issue kill commands in remote
-    autosubmit recovery cxxx -f -s
-    # check in remote for completion files 
-    autosubmit recovery cxxx --all -s
+    autosubmit recovery <EXPID> -f -s
+    # check in remote for completion files
+    autosubmit recovery <EXPID> --all -s
 
 Options:
-::
 
-    usage: autosubmit recovery [-h] [-np] [--all] [-s] [--hide] [-group_by {date,member,chunk,split,automatic}] [-expand EXPAND]
-                           [-expand_status EXPAND_STATUS] [-nt] [-nl] [-d] [-f] [-v]
-                           EXPID
-
-    recover specified experiment
-
-    positional arguments:
-      EXPID                 experiment identifier
-
-    options:
-      -h, --help            show this help message and exit
-      -np, --noplot         omit plot
-      --all                 Get completed files to synchronize pkl
-      -s, --save            Save changes to disk
-      --hide                hides plot window
-      -group_by {date,member,chunk,split,automatic}
-                        Groups the jobs automatically or by date, member, chunk or split
-      -expand EXPAND        Supply the list of dates/members/chunks to filter the list of jobs. Default = "Any". LIST = "[
-                        19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"
-      -expand_status EXPAND_STATUS
-                            Select the statuses to be expanded
-      -nt, --notransitive   Disable transitive reduction
-      -nl, --no_recover_logs
-                            Disable logs recovery
-      -d, --detail          Show Job List view in terminal
-      -f, --force           Cancel active jobs
-      -v, --update_version  Update experiment version
+.. runcmd:: autosubmit recovery -h
 
 How to rerun a part of the experiment
 -------------------------------------
 
 This procedure allows you to create automatically a new pickle with a list of jobs of the experiment to rerun.
 
-Using the ``expdef_<expid>.yml`` the ``create`` command will generate the rerun if the variable RERUN is set to TRUE and a RERUN_JOBLIST is provided.
+Using the ``expdef_<EXPID>.yml`` the ``create`` command will generate the rerun if the variable RERUN is set to TRUE and a RERUN_JOBLIST is provided.
 
 Additionally, you can have re-run only jobs that won't be include in the default job_list. In order to do that, you have to set RERUN_ONLY in the jobs conf of the corresponding job.
 
 ::
 
-    autosubmit create cxxx
+    autosubmit create <EXPID>
 
 It will read the list of jobs specified in the RERUN_JOBLIST and will generate a new plot.
 
 Example:
 ::
 
-    vi <experiments_directory>/cxxx/conf/expdef_cxxx.yml
+    vi <experiments_directory>/<EXPID>/conf/expdef_<EXPID>.yml
 
 .. code-block:: yaml
 
@@ -92,7 +65,7 @@ Example:
         RERUN_JOBLIST: RERUN_TEST_INI;SIM[19600101[C:3]],RERUN_TEST_INI_chunks[19600101[C:3]]
     ...
 
-    vi <experiments_directory>/cxxx/conf/jobs_cxxx.yml
+    vi <experiments_directory>/<EXPID>/conf/jobs_<EXPID>.yml
 
 .. code-block:: yaml
 
@@ -127,5 +100,4 @@ Run the command:
 
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    nohup autosubmit run cxxx &
-
+    nohup autosubmit run <EXPID> &

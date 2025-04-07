@@ -15,30 +15,19 @@ It checks experiment configuration and warns about any detected error or inconsi
 It is used to check if the script is well-formed.
 If any template has an inconsistency it will replace them for an empty value on the cmd generated.
 Options:
-::
 
-    usage: autosubmit check [-h] [-nt] [-v] EXPID
-
-    check configuration for specified experiment
-
-    positional arguments:
-      EXPID                 experiment identifier
-
-    options:
-      -h, --help            show this help message and exit
-      -nt, --notransitive   Disable transitive reduction
-      -v, --update_version  Update experiment version
+.. runcmd:: autosubmit check -h
 
 
 Example:
 ::
 
-    autosubmit check cxxx
+    autosubmit check <EXPID>
 
 How to use check in running time:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In ``jobs_cxxx.yml`` , you can set check(default true) to check the scripts during autosubmit run cxx.
+In ``jobs_<EXPID>.yml`` , you can set check(default true) to check the scripts during autosubmit run cxx.
 
 There are two parameters related to check:
 
@@ -99,56 +88,30 @@ To generate  the cmd files of the current non-active jobs experiment, it is poss
 
 EXPID is the experiment identifier.
 Options:
-::
 
-   usage: autosubmit inspect [-h] [-nt] [-f] [-cw] [-v] [-q]
-                          [-fl LIST | -fc FILTER_CHUNKS | -fs {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN} | -ft FILTER_TYPE]
-                          EXPID
-
-    Generate all .cmd files
-
-    positional arguments:
-      EXPID                 experiment identifier
-
-    options:
-      -h, --help            show this help message and exit
-      -nt, --notransitive   Disable transitive reduction
-      -f, --force           Overwrite all cmd
-      -cw, --check_wrapper  Generate possible wrapper in the current workflow
-      -v, --update_version  Update experiment version
-      -q, --quick           Only checks one job per each section
-      -fl LIST, --list LIST
-                            Supply the list of job names to be filtered. Default = "Any". LIST = "b037_20101101_fc3_21_sim
-                            b037_20111101_fc4_26_sim"
-      -fc FILTER_CHUNKS, --filter_chunks FILTER_CHUNKS
-                            Supply the list of chunks to filter the list of jobs. Default = "Any". LIST = "[ 19601101 [ fc0 [1 2
-                            3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"
-      -fs {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}, --filter_status {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}
-                             Select the original status to filter the list of jobs
-      -ft FILTER_TYPE, --filter_type FILTER_TYPE
-                             Select the job type to filter the list of jobs
+.. runcmd:: autosubmit inspect -h
 
 Examples:
 
 with autosubmit.lock present or not:
 ::
 
-    autosubmit inspect cxxx
+    autosubmit inspect <EXPID>
 
 with autosubmit.lock present or not:
 ::
 
-    autosubmit inspect cxxx -f
+    autosubmit inspect <EXPID> -f
 
 without autosubmit.lock:
 ::
 
-    autosubmit inspect cxxx -fl [-fc,-fs or ft]
+    autosubmit inspect <EXPID> -fl [-fc,-fs or ft]
 
 To generate cmd for wrappers:
 ::
 
-    autosubmit inspect cxxx -cw -f
+    autosubmit inspect <EXPID> -cw -f
 
 
 With autosubmit.lock and no (-f) force, it will only generate all files that are not submitted.
@@ -158,7 +121,7 @@ Without autosubmit.lock, it will generate all unless filtered by -fl,fc,fs or ft
 To generate cmd only for a single job of the section :
 ::
 
-    autosubmit inspect cxxx -q
+    autosubmit inspect <EXPID> -q
 
 How to monitor an experiment
 ----------------------------
@@ -171,54 +134,14 @@ To monitor the status of the experiment, use the command:
 *EXPID* is the experiment identifier.
 
 Options:
-::
 
-   usage: autosubmit monitor [-h] [-o {pdf,png,ps,svg,txt}] [-group_by {date,member,chunk,split,automatic}] [-expand EXPAND]
-                          [-expand_status EXPAND_STATUS] [--hide_groups] [-cw]
-                          [-fl LIST | -fc FILTER_CHUNKS | -fs {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN} | -ft FILTER_TYPE]
-                          [--hide] [-txt | -txtlog] [-nt] [-v] [-p]
-                          expid
+.. runcmd:: autosubmit monitor -h
 
-    plots specified experiment
 
-    positional arguments:
-      expid                 experiment identifier
-
-    options:
-      -h, --help            show this help message and exit
-      -o {pdf,png,ps,svg,txt}, --output {pdf,png,ps,svg,txt}
-                            chooses type of output for generated plot
-      -group_by {date,member,chunk,split,automatic}
-                            Groups the jobs automatically or by date, member, chunk or split
-      -expand EXPAND        Supply the list of dates/members/chunks to filter the list of jobs. Default = "Any". LIST = "[
-                            19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"
-      -expand_status EXPAND_STATUS
-                            Select the stat uses to be expanded
-      --hide_groups         Hides the groups from the plot
-      -cw, --check_wrapper  Generate possible wrapper in the current workflow
-      -fl LIST, --list LIST
-                            Supply the list of job names to be filtered. Default = "Any". LIST = "b037_20101101_fc3_21_sim
-                            b037_20111101_fc4_26_sim"
-      -fc FILTER_CHUNKS, --filter_chunks FILTER_CHUNKS
-                            Supply the list of chunks to filter the list of jobs. Default = "Any". LIST = "[ 19601101 [ fc0 [1 2
-                            3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"
-     -fs {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}, --filter_status {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}
-                            Select the original status to filter the list of jobs
-     -ft FILTER_TYPE, --filter_type FILTER_TYPE
-                           Select the job type to filter the list of jobs
-     --hide                hides plot window
-     -txt, --text          Generates only txt status file
-     -txtlog, --txt_logfiles
-                           Generates only txt status file(AS < 3.12b behaviour)
-     -nt, --notransitive   Disable transitive reduction
-      -v, --update_version  Update experiment version
-      -p, --profile         Prints performance parameters of the execution of this command.
-
-                                
 Example:
 ::
 
-    autosubmit monitor cxxx
+    autosubmit monitor <EXPID>
 
 The location where the user can find the generated plots with date and timestamp can be found below:
 
@@ -451,8 +374,8 @@ Especially in the case of monitoring an experiment with a very large number of c
 How to profile Autosubmit while monitoring an experiment
 --------------------------------------------------------
 
-Autosubmit offers the possibility to profile the execution of the monitoring process. To enable the 
-profiler, just add the ``--profile`` (or ``-p``) flag to your ``autosubmit monitor`` command, as in 
+Autosubmit offers the possibility to profile the execution of the monitoring process. To enable the
+profiler, just add the ``--profile`` (or ``-p``) flag to your ``autosubmit monitor`` command, as in
 the following example:
 
 .. code-block:: bash
@@ -477,27 +400,16 @@ To get details about the experiment, use the command:
 It displays information about the experiment. Currently it describes owner,description_date,model,branch and hpc
 
 Options:
-::
 
-    usage: autosubmit describe [-h] [-u USER] [-v] [EXPID]
-
-    Show details for specified experiment
-
-    positional arguments:
-      EXPID                 experiment identifier, can be a list of expid separated by comma or spaces
-
-    options:
-      -h, --help            show this help message and exit
-      -u USER, --user USER  username, default is current user or listed expid
-      -v, --update_version  Update experiment version
+.. runcmd:: autosubmit describe -h
 
 
 Examples:
 ::
 
-   autosubmit describe cxxx
-   autosubmit describe "cxxx cyyy"
-   autosubmit describe cxxx,cyyy
+   autosubmit describe <EXPID>
+   autosubmit describe "<EXPID> <EXPID>"
+   autosubmit describe <EXPID>,<EXPID>
    autosubmit describe -u dbeltran
 
 .. _autoStatistics:
@@ -513,33 +425,14 @@ The following command could be adopted to generate the plots for visualizing the
 *EXPID* is the experiment identifier.
 
 Options:
-::
 
-    usage: autosubmit stats [-h] [-ft FILTER_TYPE] [-fp FILTER_PERIOD] [-o {pdf,png,ps,svg}] [--hide] [-nt] [-v] [-db] EXPID
-
-    plots statistics for specified experiment
-
-    positional arguments:
-      EXPID                 experiment identifier
-
-    options:
-      -h, --help            show this help message and exit
-      -ft FILTER_TYPE, --filter_type FILTER_TYPE
-                            Select the job type to filter the list of jobs
-      -fp FILTER_PERIOD, --filter_period FILTER_PERIOD
-                           Select the period to filter jobs from current time to the past in number of hours back (must be greater than 0)
-      -o {pdf,png,ps,svg}, --output {pdf,png,ps,svg}
-                            type of output for generated plot
-      --hide                hides plot window
-      -nt, --notransitive   Disable transitive reduction
-      -v, --update_version  Update experiment version
-      -db, --database       Use database for statistics
+.. runcmd:: autosubmit stats -h
 
 
 Example:
 ::
 
-    autosubmit stats cxxx
+    autosubmit stats <EXPID>
 
 The location where user can find the generated plots with date and timestamp can be found below:
 
@@ -550,7 +443,7 @@ The location where user can find the generated plots with date and timestamp can
 For including the summaries:
 ::
 
-        autosubmit stats --section_summary --jobs_summary cxxx
+        autosubmit stats --section_summary --jobs_summary <EXPID>
 
 The location will be:
 ::
@@ -672,25 +565,8 @@ Or combined as follows:
     autosubmit report EXPID -t "absolute_file_path"
 
 Options:
-::
 
-   usage: autosubmit report [-h] [-t TEMPLATE] [-all] [-fp FOLDER_PATH] [-p] [-v] EXPID
-
-   Show metrics..
-
-   positional arguments:
-   EXPID            experiment identifier
-
-   options:
-   -h, --help            show this help message and exit
-   -t TEMPLATE, --template TEMPLATE
-   Supply the metric template.
-   -all, --show_all_parameters
-   Writes a file containing all parameters
-   -fp FOLDER_PATH, --folder_path FOLDER_PATH
-   Allows to select a non-default folder.
-   -p, --placeholders    disables the substitution of placeholders by -
-   -v, --update_version  Update experiment version
+.. runcmd:: autosubmit report -h
 
 
 Autosubmit parameters are encapsulated by %_%, once you know how the parameter is called you can create a template similar to the one as follows:
