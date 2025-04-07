@@ -1,15 +1,12 @@
 ###############
 Experiment ID's
 ###############
-.. _expids:
 
-The experiment ID's are generated through the command autosubmit expid.
-The ID’s of Autosubmit experiments start from ``a000``
+Autosubmit 4 uses a SQLite database to automatically generate unique
+experiment ID’s. The ID’s of Autosubmit experiments start from ``a000``
 and have at least four alpha-numerical characters, using digits from
 ``0`` to ``9`` and the ``26`` letters from the English alphabet, from ``a``
-to ``z``. Autosubmit also supports three types of special experiments; 
-operational, test and evaluation, with experiment IDs starting with ``o``,
-``t`` and ``o`` repsectively.
+to ``z``.
 
 Internally, experiment ID’s are case insensitive, but for Autosubmit
 commands this may not always be true, i.e. ``autosubmit monitor a000``
