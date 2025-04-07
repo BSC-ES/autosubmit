@@ -12,9 +12,6 @@ autosubmit.platform
 .. automodule:: autosubmit.platforms.slurmplatform
    :show-inheritance:
    :members:
-.. automodule:: autosubmit.platforms.slurm_example
-   :show-inheritance:
-   :members:
 .. automodule:: autosubmit.platforms.locplatform
    :show-inheritance:
    :members:

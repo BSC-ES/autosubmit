@@ -328,9 +328,8 @@ class SlurmPlatform(ParamikoPlatform):
         retrieves the Jobs_ID of all jobs at once.
 
         :param hold: Submit a job in held status. Held jobs will only earn priority status if the
-        remote machine allows it.
+            remote machine allows it.
         :type hold: bool
-
         :return: job id for submitted jobs.
         :rtype: Union[List[int], int]
         """

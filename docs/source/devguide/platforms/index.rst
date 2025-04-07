@@ -94,12 +94,10 @@ Integrating the extended platform into the module
 In order to ensure that the platform will be created as expected we need to make some changes in 4 different files
 |br| ``autosubmit/job/job.py`` - see in GitHub `job.py <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py>`_.
 |br| ``autosubmit/autosubmit.py`` - see in GitHub `autosubmit.py <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/autosubmit.py>`_.
-|br| ``autosubmit/platforms/ecplatform.py`` - see in GitHub `ecplatform.py <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/platforms/ecplatform.py>`_.
 |br| ``autosubmit/platforms/paramiko_submitter.py`` - see in GitHub `paramiko_submitter.py <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/platforms/paramiko_submitter.py>`_.
 
-The ``platform.type`` attribute indicates whether a platform is local or not.
-The ``type`` is also used to determine the scheduler.
 |br| ``type`` is defined in the yaml file that configures a platform as it's shown :ref:`here <TargetPlatform>`
+to determine the scheduler.
 
 .. warning::
     The number written down to each of the files could become obsolete locally as files get updated so they should be
@@ -124,7 +122,7 @@ end timestamp to TOTAL_STATS file and jobs_data.db properly.
 .. code-block:: python
    :emphasize-lines: 1
 
-    if job_data_dc and type(self.platform) is not str and (self.platform.type == "slurm" or self.platform.type == "example"):
+    if job_data_dc and type(self.platform) is not str and (self.platform.type in ["slurm", "example"]):
         thread_write_finish = Thread(target=ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR).write_platform_data_after_finish, args=(job_data_dc, self.platform))
             thread_write_finish.name = "JOB_data_{}".format(self.name)
             thread_write_finish.start()
@@ -135,24 +133,12 @@ creation where the platform type
 .. code-block:: python
     :emphasize-lines: 1
 
-    if self._platform.type == 'slurm' or self._platform.type == 'example':
+    if self._platform.type in ["slurm", "example"]:
         self._platform.send_command(
             self._platform.get_queue_status_cmd(self.id))
         reason = self._platform.parse_queue_reason(
             self._platform._ssh_output, self.id)
 
-``autosubmit/platforms/ecplatform.py`` in `line 59 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/platforms/ecplatform.py#L59>`_ add a new validation for the header command
-creation where the platform type
-
-.. code-block:: python
-    :emphasize-lines: 1
-
-    elif scheduler == 'slurm' or scheduler == 'example':
-        self._header = SlurmHeader()
-
-.. hint::
-    This would only be useful if extending ecplatform, and you need a platform that can change the header
-    and adapt to other platforms
 
 ``autosubmit/platforms/paramiko_submitter.py`` in `line 143 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/platforms/paramiko_submitter.py#L143>`_ add a new validation for the header command
 creation where the platform type
@@ -160,7 +146,7 @@ creation where the platform type
 .. code-block:: python
    :emphasize-lines: 1
 
-    elif platform_type == 'slurm' or platform_type == 'example':
+    elif platform_type in ["slurm", "example"]:
         remote_platform = SlurmPlatform(
             asconf.expid, section, exp_data, auth_password = auth_password)
 
@@ -171,7 +157,9 @@ How to configure a Platform
 To set up your platform, you first have to create a new experiment by running the following command:
 |br| *change the platform from MARENOSTRUM5 to whichever you will use*
 
-``autosubmit expid -H MARENOSTRUM5 -d "platform test" --minimal``
+.. parsed-literal::
+
+    autosubmit :ref:`expid <expids>` -H MARENOSTRUM5 -d "platform test" --minimal
 
 This will generate a minimal version of an experiment.
 
@@ -232,13 +220,6 @@ Autosubmit will copy your sources to the ``$autosubmit_installation/$expid/proj/
 The following settings are used towards creating a connection with a platform to execute the jobs,
 you have to input the information suitable for your project. (e.g.: user, host, platform)
 
-.. warning::
-    In case of not being able to connect it can be either because your user don't have access to the host
-    or the PARAMETER ``SCRATCH_DIR`` might be pointing to a non existing folder inside the host.
-
-    Make sure to have created the folder with your USERNAME inside the proper path you pointed to
-    (e.g.: <Project_Dir>/<Project_Name_Folder>/<USER>)
-
 
 .. _TargetPlatform:
 
@@ -248,22 +229,38 @@ you have to input the information suitable for your project. (e.g.: user, host, 
 
     PLATFORMS:
         MARENOSTRUM5:
-            TYPE: <Scheduler> [pjm, slurm, ecaccess, ps, exemple]
+            TYPE: <Scheduler> [slurm, ps, example]
             HOST: <Host>
             PROJECT: <Project_Name_Folder>
             USER: <User>
-            QUEUE: [dummy, gp_debug, nf, hpc]
+            scratch_dir: <location of project/user>
+            QUEUE: gp_debug [dummy, gp_debug, nf, hpc]
+            MAX_WALLCLOCK: <HH:MM>
+            MAX_PROCESSORS: <N> # This is to enable horizontal_wrappers
+            PROCESSORS_PER_NODE: <N>
 
         MARENOSTRUM_ARCHIVE:
-            TYPE: <Scheduler> [pjm, slurm, ecaccess, ps, exemple]
+            TYPE: ps [slurm, ps, example]
             HOST: <Host>
             PROJECT: <Project_Name_Folder>
             USER: <User>
+
+.. warning::
+    In case of not being able to connect it can be either because your user don't have access to the host
+    or the PARAMETER ``SCRATCH_DIR`` might be pointing to a non existing folder inside the host.
+
+    Make sure to have created the folder with your USERNAME inside the proper path you pointed to
+    (e.g.: <Project_Dir>/<Project_Name_Folder>/<USER>)
+
+How to generate a new experiment
+------------------------------------
 
 Now you can add jobs at the end of the file to see the execution
 Each job will point to one of the ``Bash`` files that will be created in the next step, which means that autosubmit
 will look for the instruction of the experiment in the ``~/autosubmit/<expid>/proj/local_project/`` if none is found
-autosubmit will look at ``LOCAL.PROJECT_PATH`` set earlier in order to look and if they exist copy to the new project.
+inside the folder autosubmit will look at ``LOCAL.PROJECT_PATH`` set earlier in order to copy to the project folder
+if they exist.
+
 
 .. code-block:: yaml
 
@@ -335,8 +332,8 @@ executed in the platform.
     The given name of the folder can be any as long as it matches the ``Local`` Parameter pointed out in the
     configuration file, the change in name needs to take this into account
 
-For the execution of this test, a few files will need to be created within the new folder,
-this file will have the Platform commands to be executed
+For the execution of this test, a few files will need to be created within the new folder, this file will
+contain proj-associated-code that will be executed in the job-specified platform
 
 .. code-block:: yaml
 
@@ -351,11 +348,14 @@ this file will have the Platform commands to be executed
     CLEAN.sh
 
 For sake of keeping and concise and clear example of how Autosubmit works a simple instruction can be executed as a test.
+So add the following the instruction bellow to one or more ``Bash`` file(s) created in the previous instruction.
 
 .. code-block:: yaml
 
     sleep 5
 
+How to run the experiment
+------------------------------------
 
 ``autosubmit create -np -f -v <EXPID>``
 
@@ -363,3 +363,5 @@ Once the experiment is generated we can execute it and check its results by runn
 the experiment and check if its behaviour is as expected
 
 ``autosubmit run <EXPID>``
+
+For more examples on how to create and share configurations you can visit this :ref:`page <create_and_share_config>`
