@@ -15,12 +15,11 @@ Platforms are defined under python classes. The source files for such classes ar
 ``autosubmit/platforms/`` directory. To extend an existing platform we will create a child class from an existing
 platform class, for which first we need to identify which existing platform is the most suitable for out project.
 
-Currently the platforms available are:
-|br| :ref:`Local Platform <Local Platform>`
-|br| :mod:`EC Platform <autosubmit.platforms.ecplatform>`
-|br| :mod:`PBS Platform <autosubmit.platforms.pbsplatform.PBSPlatform>`
-|br| :mod:`Sge Platform <autosubmit.platforms.sgeplatform.SgePlatform>`
-|br| :mod:`Slurm Platform <autosubmit.platforms.slurmplatform.SlurmPlatform>`
+.. note::
+    Currently the platforms available are:
+    |br| :ref:`Local Platform <Local Platform>`
+    |br| :mod:`EC Platform <autosubmit.platforms.ecplatform>` :mod:`PBS Platform <autosubmit.platforms.pbsplatform.PBSPlatform>`
+    |br| :mod:`Sge Platform <autosubmit.platforms.sgeplatform.SgePlatform>` :mod:`Slurm Platform <autosubmit.platforms.slurmplatform.SlurmPlatform>`
 
 Composing the extended platform class
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
