@@ -194,7 +194,7 @@ Open the file ``~/autosubmit/<expid>/config/minimal.yml`` and you'll find a file
 
     DEFAULT:
         EXPID: <EXPID> # ID of the experiment
-        HPCARCH: "MARENOSTRUM5"
+        HPCARCH: "MARENOSTRUM5" # This will be the default platform if a job doesn't contain a defined platform
         #hint: use %PROJDIR% to point to the project folder (where the project is cloned)
         CUSTOM_CONFIG: "%PROJDIR%/"
 
@@ -338,7 +338,7 @@ if they exist.
 
         CLEAN:
             FILE: CLEAN.sh
-            PLATFORM: MARENOSTRUM5
+            # PLATFORM: MARENOSTRUM5
             DEPENDENCIES: APP SIM STATISTICS
             RUNNING: once
             WALLCLOCK: 00:05
