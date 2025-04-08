@@ -6,14 +6,14 @@ Platforms
 
 
 .. note::
-    This documentation is based on the master branch, and can only warranty reproducibility in this context
+    This documentation is based on the master branch, and can only guarantee reproducibility in this context
 
-Extending an existing platform
+Extending an Existing Platform
 ------------------------------
 
-Platforms are defined under python classes. The source files for such classes are stored inside
+Platforms are defined under Python classes. The source files for such classes are stored inside
 ``autosubmit/platforms/`` directory. To extend an existing platform we will create a child class from an existing
-platform class, for which first we need to identify which existing platform is the most suitable for out project.
+platform class, for which first we need to identify which existing platform is the most suitable for our project.
 
 .. note::
     Currently the platforms available are:
@@ -21,15 +21,15 @@ platform class, for which first we need to identify which existing platform is t
     |br| :mod:`EC Platform <autosubmit.platforms.ecplatform>` :mod:`PBS Platform <autosubmit.platforms.pbsplatform.PBSPlatform>`
     |br| :mod:`Sge Platform <autosubmit.platforms.sgeplatform.SgePlatform>` :mod:`Slurm Platform <autosubmit.platforms.slurmplatform.SlurmPlatform>`
 
-Composing the extended platform class
+Composing the Extended Platform Class
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In this page we will be extending the SLURM
 platform - source file ``autosubmit/platforms/slurmplatform.py``, see in GitHub `slurmplatform.py <https://github.com/BSC-ES/autosubmit/blob/53b2a142fee5c8d8ac169547528c768c93e02a4a/autosubmit/platforms/slurmplatform.py#L35>`_ -, but any platform can be extended by following the same steps.
 
 The platform will be transcribing the files and configurations you set manually to allow operations,
-and connection to SLURM and its commands, prepare your experiments to be executed transforming configuration
-into executable function.
+and connection to SLURM and its commands, preparing your experiments to be executed transforming configuration
+into executable functions.
 
 We will create a new file in ``/autosubmit/platforms/``
 and we are going to call it ``slurm_example.py``.
@@ -63,10 +63,10 @@ We create an initialization method with the required parameters.
         SlurmPlatform.__init__(self, expid, name, config, auth_password = auth_password)
         self.example_platform_parameter = ... # add any platform specific parameters
 
-As you can see the parent class has an initialization in order invoke all the parent`s methods and attributes into the
-child (``Slurm_ExamplePlatform``).
+As it can be seen, the parent class has an initialization method to invoke all the parent'`s methods and attributes
+into the child (``Slurm_ExamplePlatform``).
 In order to override methods from the parent class, we can simply redefine them as shown below, this way we can add
-new Parameters and/or behaviours, making it possible to add flexibility and restructure a platform for the new needs.
+new parameters and/or behaviours, making it possible to add flexibility and restructure a platform for the new needs.
 
 .. code-block:: python
     :linenos:
@@ -106,23 +106,23 @@ After all needed modifications and expansions, the ``Slurm_ExamplePlatform`` cla
             return None
 
 
-Integrating the extended platform into the module
+Integrating the Extended Platform into the Module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In order to ensure that the platform will be created as expected we need to make some changes in 4 different files
+To ensure that the platform will be created as expected, we need to make some changes in 4 different files
 |br| ``autosubmit/job/job.py`` - see in GitHub `job.py <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py>`_.
 |br| ``autosubmit/autosubmit.py`` - see in GitHub `autosubmit.py <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/autosubmit.py>`_.
 |br| ``autosubmit/platforms/paramiko_submitter.py`` - see in GitHub `paramiko_submitter.py <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/platforms/paramiko_submitter.py>`_.
 
-|br| ``type`` is defined in the yaml file that configures a platform as it's shown :ref:`here <TargetPlatform>`
+|br| ``type`` is defined in the YAML file that configures a platform as it's shown :ref:`here <TargetPlatform>`
 to determine the scheduler.
 
 .. warning::
-    The number written down to each of the files could become obsolete locally as files get updated so they should be
+    The numbers noted down to each of the files could become obsolete locally as files get updated so they should be
     seen more as a reference
 
 
-``autosubmit/autosubmit.py`` in `line 2538 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/autosubmit.py#L2537>`_  add a new ``String`` making sure the new platform type is considered
+``autosubmit/autosubmit.py`` in `line 2538 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/autosubmit.py#L2537>`_  add a new ``string`` making sure the new platform type is considered
 the same as SLURM platform, as we expect a similar behaviour.
 
 .. code-block:: python
@@ -134,8 +134,8 @@ the same as SLURM platform, as we expect a similar behaviour.
                                                                                          failed_packages,
                                                                                          error_message="", hold=hold)
 
-``autosubmit/job/job.py`` in `line 2575 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py#L2575>`_ making sure each Job writes
-end timestamp to TOTAL_STATS file and jobs_data.db properly.
+``autosubmit/job/job.py`` in `line 2575 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py#L2575>`_ ensure each job Job writes
+the timestamp to TOTAL_STATS file and jobs_data.db properly.
 
 .. code-block:: python
    :emphasize-lines: 1
@@ -146,7 +146,7 @@ end timestamp to TOTAL_STATS file and jobs_data.db properly.
             thread_write_finish.start()
 
 ``autosubmit/job/job.py`` in `line 2817 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py#L2817>`_ add a new validation for the validation of the queue
-creation where the platform type
+creation with the platform type
 
 .. code-block:: python
     :emphasize-lines: 1
@@ -169,11 +169,11 @@ creation where the platform type
             asconf.expid, section, exp_data, auth_password = auth_password)
 
 
-How to configure a Platform
+How to Configure a Platform
 ------------------------------------
 
 To set up your platform, you first have to create a new experiment by running the following command:
-|br| *change the platform from MARENOSTRUM5 to whichever you will use*
+|br| *Change the platform from MARENOSTRUM5 to whichever you will use*
 
 .. parsed-literal::
 
@@ -181,10 +181,10 @@ To set up your platform, you first have to create a new experiment by running th
 
 This will generate a minimal version of an experiment.
 
-To change the configuration of your experiment to make it work properly, you can create a project and customize tis parameters. The following instructions are
-thought out to execute a small job through Autosubmit explaining how to configure a new platform.
+To change the configuration of your experiment to ensure it works properly, you can create a project and customize its parameters. The following instructions are
+designed to execute a small job through Autosubmit, explaining how to configure a new platform.
 
-Open the file ``~/autosubmit/<expid>/config/minimal.yml`` and you'll have a file as shown below.
+Open the file ``~/autosubmit/<expid>/config/minimal.yml`` and you'll find a file as shown below.
 
 .. code-block:: yaml
 
@@ -235,8 +235,8 @@ used to execute the experiment in the platform
 
 Autosubmit will copy your sources to the ``$autosubmit_installation/$expid/proj/%PROJECT.PROJECT_DESTINATION%``.
 
-The following settings are used towards creating a connection with a platform to execute the jobs,
-you have to input the information suitable for your project. (e.g.: user, host, platform)
+The following settings used to create a connection with a platform to execute the jobs,
+you must to input the information suitable for your project. (e.g.: user, host, platform)
 
 
 .. _TargetPlatform:
@@ -258,19 +258,19 @@ you have to input the information suitable for your project. (e.g.: user, host, 
             PROCESSORS_PER_NODE: <N>
 
 .. warning::
-    In case of not being able to connect it can be either because your user don't have access to the host
-    or the PARAMETER ``SCRATCH_DIR`` might be pointing to a non existing folder inside the host.
+    If you cannot connect , it may be because your user doesn 't have access to the host, or the PARAMETER SCRATCH_DIR
+    might be pointing to a non-existing folder on the host.
 
-    Make sure to have created the folder with your USERNAME inside the proper path you pointed to
+    Make sure to create the folder with your USERNAME inside the proper path you pointed to
     (e.g.: <Project_Dir>/<Project_Name_Folder>/<USER>)
 
 How to generate a new experiment
 ------------------------------------
 
 Now you can add jobs at the end of the file to see the execution
-Each job will point to one of the ``Bash`` files that will be created in the next step, which means that autosubmit
-will look for the instruction of the experiment in the ``~/autosubmit/<expid>/proj/local_project/`` if none is found
-inside the folder autosubmit will look at ``LOCAL.PROJECT_PATH`` set earlier in order to copy to the project folder
+Each job will point to one of the ``Bash`` files that will be created in the next step, meaning that Autosubmit will
+look for the instructions of the experiment in the ``~/autosubmit/<expid>/proj/local_project/`` if none is found
+inside the folder Autosubmit will look at ``LOCAL.PROJECT_PATH`` set earlier in order to copy to the project folder
 if they exist.
 
 
@@ -334,18 +334,18 @@ if they exist.
             RUNNING: once
             WALLCLOCK: 00:05
 
-As you finish to set up all the new configuration you can run the following command to generate the experiment
-that was just created we need to create a new folder that will keep all the instructions for the experiment to be
-executed in the platform.
+Once you finish setting up all the new configurations, you can run the following command to generate the experiment
+just created; we need to create a new folder to keep all the instructions for the experiment to be executed on the
+platform.
 
 ``mkdir -p /home/user/experiment_example``
 
 .. hint::
-    The given name of the folder can be any as long as it matches the ``Local`` Parameter pointed out in the
-    configuration file, the change in name needs to take this into account
+    The name of the folder can be anything as long as it matches the Local Parameter specified in the configuration
+    file; the name change needs to take this into account
 
-For the execution of this test, a few files will need to be created within the new folder, this file will
-contain proj-associated-code that will be executed in the job-specified platform
+For the execution of this test, a few files will need to be created within the new folder;
+these files will contain proj-associated code that will be executed on the job-specified platform.
 
 .. code-block:: yaml
 
@@ -359,8 +359,8 @@ contain proj-associated-code that will be executed in the job-specified platform
     APP.sh
     CLEAN.sh
 
-For sake of keeping and concise and clear example of how Autosubmit works a simple instruction can be executed as a test.
-So add the following the instruction below to one or more ``Bash`` file(s) created in the previous instruction.
+To keep and concise and clear example of how Autosubmit works, a simple instruction can be executed as a test.
+So add the following the instruction below to one or more ``Bash`` files created in the previous steps.
 
 .. code-block:: yaml
 
@@ -374,11 +374,11 @@ How to run the experiment
 Once the experiment is generated we can execute it and check if by running the command below the experiment
 
     #. Submit the job to the specified platform
-    #. monitor the status of them
+    #. monitor their status
     #. transfers logs to $expid/tmp/Log_$expid
 
 ``autosubmit run <EXPID>``
 
 .. note::
-    For more examples on how to create and share configurations of experiments and platform
-    you can visit this :ref:`page <create_and_share_config>`
+    For more examples on how to create and share configurations of experiments and platforms,
+    you can visit the :ref:`page <create_and_share_config>`.
