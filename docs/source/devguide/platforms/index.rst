@@ -257,12 +257,6 @@ you have to input the information suitable for your project. (e.g.: user, host, 
             MAX_PROCESSORS: <N> # This is to enable horizontal_wrappers
             PROCESSORS_PER_NODE: <N>
 
-        MARENOSTRUM_ARCHIVE:
-            TYPE: ps [slurm, ps, example]
-            HOST: <Host>
-            PROJECT: <Project_Name_Folder>
-            USER: <User>
-
 .. warning::
     In case of not being able to connect it can be either because your user don't have access to the host
     or the PARAMETER ``SCRATCH_DIR`` might be pointing to a non existing folder inside the host.
@@ -311,13 +305,13 @@ if they exist.
 
         DATA_NOTIFIER:
             FILE: DATA_NOTIFIER.sh
-            PLATFORM: MARENOSTRUM_ARCHIVE
+            PLATFORM: MARENOSTRUM5
             DEPENDENCIES: INI
             RUNNING: chunk
 
         SIM:
             FILE: SIM.sh
-            PLATFORM: MARENOSTRUM_ARCHIVE
+            PLATFORM: MARENOSTRUM5
             DEPENDENCIES: DATA_NOTIFIER
             RUNNING: chunk
 
