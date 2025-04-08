@@ -1143,10 +1143,10 @@ class Job(object):
             int: Value in the index position, or 0 if the file or index does not exist.
         """
         if fail_count == -1:
-            logname = os.path.join(self._tmp_path, f"{self.stat_file}0")
+            logname = os.path.join(self._log_path, f"{self.stat_file}0")
         else:
             fail_count = str(fail_count)
-            logname = os.path.join(self._tmp_path, f"{self.stat_file}{fail_count}")
+            logname = os.path.join(self._log_path, f"{self.stat_file}{fail_count}")
         if os.path.exists(logname):
             lines = open(logname).readlines()
             if len(lines) >= index + 1:
@@ -1353,8 +1353,8 @@ class Job(object):
             self.update_local_logs(update_submit_time=False)
             self.platform.get_stat_file(self)
             self.write_submit_time()
-            self.write_start_time()
-            self.write_end_time(self.status == Status.COMPLETED)
+            self.write_start_time(count=self.fail_count)
+            self.write_end_time(self.status == Status.COMPLETED, self.fail_count)
             # Update the logs with Autosubmit Job ID Brand
             try:
                 for local_log in self.local_logs:
