@@ -415,7 +415,7 @@ class JobList(object):
 
     def find_and_delete_redundant_relations(self, problematic_jobs: dict) -> None:
         """
-        Jobs with intrisic rules than can't be safelty not added without messing other workflows.
+        Jobs with intrinsic rules than can't be safety not added without messing other workflows.
         The graph will have the least amount of edges added as much as safely possible
         before this function.
         Structure:
@@ -575,7 +575,7 @@ class JobList(object):
         else:
             # value
             return [value_to_check]
-        ## values to return
+        # values to return
         if len(value_list) > 0:
             if start is None:
                 start = value_list[0]
@@ -883,7 +883,7 @@ class JobList(object):
         filters_to_apply = {}
         # Check if filter_from-filter_to relationship is set
         if relationships is not None and len(relationships) > 0:
-            # Look for a starting point, this can be if else becasue they're exclusive as a
+            # Look for a starting point, this can be if else because they're exclusive as a
             # DATE_FROM can't be in a MEMBER_FROM and so on
             if "DATES_FROM" in relationships:
                 filters_to_apply = self._check_dates(relationships, current_job)
@@ -1000,11 +1000,9 @@ class JobList(object):
         return distance
 
     def _calculate_natural_dependencies(self, dic_jobs, job, dependency, date, member, chunk, graph,
-                                        dependencies_keys_without_special_chars, distances_of_current_section,
-                                        distances_of_current_section_members,
-                                        key, dependencies_of_that_section,
-                                        chunk_list, date_list, member_list, special_dependencies, max_distance,
-                                        problematic_dependencies):
+                                        distances_of_current_section, key, dependencies_of_that_section,
+                                        chunk_list, date_list, member_list, special_dependencies,
+                                        max_distance, problematic_dependencies):
         """
         Calculate natural dependencies and add them to the graph if they're necessary.
         :param dic_jobs: JobList
@@ -1014,9 +1012,7 @@ class JobList(object):
         :param member: Member
         :param chunk: Chunk
         :param graph: Graph
-        :param dependencies_keys_without_special_chars: Dependencies of current job without special chars ( without SIM-10 -> SIM )
         :param distances_of_current_section: Distances of current section
-        :param distances_of_current_section_members: Distances of current section members
         :param key: Key
         :param dependencies_of_that_section: Dependencies of that section ( Dependencies of target parent )
         :param chunk_list: Chunk list
@@ -1112,11 +1108,10 @@ class JobList(object):
                 graph.add_edge(parent.name, job.name)
         return problematic_dependencies
 
-    def _calculate_filter_dependencies(self, filters_to_apply, dic_jobs, job, dependency, date, member, chunk, graph,
-                                       dependencies_keys_without_special_chars, distances_of_current_section,
-                                       distances_of_current_section_members,
-                                       key, dependencies_of_that_section,
-                                       chunk_list, date_list, member_list, special_dependencies,
+    def _calculate_filter_dependencies(self, filters_to_apply, dic_jobs, job, dependency, date,
+                                       member, chunk, graph, dependencies_keys_without_special_chars,
+                                       dependencies_of_that_section, chunk_list, date_list, member_list,
+                                       special_dependencies,
                                        problematic_dependencies):
         """
         Calculate dependencies that has any kind of filter set and add them to the graph if they're necessary.
@@ -1129,9 +1124,6 @@ class JobList(object):
         :param chunk: Chunk
         :param graph: Graph
         :param dependencies_keys_without_special_chars: Dependencies keys without special chars
-        :param distances_of_current_section: Distances of current section
-        :param distances_of_current_section_members: Distances of current section members
-        :param key: Key
         :param dependencies_of_that_section: Dependencies of that section
         :param chunk_list: Chunk list
         :param date_list: Date list
@@ -1318,7 +1310,7 @@ class JobList(object):
             dependencies_keys_without_special_chars.append(key_aux_stripped)
         self.dependency_map[job.section] = self.dependency_map[job.section].difference(set(dependencies_keys_aux))
         # If parent already has defined that dependency, skip it to reduce the transitive reduction complexity
-        # Calcule distances ( SIM-1, ClEAN-2..)
+        # Calculate distances ( SIM-1, ClEAN-2..)
         for dependency_key in dependencies_keys_aux:
             if "-" in dependency_key:
                 aux_key = dependency_key.split("-")[0]
@@ -1387,7 +1379,7 @@ class JobList(object):
                 if aux_key in distances_of_current_section_member:
                     if distance > distances_of_current_section_member[aux_key]:
                         distances_of_current_section_member[aux_key] = distance
-        ### Adding the dependency to the graph if possible
+        # Adding the dependency to the graph if possible
         sections_to_calculate = [key for key in dependencies_keys_aux if key not in dependencies_to_del]
         natural_sections = list()
         # Parse first sections with special filters if any
@@ -1404,16 +1396,13 @@ class JobList(object):
 
             if len(filters_to_apply) > 0:
                 dependencies_of_that_section = dic_jobs.as_conf.jobs_data[dependency.section].get("DEPENDENCIES", {})
-                ## Adds the dependencies to the job, and if not possible, adds the job to the problematic_dependencies
+                # Adds the dependencies to the job, and if not possible, adds the job to the problematic_dependencies
                 special_dependencies, problematic_dependencies = self._calculate_filter_dependencies(filters_to_apply,
                                                                                                      dic_jobs, job,
                                                                                                      dependency, date,
                                                                                                      member, chunk,
                                                                                                      graph,
                                                                                                      dependencies_keys_without_special_chars,
-                                                                                                     distances_of_current_section,
-                                                                                                     distances_of_current_section_member,
-                                                                                                     key,
                                                                                                      dependencies_of_that_section,
                                                                                                      chunk_list,
                                                                                                      date_list,
@@ -1443,13 +1432,12 @@ class JobList(object):
                     key_aux_stripped = key_aux_stripped.split("+")[0]
 
                 dependencies_of_that_section.append(key_aux_stripped)
+            # Adds the dependencies to the job, and if not possible, adds the job to the
+            # problematic_dependencies
             # Adds the dependencies to the job, and if not possible, adds the job to the problematic_dependencies
-            problematic_dependencies = self._calculate_natural_dependencies(dic_jobs, job, dependency, date,
-                                                                            member, chunk, graph,
-                                                                            dependencies_keys_without_special_chars,
-                                                                            distances_of_current_section,
-                                                                            distances_of_current_section_member,
-                                                                            key,
+            problematic_dependencies = self._calculate_natural_dependencies(dic_jobs, job,
+                                                                            dependency, date, member, chunk, graph,
+                                                                            distances_of_current_section, key,
                                                                             dependencies_of_that_section, chunk_list,
                                                                             date_list, member_list,
                                                                             special_dependencies, max_distance,
@@ -3163,7 +3151,7 @@ class JobList(object):
                                if job.name in statusChange else "")
                     result += (bcolors.ENDC +
                                bcolors.ENDC if nocolor is False else "")
-                # order by name, this is for compare 4.0 with 4.1 as the children orden is different
+                # order by name, this is for compare 4.0 with 4.1 as the children order is different
                 for child in sorted(children, key=lambda x: x.name):
                     # Continues recursion
                     result += self._recursion_print(
@@ -3262,12 +3250,9 @@ class JobList(object):
         energy = 0
         seconds_queued = 0
         seconds_running = 0
-        queue_time = running_time = 0
         submit_time = datetime.timedelta()
         start_time = datetime.timedelta()
         finish_time = datetime.timedelta()
-        running_for_min = datetime.timedelta()
-        queuing_for_min = datetime.timedelta()
 
         try:
             # Getting data from new job database
