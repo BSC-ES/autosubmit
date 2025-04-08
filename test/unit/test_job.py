@@ -1895,12 +1895,13 @@ def _check_parents_array(job, assertions, jobs):
     ],
 )
 def test_get_from_stat(tmpdir, file_exists, index_timestamp, fail_count, expected):
-    # Arrange
+
     job = Job("dummy", 1, Status.WAITING, 0)
     assert job.stat_file == f"{job.name}_STAT_"
     job._tmp_path = Path(tmpdir)
     job._tmp_path.mkdir(parents=True, exist_ok=True)
 
+    # Generating the timestamp file
     if file_exists:
         with open(job._tmp_path.joinpath(f"{job.stat_file}0"), "w") as stat_file:
             stat_file.write("19704923\n19704924\n")
@@ -1913,5 +1914,4 @@ def test_get_from_stat(tmpdir, file_exists, index_timestamp, fail_count, expecte
     else:
         result = job._get_from_stat(index_timestamp, fail_count)
 
-    # Assert
     assert result == expected
