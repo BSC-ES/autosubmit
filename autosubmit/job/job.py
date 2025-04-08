@@ -243,7 +243,7 @@ class Job(object):
         self._local_logs = ('', '')
         self._remote_logs = ('', '')
         self.script_name = self.name + ".cmd"
-        self.stat_file = self.script_name[:-4] + "_STAT_0"
+        self.stat_file = self.script_name[:-4] + "_STAT_"
         self._status = None
         self.status = status
         self.prev_status = status

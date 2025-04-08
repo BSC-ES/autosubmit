@@ -1861,3 +1861,57 @@ def check_ancestors_array(job, assertions, jobs):
 def _check_parents_array(job, assertions, jobs):
     for assertion, jobs_job in zip(assertions, jobs):
         assert assertion == job.is_parent(jobs_job)
+
+
+@pytest.mark.parametrize(
+    "file_exists, index_timestamp, fail_count, expected",
+    [
+        (True, 0, None, 19704923),
+        (True, 1, None, 19704924),
+        (True, 0, 0, 19704923),
+        (True, 0, 1, 29704923),
+        (True, 1, 0, 19704924),
+        (True, 1, 1, 29704924),
+        (False, 0, None, 0),
+        (False, 1, None, 0),
+        (False, 0, 0, 0),
+        (False, 0, 1, 0),
+        (False, 1, 0, 0),
+        (False, 1, 1, 0),
+    ],
+    ids=[
+        "File exists, index_timestamp=0",
+        "File exists, index_timestamp=1",
+        "File exists, index_timestamp=0, fail_count=0",
+        "File exists, index_timestamp=0, fail_count=1",
+        "File exists, index_timestamp=1, fail_count=0",
+        "File exists, index_timestamp=1, fail_count=1",
+        "File does not exist, index_timestamp=0",
+        "File does not exist, index_timestamp=1",
+        "File does not exist, index_timestamp=0, fail_count=0",
+        "File does not exist, index_timestamp=0, fail_count=1",
+        "File does not exist, index_timestamp=1, fail_count=0",
+        "File does not exist, index_timestamp=1, fail_count=1",
+    ],
+)
+def test_get_from_stat(tmpdir, file_exists, index_timestamp, fail_count, expected):
+    # Arrange
+    job = Job("dummy", 1, Status.WAITING, 0)
+    assert job.stat_file == f"{job.name}_STAT_"
+    job._tmp_path = Path(tmpdir)
+    job._tmp_path.mkdir(parents=True, exist_ok=True)
+
+    if file_exists:
+        with open(job._tmp_path.joinpath(f"{job.stat_file}0"), "w") as stat_file:
+            stat_file.write("19704923\n19704924\n")
+        with open(job._tmp_path.joinpath(f"{job.stat_file}1"), "w") as stat_file:
+            stat_file.write("29704923\n29704924\n")
+
+    # Act
+    if fail_count is None:
+        result = job._get_from_stat(index_timestamp)
+    else:
+        result = job._get_from_stat(index_timestamp, fail_count)
+
+    # Assert
+    assert result == expected
