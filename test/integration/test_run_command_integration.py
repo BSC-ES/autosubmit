@@ -173,7 +173,15 @@ def check_db_fields(run_tmpdir, expected_entries, final_status) -> dict:
     # Tune the print so it is more readable, so it is easier to debug in case of failure
     db_check_list["JOB_DATA_FIELDS"] = {}
     counter_by_name = {}
+    last_times = {}
     for row_dict in rows_as_dicts:
+        if row_dict["job_name"] not in last_times:
+            last_times[row_dict["job_name"]] = {
+                "submit": 0,
+                "start": 0,
+                "finish": 0
+            }
+
         # Check that all fields contain data, except extra_data, children, and platform_output
         # Check that submit, start and finish are > 0
         if row_dict["job_name"] not in counter_by_name:
@@ -187,17 +195,29 @@ def check_db_fields(run_tmpdir, expected_entries, final_status) -> dict:
             row_dict["start"] > 0 and row_dict["start"] != 1970010101
         db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["finish"] = \
             row_dict["finish"] > 0 and row_dict["finish"] != 1970010101
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["start>submit"] = \
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
+            "start>submit"] = \
             int(row_dict["start"]) >= int(row_dict["submit"])
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["finish>start"] = \
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
+            "finish>start"] = \
             int(row_dict["finish"]) >= int(row_dict["start"])
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["finish>submit"] = \
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
+            "finish>submit"] = \
             int(row_dict["finish"]) >= int(row_dict["submit"])
-
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
+            "submit>=last"] = \
+            row_dict["submit"] >= last_times[row_dict["job_name"]]["submit"]
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
+            "start>=last"] = \
+            row_dict["start"] >= last_times[row_dict["job_name"]]["start"]
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
+            "finish>=last"] = \
+            row_dict["finish"] >= last_times[row_dict["job_name"]]["finish"]
         db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["status"] = \
             row_dict["status"] == final_status
         db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
             "workflow_commit"] = row_dict["workflow_commit"] == "debug-commit-hash"
+
         empty_fields = []
         for key in [key for key in row_dict.keys() if
                     key not in ["status", "finish", "submit", "start", "extra_data", "children", "platform_output"]]:
@@ -206,6 +226,9 @@ def check_db_fields(run_tmpdir, expected_entries, final_status) -> dict:
         db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
             "empty_fields"] = " ".join(empty_fields)
         counter_by_name[row_dict["job_name"]] += 1
+        last_times[row_dict["job_name"]]["submit"] = row_dict["submit"]
+        last_times[row_dict["job_name"]]["start"] = row_dict["start"]
+        last_times[row_dict["job_name"]]["finish"] = row_dict["finish"]
     print_db_results(db_check_list, rows_as_dicts, run_tmpdir)
     c.close()
     conn.close()
