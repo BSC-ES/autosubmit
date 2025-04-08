@@ -6,7 +6,7 @@ autosubmit.platform
 .. automodule:: autosubmit.platforms.pbsplatform
    :show-inheritance:
    :members:
-.. automodule:: autosubmit.platforms.sgeplatform
+.. automodule:: autosubmit.platforms.pjmplatform
    :show-inheritance:
    :members:
 .. automodule:: autosubmit.platforms.slurmplatform
