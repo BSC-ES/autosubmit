@@ -226,9 +226,9 @@ def check_db_fields(run_tmpdir, expected_entries, final_status) -> dict:
         db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
             "empty_fields"] = " ".join(empty_fields)
         counter_by_name[row_dict["job_name"]] += 1
-        last_times[row_dict["job_name"]]["submit"] = row_dict["submit"]
-        last_times[row_dict["job_name"]]["start"] = row_dict["start"]
-        last_times[row_dict["job_name"]]["finish"] = row_dict["finish"]
+        last_times[row_dict["job_name"]]["submit"] = int(row_dict["submit"])
+        last_times[row_dict["job_name"]]["start"] = int(row_dict["start"])
+        last_times[row_dict["job_name"]]["finish"] = int(row_dict["finish"])
     print_db_results(db_check_list, rows_as_dicts, run_tmpdir)
     c.close()
     conn.close()
