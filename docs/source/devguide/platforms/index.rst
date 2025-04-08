@@ -6,7 +6,7 @@ Platforms
 
 
 .. note::
-    This documentation is based on the master branch, and can only guarantee reproducibility in this context
+    This documentation is based on the v4.1.13 branch, and can only guarantee reproducibility in this context
 
 Extending an Existing Platform
 ------------------------------
@@ -18,8 +18,8 @@ platform class, for which first we need to identify which existing platform is t
 .. note::
     Currently the platforms available are:
     |br| :ref:`Local Platform <Local Platform>`
-    |br| :mod:`EC Platform <autosubmit.platforms.ecplatform>` :mod:`PBS Platform <autosubmit.platforms.pbsplatform.PBSPlatform>`
-    |br| :mod:`Sge Platform <autosubmit.platforms.sgeplatform.SgePlatform>` :mod:`Slurm Platform <autosubmit.platforms.slurmplatform.SlurmPlatform>`
+    |br| :mod:`EC Platform <autosubmit.platforms.ecplatform>` :mod:`PBS Platform <autosubmit.platforms.pbsplatform>`
+    |br| :mod:`PJM Platform <autosubmit.platforms.pjmplatform>` :mod:`Slurm Platform <autosubmit.platforms.slurmplatform>`
 
 Composing the Extended Platform Class
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -109,12 +109,11 @@ After all needed modifications and expansions, the ``Slurm_ExamplePlatform`` cla
 Integrating the Extended Platform into the Module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To ensure that the platform will be created as expected, we need to make some changes in 4 different files
+To ensure that the platform will be created as expected, we need to make some changes in 3 different files
 |br| ``autosubmit/job/job.py`` - see in GitHub `job.py <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py>`_.
 |br| ``autosubmit/autosubmit.py`` - see in GitHub `autosubmit.py <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/autosubmit.py>`_.
 |br| ``autosubmit/platforms/paramiko_submitter.py`` - see in GitHub `paramiko_submitter.py <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/platforms/paramiko_submitter.py>`_.
-
-|br| ``type`` is defined in the YAML file that configures a platform as it's shown :ref:`here <TargetPlatform>`
+|br| ``type`` from ``platform.type`` is defined in the YAML file that configures a platform as it's shown :ref:`here <TargetPlatform>`
 to determine the scheduler.
 
 .. warning::
@@ -255,10 +254,10 @@ you must to input the information suitable for your project. (e.g.: user, host, 
             QUEUE: gp_debug [dummy, gp_debug, nf, hpc]
             MAX_WALLCLOCK: <HH:MM>
             MAX_PROCESSORS: <N> # This is to enable horizontal_wrappers
-            PROCESSORS_PER_NODE: <N>
+            PROCESSORS_PER_NODE: 112 # Each HPC has their own number check the documentation of your platform
 
 .. warning::
-    If you cannot connect , it may be because your user doesn 't have access to the host, or the PARAMETER SCRATCH_DIR
+    If you cannot connect, it may be because your user doesn't have access to the host, or the PARAMETER SCRATCH_DIR
     might be pointing to a non-existing folder on the host.
 
     Make sure to create the folder with your USERNAME inside the proper path you pointed to
@@ -274,12 +273,22 @@ inside the folder Autosubmit will look at ``LOCAL.PROJECT_PATH`` set earlier in 
 if they exist.
 
 
+.. note::
+    The files can also be R, python2, python3. By default it is bash and can be changed by setting the file type.
+
+    .. code-block:: yaml
+
+        JOBS:
+            LOCAL_SETUP:
+                TYPE: Python # adding this
+
+
 .. code-block:: yaml
 
     JOBS:
         LOCAL_SETUP:
             FILE: LOCAL_SETUP.sh # ~/autosubmit/<expid>/proj/local_project/LOCAL_SETUP.sh
-            PLATFORM: MARENOSTRUM5
+            PLATFORM: Local
             RUNNING: once
 
         SYNCHRONIZE:
