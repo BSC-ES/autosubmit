@@ -29,6 +29,8 @@ Or download, unpack and:
 
     pip install .
 
+.. runcmd:: autosubmit install
+
 .. runcmd:: autosubmit configure
 
 .. hint::
