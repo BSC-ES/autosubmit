@@ -13,40 +13,8 @@ To create a new experiment, just run the command:
 *Description* is a brief experiment description.
 
 Options:
-::
 
-    usage: autosubmit expid [-h] [-y COPY] [-dm] [-min] [-repo GIT_REPO]
-                            [-b GIT_BRANCH] [-conf GIT_AS_CONF] [-local] [-op]
-                            [-H HPC] -d DESCRIPTION [-t]
-                            [-fs {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}]
-    
-    Creates a new experiment
-    
-    optional arguments:
-      -h, --help            show this help message and exit
-      -y COPY, --copy COPY  makes a copy of the specified experiment
-      -dm, --dummy          creates a new experiment with default values, usually
-                            for testing
-      -min, --minimal_configuration
-                            creates a new experiment with minimal configuration,
-                            usually combined with -repo
-      -repo GIT_REPO, --git_repo GIT_REPO
-                            sets a git repository for the experiment
-      -b GIT_BRANCH, --git_branch GIT_BRANCH
-                            sets a git branch for the experiment
-      -conf GIT_AS_CONF, --git_as_conf GIT_AS_CONF
-                            sets the git path to as_conf
-      -local, --use_local_minimal
-                            uses local minimal file instead of git
-      -op, --operational    creates a new experiment with operational experiment id
-      -ev, --evaluation     creates a new experiment with evaluation experiment id
-      -H HPC, --HPC HPC     specifies the HPC to use for the experiment
-      -d DESCRIPTION, --description DESCRIPTION
-                            sets a description for the experiment to store in the
-                            database.
-      -t, --testcase        creates a new experiment with testcase experiment id
-      -fs {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}, --filter_status {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}
-                            Select the original status to filter the list of jobs
+.. runcmd:: autosubmit expid -h
 
 Example:
 ::
@@ -139,37 +107,8 @@ To create a test case experiment, use the command:
     autosubmit testcase
 
 Options:
-::
 
-    usage: autosubmit testcase [-h] [-y COPY | -min] -d DESCRIPTION [-c CHUNKS]
-                               [-m MEMBER] [-s STARDATE] -H HPC [-repo GIT_REPO]
-                               [-b GIT_BRANCH] [-conf GIT_AS_CONF] [-local]
-    
-    create test case experiment
-    
-    optional arguments:
-      -h, --help            show this help message and exit
-      -y COPY, --copy COPY  makes a copy of the specified experiment
-      -min, --minimal_configuration
-                            creates a new experiment with minimal configuration,
-                            usually combined with -repo
-      -d DESCRIPTION, --description DESCRIPTION
-                            description of the test case
-      -c CHUNKS, --chunks CHUNKS
-                            chunks to run
-      -m MEMBER, --member MEMBER
-                            member to run
-      -s STARDATE, --stardate STARDATE
-                            stardate to run
-      -H HPC, --HPC HPC     HPC to run experiment on it
-      -repo GIT_REPO, --git_repo GIT_REPO
-                            sets a git repository for the experiment
-      -b GIT_BRANCH, --git_branch GIT_BRANCH
-                            sets a git branch for the experiment
-      -conf GIT_AS_CONF, --git_as_conf GIT_AS_CONF
-                            sets the git path to as_conf
-      -local, --use_local_minimal
-                            uses local minimal file instead of git
+.. runcmd:: autosubmit testcase -h
 
 Example:
 ::
@@ -193,27 +132,8 @@ To test the experiment, use the command:
 
 
 Options:
-::
 
-    usage: autosubmit test [-h] -c CHUNKS [-m MEMBER] [-s STARDATE] [-H HPC] [-b BRANCH] [-v] EXPID
-
-     test experiment
-
-     positional arguments:
-        EXPID                 experiment identifier
-
-     options:
-         -h, --help            show this help message and exit
-         -c CHUNKS, --chunks CHUNKS
-                               chunks to run
-         -m MEMBER, --member MEMBER
-                               member to run
-         -s STARDATE, --stardate STARDATE
-                               stardate to run
-         -H HPC, --HPC HPC     HPC to run experiment on it
-         -b BRANCH, --branch BRANCH
-                               branch of git to run (or revision from subversion)
-         -v, --update_version  Update experiment version
+.. runcmd:: autosubmit test -h
 
 Example:
 ::
