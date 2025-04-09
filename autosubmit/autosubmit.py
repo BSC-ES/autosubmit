@@ -1411,8 +1411,8 @@ class Autosubmit:
             os.chmod(os.path.join(exp_folder, "tmp"), 0o755)
             os.chmod(os.path.join(exp_folder, "tmp", "ASLOGS"), 0o755)
             os.chmod(os.path.join(exp_folder, "tmp", "LOG_"+exp_id), 0o755)
-            os.chmod(os.path.join(exp_folder, "plot"), 0o755)
-            os.chmod(os.path.join(exp_folder, "status"), 0o755)
+            os.chmod(os.path.join(exp_folder, "plot"), 0o775)
+            os.chmod(os.path.join(exp_folder, "status"), 0o775)
             Log.info(f"Experiment folder: {exp_folder}")
         except OSError as e:
             try:
