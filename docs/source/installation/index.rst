@@ -29,6 +29,8 @@ Or download, unpack and:
 
     pip install .
 
+.. runcmd:: autosubmit configure
+
 .. hint::
     To check if Autosubmit is installed, run ``autosubmit -v`` This command will print Autosubmit's current version
 
