@@ -1,5 +1,8 @@
 autosubmit.platform
 ===================
+.. automodule:: autosubmit.platforms.platform
+   :show-inheritance:
+   :members:
 .. automodule:: autosubmit.platforms.ecplatform
    :show-inheritance:
    :members:

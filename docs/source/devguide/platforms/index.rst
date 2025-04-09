@@ -17,7 +17,7 @@ platform class, for which first we need to identify which existing platform is t
 
 .. note::
     Currently the platforms available are:
-    |br| :ref:`Local Platform <Local Platform>`
+    |br| :ref:`Local Platform <Local Platform>` :mod:`Platform <autosubmit.platforms.platform>`
     |br| :mod:`EC Platform <autosubmit.platforms.ecplatform>` :mod:`PBS Platform <autosubmit.platforms.pbsplatform>`
     |br| :mod:`PJM Platform <autosubmit.platforms.pjmplatform>` :mod:`Slurm Platform <autosubmit.platforms.slurmplatform>`
 
