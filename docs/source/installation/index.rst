@@ -19,6 +19,7 @@ The Autosubmit code is hosted in GitHub. The Autosubmit Python package is availa
 
 .. important:: The host machine has to be able to access HPCs/Clusters via password-less ssh. Ensure that the ssh key is in PEM format ``ssh-keygen -t rsa -b 4096 -C "email@email.com" -m PEM``.
 
+
 To install autosubmit, execute the following:
 ::
 
@@ -70,19 +71,18 @@ For a very quick test, you can follow the next instructions to configure and run
 .. code-block:: bash
 
     # Quick-configure ( user-level database)
-    autosubmit configure
+    # autosubmit configure
 
     # Install
-    autosubmit install
+    # autosubmit install
 
     # Quick-start
-
-    # Get expid
-    autosubmit expid -H "local" -d "Test exp in local."
+    # Get <EXPID>
+    # autosubmit expid -H "local" -d "Test exp in local."
 
     # Create with
-    # Since it was a new install, the expid will be a000
-    autosubmit create a000
+    # Since it was a new install, the <EXPID> will be a000
+    # autosubmit create a000
 
     # In case you want to use a remote platform
 
@@ -103,7 +103,7 @@ For a very quick test, you can follow the next instructions to configure and run
     # Where ~/.ssh/id_rsa is the path to your private key
 
     # run
-    autosubmit run a000
+    # autosubmit run a000
 
 
 The sequence of instructions to install Autosubmit and its dependencies with conda.
@@ -151,7 +151,7 @@ For a very quick test, you can follow the next instructions to configure and run
     autosubmit expid -H "local" -d "Test exp in local."
 
     # Create with
-    # Since it was a new install, the expid will be a000
+    # Since it was a new install, the <EXPID> will be a000
     autosubmit create a000
 
     # In case you want to use a remote platform
@@ -270,7 +270,7 @@ Mandatory parameters of /etc/autosubmit
     [local]
     path = <experiment_path>
 
-    # Global logs, logs without expid associated.
+    # Global logs, logs without <EXPID> associated.
     [globallogs]
     path = /home/dbeltran/autosubmit/logs
 
