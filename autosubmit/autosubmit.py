@@ -26,6 +26,7 @@ from ruamel.yaml import YAML
 from typing import Dict, Set, Tuple, Union, Any, List, Optional
 
 from autosubmit.database.db_common import update_experiment_descrip_version
+from autosubmit.experiment.detail_updater import ExperimentDetails
 from autosubmit.helpers.utils import strtobool
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
@@ -1445,6 +1446,12 @@ class Autosubmit:
             except Exception:
                 pass
             raise AutosubmitCritical(f"Error while setting the default values: {str(e)}", 7011)
+        
+        # Try to update the experiment details
+        try:
+            ExperimentDetails(exp_id).save_update_details()
+        except Exception:
+            pass
 
         Log.result(f"Experiment {exp_id} created")
         return exp_id
@@ -1469,6 +1476,13 @@ class Autosubmit:
         if experiment_path.exists():
             if force or Autosubmit._user_yes_no_query(f"Do you want to delete {expid} ?"):
                 Log.debug('Enter Autosubmit._delete_expid {0}', expid)
+                
+                # Try to delete the experiment details
+                try:
+                    ExperimentDetails(expid).delete_details()
+                except Exception:
+                    pass
+
                 try:
                     return Autosubmit._delete_expid(expid, force)
                 except AutosubmitCritical as e:

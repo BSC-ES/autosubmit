@@ -278,6 +278,31 @@ def delete_experiment(experiment_id):
         proc.terminate()
     return result
 
+def get_experiment_id(name: str) -> int:
+    """
+    Gets the experiment numerical id from the database. Anti-lock version.
+
+    :param name: experiment name
+    :return: experiment numerical id
+    """
+    queue = multiprocessing.Queue(1)
+    proc = multiprocessing.Process(
+        target=fn_wrapper, args=(_get_experiment_id, queue, name)
+    )
+    proc.start()
+
+    try:
+        result = queue.get(True, TIMEOUT)
+    except BaseException:
+        raise AutosubmitCritical(
+            "The database process exceeded the timeout limit {0}s. Get experiment {1} id failed to complete.".format(
+                TIMEOUT, name
+            )
+        )
+    finally:
+        proc.terminate()
+    return result
+
 def _save_experiment(name, description, version):
     """
     Stores experiment in database
@@ -571,6 +596,32 @@ def _update_database(version, cursor):
     Log.info("Update completed")
     return True
 
+def _get_experiment_id(name: str) -> int:
+    """
+    Gets the experiment id from the database
+
+    :param name: experiment name
+    :return: experiment numerical id
+    """
+    if not check_db():
+        return False
+    try:
+        (conn, cursor) = open_conn()
+    except DbException as e:
+        raise AutosubmitCritical(
+            "Could not establish a connection to database", 7001, str(e)
+        )
+    conn.isolation_level = None
+
+    conn.text_factory = str
+    cursor.execute("SELECT id FROM experiment WHERE name=:name", {"name": name})
+    row = cursor.fetchone()
+    close_conn(conn, cursor)
+    if row is None:
+        raise AutosubmitCritical(
+            'The experiment "{0}" does not exist'.format(name), 7005
+        )
+    return row[0]
 
 class DbException(Exception):
     """
