@@ -37,12 +37,8 @@ Or download, unpack and:
 .. hint::
     To read Autosubmit's readme file, run ``autosubmit readme``
 
-.. runcmd:: autosubmit readme
-
 .. hint::
     To see the changelog, use ``autosubmit changelog``
-
-.. runcmd:: autosubmit changelog
 
 The sequence of instructions to install Autosubmit and its dependencies with pip.
 ---------------------------------------------------------------------------------
