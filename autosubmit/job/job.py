@@ -1571,6 +1571,10 @@ class Job(object):
         for key, value in as_conf.jobs_data[self.section].items():
             parameters[f"CURRENT_{key.upper()}"] = value
 
+        # retrocompatibility
+        if 'CURRENT_SCRATCH_DIR' in parameters:
+            parameters['SCRATCH_DIR'] = parameters['CURRENT_SCRATCH_DIR']
+
         return parameters
 
     def update_platform_parameters(self, as_conf, parameters):
