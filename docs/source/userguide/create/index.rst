@@ -130,6 +130,6 @@ How to profile Autosubmit while creating an experiment
 Autosubmit offers the possibility to profile the experiment creation process. To enable the profiler, just 
 add the ``--profile`` (or ``-p``) flag to your ``autosubmit create`` command, as in the following example:
 
-.. runcmd:: autosubmit create --profile EXPID
+.. runcmd:: autosubmit create --profile a000
 
 .. include:: ../../_include/profiler_common.rst
