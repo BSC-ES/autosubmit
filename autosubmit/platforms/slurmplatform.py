@@ -22,13 +22,12 @@ Slurm Platform File
 This Files is responsible to generate the interactions between Autosubmit and a Slurm Platform creating commands
 being responsible for executing them as needed but the Jobs.
 """
-import contextlib
+from contextlib import suppress
 import locale
 import os
 from time import sleep
 from typing import List, Union, Any
 from xml.dom.minidom import parseString
-
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 from autosubmit.job.job_common import Status
