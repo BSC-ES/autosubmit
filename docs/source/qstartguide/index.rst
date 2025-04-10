@@ -64,13 +64,13 @@ Description of most used commands
 Create a new experiment
 =======================
 
-.. runcmd:: autosubmit expid -dm -H "local" -d "Tutorial"
-
     ``autosubmit expid -dm -H "local" -d "Tutorial"``
 
 - *-dm: Generates a dummy experiment.*
 - *-H: Sets the principal experiment platform.*
 - *-d: Sets a short description for the experiment.*
+
+.. runcmd:: autosubmit expid -dm -H "local" -d "Tutorial"
 
 The output of the command will show the expid of the experiment and generate the following directory structure:
 
