@@ -399,10 +399,24 @@ class ExperimentHistoryDbManager(DatabaseManager):
         models = [Models.JobDataRow(*row) for row in job_data_rows][-1]
         return JobData.from_model(models)
 
-    def get_job_data_max_counter(self):
-        """ The max counter is the maximum count value for the count column in job_data. """
-        statement = "SELECT MAX(counter) as maxcounter FROM job_data"
-        counter_result = self.get_from_statement(self.historicaldb_file_path, statement)
+    def get_job_data_max_counter(self, job_name: str = None) -> int:
+        """
+        Get the maximum counter value from the `job_data` table. If a `job_name` is provided,
+        the query will filter by that specific job name.
+
+        :param job_name: The name of the job to filter by (optional).
+        :type job_name: str, optional
+        :return: The maximum counter value, or the default value if no rows are found.
+        :rtype: int
+        """
+        if job_name:
+            statement = "SELECT MAX(counter) as maxcounter FROM job_data WHERE job_name = ?"
+            arguments = (job_name,)
+            counter_result = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
+        else:
+            statement = "SELECT MAX(counter) as maxcounter FROM job_data"
+            counter_result = self.get_from_statement(self.historicaldb_file_path, statement)
+
         if len(counter_result) <= 0:
             return DEFAULT_MAX_COUNTER
         else:
@@ -479,7 +493,7 @@ class ExperimentHistoryDatabaseManager(Protocol):
 
     def get_job_data_by_name(self, job_name): ...
 
-    def get_job_data_max_counter(self): ...
+    def get_job_data_max_counter(self, job_name: str = None) -> int: ...
 
     def delete_job_data(self, id_): ...
 

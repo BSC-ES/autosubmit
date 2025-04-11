@@ -344,7 +344,7 @@ There are some other parameters that you may need to specify:
     :widths: 25 75
     :header-rows: 1
 
-    * - Paramter
+    * - Parameter
       - Description
     * - ``BUDGET``
       - Budget account for the machine scheduler. If omitted, takes the value defined in ``PROJECT``

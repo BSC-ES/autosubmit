@@ -1,6 +1,23 @@
-### 4.1.14: Dependencies bug fixes, regression tests
+### 4.1.14: Bug fixes, enhancements, and new features
 
+**Bug fixes:**
+- Fixed an issue with X11 calls causing errors. [#2324](https://github.com/BSC-ES/autosubmit/issues/2324)
+- Resolved a problem where the Autosubmit monitor failed for non-owners of experiments. [#2272](https://github.com/BSC-ES/autosubmit/issues/2272)
+- Corrected an issue where `experiment_data` was not saved when using a shared account. [PR](https://github.com/BSC-ES/autosubmit-config-parser/pull/82)
+- Fixed timestamp-related issues in logs and processes. [#2275](https://github.com/BSC-ES/autosubmit/issues/2275), [PR](https://github.com/BSC-ES/autosubmit/pull/2284), [PR](https://github.com/BSC-ES/autosubmit/pull/2329)
+- Reintroduced the `%SCRATCH_DIR%` variable and fixed problems with date variables. [#2248](https://github.com/BSC-ES/autosubmit/issues/2248), [PR](https://github.com/BSC-ES/autosubmit/pull/2292)
+- Resolved an authentication issue related to user mapping. [PR #2333](https://github.com/BSC-ES/autosubmit/pull/2333)
 - Fixed issues with wrapper not updating status correctly. [#2274](https://github.com/BSC-ES/autosubmit/issues/2274) [PR](https://github.com/BSC-ES/autosubmit/pull/2327)
+
+**Enhancements:**
+- Improved validation for the `expid` flag. [PR](https://github.com/BSC-ES/autosubmit/pull/2309)
+- Made the details database more consistent and reliable. [PR](https://github.com/BSC-ES/autosubmit/pull/2296)
+- Enhanced the flexibility of workflows, allowing for more adaptable configurations. [#2276](https://github.com/BSC-ES/autosubmit/issues/2276)
+- Improved the log recovery logs. [PR](https://github.com/BSC-ES/autosubmit/pull/2341)
+
+**New features:**
+- Added support for `%^%` variables to improve template customization. [PR](https://github.com/BSC-ES/autosubmit/pull/2288), [Docs](https://autosubmit.readthedocs.io/en/latest/userguide/templates.html#sustitute-placeholders-after-all-files-have-been-loaded)
+- Operational runs now require no pending commits, ensuring a cleaner workflow. [#2220](https://github.com/BSC-ES/autosubmit/issues/2220), [PR](https://github.com/BSC-ES/autosubmit/pull/2293)
 
 ### 4.1.13: Dependencies bug fixes, regression tests
 
