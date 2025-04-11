@@ -1,0 +1,42 @@
+## String representation of Job List [41]  ##
+a001_LOCAL_SETUP ~ [4 children]
+|  a001_20000101_fc0_INI ~ [1 child]
+|  |  a001_20000101_fc0_1_SIM ~ [2 children]
+|  |  |  a001_20000101_fc0_1_POST ~ [1 child]
+|  |  |  |  a001_20000101_fc0_1_CLEAN
+|  |  |  a001_20000101_fc0_2_SIM ~ [2 children]
+|  |  |  |  a001_20000101_fc0_2_POST ~ [1 child]
+|  |  |  |  |  a001_20000101_fc0_2_CLEAN
+|  |  |  |  a001_20000101_fc0_3_SIM ~ [1 child]
+|  |  |  |  |  a001_20000101_fc0_3_POST ~ [1 child]
+|  |  |  |  |  |  a001_20000101_fc0_3_CLEAN
+|  a001_20000101_fc1_INI ~ [1 child]
+|  |  a001_20000101_fc1_1_SIM ~ [2 children]
+|  |  |  a001_20000101_fc1_1_POST ~ [1 child]
+|  |  |  |  a001_20000101_fc1_1_CLEAN
+|  |  |  a001_20000101_fc1_2_SIM ~ [2 children]
+|  |  |  |  a001_20000101_fc1_2_POST ~ [1 child]
+|  |  |  |  |  a001_20000101_fc1_2_CLEAN
+|  |  |  |  a001_20000101_fc1_3_SIM ~ [1 child]
+|  |  |  |  |  a001_20000101_fc1_3_POST ~ [1 child]
+|  |  |  |  |  |  a001_20000101_fc1_3_CLEAN
+|  a001_20000201_fc0_INI ~ [1 child]
+|  |  a001_20000201_fc0_1_SIM ~ [2 children]
+|  |  |  a001_20000201_fc0_1_POST ~ [1 child]
+|  |  |  |  a001_20000201_fc0_1_CLEAN
+|  |  |  a001_20000201_fc0_2_SIM ~ [2 children]
+|  |  |  |  a001_20000201_fc0_2_POST ~ [1 child]
+|  |  |  |  |  a001_20000201_fc0_2_CLEAN
+|  |  |  |  a001_20000201_fc0_3_SIM ~ [1 child]
+|  |  |  |  |  a001_20000201_fc0_3_POST ~ [1 child]
+|  |  |  |  |  |  a001_20000201_fc0_3_CLEAN
+|  a001_20000201_fc1_INI ~ [1 child]
+|  |  a001_20000201_fc1_1_SIM ~ [2 children]
+|  |  |  a001_20000201_fc1_1_POST ~ [1 child]
+|  |  |  |  a001_20000201_fc1_1_CLEAN
+|  |  |  a001_20000201_fc1_2_SIM ~ [2 children]
+|  |  |  |  a001_20000201_fc1_2_POST ~ [1 child]
+|  |  |  |  |  a001_20000201_fc1_2_CLEAN
+|  |  |  |  a001_20000201_fc1_3_SIM ~ [1 child]
+|  |  |  |  |  a001_20000201_fc1_3_POST ~ [1 child]
+|  |  |  |  |  |  a001_20000201_fc1_3_CLEAN
