@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import argparse
 import os
 import pwd
 import sqlite3
@@ -22,11 +23,13 @@ import tempfile
 from itertools import permutations, product
 from pathlib import Path
 from textwrap import dedent
+from ruamel.yaml import YAML
 
 import pytest
 from mock import Mock, patch
 
 from autosubmit.autosubmit import Autosubmit
+from autosubmit.git.autosubmit_git import AutosubmitGit
 from autosubmit.experiment.experiment_common import new_experiment, copy_experiment
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from log.log import AutosubmitCritical, AutosubmitError
@@ -468,3 +471,38 @@ def test_perform_deletion(create_autosubmit_tmpdir, generate_new_experiment, set
     assert all(x in err_message for x in
                ["Cannot delete experiment entry", "Cannot delete directory", "Cannot delete structure",
                 "Cannot delete job_data"])
+
+
+@pytest.mark.parametrize(
+    "project_type, generate_new_experiment",
+    [
+        ('git', 'operational'),
+        ('git', 'normal'),
+        ('git', 'test'),
+        ('git', 'evaluation'),
+        ('svn', 'operational'),
+        ('svn', 'normal'),
+        ('svn', 'test'),
+        ('svn', 'evaluation')
+    ],
+    indirect=["generate_new_experiment"]
+)
+def test_remote_repo_operational(generate_new_experiment, create_autosubmit_tmpdir, project_type):
+    expid = generate_new_experiment
+    temp_path = Path(create_autosubmit_tmpdir) / expid / "conf" / f"expdef_{expid}.yml"
+    
+    with open(temp_path, 'r') as f: 
+        yaml = YAML(typ='rt')
+        data = yaml.load(f)
+    data["PROJECT"]["PROJECT_TYPE"] = project_type
+    with open(temp_path, 'w') as f:
+        yaml.dump(data, f)
+
+    with patch('subprocess.check_output') as mock_check_output:
+        mock_check_output.return_value = b'M\n'
+        if expid[0] != 'o':
+            AutosubmitGit.check_unpushed_changes(expid)
+        else:
+            with pytest.raises(AutosubmitCritical):
+                AutosubmitGit.check_unpushed_changes(expid) 
+            
