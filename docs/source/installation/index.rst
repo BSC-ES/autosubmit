@@ -80,7 +80,7 @@ For a very quick test, you can follow the next instructions to configure and run
     # Get expid
 
 
-.. runcmd:: autosubmit expid -H "local" -d "Test exp in local."
+.. runcmd:: autosubmit install && autosubmit expid -H "local" -d "Test exp in local."
 
 
 .. code-block:: bash
