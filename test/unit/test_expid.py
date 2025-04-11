@@ -486,7 +486,7 @@ def test_remote_repo_operational(generate_new_experiment, create_autosubmit_tmpd
         yaml.dump(data, f)
 
     with patch('subprocess.check_output') as mock_check_output:
-        mock_check_output.return_value = b'do not run\n'
+        mock_check_output.return_value = b'M\n'
         args = argparse.Namespace(
             command="run",
             logconsole=True,

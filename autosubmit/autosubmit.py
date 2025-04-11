@@ -735,7 +735,7 @@ class Autosubmit:
                         raise AutosubmitCritical("Push local changes to remote repository before running", 7075)
                 elif project == "svn":
                     output = subprocess.check_output(["svn", "status"]).decode()
-                    if 'M' in output:
+                    if any(status in output for status in ['M', 'A', 'D', '?']):
                         raise AutosubmitCritical("Push local changes to remote repository before running", 7075)
             return Autosubmit.run_experiment(args.expid, args.notransitive,args.start_time,args.start_after, args.run_only_members, args.profile)
         elif args.command == 'expid':
