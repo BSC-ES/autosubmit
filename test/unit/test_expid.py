@@ -29,6 +29,7 @@ import pytest
 from mock import Mock, patch
 
 from autosubmit.autosubmit import Autosubmit
+from autosubmit.git.autosubmit_git import AutosubmitGit
 from autosubmit.experiment.experiment_common import new_experiment, copy_experiment
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from log.log import AutosubmitCritical, AutosubmitError
@@ -472,8 +473,20 @@ def test_perform_deletion(create_autosubmit_tmpdir, generate_new_experiment, set
                 "Cannot delete job_data"])
 
 
-@pytest.mark.parametrize("project_type", ['git', 'svn'])
-@pytest.mark.parametrize("generate_new_experiment", ['operational'], indirect=True)
+@pytest.mark.parametrize(
+    "project_type, generate_new_experiment",
+    [
+        ('git', 'operational'),
+        ('git', 'normal'),
+        ('git', 'test'),
+        ('git', 'evaluation'),
+        ('svn', 'operational'),
+        ('svn', 'normal'),
+        ('svn', 'test'),
+        ('svn', 'evaluation')
+    ],
+    indirect=["generate_new_experiment"]
+)
 def test_remote_repo_operational(generate_new_experiment, create_autosubmit_tmpdir, project_type):
     expid = generate_new_experiment
     temp_path = Path(create_autosubmit_tmpdir) / expid / "conf" / f"expdef_{expid}.yml"
@@ -487,16 +500,9 @@ def test_remote_repo_operational(generate_new_experiment, create_autosubmit_tmpd
 
     with patch('subprocess.check_output') as mock_check_output:
         mock_check_output.return_value = b'M\n'
-        args = argparse.Namespace(
-            command="run",
-            logconsole=True,
-            logfile="test.log",
-            expid= expid,
-            notransitive=False,
-            start_time=None,
-            start_after=None,
-            run_only_members = None,
-            profile=False
-        )
-        with pytest.raises(AutosubmitCritical): # add regex to match error message or code 
-            Autosubmit.run_command(args)
+        if expid[0] != 'o':
+            AutosubmitGit.check_unpushed_changes(expid)
+        else:
+            with pytest.raises(AutosubmitCritical):
+                AutosubmitGit.check_unpushed_changes(expid) 
+            

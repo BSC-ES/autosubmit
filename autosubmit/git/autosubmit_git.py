@@ -22,6 +22,8 @@ import locale
 import os
 import shutil
 import subprocess
+from pathlib import Path
+from ruamel.yaml import YAML
 from shutil import rmtree
 from time import time
 from typing import List, Union
@@ -257,3 +259,25 @@ class AutosubmitGit:
             shutil.rmtree(project_backup_path)
 
         return True
+
+    @staticmethod
+    def check_unpushed_changes(expid):
+        if expid[0] == 'o':
+            origin = Path(BasicConfig.expid_dir(expid).joinpath("conf/expdef_{}.yml".format(expid)))
+            with open(origin, 'r') as f:
+                yaml = YAML(typ='rt')
+                data = yaml.load(f)
+                project = data["PROJECT"]["PROJECT_TYPE"]
+
+            version_controls = ["git", 
+                                "git",
+                                "svn"]
+            arguments = [["status", "--porcelain"],
+                        ["submodule", "foreach", "'git status --porcelain'"],
+                        "status"]
+            for version_control, args in zip(version_controls, arguments):
+                if project == version_control:
+                    output = subprocess.check_output([version_control, args]).decode(locale.getlocale()[1])
+                    if any(status in output for status in ['M', 'A', 'D', '?']):
+                        raise AutosubmitCritical("Push local changes to remote repository before running", 7075)
+

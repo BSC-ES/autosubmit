@@ -723,20 +723,7 @@ class Autosubmit:
             Autosubmit._init_logs(args, args.logconsole, args.logfile, expid)
 
         if args.command == 'run':
-            if expid[0] == 'o':
-                origin = Path(BasicConfig.expid_dir(expid).joinpath("conf/expdef_{}.yml".format(expid))) 
-                with open(origin, 'r') as f:
-                    yaml = YAML(typ='rt')
-                    data = yaml.load(f)
-                    project = data["PROJECT"]["PROJECT_TYPE"]
-                if project == "git":
-                    output = subprocess.check_output(["git", "status"]).decode()
-                    if "nothing to commit" not in output:
-                        raise AutosubmitCritical("Push local changes to remote repository before running", 7075)
-                elif project == "svn":
-                    output = subprocess.check_output(["svn", "status"]).decode()
-                    if any(status in output for status in ['M', 'A', 'D', '?']):
-                        raise AutosubmitCritical("Push local changes to remote repository before running", 7075)
+            a = AutosubmitGit.check_unpushed_changes(expid)
             return Autosubmit.run_experiment(args.expid, args.notransitive,args.start_time,args.start_after, args.run_only_members, args.profile)
         elif args.command == 'expid':
             return Autosubmit.expid(args.description,args.HPC,args.copy, args.dummy,args.minimal_configuration,args.git_repo,args.git_branch,args.git_as_conf,args.operational,args.testcase,args.evaluation,args.use_local_minimal) != ''
