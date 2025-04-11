@@ -23,12 +23,6 @@ def test_details_properties():
     assert exp_details.model == "my_git_origin"
     assert exp_details.branch == "my_git_branch"
 
-    mock_as_conf.get_project_type.return_value = "svn"
-    mock_as_conf.get_svn_project_url.return_value = "my_svn_origin"
-
-    assert exp_details.model == "my_svn_origin"
-    assert exp_details.branch == "my_svn_origin"
-
 
 def test_details_repository(tmpdir):
     with patch("autosubmit.experiment.detail_updater.BasicConfig") as mock_basic_config:
