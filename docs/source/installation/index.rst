@@ -73,6 +73,8 @@ For a very quick test, you can follow the next instructions to configure and run
 
 .. runcmd:: autosubmit configure
 
+.. code-block:: bash
+
     # Install
 
 .. runcmd:: autosubmit install
