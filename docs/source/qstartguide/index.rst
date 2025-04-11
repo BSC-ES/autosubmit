@@ -13,11 +13,6 @@ Real experiments instead run workflows with complex tasks. To read information a
 Pre-requisites
 ==============
 
-.. runcmd:: autosubmit configure
-
-.. runcmd:: autosubmit install
-
-
 Autosubmit needs to establish **password-less SSH connections** in order to run and monitor workflows on remote platforms.
 
 Ensure that you have a **password-less** connection to all platforms you want to use in your experiment. If you are unsure how to do this, please follow these instructions:
