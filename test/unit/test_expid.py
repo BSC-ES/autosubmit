@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import argparse
 import os
 import pwd
 import sqlite3
@@ -22,6 +23,7 @@ import tempfile
 from itertools import permutations, product
 from pathlib import Path
 from textwrap import dedent
+from ruamel.yaml import YAML
 
 import pytest
 from mock import Mock, patch
@@ -468,3 +470,33 @@ def test_perform_deletion(create_autosubmit_tmpdir, generate_new_experiment, set
     assert all(x in err_message for x in
                ["Cannot delete experiment entry", "Cannot delete directory", "Cannot delete structure",
                 "Cannot delete job_data"])
+
+
+@pytest.mark.parametrize("project_type", ['git', 'svn'])
+@pytest.mark.parametrize("generate_new_experiment", ['operational'], indirect=True)
+def test_remote_repo_operational(generate_new_experiment, create_autosubmit_tmpdir, project_type):
+    expid = generate_new_experiment
+    temp_path = Path(create_autosubmit_tmpdir) / expid / "conf" / f"expdef_{expid}.yml"
+    
+    with open(temp_path, 'r') as f: 
+        yaml = YAML(typ='rt')
+        data = yaml.load(f)
+    data["PROJECT"]["PROJECT_TYPE"] = project_type
+    with open(temp_path, 'w') as f:
+        yaml.dump(data, f)
+
+    with patch('subprocess.check_output') as mock_check_output:
+        mock_check_output.return_value = b'do not run\n'
+        args = argparse.Namespace(
+            command="run",
+            logconsole=True,
+            logfile="test.log",
+            expid= expid,
+            notransitive=False,
+            start_time=None,
+            start_after=None,
+            run_only_members = None,
+            profile=False
+        )
+        with pytest.raises(AutosubmitCritical): # add regex to match error message or code 
+            Autosubmit.run_command(args)

@@ -732,11 +732,11 @@ class Autosubmit:
                 if project == "git":
                     output = subprocess.check_output(["git", "status"]).decode()
                     if "nothing to commit" not in output:
-                        raise AutosubmitCritical(f"Push local changes to remote repository before running")
+                        raise AutosubmitCritical("Push local changes to remote repository before running", 7075)
                 elif project == "svn":
                     output = subprocess.check_output(["svn", "status"]).decode()
                     if 'M' in output:
-                        raise AutosubmitCritical(f"Push local changes to remote repository before running")
+                        raise AutosubmitCritical("Push local changes to remote repository before running", 7075)
             return Autosubmit.run_experiment(args.expid, args.notransitive,args.start_time,args.start_after, args.run_only_members, args.profile)
         elif args.command == 'expid':
             return Autosubmit.expid(args.description,args.HPC,args.copy, args.dummy,args.minimal_configuration,args.git_repo,args.git_branch,args.git_as_conf,args.operational,args.testcase,args.evaluation,args.use_local_minimal) != ''
