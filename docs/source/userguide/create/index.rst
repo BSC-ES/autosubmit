@@ -25,10 +25,7 @@ Example:
     autosubmit expid -dm -d "dummy test"
 
 
-.. runcmd:: autosubmit expid -dm -d "dummy test"
-
-
-If there is an autosubmitrc or .autosubmitrc file in your home directory (cd ~), you can setup a default file from where the contents of platforms_expid.yml should be copied.
+If there is an autosubmitrc or .autosubmitrc file in your home directory (cd ~), you can setup a default file from where the contents of platforms_<EXPID>.yml should be copied.
 
 In this autosubmitrc or .autosubmitrc file, include the configuration setting custom_platforms:
 
@@ -67,7 +64,7 @@ Example:
 
 .. warning:: You can only copy experiments created with Autosubmit 3.11 or above.
 
-If there is an autosubmitrc or .autosubmitrc file in your home directory (cd ~), you can setup a default file from where the contents of platforms_expid.yml should be copied.
+If there is an autosubmitrc or .autosubmitrc file in your home directory (cd ~), you can setup a default file from where the contents of platforms_<EXPID>.yml should be copied.
 
 In this autosubmitrc or .autosubmitrc file, include the configuration setting custom_platforms:
 

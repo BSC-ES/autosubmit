@@ -53,7 +53,7 @@ experiment.
 Users can create “test experiments” which experiment ID’s start at ``t001``, 
 “operational experiments” which experiment ID’s start at ``o001`` and 
 "evaluation experiments" with IDs starting at ``e001``.
-This is done via flags passed to the ``autosubmit expid`` in the command-line.
+This is done via flags passed to the ``autosubmit <EXPID>`` in the command-line.
 
 There is no other way for users to modify the automatic generation of
 experiment ID’s in Autosubmit (other than manually editing the SQLite database).
