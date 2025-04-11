@@ -1451,7 +1451,7 @@ class Autosubmit:
         try:
             ExperimentDetails(exp_id).save_update_details()
         except Exception:
-            pass
+            Log.warning(f"Could not update experiment details for {exp_id}. Omitting this step.")
 
         Log.result(f"Experiment {exp_id} created")
         return exp_id

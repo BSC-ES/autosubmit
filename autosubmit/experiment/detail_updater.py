@@ -111,6 +111,7 @@ class ExperimentDetails:
 
         # Get experiment config
         self.as_conf = AutosubmitConfig(self.expid, BasicConfig, YAMLParserFactory())
+        self.as_conf.reload()
 
     def save_update_details(self):
         # Upsert the details into the database
@@ -155,4 +156,7 @@ class ExperimentDetails:
 
     @property
     def hpc(self) -> str:
-        return self.as_conf.get_platform()
+        try:
+            return self.as_conf.get_platform()
+        except Exception:
+            return "NA"
