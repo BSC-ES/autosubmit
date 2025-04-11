@@ -21,7 +21,7 @@ build:
       # - https://yaml.readthedocs.io/en/latest/api.html
       - pip uninstall ruamel.yaml.clib -y
       - autosubmit configure
-      - autosubmit install
+      # - autosubmit install
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
