@@ -229,11 +229,10 @@ class ExperimentHistoryDbManager(DatabaseManager):
         """
         Update JobData data class. Returns the latest row from job_data by job_name.
 
-        Args:
-            job_data_dc (JobData): The JobData data class instance containing job_id and job_name.
-
-        Returns:
-            Any: The latest row from job_data corresponding to the given job_id and job_name.
+        :param job_data_dc: The JobData data class instance containing job_id and job_name.
+        :type job_data_dc: JobData
+        :return: The latest row from job_data corresponding to the given job_id and job_name.
+        :rtype: Any
         """
         self._update_job_data_by_id(job_data_dc)
         # Return the latest row from job_data by job_id and job_name
@@ -345,11 +344,8 @@ class ExperimentHistoryDbManager(DatabaseManager):
         Update job_data table with data class JobData.
         Update last, submit, start, finish, modified, job_id, status, energy, extra_data, nnodes, ncpus, rowstatus, out, err by id.
 
-        Args:
-            job_data_dc (JobData): The JobData data class instance containing job data to be updated.
-
-        Returns:
-            None
+        :param job_data_dc: The JobData data class instance containing job data to be updated.
+        :type job_data_dc: JobData
         """
         statement = ''' UPDATE job_data SET last=?, submit=?, start=?, finish=?, modified=?, 
                     job_id=?, status=?, energy=?, extra_data=?, 
@@ -390,12 +386,12 @@ class ExperimentHistoryDbManager(DatabaseManager):
         """
         Get the latest JobData for a given job_id and job_name.
 
-        Args:
-            job_id (int): The job ID.
-            job_name (str): The job name.
-
-        Returns:
-            JobData: The latest JobData instance.
+        :param job_id: The job ID.
+        :type job_id: int
+        :param job_name: The job name.
+        :type job_name: str
+        :return: The latest JobData instance.
+        :rtype: JobData
         """
         statement = self.get_built_select_statement("job_data", "job_id=? AND job_name=? ORDER BY counter")
         arguments = (int(job_id), str(job_name),)

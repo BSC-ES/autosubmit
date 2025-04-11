@@ -192,7 +192,10 @@ class ParamikoPlatform(Platform):
 
     def agent_auth(self,port):
         """
-        Attempt to authenticate to the given SSH server using the most common authentication methods available. This will always try to use the SSH agent first, and will fall back to using the others methods if that fails.
+        Attempt to authenticate to the given SSH server using the most common authentication methods available.
+            This will always try to use the SSH agent first, and will fall back to using the others methods if
+            that fails.
+
         :parameter port: port to connect
         :return: True if authentication was successful, False otherwise
         """
@@ -583,11 +586,10 @@ class ParamikoPlatform(Platform):
         """
         Checks job energy and return values. Defined in child classes.
 
-        Args:
-            job_id (int): ID of Job
-
-        Returns:
-            4-tuple (int, int, int, int): submit time, start time, finish time, energy
+        :param job_id: ID of Job.
+        :type job_id: int
+        :return: submit time, start time, finish time, energy.
+        :rtype: (int, int, int, int)
         """
         check_energy_cmd = self.get_job_energy_cmd(job_id)
         self.send_command(check_energy_cmd)
@@ -596,6 +598,7 @@ class ParamikoPlatform(Platform):
     def submit_Script(self, hold=False):
         """
         Sends a Submitfile Script, exec in platform and retrieve the Jobs_ID.
+
         :param hold: send job hold
         :type hold: boolean
         :return: job id for the submitted job
@@ -746,6 +749,7 @@ class ParamikoPlatform(Platform):
     def parse_joblist(self, job_list):
         """
         Convert a list of job_list to job_list_cmd
+
         :param job_list: list of jobs
         :type job_list: list
         :param ssh_output: ssh output
@@ -767,6 +771,7 @@ class ParamikoPlatform(Platform):
     def check_Alljobs(self, job_list, as_conf, retries=5):
         """
         Checks jobs running status
+
         :param job_list: list of jobs
         :type job_list: list
         :param job_list_cmd: list of jobs in the queue system
@@ -871,6 +876,7 @@ class ParamikoPlatform(Platform):
     def get_jobid_by_jobname(self,job_name,retries=2):
         """
         Get job id by job name
+
         :param job_name:
         :param retries: retries
         :type retries: int
@@ -930,6 +936,7 @@ class ParamikoPlatform(Platform):
     def get_jobid_by_jobname_cmd(self, job_name):
         """
         Returns command to get job id by job name on remote platforms
+
         :param job_name:
         :return: str
         """
@@ -938,6 +945,7 @@ class ParamikoPlatform(Platform):
     def get_queue_status_cmd(self, job_name):
         """
         Returns command to get queue status on remote platforms
+
         :return: str
         """
         return NotImplementedError
@@ -1009,15 +1017,13 @@ class ParamikoPlatform(Platform):
         :param x11:
         :param retries:
         :param get_pty:
-        :param str command: the command to execute
-        :param int bufsize:
-            interpreted the same way as by the built-in ``file()`` function in
-            Python
-        :param int timeout:
-            set command's channel timeout. See `Channel.settimeout`.settimeout
-        :return:
-            the stdin, stdout, and stderr of the executing command, as a
-            3-tuple
+        :param command: the command to execute.
+        :type command: str
+        :param bufsize: interpreted the same way as by the built-in ``file()`` function in Python.
+        :type bufsize: int
+        :param timeout: set command's channel timeout. See `Channel.settimeout`.settimeout.
+        :type timeout: int
+        :return: the stdin, stdout, and stderr of the executing command
 
         :raises SSHException: if the server fails to execute the command
         """
@@ -1212,6 +1218,7 @@ class ParamikoPlatform(Platform):
     def parse_Alljobs_output(self, output, job_id):
         """
         Parses check jobs command output, so it can be interpreted by autosubmit
+
         :param output: output to parse
         :param job_id: select the job to parse
         :type output: str
@@ -1330,6 +1337,7 @@ class ParamikoPlatform(Platform):
     def get_submitted_job_id(self, output, x11 = False):
         """
         Parses submit command output to extract job id
+
         :param x11:
         :param output: output to parse
         :type output: str

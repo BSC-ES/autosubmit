@@ -5740,11 +5740,16 @@ class Autosubmit:
         file contents (similar to the ``cat`` command) or to start tailing its output (akin to
         ``tail -f``).
 
-        Args:
-            exp_or_job_id: A workflow or job ID.
-            file: the type of the file to be printed (not the file path!).
-            mode: the mode to print the file (e.g. cat, tail).
-            inspect: when True it will use job files in tmp/ instead of tmp/LOG_a000/.
+        :param exp_or_job_id: A workflow or job ID.
+        :type exp_or_job_id: str
+        :param file: the type of the file to be printed (not the file path!).
+        :type file: Union[None, str]
+        :param mode: the mode to print the file (e.g. cat, tail).
+        :type mode: Union[None, str]
+        :param inspect: when True it will use job files in tmp/ instead of tmp/LOG_a000/.
+        :type inspect: bool
+        :return:
+        :rtype: bool
         """
         def view_file(log_file: Path, mode: str):
             if mode == 'c':

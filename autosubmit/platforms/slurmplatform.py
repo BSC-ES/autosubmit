@@ -729,7 +729,6 @@ class SlurmPlatform(ParamikoPlatform):
     def check_file_exists(self, src: str, wrapper_failed: bool=False, sleeptime: int=5, max_retries: int=3) -> bool:
         """
         Checks if a file exists on the FTP server.
-
         :param src: The name of the file to check.
         :type src: str
         :param wrapper_failed: Whether the wrapper has failed. Defaults to False.

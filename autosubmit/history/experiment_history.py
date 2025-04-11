@@ -101,20 +101,26 @@ class ExperimentHistory:
 
     def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug", job_id: int = 0, wrapper_queue: str = None, wrapper_code: str = None, children: str = "") -> JobData:
         """
-            Updates the start time and other details of a job in the database.
+        Updates the start time and other details of a job in the database.
 
-            Args:
-                job_name (str): The name of the job.
-                start (int, optional): The start time of the job. Default to 0.
-                status (str, optional): The status of the job. Defaults to "UNKNOWN".
-                qos (str, optional): The quality of service. Default to "debug".
-                job_id (int, optional): The job ID. Default to 0.
-                wrapper_queue (Optional[str], optional): The wrapper queue. Defaults to None.
-                wrapper_code (Optional[str], optional): The wrapper code. Defaults to None.
-                children (str, optional): The children. Default to an empty string.
-
-            Returns:
-                JobData: The result of updating the job data, or None if an exception occurs.
+        :param job_name: The name of the job.
+        :type job_name: str
+        :param start: The start time of the job. Default to 0.
+        :type start: int
+        :param status: The status of the job. Defaults to "UNKNOWN".
+        :type status: str
+        :param qos: The quality of service. Default to "debug".
+        :type qos: str
+        :param job_id: The job ID. Default to 0.
+        :type job_id: str
+        :param wrapper_queue: The wrapper queue. Defaults to None.
+        :type wrapper_queue: str
+        :param wrapper_code: The wrapper code. Defaults to None.
+        :type wrapper_code: str
+        :param children: The children. Default to an empty string.
+        :type children: str
+        :return: The result of updating the job data, or None if an exception occurs.
+        :rtype: JobData
         """
         try:
             job_data_dc_last = self.manager.get_job_data_by_job_id_name(job_id, job_name)
@@ -135,16 +141,20 @@ class ExperimentHistory:
         """
         Updates the finish time and other details of a job in the database.
 
-        Args:
-            job_name (str): The name of the job.
-            finish (int, optional): The finish time of the job. Default to 0.
-            status (str, optional): The status of the job. Defaults to "UNKNOWN".
-            job_id (int, optional): The job ID. Default to 0.
-            out_file (Optional[str], optional): The output file path. Defaults to None.
-            err_file (Optional[str], optional): The error file path. Defaults to None.
-
-        Returns:
-            JobData: The result of updating the job data, or None if an exception occurs.
+        :param job_name: The name of the job.
+        :type job_name: str
+        :param finish: The finish time of the job. Default to 0.
+        :type finish: int
+        :param status: The status of the job. Defaults to "UNKNOWN".
+        :type status: str
+        :param job_id: The job ID. Default to 0.
+        :type job_id: int
+        :param out_file: The output file path. Defaults to None.
+        :type out_file: Optional[str]
+        :param err_file: The error file path. Defaults to None.
+        :type err_file: Optional[str]
+        :return: The result of updating the job data, or None if an exception occurs.
+        :rtype: JobData
         """
         try:
             job_data_dc_last = self.manager.get_job_data_by_job_id_name(job_id, job_name)

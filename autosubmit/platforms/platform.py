@@ -35,11 +35,14 @@ class CopyQueue(Queue):
         """
         Initializes the Queue.
 
-        Args:
-            maxsize (int): Maximum size of the queue. Defaults to -1 (infinite size).
-            block (bool): Whether to block when the queue is full. Defaults to True.
-            timeout (float): Timeout for blocking operations. Defaults to None.
-            ctx (Context): Context for the queue. Defaults to None.
+        :param maxsize: Maximum size of the queue. Defaults to -1 (infinite size).
+        :type maxsize: int
+        :param block: Whether to block when the queue is full. Defaults to True.
+        :type block: bool
+        :param timeout: Timeout for blocking operations. Defaults to None.
+        :type timeout: float
+        :param ctx: Context for the queue. Defaults to None.
+        :type ctx: Context
         """
         self.block = block
         self.timeout = timeout
@@ -50,10 +53,12 @@ class CopyQueue(Queue):
         """
         Puts a job into the queue if it is not a duplicate.
 
-        Args:
-            job (Any): The job to be added to the queue.
-            block (bool): Whether to block when the queue is full. Defaults to True.
-            timeout (float): Timeout for blocking operations. Defaults to None.
+        :param job: The job to be added to the queue.
+        :type job: Any
+        :param block: Whether to block when the queue is full. Defaults to True.
+        :type block: bool
+        :param timeout: Timeout for blocking operations. Defaults to None.
+        :type timeout: float
         """
         super().put(job.__getstate__(), block, timeout)
 
@@ -292,6 +297,7 @@ class Platform(object):
     def get_exclusive_directive(self, job):
         """
         Returns exclusive directive for the specified job
+
         :param job: job to create exclusive directive for
         :type job: Job
         :return: exclusive directive
@@ -418,6 +424,7 @@ class Platform(object):
     def serial_platform(self):
         """
         Platform to use for serial jobs
+
         :return: platform's object
         :rtype: platform
         """
@@ -465,6 +472,7 @@ class Platform(object):
     def serial_partition(self):
         """
         Partition to use for serial jobs
+
         :return: partition's name
         :rtype: str
         """
@@ -480,6 +488,7 @@ class Platform(object):
     def serial_queue(self):
         """
         Queue to use for serial jobs
+
         :return: queue's name
         :rtype: str
         """
@@ -541,6 +550,7 @@ class Platform(object):
     def send_file(self, filename, check=True):
         """
         Sends a local file to the platform
+
         :param check:
         :param filename: name of the file to send
         :type filename: str
@@ -550,6 +560,7 @@ class Platform(object):
     def move_file(self, src, dest):
         """
         Moves a file on the platform
+
         :param src: source name
         :type src: str
         :param dest: destination name
@@ -617,6 +628,7 @@ class Platform(object):
     def get_checkpoint_files(self, job):
         """
         Get all the checkpoint files of a job
+
         :param job: Get the checkpoint files
         :type job: Job
         :param max_step: max step possible
@@ -635,7 +647,6 @@ class Platform(object):
     def get_completed_files(self, job_name, retries=0, recovery=False, wrapper_failed=False):
         """
         Get the COMPLETED file of the given job
-
 
         :param wrapper_failed:
         :param recovery:
@@ -664,11 +675,10 @@ class Platform(object):
         """
         Removes STAT files from remote.
 
-        Args:
-            job (Job): Job to check.
-
-        Returns:
-            bool: True if the file was removed, False otherwise.
+        :param job: Job to check.
+        :type job: Job
+        :return: True if the file was removed, False otherwise.
+        :rtype: bool
         """
         if self.delete_file(f"{job.stat_file[:-1]}{job.fail_count}"):
             Log.debug(f"{job.stat_file[:-1]}{job.fail_count} have been removed")
@@ -923,8 +933,8 @@ class Platform(object):
         """
         Spawns a process to recover the logs of the jobs that have been completed on this platform.
 
-        Args:
-            as_conf (AutosubmitConfig): Configuration object for the platform.
+        :param as_conf: Configuration object for the platform.
+        :type as_conf: AutosubmitConfig
         """
         if not self.log_retrieval_process_active and (
                 as_conf is None or str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS',
@@ -950,11 +960,10 @@ class Platform(object):
         """
         Waits for the work_event to be set or the cleanup_event to be set for a mandatory time.
 
-        Args:
-            sleep_time (int): Minimum time to wait in seconds. Defaults to 60.
-
-        Returns:
-            bool: True if there is work to process, False otherwise.
+        :param sleep_time: Minimum time to wait in seconds. Defaults to 60.
+        :type sleep_time: int
+        :return: True if there is work to process, False otherwise.
+        :rtype: bool
         """
         process_log = False
         for remaining in range(sleep_time, 0, -1):
@@ -970,11 +979,10 @@ class Platform(object):
         """
         Waits a mandatory time and then waits until there is work, no work to more process or the cleanup event is set.
 
-        Args:
-            sleep_time (int): Maximum time to wait in seconds. Defaults to 60.
-
-        Returns:
-            bool: True if there is work to process, False otherwise.
+        :param sleep_time: Maximum time to wait in seconds. Defaults to 60.
+        :type sleep_time: int
+        :return: True if there is work to process, False otherwise.
+        :rtype: bool
         """
         process_log = self.wait_mandatory_time(sleep_time)
         if not process_log:
@@ -986,11 +994,10 @@ class Platform(object):
         """
         Waits until the timeout is reached or any signal is set to process logs.
 
-        Args:
-            timeout (int): Maximum time to wait in seconds. Defaults to 60.
-
-        Returns:
-            bool: True if there is work to process, False otherwise.
+        :param sleep_time: Maximum time to wait in seconds. Defaults to 60.
+        :type sleep_time: int
+        :return: True if there is work to process, False otherwise.
+        :rtype: bool
         """
         process_log = False
         for _ in range(timeout, 0, -1):
@@ -1004,12 +1011,12 @@ class Platform(object):
         """
         Recovers log files for jobs from the recovery queue and retry failed jobs.
 
-        Args:
-            identifier (str): Identifier for logging purposes.
-            jobs_pending_to_process (Set[Any]): Set of jobs that had issues during log retrieval.
-
-        Returns:
-            Set[Any]: Updated set of jobs pending to process.
+        :param identifier: Identifier for logging purposes.
+        :type identifier: str
+        :param jobs_pending_to_process: Set of jobs that had issues during log retrieval.
+        :type jobs_pending_to_process: Set[Any]
+        :return: Updated set of jobs pending to process.
+        :rtype: Set[Any]
         """
         job = None
 

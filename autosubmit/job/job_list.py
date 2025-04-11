@@ -1814,11 +1814,10 @@ class JobList(object):
         """
         Returns a list of completed or failed jobs without updated logs.
 
-        Args:
-            platform Platform: Job platform, defaults to None.
-
-        Returns:
-            List[Job]: List of completed and failed jobs without updated logs.
+        :param platform: Job platform, defaults to None.
+        :type platform: Platform
+        :return: List of completed and failed jobs without updated logs.
+        :rtype: List[Job]
         """
 
         completed_failed_jobs = [job for job in self._job_list if
@@ -2594,11 +2593,10 @@ class JobList(object):
         - File timestamp should be greater than the job ready_date,
         otherwise it is from a previous run.
 
-        Args:
-            job (Job): The job object to check the log for.
-
-        Returns:
-            Path: The path to the recovered log file if found, otherwise None.
+        :param job: The job object to check the log for.
+        :type job: Job
+        :return: The path to the recovered log file if found, otherwise None.
+        :rtype: Path
         """
 
         if not hasattr(job, "updated_log") or not job.updated_log:

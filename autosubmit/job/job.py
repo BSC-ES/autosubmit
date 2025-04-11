@@ -1135,12 +1135,12 @@ class Job(object):
         """
         Returns value from given row index position in STAT file associated to job.
 
-        Args:
-            index (int): Row position to retrieve.
-            fail_count (int, optional): Fail count to determine the STAT file name. Default to self.stat_file for non-wrapped jobs.
-
-        Returns:
-            int: Value in the index position, or 0 if the file or index does not exist.
+        :param index: Row position to retrieve.
+        :type index: int
+        :param fail_count: Fail count to determine the STAT file name. Default to self.stat_file for non-wrapped jobs.
+        :type fail_count: int
+        :return:
+        :rtype: int
         """
         if fail_count == -1:
             logname = os.path.join(self._log_path, f"{self.stat_file}0")
@@ -1323,16 +1323,11 @@ class Job(object):
 
     def write_stats(self, last_retrial: int) -> None:
         """
-
         Gathers the stat file, writes statistics into the job_data.db, and updates the total_stat file.
         Considers whether the job is a vertical wrapper and the number of retrials to gather.
 
-        Args:
-            last_retrial (int): The last retrial count.
-
-        Returns:
-            None
-
+        :param last_retrial: The last retrial count.
+        :type last_retrial: int
         """
         # Write stats for vertical wrappers
         if self.wrapper_type == "vertical":  # Disable AS retrials for vertical wrappers to use internal ones
@@ -1367,11 +1362,10 @@ class Job(object):
         """
         Retrieves log files from remote host.
 
-        Args:
-            raise_error (bool): If True, raises an error if the log files are not retrieved.
-
-        Returns:
-            Dict[str, int]: Dictionary with finish timestamps per job.
+        :param raise_error: If True, raises an error if the log files are not retrieved.
+        :type raise_error: bool
+        :return: Dictionary with finish timestamps per job.
+        :rtype: Dict[str, int]
         """
         backup_logname = copy.copy(self.local_logs)
         if self.wrapper_type == "vertical":
@@ -1410,7 +1404,8 @@ class Job(object):
         :param wallclock: The original wallclock time.
         :type wallclock: datetime.timedelta
 
-        :return int: The total wallclock time in seconds.
+        :return: The total wallclock time in seconds.
+        :rtype: int
         """
         total = int(wallclock.total_seconds() * 1.30)
         total_platform = self._max_possible_wallclock()
@@ -1442,7 +1437,9 @@ class Job(object):
     def is_over_wallclock(self):
         """
         Check if the job is over the wallclock time, it is an alternative method to avoid platform issues
+
         :return:
+        :rtype: bool
         """
         elapsed = datetime.datetime.now() - self.start_time
         if int(elapsed.total_seconds()) > self.wallclock_in_seconds:
@@ -1536,6 +1533,7 @@ class Job(object):
         """
         Check the presence of *COMPLETED* file.
         Change status to COMPLETED if *COMPLETED* file exists and to FAILED otherwise.
+
         :param over_wallclock:
         :param default_status: status to set if job is not completed. By default, it is FAILED
         :type default_status: Status
@@ -1599,8 +1597,8 @@ class Job(object):
 
     def process_scheduler_parameters(self, job_platform, chunk):
         """
-        Parsers yaml data stored in the dictionary
-        and calculates the components of the heterogeneous job if any
+        Parsers yaml data stored in the dictionary and calculates the components of the heterogeneous job if any
+
         :return:
         """
         hetsize = 0
