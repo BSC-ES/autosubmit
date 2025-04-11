@@ -10,33 +10,15 @@ Launch Autosubmit with the command:
 
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    autosubmit run EXPID
+    autosubmit run <EXPID>
 
-In the previous command output ``EXPID`` is the experiment identifier. The command
+In the previous command output ``<EXPID>`` is the experiment identifier. The command
 exits with ``0`` when the workflow finishes with no failed jobs, and with ``1``
 otherwise.
 
 Options:
-::
 
-    usage: autosubmit run [-h] [-nt] [-v] [-st START_TIME] [-sa START_AFTER] [-rom RUN_ONLY_MEMBERS] [-p] EXPID
-
-    runs specified experiment
-
-    positional arguments:
-      EXPID                 experiment identifier
-
-    options:
-      -h, --help            show this help message and exit
-      -nt, --notransitive   Disable transitive reduction
-      -v, --update_version  Update experiment version
-      -st START_TIME, --start_time START_TIME
-                            Sets the starting time for this experiment
-      -sa START_AFTER, --start_after START_AFTER
-                            Sets a experiment expid which completion will trigger the start of this experiment.
-      -rom RUN_ONLY_MEMBERS, --run_only_members RUN_ONLY_MEMBERS
-                            Sets members allowed on this run.
-      -p, --profile         Prints performance parameters of the execution of this command.
+.. runcmd:: autosubmit run -h
 
 
 Example:
@@ -45,16 +27,16 @@ Example:
 
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    autosubmit run cxxx
+    autosubmit run <EXPID>
 
-.. important:: If the autosubmit version is set on ``autosubmit.yml`` it must match the actual autosubmit version
+.. important:: If the autosubmit version is set on ``autosubmit_<EXPID>.yml`` it must match the actual autosubmit version
 .. hint:: It is recommended to launch it in background and with ``nohup`` (continue running although the user who launched the process logs out).
 
 .. code-block:: bash
 
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    nohup autosubmit run cxxx &
+    nohup autosubmit run <EXPID> &
 
 .. important:: Before launching Autosubmit check password-less ssh is feasible (*HPCName* is the hostname):
 .. important:: Add encryption key to ssh agent for each session (if your ssh key is encrypted)
@@ -76,13 +58,13 @@ Once you've already loaded / installed the Autosubmit version do you want:
 
 .. code-block:: bash
 
-    autosubmit create $EXPID -np
-    autosubmit recovery $EXPID -s --all -f -np
+    autosubmit create <EXPID> -np
+    autosubmit recovery <EXPID> -s --all -f -np
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    autosubmit run $EXPID -v
+    autosubmit run <EXPID> -v
     or
-    autosubmit updateversion $EXPID
+    autosubmit updateversion <EXPID>
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
     autosubmit run $EXPID -v
@@ -217,7 +199,7 @@ This feature allows to run an experiment in two separated steps without the need
 
 To achieve this, you will have to use an special parameter called TWO_STEP_START in which you will put the list of the jobs that you want to run in an exclusive mode. These jobs will run until all of them finishes and once it finishes, the rest of the jobs will begun the execution.
 
-It can be activated through TWO_STEP_START and it is set on expdef_a02n.yml, under the experiment: section.
+It can be activated through TWO_STEP_START and it is set on expdef_<EXPID>.yml, under the experiment: section.
 
 .. code-block:: ini
 
@@ -412,7 +394,7 @@ Finally, you can launch Autosubmit *run* in background and with ``nohup`` (conti
 
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    nohup autosubmit run cxxx &
+    nohup autosubmit run <EXPID> &
 
 How to stop the experiment
 --------------------------
@@ -420,41 +402,16 @@ How to stop the experiment
 From Autosubmit 4.1.6, you can stop an experiment using the command `autosubmit stop`
 
 Options:
-::
 
-    usage: autosubmit stop [-h] [-f] [-a] [-fa] [-c] [-fs FILTER_STATUS]
-                       [-t STATUS]
-                       [EXPID]
-
-    Completely stops an autosubmit run process
-
-    positional arguments:
-      EXPID                 experiment identifier, stops the listed expids
-                            separated by ","
-
-    optional arguments:
-      -h, --help            show this help message and exit
-      -f, --force           Forces to stop autosubmit process, equivalent to kill
-                            -9
-      -a, --all             Stop all current running autosubmit processes, will
-                            ask for confirmation
-      -fa, --force_all      Stop all current running autosubmit processes
-      -c, --cancel          Orders to the schedulers to stop active jobs.
-      -fs FILTER_STATUS, --filter_status FILTER_STATUS
-                            Select the status (one or more) to filter the list of
-                            jobs. Default is SUBMITTED, QUEUING, RUNNING.
-			    
-      -t STATUS, --target STATUS
-                            Final status of killed jobs. Default is FAILED.
-
+.. runcmd:: autosubmit stop -h
 
 Examples:
 ~~~~~~~~~
 
 .. code-block:: bash
 
-    autosubmit stop cxxx
-    autosubmit stop cxxx, cyyy
+    autosubmit stop <EXPID>
+    autosubmit stop <EXPID>, <EXPID>
     autosubmit stop -a
     autosubmit stop -a -f
     autosubmit stop -a -c
@@ -466,12 +423,12 @@ To get the process identifier (PID) you can use the ps command on a shell interp
 ::
 
     ps -ef | grep autosubmit
-    dbeltran  22835     1  1 May04 ?        00:45:35 autosubmit run cxxy
-    dbeltran  25783     1  1 May04 ?        00:42:25 autosubmit run cxxx
+    dbeltran  22835     1  1 May04 ?        00:45:35 autosubmit run <EXPID>
+    dbeltran  25783     1  1 May04 ?        00:42:25 autosubmit run <EXPID>
 
 To send a signal to a process you can use kill also on a terminal.
 
-To stop immediately experiment cxxx:
+To stop immediately experiment <EXPID>:
 ::
 
     kill -9 22835

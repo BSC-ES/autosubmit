@@ -40,7 +40,7 @@ Configuration changes
 Now autosubmit is composed by two kind of YAML configurations, the default ones, which are the same as always, and the custom ones.
 
 The custom ones, allows to define custom configurations that will override the default ones, in order to do this, you only have to put the key in the custom configuration file.
-These custom ones, can be anywhere and have any name, by default they're inside `<expid>/conf` but you can change this path in the expdef.yml file. `DEFAULT.CUSTOM_CONFIG`
+These custom ones, can be anywhere and have any name, by default they're inside `<EXPID>/conf` but you can change this path in the expdef_<EXPID>.yml file. `DEFAULT.CUSTOM_CONFIG`
 
 Additionally, you must be aware of the following changes:
 
@@ -48,7 +48,7 @@ Additionally, you must be aware of the following changes:
  - To define a job, you must put them under the key `jobs` in any custom configuration file.
  - To define a platform, you must put them under the key `platforms` in any custom configuration file.
  - To define a loop, you must put the key "FOR" as the first key of the section.
- - You can put any %placeholder% in the proj.yml and custom files, and also you can put %ROOTDIR% in the expdef.yml.
+ - You can put any %placeholder% in the proj_<EXPID>.yml and custom files, and also you can put %ROOTDIR% in the expdef_<EXPID>.yml.
  - All configuration is now based in an hierarchical structure, so to export a var, you must use the following syntax: `%KEY.SUBKEY.SUBSUBKEY%`. The same goes for override them.
  - YAML has into account the type.
 
@@ -67,7 +67,7 @@ List of example with the new configuration and the structure as follows
 Configuration
 =============
 
-    `autosubmit_expid.yml`
+    `autosubmit_<EXPID>.yml`
 
     .. code-block:: yaml
 
@@ -81,7 +81,7 @@ Configuration
           NOTIFICATIONS: 'False'
           TO: daniel.beltran@bsc.es
 
-    `expdef_expid.yml`
+    `expdef_<EXPID>.yml`
 
     .. code-block:: yaml
 
@@ -115,7 +115,7 @@ Configuration
           FILE_PROJECT_CONF: ''
           FILE_JOBS_CONF: ''
 
-    `jobs_expid.yml`
+    `jobs_<EXPID>.yml`
 
     .. code-block:: yaml
 
@@ -172,7 +172,7 @@ Configuration
             DEPENDENCIES: CLEAN
             RUNNING: member
 
-    `platforms_expid.yml`
+    `platforms_<EXPID>.yml`
 
     .. code-block:: yaml
 
