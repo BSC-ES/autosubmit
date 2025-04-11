@@ -115,7 +115,7 @@ Options:
 To migrate it, you need to generate a new file inside <EXPID>/conf/ with the **new user** information for each platform that you want to migrate.
 
 
-Platform file example: $expid/conf/platforms.yml
+Platform file example: $expid/conf/platforms_<EXPID>.yml
 ::
 
     PLATFORMS:
@@ -128,7 +128,7 @@ Platform file example: $expid/conf/platforms.yml
         no-migrated-platform:
             ...
 
-Migrate file example: $expid/conf/migrate.yml
+Migrate file example: $expid/conf/migrate_<EXPID>.yml
 ::
 
     AS_MISC: True # Important to set this flag to True
@@ -145,7 +145,7 @@ Migrate file example: $expid/conf/migrate.yml
 
 .. warning:: The USER in the migrate file must be a different user, in case you want to maintain the same user, put SAME_USER: True.
 
-.. warning:: The temporary directory(%PLATFORMS.TEST-LOCAL.TEMP_DIR%) must be set in the <EXPID>/conf/migrate.yml file.
+.. warning:: The temporary directory(%PLATFORMS.TEST-LOCAL.TEMP_DIR%) must be set in the <EXPID>/conf/migrate_<EXPID>.yml file.
 
 .. warning:: The temporary directory(%PLATFORMS.TEST-LOCAL.TEMP_DIR%) must be readable by both users (old owner and new owner)
     Example for a RES account to BSC account the tmp folder must have rwx|rwx|--- permissions.
