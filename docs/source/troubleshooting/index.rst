@@ -30,7 +30,7 @@ Unable to recover remote logs files.
 ========================================================
 
 *Explanation*: If there are limitations on the remote platform regarding multiple connections,
-*Solution*:  You can try DISABLE_RECOVERY_THREADS: TRUE under the platform_name: section in the platform.yml.
+*Solution*:  You can try DISABLE_RECOVERY_THREADS: TRUE under the platform_name: section in the platform_<EXPID>.yml.
 
 Error on create caused by a configuration parsing error
 =======================================================

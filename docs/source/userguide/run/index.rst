@@ -27,16 +27,16 @@ Example:
 
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    autosubmit run cxxx
+    autosubmit run <EXPID>
 
-.. important:: If the autosubmit version is set on ``autosubmit.yml`` it must match the actual autosubmit version
+.. important:: If the autosubmit version is set on ``autosubmit_<EXPID>.yml`` it must match the actual autosubmit version
 .. hint:: It is recommended to launch it in background and with ``nohup`` (continue running although the user who launched the process logs out).
 
 .. code-block:: bash
 
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    nohup autosubmit run cxxx &
+    nohup autosubmit run <EXPID> &
 
 .. important:: Before launching Autosubmit check password-less ssh is feasible (*HPCName* is the hostname):
 .. important:: Add encryption key to ssh agent for each session (if your ssh key is encrypted)
@@ -199,7 +199,7 @@ This feature allows to run an experiment in two separated steps without the need
 
 To achieve this, you will have to use an special parameter called TWO_STEP_START in which you will put the list of the jobs that you want to run in an exclusive mode. These jobs will run until all of them finishes and once it finishes, the rest of the jobs will begun the execution.
 
-It can be activated through TWO_STEP_START and it is set on expdef_a02n.yml, under the experiment: section.
+It can be activated through TWO_STEP_START and it is set on expdef_<EXPID>.yml, under the experiment: section.
 
 .. code-block:: ini
 
@@ -394,7 +394,7 @@ Finally, you can launch Autosubmit *run* in background and with ``nohup`` (conti
 
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    nohup autosubmit run cxxx &
+    nohup autosubmit run <EXPID> &
 
 How to stop the experiment
 --------------------------
@@ -410,8 +410,8 @@ Examples:
 
 .. code-block:: bash
 
-    autosubmit stop cxxx
-    autosubmit stop cxxx, cyyy
+    autosubmit stop <EXPID>
+    autosubmit stop <EXPID>, <EXPID>
     autosubmit stop -a
     autosubmit stop -a -f
     autosubmit stop -a -c
@@ -423,12 +423,12 @@ To get the process identifier (PID) you can use the ps command on a shell interp
 ::
 
     ps -ef | grep autosubmit
-    dbeltran  22835     1  1 May04 ?        00:45:35 autosubmit run cxxy
-    dbeltran  25783     1  1 May04 ?        00:42:25 autosubmit run cxxx
+    dbeltran  22835     1  1 May04 ?        00:45:35 autosubmit run <EXPID>
+    dbeltran  25783     1  1 May04 ?        00:42:25 autosubmit run <EXPID>
 
 To send a signal to a process you can use kill also on a terminal.
 
-To stop immediately experiment cxxx:
+To stop immediately experiment <EXPID>:
 ::
 
     kill -9 22835

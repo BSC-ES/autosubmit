@@ -19,7 +19,7 @@ Job packages, or "wrappers", are jobs created as bundles of different tasks (sub
 Basic configuration
 -------------------
 
-To configure a new wrapper, the user has to define a `WRAPPERS` section in any configuration file. When using the standard configuration, this one is autosubmit.yml.
+To configure a new wrapper, the user has to define a `WRAPPERS` section in any configuration file. When using the standard configuration, this one is autosubmit_<EXPID>.yml.
 
 .. code-block:: YAML
 
