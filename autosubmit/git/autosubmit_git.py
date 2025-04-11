@@ -278,6 +278,6 @@ class AutosubmitGit:
             for version_control, args in zip(version_controls, arguments):
                 if project == version_control:
                     output = subprocess.check_output([version_control, args]).decode(locale.getlocale()[1])
-                    if any(status in output for status in ['M', 'A', 'D', '?']):
+                    if any(status.startswith(code) for code in ["M", "A", "D", "?"] for status in output.splitlines()):
                         raise AutosubmitCritical("Push local changes to remote repository before running", 7075)
 
