@@ -78,21 +78,11 @@ For a very quick test, you can follow the next instructions to configure and run
 
     # Quick-start
     # Get expid
-
-
-.. runcmd:: autosubmit install && autosubmit expid -H "local" -d "Test exp in local."
-
-
-.. code-block:: bash
+    # autosubmit expid -H "local" -d "Test exp in local."
 
     # Create with
     # Since it was a new install, the expid will be a000
-
-
-.. runcmd:: autosubmit create a000
-
-
-.. code-block:: bash
+    # autosubmit create a000
 
     # In case you want to use a remote platform
 
@@ -113,8 +103,7 @@ For a very quick test, you can follow the next instructions to configure and run
     # Where ~/.ssh/id_rsa is the path to your private key
 
     # run
-
-.. runcmd:: autosubmit run a000
+    # autosubmit run a000
 
 
 The sequence of instructions to install Autosubmit and its dependencies with conda.
