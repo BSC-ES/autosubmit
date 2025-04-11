@@ -22,7 +22,7 @@ Options:
 Example:
 ::
 
-    autosubmit clean cxxx -p
+    autosubmit clean <EXPID> -p
 
 * The -pr flag is used to clean our experiment ``proj`` locally in order to save space (it could be particularly big).
 
@@ -31,14 +31,14 @@ Example:
 Example:
 ::
 
-    autosubmit clean cxxx -pr
+    autosubmit clean <EXPID> -pr
 
 A bare copy (which occupies less space on disk) will be automatically made.
 
 .. hint:: That bare clone can be always reconverted in a working clone if we want to run again the experiment by using ``git clone bare_clone original_clone``.
 
 .. note:: In addition, every time you run this command with -pr option, it will check the commit unique identifier for local working tree existing on the ``proj`` directory.
-    In case that commit identifier exists, clean will register it to the ``expdef_cxxx.yml`` file.
+    In case that commit identifier exists, clean will register it to the ``expdef_<EXPID>.yml`` file.
 
 .. _archive:
 
@@ -70,7 +70,7 @@ To unarchive an experiment, use the command:
 
 .. code-block::
 
-    autosubmit unarchive EXPID
+    autosubmit unarchive <EXPID>
 
 Options:
 
@@ -82,9 +82,9 @@ How to delete the experiment
 To delete the experiment, use the command:
 ::
 
-    autosubmit delete EXPID
+    autosubmit delete <EXPID>
 
-*EXPID* is the experiment identifier.
+*<EXPID>* is the experiment identifier.
 
 .. warning:: DO NOT USE THIS COMMAND IF YOU ARE NOT SURE !
     It deletes the experiment from database and experiment’s folder.
@@ -96,7 +96,7 @@ Options:
 Example:
 ::
 
-    autosubmit delete cxxx
+    autosubmit delete <EXPID>
 
 .. warning:: Be careful ! force option does not ask for your confirmation.
 
@@ -112,7 +112,7 @@ Options:
 
 .. runcmd:: autosubmit migrate -h
 
-To migrate it, you need to generate a new file inside $expid/conf/ with the **new user** information for each platform that you want to migrate.
+To migrate it, you need to generate a new file inside <EXPID>/conf/ with the **new user** information for each platform that you want to migrate.
 
 
 Platform file example: $expid/conf/platforms.yml
@@ -145,7 +145,7 @@ Migrate file example: $expid/conf/migrate.yml
 
 .. warning:: The USER in the migrate file must be a different user, in case you want to maintain the same user, put SAME_USER: True.
 
-.. warning:: The temporary directory(%PLATFORMS.TEST-LOCAL.TEMP_DIR%) must be set in the $expid/conf/migrate.yml file.
+.. warning:: The temporary directory(%PLATFORMS.TEST-LOCAL.TEMP_DIR%) must be set in the <EXPID>/conf/migrate.yml file.
 
 .. warning:: The temporary directory(%PLATFORMS.TEST-LOCAL.TEMP_DIR%) must be readable by both users (old owner and new owner)
     Example for a RES account to BSC account the tmp folder must have rwx|rwx|--- permissions.
@@ -154,14 +154,14 @@ Migrate file example: $expid/conf/migrate.yml
 User A, To offer the experiment:
 ::
 
-    autosubmit migrate --offer EXPID
+    autosubmit migrate --offer <EXPID>
 
 Local files will be archived and remote files put in the HPC temporary directory.
 
 User A To only offer the remote files
 ::
 
-    autosubmit migrate EXPID --offer --onlyremote
+    autosubmit migrate <EXPID> --offer --onlyremote
 
 Only remote files will be put in the HPC temporary directory.
 
@@ -174,14 +174,14 @@ Only remote files will be put in the HPC temporary directory.
 Now to pick the experiment, the user B, must do
 ::
 
-    autosubmit migrate --pickup EXPID
+    autosubmit migrate --pickup <EXPID>
 
 Local files will be unarchived and remote files copied from the temporal location.
 
 To only pick the remote files, the user B, must do
 ::
 
-    autosubmit migrate --pickup EXPID --onlyremote
+    autosubmit migrate --pickup <EXPID> --onlyremote
 
 How to synchronize with the project's latest changes
 ----------------------------------------------------
@@ -192,14 +192,14 @@ In order to synchronize with remote, use the command:
 
 ::
 
-    autosubmit refresh EXPID
+    autosubmit refresh <EXPID>
 
-where *EXPID* is the experiment identifier.
+where *<EXPID>* is the experiment identifier.
 
 It checks the experiment configuration and copies code from the original repository to project directory.
 
 .. warning:: THIS WILL OVERWRITE LOCAL CHANGES!
-    Project directory ( <expid>/proj will be overwritten and you may loose local changes.
+    Project directory ( <EXPID>/proj will be overwritten and you may loose local changes.
 
 
 Options:
@@ -208,7 +208,7 @@ Options:
 Example:
 ::
 
-    autosubmit refresh cxxx
+    autosubmit refresh <EXPID>
 
 .. _updateDescrip:
 
@@ -248,9 +248,9 @@ This procedure allows you to modify the status of your jobs.
 You must execute:
 ::
 
-    autosubmit setstatus EXPID -fs STATUS_ORIGINAL -t STATUS_FINAL -s
+    autosubmit setstatus <EXPID> -fs STATUS_ORIGINAL -t STATUS_FINAL -s
 
-*EXPID* is the experiment identifier.
+*<EXPID>* is the experiment identifier.
 *STATUS_ORIGINAL* is the original status to filter by the list of jobs.
 *STATUS_FINAL* the desired target status.
 
@@ -261,36 +261,36 @@ Options:
 Examples:
 ::
 
-    autosubmit setstatus cxxx -fl "cxxx_20101101_fc3_21_sim cxxx_20111101_fc4_26_sim" -t READY -s
-    autosubmit setstatus cxxx -fc "[ 19601101 [ fc1 [1] ] ]" -t READY -s
-    autosubmit setstatus cxxx -fs FAILED -t READY -s
-    autosubmit setstatus cxxx -ft TRANSFER -t SUSPENDED -s
-    autosubmit setstatus cxxx -ftc "[ 19601101 [ fc1 [1] ] ], SIM" -t SUSPENDED -s
+    autosubmit setstatus <EXPID> -fl "<EXPID>_20101101_fc3_21_sim <EXPID>_20111101_fc4_26_sim" -t READY -s
+    autosubmit setstatus <EXPID> -fc "[ 19601101 [ fc1 [1] ] ]" -t READY -s
+    autosubmit setstatus <EXPID> -fs FAILED -t READY -s
+    autosubmit setstatus <EXPID> -ft TRANSFER -t SUSPENDED -s
+    autosubmit setstatus <EXPID> -ftc "[ 19601101 [ fc1 [1] ] ], SIM" -t SUSPENDED -s
 
 Date (month) range example:
 ::
 
-    autosubmit setstatus cxxx -ftc "[ 1960(1101-1201) [ fc1 [1] ] ], SIM" -t SUSPENDED -s
+    autosubmit setstatus <EXPID> -ftc "[ 1960(1101-1201) [ fc1 [1] ] ], SIM" -t SUSPENDED -s
 
 This example will result changing the following jobs:
 ::
 
-    cxxx_19601101_fc1_1_SIM
-    cxxx_19601201_fc1_1_SIM
+    <EXPID>_19601101_fc1_1_SIM
+    <EXPID>_19601201_fc1_1_SIM
 
 Date (day) range example:
 ::
 
-    autosubmit setstatus cxxx -ftc "[ 1960(1101-1105) [ fc1 [1] ] ], SIM" -t SUSPENDED -s
+    autosubmit setstatus <EXPID> -ftc "[ 1960(1101-1105) [ fc1 [1] ] ], SIM" -t SUSPENDED -s
 
 Result:
 ::
 
-    cxxx_19601101_fc1_1_SIM
-    cxxx_19601102_fc1_1_SIM
-    cxxx_19601103_fc1_1_SIM
-    cxxx_19601104_fc1_1_SIM
-    cxxx_19601105_fc1_1_SIM
+    <EXPID>_19601101_fc1_1_SIM
+    <EXPID>_19601102_fc1_1_SIM
+    <EXPID>_19601103_fc1_1_SIM
+    <EXPID>_19601104_fc1_1_SIM
+    <EXPID>_19601105_fc1_1_SIM
 
 This script has two mandatory arguments.
 
@@ -305,7 +305,7 @@ The second argument has four alternatives, the -fl, -fc, -fs and -ft; with those
 * The -fl variable receives a list of job names separated by blank spaces: e.g.:
     ::
 
-     "cxxx_20101101_fc3_21_sim cxxx_20111101_fc4_26_sim"
+     "<EXPID>_20101101_fc3_21_sim <EXPID>_20111101_fc4_26_sim"
 
 If we supply the key word "Any", all jobs will be changed to the target status.
 
@@ -366,12 +366,12 @@ Options:
 Example:
 ::
 
-    vi updated_list_cxxx.txt
+    vi updated_list_<EXPID>.txt
 
 .. code-block:: ini
 
-    cxxx_20101101_fc3_21_sim    READY
-    cxxx_20111101_fc4_26_sim    READY
+    <EXPID>_20101101_fc3_21_sim    READY
+    <EXPID>_20111101_fc4_26_sim    READY
 
 If Autosubmit finds the above file, it will process it. You can check that the processing was OK at a given date and time,
 if you see that the file name has changed to:
