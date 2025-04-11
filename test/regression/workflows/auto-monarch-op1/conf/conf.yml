@@ -1,0 +1,177 @@
+DEFAULT:
+  EXPID: t0jm
+  HPCARCH: local
+JOBS:
+  LOCAL_SETUP:
+    FILE: hidden
+    TYPE: python
+    PLATFORM: local
+    RUNNING: once
+    NOTIFY_ON: FAILED COMPLETED
+    DEPENDENCIES: {}
+  LOCAL_SEND_INITIAL:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+    RUNNING: chunk
+    NOTIFY_ON: FAILED
+  LOCAL_SEND_SPINUP:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+    RUNNING: member
+    NOTIFY_ON: FAILED
+  LOCAL_SEND_SOURCE:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+    RUNNING: once
+    NOTIFY_ON: FAILED
+  LOCAL_SEND_STATIC:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+    RUNNING: once
+    NOTIFY: FAILED
+  LOCAL_SEND_HERMES:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_SOURCE: {}
+    PLATFORM: local
+    RUNNING: once
+    NOTIFY: FAILED
+  LOCAL_SEND_EMISSIONS:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+      LOCAL_SEND_EMISSIONS-1: {}
+      SIM-1: {}
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    NOTIFY_ON: FAILED
+  LOCAL_SEND_CHEM:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+      LOCAL_SEND_CHEM-1: {}
+      SIM-1: {}
+    RUNNING: chunk
+    NOTIFY_ON: FAILED
+  REMOTE_COMPILE:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_SOURCE: {}
+    RUNNING: once
+    PROCESSORS: '4'
+    WALLCLOCK: 02:00
+    NOTIFY_ON: FAILED
+  PREPROCFIX:
+    FILE: hidden
+    DEPENDENCIES:
+      REMOTE_COMPILE: {}
+      LOCAL_SEND_STATIC: {}
+    RUNNING: once
+    WALLCLOCK: 02:00
+    NOTIFY_ON: FAILED
+  PREPROCVAR:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_INITIAL: {}
+      LOCAL_SEND_CHEM: {}
+      PREPROCFIX: {}
+    RUNNING: chunk
+    WALLCLOCK: 02:00
+    NOTIFY_ON: FAILED
+    CUSTOM_DIRECTIVES: '["#SBATCH --exclusive"]'
+  HERMES_GR_PREPROC:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_HERMES: {}
+      PREPROCFIX: {}
+    CUSTOM_DIRECTIVES: '["#SBATCH --exclusive"]'
+    RUNNING: member
+    WALLCLOCK: 02:00
+    NOTIFY_ON: FAILED
+    PROCESSORS: '50'
+    RETRIALS: '2'
+  HERMES_GR:
+    FILE: hidden
+    DEPENDENCIES:
+      HERMES_GR_PREPROC: {}
+      LOCAL_SEND_EMISSIONS: {}
+      HERMES_GR-1: {}
+    RUNNING: chunk
+    WALLCLOCK: 02:00
+    PROCESSORS: '100'
+    NOTIFY_ON: FAILED
+  SIM:
+    FILE: hidden
+    DEPENDENCIES:
+      PREPROCVAR: {}
+      SIM-1: {}
+      HERMES_GR: {}
+    RUNNING: chunk
+    PROCESSORS: '260'
+    WALLCLOCK: 04:00
+    QUEUE: gp_bsces
+    NOTIFY_ON: FAILED COMPLETED
+  POSTPROC:
+    FILE: hidden
+    DEPENDENCIES:
+      SIM+1: {}
+      POSTPROC-1: {}
+    RUNNING: chunk
+    PROCESSORS: '48'
+    WALLCLOCK: 02:00
+    NOTIFY_ON: FAILED COMPLETED
+    RETRIALS: '2'
+  POSTPROC_ICAP:
+    FILE: hidden
+    TYPE: python
+    DEPENDENCIES:
+      POSTPROC: {}
+    RUNNING: chunk
+    WALLCLOCK: 02:00
+    NOTIFY_ON: FAILED
+    EXECUTABLE: hidden
+  ARCHIVE:
+    FILE: hidden
+    DEPENDENCIES:
+      POSTPROC_ICAP: {}
+      ARCHIVE-1: {}
+    PLATFORM: local
+    RUNNING: chunk
+    WALLCLOCK: 02:00
+    NOTIFY_ON: FAILED
+  CLEAN:
+    FILE: hidden
+    DEPENDENCIES:
+      POSTPROC+1: {}
+      ARCHIVE: {}
+    PLATFORM: local
+    RUNNING: chunk
+    WALLCLOCK: 00:10
+    NOTIFY_ON: FAILED
+EXPERIMENT:
+  DATELIST: '20241008'
+  MEMBERS: '000'
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '1'
+  CHUNKINI: ''
+  CALENDAR: standard
+PROJECT:
+  PROJECT_TYPE: none
+  PROJECT_DESTINATION: auto-monarch
+GIT:
+  PROJECT_ORIGIN: hidden
+  PROJECT_BRANCH: 489-move-the-workflow-to-as4
+  PROJECT_COMMIT: ''
+  PROJECT_SUBMODULES: ''
+  FETCH_SINGLE_BRANCH: 'true'

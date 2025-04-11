@@ -256,7 +256,7 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
     add_new_test = False  # Enable when adding a new test
     show_workflow_plot = False  # Enable only for debugging purposes
     expids_to_plot = []
-    if expid.startswith("automatic"):  # Modify only for debugging purposes
+    if expid.startswith("auto-monarch-op"):  # Modify only for debugging purposes
         expids_to_plot.append(expid)
     profiler = cProfile.Profile()
 
