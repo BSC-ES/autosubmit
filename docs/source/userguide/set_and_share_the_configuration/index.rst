@@ -25,29 +25,29 @@ The following table summarizes what configuration files Autosubmit expects and w
 
     * - File
       - Content
-    * - ``expdef.yml``
+    * - ``expdef_<EXPID>.yml``
       -
         * It contains the default platform, the one set with -H.
         * Allows changing the start dates, members and chunks.
         * Allows changing the experiment project source ( git, local, svn or dummy)
-    * - ``platforms.yml``
+    * - ``platforms_<EXPID>.yml``
       -
         * It contains the list of platforms to use in the experiment.
         * This file must be filled-up with the platform(s) configuration(s).
         * Several platforms can be defined and used in the same experiment.
-    * - ``jobs.yml``
+    * - ``jobs_<EXPID>.yml``
       -
         - It contains the tasks' definitions in sections.
         - This file must be filled-up with the tasks' definitions.
         - Several sections can be defined and used in the same experiment.
-    * - ``autosubmit.yml``
+    * - ``autosubmit_<EXPID>.yml``
       -
         - Parameters that control workflow behavior.
         - Parameters that activate extra functionalities.
-    * - ``proj.yml``
+    * - ``proj_<EXPID>.yml``
       -
         - Project-dependent parameters.
-    * - ``version.yml``
+    * - ``version_<EXPID>.yml``
       -
         - Current AS version for this experiment.
 
@@ -218,7 +218,7 @@ Advanced configuration - Full dummy example (reproducible)
     dbeltran@bsces107894: autosubmit refresh a04b
     # Check the downloaded model-configuration
     dbeltran@bsces107894:~/autosubmit/a04b$ ls proj/git_project/as_conf/
-    autosubmit.yml  expdef.yml  jobs.yml  platforms.yml
+    autosubmit_<EXPID>.yml  expdef.yml  jobs.yml  platforms.yml
 
 Model configuration is distributed at `git. <https://earth.bsc.es/gitlab/ces/auto-advanced_config_example/-/tree/main/as_conf>`_
 

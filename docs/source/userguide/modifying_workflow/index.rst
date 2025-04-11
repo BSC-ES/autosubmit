@@ -41,7 +41,7 @@ How to rerun a part of the experiment
 
 This procedure allows you to create automatically a new pickle with a list of jobs of the experiment to rerun.
 
-Using the ``expdef_<expid>.yml`` the ``create`` command will generate the rerun if the variable RERUN is set to TRUE and a RERUN_JOBLIST is provided.
+Using the ``expdef_<EXPID>.yml`` the ``create`` command will generate the rerun if the variable RERUN is set to TRUE and a RERUN_JOBLIST is provided.
 
 Additionally, you can have re-run only jobs that won't be include in the default job_list. In order to do that, you have to set RERUN_ONLY in the jobs conf of the corresponding job.
 
