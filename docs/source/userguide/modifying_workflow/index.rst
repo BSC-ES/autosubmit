@@ -24,13 +24,13 @@ Examples:
 
 ::
     # check locally for completion files, do not kill running tasks, and do not commit changes
-    autosubmit recovery cxxx
+    autosubmit recovery <EXPID>
     # commit to the previous states
-    autosubmit recovery cxxx -s
+    autosubmit recovery <EXPID> -s
     # check locally for completion file AND issue kill commands in remote
-    autosubmit recovery cxxx -f -s
+    autosubmit recovery <EXPID> -f -s
     # check in remote for completion files 
-    autosubmit recovery cxxx --all -s
+    autosubmit recovery <EXPID> --all -s
 
 Options:
 
@@ -47,14 +47,14 @@ Additionally, you can have re-run only jobs that won't be include in the default
 
 ::
 
-    autosubmit create cxxx
+    autosubmit create <EXPID>
 
 It will read the list of jobs specified in the RERUN_JOBLIST and will generate a new plot.
 
 Example:
 ::
 
-    vi <experiments_directory>/cxxx/conf/expdef_cxxx.yml
+    vi <experiments_directory>/<EXPID>/conf/expdef_<EXPID>.yml
 
 .. code-block:: yaml
 
@@ -65,7 +65,7 @@ Example:
         RERUN_JOBLIST: RERUN_TEST_INI;SIM[19600101[C:3]],RERUN_TEST_INI_chunks[19600101[C:3]]
     ...
 
-    vi <experiments_directory>/cxxx/conf/jobs_cxxx.yml
+    vi <experiments_directory>/<EXPID>/conf/jobs_<EXPID>.yml
 
 .. code-block:: yaml
 
@@ -100,5 +100,5 @@ Run the command:
 
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    nohup autosubmit run cxxx &
+    nohup autosubmit run <EXPID> &
 
