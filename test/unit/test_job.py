@@ -459,7 +459,7 @@ CONFIG:
                 experiment_data.flush()
             # For could be added here to cover more configurations options
             with open(Path(temp_dir, f'{expid}/conf/hetjob.yml'), 'w+') as hetjob:
-                hetjob.write(dedent(f'''\
+                hetjob.write(dedent('''\
                             JOBS:
                                 HETJOB_A:
                                     FILE: a
@@ -905,7 +905,7 @@ CONFIG:
                     template_content, additional_templates = job.update_content(config, parameters)
                     assert not additional_templates
 
-                    assert f'#SBATCH --reservation' not in template_content
+                    assert '#SBATCH --reservation' not in template_content
                 else:
                     assert reservation == parameters['JOBS.A.RESERVATION']
 
