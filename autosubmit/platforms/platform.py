@@ -69,9 +69,17 @@ class Platform(object):
 
     def __init__(self, expid, name, config, auth_password=None):
         """
-        :param config:
-        :param expid:
-        :param name:
+        Initializes the Platform object with the given experiment ID, platform name, configuration,
+        and optional authentication password for two-factor authentication.
+
+        :param expid: The experiment ID associated with the platform.
+        :type expid: str
+        :param name: The name of the platform.
+        :type name: str
+        :param config: Configuration dictionary containing platform-specific settings.
+        :type config: dict
+        :param auth_password: Optional password for two-factor authentication.
+        :type auth_password: str or list, optional
         """
         self.connected = False
         self.expid = expid  # type: str
@@ -507,8 +515,6 @@ class Platform(object):
 
         :param as_conf: autosubmit config object
         :type as_conf: AutosubmitConfig object
-        :param main_hpc: if it's True, uses HPC instead of NAME_ as prefix for the parameters
-        :type main_hpc: bool
         """
         prefix = 'HPC'
 
