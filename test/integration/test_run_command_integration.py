@@ -173,7 +173,15 @@ def check_db_fields(run_tmpdir, expected_entries, final_status) -> dict:
     # Tune the print so it is more readable, so it is easier to debug in case of failure
     db_check_list["JOB_DATA_FIELDS"] = {}
     counter_by_name = {}
+    last_times = {}
     for row_dict in rows_as_dicts:
+        if row_dict["job_name"] not in last_times:
+            last_times[row_dict["job_name"]] = {
+                "submit": 0,
+                "start": 0,
+                "finish": 0
+            }
+
         # Check that all fields contain data, except extra_data, children, and platform_output
         # Check that submit, start and finish are > 0
         if row_dict["job_name"] not in counter_by_name:
@@ -187,10 +195,29 @@ def check_db_fields(run_tmpdir, expected_entries, final_status) -> dict:
             row_dict["start"] > 0 and row_dict["start"] != 1970010101
         db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["finish"] = \
             row_dict["finish"] > 0 and row_dict["finish"] != 1970010101
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
+            "start>submit"] = \
+            int(row_dict["start"]) >= int(row_dict["submit"])
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
+            "finish>start"] = \
+            int(row_dict["finish"]) >= int(row_dict["start"])
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
+            "finish>submit"] = \
+            int(row_dict["finish"]) >= int(row_dict["submit"])
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
+            "submit>=last"] = \
+            row_dict["submit"] >= last_times[row_dict["job_name"]]["submit"]
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
+            "start>=last"] = \
+            row_dict["start"] >= last_times[row_dict["job_name"]]["start"]
+        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
+            "finish>=last"] = \
+            row_dict["finish"] >= last_times[row_dict["job_name"]]["finish"]
         db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["status"] = \
             row_dict["status"] == final_status
         db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
             "workflow_commit"] = row_dict["workflow_commit"] == "debug-commit-hash"
+
         empty_fields = []
         for key in [key for key in row_dict.keys() if
                     key not in ["status", "finish", "submit", "start", "extra_data", "children", "platform_output"]]:
@@ -199,6 +226,9 @@ def check_db_fields(run_tmpdir, expected_entries, final_status) -> dict:
         db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
             "empty_fields"] = " ".join(empty_fields)
         counter_by_name[row_dict["job_name"]] += 1
+        last_times[row_dict["job_name"]]["submit"] = int(row_dict["submit"])
+        last_times[row_dict["job_name"]]["start"] = int(row_dict["start"])
+        last_times[row_dict["job_name"]]["finish"] = int(row_dict["finish"])
     print_db_results(db_check_list, rows_as_dicts, run_tmpdir)
     c.close()
     conn.close()
@@ -359,9 +389,11 @@ def init_run(run_tmpdir, jobs_data):
         job:
             SCRIPT: |
                 echo "Hello World with id=Success"
+                sleep 1
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
+            
     """, 3, "COMPLETED"),  # Number of jobs
     # Success wrapper
     ("""
@@ -371,17 +403,21 @@ def init_run(run_tmpdir, jobs_data):
         job:
             SCRIPT: |
                 echo "Hello World with id=Success + wrappers"
+                sleep 1
             DEPENDENCIES: job-1
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
+            
         job2:
             SCRIPT: |
                 echo "Hello World with id=Success + wrappers"
+                sleep 1
             DEPENDENCIES: job2-1
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
+            
     wrappers:
         wrapper:
             JOBS_IN_WRAPPER: job
@@ -396,6 +432,7 @@ def init_run(run_tmpdir, jobs_data):
         job:
             SCRIPT: |
                 decho "Hello World with id=FAILED"
+                sleep 1
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
@@ -407,6 +444,7 @@ def init_run(run_tmpdir, jobs_data):
         job:
             SCRIPT: |
                 decho "Hello World with id=FAILED + wrappers"
+                sleep 1
             PLATFORM: local
             DEPENDENCIES: job-1
             RUNNING: chunk
@@ -427,9 +465,20 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
     db_check_list = check_db_fields(run_tmpdir, expected_db_entries, final_status)
     files_check_list = check_files_recovered(run_tmpdir, log_dir, expected_files=expected_db_entries * 2)
 
+    e_msg = f"Current folder: {run_tmpdir.strpath}\n"
+    for check, value in db_check_list.items():
+        e_msg += f"{check}: {value}\n"
+
+    for check, value in files_check_list.items():
+        e_msg += f"{check}: {value}\n"
+
     # Assert
-    assert_db_fields(db_check_list)
-    assert_files_recovered(files_check_list)
+    try:
+        assert_db_fields(db_check_list)
+        assert_files_recovered(files_check_list)
+    except AssertionError:
+        pytest.fail(e_msg)
+
     # TODO: GITLAB pipeline is not returning 0 or 1 for check_exit_code(final_status, exit_code)
     # assert_exit_code(final_status, exit_code)
 
@@ -443,6 +492,7 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
         job:
             SCRIPT: |
                 echo "Hello World with id=Success"
+                sleep 1
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
@@ -455,6 +505,7 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
         job:
             SCRIPT: |
                 echo "Hello World with id=Success + wrappers"
+                sleep 5
             DEPENDENCIES: job-1
             PLATFORM: local
             RUNNING: chunk
@@ -462,6 +513,7 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
         job2:
             SCRIPT: |
                 echo "Hello World with id=Success + wrappers"
+                sleep 1
             DEPENDENCIES: job2-1
             PLATFORM: local
             RUNNING: chunk
@@ -480,6 +532,7 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
         job:
             SCRIPT: |
                 decho "Hello World with id=FAILED"
+                sleep 1
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
@@ -491,6 +544,7 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
         job:
             SCRIPT: |
                 decho "Hello World with id=FAILED + wrappers"
+                sleep 1
             PLATFORM: local
             DEPENDENCIES: job-1
             RUNNING: chunk

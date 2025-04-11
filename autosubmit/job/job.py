@@ -243,7 +243,7 @@ class Job(object):
         self._local_logs = ('', '')
         self._remote_logs = ('', '')
         self.script_name = self.name + ".cmd"
-        self.stat_file = self.script_name[:-4] + "_STAT_0"
+        self.stat_file = self.script_name[:-4] + "_STAT_"
         self._status = None
         self.status = status
         self.prev_status = status
@@ -1143,10 +1143,10 @@ class Job(object):
             int: Value in the index position, or 0 if the file or index does not exist.
         """
         if fail_count == -1:
-            logname = os.path.join(self._tmp_path, self.stat_file)
+            logname = os.path.join(self._log_path, f"{self.stat_file}0")
         else:
             fail_count = str(fail_count)
-            logname = os.path.join(self._tmp_path, self.name + '_STAT_' + fail_count)
+            logname = os.path.join(self._log_path, f"{self.stat_file}{fail_count}")
         if os.path.exists(logname):
             lines = open(logname).readlines()
             if len(lines) >= index + 1:
@@ -1154,6 +1154,7 @@ class Job(object):
             else:
                 return 0
         else:
+            Log.warning(f"Log file {logname} does not exist")
             return 0
 
     def _get_from_total_stats(self, index):
@@ -1352,8 +1353,8 @@ class Job(object):
             self.update_local_logs(update_submit_time=False)
             self.platform.get_stat_file(self)
             self.write_submit_time()
-            self.write_start_time()
-            self.write_end_time(self.status == Status.COMPLETED)
+            self.write_start_time(count=self.fail_count)
+            self.write_end_time(self.status == Status.COMPLETED, self.fail_count)
             # Update the logs with Autosubmit Job ID Brand
             try:
                 for local_log in self.local_logs:
