@@ -4873,7 +4873,7 @@ class Autosubmit:
         # If everything is fine until this point
         if fc_filter_is_correct is True:
             # Retrieve experiment data
-            current_dates = as_conf.experiment_data["EXPERIMENT"]["DATELIST"].split()
+            current_dates = str(as_conf.experiment_data["EXPERIMENT"]["DATELIST"]).split()
             current_members = as_conf.get_member_list()
             # Parse json
             try:
@@ -5378,9 +5378,8 @@ class Autosubmit:
                                                 groups=groups_dict,
                                                 job_list_object=job_list)
                 return True
-        except BaseException as e:
-            raise AutosubmitCritical(
-                "An Error has occurred while setting some of the workflow jobs, no changes were made", 7040, str(e))
+        except BaseException:
+            raise
 
     @staticmethod
     def _user_yes_no_query(question):
