@@ -1,0 +1,115 @@
+DEFAULT:
+  EXPID: a8oq
+  HPCARCH: local
+JOBS:
+  LOCAL_SETUP:
+    FILE: hidden
+    TYPE: python
+    PLATFORM: local
+    RUNNING: once
+    NOTIFY_ON: FAILED COMPLETED
+    DEPENDENCIES: { }
+  LOCAL_SEND_SOURCE:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: { }
+    RUNNING: once
+    RETRIALS: '1'
+    WALLCLOCK: 00:20
+  LOCAL_SEND_STATIC:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SEND_SOURCE: { }
+    RUNNING: once
+  REMOTE_COMPILE:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_STATIC: { }
+    RUNNING: once
+    PROCESSORS: '4'
+    WALLCLOCK: 00:25
+    RETRIALS: '1'
+  PERTURB_EMIS:
+    FILE: hidden
+    DEPENDENCIES:
+      REMOTE_COMPILE:
+      PERTURB_EMIS:
+        CHUNKS_FROM:
+          1,2,3,4,5:
+            CHUNKS_TO: None
+          '6':
+            CHUNKS_TO: 1
+    RUNNING: chunk
+    WALLCLOCK: 00:20
+    PROCESSORS: '48'
+    NOTIFY_ON: FAILED
+    RETRIALS: '2'
+  SIM:
+    FILE: hidden
+    DEPENDENCIES:
+      PERTURB_EMIS:
+        CHUNKS_FROM:
+          '1':
+            CHUNKS_TO: 1
+      SIM-1:
+    RUNNING: chunk
+    PROCESSORS: '264'
+    WALLCLOCK: 00:40
+    NOTIFY_ON: FAILED COMPLETED
+  POSTPROC_HERMES:
+    FILE: hidden
+    DEPENDENCIES:
+      SIM: { }
+    RUNNING: chunk
+    PROCESSORS: '42'
+    WALLCLOCK: 00:30
+    NOTIFY_ON: FAILED COMPLETED
+    RETRIALS: '2'
+  POSTPROC:
+    FILE: hidden
+    DEPENDENCIES:
+      POSTPROC_HERMES: { }
+    RUNNING: chunk
+    PROCESSORS: '144'
+    WALLCLOCK: 00:30
+    NOTIFY_ON: FAILED COMPLETED
+    RETRIALS: '2'
+  MOVE:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      POSTPROC: { }
+      SIM+2: { }
+      MOVE-1: { }
+    RUNNING: chunk
+    WALLCLOCK: 01:00
+    NOTIFY_ON: FAILED COMPLETED
+  CLEAN:
+    FILE: hidden
+    DEPENDENCIES:
+      MOVE: { }
+      CLEAN-1: { }
+    PLATFORM: local
+    RUNNING: chunk
+    WALLCLOCK: 00:20
+    NOTIFY_ON: FAILED COMPLETED
+EXPERIMENT:
+  DATELIST: '20191216'
+  MEMBERS: 000 001
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: 1
+  NUMCHUNKS: 6
+  CHUNKINI: ''
+  CALENDAR: standard
+PROJECT:
+  PROJECT_TYPE: none
+  PROJECT_DESTINATION: auto-monarch
+GIT:
+  PROJECT_ORIGIN: hidden
+  PROJECT_BRANCH: eMONARCH_perturb_training_data_AS4
+  PROJECT_COMMIT: ''
+  PROJECT_SUBMODULES: ''
+  FETCH_SINGLE_BRANCH: 'true'
+  PROJECT_SUBMODULES_DEPTH: '10'
