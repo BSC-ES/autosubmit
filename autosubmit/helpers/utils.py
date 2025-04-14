@@ -1,3 +1,4 @@
+import locale
 import os
 import pwd
 import re
@@ -220,3 +221,8 @@ def strtobool(val):
         return 0
     else:
         raise ValueError("invalid truth value %r" % (val,))
+
+
+def get_locale():
+    """Get the default language of the system."""
+    return locale.getlocale()[1] or locale.getdefaultlocale()[1] or 'UTF-8'

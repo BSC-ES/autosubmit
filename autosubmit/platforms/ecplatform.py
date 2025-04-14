@@ -19,6 +19,7 @@ import os
 import subprocess
 from typing import Any
 
+from autosubmit.helpers.utils import get_locale
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException
 from log.log import Log,AutosubmitError
 from autosubmit.platforms.headers.ec_header import EcHeader
@@ -216,7 +217,7 @@ class EcPlatform(ParamikoPlatform):
             return False
 
     def send_command(self, command, ignore_log=False, x11 = False):
-        lang = locale.getlocale()[1] or locale.getdefaultlocale()[1] or 'UTF-8'
+        lang = get_locate()
         err_message = 'command not executed'
         for _ in range(3):
             try:
