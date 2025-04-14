@@ -26,7 +26,6 @@ from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 from log.log import AutosubmitCritical
-from test.unit.utils.common import create_database, init_expid
 
 
 @pytest.mark.skip('This test requires a running SSH server, with password-less authentication')
@@ -69,10 +68,14 @@ path = {folder}
 
 ''')
         os.environ['AUTOSUBMIT_CONFIGURATION'] = str(folder.join('autosubmitrc'))
-        create_database(str(folder.join('autosubmitrc')))
-        assert "tests.db" in [Path(f).name for f in folder.listdir()]
-        init_expid(str(folder.join('autosubmitrc')), platform='pytest-local', create=False)
-        assert "t000" in [Path(f).name for f in folder.listdir()]
+        # TODO: This code was commented out as the test was not fully updated after the removal of
+        #       from test.unit.utils.common import create_database, init_expid (see git history).
+        #       This test is currently skipped, but we should either delete these lines, or make
+        #       them work again when un-skipping this test.
+        # create_database(str(folder.join('autosubmitrc')))
+        # assert "tests.db" in [Path(f).name for f in folder.listdir()]
+        # init_expid(str(folder.join('autosubmitrc')), platform='pytest-local', create=False)
+        # assert "t000" in [Path(f).name for f in folder.listdir()]
         return folder
 
     @pytest.fixture(scope='class')

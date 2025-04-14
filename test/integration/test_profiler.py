@@ -17,85 +17,9 @@
 
 """File to create a test for the profiling."""
 
-import os
-import pwd
 from pathlib import Path
 
-import pytest
-from _pytest._py.path import LocalPath
-from _pytest.legacypath import TempdirFactory
-
-from autosubmit.autosubmit import Autosubmit
-from test.unit.utils.common import create_database, init_expid
-
-
-@pytest.fixture
-def run_tmpdir(tmpdir_factory: TempdirFactory) -> LocalPath:
-    """
-    factory creating path and directories for test execution
-    :param tmpdir_factory: mktemp
-    :return: LocalPath
-    """
-    folder = tmpdir_factory.mktemp('run_tests')
-    os.mkdir(folder.join(Path('scratch')))
-    os.mkdir(folder.join(Path('run_tmp_dir')))
-    file_stat = os.stat(f"{folder.strpath}")
-    file_owner_id = file_stat.st_uid
-    file_owner = pwd.getpwuid(file_owner_id).pw_name
-    folder.owner = file_owner
-
-    # Write an autosubmitrc file in the temporary directory
-    autosubmitrc = folder.join(Path('autosubmitrc'))
-    autosubmitrc.write(f'''
-        [database]
-        path = {folder}
-        filename = tests.db
-        [local]
-        path = {folder}
-        [globallogs]
-        path = {folder}
-        [structures]
-        path = {folder}
-        [historicdb]
-        path = {folder}
-        [historiclog]
-        path = {folder}
-        [defaultstats]
-        path = {folder}
-    ''')
-    os.environ['AUTOSUBMIT_CONFIGURATION'] = str(folder.join(Path('autosubmitrc')))
-    create_database(str(folder.join(Path('autosubmitrc'))))
-    assert "tests.db" in [Path(f).name for f in folder.listdir()]
-    init_expid(str(folder.join(Path('autosubmitrc'))),
-               platform='local', create=False, test_type='test')
-    assert "t000" in [Path(f).name for f in folder.listdir()]
-    return folder
-
-
-def init_run(run_tmpdir, jobs_data):
-    """
-    Initialize the run, writing the jobs.yml file and creating the experiment.
-    """
-    # write jobs_data
-    jobs_path = Path(f"{run_tmpdir.strpath}/t000/conf/jobs.yml")
-    log_dir = Path(f"{run_tmpdir.strpath}/t000/tmp/LOG_t000")
-    with jobs_path.open('w', encoding="utf-8") as f:
-        f.write(jobs_data)
-
-    # Create
-    init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid='t000',
-               create=True, test_type='test')
-
-    # This is set in _init_log which is not called
-    as_misc = Path(f"{run_tmpdir.strpath}/t000/conf/as_misc.yml")
-    with as_misc.open('w', encoding="utf-8") as f:
-        f.write("""
-            AS_MISC: True
-            ASMISC:
-                COMMAND: run
-            AS_COMMAND: run
-        """)
-    return log_dir
+_EXPID = 't000'
 
 
 def check_profile(run_tmpdir) -> bool:
@@ -103,35 +27,37 @@ def check_profile(run_tmpdir) -> bool:
     Initialize the run, writing the jobs.yml file and creating the experiment.
     """
     # write jobs_data
-    profile_path = Path(f"{run_tmpdir.strpath}/t000/tmp/profile/")
+    profile_path = Path(f"{run_tmpdir}/{_EXPID}/tmp/profile/")
     if profile_path.exists():
         return True
     return False
 
 
-@pytest.mark.parametrize("jobs_data, profiler", [
-    ("""
-            CONFIG:
-                SAFETYSLEEPTIME: 0
-            EXPERIMENT:
-                NUMCHUNKS: '1'
-            JOBS:
-                job:
-                    SCRIPT: |
-                        echo "Hello World with id=Success"
-            """,
-     True
-     ),
-], ids=['profile experiment']
-                         )
-def test_run_profile(run_tmpdir, jobs_data, profiler):
-    """
-    tester function of the run_profile function
-    """
-    init_run(run_tmpdir, jobs_data)
+def test_run_profile(autosubmit_exp, tmp_path):
+    as_exp = autosubmit_exp(_EXPID, experiment_data={
+        'JOBS': {
+            'job': {
+                'SCRIPT': 'echo "Hello World with id=Success"',
+                'PLATFORM': 'local',
+                'RUNNING': 'once'
+            }
+        },
+        'PROJECT': {
+            'TYPE': 'local',
+            'PROJECT_DESTINATION': 'local_project'
+        },
+        'LOCAL': {
+            'PROJECT_PATH': str(tmp_path)
+        }
+    })
     # Run the experiment
-    try:
-        Autosubmit.run_experiment(expid='t000', profile=profiler)
-        assert check_profile(run_tmpdir)
-    except Exception as exc:
-        assert False, f"test_run_uninterrupted_profile raised an exception: {exc}"
+    # TODO: In the future, we should be able to remove the MISC files, and
+    #       instead either carry the state in the code via objects/decorators,
+    #       etc., or use the DB to know what was the last command used -- if
+    #       that is needed.
+    as_exp.autosubmit._check_ownership_and_set_last_command(
+        as_exp.as_conf,
+        as_exp.expid,
+        'run')
+    as_exp.autosubmit.run_experiment(expid=as_exp.expid, profile=True)
+    assert check_profile(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR)

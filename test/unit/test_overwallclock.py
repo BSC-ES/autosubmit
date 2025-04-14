@@ -31,7 +31,7 @@ from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
 
 @pytest.fixture
-def setup_as_conf(autosubmit_config, tmpdir, prepare_basic_config):
+def setup_as_conf(autosubmit_config, tmpdir):
     exp_data = {
         "WRAPPERS": {
             "WRAPPERS": {
@@ -59,7 +59,7 @@ def setup_as_conf(autosubmit_config, tmpdir, prepare_basic_config):
 
 
 @pytest.fixture
-def new_job_list(setup_as_conf, tmpdir, prepare_basic_config):
+def new_job_list(setup_as_conf, tmpdir):
     job_list = JobList("random-id", setup_as_conf, YAMLParserFactory(),
                        JobListPersistencePkl())
 

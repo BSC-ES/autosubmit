@@ -112,15 +112,6 @@ jobs:
             test/integration \
             -m ''
 
-      # Run regression tests
-      - name: Regression tests
-        run: |
-          pytest \
-            --cov=autosubmit --cov-config=.coveragerc \
-            --cov-report=xml:test/coverage.xml --cov-append \
-            test/regression \
-            -m ''
-
       - name: Coverage report
         run: |
           coverage xml

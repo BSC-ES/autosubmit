@@ -16,9 +16,11 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import io
-import pytest
 import sys
 from contextlib import redirect_stdout
+from pathlib import Path
+
+import pytest
 
 from autosubmit.autosubmit import AutosubmitCritical
 
@@ -33,8 +35,8 @@ def as_conf(autosubmit_config):
 
 
 @pytest.fixture
-def exp_path(as_conf):
-    return as_conf.basic_config.LOCAL_ROOT_DIR / _EXPID
+def exp_path(as_conf) -> Path:
+    return Path(as_conf.basic_config.LOCAL_ROOT_DIR) / _EXPID
 
 
 @pytest.fixture
@@ -54,7 +56,7 @@ def aslogs_dir(exp_path, as_conf):
 @pytest.fixture
 def status_path(exp_path, as_conf):
     status_path = exp_path / 'status'
-    status_path.mkdir()
+    status_path.mkdir(exist_ok=True)
     return status_path
 
 
@@ -101,8 +103,8 @@ def test_is_workflow_log_is_dir(autosubmit, aslogs_dir):
 
 def test_is_workflow_out_cat(mocker, autosubmit, aslogs_dir):
     popen = mocker.patch('subprocess.Popen')
-    log_file = aslogs_dir / 'log_run.log'
-    if log_file.isdir():  # dir is created in previous test
+    log_file = Path(aslogs_dir, 'log_run.log')
+    if log_file.is_dir():  # dir is created in previous test
         log_file.rmdir()
     with open(log_file, 'w') as f:
         f.write('as test')
@@ -150,8 +152,8 @@ def test_is_jobs_log_is_dir(autosubmit, exp_logs_dir):
 
 def test_is_jobs_out_tail(mocker, autosubmit, exp_logs_dir):
     popen = mocker.patch('subprocess.Popen')
-    log_file = exp_logs_dir / f'{_EXPID}_INI.20200101.out'
-    if log_file.isdir():  # dir is created in previous test
+    log_file = Path(exp_logs_dir, f'{_EXPID}_INI.20200101.out')
+    if log_file.is_dir():  # dir is created in previous test
         log_file.rmdir()
     with open(log_file, 'w') as f:
         f.write('as test')

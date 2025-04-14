@@ -33,7 +33,7 @@ from log.log import AutosubmitCritical, AutosubmitError
 def platform(autosubmit_config):
     expid = 'a000'
     as_conf = autosubmit_config(expid, experiment_data={})
-    exp_path = as_conf.basic_config.LOCAL_ROOT_DIR / expid
+    exp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, expid)
     aslogs_dir = exp_path / as_conf.basic_config.LOCAL_TMP_DIR / as_conf.basic_config.LOCAL_ASLOG_DIR
     submit_platform_script = aslogs_dir / 'submit_local.sh'
     Path(submit_platform_script).touch()

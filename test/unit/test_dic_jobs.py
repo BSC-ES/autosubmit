@@ -28,7 +28,7 @@ from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistenceDb
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
-_EXPID = 'random-id'
+_EXPID = 't001'
 _DATE_LIST = ['fake-date1', 'fake-date2']
 _MEMBER_LIST = ['fake-member1', 'fake-member2']
 _NUM_CHUNKS = 99
@@ -52,7 +52,7 @@ def dictionary(as_conf):
 
 @pytest.fixture
 def joblist(tmp_path, as_conf):
-    job_list_persistence = JobListPersistenceDb(str(tmp_path), 'db')
+    job_list_persistence = JobListPersistenceDb(str(tmp_path))
     return JobList(_EXPID, as_conf, YAMLParserFactory(), job_list_persistence)
 
 
@@ -217,23 +217,26 @@ def test_read_section_running_chunk_create_jobs_chunk(mocker, dictionary):
 
 def test_build_job_with_existent_job_list_status(mocker, dictionary):
     mock_date2str = mocker.patch('autosubmit.job.job_dict.date2str')
-    # arrange
-    job_list = [Job("random-id_fake-date_fc0_2_fake-section", 1, Status.READY, 0),
-                Job("random-id_fake-date_fc0_2_fake-section2", 2, Status.RUNNING, 0)]
-    dictionary.job_list = {}
-    for job in job_list:
-        dictionary.job_list[job.name] = job.__getstate__()
     mock_date2str.side_effect = lambda x, y: str(x)
-    section = 'fake-section'
+
     priority = 0
     date = "fake-date"
     member = 'fc0'
     chunk = 2
     # act
     section_data = []
-    dictionary.build_job(section, priority, date, member, chunk, Type.BASH, section_data, splits=1)
-    section = 'fake-section2'
-    dictionary.build_job(section, priority, date, member, chunk, Type.BASH, section_data, splits=1)
+
+    # arrange
+    job_list = [Job(f"{_EXPID}_fake-date_fc0_2_fake-section1", 1, Status.READY, 0),
+                Job(f"{_EXPID}_fake-date_fc0_2_fake-section2", 2, Status.RUNNING, 0)]
+
+    dictionary.job_list = {}
+    for job in job_list:
+        dictionary.job_list[job.name] = job.__getstate__()
+
+    dictionary.build_job('fake-section1', priority, date, member, chunk, Type.BASH, section_data, splits=1)
+    dictionary.build_job('fake-section2', priority, date, member, chunk, Type.BASH, section_data, splits=1)
+
     # assert
     assert Status.WAITING == section_data[0].status
     assert Status.RUNNING == section_data[1].status
@@ -256,8 +259,7 @@ def test_dic_creates_right_jobs_by_startdate(mocker, dictionary):
     assert len(_DATE_LIST) == dictionary.build_job.call_count
     assert len(dictionary._dic[mock_section.name]) == len(_DATE_LIST)
     for date in _DATE_LIST:
-        assert dictionary._dic[mock_section.name][date][0].name == \
-               f'{_EXPID}_{date}_{mock_section.name}'
+        assert dictionary._dic[mock_section.name][date][0].name == f'{_EXPID}_{date}_{mock_section.name}'
 
 
 def test_dic_creates_right_jobs_by_member(mocker, dictionary):

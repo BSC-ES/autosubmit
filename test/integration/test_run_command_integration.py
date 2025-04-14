@@ -17,295 +17,183 @@
 
 import os
 import pwd
-import shutil
 import sqlite3
+from contextlib import suppress
 from pathlib import Path
+from textwrap import dedent
+from typing import Any
 
 import pytest
+from psutil import ZombieProcess
 
-from autosubmit.autosubmit import Autosubmit
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
-from test.unit.utils.common import create_database, init_expid
-
-
-def _get_script_files_path() -> Path:
-    return Path(__file__).resolve().parent / 'files'
+_EXPID = 't000'
+"""The experiment ID used throughout the test."""
 
 
 # TODO expand the tests to test Slurm, PSPlatform, Ecplatform whenever possible
 
-@pytest.fixture
-def run_tmpdir(tmpdir_factory):
-    folder = tmpdir_factory.mktemp('run_tests')
-    os.mkdir(folder.join('scratch'))
-    os.mkdir(folder.join('run_tmp_dir'))
-    file_stat = os.stat(f"{folder.strpath}")
-    file_owner_id = file_stat.st_uid
-    file_owner = pwd.getpwuid(file_owner_id).pw_name
-    folder.owner = file_owner
-
-    # Write an autosubmitrc file in the temporary directory
-    autosubmitrc = folder.join('autosubmitrc')
-    autosubmitrc.write(f'''
-[database]
-path = {folder}
-filename = tests.db
-
-[local]
-path = {folder}
-
-[globallogs]
-path = {folder}
-
-[structures]
-path = {folder}
-
-[historicdb]
-path = {folder}
-
-[historiclog]
-path = {folder}
-
-[defaultstats]
-path = {folder}
-
-''')
-    os.environ['AUTOSUBMIT_CONFIGURATION'] = str(folder.join('autosubmitrc'))
-    create_database(str(folder.join('autosubmitrc')))
-    assert "tests.db" in [Path(f).name for f in folder.listdir()]
-    init_expid(str(folder.join('autosubmitrc')), platform='local', create=False, test_type='test')
-    assert "t000" in [Path(f).name for f in folder.listdir()]
-    return folder
-
+# --- Fixtures.
 
 @pytest.fixture
-def prepare_run(run_tmpdir):
-    # touch as_misc
-    # remove files under t000/conf
-    conf_folder = Path(f"{run_tmpdir.strpath}/t000/conf")
-    shutil.rmtree(conf_folder)
-    os.makedirs(conf_folder)
-    platforms_path = Path(f"{run_tmpdir.strpath}/t000/conf/platforms.yml")
-    main_path = Path(f"{run_tmpdir.strpath}/t000/conf/AAAmain.yml")
-    # Add each platform to test
-    with platforms_path.open('w') as f:
-        f.write(f"""
-PLATFORMS:
-    dummy:
-        type: dummy
-        """)
+def as_exp(autosubmit_exp):
+    exp = autosubmit_exp(_EXPID, experiment_data={
+        'PROJECT': {
+            'PROJECT_TYPE': 'none',
+            'PROJECT_DESTINATION': 'dummy_project'
+        }
+    })
 
-    with main_path.open('w') as f:
-        f.write("""
-EXPERIMENT:
-    # List of start dates
-    DATELIST: '20000101'
-    # List of members.
-    MEMBERS: fc0
-    # Unit of the chunk size. Can be hour, day, month, or year.
-    CHUNKSIZEUNIT: month
-    # Size of each chunk.
-    CHUNKSIZE: '2'
-    # Number of chunks of the experiment.
-    NUMCHUNKS: '3'  
-    CHUNKINI: ''
-    # Calendar used for the experiment. Can be standard or noleap.
-    CALENDAR: standard
+    run_tmpdir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR)
 
-CONFIG:
-    # Current version of Autosubmit.
-    AUTOSUBMIT_VERSION: ""
-    # Total number of jobs in the workflow.
-    TOTALJOBS: 3
-    # Maximum number of jobs permitted in the waiting status.
-    MAXWAITINGJOBS: 3
-    SAFETYSLEEPTIME: 0
-DEFAULT:
-    # Job experiment ID.
-    EXPID: "t000"
-    # Default HPC platform name.
-    HPCARCH: "local"
-    #hint: use %PROJDIR% to point to the project folder (where the project is cloned)
-    # Custom configuration location.
-project:
-    # Type of the project.
-    PROJECT_TYPE: None
-    # Folder to hold the project sources.
-    PROJECT_DESTINATION: local_project
-AUTOSUBMIT:
-    WORKFLOW_COMMIT: "debug-commit-hash"
-""")
-    expid_dir = Path(f"{run_tmpdir.strpath}/scratch/whatever/{run_tmpdir.owner}/t000")
-    dummy_dir = Path(f"{run_tmpdir.strpath}/scratch/whatever/{run_tmpdir.owner}/t000/dummy_dir")
-    real_data = Path(f"{run_tmpdir.strpath}/scratch/whatever/{run_tmpdir.owner}/t000/real_data")
+    dummy_dir = Path(run_tmpdir, f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/dummy_dir")
+    real_data = Path(run_tmpdir, f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/real_data")
     # We write some dummy data inside the scratch_dir
-    os.makedirs(expid_dir, exist_ok=True)
-    os.makedirs(dummy_dir, exist_ok=True)
-    os.makedirs(real_data, exist_ok=True)
+    dummy_dir.mkdir(parents=True)
+    real_data.mkdir(parents=True)
 
-    with open(dummy_dir.joinpath('dummy_file'), 'w') as f:
+    with open(dummy_dir / 'dummy_file', 'w') as f:
         f.write('dummy data')
+
     # create some dummy absolute symlinks in expid_dir to test migrate function
-    (real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
-    return run_tmpdir
+    Path(real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
+
+    exp.as_conf.reload(force_load=True)
+
+    return exp
 
 
-def check_db_fields(run_tmpdir, expected_entries, final_status) -> dict:
+# --- Internal utility functions.
+
+def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[str, (bool, str)]:
     """
     Check that the database contains the expected number of entries, and that all fields contain data after a completed run.
     """
-    db_check_list = {}
     # Test database exists.
-    job_data = Path(f"{run_tmpdir.strpath}/job_data_t000.db")
-    autosubmit_db = Path(f"{run_tmpdir.strpath}/tests.db")
-    db_check_list["JOB_DATA_EXIST"] = job_data.exists()
-    db_check_list["AUTOSUBMIT_DB_EXIST"] = autosubmit_db.exists()
+    job_data_db = run_tmpdir / f'metadata/data/job_data_{_EXPID}.db'
+    autosubmit_db = Path(run_tmpdir, "tests.db")
+    db_check_list = {
+        "JOB_DATA_EXIST": (job_data_db.exists(), f"DB {str(job_data_db)} missing"),
+        "AUTOSUBMIT_DB_EXIST": (autosubmit_db.exists(), f"DB {str(autosubmit_db)} missing"),
+        "JOB_DATA_FIELDS": {}
+    }
 
     # Check job_data info
-    conn = sqlite3.connect(job_data)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute("SELECT * FROM job_data")
-    rows = c.fetchall()
-    db_check_list["JOB_DATA_ENTRIES"] = len(rows) == expected_entries
-    # Convert rows to a list of dictionaries
-    rows_as_dicts = [dict(row) for row in rows]
-    # Tune the print so it is more readable, so it is easier to debug in case of failure
-    db_check_list["JOB_DATA_FIELDS"] = {}
-    counter_by_name = {}
-    last_times = {}
-    for row_dict in rows_as_dicts:
-        if row_dict["job_name"] not in last_times:
-            last_times[row_dict["job_name"]] = {
-                "submit": 0,
-                "start": 0,
-                "finish": 0
+    with sqlite3.connect(job_data_db) as conn:
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT * FROM job_data")
+        rows = c.fetchall()
+        db_check_list["JOB_DATA_ENTRIES"] = len(rows) == expected_entries, \
+            f"Expected {expected_entries} entries, found {len(rows)}"
+        # Convert rows to a list of dictionaries
+        rows_as_dicts: list[dict[str, Any]] = [dict(row) for row in rows]
+        # Tune the print, so it is more readable, so it is easier to debug in case of failure
+        counter_by_name = {}
+
+        excluded_keys = ["status", "finish", "submit", "start", "extra_data", "children", "platform_output"]
+
+        last_times = {}
+
+        for row_dict in rows_as_dicts:
+            # Check that all fields contain data, except extra_data, children, and platform_output
+            # Check that submit, start and finish are > 0
+            job_name = row_dict["job_name"]
+
+            if job_name not in last_times:
+                last_times[job_name] = {
+                    "submit": 0,
+                    "start": 0,
+                    "finish": 0
+                }
+
+            if job_name not in counter_by_name:
+                counter_by_name[job_name] = 0
+
+            if job_name not in db_check_list["JOB_DATA_FIELDS"]:
+                db_check_list["JOB_DATA_FIELDS"][job_name] = {}
+
+            check_job_submit = row_dict["submit"] > 0 and row_dict["submit"] != 1970010101
+            check_job_submit_last = row_dict["submit"] >= last_times[row_dict["job_name"]]["submit"]
+            check_job_start = row_dict["start"] > 0 and row_dict["start"] != 1970010101
+            check_job_start_last = row_dict["start"] >= last_times[row_dict["job_name"]]["start"]
+            check_job_start_submit = int(row_dict["start"]) >= int(row_dict["submit"])
+            check_job_finish = row_dict["finish"] > 0 and row_dict["finish"] != 1970010101
+            check_job_finish_last = row_dict["finish"] >= last_times[row_dict["job_name"]]["finish"]
+            check_job_finish_start = int(row_dict["finish"]) >= int(row_dict["start"])
+            check_job_finish_submit = int(row_dict["finish"]) >= int(row_dict["submit"])
+            check_job_status = row_dict["status"] == final_status
+            # TODO: Now that we run the real workflow with less mocking, we cannot get the
+            #       debug mock workflow commit, as in reality the temporary project will
+            #       simply return an empty commit. We could modify the test to actually create
+            #       a project in the future, but this test will verify just that the job data
+            #       contains the workflow commit column. For the content we can verify it
+            #       later with a more complete functional test using Git.
+            check_workflow_commit = "workflow_commit" in row_dict
+
+            db_check_job = db_check_list["JOB_DATA_FIELDS"][job_name]
+
+            job_counter_by_name = str(counter_by_name[job_name])
+            db_check_job[job_counter_by_name] = {
+                "submit": check_job_submit,
+                "submit>=last": check_job_submit_last,
+                "start": check_job_start,
+                "start>=last": check_job_start_last,
+                "start>submit": check_job_start_submit,
+                "finish": check_job_finish,
+                "finish>=last": check_job_finish_last,
+                "finish>start": check_job_finish_start,
+                "finish>submit": check_job_finish_submit,
+                "status": check_job_status,
+                "workflow_commit": check_workflow_commit
             }
 
-        # Check that all fields contain data, except extra_data, children, and platform_output
-        # Check that submit, start and finish are > 0
-        if row_dict["job_name"] not in counter_by_name:
-            counter_by_name[row_dict["job_name"]] = 0
-        if row_dict["job_name"] not in db_check_list["JOB_DATA_FIELDS"]:
-            db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]] = {}
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])] = {}
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["submit"] = \
-            row_dict["submit"] > 0 and row_dict["submit"] != 1970010101
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["start"] = \
-            row_dict["start"] > 0 and row_dict["start"] != 1970010101
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["finish"] = \
-            row_dict["finish"] > 0 and row_dict["finish"] != 1970010101
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
-            "start>submit"] = \
-            int(row_dict["start"]) >= int(row_dict["submit"])
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
-            "finish>start"] = \
-            int(row_dict["finish"]) >= int(row_dict["start"])
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
-            "finish>submit"] = \
-            int(row_dict["finish"]) >= int(row_dict["submit"])
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
-            "submit>=last"] = \
-            row_dict["submit"] >= last_times[row_dict["job_name"]]["submit"]
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
-            "start>=last"] = \
-            row_dict["start"] >= last_times[row_dict["job_name"]]["start"]
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
-            "finish>=last"] = \
-            row_dict["finish"] >= last_times[row_dict["job_name"]]["finish"]
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])]["status"] = \
-            row_dict["status"] == final_status
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
-            "workflow_commit"] = row_dict["workflow_commit"] == "debug-commit-hash"
+            db_check_job[job_counter_by_name]["empty_fields"] = " ".join(
+                {
+                    str(k): v
+                    for k, v in row_dict.items()
+                    if k not in excluded_keys and v == ""
+                }.keys()
+            )
 
-        empty_fields = []
-        for key in [key for key in row_dict.keys() if
-                    key not in ["status", "finish", "submit", "start", "extra_data", "children", "platform_output"]]:
-            if str(row_dict[key]) == str(""):
-                empty_fields.append(key)
-        db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
-            "empty_fields"] = " ".join(empty_fields)
-        counter_by_name[row_dict["job_name"]] += 1
-        last_times[row_dict["job_name"]]["submit"] = int(row_dict["submit"])
-        last_times[row_dict["job_name"]]["start"] = int(row_dict["start"])
-        last_times[row_dict["job_name"]]["finish"] = int(row_dict["finish"])
-    print_db_results(db_check_list, rows_as_dicts, run_tmpdir)
-    c.close()
-    conn.close()
+            counter_by_name[job_name] += 1
+            last_times[job_name]["submit"] = int(row_dict["submit"])
+            last_times[job_name]["start"] = int(row_dict["start"])
+            last_times[job_name]["finish"] = int(row_dict["finish"])
+
     return db_check_list
 
 
-def print_db_results(db_check_list, rows_as_dicts, run_tmpdir):
-    """
-    Print the database check results.
-    """
-    column_names = rows_as_dicts[0].keys() if rows_as_dicts else []
-    column_widths = [max(len(str(row[col])) for row in rows_as_dicts + [dict(zip(column_names, column_names))]) for col
-                     in column_names]
-    print(f"Experiment folder: {run_tmpdir.strpath}")
-    header = " | ".join(f"{name:<{width}}" for name, width in zip(column_names, column_widths))
-    print(f"\n{header}")
-    print("-" * len(header))
-    # Print the rows
-    for row_dict in rows_as_dicts:  # always print, for debug proposes
-        print(" | ".join(f"{str(row_dict[col]):<{width}}" for col, width in zip(column_names, column_widths)))
-    # Print the results
-    print("\nDatabase check results:")
-    print(f"JOB_DATA_EXIST: {db_check_list['JOB_DATA_EXIST']}")
-    print(f"AUTOSUBMIT_DB_EXIST: {db_check_list['AUTOSUBMIT_DB_EXIST']}")
-    print(f"JOB_DATA_ENTRIES_ARE_CORRECT: {db_check_list['JOB_DATA_ENTRIES']}")
+def _assert_db_fields(db_check_list: dict[str, (bool, str)]) -> None:
+    """Run assertions against database values, checking for possible issues."""
+    assert db_check_list["JOB_DATA_EXIST"][0], db_check_list["JOB_DATA_EXIST"][1]
+    assert db_check_list["AUTOSUBMIT_DB_EXIST"][0], db_check_list["AUTOSUBMIT_DB_EXIST"][1]
+    assert db_check_list["JOB_DATA_ENTRIES"][0], db_check_list["JOB_DATA_ENTRIES"][1]
 
     for job_name in db_check_list["JOB_DATA_FIELDS"]:
-        for job_counter in db_check_list["JOB_DATA_FIELDS"][job_name]:
-            all_ok = True
-            for field in db_check_list["JOB_DATA_FIELDS"][job_name][job_counter]:
+        db_check_job = db_check_list["JOB_DATA_FIELDS"][job_name]
+
+        for job_counter in db_check_job:
+            db_check_job_counter = db_check_job[job_counter]
+
+            for field in db_check_job_counter:
+                db_check_job_field = db_check_job_counter[field]
+
                 if field == "empty_fields":
-                    if len(db_check_list['JOB_DATA_FIELDS'][job_name][job_counter][field]) > 0:
-                        all_ok = False
-                        print(f"{field} assert FAILED")
+                    assert len(db_check_job_field) == 0
                 else:
-                    if not db_check_list['JOB_DATA_FIELDS'][job_name][job_counter][field]:
-                        all_ok = False
-                        print(f"{field} assert FAILED")
-            if int(job_counter) > 0:
-                print(f"Job entry: {job_name} retrial: {job_counter} assert {str(all_ok).upper()}")
-            else:
-                print(f"Job entry: {job_name} assert {str(all_ok).upper()}")
+                    assert db_check_job_field, f"Field {field} missing"
 
 
-def assert_db_fields(db_check_list):
-    """
-    Assert that the database fields are correct.
-    """
-    assert db_check_list["JOB_DATA_EXIST"]
-    assert db_check_list["AUTOSUBMIT_DB_EXIST"]
-    assert db_check_list["JOB_DATA_ENTRIES"]
-    for job_name in db_check_list["JOB_DATA_FIELDS"]:
-        for job_counter in db_check_list["JOB_DATA_FIELDS"][job_name]:
-            for field in db_check_list["JOB_DATA_FIELDS"][job_name][job_counter]:
-                if field == "empty_fields":
-                    assert len(db_check_list['JOB_DATA_FIELDS'][job_name][job_counter][field]) == 0
-                else:
-                    assert db_check_list['JOB_DATA_FIELDS'][job_name][job_counter][field]
-
-
-def assert_exit_code(final_status, exit_code):
-    """
-    Check that the exit code is correct.
-    """
+def _assert_exit_code(final_status: str, exit_code: int) -> None:
+    """Check that the exit code is correct."""
     if final_status == "FAILED":
         assert exit_code > 0
     else:
         assert exit_code == 0
 
 
-def check_files_recovered(run_tmpdir, log_dir, expected_files) -> dict:
-    """
-    Check that all files are recovered after a run.
-    """
-    # Check logs recovered and all stat files exists.
-    as_conf = AutosubmitConfig("t000")
-    as_conf.reload()
+def _check_files_recovered(as_conf, log_dir, expected_files) -> dict:
+    """Check that all files are recovered after a run."""
     retrials = as_conf.experiment_data['JOBS']['JOB'].get('RETRIALS', 0)
     files_check_list = {}
     for f in log_dir.glob('*'):
@@ -325,9 +213,14 @@ def check_files_recovered(run_tmpdir, log_dir, expected_files) -> dict:
         print("All log files downloaded are renamed correctly.")
     else:
         print("Some log files are not renamed correctly.")
-    files_err_out_found = [f for f in log_dir.glob('*') if (
-            str(f).endswith(".err") or str(f).endswith(".out") or "retrial" in str(
-        f).lower()) and "ASThread" not in str(f)]
+    files_err_out_found = [
+        f for f in log_dir.glob('*')
+        if (
+                   str(f).endswith(".err") or
+                   str(f).endswith(".out") or
+                   "retrial" in str(f).lower()
+           ) and "ASThread" not in str(f)
+    ]
     files_check_list["EXPECTED_FILES"] = len(files_err_out_found) == expected_files
     if not files_check_list["EXPECTED_FILES"]:
         print(f"Expected number of log files: {expected_files}. Found: {len(files_err_out_found)}")
@@ -347,42 +240,38 @@ def check_files_recovered(run_tmpdir, log_dir, expected_files) -> dict:
     return files_check_list
 
 
-def assert_files_recovered(files_check_list):
-    """
-    Assert that the files are recovered correctly.
-    """
+def _assert_files_recovered(files_check_list):
+    """Assert that the files are recovered correctly."""
     for check_name in files_check_list:
         assert files_check_list[check_name]
 
 
-def init_run(run_tmpdir, jobs_data):
-    """
-    Initialize the run, writing the jobs.yml file and creating the experiment.
-    """
-    # write jobs_data
-    jobs_path = Path(f"{run_tmpdir.strpath}/t000/conf/jobs.yml")
-    log_dir = Path(f"{run_tmpdir.strpath}/t000/tmp/LOG_t000")
+def _init_run(as_exp, jobs_data) -> Path:
+    as_conf = as_exp.as_conf
+    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+
+    exp_path = run_tmpdir / _EXPID
+    jobs_path = exp_path / f"conf/jobs_{_EXPID}.yml"
     with jobs_path.open('w') as f:
         f.write(jobs_data)
 
-    # Create
-    init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid='t000', create=True, test_type='test')
+    # This is set in _init_log which is not done automatically by Autosubmit
+    as_exp.autosubmit._check_ownership_and_set_last_command(
+        as_exp.as_conf,
+        as_exp.expid,
+        'run')
 
-    # This is set in _init_log which is not called
-    as_misc = Path(f"{run_tmpdir.strpath}/t000/conf/as_misc.yml")
-    with as_misc.open('w') as f:
-        f.write("""
-    AS_MISC: True
-    ASMISC:
-        COMMAND: run
-    AS_COMMAND: run
-            """)
-    return log_dir
+    # We have to reload as we changed the jobs.
+    as_conf.reload(force_load=True)
 
+    return exp_path / f'tmp/LOG_{_EXPID}'
+
+
+# -- Tests
 
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status", [
     # Success
-    ("""
+    (dedent("""\
     EXPERIMENT:
         NUMCHUNKS: '3'
     JOBS:
@@ -393,10 +282,9 @@ def init_run(run_tmpdir, jobs_data):
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
-            
-    """, 3, "COMPLETED"),  # Number of jobs
+    """), 3, "COMPLETED"),  # Number of jobs
     # Success wrapper
-    ("""
+    (dedent("""\
     EXPERIMENT:
         NUMCHUNKS: '2'
     JOBS:
@@ -408,7 +296,7 @@ def init_run(run_tmpdir, jobs_data):
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
-            
+
         job2:
             SCRIPT: |
                 echo "Hello World with id=Success + wrappers"
@@ -417,7 +305,7 @@ def init_run(run_tmpdir, jobs_data):
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
-            
+
     wrappers:
         wrapper:
             JOBS_IN_WRAPPER: job
@@ -425,26 +313,26 @@ def init_run(run_tmpdir, jobs_data):
         wrapper2:
             JOBS_IN_WRAPPER: job2
             TYPE: vertical
-    """, 4, "COMPLETED"),  # Number of jobs
+    """), 4, "COMPLETED"),  # Number of jobs
     # Failure
-    ("""
+    (dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '2'
     JOBS:
         job:
             SCRIPT: |
-                decho "Hello World with id=FAILED"
-                sleep 1
+                d_echo "Hello World with id=FAILED"
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
             retrials: 2  # In local, it started to fail at 18 retrials.
-    """, (2 + 1) * 3, "FAILED"),  # Retries set (N + 1) * number of jobs to run
+    """), (2 + 1) * 2, "FAILED"),  # Retries set (N + 1) * number of jobs to run
     # Failure wrappers
-    ("""
+    (dedent("""\
     JOBS:
         job:
             SCRIPT: |
-                decho "Hello World with id=FAILED + wrappers"
-                sleep 1
+                d_echo "Hello World with id=FAILED + wrappers"
             PLATFORM: local
             DEPENDENCIES: job-1
             RUNNING: chunk
@@ -454,33 +342,37 @@ def init_run(run_tmpdir, jobs_data):
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
-    """, (2 + 1) * 1, "FAILED"),  # Retries set (N + 1) * job chunk 1 ( the rest shouldn't run )
+    """), (2 + 1) * 1, "FAILED"),  # Retries set (N + 1) * job chunk 1 ( the rest shouldn't run )
 ], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
-def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries, final_status):
-    log_dir = init_run(run_tmpdir, jobs_data)
+def test_run_uninterrupted(
+        as_exp,
+        jobs_data,
+        expected_db_entries,
+        final_status):
+    as_conf = as_exp.as_conf
+    log_dir = _init_run(as_exp, jobs_data)
+
     # Run the experiment
-    exit_code = Autosubmit.run_experiment(expid='t000')
+    exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
+    _assert_exit_code(final_status, exit_code)
 
     # Check and display results
-    db_check_list = check_db_fields(run_tmpdir, expected_db_entries, final_status)
-    files_check_list = check_files_recovered(run_tmpdir, log_dir, expected_files=expected_db_entries * 2)
+    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    e_msg = f"Current folder: {run_tmpdir.strpath}\n"
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status)
+    e_msg = f"Current folder: {str(run_tmpdir)}\n"
     for check, value in db_check_list.items():
         e_msg += f"{check}: {value}\n"
 
+    files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
     for check, value in files_check_list.items():
         e_msg += f"{check}: {value}\n"
 
-    # Assert
     try:
-        assert_db_fields(db_check_list)
-        assert_files_recovered(files_check_list)
+        _assert_db_fields(db_check_list)
+        _assert_files_recovered(files_check_list)
     except AssertionError:
         pytest.fail(e_msg)
-
-    # TODO: GITLAB pipeline is not returning 0 or 1 for check_exit_code(final_status, exit_code)
-    # assert_exit_code(final_status, exit_code)
 
 
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status", [
@@ -528,23 +420,25 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
     """, 4, "COMPLETED"),  # Number of jobs
     # Failure
     ("""
+    EXPERIMENT:
+        NUMCHUNKS: '2'
     JOBS:
         job:
             SCRIPT: |
-                decho "Hello World with id=FAILED"
-                sleep 1
+                d_echo "Hello World with id=FAILED"
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
             retrials: 2  # In local, it started to fail at 18 retrials.
-    """, (2 + 1) * 3, "FAILED"),  # Retries set (N + 1) * number of jobs to run
+    """, (2 + 1) * 2, "FAILED"),  # Retries set (N + 1) * number of jobs to run
     # Failure wrappers
     ("""
+    EXPERIMENT:
+        NUMCHUNKS: '2'
     JOBS:
         job:
             SCRIPT: |
-                decho "Hello World with id=FAILED + wrappers"
-                sleep 1
+                d_echo "Hello World with id=FAILED + wrappers"
             PLATFORM: local
             DEPENDENCIES: job-1
             RUNNING: chunk
@@ -556,25 +450,39 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
             TYPE: vertical
     """, (2 + 1) * 1, "FAILED"),  # Retries set (N + 1) * job chunk 1 ( the rest shouldn't run )
 ], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
-def test_run_interrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries, final_status, mocker):
-    mocked_input = mocker.patch('autosubmit.autosubmit.input')
-    mocked_input.side_effect = ['yes']
+def test_run_interrupted(
+        as_exp,
+        jobs_data,
+        expected_db_entries,
+        final_status):
+    as_conf = as_exp.as_conf
+    log_dir = _init_run(as_exp, jobs_data)
 
-    from time import sleep
-    log_dir = init_run(run_tmpdir, jobs_data)
     # Run the experiment
-    exit_code = Autosubmit.run_experiment(expid='t000')
-    assert exit_code == 0 if final_status != 'FAILED' else 1
-    sleep(2)
-    Autosubmit.stop(all_expids=False, cancel=False, current_status='SUBMITTED, QUEUING, RUNNING', expids='t000',
-                    force=True, force_all=False, status='FAILED')
-    Autosubmit.run_experiment(expid='t000')
-    # Check and display results
-    db_check_list = check_db_fields(run_tmpdir, expected_db_entries, final_status)
-    files_check_list = check_files_recovered(run_tmpdir, log_dir, expected_files=expected_db_entries * 2)
+    exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
+    _assert_exit_code(final_status, exit_code)
 
-    # Assert
-    assert_db_fields(db_check_list)
-    assert_files_recovered(files_check_list)
-    # TODO: GITLAB pipeline is not returning 0 or 1 for check_exit_code(final_status, exit_code)
-    # assert_exit_code(final_status, exit_code)
+    current_statuses = 'SUBMITTED, QUEUING, RUNNING'
+    # TODO: When you call ``.cmdline`` in a ``psutil.Process`` during an iteration,
+    #       if it is a zombie it might raise a ``ZombieProcess`` error.
+    with suppress(ZombieProcess):
+        as_exp.autosubmit.stop(
+            all_expids=False,
+            cancel=False,
+            current_status=current_statuses,
+            expids=_EXPID,
+            force=True,
+            force_all=True,
+            status='FAILED')
+
+    exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
+    _assert_exit_code(final_status, exit_code)
+
+    # Check and display results
+    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status)
+    _assert_db_fields(db_check_list)
+
+    files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
+    _assert_files_recovered(files_check_list)

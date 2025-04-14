@@ -1425,7 +1425,7 @@ def test_reset_logs(autosubmit_config):
             'WORKFLOW_COMMIT': "dummy-commit",
         },
     }
-    as_conf = autosubmit_config("test-expid", experiment_data)
+    as_conf = autosubmit_config("t000", experiment_data)
     job = Job("job1", "1", Status.READY, 0)
     job.reset_logs(as_conf)
     assert job.workflow_commit == "dummy-commit"
@@ -1457,7 +1457,7 @@ def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_templat
 
 
 def create_job_and_update_parameters(autosubmit_config, experiment_data, platform_type="ps"):
-    as_conf = autosubmit_config("test-expid", experiment_data)
+    as_conf = autosubmit_config("t000", experiment_data)
     as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
     as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
     as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
@@ -1466,9 +1466,9 @@ def create_job_and_update_parameters(autosubmit_config, experiment_data, platfor
     # Create some jobs
     job = Job('A', '1', 0, 1)
     if platform_type == "ps":
-        platform = PsPlatform(expid='test-expid', name='DUMMY_PLATFORM', config=as_conf.experiment_data)
+        platform = PsPlatform(expid='t000', name='DUMMY_PLATFORM', config=as_conf.experiment_data)
     else:
-        platform = SlurmPlatform(expid='test-expid', name='DUMMY_PLATFORM', config=as_conf.experiment_data)
+        platform = SlurmPlatform(expid='t000', name='DUMMY_PLATFORM', config=as_conf.experiment_data)
     job.section = 'RANDOM-SECTION'
     job.platform = platform
     parameters = job.update_parameters(as_conf, set_attributes=True)
@@ -1652,8 +1652,6 @@ def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines
         'LOCAL_ASLOG_DIR': f"{full_path}",
     }
     tmpdir_path.joinpath(f"{scratch_dir}/{project}/{user}").mkdir(parents=True)
-    tmpdir_path.joinpath("test-expid").mkdir(parents=True)
-    tmpdir_path.joinpath("test-expid/tmp/LOG_test-expid").mkdir(parents=True)
 
     if test_type == "platform":
         experiment_data['PLATFORMS']['dummy_platform']['CUSTOM_DIRECTIVES'] = custom_directives

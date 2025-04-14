@@ -19,23 +19,24 @@
 import os
 import pwd
 from dataclasses import dataclass
+from fileinput import FileInput
 from pathlib import Path
-from shutil import rmtree
-from tempfile import TemporaryDirectory
+from re import sub
+from textwrap import dedent
 from time import time
-from typing import Any, Dict, Callable, List, Protocol, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, Callable, Protocol, Optional, Type
 
 import pytest
+from pytest_mock import MockerFixture
 from ruamel.yaml import YAML
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
 if TYPE_CHECKING:
-    import pytest_mock
+    from py._path.local import LocalPath  # type: ignore
 
 
 @dataclass
@@ -43,6 +44,7 @@ class AutosubmitExperiment:
     """This holds information about an experiment created by Autosubmit."""
     expid: str
     autosubmit: Autosubmit
+    as_conf: AutosubmitConfig
     exp_path: Path
     tmp_dir: Path
     aslogs_dir: Path
@@ -50,27 +52,168 @@ class AutosubmitExperiment:
     platform: ParamikoPlatform
 
 
+def _initialize_autosubmitrc(folder: Path) -> Path:
+    """Initialize the ``autosubmit.rc`` file.
+
+    This function should populate enough information so ``BasicConfig.read()`` works
+    without the need of any mocking.
+
+    The Autosubmit database file used is called ``tests.db``.
+
+    This function can be called multiple times.
+
+    :param folder: Folder to sve the ``.autosubmitrc`` file in.
+    :return: Path to the ``.autosubmitrc`` file.
+    """
+    autosubmitrc = folder / '.autosubmitrc'
+    autosubmitrc.write_text(
+        dedent(f'''\
+                [database]
+                path = {folder}
+                filename = tests.db
+
+                [local]
+                path = {folder}
+
+                [globallogs]
+                path = {folder / "logs"}
+
+                [structures]
+                path = {folder / "metadata/structures"}
+
+                [historicdb]
+                path = {folder / "metadata/data"}
+
+                [historiclog]
+                path = {folder / "metadata/logs"}
+
+                [defaultstats]
+                path = {folder / "as_output/stats"}
+                ''')
+    )
+    return autosubmitrc
+
+
 @pytest.fixture(scope='function')
-def autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> Callable:
-    """Create an instance of ``Autosubmit`` with an experiment."""
+def autosubmit_exp(
+        autosubmit: Autosubmit,
+        request: pytest.FixtureRequest,
+        tmp_path: "LocalPath",
+        mocker: "MockerFixture",
+) -> Callable:
+    """Create an instance of ``Autosubmit`` with an experiment.
 
-    original_root_dir = BasicConfig.LOCAL_ROOT_DIR
-    tmp_dir = TemporaryDirectory()
-    tmp_path = Path(tmp_dir.name)
+    If an ``expid`` is provided, it will create an experiment with that ID.
+    Otherwise, it will simply get the next available ID.
 
-    def _create_autosubmit_exp(expid: str):
-        root_dir = tmp_path
-        BasicConfig.LOCAL_ROOT_DIR = str(root_dir)
-        exp_path = BasicConfig.expid_dir(expid)
+    It sets the ``AUTOSUBMIT_CONFIGURATION`` environment variable, pointing
+    to a newly created file in a temporary directory.
 
-        # directories used when searching for logs to cat
-        exp_tmp_dir = BasicConfig.expid_tmp_dir(expid)
-        aslogs_dir = BasicConfig.expid_aslog_dir(expid)
+    A complete experiment is created, with the default configuration files,
+    unless ``experiment_data`` is provided. This is a Python dictionary that
+    will be used to populate files such as `jobs_<EXPID>.yml` (the ``JOBS``
+    YAML key will be written to that file).
+
+    Returns a data class that contains the ``AutosubmitConfig``.
+
+    TODO: Use minimal to avoid having to juggle with the configuration files.
+    """
+    def _create_autosubmit_exp(
+            expid: Optional[str] = None,
+            experiment_data: Optional[Dict] = None,
+            *_,
+            **kwargs
+    ):
+        if experiment_data is None:
+            experiment_data = {}
+
+        autosubmitrc = _initialize_autosubmitrc(tmp_path)
+        os.environ['AUTOSUBMIT_CONFIGURATION'] = str(autosubmitrc)
+
+        BasicConfig.read()
+
+        if not Path(BasicConfig.DB_PATH).exists():
+            autosubmit.install()
+            autosubmit.configure(
+                advanced=False,
+                database_path=BasicConfig.DB_DIR,  # type: ignore
+                database_filename=BasicConfig.DB_FILE,  # type: ignore
+                local_root_path=str(tmp_path),
+                platforms_conf_path=None,  # type: ignore
+                jobs_conf_path=None,  # type: ignore
+                smtp_hostname=None,  # type: ignore
+                mail_from=None,  # type: ignore
+                machine=False,
+                local=False,
+            )
+
+        if expid:
+            mocker.patch('autosubmit.experiment.experiment_common.db_common.last_name_used', return_value=expid)
+
+        expid = autosubmit.expid(
+            description=f"Pytest experiment (delete me)",
+            hpc="local",
+            copy_id="",
+            dummy=True,
+            minimal_configuration=False,
+            git_repo="",
+            git_branch="",
+            git_as_conf="",
+            operational=False,
+            testcase=True,
+            evaluation=False,
+            use_local_minimal=False
+        )
+        exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
+        conf_dir = exp_path / "conf"
+        global_logs = Path(BasicConfig.GLOBAL_LOG_DIR)
+        global_logs.mkdir(parents=True, exist_ok=True)
+        exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
+        aslogs_dir = exp_tmp_dir / BasicConfig.LOCAL_ASLOG_DIR
         status_dir = exp_path / 'status'
-        if not os.path.exists(aslogs_dir):
-            os.makedirs(aslogs_dir)
-        if not os.path.exists(status_dir):
-            os.makedirs(status_dir)
+
+        config = AutosubmitConfig(
+            expid=expid,
+            basic_config=BasicConfig
+        )
+
+        config.experiment_data = {**config.experiment_data, **experiment_data}
+
+        key_file = {
+            'JOBS': 'jobs',
+            'PLATFORMS': 'platforms',
+            'EXPERIMENT': 'expdef'
+        }
+
+        for key, file in key_file.items():
+            if key in experiment_data:
+                mode = 'a' if key == 'EXPERIMENT' else 'w'
+                with open(conf_dir / f'{file}_{expid}.yml', mode) as f:
+                    YAML().dump({key: experiment_data[key]}, f)
+
+        other_yaml = {
+            k: v for k, v in experiment_data.items()
+            if k not in key_file
+        }
+        if other_yaml:
+            with open(conf_dir / f'tests_{expid}.yml', 'w') as f:
+                YAML().dump(other_yaml, f)
+
+        config.reload(force_load=True)
+
+        # TBD: this is not set in ``AutosubmitConfig``, but
+        # maybe it should be? Ignore linter errors for now.
+        config.autosubmitrc = autosubmitrc
+
+        # Default values for experiment data
+        # TODO: This probably has a way to be initialized in config-parser?
+        must_exists = ['DEFAULT', 'JOBS', 'PLATFORMS', 'CONFIG']
+        for must_exist in must_exists:
+            if must_exist not in config.experiment_data:
+                config.experiment_data[must_exist] = {}
+
+        for arg, value in kwargs.items():
+            setattr(config, arg, value)
 
         platform_config = {
             "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
@@ -87,22 +230,32 @@ def autosubmit_exp(autosubmit: Autosubmit, request: pytest.FixtureRequest) -> Ca
         submit_platform_script = aslogs_dir.joinpath('submit_local.sh')
         submit_platform_script.touch(exist_ok=True)
 
+        config.experiment_data['CONFIG']['SAFETYSLEEPTIME'] = 0
+        # TODO: would be nice if we had a way in Autosubmit Config Parser or
+        #       Autosubmit to define variables. We are replacing it
+        #       in other parts of the code, but without ``fileinput``.
+        with FileInput(conf_dir / f'autosubmit_{expid}.yml', inplace=True, backup='.bak') as file:
+            for line in file:
+                if 'SAFETYSLEEPTIME' in line:
+                    print(sub(r'\d+', '0', line), end='')
+                else:
+                    print(line, end='')
+        # TODO: one test failed while moving things from unit to integration, but this shouldn't be
+        #       needed, especially if the disk has the valid value?
+        config.experiment_data['DEFAULT']['EXPID'] = expid
+
+        autosubmit.create(expid, noplot=True, hide=False, force=True)
+
         return AutosubmitExperiment(
             expid=expid,
             autosubmit=autosubmit,
+            as_conf=config,
             exp_path=exp_path,
             tmp_dir=exp_tmp_dir,
             aslogs_dir=aslogs_dir,
             status_dir=status_dir,
             platform=platform
         )
-
-    def finalizer():
-        BasicConfig.LOCAL_ROOT_DIR = original_root_dir
-        if tmp_path and tmp_path.exists():
-            rmtree(tmp_path)
-
-    request.addfinalizer(finalizer)
 
     return _create_autosubmit_exp
 
@@ -112,48 +265,23 @@ def autosubmit() -> Autosubmit:
     """Create an instance of ``Autosubmit``.
 
     Useful when you need ``Autosubmit`` but do not need any experiments."""
-    autosubmit = Autosubmit()
-    return autosubmit
-
-
-@pytest.fixture(scope='function')
-def create_as_conf() -> Callable:  # May need to be changed to use the autosubmit_config one
-    def _create_as_conf(autosubmit_exp: AutosubmitExperiment, yaml_files: List[Path], experiment_data: Dict[str, Any]):
-        conf_dir = autosubmit_exp.exp_path.joinpath('conf')
-        conf_dir.mkdir(parents=False, exist_ok=False)
-        basic_config = BasicConfig
-        parser_factory = YAMLParserFactory()
-        as_conf = AutosubmitConfig(
-            expid=autosubmit_exp.expid,
-            basic_config=basic_config,
-            parser_factory=parser_factory
-        )
-        for yaml_file in yaml_files:
-            with open(conf_dir / yaml_file.name, 'w+') as f:
-                f.write(yaml_file.read_text())
-                f.flush()
-        # add user-provided experiment data
-        with open(conf_dir / 'conftest_as.yml', 'w+') as f:
-            yaml = YAML()
-            yaml.indent(sequence=4, offset=2)
-            yaml.dump(experiment_data, f)
-            f.flush()
-        return as_conf
-
-    return _create_as_conf
+    return Autosubmit()
 
 
 # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
 class AutosubmitConfigFactory(Protocol):
 
-    def __call__(self, expid: str, experiment_data: Optional[Dict] = None, *args: Any, **kwargs: Any) -> AutosubmitConfig: ...
+    def __call__(self, expid: str, experiment_data: Optional[Dict] = None, *args: Any,
+                 **kwargs: Any) -> AutosubmitConfig: ...
 
 
 @pytest.fixture(scope="function")
 def autosubmit_config(
         request: pytest.FixtureRequest,
-        mocker: "pytest_mock.MockerFixture",
-        prepare_basic_config: BasicConfig) -> AutosubmitConfigFactory:
+        tmp_path: Path,
+        autosubmit: Autosubmit,
+        mocker: MockerFixture
+) -> AutosubmitConfigFactory:
     """Return a factory for ``AutosubmitConfig`` objects.
 
     Abstracts the necessary mocking in ``AutosubmitConfig`` and related objects,
@@ -165,15 +293,60 @@ def autosubmit_config(
     cleaned (see ``finalizer`` below).
     """
 
-    original_root_dir = BasicConfig.LOCAL_ROOT_DIR
-
     # Mock this as otherwise BasicConfig.read resets our other mocked values above.
     mocker.patch.object(BasicConfig, "read", autospec=True)
 
-    def _create_autosubmit_config(expid: str, experiment_data: Dict = None, *_, **kwargs) -> AutosubmitConfig:
-        """Create an instance of ``AutosubmitConfig``."""
-        for k, v in prepare_basic_config.__dict__.items():
+    def _prepare_basic_config(folder: Path) -> BasicConfig:
+        """Sets up ``BasicConfig`` using a given temporary directory as root dir."""
+        basic_conf = BasicConfig()
+        BasicConfig.DB_DIR = folder / "exp_root"
+        BasicConfig.DB_FILE = "debug.db"
+        BasicConfig.DB_PATH = BasicConfig.DB_DIR / BasicConfig.DB_FILE
+        BasicConfig.LOCAL_ROOT_DIR = folder / "exp_root"
+        BasicConfig.LOCAL_TMP_DIR = "tmp"
+        BasicConfig.LOCAL_ASLOG_DIR = "ASLOGS"
+        BasicConfig.LOCAL_PROJ_DIR = "proj"
+        BasicConfig.DEFAULT_PLATFORMS_CONF = ""
+        BasicConfig.CUSTOM_PLATFORMS_PATH = ""
+        BasicConfig.DEFAULT_JOBS_CONF = ""
+        BasicConfig.SMTP_SERVER = ""
+        BasicConfig.MAIL_FROM = ""
+        BasicConfig.ALLOWED_HOSTS = ""
+        BasicConfig.DENIED_HOSTS = ""
+        BasicConfig.CONFIG_FILE_FOUND = True
+        BasicConfig.GLOBAL_LOG_DIR = folder / "global_logs"
+        return basic_conf
+
+    def _create_autosubmit_config(
+            expid: str,
+            experiment_data: Dict = None,
+            *_,
+            **kwargs
+    ) -> AutosubmitConfig:
+        """Create an Autosubmit configuration object.
+
+        The values in ``BasicConfig`` are configured to use a temporary directory as base,
+        then create the ``exp_root`` as the experiment directory (equivalent to the
+        ``~/autosubmit/<EXPID>``).
+
+        This function also sets the environment variable ``AUTOSUBMIT_CONFIGURATION``.
+
+        :param expid: Experiment ID
+        :param experiment_data: YAML experiment data dictionary
+        """
+        if not expid:
+            raise ValueError("No value provided for expid")
+
+        if experiment_data is None:
+            experiment_data = {}
+
+        autosubmitrc = _initialize_autosubmitrc(tmp_path)
+        os.environ['AUTOSUBMIT_CONFIGURATION'] = str(autosubmitrc)
+
+        basic_config = _prepare_basic_config(tmp_path)
+        for k, v in basic_config.__dict__.items():
             setattr(BasicConfig, k, v)
+
         exp_path = BasicConfig.LOCAL_ROOT_DIR / expid
         # <expid>/tmp/
         exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
@@ -196,25 +369,28 @@ def autosubmit_config(
         global_logs = Path(BasicConfig.GLOBAL_LOG_DIR)
         global_logs.mkdir(parents=True, exist_ok=True)
 
-        if not expid:
-            raise ValueError("No value provided for expid")
         config = AutosubmitConfig(
             expid=expid,
             basic_config=BasicConfig
         )
-        if experiment_data is None:
-            experiment_data = {}
-        config.experiment_data = experiment_data
-        for k, v in BasicConfig.__dict__.items():
+
+        # Populate the configuration object's ``experiment_data`` dictionary with the values
+        # in ``BasicConfig``. For some reason, some platforms use variables like ``LOCAL_ROOT_DIR``
+        # from the configuration object, instead of using ``BasicConfig``.
+        for k, v in {k: v for k, v in basic_config.__class__.__dict__.items() if not k.startswith('__')}.items():
             config.experiment_data[k] = v
+        config.experiment_data.update(experiment_data)
 
         # Default values for experiment data
         # TODO: This probably has a way to be initialized in config-parser?
-        must_exists = ['DEFAULT', 'JOBS', 'PLATFORMS']
+        must_exists = ['DEFAULT', 'JOBS', 'PLATFORMS', 'CONFIG']
         for must_exist in must_exists:
             if must_exist not in config.experiment_data:
                 config.experiment_data[must_exist] = {}
+
+        config.experiment_data['CONFIG']['SAFETYSLEEPTIME'] = 0
         config.experiment_data['DEFAULT']['EXPID'] = expid
+
         if 'HPCARCH' not in config.experiment_data['DEFAULT']:
             config.experiment_data['DEFAULT']['HPCARCH'] = 'LOCAL'
 
@@ -223,34 +399,7 @@ def autosubmit_config(
         config.current_loaded_files[str(conf_dir / 'dummy-so-it-doesnt-force-reload.yml')] = time()
         return config
 
-    def finalizer() -> None:
-        BasicConfig.LOCAL_ROOT_DIR = original_root_dir
-
-    request.addfinalizer(finalizer)
-
     return _create_autosubmit_config
-
-
-@pytest.fixture
-def prepare_basic_config(tmpdir):
-    basic_conf = BasicConfig()
-    BasicConfig.DB_DIR = tmpdir / "exp_root"
-    BasicConfig.DB_FILE = "debug.db"
-    BasicConfig.DB_PATH = BasicConfig.DB_DIR / BasicConfig.DB_FILE
-    BasicConfig.LOCAL_ROOT_DIR = tmpdir / "exp_root"
-    BasicConfig.LOCAL_TMP_DIR = "tmp"
-    BasicConfig.LOCAL_ASLOG_DIR = "ASLOGS"
-    BasicConfig.LOCAL_PROJ_DIR = "proj"
-    BasicConfig.DEFAULT_PLATFORMS_CONF = ""
-    BasicConfig.CUSTOM_PLATFORMS_PATH = ""
-    BasicConfig.DEFAULT_JOBS_CONF = ""
-    BasicConfig.SMTP_SERVER = ""
-    BasicConfig.MAIL_FROM = ""
-    BasicConfig.ALLOWED_HOSTS = ""
-    BasicConfig.DENIED_HOSTS = ""
-    BasicConfig.CONFIG_FILE_FOUND = True
-    BasicConfig.GLOBAL_LOG_DIR = tmpdir / "global_logs"
-    return basic_conf
 
 
 @pytest.fixture
@@ -327,3 +476,24 @@ def local(prepare_test):
     }
     local = LocalPlatform(expid='t000', name='local', config=config)
     return local
+
+
+def _identity_value(value=None):
+    """A type of identity function; returns a function that returns ``value``."""
+    return lambda *ignore_args, **ignore_kwargs: value
+
+
+@pytest.fixture
+def as_db_sqlite(monkeypatch: pytest.MonkeyPatch, tmp_path: "LocalPath") -> Type[BasicConfig]:
+    """Overwrites the BasicConfig to use SQLite database for testing.
+    Args:
+        monkeypatch: Monkey Patcher.
+        tmp_path: Temporary path fixture.
+    Returns:
+        BasicConfig class.
+    """
+    monkeypatch.setattr(BasicConfig, "read", _identity_value())
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "sqlite")
+    monkeypatch.setattr(BasicConfig, "DB_PATH", str(tmp_path / "autosubmit.db"))
+
+    return BasicConfig

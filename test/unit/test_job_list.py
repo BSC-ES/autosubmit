@@ -37,12 +37,16 @@ from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 _EXPID = 'a000'
 
 
-@pytest.fixture(scope='function')
-def setup_job_list(autosubmit_config, tmpdir, mocker, prepare_basic_config):
-    as_conf = autosubmit_config(_EXPID, experiment_data={
+@pytest.fixture
+def as_conf(autosubmit_config):
+    return autosubmit_config(_EXPID, experiment_data={
         'JOBS': {},
         'PLATFORMS': {}
     })
+
+
+@pytest.fixture(scope='function')
+def setup_job_list(as_conf, tmpdir, mocker):
     job_list = JobList(_EXPID, as_conf, YAMLParserFactory(), JobListPersistencePkl())
     dummy_serial_platform = mocker.MagicMock()
     dummy_serial_platform.name = 'serial'
@@ -107,11 +111,7 @@ def jobs_as_dict():
 
 
 @pytest.fixture
-def job_list(autosubmit_config, mocker, jobs_as_dict):
-    as_conf = autosubmit_config(_EXPID, experiment_data={
-        'JOBS': {},
-        'PLATFORMS': {},
-    })
+def job_list(as_conf, mocker, jobs_as_dict):
     parameters = {'fake-key': 'fake-value',
                   'fake-key2': 'fake-value2'}
     as_conf.load_parameters = mocker.Mock(return_value=parameters)
@@ -133,18 +133,14 @@ def _create_dummy_job_with_status(status):
 
 
 @pytest.fixture
-def empty_job_list(tmp_path, autosubmit_config, mocker):
+def empty_job_list(tmp_path, as_conf, mocker):
     def fn():
-        as_conf = autosubmit_config(_EXPID, experiment_data={
-            'JOBS': {},
-            'PLATFORMS': {}
-        })
         parameters = {'fake-key': 'fake-value',
                       'fake-key2': 'fake-value2'}
         as_conf.load_parameters = mocker.Mock(return_value=parameters)
         as_conf.default_parameters = {}
         job_list = JobList(_EXPID, as_conf, as_conf.parser_factory, JobListPersistencePkl())
-        pickle_directory = Path(as_conf.basic_config.LOCAL_ROOT_DIR / _EXPID / 'pkl')
+        pickle_directory = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, 'pkl')
         pickle_directory.mkdir(parents=True, exist_ok=True)
         job_list._persistence_path = str(pickle_directory)
 
@@ -153,8 +149,7 @@ def empty_job_list(tmp_path, autosubmit_config, mocker):
     return fn
 
 
-def test_load(mocker, empty_job_list, autosubmit_config):
-    as_conf = autosubmit_config(_EXPID, experiment_data={})
+def test_load(mocker, as_conf, empty_job_list):
     date_list = ['fake-date1', 'fake-date2']
     member_list = ['fake-member1', 'fake-member2']
     num_chunks = 999
@@ -329,7 +324,7 @@ def test_sort_by_status_returns_the_list_of_jobs_well_sorted(job_list):
         assert sorted_by_status[i].status <= sorted_by_status[i + 1].status
 
 
-def test_that_create_method_makes_the_correct_calls(mocker, empty_job_list, autosubmit_config):
+def test_that_create_method_makes_the_correct_calls(mocker, empty_job_list, as_conf):
     job_list = empty_job_list()
     job_list._create_jobs = mocker.Mock()
     job_list._add_dependencies = mocker.Mock()
@@ -345,7 +340,7 @@ def test_that_create_method_makes_the_correct_calls(mocker, empty_job_list, auto
     graph = networkx.DiGraph()
     job_list.graph = graph
 
-    as_conf = autosubmit_config(_EXPID, experiment_data={
+    as_conf.experiment_data = {
         'PLATFORMS': {
             'fake-platform': {
                 'TYPE': 'ps',
@@ -353,7 +348,7 @@ def test_that_create_method_makes_the_correct_calls(mocker, empty_job_list, auto
                 'USERNAME': 'fake-user'
             }
         }
-    })
+    }
     as_conf.get_platform = mocker.Mock(return_value="fake-platform")
     # act
     mocker.patch('autosubmit.job.job.Job.update_parameters', return_value={})
@@ -406,8 +401,8 @@ def test_that_create_job_method_calls_dic_jobs_method_with_increasing_priority(m
     dic_mock.read_section.assert_any_call('fake-section-2', 1, Type.BASH)
 
 
-def test_run_member(job_list, mocker, autosubmit_config, empty_job_list):
-    as_conf = autosubmit_config(_EXPID, experiment_data={
+def test_run_member(job_list, mocker, as_conf, empty_job_list):
+    as_conf.experiment_data= {
         'PLATFORMS': {
             'fake-platform': {
                 'TYPE': 'ps',
@@ -415,7 +410,7 @@ def test_run_member(job_list, mocker, autosubmit_config, empty_job_list):
                 'USER': 'fake-user'
             }
         }
-    })
+    }
     as_conf.get_platform = mocker.MagicMock(return_value="fake-platform")
     job_list = empty_job_list()
     job_list._create_jobs = mocker.Mock()
@@ -462,14 +457,14 @@ def test_run_member(job_list, mocker, autosubmit_config, empty_job_list):
     assert len(job_list_aux._job_list) == 0
 
 
-def test_create_dictionary(job_list, mocker, autosubmit_config, empty_job_list):
+def test_create_dictionary(job_list, mocker, as_conf, empty_job_list):
     parameters = {'fake-key': 'fake-value',
                   'fake-key2': 'fake-value2'}
-    as_conf = autosubmit_config(_EXPID, experiment_data={
+    as_conf.experiment_data = {
         'JOBS': {
             'fake-section': parameters,
             'fake-section-2': parameters}
-    })
+    }
     job_list = empty_job_list()
     job_list._create_jobs = mocker.Mock()
     job_list._add_dependencies = mocker.Mock()
@@ -524,8 +519,8 @@ def test_create_dictionary(job_list, mocker, autosubmit_config, empty_job_list):
     assert len(job_list._ordered_jobs_by_date_member["WRAPPER_FAKE_SECTION"]["fake-date1"]["fake-member1"]) == 1
 
 
-def test_generate_job_list_from_monitor_run(autosubmit_config, mocker, empty_job_list):
-    as_conf = autosubmit_config(_EXPID, {
+def test_generate_job_list_from_monitor_run(as_conf, mocker, empty_job_list):
+    as_conf.experiment_data = {
         'DEFAULT': {
             'EXPID': _EXPID,
             'HPCARCH': 'ARM'
@@ -547,7 +542,7 @@ def test_generate_job_list_from_monitor_run(autosubmit_config, mocker, empty_job
                 'user': 'fake-user'
             }
         }
-    })
+    }
 
     date_list = ['fake-date1', 'fake-date2']
     member_list = ['fake-member1', 'fake-member2']
@@ -738,7 +733,7 @@ def test_normalize_to_filters(job_list):
             assert not bool(e)
 
 
-def test_manage_dependencies(autosubmit_config, empty_job_list):
+def test_manage_dependencies(as_conf, empty_job_list):
     """testing function _manage_dependencies from job_list."""
     dependencies_keys = {
         'dummy=1': {'test', 'test2'},
@@ -748,7 +743,6 @@ def test_manage_dependencies(autosubmit_config, empty_job_list):
         'dummy?5': ""
     }
 
-    as_conf = autosubmit_config('a000', experiment_data={})
     job_list = empty_job_list()
 
     job = {

@@ -14,30 +14,28 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
 from pathlib import Path
 from textwrap import dedent
 
 import pytest
 
-from autosubmit.autosubmit import Autosubmit
-
 
 @pytest.mark.parametrize('suffix', [
-    (''),
-    ('/'),
-    ('//')
+    '',
+    '/',
+    '//'
 ])
-def test_configure(mocker, tmp_path, suffix: str) -> None:
+def test_configure(mocker, tmp_path, suffix: str, autosubmit) -> None:
     # To update ``Path.home`` appending the provided suffix.
-    mocker.patch('pathlib.Path.home').return_value = Path(str(tmp_path) + suffix)
+    mocker.patch('autosubmit.autosubmit.get_rc_path').return_value = \
+        Path(str(tmp_path) + suffix, '.autosubmitrc')
 
-    # asign values that will be passed on cmd
+    # assign values that will be passed on cmd
     database_filename = "autosubmit.db"
-    db_path = Path.home() / 'database'
-    lr_path = Path.home() / 'experiments'
+    db_path = tmp_path / 'database'
+    lr_path = tmp_path / 'experiments'
 
-    Autosubmit.configure(
+    autosubmit.configure(
         advanced=False,
         database_path=str(db_path),
         database_filename=database_filename,

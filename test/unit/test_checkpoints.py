@@ -17,7 +17,6 @@
 
 import shutil
 from random import randrange
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -28,28 +27,21 @@ from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistenceDb
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
+_EXPID = 't000'
 
-@pytest.fixture(scope='function')
-def setup_job_list(autosubmit_config, tmpdir, mocker, prepare_basic_config):
-    experiment_id = 'random-id'
-    as_conf = autosubmit_config(experiment_id)
+
+@pytest.fixture
+def setup_job_list(autosubmit_exp, tmpdir, mocker):
+    as_exp = autosubmit_exp(_EXPID)
+    as_conf = as_exp.as_conf
     as_conf.experiment_data = dict()
     as_conf.experiment_data["JOBS"] = dict()
     as_conf.experiment_data["PLATFORMS"] = dict()
 
-    prepare_basic_config.DB_DIR = tmpdir
-    prepare_basic_config.DB_FILE = Path(tmpdir, 'test-db.db')
-    prepare_basic_config.DB_PATH = prepare_basic_config.DB_FILE
-    prepare_basic_config.LOCAL_PROJ_DIR = tmpdir
-    prepare_basic_config.LOCAL_ROOT_DIR = tmpdir
-    prepare_basic_config.LOCAL_TMP_DIR = tmpdir
+    basic_config = as_conf.basic_config
 
-    Path(prepare_basic_config.DB_FILE).touch()
-    Path(prepare_basic_config.LOCAL_ROOT_DIR, experiment_id, 'pkl').mkdir(parents=True, exist_ok=True)
-
-    with patch('autosubmit.job.job_list_persistence.BasicConfig', prepare_basic_config):
-        job_list = JobList(experiment_id, prepare_basic_config, YAMLParserFactory(),
-                            JobListPersistenceDb(experiment_id))
+    with patch('autosubmit.job.job_list_persistence.BasicConfig', basic_config):
+        job_list = JobList(_EXPID, basic_config, YAMLParserFactory(), JobListPersistenceDb(_EXPID))
 
     dummy_serial_platform = mocker.MagicMock()
     dummy_serial_platform.name = 'serial'
@@ -58,14 +50,14 @@ def setup_job_list(autosubmit_config, tmpdir, mocker, prepare_basic_config):
     dummy_platform.name = 'dummy_platform'
 
     jobs = {
-        "completed": [create_dummy_job_with_status(Status.COMPLETED, dummy_platform) for _ in range(4)],
-        "submitted": [create_dummy_job_with_status(Status.SUBMITTED, dummy_platform) for _ in range(3)],
-        "running": [create_dummy_job_with_status(Status.RUNNING, dummy_platform) for _ in range(2)],
-        "queuing": [create_dummy_job_with_status(Status.QUEUING, dummy_platform)],
-        "failed": [create_dummy_job_with_status(Status.FAILED, dummy_platform) for _ in range(4)],
-        "ready": [create_dummy_job_with_status(Status.READY, dummy_platform) for _ in range(3)],
-        "waiting": [create_dummy_job_with_status(Status.WAITING, dummy_platform) for _ in range(2)],
-        "unknown": [create_dummy_job_with_status(Status.UNKNOWN, dummy_platform)]
+        "completed": [_create_dummy_job_with_status(Status.COMPLETED, dummy_platform) for _ in range(4)],
+        "submitted": [_create_dummy_job_with_status(Status.SUBMITTED, dummy_platform) for _ in range(3)],
+        "running": [_create_dummy_job_with_status(Status.RUNNING, dummy_platform) for _ in range(2)],
+        "queuing": [_create_dummy_job_with_status(Status.QUEUING, dummy_platform)],
+        "failed": [_create_dummy_job_with_status(Status.FAILED, dummy_platform) for _ in range(4)],
+        "ready": [_create_dummy_job_with_status(Status.READY, dummy_platform) for _ in range(3)],
+        "waiting": [_create_dummy_job_with_status(Status.WAITING, dummy_platform) for _ in range(2)],
+        "unknown": [_create_dummy_job_with_status(Status.UNKNOWN, dummy_platform)]
     }
 
     job_list._job_list = [job for job_list in jobs.values() for job in job_list]
@@ -77,7 +69,7 @@ def setup_job_list(autosubmit_config, tmpdir, mocker, prepare_basic_config):
     shutil.rmtree(tmpdir)
 
 
-def create_dummy_job_with_status(status, platform):
+def _create_dummy_job_with_status(status, platform):
     job_name = str(randrange(999999, 999999999))
     job_id = randrange(1, 999)
     job = Job(job_name, job_id, status, 0)
