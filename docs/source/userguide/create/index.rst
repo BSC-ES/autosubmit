@@ -57,8 +57,8 @@ It registers a new unique identifier and copies all configuration files in the n
 Example:
 ::
 
-    autosubmit expid -y <EXPID> -H ithaca -d "experiment is about..."
-    autosubmit expid -y <EXPID> -p "/esarchive/autosubmit/genericFiles/conf" -H marenostrum4 -d "experiment is about..."
+    autosubmit expid -y cxxx -H ithaca -d "experiment is about..."
+    autosubmit expid -y cxxx -p "/esarchive/autosubmit/genericFiles/conf" -H marenostrum4 -d "experiment is about..."
 
 .. warning:: You can only copy experiments created with Autosubmit 3.11 or above.
 
@@ -104,6 +104,6 @@ Autosubmit offers the possibility to profile the experiment creation process. To
 add the ``--profile`` (or ``-p``) flag to your ``autosubmit create`` command, as in the following example:
 ::
 
-    autosubmit create --profile <EXPID>
+    autosubmit create --profile EXPID
 
 .. include:: ../../_include/profiler_common.rst

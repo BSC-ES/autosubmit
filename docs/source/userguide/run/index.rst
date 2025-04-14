@@ -27,7 +27,7 @@ Example:
 
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    autosubmit run <EXPID>
+    autosubmit run cxxx
 
 .. important:: If the autosubmit version is set on ``autosubmit.yml`` it must match the actual autosubmit version
 .. hint:: It is recommended to launch it in background and with ``nohup`` (continue running although the user who launched the process logs out).
@@ -36,7 +36,7 @@ Example:
 
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    nohup autosubmit run <EXPID> &
+    nohup autosubmit run cxxx &
 
 .. important:: Before launching Autosubmit check password-less ssh is feasible (*HPCName* is the hostname):
 .. important:: Add encryption key to ssh agent for each session (if your ssh key is encrypted)
@@ -394,7 +394,7 @@ Finally, you can launch Autosubmit *run* in background and with ``nohup`` (conti
 
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    nohup autosubmit run <EXPID> &
+    nohup autosubmit run cxxx &
 
 How to stop the experiment
 --------------------------
@@ -410,8 +410,8 @@ Examples:
 
 .. code-block:: bash
 
-    autosubmit stop <EXPID>
-    autosubmit stop <EXPID>, <EXPID>
+    autosubmit stop cxxx
+    autosubmit stop cxxx, cyyy
     autosubmit stop -a
     autosubmit stop -a -f
     autosubmit stop -a -c
@@ -423,12 +423,12 @@ To get the process identifier (PID) you can use the ps command on a shell interp
 ::
 
     ps -ef | grep autosubmit
-    dbeltran  22835     1  1 May04 ?        00:45:35 autosubmit run <EXPID>
-    dbeltran  25783     1  1 May04 ?        00:42:25 autosubmit run <EXPID>
+    dbeltran  22835     1  1 May04 ?        00:45:35 autosubmit run cxxy
+    dbeltran  25783     1  1 May04 ?        00:42:25 autosubmit run cxxx
 
 To send a signal to a process you can use kill also on a terminal.
 
-To stop immediately experiment <EXPID>:
+To stop immediately experiment cxxx:
 ::
 
     kill -9 22835

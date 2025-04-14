@@ -22,12 +22,12 @@ Options:
 Example:
 ::
 
-    autosubmit check <EXPID>
+    autosubmit check cxxx
 
 How to use check in running time:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In ``jobs_<EXPID>.yml`` , you can set check(default true) to check the scripts during autosubmit run cxx.
+In ``jobs_cxxx.yml`` , you can set check(default true) to check the scripts during autosubmit run cxx.
 
 There are two parameters related to check:
 
@@ -96,22 +96,22 @@ Examples:
 with autosubmit.lock present or not:
 ::
 
-    autosubmit inspect <EXPID>
+    autosubmit inspect cxxx
 
 with autosubmit.lock present or not:
 ::
 
-    autosubmit inspect <EXPID> -f
+    autosubmit inspect cxxx -f
 
 without autosubmit.lock:
 ::
 
-    autosubmit inspect <EXPID> -fl [-fc,-fs or ft]
+    autosubmit inspect cxxx -fl [-fc,-fs or ft]
 
 To generate cmd for wrappers:
 ::
 
-    autosubmit inspect <EXPID> -cw -f
+    autosubmit inspect cxxx -cw -f
 
 
 With autosubmit.lock and no (-f) force, it will only generate all files that are not submitted.
@@ -121,7 +121,7 @@ Without autosubmit.lock, it will generate all unless filtered by -fl,fc,fs or ft
 To generate cmd only for a single job of the section :
 ::
 
-    autosubmit inspect <EXPID> -q
+    autosubmit inspect cxxx -q
 
 How to monitor an experiment
 ----------------------------
@@ -141,7 +141,7 @@ Options:
 Example:
 ::
 
-    autosubmit monitor <EXPID>
+    autosubmit monitor cxxx
 
 The location where the user can find the generated plots with date and timestamp can be found below:
 
@@ -407,9 +407,9 @@ Options:
 Examples:
 ::
 
-   autosubmit describe <EXPID>
-   autosubmit describe "<EXPID> <EXPID>"
-   autosubmit describe <EXPID>,<EXPID>
+   autosubmit describe cxxx
+   autosubmit describe "cxxx cyyy"
+   autosubmit describe cxxx,cyyy
    autosubmit describe -u dbeltran
 
 .. _autoStatistics:
@@ -432,7 +432,7 @@ Options:
 Example:
 ::
 
-    autosubmit stats <EXPID>
+    autosubmit stats cxxx
 
 The location where user can find the generated plots with date and timestamp can be found below:
 
@@ -443,7 +443,7 @@ The location where user can find the generated plots with date and timestamp can
 For including the summaries:
 ::
 
-        autosubmit stats --section_summary --jobs_summary <EXPID>
+        autosubmit stats --section_summary --jobs_summary cxxx
 
 The location will be:
 ::
