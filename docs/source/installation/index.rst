@@ -70,28 +70,19 @@ For a very quick test, you can follow the next instructions to configure and run
 .. code-block:: bash
 
     # Quick-configure ( user-level database)
-
-.. runcmd:: autosubmit configure
+    autosubmit configure
 
     # Install
-
-.. runcmd:: autosubmit install
-
-.. code-block:: bash
+    autosubmit install
 
     # Quick-start
+
     # Get expid
-
-.. runcmd:: autosubmit expid -H "local" -d "Test exp in local."
-
-.. code-block:: bash
+    autosubmit expid -H "local" -d "Test exp in local."
 
     # Create with
     # Since it was a new install, the expid will be a000
-
-.. runcmd:: autosubmit create a000
-
-.. code-block:: bash
+    autosubmit create a000
 
     # In case you want to use a remote platform
 

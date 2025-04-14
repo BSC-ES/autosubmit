@@ -70,6 +70,8 @@ Create a new experiment
 - *-H: Sets the principal experiment platform.*
 - *-d: Sets a short description for the experiment.*
 
+.. runcmd:: autosubmit expid -dm -H "local" -d "Tutorial"
+
 The output of the command will show the expid of the experiment and generate the following directory structure:
 
 .. list-table::
@@ -91,6 +93,8 @@ The output of the command will show the expid of the experiment and generate the
 
 
 Then, execute ``autosubmit create <expid> -np`` and Autosubmit will generate the workflow graph.
+
+.. runcmd:: autosubmit create a000 -np
 
 Run and monitoring
 ==================
