@@ -9,13 +9,6 @@ To create a new experiment, just run the command:
 
     autosubmit expid -H HPCname -d Description
 
-
-.. runcmd:: autosubmit configure
-
-
-.. runcmd:: autosubmit install
-
-
 *HPCname* is the name of the main HPC platform for the experiment: it will be the default platform for the tasks.
 *Description* is a brief experiment description.
 
@@ -29,9 +22,6 @@ Example:
     autosubmit expid --HPC marenostrum4 --description "experiment is about..."
     autosubmit expid -min -repo https://earth.bsc.es/gitlab/ces/auto-advanced_config_example -b main -conf as_conf -d "minimal config example"
     autosubmit expid -dm -d "dummy test"
-
-
-.. runcmd:: autosubmit expid -dm -d "dummy test"
 
 
 If there is an autosubmitrc or .autosubmitrc file in your home directory (cd ~), you can setup a default file from where the contents of platforms_expid.yml should be copied.
@@ -55,10 +45,6 @@ It registers a new unique identifier and copies all configuration files in the n
 
     autosubmit expid -y COPY -H HPCname -d Description
     autosubmit expid -y COPY -c PATH -H HPCname -d Description
-
-
-.. runcmd:: autosubmit expid -y a000 -H HPCname -d Description
-
 
 *HPCname* is the name of the main HPC platform for the experiment: it will be the default platform for the tasks.
 *COPY* is the experiment identifier to copy from.
@@ -124,9 +110,35 @@ Options:
 
 .. runcmd:: autosubmit testcase -h
 
+Example:
+::
 
-.. runcmd:: autosubmit testcase -d "TEST CASE cca-intel auto-ecearth3 layer 0: T511L91-ORCA025L75-LIM3 (cold restart) (a092-a09n)" -H cca-intel -b 4.1.11 -y a000
+    autosubmit testcase -d "TEST CASE cca-intel auto-ecearth3 layer 0: T511L91-ORCA025L75-LIM3 (cold restart) (a092-a09n)" -H cca-intel -b 3.2.0b_develop -y a09n
 
+Test the experiment
+-------------------
+
+This method is to conduct a test for a given experiment. It creates a new experiment for a given experiment with a
+given number of chunks with a random start date and a random member to be run on a random HPC.
+
+To test the experiment, use the command:
+::
+
+    autosubmit test CHUNKS EXPID
+
+*EXPID* is the experiment identifier.
+*CHUNKS* is the number of chunks to run in the test.
+
+
+
+Options:
+
+.. runcmd:: autosubmit test -h
+
+Example:
+::
+
+    autosubmit test -c 1 -s 19801101 -m fc0 -H ithaca -b develop cxxx
 
 .. _create_profiling:
 
@@ -136,6 +148,8 @@ How to profile Autosubmit while creating an experiment
 Autosubmit offers the possibility to profile the experiment creation process. To enable the profiler, just 
 add the ``--profile`` (or ``-p``) flag to your ``autosubmit create`` command, as in the following example:
 
-.. runcmd:: autosubmit create --profile EXPID
+.. code-block:: bash
+
+    autosubmit create --profile EXPID
 
 .. include:: ../../_include/profiler_common.rst

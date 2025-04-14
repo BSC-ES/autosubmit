@@ -8,6 +8,13 @@ Dummy experiments run workflows with inexpensive empty tasks and therefore are i
 
 Real experiments instead run workflows with complex tasks. To read information about how to develop parameterizable tasks for Autosubmit workflows, refer to :ref:`develproject`.
 
+
+.. runcmd:: autosubmit configure
+
+
+.. runcmd:: autosubmit install
+
+
 .. _Local Platform:
 
 Pre-requisites
@@ -132,16 +139,7 @@ log file, or to memorize the location of these files, Autosubmit provides the
 
 .. code-block:: bash
 
-    $ autosubmit cat-log a000
-    Autosubmit is running with 4.0.0b
-    2023-02-27 21:45:47,863 Autosubmit is running with 4.0.0b
-    2023-02-27 21:45:47,872
-    Checking configuration files...
-    2023-02-27 21:45:47,900 expdef_a000.yml OK
-    2023-02-27 21:45:47,904 platforms_a000.yml OK
-    2023-02-27 21:45:47,905 jobs_a000.yml OK
-    2023-02-27 21:45:47,906 autosubmit_a000.yml OK
-    2023-02-27 21:45:47,907 Configuration files OK
+.. runcmd:: autosubmit cat-log a000
 
 .. note::
     The ``-f`` (``--file``) option is for the file type, not the file path.
@@ -197,43 +195,17 @@ Final step: Modify and run
 
  Open expdef.yml
 
-.. code-block:: yaml
 
-    DEFAULT:
-        # Don't change
-        EXPID: "a000"
-        # Change for your new main platform name, ej. marenostrum4
-        HPCARCH: "local"
-        # Locate and  change these parameters, per ej. numchunks: 3
-        EXPERIMENT:
-            DATELIST: 20000101
-            MEMBERS: fc0
-            NUMCHUNKS: 1
-        (...)
+.. runcmd:: cat ~/autosubmit/a000/expdef_a000.yml
+
+
 
 Now open platforms.yml. Note: This will be an example for marenostrum4
 
-.. code-block:: yaml
 
-    PLATFORMS:
-        marenostrum4:
-            # Queue type. Options: ps, SGE, SLURM, PBS, eceaccess
-            # scheduler type
-            TYPE: slurm
-            HOST: mn1.bsc.es,mn2.bsc.es,mn3.bsc.es
-            # your project
-            PROJECT: bsc32
-            # <- your user
-            USER: bsc32070
-            SCRATCH_DIR: /gpfs/scratch
-            ADD_PROJECT_TO_HOST: False
-            # use 72:00 if you are using a PRACE account, 48:00 for the bsc account
-            MAX_WALLCLOCK: 02:00
-            # use 19200 if you are using a PRACE account, 2400 for the bsc account
-            MAX_PROCESSORS: 2400
-            PROCESSORS_PER_NODE: 48
-            SERIAL_QUEUE: debug
-            QUEUE: debug
+.. runcmd:: cat ~/autosubmit/a000/platforms_a000.yml
+
+
 
 ``autosubmit create <expid>** (without -np)`` will generate the new workflow and ``autosubmit run <expid>`` will run the experiment with the latest changes.
 
