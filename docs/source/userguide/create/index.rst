@@ -46,7 +46,6 @@ It registers a new unique identifier and copies all configuration files in the n
 
     autosubmit expid -y <EXPID> -H HPCname -d "Description"
     autosubmit expid -y <EXPID> -c PATH -H HPCname -d "Description"
-    autosubmit expid -y a000 -H HPCname -d "Description"
 
 
 *HPCname* is the name of the main HPC platform for the experiment: it will be the default platform for the tasks.
@@ -102,7 +101,8 @@ How to profile Autosubmit while creating an experiment
 
 Autosubmit offers the possibility to profile the experiment creation process. To enable the profiler, just 
 add the ``--profile`` (or ``-p``) flag to your ``autosubmit create`` command, as in the following example:
-::
+
+.. code-block:: bash
 
     autosubmit create --profile <EXPID>
 

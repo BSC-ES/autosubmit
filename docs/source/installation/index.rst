@@ -71,14 +71,14 @@ For a very quick test, you can follow the next instructions to configure and run
 .. code-block:: bash
 
     # Quick-configure ( user-level database)
-    # autosubmit configure
+    autosubmit configure
 
     # Install
     autosubmit install
 
     # Quick-start
     # Get <EXPID>
-    # autosubmit expid -H "local" -d "Test exp in local."
+    autosubmit expid -H "local" -d "Test exp in local."
 
     # Create with
     # Since it was a new install, the <EXPID> will be a000
