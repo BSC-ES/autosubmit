@@ -85,7 +85,8 @@ For a very quick test, you can follow the next instructions to configure and run
 
     # Create with
     # Since it was a new install, the expid will be a000
-    # autosubmit create a000
+
+.. runcmd:: autosubmit create a000
 
 .. code-block:: bash
 
@@ -108,7 +109,8 @@ For a very quick test, you can follow the next instructions to configure and run
     # Where ~/.ssh/id_rsa is the path to your private key
 
     # run
-    # autosubmit run a000
+
+.. runcmd:: autosubmit run a000
 
 
 The sequence of instructions to install Autosubmit and its dependencies with conda.
