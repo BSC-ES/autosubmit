@@ -225,19 +225,8 @@ Use the command:
 *DESCRIPTION* is the new description of your experiment.
 
 Options:
-::
 
-    usage: autosubmit updatedescrip [-h] [-v] expid description
-
-    Updates the experiment's description.
-
-    positional arguments:
-        expid                 experiment identifier
-        description           New description.
-
-    optional arguments:
-        -h, --help            show this help message and exit
-        -v, --update_version  Update experiment version
+.. runcmd:: autosubmit updatedescrip -h
 
 Autosubmit will validate the provided data and print the results in the command line.
 
