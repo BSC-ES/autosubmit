@@ -70,7 +70,7 @@ Create a new experiment
 - *-H: Sets the principal experiment platform.*
 - *-d: Sets a short description for the experiment.*
 
-The output of the command will show the <EXPID> of the experiment and generate the following directory structure:
+The output of the command will show the expid of the experiment and generate the following directory structure:
 
 .. list-table::
     :header-rows: 1
