@@ -2531,40 +2531,42 @@ class Autosubmit:
         wrapper_errors = {}
         any_job_submitted = False
         # Check section jobs
-        if not only_wrappers and not inspect :
+        if not only_wrappers and not inspect:
             jobs_section = set([job.section for job in job_list.get_ready()])
             for section in jobs_section:
                 if check_jobs_file_exists(as_conf, section):
-                    raise AutosubmitCritical(f"Job {section} does not have a correct template// template not found", 7014)
+                    raise AutosubmitCritical(f"Job {section} does not have a correct template// template not found",
+                                             7014)
         try:
-            for platform in platforms_to_test:
-                packager = JobPackager(as_conf, platform, job_list, hold=hold)
+            for p in platforms_to_test:
+                packager = JobPackager(as_conf, p, job_list, hold=hold)
                 packages_to_submit = packager.build_packages()
-                save_1, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = platform.submit_ready_jobs(as_conf,
-                                                                                                              job_list,
-                                                                                                              packages_persistence,
-                                                                                                              packages_to_submit,
-                                                                                                              inspect=inspect,
-                                                                                                              only_wrappers=only_wrappers,
-                                                                                                              hold=hold)
+                save_1, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = p.submit_ready_jobs(
+                    as_conf,
+                    job_list,
+                    packages_persistence,
+                    packages_to_submit,
+                    inspect=inspect,
+                    only_wrappers=only_wrappers,
+                    hold=hold)
                 wrapper_errors.update(packager.wrappers_with_error)
                 # Jobs that are being retrieved in batch. Right now, only available for slurm platforms.
 
                 if not inspect and len(valid_packages_to_submit) > 0:
                     job_list.save()
                 save_2 = False
-                if platform.type.lower() in [ "slurm" , "pjm" ] and not inspect and not only_wrappers:
+                if p.type.lower() in ["slurm", "pjm"] and not inspect and not only_wrappers:
                     # Process the script generated in submit_ready_jobs
-                    save_2, valid_packages_to_submit = platform.process_batch_ready_jobs(valid_packages_to_submit,
-                                                                                         failed_packages,
-                                                                                         error_message="", hold=hold)
+                    save_2, valid_packages_to_submit = p.process_batch_ready_jobs(valid_packages_to_submit,
+                                                                                  failed_packages,
+                                                                                  error_message="", hold=hold)
                     if not inspect and len(valid_packages_to_submit) > 0:
                         job_list.save()
                 # Save wrappers(jobs that has the same id) to be visualized and checked in other parts of the code
                 job_list.save_wrappers(valid_packages_to_submit, failed_packages, as_conf, packages_persistence,
                                        hold=hold, inspect=inspect)
                 if error_message != "":
-                    raise AutosubmitCritical(f"Submission Failed due wrong configuration:{error_message}",7014)
+                    raise AutosubmitCritical(f"Submission Failed due wrong configuration:{error_message}", 7014)
 
             if wrapper_errors and not any_job_submitted and len(job_list.get_in_queue()) == 0:
                 # Deadlock situation
@@ -2577,11 +2579,7 @@ class Autosubmit:
             else:
                 return False
 
-        except AutosubmitError as e:
-            raise
-        except AutosubmitCritical as e:
-            raise
-        except BaseException as e:
+        except BaseException:
             raise
 
     @staticmethod

@@ -126,7 +126,7 @@ class SlurmPlatform(ParamikoPlatform):
         self._submit_script_path = self._submit_script_base_name + os.urandom(16).hex() + ".sh"
 
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages: list[str],
-                                 error_message: str="", hold: bool=False) -> tuple[bool, list]:
+                                 error_message: str = "", hold: bool = False) -> tuple[bool, list]:
         """
         Retrieve multiple jobs identifiers.
 
@@ -143,7 +143,7 @@ class SlurmPlatform(ParamikoPlatform):
         :rtype: tuple[bool, list[JobPackageBase]]
         """
         try:
-            valid_packages_to_submit = [ package for package in valid_packages_to_submit if package.x11 is not True]
+            valid_packages_to_submit = [package for package in valid_packages_to_submit if package.x11 is not True]
             if len(valid_packages_to_submit) > 0:
                 duplicated_jobs_already_checked = False
                 platform = valid_packages_to_submit[0].jobs[0].platform
@@ -154,14 +154,14 @@ class SlurmPlatform(ParamikoPlatform):
                     duplicated_jobs_already_checked = True
                     try:
                         for package_ in valid_packages_to_submit:
-                            if hasattr(package_,"name"):
-                                job_names.append(package_.name) # wrapper_name
+                            if hasattr(package_, "name"):
+                                job_names.append(package_.name)  # wrapper_name
                             else:
-                                job_names.append(package_.jobs[0].name) # job_name
+                                job_names.append(package_.jobs[0].name)  # job_name
                         Log.error(f'TRACE:{e.trace}\n{e.message} JOBS:{job_names}')
                         for job_name in job_names:
                             jobid = self.get_jobid_by_jobname(job_name)
-                            #cancel bad submitted job if jobid is encountered
+                            # cancel bad submitted job if jobid is encountered
                             for id_ in jobid:
                                 self.send_command(self.cancel_job(id_))
                     except:
@@ -182,11 +182,12 @@ class SlurmPlatform(ParamikoPlatform):
                                 if job_tmp.section not in error_msg:
                                     error_msg += job_tmp.section + "&"
                         if has_trace_bad_parameters:
-                            error_message+=(f"Check job and queue specified in your JOBS definition in YAML. Sections "
-                                            f"that could be affected: {error_msg[:-1]}")
+                            error_message += (
+                                f"Check job and queue specified in your JOBS definition in YAML. Sections "
+                                f"that could be affected: {error_msg[:-1]}")
                         else:
-                            error_message+=(f"\ncheck that {self.name} platform has set the correct scheduler. "
-                                            f"Sections that could be affected: {error_msg[:-1]}")
+                            error_message += (f"\ncheck that {self.name} platform has set the correct scheduler. "
+                                              f"Sections that could be affected: {error_msg[:-1]}")
 
                         raise AutosubmitCritical(error_message, 7014, e.error_message) from e
                 except IOError as e:
@@ -194,15 +195,15 @@ class SlurmPlatform(ParamikoPlatform):
                 except BaseException as e:
                     if str(e).find("scheduler") != -1:
                         raise AutosubmitCritical(f"Are you sure that [{self.type.upper()}] scheduler is the "
-                                    f"correct type for platform [{self.name.upper()}]?.\n Please, double check that "
-                                    f"{self.type.upper()} is loaded for {self.name.upper()} before "
-                                    f"autosubmit launch any job.",7070) from e
+                                                 f"correct type for platform [{self.name.upper()}]?.\n Please, double check that "
+                                                 f"{self.type.upper()} is loaded for {self.name.upper()} before "
+                                                 f"autosubmit launch any job.", 7070) from e
                     raise AutosubmitError(
                         "Submission failed, this can be due a failure on the platform", 6015, str(e)) from e
                 if jobs_id is None or len(jobs_id) <= 0:
                     raise AutosubmitError(
                         "Submission failed, this can be due a failure on the platform",
-                        6015,f"Jobs_id {jobs_id}")
+                        6015, f"Jobs_id {jobs_id}")
                 if hold:
                     sleep(10)
                 jobid_index = 0
@@ -228,7 +229,7 @@ class SlurmPlatform(ParamikoPlatform):
                                 retries = retries - 1
                             if not can_continue:
                                 package.jobs[0].platform.send_command(
-                                    package.jobs[0].platform.cancel_cmd+f" {current_package_id}")
+                                    package.jobs[0].platform.cancel_cmd + f" {current_package_id}")
                                 jobid_index += 1
                                 continue
                             if not self.hold_job(package.jobs[0]):
@@ -242,13 +243,13 @@ class SlurmPlatform(ParamikoPlatform):
                     if not duplicated_jobs_already_checked:
                         job_name = package.name if hasattr(package, "name") else package.jobs[0].name
                         jobid = self.get_jobid_by_jobname(job_name)
-                        if len(jobid) > 1: # Cancel each job that is not the associated
+                        if len(jobid) > 1:  # Cancel each job that is not the associated
                             ids_to_check = [package.jobs[0].id]
                             if package.jobs[0].het:
-                                for i in range(1,package.jobs[0].het.get("HETSIZE",1)): # noqa
+                                for i in range(1, package.jobs[0].het.get("HETSIZE", 1)):  # noqa
                                     ids_to_check.append(str(int(ids_to_check[0]) + i))
                             # TODO to optimize cancel all jobs at once
-                            for id_ in [ jobid for jobid in jobid if jobid not in ids_to_check]:
+                            for id_ in [jobid for jobid in jobid if jobid not in ids_to_check]:
                                 self.send_command(self.cancel_job(id_))
                                 Log.debug(f'Job {id_} with the assigned name: {job_name} has been cancelled')
                             Log.debug(f'Job {package.jobs[0].id} with the assigned name: {job_name} has been submitted')
@@ -266,7 +267,7 @@ class SlurmPlatform(ParamikoPlatform):
             raise
         except Exception as e:
             raise AutosubmitError(f"{self.name} submission failed", 6015, str(e)) from e
-        return save,valid_packages_to_submit
+        return save, valid_packages_to_submit
 
     def generate_submit_script(self) -> None:
         """
