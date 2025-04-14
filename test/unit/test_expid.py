@@ -487,7 +487,7 @@ def test_perform_deletion(create_autosubmit_tmpdir, generate_new_experiment, set
     ],
     indirect=["generate_new_experiment"]
 )
-def test_remote_repo_operational(generate_new_experiment, create_autosubmit_tmpdir, project_type):
+def test_remote_repo_operational(generate_new_experiment, create_autosubmit_tmpdir, project_type, mocker):
     expid = generate_new_experiment
     temp_path = Path(create_autosubmit_tmpdir) / expid / "conf" / f"expdef_{expid}.yml"
     
@@ -498,11 +498,10 @@ def test_remote_repo_operational(generate_new_experiment, create_autosubmit_tmpd
     with open(temp_path, 'w') as f:
         yaml.dump(data, f)
 
-    with patch('subprocess.check_output') as mock_check_output:
-        mock_check_output.return_value = b'M\n'
-        if expid[0] != 'o':
-            AutosubmitGit.check_unpushed_changes(expid)
-        else:
-            with pytest.raises(AutosubmitCritical):
-                AutosubmitGit.check_unpushed_changes(expid) 
+    mocker.patch('subprocess.check_output', return_value = b'M\n')
+    if expid[0] != 'o':
+        AutosubmitGit.check_unpushed_changes(expid)
+    else:
+        with pytest.raises(AutosubmitCritical):
+            AutosubmitGit.check_unpushed_changes(expid) 
             
