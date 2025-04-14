@@ -11,6 +11,8 @@ import select
 import re
 from datetime import timedelta
 import random
+
+from autosubmit.helpers.utils import get_locale
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_common import Type
 from autosubmit.platforms.platform import Platform
@@ -396,11 +398,7 @@ class ParamikoPlatform(Platform):
         multiple_delete_previous_run = os.path.join(
             log_dir, "multiple_delete_previous_run.sh")
         if os.path.exists(log_dir):
-            lang = locale.getlocale()[1]
-            if lang is None:
-                lang = locale.getdefaultlocale()[1]
-                if lang is None:
-                    lang = 'UTF-8'
+            lang = get_locate()
             open(multiple_delete_previous_run, 'wb+').write( ("rm -f" + filenames).encode(lang))
             os.chmod(multiple_delete_previous_run, 0o770)
             self.send_file(multiple_delete_previous_run, False)
@@ -1077,22 +1075,29 @@ class ParamikoPlatform(Platform):
         thread.start()
         return thread
 
-    def send_command(self, command, ignore_log=False, x11 = False):
+    def send_command(self, command: str, ignore_log: bool = False, x11: bool = False) -> bool:
         """
-        Sends given command to HPC
+        Sends a given command to the HPC platform.
 
-        :param x11:
-        :param ignore_log:
-        :param command: command to send
+        This method executes a command on a remote platform via SSH, handles the output,
+        and processes any errors that occur during execution. It supports optional X11 forwarding.
+
+        :param command: The command to execute on the remote platform.
         :type command: str
-        :return: True if executed, False if failed
+        :param ignore_log: If True, suppresses logging of command warnings or errors.
+        :type ignore_log: bool
+        :param x11: If True, enables X11 forwarding for the command execution.
+        :type x11: bool
+        :return: True if the command was executed successfully, False otherwise.
         :rtype: bool
+
+        :raises AutosubmitError: Raised for various SSH-related errors, such as session issues,
+                                 command not found, or invalid parameters.
+        :raises AutosubmitCritical: Raised for critical errors, such as syntax errors in the command.
+        :raises IOError: Raised for I/O-related issues during command execution.
+        :raises BaseException: Raised for any other unexpected errors.
         """
-        lang = locale.getlocale()[1]
-        if lang is None:
-            lang = locale.getdefaultlocale()[1]
-            if lang is None:
-                lang = 'UTF-8'
+        lang = get_locale()
         if "rsync" in command or "find" in command or "convertLink" in command:
             timeout = None  # infinite timeout on migrate command
         elif "rm" in command:
@@ -1112,10 +1117,9 @@ class ParamikoPlatform(Platform):
                 stdout_chunks.append(stdout.channel.recv(len(stdout.channel.in_buffer)))
 
             aux_stderr = []
-            i = 0
             x11_exit = False
 
-            while (not channel.closed or channel.recv_ready() or channel.recv_stderr_ready() ) and not x11_exit:
+            while (not channel.closed or channel.recv_ready() or channel.recv_stderr_ready()) and not x11_exit:
                 # stop if channel was closed prematurely, and there is no data in the buffers.
                 got_chunk = False
                 readq, _, _ = select.select([stdout.channel], [], [], 2)
@@ -1134,7 +1138,7 @@ class ParamikoPlatform(Platform):
                         aux_stderr.extend(stderr_readlines)
                         for stderr_line in stderr_readlines:
                             stderr_line = stderr_line.decode(lang)
-                            if "salloc" in stderr_line: # salloc is the command to allocate resources in slurm, for pjm it is different
+                            if "salloc" in stderr_line:  # salloc is the command to allocate resources in slurm, for pjm it is different
                                 job_id = re.findall(r'\d+', stderr_line)
                                 if job_id:
                                     stdout_chunks.append(job_id[0].encode(lang))
@@ -1156,7 +1160,6 @@ class ParamikoPlatform(Platform):
                 stdout.close()
                 stderr.close()
 
-
             self._ssh_output = ""
             self._ssh_output_err = ""
             for s in stdout_chunks:
@@ -1166,7 +1169,7 @@ class ParamikoPlatform(Platform):
                 self._ssh_output_err += errorLineCase.decode(lang)
 
                 errorLine = errorLineCase.lower().decode(lang)
-                 # to be simplified in the future in a function and using in. The errors should be inside the class of the platform not here
+                # to be simplified in the future in a function and using in. The errors should be inside the class of the platform not here
                 if "not active" in errorLine:
                     raise AutosubmitError(
                         'SSH Session not active, will restart the platforms', 6005)
@@ -1178,9 +1181,18 @@ class ParamikoPlatform(Platform):
                         self._ssh_output_err
                     )
                 elif errorLine.find("syntax error") != -1:
-                    raise AutosubmitCritical("Syntax error",7052,self._ssh_output_err)
-                elif errorLine.find("refused") != -1 or errorLine.find("slurm_persist_conn_open_without_init") != -1 or errorLine.find("slurmdbd") != -1 or errorLine.find("submission failed") != -1 or errorLine.find("git clone") != -1 or errorLine.find("sbatch: error: ") != -1 or errorLine.find("not submitted") != -1 or errorLine.find("invalid") != -1 or "[ERR.] PJM".lower() in errorLine:
-                    if "salloc: error" in errorLine or "salloc: unrecognized option" in errorLine or "[ERR.] PJM".lower() in errorLine or (self._submit_command_name == "sbatch" and (errorLine.find("policy") != -1 or errorLine.find("invalid") != -1) ) or (self._submit_command_name == "sbatch" and errorLine.find("argument") != -1) or (self._submit_command_name == "bsub" and errorLine.find("job not submitted") != -1) or self._submit_command_name == "ecaccess-job-submit" or self._submit_command_name == "qsub ":
+                    raise AutosubmitCritical("Syntax error", 7052, self._ssh_output_err)
+                elif errorLine.find("refused") != -1 or errorLine.find(
+                        "slurm_persist_conn_open_without_init") != -1 or errorLine.find(
+                        "slurmdbd") != -1 or errorLine.find("submission failed") != -1 or errorLine.find(
+                        "git clone") != -1 or errorLine.find("sbatch: error: ") != -1 or errorLine.find(
+                        "not submitted") != -1 or errorLine.find("invalid") != -1 or "[ERR.] PJM".lower() in errorLine:
+                    if "salloc: error" in errorLine or "salloc: unrecognized option" in errorLine or "[ERR.] PJM".lower() in errorLine or (
+                            self._submit_command_name == "sbatch" and (
+                            errorLine.find("policy") != -1 or errorLine.find("invalid") != -1)) or (
+                            self._submit_command_name == "sbatch" and errorLine.find("argument") != -1) or (
+                            self._submit_command_name == "bsub" and errorLine.find(
+                            "job not submitted") != -1) or self._submit_command_name == "ecaccess-job-submit" or self._submit_command_name == "qsub ":
                         raise AutosubmitError(errorLine, 7014, "Bad Parameters.")
                     raise AutosubmitError(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6005)
 
@@ -1189,7 +1201,7 @@ class ParamikoPlatform(Platform):
                     Log.printlog(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6006)
                 else:
                     pass
-                    #Log.debug('Command {0} in {1} successful without message: {2}', command, self.host, self._ssh_output)
+                    # Log.debug('Command {0} in {1} successful without message: {2}', command, self.host, self._ssh_output)
             return True
         except AttributeError as e:
             raise AutosubmitError(f'Session not active: {str(e)}', 6005)
@@ -1198,7 +1210,7 @@ class ParamikoPlatform(Platform):
         except AutosubmitError as e:
             raise
         except IOError as e:
-            raise AutosubmitError(str(e),6016)
+            raise AutosubmitError(str(e), 6016)
         except BaseException as e:
             if type(stderr_readlines) is str:
                 stderr_readlines = '\n'.join(stderr_readlines)

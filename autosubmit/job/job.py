@@ -24,6 +24,7 @@ Main module for Autosubmit. Only contains an interface class to all functionalit
 from collections import OrderedDict
 from pathlib import Path
 
+from autosubmit.helpers.utils import get_locale
 from autosubmit.job import job_utils
 import copy
 import datetime
@@ -2355,11 +2356,7 @@ class Job(object):
         :rtype: str
         """
 
-        lang = locale.getlocale()[1]
-        if lang is None:
-            lang = locale.getdefaultlocale()[1]
-            if lang is None:
-                lang = 'UTF-8'
+        lang = get_locate()
         parameters = self.update_parameters(as_conf, set_attributes=False)
         template_content,additional_templates = self.update_content(as_conf, parameters)
         #enumerate and get value
