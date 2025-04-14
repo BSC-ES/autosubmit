@@ -139,7 +139,16 @@ log file, or to memorize the location of these files, Autosubmit provides the
 
 .. code-block:: bash
 
-.. runcmd:: autosubmit cat-log a000
+    $ autosubmit cat-log a000
+    Autosubmit is running with 4.0.0b
+    2023-02-27 21:45:47,863 Autosubmit is running with 4.0.0b
+    2023-02-27 21:45:47,872
+    Checking configuration files...
+    2023-02-27 21:45:47,900 expdef_a000.yml OK
+    2023-02-27 21:45:47,904 platforms_a000.yml OK
+    2023-02-27 21:45:47,905 jobs_a000.yml OK
+    2023-02-27 21:45:47,906 autosubmit_a000.yml OK
+    2023-02-27 21:45:47,907 Configuration files OK
 
 .. note::
     The ``-f`` (``--file``) option is for the file type, not the file path.
@@ -195,9 +204,6 @@ Final step: Modify and run
 
  Open expdef.yml
 
-.. runcmd:: vi ~/autosubmit/a000/expdef_a000.yml
-
-
 .. code-block:: yaml
 
     DEFAULT:
@@ -213,9 +219,6 @@ Final step: Modify and run
         (...)
 
 Now open platforms.yml. Note: This will be an example for marenostrum4
-
-.. runcmd:: vi ~/autosubmit/a000/platforms_a000.yml
-
 
 .. code-block:: yaml
 
