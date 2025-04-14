@@ -24,6 +24,7 @@ import random
 import time
 from datetime import timedelta
 
+from autosubmit.helpers.utils import get_locale
 from autosubmit.job.job_common import Status
 from log.log import Log, AutosubmitCritical
 
@@ -560,11 +561,7 @@ class JobPackageThread(JobPackageBase):
             self._job_scripts[self.jobs[i].name] = self.jobs[i].create_script(configuration)
         self._common_script = self._create_common_script()
     def _create_common_script(self,filename=""):
-        lang = locale.getlocale()[1]
-        if lang is None:
-            lang = locale.getdefaultlocale()[1]
-            if lang is None:
-                lang = 'UTF-8'
+        lang = get_locate()
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
         open(os.path.join(self._tmp_path, script_file), 'wb').write(script_content.encode(lang))

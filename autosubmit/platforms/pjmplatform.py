@@ -22,6 +22,7 @@ from contextlib import suppress
 from time import sleep
 from typing import List, Union
 
+from autosubmit.helpers.utils import get_locale
 from autosubmit.job.job_common import Status
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.headers.pjm_header import PJMHeader
@@ -377,11 +378,7 @@ class PJMPlatform(ParamikoPlatform):
 
 
         with suppress(BaseException):
-            lang = locale.getlocale()[1]
-            if lang is None:
-                lang = locale.getdefaultlocale()[1]
-                if lang is None:
-                    lang = 'UTF-8'
+            lang = get_locate()
             with open(self._submit_script_path, "ab") as submit_script_file:
                 if not hold:
                     submit_script_file.write((export + self._submit_cmd + job_script + "\n").encode(lang))

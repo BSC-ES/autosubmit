@@ -28,6 +28,8 @@ import os
 from time import sleep
 from typing import List, Union, Any
 from xml.dom.minidom import parseString
+
+from autosubmit.helpers.utils import get_locale
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 from autosubmit.job.job_common import Status
@@ -551,11 +553,7 @@ class SlurmPlatform(ParamikoPlatform):
 
         if not x11:
             try:
-                lang = locale.getlocale()[1]
-                if lang is None:
-                    lang = locale.getdefaultlocale()[1]
-                    if lang is None:
-                        lang = 'UTF-8'
+                lang = get_locate()
                 with open(self._submit_script_path, "ab") as submit_script_file:
                     if not hold:
                         submit_script_file.write((export + self._submit_cmd + job_script + "\n").encode(lang))

@@ -21,6 +21,8 @@ import os
 from pathlib import Path
 from xml.dom.minidom import parseString
 import subprocess
+
+from autosubmit.helpers.utils import get_locale
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.headers.local_header import LocalHeader
 from autosubmit.platforms.wrappers.wrapper_factory import LocalWrapperFactory
@@ -137,11 +139,7 @@ class LocalPlatform(ParamikoPlatform):
             self.check_job(job)
 
     def send_command(self, command, ignore_log=False, x11 = False):
-        lang = locale.getlocale()[1]
-        if lang is None:
-            lang = locale.getdefaultlocale()[1]
-            if lang is None:
-                lang = 'UTF-8'
+        lang = get_locate()
         try:
             output = subprocess.check_output(command.encode(lang), shell=True)
         except subprocess.CalledProcessError as e:
@@ -188,9 +186,7 @@ class LocalPlatform(ParamikoPlatform):
         multiple_delete_previous_run = os.path.join(
             log_dir, "multiple_delete_previous_run.sh")
         if os.path.exists(log_dir):
-            lang = locale.getlocale()[1]
-            if lang is None:
-                lang = 'UTF-8'
+            lang = get_locate()
             open(multiple_delete_previous_run, 'wb+').write(("rm -f" + filenames).encode(lang))
             os.chmod(multiple_delete_previous_run, 0o770)
         return ""
