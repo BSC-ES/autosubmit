@@ -137,7 +137,7 @@ class RunCmdDirective(code.CodeBlock):
         # allow the directive to receive a working directory, so that we
         # change to that working directory before running the desired command.
         # The working directory is omitted from the final output.
-        working_directory = self.options.get('working-directory', '')
+        working_directory = self.options.get('working-directory', 'source/')
         if working_directory == '':
             # subprocess default value, so that we can disable it if needed.
             working_directory = None
