@@ -67,7 +67,7 @@ Once you've already loaded / installed the Autosubmit version do you want:
     autosubmit updateversion <EXPID>
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    autosubmit run $EXPID -v
+    autosubmit run <EXPID> -v
 
 *EXPID* is the experiment identifier.
 The most common problem when you change your Autosubmit version is the apparition of several Python errors.
@@ -83,21 +83,21 @@ Once you've already loaded / installed the Autosubmit version do you want:
 
 .. code-block:: bash
 
-    autosubmit upgrade $EXPID
-    autosubmit create $EXPID -np
-    autosubmit recovery $EXPID -s --all -f -np
+    autosubmit upgrade <EXPID>
+    autosubmit create <EXPID> -np
+    autosubmit recovery <EXPID> -s --all -f -np
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    autosubmit run $EXPID -v
+    autosubmit run <EXPID> -v
     or
-    autosubmit updateversion $EXPID
+    autosubmit updateversion <EXPID>
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    autosubmit run $EXPID -v
+    autosubmit run <EXPID> -v
 
-*EXPID* is the experiment identifier.
+*<EXPID>* is the experiment identifier.
 The most common problem when you upgrade an experiment with INI configuration to YAML is that some variables may be not automatically translated.
-Ensure that all your $EXPID/conf/\*.yml files are correct and also revise the templates in $EXPID/proj/$proj_name.
+Ensure that all your <EXPID>/conf/\*.yml files are correct and also revise the templates in <EXPID>/proj/$proj_name.
 
 
 How to run only selected members
@@ -109,9 +109,9 @@ To run only a subset of selected members you can execute the command:
 
         # Add your key to ssh agent ( if encrypted )
         ssh-add ~/.ssh/id_rsa
-        autosubmit run EXPID -rom MEMBERS
+        autosubmit run <EXPID> -rom MEMBERS
 
-*EXPID* is the experiment identifier, the experiment you want to run.
+*<EXPID>* is the experiment identifier, the experiment you want to run.
 
 *MEMBERS* is the selected subset of members. Format `"member1 member2 member2"`, example: `"fc0 fc1 fc2"`.
 
@@ -123,11 +123,11 @@ Furthermore, if you wish to run a sequence of only members execution; then, inst
 
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    autosubmit run EXPID -rom MEMBER_1
-    autosubmit run EXPID -rom MEMBER_2
-    autosubmit run EXPID -rom MEMBER_3
+    autosubmit run <EXPID> -rom MEMBER_1
+    autosubmit run <EXPID> -rom MEMBER_2
+    autosubmit run <EXPID> -rom MEMBER_3
     ...
-    autosubmit run EXPID -rom MEMBER_N
+    autosubmit run <EXPID> -rom MEMBER_N
 
 How to start an experiment at a given time
 ------------------------------------------
@@ -138,9 +138,9 @@ To start an experiment at a given time, use the command:
 
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    autosubmit run EXPID -st INPUT
+    autosubmit run <EXPID> -st INPUT
 
-*EXPID* is the experiment identifier
+*<EXPID>* is the experiment identifier
 
 *INPUT* is the time when your experiment will start. You can provide two formats:
   * `H:M:S`: For example `15:30:00` will start your experiment at 15:30 in the afternoon of the present day.
@@ -162,11 +162,11 @@ To start an experiment after another experiment is finished, use the command:
 
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    autosubmit run EXPID -sa EXPIDB
+    autosubmit run <EXPID> -sa <EXPIDB>
 
-*EXPID* is the experiment identifier, the experiment you want to start.
+*<EXPID>* is the experiment identifier, the experiment you want to start.
 
-*EXPIDB* is the experiment identifier of the experiment you are waiting for before your experiment starts.
+*<EXPIDB>* is the experiment identifier of the experiment you are waiting for before your experiment starts.
 
 .. warning:: Both experiments must be using Autosubmit version `3.13.0` or later.
 
@@ -186,7 +186,7 @@ add the ``--profile`` (or ``-p``) flag to your ``autosubmit run`` command, as in
 
 .. code-block:: bash
 
-    autosubmit run --profile EXPID
+    autosubmit run --profile <EXPID>
 
 .. include:: ../../_include/profiler_common.rst
 
