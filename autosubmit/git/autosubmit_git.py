@@ -23,6 +23,8 @@ import os
 import re
 import shutil
 import subprocess
+from pathlib import Path
+from ruamel.yaml import YAML
 from shutil import rmtree
 from time import time
 from typing import List, Union
@@ -260,19 +262,29 @@ class AutosubmitGit:
         return True
 
     @staticmethod
-    def is_github_repo(git_repo: str) -> bool:
-        '''
-        Checks if a given string is a valid github repository
-        '''
+    def check_unpushed_changes(expid: str) -> None:
+        """
+        Raises an AutosubmitCritical error if the experiment is operational, the platform is Git, and there are unpushed changes.
 
-        git_repo = git_repo.lower().strip()
+        Args: expid (str): The experiment ID.
 
-        git_url_pattern = re.compile(
-                r'^(?:git|ssh|https?|git@[\w\.]+):(//)?[\w\.@\:/\-~]+\.git/?$'
-                )
+        Returns: None
+        """
+        if expid[0] == 'o':
+            origin = Path(BasicConfig.expid_dir(expid).joinpath("conf/expdef_{}.yml".format(expid)))
+            with open(origin, 'r') as f:
+                yaml = YAML(typ='rt')
+                data = yaml.load(f)
+                project = data["PROJECT"]["PROJECT_TYPE"]
 
-        file_url_pattern = re.compile(
-                r'^file://.+$'
-                )
+            version_controls = ["git", 
+                                "git submodule"]
+            arguments = [["status", "--porcelain"],
+                        ["foreach", "'git status --porcelain'"]]
+            for version_control, args in zip(version_controls, arguments):
+                if project == version_control:
+                    output = subprocess.check_output([version_control, args]).decode(locale.getlocale()[1])
+                    if any(status.startswith(code) for code in ["M", "A", "D", "?"] for status in output.splitlines()):
+                        # M: Modified, A: Added, D: Deleted, ?: Untracked
+                        raise AutosubmitCritical("Push local changes to remote repository before running", 7075)
 
-        return bool(git_url_pattern.search(git_repo) or file_url_pattern.search(git_repo))
