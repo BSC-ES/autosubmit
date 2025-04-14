@@ -2,11 +2,11 @@ import os
 import pwd
 import re
 from itertools import zip_longest
-
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from pathlib import Path
 
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
+from autosubmitconfigparser.config.basicconfig import BasicConfig
 from log.log import AutosubmitCritical, Log
 
 
@@ -119,6 +119,7 @@ def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=N
         else:
             raise AutosubmitCritical("Issues while checking the connectivity of platforms.", 7010, issues + "\n" + ssh_config_issues)
 
+
 # Source: https://github.com/cylc/cylc-flow/blob/a722b265ad0bd68bc5366a8a90b1dbc76b9cd282/cylc/flow/tui/util.py#L226
 class NaturalSort:
     """An object to use as a sort key for sorting strings as a human would.
@@ -220,3 +221,31 @@ def strtobool(val):
         return 0
     else:
         raise ValueError("invalid truth value %r" % (val,))
+
+
+def get_rc_path(machine: bool, local: bool) -> Path:
+    """Get the ``.autosubmit.rc`` path.
+
+    If the environment variable ``AUTOSUBMIT_CONFIGURATION`` is specified in the
+    system, this function will return a ``Path`` pointing to that value.
+
+    If ``machine`` is ``True``, it will use the file from ``/etc/.autosubmitrc``
+    (pay attention to the dot prefix).
+
+    Else, if ``local`` is ``True``, it will use the file from  ``./.autosubmitrc``
+    (i.e. it will use the current working directory for the process).
+
+    Otherwise, it will load the file from ``~/.autosubmitrc``, for the user
+    currently running Autosubmit.
+    """
+    if 'AUTOSUBMIT_CONFIGURATION' in os.environ:
+        return Path(os.environ['AUTOSUBMIT_CONFIGURATION'])
+
+    if machine:
+        rc_path = '/etc'
+    elif local:
+        rc_path = '.'
+    else:
+        rc_path = Path.home()
+
+    return Path(rc_path) / '.autosubmitrc'

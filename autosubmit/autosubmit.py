@@ -80,7 +80,7 @@ from .history.experiment_history import ExperimentHistory
 import autosubmit.history.utils as HUtils
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 import autosubmit.statistics.utils as StatisticsUtils
-from autosubmit.helpers.utils import check_jobs_file_exists
+from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path
 
 from contextlib import suppress
 
@@ -2149,7 +2149,7 @@ class Autosubmit:
             p.work_event.set()
 
     @staticmethod
-    def run_experiment(expid, notransitive=False, start_time=None, start_after=None, run_only_members=None, profile=False):
+    def run_experiment(expid, notransitive=False, start_time=None, start_after=None, run_only_members=None, profile=False) -> int:
         """
         Runs and experiment (submitting all the jobs properly and repeating its execution in case of failure).
         :param expid: the experiment id
@@ -2158,7 +2158,7 @@ class Autosubmit:
         :param start_after: the expid after which the experiment should start
         :param run_only_members: the members to run
         :param profile: if True, the function will be profiled
-        :return: None
+        :return: exit status
 
         """
         # Start profiling if the flag has been used
@@ -3406,7 +3406,7 @@ class Autosubmit:
 
     @staticmethod
     def configure(advanced, database_path, database_filename, local_root_path, platforms_conf_path, jobs_conf_path,
-                  smtp_hostname, mail_from, machine, local):
+                  smtp_hostname, mail_from, machine: bool, local: bool):
         """
         Configure several paths for autosubmit: database, local root and others. Can be configured at system,
         user or local levels. Local level configuration precedes user level and user level precedes system
@@ -3486,61 +3486,54 @@ class Autosubmit:
                     Log.error("jobs.yml path does not exist.")
                     return False
 
-            if machine:
-                rc_path = '/etc'
-            elif local:
-                rc_path = '.'
-            else:
-                rc_path = home_path
-            rc_path = rc_path.joinpath('.autosubmitrc')
+            rc_path: Path = get_rc_path(machine, local)
 
-            config_file = open(rc_path, 'w')
-            Log.info("Writing configuration file...")
-            try:
-                parser = ConfigParser()
-                parser.add_section('database')
-                parser.set('database', 'path', str(database_path))
-                if database_filename is not None and len(str(database_filename)) > 0:
-                    parser.set('database', 'filename', str(database_filename))
-                parser.add_section('local')
-                parser.set('local', 'path', str(local_root_path))
-                if (jobs_conf_path is not None and len(str(jobs_conf_path)) > 0) or (
-                        platforms_conf_path is not None and len(str(platforms_conf_path)) > 0):
-                    parser.add_section('conf')
-                    if jobs_conf_path is not None:
-                        parser.set('conf', 'jobs', str(jobs_conf_path))
-                    if platforms_conf_path is not None:
-                        parser.set('conf', 'platforms', str(platforms_conf_path))
-                if smtp_hostname is not None or mail_from is not None:
-                    parser.add_section('mail')
-                    parser.set('mail', 'smtp_server', smtp_hostname)
-                    parser.set('mail', 'mail_from', mail_from)
-                parser.add_section("globallogs")
-                parser.set("globallogs", "path", str(global_logs_path))
-                parser.add_section("structures")
-                parser.set("structures", "path", str(structures_path))
-                parser.add_section("historicdb")
-                parser.set("historicdb", "path", str(historicdb_path))
-                parser.add_section("historiclog")
-                parser.set("historiclog", "path", str(historiclog_path))
-                parser.add_section("autosubmitapi")
-                parser.set("autosubmitapi", "url", autosubmitapi_url)
-                # parser.add_section("hosts")
-                # parser.set("hosts", "whitelist", " localhost # Add your machine names")
-                parser.write(config_file)
-                config_file.close()
-                Log.result(f"Configuration file written successfully: \n\t{rc_path}")
-                HUtils.create_path_if_not_exists(local_root_path)
-                HUtils.create_path_if_not_exists(global_logs_path)
-                HUtils.create_path_if_not_exists(structures_path)
-                HUtils.create_path_if_not_exists(historicdb_path)
-                HUtils.create_path_if_not_exists(historiclog_path)
-                Log.result(f"Directories configured successfully: \n\t{str(database_path)} \n\t{str(local_root_path)}"
-                           f" \n\t{str(global_logs_path)} \n\t{str(structures_path)} \n\t{str(historicdb_path)}"
-                           f" \n\t{str(historiclog_path)}")
-            except (IOError, OSError) as e:
-                raise AutosubmitCritical(
-                    "Can not write config file: {0}", 7012, e.message)
+            with open(rc_path, 'w') as config_file:
+                Log.info("Writing configuration file...")
+                try:
+                    parser = ConfigParser()
+                    parser.add_section('database')
+                    parser.set('database', 'path', str(database_path))
+                    if database_filename is not None and len(str(database_filename)) > 0:
+                        parser.set('database', 'filename', str(database_filename))
+                    parser.add_section('local')
+                    parser.set('local', 'path', str(local_root_path))
+                    if (jobs_conf_path is not None and len(str(jobs_conf_path)) > 0) or (
+                            platforms_conf_path is not None and len(str(platforms_conf_path)) > 0):
+                        parser.add_section('conf')
+                        if jobs_conf_path is not None:
+                            parser.set('conf', 'jobs', str(jobs_conf_path))
+                        if platforms_conf_path is not None:
+                            parser.set('conf', 'platforms', str(platforms_conf_path))
+                    if smtp_hostname is not None or mail_from is not None:
+                        parser.add_section('mail')
+                        parser.set('mail', 'smtp_server', smtp_hostname)
+                        parser.set('mail', 'mail_from', mail_from)
+                    parser.add_section("globallogs")
+                    parser.set("globallogs", "path", str(global_logs_path))
+                    parser.add_section("structures")
+                    parser.set("structures", "path", str(structures_path))
+                    parser.add_section("historicdb")
+                    parser.set("historicdb", "path", str(historicdb_path))
+                    parser.add_section("historiclog")
+                    parser.set("historiclog", "path", str(historiclog_path))
+                    parser.add_section("autosubmitapi")
+                    parser.set("autosubmitapi", "url", autosubmitapi_url)
+                    # parser.add_section("hosts")
+                    # parser.set("hosts", "whitelist", " localhost # Add your machine names")
+                    parser.write(config_file)
+                    Log.result(f"Configuration file written successfully: \n\t{rc_path}")
+                    HUtils.create_path_if_not_exists(local_root_path)
+                    HUtils.create_path_if_not_exists(global_logs_path)
+                    HUtils.create_path_if_not_exists(structures_path)
+                    HUtils.create_path_if_not_exists(historicdb_path)
+                    HUtils.create_path_if_not_exists(historiclog_path)
+                    Log.result(f"Directories configured successfully: \n\t{str(database_path)} \n\t{str(local_root_path)}"
+                               f" \n\t{str(global_logs_path)} \n\t{str(structures_path)} \n\t{str(historicdb_path)}"
+                               f" \n\t{str(historiclog_path)}")
+                except (IOError, OSError) as e:
+                    raise AutosubmitCritical(
+                        "Can not write config file: {0}", 7012, e.message)
         except (AutosubmitCritical, AutosubmitError) as e:
             raise
         except BaseException as e:

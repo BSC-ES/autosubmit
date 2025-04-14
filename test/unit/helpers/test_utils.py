@@ -15,9 +15,11 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+from pathlib import Path
+
 import pytest
 
-from autosubmit.helpers.utils import strtobool
+from autosubmit.helpers.utils import strtobool, get_rc_path
 
 
 @pytest.mark.parametrize(
@@ -54,3 +56,28 @@ def test_strtobool(val, expected):
             strtobool(val)
     else:
         assert expected == strtobool(val)
+
+
+@pytest.mark.parametrize(
+    'expected,machine,local,env_vars',
+    [
+        (Path('/tmp/hello/scooby/doo/ooo.txt'), True, True, {
+            'AUTOSUBMIT_CONFIGURATION': '/tmp/hello/scooby/doo/ooo.txt'
+        }),
+        (Path('/etc/.autosubmitrc'), True, True, {}),
+        (Path('/etc/.autosubmitrc'), True, False, {}),
+        (Path('./.autosubmitrc'), False, True, {}),
+        (Path(Path.home(), '.autosubmitrc'), False, False, {})
+    ],
+    ids=[
+        'Use env var',
+        'Use machine, even if local is true',
+        'Use machine',
+        'Use local',
+        'Use home'
+    ]
+)
+def test_get_rc_path(expected: Path, machine: bool, local: bool, env_vars: dict, mocker):
+    mocker.patch.dict('autosubmit.helpers.utils.os.environ', env_vars, clear=True)
+
+    assert expected == get_rc_path(machine, local)
