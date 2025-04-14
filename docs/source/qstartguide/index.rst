@@ -195,7 +195,7 @@ Final step: Modify and run
 
  Open expdef.yml
 
-.. runcmd:: cat ~/autosubmit/a000/expdef_a000.yml
+.. runcmd:: vi ~/autosubmit/a000/expdef_a000.yml
 
 
 .. code-block:: yaml
@@ -214,7 +214,7 @@ Final step: Modify and run
 
 Now open platforms.yml. Note: This will be an example for marenostrum4
 
-.. runcmd:: cat ~/autosubmit/a000/platforms_a000.yml
+.. runcmd:: vi ~/autosubmit/a000/platforms_a000.yml
 
 
 .. code-block:: yaml
