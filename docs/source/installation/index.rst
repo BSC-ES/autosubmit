@@ -74,7 +74,11 @@ For a very quick test, you can follow the next instructions to configure and run
     # autosubmit configure
 
     # Install
-    # autosubmit install
+
+.. runcmd:: autosubmit install
+
+
+.. code-block:: bash
 
     # Quick-start
     # Get expid
