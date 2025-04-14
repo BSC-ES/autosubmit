@@ -10,7 +10,7 @@ This procedure allows you to save space after finalising an experiment.
 You must execute:
 ::
 
-    autosubmit clean <EXPID>
+    autosubmit clean EXPID
 
 
 Options:

@@ -51,11 +51,11 @@ Other possible errors
 
 *Explanation*: The latest version of autosubmit uses a database to efficiently track changes in the jobs of your experiment. It could have happened that this small database got corrupted.
 
-*Solution*: run `autosubmit dbfix <EXPID>` where `<EXPID>` is the identifier of your experiment. This function will rebuild the database saving as much information as possible (usually all of it).
+*Solution*: run `autosubmit dbfix expid` where `expid` is the identifier of your experiment. This function will rebuild the database saving as much information as possible (usually all of it).
 
-**The pkl file of my experiment is empty but there is a job_list_%<EXPID>%_backup.pkl file that seems to be the real one.**
+**The pkl file of my experiment is empty but there is a job_list_%expid%_backup.pkl file that seems to be the real one.**
 
-*Solution*: run `autosubmit pklfix <EXPID>`, it will restore the `backup` file if possible.
+*Solution*: run `autosubmit pklfix expid`, it will restore the `backup` file if possible.
 
 Error codes
 ===========

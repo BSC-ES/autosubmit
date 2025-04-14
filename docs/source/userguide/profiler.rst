@@ -31,7 +31,7 @@ please, do not use it on concurrent code. For memory profiling, it uses ``psutil
       it in other functions may produce unexpected results or errors. Now, its usage have been 
       extended to ``autosubmit create`` and ``monitor``.
       
-      The profiler instantiation requires an ``<EXPID>``, and not all the functions in Autosubmit use it.
+      The profiler instantiation requires an ``EXPID``, and not all the functions in Autosubmit use it. 
       This can be bypassed using another string, but keep in mind that there is no error handling in 
       this case.
 
@@ -52,7 +52,7 @@ your parser:
 The function must receive the flag as argument to control the execution of the profiler. If the flag 
 has value ``True``, you should proceed as follows:
 
-1. Instantiate a **Profiler(EXPID)** object. Specifying the ``<EXPID>`` is mandatory.
+1. Instantiate a **Profiler(EXPID)** object. Specifying the ``EXPID`` is mandatory.
 
 2. Run the profiler by calling the **start()** function of the instantiated object, at the beginning 
    of the function or code fragment you want to evaluate. The measurement will start instantly.

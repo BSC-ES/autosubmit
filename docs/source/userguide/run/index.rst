@@ -10,9 +10,9 @@ Launch Autosubmit with the command:
 
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    autosubmit run <EXPID>
+    autosubmit run EXPID
 
-In the previous command output ``<EXPID>`` is the experiment identifier. The command
+In the previous command output ``EXPID`` is the experiment identifier. The command
 exits with ``0`` when the workflow finishes with no failed jobs, and with ``1``
 otherwise.
 
@@ -58,13 +58,13 @@ Once you've already loaded / installed the Autosubmit version do you want:
 
 .. code-block:: bash
 
-    autosubmit create <EXPID> -np
-    autosubmit recovery <EXPID> -s --all -f -np
+    autosubmit create $EXPID -np
+    autosubmit recovery $EXPID -s --all -f -np
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
-    autosubmit run <EXPID> -v
+    autosubmit run $EXPID -v
     or
-    autosubmit updateversion <EXPID>
+    autosubmit updateversion $EXPID
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
     autosubmit run $EXPID -v

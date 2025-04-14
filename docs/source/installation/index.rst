@@ -77,11 +77,11 @@ For a very quick test, you can follow the next instructions to configure and run
     # autosubmit install
 
     # Quick-start
-    # Get <EXPID>
+    # Get expid
     # autosubmit expid -H "local" -d "Test exp in local."
 
     # Create with
-    # Since it was a new install, the <EXPID> will be a000
+    # Since it was a new install, the expid will be a000
     # autosubmit create a000
 
     # In case you want to use a remote platform
@@ -151,7 +151,7 @@ For a very quick test, you can follow the next instructions to configure and run
     autosubmit expid -H "local" -d "Test exp in local."
 
     # Create with
-    # Since it was a new install, the <EXPID> will be a000
+    # Since it was a new install, the expid will be a000
     autosubmit create a000
 
     # In case you want to use a remote platform
@@ -270,7 +270,7 @@ Mandatory parameters of /etc/autosubmit
     [local]
     path = <experiment_path>
 
-    # Global logs, logs without <EXPID> associated.
+    # Global logs, logs without expid associated.
     [globallogs]
     path = /home/dbeltran/autosubmit/logs
 
