@@ -44,9 +44,11 @@ This option makes a copy of an existing experiment.
 It registers a new unique identifier and copies all configuration files in the new experiment folder:
 ::
 
-    autosubmit expid -y <EXPID> -H HPCname -d Description
-    autosubmit expid -y <EXPID> -c PATH -H HPCname -d Description
-    autosubmit expid -y a000 -H HPCname -d Description
+    autosubmit expid -y COPY -H HPCname -d Description
+    autosubmit expid -y COPY -c PATH -H HPCname -d Description
+
+
+.. runcmd:: autosubmit expid -y a000 -H HPCname -d Description
 
 
 *HPCname* is the name of the main HPC platform for the experiment: it will be the default platform for the tasks.
@@ -95,6 +97,28 @@ Example:
 
     autosubmit expid -H ithaca -dm -d "experiment is about..."
 
+Create a test case experiment
+------------------------------------
+
+Test case experiments are special experiments which have a reserved first letter "t" at the expid. They are meant to
+help differentiate testing suits of the automodels from normal runs.
+
+This method is to create a test case experiment. It creates a new experiment for a test case with a
+given number of chunks, start date, member and HPC.
+
+To create a test case experiment, use the command:
+::
+
+    autosubmit testcase
+
+Options:
+
+.. runcmd:: autosubmit testcase -h
+
+
+.. runcmd:: autosubmit testcase -d "TEST CASE cca-intel auto-ecearth3 layer 0: T511L91-ORCA025L75-LIM3 (cold restart) (a092-a09n)" -H cca-intel -b 4.1.11 -y a000
+
+
 .. _create_profiling:
 
 How to profile Autosubmit while creating an experiment
@@ -102,8 +126,7 @@ How to profile Autosubmit while creating an experiment
 
 Autosubmit offers the possibility to profile the experiment creation process. To enable the profiler, just 
 add the ``--profile`` (or ``-p``) flag to your ``autosubmit create`` command, as in the following example:
-::
 
-    autosubmit create --profile EXPID
+.. runcmd:: autosubmit create --profile a000
 
 .. include:: ../../_include/profiler_common.rst
