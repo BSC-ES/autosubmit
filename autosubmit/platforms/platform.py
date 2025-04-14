@@ -507,8 +507,6 @@ class Platform(object):
 
         :param as_conf: autosubmit config object
         :type as_conf: AutosubmitConfig object
-        :param main_hpc: if it's True, uses HPC instead of NAME_ as prefix for the parameters
-        :type main_hpc: bool
         """
         prefix = 'HPC'
 
