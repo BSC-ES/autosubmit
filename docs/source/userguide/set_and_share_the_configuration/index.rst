@@ -274,7 +274,7 @@ The expid command can copy another user's existing expid to work correctly.
 .. code-block:: bash
 
    #Create a new experiment.
-   autosubmit expid --copy a002 -H "LOCAL" -d "Advanced configuration. --copy of a002"
+   autosubmit expid  --copy a002 -H "LOCAL" -d "Advanced configuration. --copy of a002"
    # Get the expid from the output. Ex. expid=a004
    cd $autosubmit_experiment_folder/a004
    ls conf

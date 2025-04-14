@@ -17,8 +17,26 @@ exits with ``0`` when the workflow finishes with no failed jobs, and with ``1``
 otherwise.
 
 Options:
+::
 
-.. runcmd:: autosubmit run -h
+    usage: autosubmit run [-h] [-nt] [-v] [-st START_TIME] [-sa START_AFTER] [-rom RUN_ONLY_MEMBERS] [-p] EXPID
+
+    runs specified experiment
+
+    positional arguments:
+      EXPID                 experiment identifier
+
+    options:
+      -h, --help            show this help message and exit
+      -nt, --notransitive   Disable transitive reduction
+      -v, --update_version  Update experiment version
+      -st START_TIME, --start_time START_TIME
+                            Sets the starting time for this experiment
+      -sa START_AFTER, --start_after START_AFTER
+                            Sets a experiment expid which completion will trigger the start of this experiment.
+      -rom RUN_ONLY_MEMBERS, --run_only_members RUN_ONLY_MEMBERS
+                            Sets members allowed on this run.
+      -p, --profile         Prints performance parameters of the execution of this command.
 
 
 Example:
@@ -402,8 +420,33 @@ How to stop the experiment
 From Autosubmit 4.1.6, you can stop an experiment using the command `autosubmit stop`
 
 Options:
+::
 
-.. runcmd:: autosubmit stop -h
+    usage: autosubmit stop [-h] [-f] [-a] [-fa] [-c] [-fs FILTER_STATUS]
+                       [-t STATUS]
+                       [EXPID]
+
+    Completely stops an autosubmit run process
+
+    positional arguments:
+      EXPID                 experiment identifier, stops the listed expids
+                            separated by ","
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      -f, --force           Forces to stop autosubmit process, equivalent to kill
+                            -9
+      -a, --all             Stop all current running autosubmit processes, will
+                            ask for confirmation
+      -fa, --force_all      Stop all current running autosubmit processes
+      -c, --cancel          Orders to the schedulers to stop active jobs.
+      -fs FILTER_STATUS, --filter_status FILTER_STATUS
+                            Select the status (one or more) to filter the list of
+                            jobs. Default is SUBMITTED, QUEUING, RUNNING.
+			    
+      -t STATUS, --target STATUS
+                            Final status of killed jobs. Default is FAILED.
+
 
 Examples:
 ~~~~~~~~~

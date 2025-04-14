@@ -33,8 +33,35 @@ Examples:
     autosubmit recovery cxxx --all -s
 
 Options:
+::
 
-.. runcmd:: autosubmit recovery -h
+    usage: autosubmit recovery [-h] [-np] [--all] [-s] [--hide] [-group_by {date,member,chunk,split,automatic}] [-expand EXPAND]
+                           [-expand_status EXPAND_STATUS] [-nt] [-nl] [-d] [-f] [-v]
+                           EXPID
+
+    recover specified experiment
+
+    positional arguments:
+      EXPID                 experiment identifier
+
+    options:
+      -h, --help            show this help message and exit
+      -np, --noplot         omit plot
+      --all                 Get completed files to synchronize pkl
+      -s, --save            Save changes to disk
+      --hide                hides plot window
+      -group_by {date,member,chunk,split,automatic}
+                        Groups the jobs automatically or by date, member, chunk or split
+      -expand EXPAND        Supply the list of dates/members/chunks to filter the list of jobs. Default = "Any". LIST = "[
+                        19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"
+      -expand_status EXPAND_STATUS
+                            Select the statuses to be expanded
+      -nt, --notransitive   Disable transitive reduction
+      -nl, --no_recover_logs
+                            Disable logs recovery
+      -d, --detail          Show Job List view in terminal
+      -f, --force           Cancel active jobs
+      -v, --update_version  Update experiment version
 
 How to rerun a part of the experiment
 -------------------------------------
