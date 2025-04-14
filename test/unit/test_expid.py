@@ -26,6 +26,7 @@ from textwrap import dedent
 from ruamel.yaml import YAML
 
 import pytest
+from pytest_mock import MockerFixture
 from mock import Mock, patch
 
 from autosubmit.autosubmit import Autosubmit
@@ -480,14 +481,13 @@ def test_perform_deletion(create_autosubmit_tmpdir, generate_new_experiment, set
         ('git', 'normal'),
         ('git', 'test'),
         ('git', 'evaluation'),
-        ('svn', 'operational'),
-        ('svn', 'normal'),
-        ('svn', 'test'),
-        ('svn', 'evaluation')
     ],
     indirect=["generate_new_experiment"]
 )
-def test_remote_repo_operational(generate_new_experiment, create_autosubmit_tmpdir, project_type, mocker):
+def test_remote_repo_operational(generate_new_experiment: str, create_autosubmit_tmpdir: str, project_type: str, mocker: MockerFixture) -> None:
+    '''
+    Tests the check_unpushed_changed function from AutosubmitGit, which ensures no operational test with unpushed changes in their Git repository is run.
+    '''
     expid = generate_new_experiment
     temp_path = Path(create_autosubmit_tmpdir) / expid / "conf" / f"expdef_{expid}.yml"
     

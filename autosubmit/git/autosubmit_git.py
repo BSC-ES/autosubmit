@@ -261,7 +261,14 @@ class AutosubmitGit:
         return True
 
     @staticmethod
-    def check_unpushed_changes(expid):
+    def check_unpushed_changes(expid: str) -> None:
+        """
+        Raises an AutosubmitCritical error if the experiment is operational, the platform is Git, and there are unpushed changes.
+
+        Args: expid (str): The experiment ID.
+
+        Returns: None
+        """
         if expid[0] == 'o':
             origin = Path(BasicConfig.expid_dir(expid).joinpath("conf/expdef_{}.yml".format(expid)))
             with open(origin, 'r') as f:
@@ -270,14 +277,13 @@ class AutosubmitGit:
                 project = data["PROJECT"]["PROJECT_TYPE"]
 
             version_controls = ["git", 
-                                "git",
-                                "svn"]
+                                "git submodule"]
             arguments = [["status", "--porcelain"],
-                        ["submodule", "foreach", "'git status --porcelain'"],
-                        "status"]
+                        ["foreach", "'git status --porcelain'"]]
             for version_control, args in zip(version_controls, arguments):
                 if project == version_control:
                     output = subprocess.check_output([version_control, args]).decode(locale.getlocale()[1])
                     if any(status.startswith(code) for code in ["M", "A", "D", "?"] for status in output.splitlines()):
+                        # M: Modified, A: Added, D: Deleted, ?: Untracked
                         raise AutosubmitCritical("Push local changes to remote repository before running", 7075)
 
