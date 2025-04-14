@@ -287,3 +287,4 @@ class AutosubmitGit:
                     if any(status.startswith(code) for code in ["M", "A", "D", "?"] for status in output.splitlines()):
                         # M: Modified, A: Added, D: Deleted, ?: Untracked
                         raise AutosubmitCritical("Push local changes to remote repository before running", 7075)
+
