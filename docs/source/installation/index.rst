@@ -74,7 +74,7 @@ For a very quick test, you can follow the next instructions to configure and run
     # autosubmit configure
 
     # Install
-    # autosubmit install
+    autosubmit install
 
     # Quick-start
     # Get <EXPID>
@@ -82,7 +82,7 @@ For a very quick test, you can follow the next instructions to configure and run
 
     # Create with
     # Since it was a new install, the <EXPID> will be a000
-    # autosubmit create a000
+    autosubmit create a000
 
     # In case you want to use a remote platform
 
@@ -103,7 +103,7 @@ For a very quick test, you can follow the next instructions to configure and run
     # Where ~/.ssh/id_rsa is the path to your private key
 
     # run
-    # autosubmit run a000
+    autosubmit run a000
 
 
 The sequence of instructions to install Autosubmit and its dependencies with conda.
