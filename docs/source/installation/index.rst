@@ -67,17 +67,19 @@ The sequence of instructions to install Autosubmit and its dependencies with pip
 
 For a very quick test, you can follow the next instructions to configure and run Autosubmit at the user level. Otherwise, please go directly to `How to configure Autosubmit <https://autosubmit.readthedocs.io/en/master/installation/index.html#how-to-configure-autosubmit>`_ .
 
+.. code-block:: bash
+
+    # Quick-configure ( user-level database)
+
 .. runcmd:: autosubmit configure
+
+.. code-block:: bash
+
+    # Install
 
 .. runcmd:: autosubmit install
 
 .. code-block:: bash
-
-    # Quick-configure ( user-level database)
-    autosubmit configure
-
-    # Install
-    autosubmit install
 
     # Quick-start
     # Get expid
