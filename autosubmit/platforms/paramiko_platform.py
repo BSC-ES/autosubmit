@@ -1,29 +1,29 @@
-import locale
-from contextlib import suppress
+import os
+import sys
+import time
+import re
+import random
+import socket
+import select
+import datetime
 from pathlib import Path
 from time import sleep
-import sys
-import socket
-import os
-import paramiko
-import datetime
-import select
-import re
-from datetime import timedelta
-import random
-
-from autosubmit.helpers.utils import get_locale
-from autosubmit.job.job_common import Status
-from autosubmit.job.job_common import Type
-from autosubmit.platforms.platform import Platform
-from log.log import AutosubmitError, AutosubmitCritical, Log
-from paramiko.ssh_exception import (SSHException)
-import Xlib.support.connect as xlib_connect
+from contextlib import suppress
 from threading import Thread
 import threading
-import getpass
+
+import paramiko
+from paramiko.ssh_exception import SSHException
 from paramiko.agent import Agent
-import time
+import Xlib.support.connect as xlib_connect
+
+from autosubmit.helpers.utils import get_locale
+from autosubmit.job.job_common import Status, Type
+from autosubmit.platforms.platform import Platform
+from log.log import AutosubmitError, AutosubmitCritical, Log
+
+from typing import List, Optional, Tuple, Union
+
 
 def threaded(fn):
     def wrapper(*args, **kwargs):
@@ -33,13 +33,14 @@ def threaded(fn):
 
     return wrapper
 
+
 # noinspection PyMethodParameters
 class ParamikoPlatform(Platform):
     """
     Class to manage the connections to the different platforms with the Paramiko library.
     """
 
-    def __init__(self, expid, name, config, auth_password = None):
+    def __init__(self, expid, name, config, auth_password=None):
         """
 
         :param config:
@@ -70,7 +71,7 @@ class ParamikoPlatform(Platform):
         self._header = None
         self._wrapper = None
         self.remote_log_dir = ""
-        #self.get_job_energy_cmd = ""
+        # self.get_job_energy_cmd = ""
         display = os.getenv('DISPLAY')
         if display is None:
             display = "localhost:0"
@@ -79,6 +80,7 @@ class ParamikoPlatform(Platform):
         except Exception as e:
             Log.warning(f"X11 display not found: {e}")
             self.local_x11_display = None
+
     @property
     def header(self):
         """
@@ -123,7 +125,8 @@ class ParamikoPlatform(Platform):
         except Exception as e:
             Log.warning(f"X11 display not found: {e}")
             self.local_x11_display = None
-    def test_connection(self,as_conf):
+
+    def test_connection(self, as_conf):
         """
         Test if the connection is still alive, reconnect if not.
         """
@@ -147,14 +150,13 @@ class ParamikoPlatform(Platform):
         except EOFError as e:
             self.connected = False
             raise AutosubmitError(f"[{self.name}] not alive. Host: {self.host}", 6002, str(e))
-        except (AutosubmitError,AutosubmitCritical,IOError):
+        except (AutosubmitError, AutosubmitCritical, IOError):
             self.connected = False
             raise
         except BaseException as e:
             self.connected = False
-            raise AutosubmitCritical(str(e),7051)
-            #raise AutosubmitError("[{0}] connection failed for host: {1}".format(self.name, self.host), 6002, e.message)
-
+            raise AutosubmitCritical(str(e), 7051)
+            # raise AutosubmitError("[{0}] connection failed for host: {1}".format(self.name, self.host), 6002, e.message)
 
     def restore_connection(self, as_conf):
         try:
@@ -168,10 +170,10 @@ class ParamikoPlatform(Platform):
                     Log.printlog(f"Connection Failed to {self.host.split(',')[0]}, will test another host", 6002)
                 else:
                     raise AutosubmitCritical(f"First connection to {self.host} is failed, check host configuration"
-                                             f" or try another login node ", 7050,str(e))
+                                             f" or try another login node ", 7050, str(e))
             while self.connected is False and retry < retries:
                 try:
-                    self.connect(as_conf,True)
+                    self.connect(as_conf, True)
                 except Exception as e:
                     pass
                 retry += 1
@@ -192,7 +194,7 @@ class ParamikoPlatform(Platform):
             raise AutosubmitCritical(
                 'Cant connect to this platform due an unknown error', 7050, str(e))
 
-    def agent_auth(self,port):
+    def agent_auth(self, port):
         """
         Attempt to authenticate to the given SSH server using the most common authentication methods available.
             This will always try to use the SSH agent first, and will fall back to using the others methods if
@@ -204,9 +206,10 @@ class ParamikoPlatform(Platform):
         try:
             self._ssh._agent = Agent()
             for key in self._ssh._agent.get_keys():
-                if not hasattr(key,"public_blob"):
+                if not hasattr(key, "public_blob"):
                     key.public_blob = None
-            self._ssh.connect(self._host_config['hostname'], port=port, username=self.user, timeout=60, banner_timeout=60)
+            self._ssh.connect(self._host_config['hostname'], port=port, username=self.user, timeout=60,
+                              banner_timeout=60)
         except BaseException as e:
             Log.debug(f'Failed to authenticate with ssh-agent due to {e}')
             Log.debug('Trying to authenticate with other methods')
@@ -313,18 +316,21 @@ class ParamikoPlatform(Platform):
                         self._proxy = paramiko.ProxyCommand(self._host_config['proxycommand'])
                         try:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
-                                              key_filename=self._host_config_id, sock=self._proxy, timeout=60 , banner_timeout=60)
+                                              key_filename=self._host_config_id, sock=self._proxy, timeout=60,
+                                              banner_timeout=60)
                         except Exception as e:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, sock=self._proxy, timeout=60,
-                                              banner_timeout=60, disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
+                                              banner_timeout=60,
+                                              disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
                     else:
                         try:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
-                                              key_filename=self._host_config_id, timeout=60 , banner_timeout=60)
+                                              key_filename=self._host_config_id, timeout=60, banner_timeout=60)
                         except Exception as e:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
-                                              key_filename=self._host_config_id, timeout=60 , banner_timeout=60,disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
+                                              key_filename=self._host_config_id, timeout=60, banner_timeout=60,
+                                              disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
                 self.transport = self._ssh.get_transport()
                 self.transport.banner_timeout = 60
             else:
@@ -340,7 +346,7 @@ class ParamikoPlatform(Platform):
                 try:
                     self.transport.auth_interactive(self.user, self.interactive_auth_handler)
                 except Exception as e:
-                    Log.printlog("2FA authentication failed",7000)
+                    Log.printlog("2FA authentication failed", 7000)
                     raise
                 if self.transport.is_authenticated():
                     self._ssh._transport = self.transport
@@ -348,7 +354,8 @@ class ParamikoPlatform(Platform):
                 else:
                     self.transport.close()
                     raise SSHException
-            self._ftpChannel = paramiko.SFTPClient.from_transport(self.transport,window_size=pow(4, 12) ,max_packet_size=pow(4, 12) )
+            self._ftpChannel = paramiko.SFTPClient.from_transport(self.transport, window_size=pow(4, 12),
+                                                                  max_packet_size=pow(4, 12))
             self._ftpChannel.get_channel().settimeout(120)
             self.connected = True
             self.spawn_log_retrieval_process(as_conf)
@@ -375,6 +382,7 @@ class ParamikoPlatform(Platform):
             else:
                 raise AutosubmitError(
                     "Couldn't establish a connection to the specified host, wrong configuration?", 6003, str(e))
+
     def check_completed_files(self, sections=None):
         if self.host == 'localhost':
             return None
@@ -393,13 +401,13 @@ class ParamikoPlatform(Platform):
             return None
 
     def remove_multiple_files(self, filenames):
-        #command = "rm"
+        # command = "rm"
         log_dir = os.path.join(self.tmp_path, f'LOG_{self.expid}')
         multiple_delete_previous_run = os.path.join(
             log_dir, "multiple_delete_previous_run.sh")
         if os.path.exists(log_dir):
-            lang = get_locate()
-            open(multiple_delete_previous_run, 'wb+').write( ("rm -f" + filenames).encode(lang))
+            lang = get_locale()
+            open(multiple_delete_previous_run, 'wb+').write(("rm -f" + filenames).encode(lang))
             os.chmod(multiple_delete_previous_run, 0o770)
             self.send_file(multiple_delete_previous_run, False)
             command = os.path.join(self.get_files_path(),
@@ -434,7 +442,6 @@ class ParamikoPlatform(Platform):
         except BaseException as e:
             raise AutosubmitError(
                 'Send file failed. Connection seems to no be active', 6004)
-
 
     def get_list_of_files(self):
         return self._ftpChannel.get(self.get_files_path)
@@ -505,7 +512,8 @@ class ParamikoPlatform(Platform):
                       f'wrong configuration')
             if str(e).lower().find("garbage") != -1:
                 raise AutosubmitCritical(
-                    "Wrong User or invalid .ssh/config. Or invalid user in the definition of PLATFORMS in YAML or public key not set ", 7051, str(e))
+                    "Wrong User or invalid .ssh/config. Or invalid user in the definition of PLATFORMS in YAML or public key not set ",
+                    7051, str(e))
 
     def move_file(self, src, dest, must_exist=False):
         """
@@ -516,7 +524,7 @@ class ParamikoPlatform(Platform):
         :param must_exist: ignore if file exist or not
         :type dest: str
         """
-        path_root=""
+        path_root = ""
         try:
             path_root = self.get_files_path()
             src = os.path.join(path_root, src)
@@ -524,15 +532,15 @@ class ParamikoPlatform(Platform):
             try:
                 self._ftpChannel.stat(dest)
             except IOError:
-                self._ftpChannel.rename(src,dest)
+                self._ftpChannel.rename(src, dest)
             return True
 
         except IOError as e:
             if str(e) in "Garbage":
-                raise AutosubmitError(f'File {os.path.join(path_root,src)} does not exists, something went '
+                raise AutosubmitError(f'File {os.path.join(path_root, src)} does not exists, something went '
                                       f'wrong with the platform', 6004, str(e))
             if must_exist:
-                raise AutosubmitError(f"File {os.path.join(path_root,src)} does not exists", 6004, str(e))
+                raise AutosubmitError(f"File {os.path.join(path_root, src)} does not exists", 6004, str(e))
             else:
                 Log.debug(f"File {path_root} doesn't exists ")
                 return False
@@ -570,9 +578,10 @@ class ParamikoPlatform(Platform):
             return None
         if self.send_command(cmd, x11=x11):
             x11 = False if job is None else job.x11
-            job_id = self.get_submitted_job_id(self.get_ssh_output(), x11 )
+            job_id = self.get_submitted_job_id(self.get_ssh_output(), x11)
             if job:
-                Log.result(f"Job: {job.name} submitted with job_id: {str(job_id).strip()} and workflow commit: {job.workflow_commit}")
+                Log.result(
+                    f"Job: {job.name} submitted with job_id: {str(job_id).strip()} and workflow commit: {job.workflow_commit}")
             return int(job_id)
         else:
             return None
@@ -613,6 +622,7 @@ class ParamikoPlatform(Platform):
         :return: command to get estimated queue time
         """
         raise NotImplementedError
+
     def parse_estimated_time(self, output):
         """
         Parses estimated queue time from output of get_estimated_queue_time_cmd
@@ -704,7 +714,7 @@ class ParamikoPlatform(Platform):
                 job_status = Status.RUNNING
                 if not is_wrapper:
                     if job.status != Status.RUNNING:
-                        job.start_time = datetime.datetime.now() # URi: start time
+                        job.start_time = datetime.datetime.now()  # URi: start time
                     if job.start_time is not None and str(job.wrapper_type).lower() == "none":
                         wallclock = job.wallclock
                         if job.wallclock == "00:00" or job.wallclock is None:
@@ -744,6 +754,7 @@ class ParamikoPlatform(Platform):
             if job not in ssh_output:
                 return False
         return True
+
     def parse_joblist(self, job_list):
         """
         Convert a list of job_list to job_list_cmd
@@ -756,16 +767,17 @@ class ParamikoPlatform(Platform):
         :rtype: str
         """
         job_list_cmd = ""
-        for job,job_prev_status in job_list:
+        for job, job_prev_status in job_list:
             if job.id is None:
                 job_str = "0"
             else:
                 job_str = str(job.id)
-            job_list_cmd += job_str+","
+            job_list_cmd += job_str + ","
         if job_list_cmd[-1] == ",":
-            job_list_cmd=job_list_cmd[:-1]
+            job_list_cmd = job_list_cmd[:-1]
 
         return job_list_cmd
+
     def check_Alljobs(self, job_list, as_conf, retries=5):
         """
         Checks jobs running status
@@ -814,7 +826,7 @@ class ParamikoPlatform(Platform):
             Log.debug('Successful check job command')
             in_queue_jobs = []
             list_queue_jobid = ""
-            for job,job_prev_status in job_list:
+            for job, job_prev_status in job_list:
                 if not slurm_error:
                     job_id = job.id
                     job_status = self.parse_Alljobs_output(job_list_status, job_id)
@@ -833,7 +845,7 @@ class ParamikoPlatform(Platform):
                 else:
                     job_status = job.status
                 if job.status != Status.RUNNING:
-                    job.start_time = datetime.datetime.now() # URi: start time
+                    job.start_time = datetime.datetime.now()  # URi: start time
                 if job.start_time is not None and str(job.wrapper_type).lower() == "none":
                     wallclock = job.wallclock
                     if job.wallclock == "00:00":
@@ -861,17 +873,19 @@ class ParamikoPlatform(Platform):
                     Log.error(
                         'check_job() The job id ({0}) status is {1}.', job.id, job_status)
                 job.new_status = job_status
-            self.get_queue_status(in_queue_jobs,list_queue_jobid,as_conf)
+            self.get_queue_status(in_queue_jobs, list_queue_jobid, as_conf)
         else:
             for job, job_prev_status in job_list:
                 job_status = Status.UNKNOWN
                 Log.warning(
-                    'check_job() The job id ({0}) from platform {1} has an status of {2}.', job.id, self.name, job_status)
+                    'check_job() The job id ({0}) from platform {1} has an status of {2}.', job.id, self.name,
+                    job_status)
             raise AutosubmitError("Some Jobs are in Unknown status", 6008)
             # job.new_status=job_status
         if slurm_error:
-            raise AutosubmitError(e_msg,6000)
-    def get_jobid_by_jobname(self,job_name,retries=2):
+            raise AutosubmitError(e_msg, 6000)
+
+    def get_jobid_by_jobname(self, job_name, retries=2):
         """
         Get job id by job name
 
@@ -880,7 +894,7 @@ class ParamikoPlatform(Platform):
         :type retries: int
         :return: job id
         """
-        #sleep(5)
+        # sleep(5)
         job_ids = ""
         cmd = self.get_jobid_by_jobname_cmd(job_name)
         self.send_command(cmd)
@@ -891,9 +905,9 @@ class ParamikoPlatform(Platform):
             retries -= 1
             sleep(2)
         if retries >= 0:
-            #get id last line
+            # get id last line
             job_ids_names = job_id_name.split('\n')[1:-1]
-            #get all ids by job-name
+            # get all ids by job-name
             job_ids = [job_id.split(',')[0] for job_id in job_ids_names]
         return job_ids
 
@@ -907,7 +921,6 @@ class ParamikoPlatform(Platform):
         the ``job`` status appropriately.
         """
         raise NotImplementedError
-
 
     def get_checkjob_cmd(self, job_id):
         """
@@ -965,7 +978,7 @@ class ParamikoPlatform(Platform):
         self.poller.register(local_x11_socket, select.POLLIN)
         self.transport._queue_incoming_channel(channel)
 
-    def flush_out(self,session):
+    def flush_out(self, session):
         while session.recv_ready():
             sys.stdout.write(session.recv(4096).decode(locale.getlocale()[1]))
         while session.recv_stderr_ready():
@@ -1004,8 +1017,7 @@ class ParamikoPlatform(Platform):
             except Exception as e:
                 pass
 
-
-    def exec_command(self, command, bufsize=-1, timeout=30, get_pty=False,retries=3, x11=False):
+    def exec_command(self, command, bufsize=-1, timeout=30, get_pty=False, retries=3, x11=False):
         """
         Execute a command on the SSH server.  A new `.Channel` is opened and
         the requested command is execed.  The command's input and output
@@ -1037,7 +1049,7 @@ class ParamikoPlatform(Platform):
                         Log.warning(f"X11 display not found: {e}")
                         self.local_x11_display = None
                     chan = self.transport.open_session()
-                    chan.request_x11(single_connection=False,handler=self.x11_handler)
+                    chan.request_x11(single_connection=False, handler=self.x11_handler)
                 else:
                     chan = self.transport.open_session()
                 if x11:
@@ -1046,7 +1058,7 @@ class ParamikoPlatform(Platform):
                         if timeout_command == 0:
                             timeout_command = "infinity"
                         command = f'{command} ; sleep {timeout_command} 2>/dev/null'
-                    #command = f'export display {command}'
+                    # command = f'export display {command}'
                     Log.info(command)
                     try:
                         chan.exec_command(command)
@@ -1068,7 +1080,7 @@ class ParamikoPlatform(Platform):
                 timeout = timeout + 60
                 retries = retries - 1
         if retries <= 0:
-            return False , False, False
+            return False, False, False
 
     def send_command_non_blocking(self, command, ignore_log):
         thread = threading.Thread(target=self.send_command, args=(command, ignore_log))
@@ -1098,123 +1110,210 @@ class ParamikoPlatform(Platform):
         :raises BaseException: Raised for any other unexpected errors.
         """
         lang = get_locale()
-        if "rsync" in command or "find" in command or "convertLink" in command:
-            timeout = None  # infinite timeout on migrate command
-        elif "rm" in command:
-            timeout = 60
-        else:
-            timeout = 60 * 2
-        stderr_readlines = []
-        stdout_chunks = []
+        timeout = self._determine_timeout(command)
+        stderr_readlines, stdout_chunks = [], []
 
         try:
             stdin, stdout, stderr = self.exec_command(command, x11=x11)
             channel = stdout.channel
-            if not x11:
-                channel.settimeout(timeout)
-                stdin.close()
-                channel.shutdown_write()
-                stdout_chunks.append(stdout.channel.recv(len(stdout.channel.in_buffer)))
+            self._prepare_channel(channel, stdin, timeout, x11, stdout_chunks)
 
             aux_stderr = []
-            x11_exit = False
 
-            while (not channel.closed or channel.recv_ready() or channel.recv_stderr_ready()) and not x11_exit:
-                # stop if channel was closed prematurely, and there is no data in the buffers.
-                got_chunk = False
-                readq, _, _ = select.select([stdout.channel], [], [], 2)
-                for c in readq:
-                    if c.recv_ready():
-                        stdout_chunks.append(
-                            stdout.channel.recv(len(c.in_buffer)))
-                        got_chunk = True
-                    if c.recv_stderr_ready():
-                        # make sure to read stderr to prevent stall
-                        stderr_readlines.append(
-                            stderr.channel.recv_stderr(len(c.in_stderr_buffer)))
-                        got_chunk = True
-                if x11:
-                    if len(stderr_readlines) > 0:
-                        aux_stderr.extend(stderr_readlines)
-                        for stderr_line in stderr_readlines:
-                            stderr_line = stderr_line.decode(lang)
-                            if "salloc" in stderr_line:  # salloc is the command to allocate resources in slurm, for pjm it is different
-                                job_id = re.findall(r'\d+', stderr_line)
-                                if job_id:
-                                    stdout_chunks.append(job_id[0].encode(lang))
-                                    x11_exit = True
-                    else:
-                        x11_exit = True
-                    if not x11_exit:
-                        stderr_readlines = []
-                    else:
-                        stderr_readlines = aux_stderr
-                if not got_chunk and stdout.channel.exit_status_ready() and not stderr.channel.recv_stderr_ready() and not stdout.channel.recv_ready():
-                    # indicate that we're not going to read from this channel anymore
-                    stdout.channel.shutdown_read()
-                    # close the channel
-                    stdout.channel.close()
-                    break
-            # close all the pseudo files
-            if not x11:
-                stdout.close()
-                stderr.close()
+            self._process_channel_output(
+                channel, stdout, stderr, stdout_chunks, stderr_readlines, aux_stderr, x11, lang
+            )
 
-            self._ssh_output = ""
-            self._ssh_output_err = ""
-            for s in stdout_chunks:
-                if s.decode(lang) != '':
-                    self._ssh_output += s.decode(lang)
-            for errorLineCase in stderr_readlines:
-                self._ssh_output_err += errorLineCase.decode(lang)
-
-                errorLine = errorLineCase.lower().decode(lang)
-                # to be simplified in the future in a function and using in. The errors should be inside the class of the platform not here
-                if "not active" in errorLine:
-                    raise AutosubmitError(
-                        'SSH Session not active, will restart the platforms', 6005)
-                if errorLine.find("command not found") != -1:
-                    raise AutosubmitError(
-                        f"A platform command was not found. This may be a temporary issue. "
-                        f"Please verify that the correct scheduler is specified for this platform: '{self.name}.{self.type}'.",
-                        7052,
-                        self._ssh_output_err
-                    )
-                elif errorLine.find("syntax error") != -1:
-                    raise AutosubmitCritical("Syntax error", 7052, self._ssh_output_err)
-                elif errorLine.find("refused") != -1 or errorLine.find(
-                        "slurm_persist_conn_open_without_init") != -1 or errorLine.find(
-                        "slurmdbd") != -1 or errorLine.find("submission failed") != -1 or errorLine.find(
-                        "git clone") != -1 or errorLine.find("sbatch: error: ") != -1 or errorLine.find(
-                        "not submitted") != -1 or errorLine.find("invalid") != -1 or "[ERR.] PJM".lower() in errorLine:
-                    if "salloc: error" in errorLine or "salloc: unrecognized option" in errorLine or "[ERR.] PJM".lower() in errorLine or (
-                            self._submit_command_name == "sbatch" and (
-                            errorLine.find("policy") != -1 or errorLine.find("invalid") != -1)) or (
-                            self._submit_command_name == "sbatch" and errorLine.find("argument") != -1) or (
-                            self._submit_command_name == "bsub" and errorLine.find(
-                            "job not submitted") != -1) or self._submit_command_name == "ecaccess-job-submit" or self._submit_command_name == "qsub ":
-                        raise AutosubmitError(errorLine, 7014, "Bad Parameters.")
-                    raise AutosubmitError(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6005)
-
-            if not ignore_log:
-                if len(stderr_readlines) > 0:
-                    Log.printlog(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6006)
-                else:
-                    pass
-                    # Log.debug('Command {0} in {1} successful without message: {2}', command, self.host, self._ssh_output)
+            self._process_output(stdout_chunks, stderr_readlines, lang, command, ignore_log)
             return True
-        except AttributeError as e:
-            raise AutosubmitError(f'Session not active: {str(e)}', 6005)
-        except AutosubmitCritical as e:
+        except Exception as e:
+            Log.debug(f"Exception in send_command: {e}")
+            self._handle_exceptions(e, stderr_readlines, command)
+
+    @staticmethod
+    def _determine_timeout(command: str) -> int:
+        """
+        Determines the timeout for the command based on its type.
+
+        :param command: The command to execute.
+        :type command: str
+        :return: The timeout value in seconds.
+        :rtype: int
+        """
+        if "rsync" in command or "find" in command or "convertLink" in command:
+            return None  # Infinite timeout for specific commands
+        elif "rm" in command:
+            return 60
+        return 60 * 2
+
+    @staticmethod
+    def _prepare_channel(channel: paramiko.Channel, stdin: paramiko.file.BufferedFile, timeout: Optional[int],
+                         x11: bool, stdout_chunks: List[bytes]) -> None:
+        """
+        Prepares the SSH channel for command execution.
+
+        :param channel: The SSH channel.
+        :param stdin: The standard input stream.
+        :param timeout: The timeout value for the channel.
+        :param x11: Whether X11 forwarding is enabled.
+        :type x11: bool
+        :param stdout_chunks: List to store stdout chunks.
+        :type stdout_chunks: list
+        """
+        if not x11:  # x11 doesn't open a channel
+            channel.settimeout(timeout)
+            stdin.close()
+            channel.shutdown_write()
+            stdout_chunks.append(channel.recv(len(channel.in_buffer)))
+
+    def _process_channel_output(self, channel: paramiko.Channel, stdout: paramiko.ChannelFile,
+                                stderr: paramiko.ChannelFile, stdout_chunks: List[bytes],
+                                stderr_readlines: List[bytes], aux_stderr: List[bytes], x11: bool,
+                                lang: str) -> None:
+        """
+        Processes the output from the SSH channel.
+
+        :param channel: The SSH channel.
+        :param stdout: The standard output stream.
+        :param stderr: The standard error stream.
+        :param stdout_chunks: List to store stdout chunks.
+        :type stdout_chunks: list
+        :param stderr_readlines: List to store stderr lines.
+        :type stderr_readlines: list
+        :param aux_stderr: Auxiliary list for stderr lines.
+        :type aux_stderr: list
+        :param x11: Whether X11 forwarding is enabled.
+        :type x11: bool
+        :param lang: The system locale.
+        :type lang: str
+        """
+        x11_exit = False
+        while (not channel.closed or channel.recv_ready() or channel.recv_stderr_ready()) and not x11_exit:
+            got_chunk = False
+            readq, _, _ = select.select([stdout.channel], [], [], 2)
+            for c in readq:
+                if c.recv_ready():
+                    stdout_chunks.append(stdout.channel.recv(len(c.in_buffer)))
+                    got_chunk = True
+                if c.recv_stderr_ready():
+                    stderr_readlines.append(stderr.channel.recv_stderr(len(c.in_stderr_buffer)))
+                    got_chunk = True
+            if x11:
+                x11_exit = self._handle_x11(stderr_readlines, aux_stderr, stdout_chunks, lang)
+            if not got_chunk and stdout.channel.exit_status_ready() and not stderr.channel.recv_stderr_ready() and not stdout.channel.recv_ready():
+                stdout.channel.shutdown_read()
+                stdout.channel.close()
+                break
+
+    @staticmethod
+    def _handle_x11(stderr_readlines: List[bytes], aux_stderr: List[bytes],
+                    stdout_chunks: List[bytes], lang: str) -> bool:
+        """
+        Handles X11 forwarding output.
+
+        :param stderr_readlines: List to store stderr lines.
+        :type stderr_readlines: list
+        :param aux_stderr: Auxiliary list for stderr lines.
+        :type aux_stderr: list
+        :param stdout_chunks: List to store stdout chunks.
+        :type stdout_chunks: list
+        :param lang: The system locale.
+        :type lang: str
+        :return: Whether to exit X11 processing.
+        :rtype: bool
+        """
+        if len(stderr_readlines) > 0:
+            aux_stderr.extend(stderr_readlines)
+            for stderr_line in stderr_readlines:
+                stderr_line = stderr_line.decode(lang)
+                if "salloc" in stderr_line:
+                    job_id = re.findall(r'\d+', stderr_line)
+                    if job_id:
+                        stdout_chunks.append(job_id[0].encode(lang))
+                        return True
+        else:
+            return True
+        return False
+
+    def _process_output(self, stdout_chunks: List[bytes], stderr_readlines: List[bytes],
+                        lang: str, command: str, ignore_log: bool) -> None:
+        """
+        Processes the command output and checks for errors.
+
+        :param stdout_chunks: List of stdout chunks.
+        :type stdout_chunks: list
+        :param stderr_readlines: List of stderr lines.
+        :type stderr_readlines: list
+        :param lang: The system locale.
+        :type lang: str
+        :param command: The executed command.
+        :type command: str
+        :param ignore_log: Whether to suppress logging.
+        :type ignore_log: bool
+        """
+        self._ssh_output = "".join([s.decode(lang) for s in stdout_chunks if s.decode(lang) != ""])
+        self._ssh_output_err = "".join([error.decode(lang) for error in stderr_readlines])
+
+        for error_line in stderr_readlines:
+            error_line = error_line.lower().decode(lang)
+            self._check_for_errors(error_line, command)
+
+        if not ignore_log and stderr_readlines:
+            Log.printlog(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6006)
+
+    def _check_for_errors(self, error_line: str, command: str) -> None:
+        """
+        Checks for specific error patterns in the output.
+
+        :param error_line: A line from the stderr output.
+        :type error_line: str
+        :param command: The executed command.
+        :type command: str
+        :raises AutosubmitError: If a known error pattern is detected.
+        :raises AutosubmitCritical: For critical errors.
+        """
+        if "not active" in error_line:
+            raise AutosubmitError('SSH Session not active, will restart the platforms', 6005)
+        if "command not found" in error_line:
+            raise AutosubmitError(
+                f"A platform command was not found. This may be a temporary issue. "
+                f"Please verify that the correct scheduler is specified for this platform: '{self.name}.{self.type}'.",
+                7052,
+                self._ssh_output_err
+            )
+        if "syntax error" in error_line:
+            raise AutosubmitCritical("Syntax error", 7052, self._ssh_output_err)
+        if any(keyword in error_line for keyword in [
+            "refused", "slurm_persist_conn_open_without_init", "slurmdbd",
+            "submission failed", "git clone", "sbatch: error:", "not submitted",
+            "invalid", "[err.] pjm"
+        ]):
+            raise AutosubmitError(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6005)
+
+    def _handle_exceptions(self, exception: Exception, stderr_readlines: Union[List[bytes], str],
+                           command: str) -> None:
+        """
+        Handles exceptions raised during command execution.
+
+        :param exception: The raised exception.
+        :type exception: Exception
+        :param stderr_readlines: List of stderr lines.
+        :type stderr_readlines: list
+        :param command: The executed command.
+        :type command: str
+        :raises AutosubmitError: For recuperable errors.
+        :raises AutosubmitCritical: For unrecuperable errors.
+        :raises BaseException: For unexpected errors.
+        """
+        if isinstance(exception, (AutosubmitCritical, AutosubmitError)):
             raise
-        except AutosubmitError as e:
-            raise
-        except IOError as e:
-            raise AutosubmitError(str(e), 6016)
-        except BaseException as e:
-            if type(stderr_readlines) is str:
-                stderr_readlines = '\n'.join(stderr_readlines)
-            raise AutosubmitError(f'Command {command} in {self.host} warning: {stderr_readlines}', 6005, str(e))
+        elif isinstance(exception, AttributeError):
+            raise AutosubmitError(f'Session not active: {str(exception)}', 6005)
+        elif isinstance(exception, IOError):
+            raise AutosubmitError(str(exception), 6016)
+        elif isinstance(stderr_readlines, list):
+            stderr_readlines = '\n'.join([line.decode() for line in stderr_readlines])
+        raise AutosubmitError(f'Command {command} in {self.host} warning: {stderr_readlines}', 6005, str(exception))
 
     def parse_job_output(self, output):
         """
@@ -1280,9 +1379,9 @@ class ParamikoPlatform(Platform):
         :return: output from last command
         :rtype: str
         """
-        #Log.debug('Output {0}', self._ssh_output)
+        # Log.debug('Output {0}', self._ssh_output)
 
-        #Log.debug('Output {0}', self._ssh_output)
+        # Log.debug('Output {0}', self._ssh_output)
         if self._ssh_output is None or not self._ssh_output:
             self._ssh_output = ""
         return self._ssh_output
@@ -1290,7 +1389,7 @@ class ParamikoPlatform(Platform):
     def get_ssh_output_err(self):
         return self._ssh_output_err
 
-    def get_call(self, job_script, job, export="none",timeout=-1):
+    def get_call(self, job_script, job, export="none", timeout=-1):
         """
         Gets execution command for given job
 
@@ -1303,7 +1402,7 @@ class ParamikoPlatform(Platform):
         :return: command to execute script
         :rtype: str
         """
-        if job: # If job is None, it is a wrapper. ( 0 clarity there, to be improved in a rework TODO )
+        if job:  # If job is None, it is a wrapper. ( 0 clarity there, to be improved in a rework TODO )
             executable = ''
             if job.type == Type.BASH:
                 executable = 'bash'
@@ -1314,10 +1413,11 @@ class ParamikoPlatform(Platform):
             elif job.type == Type.R:
                 executable = 'Rscript'
             if job.executable != '':
-                executable = '' # Alternative: use job.executable with substituted placeholders
-            remote_logs = (job.script_name + ".out."+str(job.fail_count), job.script_name + ".err."+str(job.fail_count))
+                executable = ''  # Alternative: use job.executable with substituted placeholders
+            remote_logs = (
+            job.script_name + ".out." + str(job.fail_count), job.script_name + ".err." + str(job.fail_count))
         else:
-            executable = 'python3' # wrappers are always python3
+            executable = 'python3'  # wrappers are always python3
             remote_logs = (f"{job_script}.out", f"{job_script}.err")
 
         if timeout < 1:
@@ -1332,7 +1432,6 @@ class ParamikoPlatform(Platform):
                        f'{os.path.join(self.remote_log_dir, remote_logs[1])} & echo $!')
         return command
 
-
     @staticmethod
     def get_pscall(job_id):
         """
@@ -1345,8 +1444,7 @@ class ParamikoPlatform(Platform):
         """
         return f'nohup kill -0 {job_id} > /dev/null 2>&1; echo $?'
 
-
-    def get_submitted_job_id(self, output, x11 = False):
+    def get_submitted_job_id(self, output, x11=False):
         """
         Parses submit command output to extract job id
 
@@ -1383,7 +1481,7 @@ class ParamikoPlatform(Platform):
 
         header = header.replace('%OUT_LOG_DIRECTIVE%', out_filename)
         header = header.replace('%ERR_LOG_DIRECTIVE%', err_filename)
-        if job.het.get("HETSIZE",0) <= 1:
+        if job.het.get("HETSIZE", 0) <= 1:
             if hasattr(self.header, 'get_queue_directive'):
                 header = header.replace(
                     '%QUEUE_DIRECTIVE%', self.header.get_queue_directive(job, parameters))
@@ -1443,7 +1541,7 @@ class ParamikoPlatform(Platform):
             if self._ftpChannel:
                 self._ftpChannel.close()
         with suppress(Exception):
-            if self._ssh._agent: # May not be in all runs
+            if self._ssh._agent:  # May not be in all runs
                 self._ssh._agent.close()
         with suppress(Exception):
             if self._ssh._transport:
@@ -1470,7 +1568,7 @@ class ParamikoPlatform(Platform):
             return True
         except Exception as e:
             return False
-    
+
     def check_remote_log_dir(self):
         """
         Creates log dir on remote host
@@ -1491,6 +1589,8 @@ class ParamikoPlatform(Platform):
                 return False
         except:
             return False
+
+
 class ParamikoPlatformException(Exception):
     """
     Exception raised from HPC queues

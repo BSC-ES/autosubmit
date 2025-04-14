@@ -26,19 +26,21 @@ from datetime import timedelta
 
 from autosubmit.helpers.utils import get_locale
 from autosubmit.job.job_common import Status
-from log.log import Log, AutosubmitCritical
+from log.log import Log, AutosubmitCritical, AutosubmitError
 
-Log.get_logger("Autosubmit")
 from autosubmit.job.job import Job
 from bscearth.utils.date import sum_str_hours
 from threading import Thread, Lock
-from typing import List, Dict
+from typing import List, Dict, Any
 import multiprocessing
 import tarfile
 import datetime
 import re
-import locale
+from paramiko.ssh_exception import SSHException
+from socket import timeout as socket_timeout
+
 lock = Lock()
+Log.get_logger("Autosubmit")
 def threaded(fn):
     def wrapper(*args, **kwargs):
         thread = Thread(target=fn, args=args, kwargs=kwargs)
@@ -154,60 +156,149 @@ class JobPackageBase(object):
             # looking for directives on jobs
             self._custom_directives = self._custom_directives | set(job.custom_directives)
         self._create_scripts(configuration)
-    def submit(self, configuration, parameters,only_generate=False,hold=False):
+
+    def submit(self, configuration: Any, parameters: Dict[str, Any], only_generate: bool = False,
+               hold: bool = False) -> None:
         """
-        :param hold:
-        :para configuration: Autosubmit basic configuration \n
-        :type configuration: AutosubmitConfig object \n
-        :param parameters; Parameters from joblist \n
-        :type parameters: JobList,parameters \n
-        :param only_generate: True if coming from generate_scripts_andor_wrappers(). If true, only generates scripts; otherwise, submits. \n
-        :type only_generate: Boolean
+        Submits jobs to the platform, either generating scripts or submitting them directly.
+
+        :param configuration: Autosubmit basic configuration.
+        :type configuration: AutosubmitConfig
+        :param parameters: Parameters from the job list.
+        :type parameters: dict
+        :param only_generate: If True, only generates scripts; otherwise, submits. Defaults to False.
+        :type only_generate: bool
+        :param hold: If True, the job won't start immediately. Defaults to False.
+        :type hold: bool
+        :raises AutosubmitError: If there is an error during file submission.
+        :raises BaseException: For any other unexpected errors.
         """
-        thread_number = multiprocessing.cpu_count()
-        if len(self.jobs) > 2500:
-            thread_number = thread_number * 2
-        elif len(self.jobs) > 5000:
-            thread_number = thread_number * 3
-        elif len(self.jobs) > 7500:
-            thread_number = thread_number * 4
-        elif len(self.jobs) > 10000:
-            thread_number = thread_number * 5
-        chunksize = int((len(self.jobs) + thread_number - 1) / thread_number)
+        thread_number: int = self._calculate_thread_number(len(self.jobs))
+        chunksize: int = self._calculate_chunksize(len(self.jobs), thread_number)
+
         try:
-            if len(self.jobs) < thread_number or str(configuration.experiment_data.get("CONFIG",{}).get("ENABLE_WRAPPER_THREADS","False")).lower() == "false":
-                self.submit_unthreaded(configuration, only_generate, hold)
-                Log.debug("Creating Scripts")
-                self._create_scripts(configuration)
+            if len(self.jobs) < thread_number or not self._are_wrapper_threads_enabled(configuration):
+                self._process_jobs_unthreaded(configuration, only_generate, hold)
             else:
-                lhandle = list()
-                for i in range(0, len(self.jobs), chunksize):
-                    Log.debug("Checking Scripts")
-                    lhandle.append(self.check_scripts(self.jobs[i:i + chunksize], configuration, parameters, only_generate, hold))
-                for dataThread in lhandle:
-                    dataThread.join()
-                for i in range(0, len(self.jobs), chunksize):
-                    Log.debug("Creating Scripts")
-                    lhandle.append(self._create_scripts_threaded(self.jobs[i:i + chunksize], configuration))
-                for dataThread in lhandle:
-                    dataThread.join()
-                self._common_script = self._create_common_script()
-        except AutosubmitCritical:
+                self._process_jobs_threaded(configuration, parameters, only_generate, hold, chunksize)
+        except BaseException:
             raise
-        except BaseException as e:
-            raise
+
         try:
             if not only_generate:
-                Log.debug("Sending Files")
-                self._send_files()
-                Log.debug("Submitting")
-                self._do_submission(hold=hold)
-        except AutosubmitCritical:
+                self._submit_files_and_jobs(hold)
+        except BaseException:
             raise
-        except BaseException as e:
-            raise AutosubmitCritical("Error while submitting jobs: {0}".format(e), 7013)
 
+    @staticmethod
+    def _calculate_thread_number(job_count: int) -> int:
+        """
+        Calculates the number of threads to use based on the job count.
 
+        :param job_count: The total number of jobs.
+        :type job_count: int
+        :return: The calculated number of threads.
+        :rtype: int
+        """
+        thread_number: int = multiprocessing.cpu_count()
+        if job_count > 2500:
+            thread_number *= 2
+        elif job_count > 5000:
+            thread_number *= 3
+        elif job_count > 7500:
+            thread_number *= 4
+        elif job_count > 10000:
+            thread_number *= 5
+        return thread_number
+
+    @staticmethod
+    def _calculate_chunksize(job_count: int, thread_number: int) -> int:
+        """
+        Calculates the chunk size for threading.
+
+        :param job_count: The total number of jobs.
+        :type job_count: int
+        :param thread_number: The number of threads.
+        :type thread_number: int
+        :return: The calculated chunk size.
+        :rtype: int
+        """
+        return int((job_count + thread_number - 1) / thread_number)
+
+    @staticmethod
+    def _are_wrapper_threads_enabled(configuration: Any) -> bool:
+        """
+        Checks if wrapper threads are enabled in the configuration.
+
+        :param configuration: Autosubmit configuration object.
+        :type configuration: AutosubmitConfig
+        :return: True if wrapper threads are enabled, False otherwise.
+        :rtype: bool
+        """
+        return str(
+            configuration.experiment_data.get("CONFIG", {}).get("ENABLE_WRAPPER_THREADS", "False")).lower() == "true"
+
+    def _process_jobs_unthreaded(self, configuration: Any, only_generate: bool, hold: bool) -> None:
+        """
+        Checks jobs templates without threading.
+
+        :param configuration: Autosubmit configuration object.
+        :type configuration: AutosubmitConfig
+        :param only_generate: If True, only generates scripts; otherwise, submits.
+        :type only_generate: bool
+        :param hold: If True, the job won't start immediately.
+        :type hold: bool
+        """
+        self.submit_unthreaded(configuration, only_generate, hold)
+        Log.debug("Creating Scripts")
+        self._create_scripts(configuration)
+
+    def _process_jobs_threaded(self, configuration: Any, parameters: Dict[str, Any], only_generate: bool, hold: bool,
+                               chunksize: int) -> None:
+        """
+        Checks jobs templates using threading.
+
+        :param configuration: Autosubmit configuration object.
+        :type configuration: AutosubmitConfig
+        :param parameters: Parameters from the job list.
+        :type parameters: dict
+        :param only_generate: If True, only generates scripts; otherwise, submits.
+        :type only_generate: bool
+        :param hold: If True, the job won't start immediately.
+        :type hold: bool
+        :param chunksize: The size of each chunk for threading.
+        :type chunksize: int
+        """
+        lhandle = []
+        for i in range(0, len(self.jobs), chunksize):
+            Log.debug("Checking Scripts")
+            lhandle.append(
+                self.check_scripts(self.jobs[i:i + chunksize], configuration, parameters, only_generate, hold))
+        for dataThread in lhandle:
+            dataThread.join()
+        for i in range(0, len(self.jobs), chunksize):
+            Log.debug("Creating Scripts")
+            lhandle.append(self._create_scripts_threaded(self.jobs[i:i + chunksize], configuration))
+        for dataThread in lhandle:
+            dataThread.join()
+        self._common_script = self._create_common_script()
+
+    def _submit_files_and_jobs(self, hold: bool) -> None:
+        """
+        Handles file submission and job submission.
+
+        :param hold: If True, the job won't start immediately.
+        :type hold: bool
+        :raises AutosubmitError: If there is an error during file submission.
+        """
+        try:
+            Log.debug("Sending Files")
+            self._send_files()
+            Log.debug("Submitting")
+            self._do_submission(hold=hold)
+        except (socket_timeout, SSHException) as e:
+            Log.error(f"Error sending files to the platform: {e}")
+            raise AutosubmitError
 
     def _create_scripts(self, configuration):
         raise Exception('Not implemented')
@@ -561,7 +652,7 @@ class JobPackageThread(JobPackageBase):
             self._job_scripts[self.jobs[i].name] = self.jobs[i].create_script(configuration)
         self._common_script = self._create_common_script()
     def _create_common_script(self,filename=""):
-        lang = get_locate()
+        lang = get_locale()
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
         open(os.path.join(self._tmp_path, script_file), 'wb').write(script_content.encode(lang))

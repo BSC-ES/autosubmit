@@ -139,7 +139,7 @@ class LocalPlatform(ParamikoPlatform):
             self.check_job(job)
 
     def send_command(self, command, ignore_log=False, x11 = False):
-        lang = get_locate()
+        lang = get_locale()
         try:
             output = subprocess.check_output(command.encode(lang), shell=True)
         except subprocess.CalledProcessError as e:
@@ -186,7 +186,7 @@ class LocalPlatform(ParamikoPlatform):
         multiple_delete_previous_run = os.path.join(
             log_dir, "multiple_delete_previous_run.sh")
         if os.path.exists(log_dir):
-            lang = get_locate()
+            lang = get_locale()
             open(multiple_delete_previous_run, 'wb+').write(("rm -f" + filenames).encode(lang))
             os.chmod(multiple_delete_previous_run, 0o770)
         return ""
