@@ -71,10 +71,10 @@ For a very quick test, you can follow the next instructions to configure and run
 .. code-block:: bash
 
     # Quick-configure ( user-level database)
-    # autosubmit configure
+    autosubmit configure
 
     # Install
-    # autosubmit install
+    autosubmit install
 
     # Quick-start
     # Get expid
