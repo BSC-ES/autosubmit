@@ -19,13 +19,6 @@ The Autosubmit code is hosted in GitHub. The Autosubmit Python package is availa
 
 .. important:: The host machine has to be able to access HPCs/Clusters via password-less ssh. Ensure that the ssh key is in PEM format ``ssh-keygen -t rsa -b 4096 -C "email@email.com" -m PEM``.
 
-
-.. runcmd:: autosubmit configure
-
-
-.. runcmd:: autosubmit install
-
-
 To install autosubmit, execute the following:
 ::
 
@@ -73,6 +66,10 @@ The sequence of instructions to install Autosubmit and its dependencies with pip
     autosubmit -h
 
 For a very quick test, you can follow the next instructions to configure and run Autosubmit at the user level. Otherwise, please go directly to `How to configure Autosubmit <https://autosubmit.readthedocs.io/en/master/installation/index.html#how-to-configure-autosubmit>`_ .
+
+.. runcmd:: autosubmit configure
+
+.. runcmd:: autosubmit install
 
 .. code-block:: bash
 
