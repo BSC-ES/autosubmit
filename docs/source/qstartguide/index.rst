@@ -64,8 +64,6 @@ Description of most used commands
 Create a new experiment
 =======================
 
-.. runcmd:: autosubmit expid -dm -H "local" -d "Tutorial"
-
     ``autosubmit expid -dm -H "local" -d "Tutorial"``
 
 - *-dm: Generates a dummy experiment.*
@@ -93,8 +91,6 @@ The output of the command will show the expid of the experiment and generate the
 
 
 Then, execute ``autosubmit create <expid> -np`` and Autosubmit will generate the workflow graph.
-
-.. runcmd:: autosubmit create a000 -np
 
 Run and monitoring
 ==================
