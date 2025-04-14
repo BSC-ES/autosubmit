@@ -217,7 +217,7 @@ class EcPlatform(ParamikoPlatform):
             return False
 
     def send_command(self, command, ignore_log=False, x11 = False):
-        lang = get_locate()
+        lang = get_locale()
         err_message = 'command not executed'
         for _ in range(3):
             try:

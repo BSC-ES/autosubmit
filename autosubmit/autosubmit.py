@@ -2535,7 +2535,6 @@ class Autosubmit:
                 packages_to_submit = packager.build_packages()
                 save_1, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = platform.submit_ready_jobs(as_conf,
                                                                                                               job_list,
-                                                                                                              platforms_to_test,
                                                                                                               packages_persistence,
                                                                                                               packages_to_submit,
                                                                                                               inspect=inspect,

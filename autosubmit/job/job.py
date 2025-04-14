@@ -29,7 +29,6 @@ from autosubmit.job import job_utils
 import copy
 import datetime
 import json
-import locale
 import os
 import re
 import textwrap
@@ -2356,7 +2355,7 @@ class Job(object):
         :rtype: str
         """
 
-        lang = get_locate()
+        lang = get_locale()
         parameters = self.update_parameters(as_conf, set_attributes=False)
         template_content,additional_templates = self.update_content(as_conf, parameters)
         #enumerate and get value
