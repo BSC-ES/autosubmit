@@ -303,10 +303,10 @@ These parameters provide extra functionalities to Autosubmit.
 .. code-block:: ini
 
     [conf]
-    # Allows using a different jobs_<EXPID>.yml default template on `autosubmit expid ``
-    jobs = <path_jobs>/jobs_<EXPID>.yml
-    # Allows using a different platforms_<EXPID>.yml default template on `autosubmit expid `
-    platforms = <path_platforms>platforms_<EXPID>.yml> path to any jobs.yml
+    # Allows using a different jobs.yml default template on `autosubmit expid ``
+    jobs = <path_jobs>/jobs.yml
+    # Allows using a different platforms.yml default template on `autosubmit expid `
+    platforms = <path_platforms>platforms.yml> path to any jobs.yml
 
     # Autosubmit API includes extra information for some Autosubmit functions. It is optional to have access to it to use Autosubmit.
     [autosubmitapi]

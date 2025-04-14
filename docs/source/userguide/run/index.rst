@@ -29,7 +29,7 @@ Example:
     ssh-add ~/.ssh/id_rsa
     autosubmit run <EXPID>
 
-.. important:: If the autosubmit version is set on ``autosubmit_<EXPID>.yml`` it must match the actual autosubmit version
+.. important:: If the autosubmit version is set on ``autosubmit.yml`` it must match the actual autosubmit version
 .. hint:: It is recommended to launch it in background and with ``nohup`` (continue running although the user who launched the process logs out).
 
 .. code-block:: bash
@@ -199,7 +199,7 @@ This feature allows to run an experiment in two separated steps without the need
 
 To achieve this, you will have to use an special parameter called TWO_STEP_START in which you will put the list of the jobs that you want to run in an exclusive mode. These jobs will run until all of them finishes and once it finishes, the rest of the jobs will begun the execution.
 
-It can be activated through TWO_STEP_START and it is set on expdef_<EXPID>.yml, under the experiment: section.
+It can be activated through TWO_STEP_START and it is set on expdef_a02n.yml, under the experiment: section.
 
 .. code-block:: ini
 
