@@ -195,17 +195,49 @@ Final step: Modify and run
 
  Open expdef.yml
 
-
 .. runcmd:: cat ~/autosubmit/a000/expdef_a000.yml
 
 
+.. code-block:: yaml
+
+    DEFAULT:
+        # Don't change
+        EXPID: "a000"
+        # Change for your new main platform name, ej. marenostrum4
+        HPCARCH: "local"
+        # Locate and  change these parameters, per ej. numchunks: 3
+        EXPERIMENT:
+            DATELIST: 20000101
+            MEMBERS: fc0
+            NUMCHUNKS: 1
+        (...)
 
 Now open platforms.yml. Note: This will be an example for marenostrum4
-
 
 .. runcmd:: cat ~/autosubmit/a000/platforms_a000.yml
 
 
+.. code-block:: yaml
+
+    PLATFORMS:
+        marenostrum4:
+            # Queue type. Options: ps, SGE, SLURM, PBS, eceaccess
+            # scheduler type
+            TYPE: slurm
+            HOST: mn1.bsc.es,mn2.bsc.es,mn3.bsc.es
+            # your project
+            PROJECT: bsc32
+            # <- your user
+            USER: bsc32070
+            SCRATCH_DIR: /gpfs/scratch
+            ADD_PROJECT_TO_HOST: False
+            # use 72:00 if you are using a PRACE account, 48:00 for the bsc account
+            MAX_WALLCLOCK: 02:00
+            # use 19200 if you are using a PRACE account, 2400 for the bsc account
+            MAX_PROCESSORS: 2400
+            PROCESSORS_PER_NODE: 48
+            SERIAL_QUEUE: debug
+            QUEUE: debug
 
 ``autosubmit create <expid>** (without -np)`` will generate the new workflow and ``autosubmit run <expid>`` will run the experiment with the latest changes.
 
