@@ -7,7 +7,7 @@ Create new experiment
 To create a new experiment, just run the command:
 ::
 
-    autosubmit expid -H HPCname -d "Description"
+    autosubmit expid -H HPCname -d Description
 
 
 *HPCname* is the name of the main HPC platform for the experiment: it will be the default platform for the tasks.
@@ -44,9 +44,9 @@ This option makes a copy of an existing experiment.
 It registers a new unique identifier and copies all configuration files in the new experiment folder:
 ::
 
-    autosubmit expid -y <EXPID> -H HPCname -d "Description"
-    autosubmit expid -y <EXPID> -c PATH -H HPCname -d "Description"
-    autosubmit expid -y a000 -H HPCname -d "Description"
+    autosubmit expid -y <EXPID> -H HPCname -d Description
+    autosubmit expid -y <EXPID> -c PATH -H HPCname -d Description
+    autosubmit expid -y a000 -H HPCname -d Description
 
 
 *HPCname* is the name of the main HPC platform for the experiment: it will be the default platform for the tasks.
@@ -85,7 +85,7 @@ The job submitted are only sleeps.
 This command creates a new experiment with default values, useful for testing:
 ::
 
-    autosubmit expid -H HPCname -dm -d "Description"
+    autosubmit expid -H HPCname -dm -d Description
 
 *HPCname* is the name of the main HPC platform for the experiment: it will be the default platform for the tasks.
 *Description* is a brief experiment description.

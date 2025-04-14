@@ -218,15 +218,26 @@ How to update the description of your experiment
 Use the command:
 ::
 
-    autosubmit updatedescrip <EXPID> "DESCRIPTION"
+    autosubmit updatedescrip EXPID DESCRIPTION
 
 *EXPID* is the experiment identifier.
 
 *DESCRIPTION* is the new description of your experiment.
 
 Options:
+::
 
-.. runcmd:: autosubmit updatedescrip -h
+    usage: autosubmit updatedescrip [-h] [-v] expid description
+
+    Updates the experiment's description.
+
+    positional arguments:
+        expid                 experiment identifier
+        description           New description.
+
+    optional arguments:
+        -h, --help            show this help message and exit
+        -v, --update_version  Update experiment version
 
 Autosubmit will validate the provided data and print the results in the command line.
 
