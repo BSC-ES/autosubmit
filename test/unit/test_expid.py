@@ -427,9 +427,9 @@ def test_remote_repo_operational(project_type: str, expid: str, create_as_exp, m
     [
         ("https://github.com/user/repo.git", True),         # valid GH link
         ("file:///home/user/project", True),                # valid file link
-        ("not-a-repo-link", False),                         # clearly invalid
+        ("not-a-repo-link", False),                         # invalid
         ("git@github.com:user/repo.git", True),             # SSH format
-        ("http://bitbucket.org/user/repo.git", True),       # other valid git host
+        ("http://bitbucket.org/user/repo.git", True),       # valid git host
         ("ftp://invalid/protocol/repo.git", False),         # invalid protocol
         ("", False),                                        # empty string
         ("file://", False),                                 # incomplete file URL

@@ -20,6 +20,7 @@ from os import path
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import locale
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
