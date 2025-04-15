@@ -20,6 +20,7 @@ from os import path
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import locale
 import os
+import re
 import shutil
 import subprocess
 from shutil import rmtree
@@ -293,3 +294,21 @@ class AutosubmitGit:
             shutil.rmtree(project_backup_path)
 
         return True
+
+    @staticmethod
+    def is_github_repo(git_repo: str) -> bool:
+        '''
+        Checks if a given string is a valid github repository
+        '''
+
+        git_repo = git_repo.lower().strip()
+
+        git_url_pattern = re.compile(
+                r'^(?:git|ssh|https?|git@[\w\.]+):(//)?[\w\.@\:/\-~]+\.git/?$'
+                )
+
+        file_url_pattern = re.compile(
+                r'^file://.+$'
+                )
+
+        return bool(git_url_pattern.search(git_repo) or file_url_pattern.search(git_repo))
