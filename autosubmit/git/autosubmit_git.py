@@ -266,7 +266,7 @@ class AutosubmitGit:
         git_repo = git_repo.lower().strip()
 
         git_url_pattern = re.compile(
-            r'^(https://|git@)[a-zA-Z0-9.-]+(:[a-zA-Z0-9./-]+)+\.git$'
+                r'^(https?://[a-zA-Z0-9.-]+/[a-zA-Z0-9.-]+/[a-zA-Z0-9.-]+\.git|git@[a-zA-Z0-9.-]+:[a-zA-Z0-9./-]+\.git)$'
         )
         file_url_pattern = re.compile(
             r'^file://.+$'
