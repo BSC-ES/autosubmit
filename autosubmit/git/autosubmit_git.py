@@ -262,11 +262,11 @@ class AutosubmitGit:
         return True
 
     @staticmethod
-    def is_github_repo(git_repo:str) -> bool:
+    def is_git_repo(git_repo: str) -> bool:
         git_repo = git_repo.lower().strip()
 
         git_url_pattern = re.compile(
-            r'^(?:git|ssh|https?|git@[\w\.]+):(//)?[\w\.@\:/\-~]+\.git/?$'
+            r'^(https://|git@)[a-zA-Z0-9.-]+(:[a-zA-Z0-9./-]+)+\.git$'
         )
         file_url_pattern = re.compile(
             r'^file://.+$'

@@ -423,7 +423,7 @@ def test_remote_repo_operational(project_type: str, expid: str, create_as_exp, m
             AutosubmitGit.check_unpushed_changes(expid) 
 
 @pytest.mark.parametrize(
-    "git_repo, expected_veredict",
+    "git_repo, expected",
     [
         ("https://github.com/user/repo.git", True),         # valid GH link
         ("file:///home/user/project", True),                # valid file link
@@ -436,5 +436,5 @@ def test_remote_repo_operational(project_type: str, expid: str, create_as_exp, m
         ("https://github.com/user/repo", False),            # missing .git
     ]
 )
-def test_valid_git_repo_check(git_repo, expected_veredict):
-    assert AutosubmitGit.is_github_repo(git_repo) == expected_veredict            
+def test_valid_git_repo_check(git_repo, expected):
+    assert AutosubmitGit.is_git_repo(git_repo) == expected

@@ -1363,9 +1363,9 @@ class Autosubmit:
         local: Gets local minimal instead of git minimal
         """
         if use_local_minimal:
-            if git_repo.lower().find("https") != -1:
-                git_repo = ""
             git_branch = ""
+            if AutosubmitGit.is_git_repo(git_repo): 
+                git_repo = ""
 
         exp_id = ""
         root_folder = os.path.join(BasicConfig.LOCAL_ROOT_DIR)
