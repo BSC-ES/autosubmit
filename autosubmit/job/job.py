@@ -1538,8 +1538,8 @@ class Job(object):
         :param default_status: status to set if job is not completed. By default, it is FAILED
         :type default_status: Status
         """
-        completed_file = os.path.join(self._tmp_path, self.name + '_COMPLETED')
-        completed_file_location = os.path.join(self._tmp_path, f"LOG_{self.expid}", self.name + '_COMPLETED')
+        completed_file = os.path.join(str(self._tmp_path), self.name + '_COMPLETED')
+        completed_file_location = os.path.join(str(self._tmp_path), f"LOG_{self.expid}", self.name + '_COMPLETED')
         # I'm not fan of this but, it is the only way of doing it without a rework.
         if os.path.exists(completed_file) or os.path.exists(completed_file_location):
             if not over_wallclock:

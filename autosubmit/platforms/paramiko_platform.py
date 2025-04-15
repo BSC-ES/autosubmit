@@ -555,7 +555,7 @@ class ParamikoPlatform(Platform):
         :param job: job object
         :type job: autosubmit.job.job.Job
         :param script_name: job script's name
-        :rtype scriptname: str
+        :rtype script_name: str
         :param hold: send job hold
         :type hold: boolean
         :return: job id for the submitted job
@@ -597,7 +597,7 @@ class ParamikoPlatform(Platform):
 
     def submit_Script(self, hold=False):
         """
-        Sends a Submitfile Script, exec in platform and retrieve the Jobs_ID.
+        Sends a Submit file Script, exec in platform and retrieve the Jobs_ID.
 
         :param hold: send job hold
         :type hold: boolean
@@ -615,6 +615,7 @@ class ParamikoPlatform(Platform):
         :return: command to get estimated queue time
         """
         raise NotImplementedError
+
     def parse_estimated_time(self, output):
         """
         Parses estimated queue time from output of get_estimated_queue_time_cmd
@@ -675,8 +676,7 @@ class ParamikoPlatform(Platform):
         self.send_command(self.get_checkjob_cmd(job_id))
         while self.get_ssh_output().strip(" ") == "" and retries > 0:
             retries = retries - 1
-            Log.debug(
-                'Retrying check job command: {0}', self.get_checkjob_cmd(job_id))
+            Log.debug('Retrying check job command: {0}', self.get_checkjob_cmd(job_id))
             Log.debug('retries left {0}', retries)
             Log.debug('Will be retrying in {0} seconds', sleep_time)
             sleep(sleep_time)
@@ -742,6 +742,11 @@ class ParamikoPlatform(Platform):
             job.new_status = job_status
 
     def _check_jobid_in_queue(self, ssh_output, job_list_cmd):
+        """
+
+        :param ssh_output: ssh output
+        :type ssh_output: str
+        """
         for job in job_list_cmd[:-1].split(','):
             if job not in ssh_output:
                 return False
@@ -752,8 +757,6 @@ class ParamikoPlatform(Platform):
 
         :param job_list: list of jobs
         :type job_list: list
-        :param ssh_output: ssh output
-        :type ssh_output: str
         :return: job status
         :rtype: str
         """
@@ -768,18 +771,17 @@ class ParamikoPlatform(Platform):
             job_list_cmd=job_list_cmd[:-1]
 
         return job_list_cmd
+
     def check_Alljobs(self, job_list, as_conf, retries=5):
         """
         Checks jobs running status
 
         :param job_list: list of jobs
         :type job_list: list
-        :param job_list_cmd: list of jobs in the queue system
-        :type job_list_cmd: str
-        :param remote_logs: remote logs
-        :type remote_logs: str
+        :param as_conf: config
+        :type as_conf: as_conf
         :param retries: retries
-        :type default_status: bool
+        :type retries: int
         :return: current job status
         :rtype: autosubmit.job.job_common.Status
         """
@@ -873,6 +875,7 @@ class ParamikoPlatform(Platform):
             # job.new_status=job_status
         if slurm_error:
             raise AutosubmitError(e_msg,6000)
+
     def get_jobid_by_jobname(self,job_name,retries=2):
         """
         Get job id by job name
@@ -1479,6 +1482,7 @@ class ParamikoPlatform(Platform):
                 return False
         except:
             return False
+
 class ParamikoPlatformException(Exception):
     """
     Exception raised from HPC queues
