@@ -294,9 +294,6 @@ class PJMPlatform(ParamikoPlatform):
     def parse_job_output(self, output):
         return output.strip().split()[1].strip().strip("\n")
 
-    def parse_job_finish_data(self, output, packed):
-        return 0, 0, 0, 0, 0, 0, dict(), False
-
     def queuing_reason_cancel(self, reason):
         try:
             if len(reason.split('(', 1)) > 1:

@@ -930,11 +930,10 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
         """
         Goes through the jobs with the same date and member as the input job, and returns the first that satisfies self._is_wrappable().
 
-        Args:
-            job (Job): Job to be evaluated.
-
-        Returns:
-            Optional[Any]: Job that is wrappable, or None if no such job is found.
+        :param job: Job to be evaluated.
+        :type job: Job
+        :return: Job that is wrappable, or None if no such job is found.
+        :rtype: Optional[Any]
         """
         sorted_jobs = self.sorted_jobs
         child = None

@@ -20,9 +20,11 @@ import os
 import pickle
 from sys import setrecursionlimit, getrecursionlimit
 import shutil
-from autosubmit.database.db_manager import DbManager
+from autosubmit.database.db_manager import create_db_manager
 from log.log import AutosubmitCritical, Log
 from contextlib import suppress
+from autosubmitconfigparser.config.basicconfig import BasicConfig
+from pathlib import Path
 
 
 class JobListPersistence(object):
@@ -140,8 +142,15 @@ class JobListPersistenceDb(JobListPersistence):
         "wrapper_type",
     ]
 
-    def __init__(self, persistence_path, persistence_file):
-        self.db_manager = DbManager(persistence_path, persistence_file, self.VERSION)
+    def __init__(self, expid: str):
+        options = {
+            "root_path": str(Path(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")),
+            "db_name": f"job_list_{expid}",
+            "db_version": self.VERSION,
+            "schema": expid
+        }
+        self.expid = expid
+        self.db_manager = create_db_manager(BasicConfig.DATABASE_BACKEND, **options)
 
     def load(self, persistence_path, persistence_file):
         """

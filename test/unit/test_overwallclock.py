@@ -1,3 +1,20 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 from datetime import datetime, timedelta
 
 import pytest
@@ -97,7 +114,8 @@ def setup_jobs(dummy_jobs, new_platform_mock):
     ids=["Submitted", "Queuing", "Running", "Failed", "Completed", "Held", "No packages"]
 )
 def test_check_wrapper_stored_status(setup_as_conf, new_job_list, new_platform_mock, initial_status, expected_status):
-    dummy_jobs = [Job("dummy-1", 1, initial_status, 0), Job("dummy-2", 2, initial_status, 0), Job("dummy-3", 3, initial_status, 0)]
+    dummy_jobs = [Job("dummy-1", 1, initial_status, 0), Job("dummy-2", 2, initial_status, 0),
+                  Job("dummy-3", 3, initial_status, 0)]
     setup_jobs(dummy_jobs, new_platform_mock)
     new_job_list.jobs = dummy_jobs
     if dummy_jobs[0].status != Status.UNKNOWN:
@@ -155,7 +173,8 @@ def test_platform_job_is_over_wallclock(setup_as_conf, new_platform_mock, platfo
     [(SlurmPlatform, "Slurm"), (PsPlatform, "PS"), (PsPlatform, "PJM")],
     ids=["SlurmPlatform", "PsPlatform", "PjmPlatform"]
 )
-def test_platform_job_is_over_wallclock_force_failure(setup_as_conf, new_platform_mock, platform_class, platform_name, mocker):
+def test_platform_job_is_over_wallclock_force_failure(setup_as_conf, new_platform_mock, platform_class, platform_name,
+                                                      mocker):
     platform_instance = platform_class("dummy", f"{platform_name}-dummy", setup_as_conf.experiment_data)
     job = Job("dummy-1", 1, Status.RUNNING, 0)
     setup_jobs([job], platform_instance)
