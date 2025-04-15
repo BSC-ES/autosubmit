@@ -23,7 +23,6 @@ Main module for Autosubmit. Only contains an interface class to all functionalit
 
 from collections import OrderedDict
 from pathlib import Path
-from xmlrpc.client import DateTime
 
 from autosubmit.job import job_utils
 import copy
@@ -3101,7 +3100,7 @@ class WrapperJob(Job):
         Parse a date from int to datetime.
         :param timestamp: time to be converted
         :type timestamp: int
-        :return: return time converted from int to datetime
+        :return: return time converted
         :rtype: datetime
         """
         value = datetime.datetime.fromtimestamp(timestamp)
