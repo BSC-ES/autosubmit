@@ -261,6 +261,19 @@ class AutosubmitGit:
         return True
 
     @staticmethod
+    def is_github_repo(git_repo:str) -> bool:
+        git_repo = git_repo.lower().strip()
+
+        git_url_pattern = re.compile(
+            r'^(?:git|ssh|https?|git@[\w\.]+):(//)?[\w\.@\:/\-~]+\.git/?$'
+        )
+        file_url_pattern = re.compile(
+            r'^file://.+$'
+        )
+
+        return bool(git_url_pattern.match(git_repo) or file_url_pattern.match(git_repo))
+
+    @staticmethod
     def check_unpushed_changes(expid: str) -> None:
         """
         Raises an AutosubmitCritical error if the experiment is operational, the platform is Git, and there are unpushed changes.
