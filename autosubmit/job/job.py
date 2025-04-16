@@ -2572,7 +2572,7 @@ class Job(object):
         job_data_dc = exp_history.write_finish_time(self.name, finish=finish_time, status=final_status, job_id=self.id, out_file=out, err_file=err)
 
         # Launch second as threaded function only for slurm
-        if job_data_dc and type(self.platform) is not str and self.platform.type == "slurm":
+        if job_data_dc and type(self.platform) is not str and (self.platform.type in ["slurm", "maestro"]):
             thread_write_finish = Thread(target=ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR).write_platform_data_after_finish, args=(job_data_dc, self.platform))
             thread_write_finish.name = "JOB_data_{}".format(self.name)
             thread_write_finish.start()
@@ -2814,7 +2814,7 @@ class WrapperJob(Job):
 
     def _check_inner_jobs_queue(self, prev_status):
         reason = str()
-        if self._platform.type == 'slurm':
+        if self._platform.type in ["slurm", "maestro"]:
             self._platform.send_command(
                 self._platform.get_queue_status_cmd(self.id))
             reason = self._platform.parse_queue_reason(

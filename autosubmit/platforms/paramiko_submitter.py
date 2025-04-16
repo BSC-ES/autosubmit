@@ -31,6 +31,7 @@ from autosubmit.platforms.pbsplatform import PBSPlatform
 from autosubmit.platforms.sgeplatform import SgePlatform
 from autosubmit.platforms.ecplatform import EcPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
+from autosubmit.platforms.maestroplatform import MaestroPlatform
 from autosubmit.platforms.pjmplatform import PJMPlatform
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.paramiko_platform import ParamikoPlatformException
@@ -141,8 +142,11 @@ class ParamikoSubmitter(Submitter):
                 elif platform_type == 'ecaccess':
                     remote_platform = EcPlatform(
                         asconf.expid, section, exp_data, platform_version)
-                elif platform_type == 'slurm':
+                elif platform_type == "slurm":
                     remote_platform = SlurmPlatform(
+                        asconf.expid, section, exp_data, auth_password = auth_password)
+                elif platform_type == "maestro":
+                    remote_platform = MaestroPlatform(
                         asconf.expid, section, exp_data, auth_password = auth_password)
                 elif platform_type == 'pjm':
                     remote_platform = PJMPlatform(
