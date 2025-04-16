@@ -35,6 +35,13 @@ from log.log import Log, AutosubmitCritical
 
 Log.get_logger("Autosubmit")
 
+_GIT_URL_PATTERN = re.compile(
+    r'''^(
+    (https?://[a-zA-Z0-9.-]+/[a-zA-Z0-9.-]+/[a-zA-Z0-9.-]+\.git) |  # e.g. https://github.com/user/repo
+    (\w+@[a-zA-Z0-9.-]+:[a-zA-Z0-9./-]+\.git) |                     # e.g. git@github.com:user/repo.git
+    (file://.+$)                                                    # e.g. file:///path/to/repo.git/
+    )''', re.VERBOSE)
+"""Regular expression to match Git URL."""
 
 class AutosubmitGit:
     """
@@ -265,14 +272,7 @@ class AutosubmitGit:
     def is_git_repo(git_repo: str) -> bool:
         git_repo = git_repo.lower().strip()
 
-        git_url_pattern = re.compile(
-                r'^(https?://[a-zA-Z0-9.-]+/[a-zA-Z0-9.-]+/[a-zA-Z0-9.-]+\.git|git@[a-zA-Z0-9.-]+:[a-zA-Z0-9./-]+\.git)$'
-        )
-        file_url_pattern = re.compile(
-            r'^file://.+$'
-        )
-
-        return bool(git_url_pattern.match(git_repo) or file_url_pattern.match(git_repo))
+        return _GIT_URL_PATTERN.match(git_repo) is not None
 
     @staticmethod
     def check_unpushed_changes(expid: str) -> None:
