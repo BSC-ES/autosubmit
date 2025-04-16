@@ -1,19 +1,17 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2024 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -21,28 +19,29 @@ import cProfile
 import io
 import os
 import pstats
-from enum import Enum
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from pstats import SortKey
 
-import psutil
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from psutil import Process
 
+from autosubmitconfigparser.config.basicconfig import BasicConfig
 from log.log import Log, AutosubmitCritical
 
-
 _UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
+
 
 class ProfilerState(Enum):
     """Enumeration of profiler states"""
     STOPPED = "stopped"
     STARTED = "started"
 
+
 class Profiler:
     """Class to profile the execution of experiments."""
 
-    def __init__(self, expid:str):
+    def __init__(self, expid: str):
         self._profiler = cProfile.Profile()
         self._expid = expid
 
@@ -103,17 +102,16 @@ class Profiler:
             raise AutosubmitCritical(
                 f'Directory {report_path} not writable. Please check permissions.', 7012)
 
-
         stream = io.StringIO()
         date_time = datetime.now().strftime('%Y%m%d-%H%M%S')
 
         # Generate function-by-function profiling results
         sort_by = SortKey.CUMULATIVE
         stats = pstats.Stats(self._profiler, stream=stream)  # generate statistics
-        stats.strip_dirs().sort_stats(sort_by).print_stats() # format and save in the stream
+        stats.strip_dirs().sort_stats(sort_by).print_stats()  # format and save in the stream
 
         # Generate memory profiling results
-        mem_total : float = self._mem_final - self._mem_init  # memory in Bytes
+        mem_total: float = self._mem_final - self._mem_init  # memory in Bytes
         unit = 0
         # reduces the value to its most suitable unit
         while mem_total >= 1024 and unit <= len(_UNITS) - 1:
@@ -128,16 +126,17 @@ class Profiler:
             _generate_title("Memory Profiling"),
             f"MEMORY CONSUMPTION: {mem_total} {_UNITS[unit]}.",
             ""
-        ]).replace('{', '{{').replace('}', '}}') # escape {} so Log can call str.format
+        ]).replace('{', '{{').replace('}', '}}')  # escape {} so Log can call str.format
 
         Log.info(report)
 
         stats.dump_stats(Path(report_path, f"{self._expid}_profile_{date_time}.prof"))
         with open(Path(report_path, f"{self._expid}_profile_{date_time}.txt"),
-            'w', encoding='UTF-8') as report_file:
+                  'w', encoding='UTF-8') as report_file:
             report_file.write(report)
 
         Log.info(f"[INFO] You can also find report and prof files at {report_path}\n")
+
 
 def _generate_title(title="") -> str:
     """
@@ -153,6 +152,7 @@ def _generate_title(title="") -> str:
     message = title.center(max_len)
     return "\n".join([separator, message, separator])
 
+
 def _get_current_memory() -> int:
     """
     Return the current memory consumption of the process in Bytes.
@@ -160,4 +160,4 @@ def _get_current_memory() -> int:
     :return: The current memory used by the process (Bytes).
     :rtype: int
     """
-    return psutil.Process(os.getpid()).memory_info().rss
+    return Process(os.getpid()).memory_info().rss

@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from getpass import getuser
+from psutil import ZombieProcess
 from typing import List, Optional
 
 import pytest
@@ -72,6 +73,26 @@ def test_retrieve_expids(mocker, expids: List[str], expected_retrieved: int, use
     assert len(found) == expected_retrieved
 
 
+def test_retrieve_expids_but_listing_raises_zombies(mocker):
+    mocker.patch('autosubmit.helpers.processes.process_iter', side_effect=ZombieProcess(1984))
+    expids = retrieve_expids()
+    assert type(expids) is list and len(expids) == 0
+
+
+def test_retrieve_expids_but_cmdline_raises_zombies(mocker):
+    a000 = _create_process(mocker, 'a000', getuser())
+    a001 = _create_process(mocker, 'a001', getuser())
+    a001.cmdline.side_effect = ZombieProcess(1984)
+    processes = [
+        a000,
+        a001
+    ]
+    mocker.patch('autosubmit.helpers.processes.process_iter', return_value=processes)
+    expids = retrieve_expids()
+    assert len(expids) == 1
+    assert expids[0] in a000.cmdline()
+
+
 @pytest.mark.parametrize(
     'expid,command,pid',
     [
@@ -111,3 +132,12 @@ def test_process_id_multiple_found(mocker):
 
     assert pid_found is 1
     assert mocked_log.warning.call_count == 1
+
+
+def test_process_id_but_there_are_zombies(mocker):
+    """Test that if the listing of process crashes due to zombies, we get an empty list."""
+    mocker.patch('autosubmit.helpers.processes.process_iter', side_effect=ZombieProcess(1984))
+
+    pid_found = process_id('a000')
+
+    assert pid_found is None

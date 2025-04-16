@@ -13,11 +13,12 @@
 # GNU General Public License for more details.
 
 import re
+from contextlib import suppress
 from getpass import getuser
 from pathlib import Path
 from typing import List, Optional
 
-from psutil import process_iter
+from psutil import process_iter, ZombieProcess
 
 from log.log import Log
 
@@ -143,15 +144,21 @@ def retrieve_expids() -> List[str]:
     """
     user: str = getuser()
     expids: List[str] = []
-    for process in [p for p in process_iter(['pid', 'cmdline', 'username']) if p.username() == user]:
-        expid = _match_autosubmit_cmdline(process.cmdline())
-        if expid:
-            expids.append(expid)
+    # NOTE: psutil may raise ``ZombieProcess`` in some cases, even when other exceptions happen in the
+    #       case when a process is a zombie (e.g. got a IO error, but the process is zombie)
+    with suppress(ZombieProcess):
+        for process in [p for p in process_iter(['pid', 'cmdline', 'username']) if p.username() == user]:
+            with suppress(ZombieProcess):
+                expid = _match_autosubmit_cmdline(process.cmdline())
+                if expid:
+                    expids.append(expid)
 
     return expids
 
 
-# TODO: check with Dani if the platform is needed (no processes using it on hub or destine vm?)
+# TODO: check with Dani if the platform is needed (no processes using it on hub or destine vm?).
+#       The previous code used ``grep`` to search by expid, and also had some code ready to
+#       search by platform name, although that was not actually used anywhere, yet.
 def process_id(expid: str, command="run") -> Optional[int]:
     """Retrieve the process id of the autosubmit process.
 
@@ -163,11 +170,16 @@ def process_id(expid: str, command="run") -> Optional[int]:
     :rtype: Optional[int]
     """
     user: str = getuser()
-    processes = [
-        p for p
-        in process_iter(['pid', 'cmdline', 'username'])
-        if p.username() == user and _match_autosubmit_cmdline(p.cmdline(), command, expid)
-    ]
+    try:
+        processes = [
+            p for p
+            in process_iter(['pid', 'cmdline', 'username'])
+            if p.username() == user and _match_autosubmit_cmdline(p.cmdline(), command, expid)
+        ]
+    except ZombieProcess:
+        # NOTE: psutil may raise ``ZombieProcess`` in some cases, even when other exceptions happen in the
+        #       case when a process is a zombie (e.g. got a IO error, but the process is zombie)
+        return None
 
     if not processes:
         return None

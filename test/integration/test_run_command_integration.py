@@ -18,13 +18,11 @@
 import os
 import pwd
 import sqlite3
-from contextlib import suppress
 from pathlib import Path
 from textwrap import dedent
 from typing import Any
 
 import pytest
-from psutil import ZombieProcess
 
 _EXPID = 't000'
 """The experiment ID used throughout the test."""
@@ -463,17 +461,14 @@ def test_run_interrupted(
     _assert_exit_code(final_status, exit_code)
 
     current_statuses = 'SUBMITTED, QUEUING, RUNNING'
-    # TODO: When you call ``.cmdline`` in a ``psutil.Process`` during an iteration,
-    #       if it is a zombie it might raise a ``ZombieProcess`` error.
-    with suppress(ZombieProcess):
-        as_exp.autosubmit.stop(
-            all_expids=False,
-            cancel=False,
-            current_status=current_statuses,
-            expids=_EXPID,
-            force=True,
-            force_all=True,
-            status='FAILED')
+    as_exp.autosubmit.stop(
+        all_expids=False,
+        cancel=False,
+        current_status=current_statuses,
+        expids=_EXPID,
+        force=True,
+        force_all=True,
+        status='FAILED')
 
     exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
     _assert_exit_code(final_status, exit_code)
