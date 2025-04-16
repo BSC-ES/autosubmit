@@ -222,11 +222,11 @@ class Autosubmit:
             subparser = subparsers.add_parser(
                 'expid', description="Creates a new experiment")
             group = subparser.add_mutually_exclusive_group()
-            group.add_argument(
+            subparser.add_argument(
                 '-y', '--copy', help='makes a copy of the specified experiment')
             group.add_argument('-dm', '--dummy', action='store_true',
                                help='creates a new experiment with default values, usually for testing')
-            group.add_argument('-min', '--minimal_configuration', action='store_true',
+            subparser.add_argument('-min', '--minimal_configuration', action='store_true',
                                help='creates a new experiment with minimal configuration, usually combined with -repo')
             subparser.add_argument('-repo', '--git_repo', type=str, default="", required=False,
                                    help='sets a git repository for the experiment')
