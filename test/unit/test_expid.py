@@ -436,5 +436,5 @@ def test_remote_repo_operational(project_type: str, expid: str, create_as_exp, m
         ("https://github.com/user/repo", False),            # missing .git
     ]
 )
-def test_valid_git_repo_check(git_repo, expected):
+def test_valid_git_repo_check(git_repo: str, expected: str) -> None:
     assert AutosubmitGit.is_git_repo(git_repo) == expected
