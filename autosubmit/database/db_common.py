@@ -316,9 +316,13 @@ def get_experiment_id(name: str) -> int:
     :param name: experiment name
     :return: experiment numerical id
     """
+    fn = _get_experiment_id
+    if BasicConfig.DATABASE_BACKEND == 'postgres':
+        fn = _get_experiment_id_sqlalchemy
+
     queue = multiprocessing.Queue(1)
     proc = multiprocessing.Process(
-        target=fn_wrapper, args=(_get_experiment_id, queue, name)
+        target=fn_wrapper, args=(fn, queue, name)
     )
     proc.start()
 
@@ -881,3 +885,17 @@ def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:
         if cast(int, result.rowcount) > 0:
             Log.debug("The experiment {0} has been deleted!!!", experiment_id)
         return True
+
+
+def _get_experiment_id_sqlalchemy(name: str) -> int:
+    query = select(tables.ExperimentTable.c.name).where(
+        tables.ExperimentTable.c.name == name
+    )
+
+    with _get_sqlalchemy_conn() as conn:
+        row = conn.execute(query).one_or_none()
+
+    if not row:
+        raise AutosubmitCritical(f'The experiment "{name}" does not exist', 7005)
+
+    return row[0]

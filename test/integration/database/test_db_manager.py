@@ -15,49 +15,67 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from autosubmit.database.db_manager import DbManager
+"""Integration tests for Autosubmit ``DbManager``."""
+
+import pytest
+from typing import cast, TYPE_CHECKING
+
+from autosubmit.database.db_manager import DatabaseManager, DbManager, SqlAlchemyDbManager
+from autosubmit.database.tables import DBVersionTable
+
+if TYPE_CHECKING:
+    # noinspection PyProtectedMember
+    from _pytest._py.path import LocalPath
 
 
-def test_create_table_command_returns_a_valid_command():
-    # arrange
-    table_name = 'tests'
-    table_fields = ['dummy1', 'dummy2', 'dummy3']
-    expected_command = 'CREATE TABLE IF NOT EXISTS tests (dummy1, dummy2, dummy3)'
-    # act
-    command = DbManager.generate_create_table_command(table_name, table_fields)
-    # assert
-    assert expected_command == command
+def _create_db_manager(root_path: "LocalPath", engine: str) -> DatabaseManager:
+    if engine == 'sqlite':
+        return cast(DatabaseManager, DbManager(str(root_path), 'test-db', 1))
+    return cast(DatabaseManager, SqlAlchemyDbManager(schema=''))
 
 
-def test_insert_command_returns_a_valid_command():
-    # arrange
-    table_name = 'tests'
-    columns = ['col1, col2, col3']
-    values = ['dummy1', 'dummy2', 'dummy3']
-    expected_command = 'INSERT INTO tests(col1, col2, col3) VALUES ("dummy1", "dummy2", "dummy3")'
-    # act
-    command = DbManager.generate_insert_command(table_name, columns, values)
-    # assert
-    assert expected_command == command
+def test_db_manager_has_made_correct_initialization(tmp_path: "LocalPath", as_db_sqlite) -> None:
+    # TODO: Only SQLite has ``db_name`` and ``db_version``, is that correct?
+    db_manager = cast(DbManager, _create_db_manager(tmp_path, 'sqlite'))
+    name = db_manager.select_first_where('db_options', ['option_name="name"'])[1]
+    version = db_manager.select_first_where('db_options', ['option_name="version"'])[1]
+    assert db_manager.db_name == name
+    assert db_manager.db_version == int(version)
 
 
-def test_insert_many_command_returns_a_valid_command():
-    # arrange
-    table_name = 'tests'
-    num_of_values = 3
-    expected_command = 'INSERT INTO tests VALUES (?,?,?)'
-    # act
-    command = DbManager.generate_insert_many_command(table_name, num_of_values)
-    # assert
-    assert expected_command == command
+@pytest.mark.parametrize(
+    "db_engine",
+    [
+        # postgres
+        pytest.param("postgres", marks=[pytest.mark.postgres, pytest.mark.docker]),
+        # sqlite
+        pytest.param("sqlite")
+    ],
+)
+def test_after_create_table_command_then_it_returns_0_rows(tmp_path: "LocalPath", db_engine: str, request):
+    request.getfixturevalue(f"as_db_{db_engine}")
+    db_manager = _create_db_manager(tmp_path, db_engine)
+    db_manager.create_table(DBVersionTable.name, ['version'])
+    count = db_manager.count(DBVersionTable.name)
+    assert 0 == count
 
 
-def test_select_command_returns_a_valid_command():
-    # arrange
-    table_name = 'tests'
-    where = ['test=True', 'debug=True']
-    expected_command = 'SELECT * FROM tests WHERE test=True AND debug=True'
-    # act
-    command = DbManager.generate_select_command(table_name, where)
-    # assert
-    assert expected_command == command
+@pytest.mark.parametrize(
+    "db_engine",
+    [
+        # postgres
+        pytest.param("postgres", marks=[pytest.mark.postgres]),
+        # sqlite
+        pytest.param("sqlite")
+    ],
+)
+def test_after_3_inserts_into_a_table_then_it_has_3_rows(
+        tmp_path: "LocalPath", db_engine: str, request):
+    request.getfixturevalue(f"as_db_{db_engine}")
+    db_manager = _create_db_manager(tmp_path, db_engine)
+    columns = ['version']
+    db_manager.create_table(DBVersionTable.name, columns)
+    for i in range(3):
+        db_manager.insert(DBVersionTable.name, columns, [str(i)])
+    count = db_manager.count(DBVersionTable.name)
+    assert 3 == count

@@ -53,26 +53,22 @@ from ruamel.yaml import YAML
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 import autosubmit.history.utils as HUtils
 import autosubmit.statistics.utils as StatisticsUtils
-from autosubmit.database.db_common import update_experiment_descrip_version
-from autosubmit.experiment.detail_updater import ExperimentDetails
-from autosubmit.helpers.processes import process_id
-from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path
-from autosubmit.helpers.utils import strtobool
-from log.log import Log, AutosubmitError, AutosubmitCritical
-from autosubmit.database.db_common import create_db
-from autosubmit.database.db_common import delete_experiment, get_experiment_descrip
-from autosubmit.database.db_common import get_autosubmit_version, check_experiment_exists
+from autosubmit.database.db_common import (
+    create_db, delete_experiment, get_experiment_descrip, get_autosubmit_version, check_experiment_exists,
+    update_experiment_descrip_version
+)
 from autosubmit.database.db_structure import get_structure
-from autosubmit.experiment.experiment_common import copy_experiment
-from autosubmit.experiment.experiment_common import new_experiment
+from autosubmit.experiment.detail_updater import ExperimentDetails
+from autosubmit.experiment.experiment_common import copy_experiment, new_experiment
 from autosubmit.git.autosubmit_git import AutosubmitGit
+from autosubmit.helpers.processes import process_id
+from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, strtobool
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_grouping import JobGrouping
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistenceDb
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
+from autosubmit.job.job_list_persistence import JobListPersistence, JobListPersistenceDb, JobListPersistencePkl
 from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packager import JobPackager
 from autosubmit.job.job_utils import SubJob, SubJobManager
@@ -81,6 +77,7 @@ from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
+from log.log import Log, AutosubmitError, AutosubmitCritical
 
 dialog = None
 
@@ -816,17 +813,23 @@ class Autosubmit:
             if not BasicConfig.CONFIG_FILE_FOUND:
                 raise AutosubmitCritical('No configuration file(autosubmitrc) found in this filesystem. Please run "autosubmit configure" first.',7006)
             if args.command != "install":
-                if not os.path.exists(BasicConfig.DB_PATH):
-                    raise AutosubmitCritical('Experiments database not found in this filesystem. Please run "autosubmit install" first.',7072)
-                else:
-                    permissions = os.access(BasicConfig.DB_PATH, os.R_OK)  # Check for read access
-                    if not permissions:
-                        raise AutosubmitCritical(f'Experiments database {BasicConfig.DB_PATH} not readable.'
-                                                 f' Please check permissions.',7007)
-                    permissions = os.access(BasicConfig.DB_PATH, os.W_OK)  # Check for write access
-                    if not permissions:
-                        raise AutosubmitCritical(f'Experiments database {BasicConfig.DB_PATH} not writable.'
-                                                 f' Please check permissions.',7007)
+                # Only check for database file if database backend is set to sqlite
+                if BasicConfig.DATABASE_BACKEND == 'sqlite':
+                    if not os.path.exists(BasicConfig.DB_PATH):
+                        raise AutosubmitCritical(
+                            'Experiments database not found in this filesystem. Please run "autosubmit install" first.',
+                            7072)
+                    else:
+                        permissions = os.access(BasicConfig.DB_PATH, os.R_OK)  # Check for read access
+                        if not permissions:
+                            raise AutosubmitCritical(
+                                'Experiments database {0} not readable. Please check permissions.'.format(
+                                    BasicConfig.DB_PATH), 7007)
+                        permissions = os.access(BasicConfig.DB_PATH, os.W_OK)  # Check for write access
+                        if not permissions:
+                            raise AutosubmitCritical(
+                                'Experiments database {0} not writable. Please check permissions.'.format(
+                                    BasicConfig.DB_PATH), 7007)
 
 
 
@@ -884,7 +887,10 @@ class Autosubmit:
                 tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
                 aslogs_path = os.path.join(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
                 if not os.path.exists(exp_path):
-                    raise AutosubmitCritical("Experiment does not exist", 7012)
+                    if BasicConfig.DATABASE_BACKEND == 'sqlite':
+                        raise AutosubmitCritical("Experiment does not exist", 7012)
+                    else:
+                        os.mkdir(exp_path)
                 # delete is treated differently
                 owner, eadmin, current_owner = Autosubmit._check_ownership_and_set_last_command(as_conf, expid, args.command)
             if not os.path.exists(tmp_path):
@@ -959,7 +965,10 @@ class Autosubmit:
             if args.command not in expid_less:
                 exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
                 if not os.path.exists(exp_path):
-                    raise AutosubmitCritical("Experiment does not exist", 7012)
+                    if BasicConfig.DATABASE_BACKEND == 'sqlite':
+                        raise AutosubmitCritical("Experiment does not exist", 7012)
+                    else:
+                        os.mkdir(exp_path)
             Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
                                       args.command + exp_id + '.log'), "out", log_level)
             Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
@@ -3796,14 +3805,20 @@ class Autosubmit:
         Creates a new database instance for autosubmit at the configured path
 
         """
-        if not os.path.exists(BasicConfig.DB_PATH):
-            Log.info("Creating autosubmit database...")
-            qry = read_files('autosubmit.database').joinpath('data/autosubmit.sql').read_text(locale.getlocale()[1])
-            if not create_db(qry):
-                raise AutosubmitCritical("Can not write database file", 7004)
-            Log.result("Autosubmit database created successfully")
+        if BasicConfig.DATABASE_BACKEND == 'sqlite':
+            if not os.path.exists(BasicConfig.DB_PATH):
+                Log.info("Creating autosubmit database...")
+                query_file = read_files('autosubmit.database') / 'data/autosubmit.sql'
+                query = query_file.read_text()
+                if not create_db(query):
+                    raise AutosubmitCritical("Can not write database file", 7004)
+                Log.result("Autosubmit database created successfully")
+            else:
+                raise AutosubmitCritical("Database already exists.", 7004)
         else:
-            raise AutosubmitCritical("Database already exists.", 7004)
+            Log.info("Creating autosubmit Postgres database...")
+            if not create_db(''):
+                raise AutosubmitCritical("Failed to create Postgres database", 7004)
         return True
 
     @staticmethod
@@ -4033,6 +4048,8 @@ class Autosubmit:
         :return:
         :rtype: 
         """
+        if BasicConfig.DATABASE_BACKEND != 'sqlite':
+            raise AutosubmitCritical("This operation is only available when Autosubmit database backend is set to sqlite", 7000)
         exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
         tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
         pkl_folder_path = os.path.join(exp_path, "pkl")
@@ -4096,15 +4113,20 @@ class Autosubmit:
 
     @staticmethod
     def database_backup(expid):
-        try:
-            database_path= os.path.join(BasicConfig.JOBDATA_DIR, f"job_data_{expid}.db")
-            backup_path = os.path.join(BasicConfig.JOBDATA_DIR, f"job_data_{expid}.sql")
-            command = f"sqlite3 {database_path} .dump > {backup_path} "
-            Log.debug("Backing up jobs_data...")
-            out = subprocess.call(command, shell=True)
-            Log.debug("Jobs_data database backup completed.")
-        except BaseException as e:
-            Log.debug("Jobs_data database backup failed.")
+        if BasicConfig.DATABASE_BACKEND == 'sqlite':
+            try:
+                database_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}.db".format(expid))
+                backup_path = os.path.join(BasicConfig.JOBDATA_DIR, "job_data_{0}.sql".format(expid))
+                command = "sqlite3 {0} .dump > {1} ".format(database_path, backup_path)
+                Log.debug("Backing up jobs_data...")
+                out = subprocess.call(command, shell=True)
+                Log.debug("Jobs_data database backup completed.")
+            except BaseException as e:
+                Log.debug("Jobs_data database backup failed.")
+        elif BasicConfig.DATABASE_BACKEND == 'postgres':
+            # TODO: Implement Postgres backup
+            Log.debug("Postgres database backup not implemented yet.")
+
     @staticmethod
     def database_fix(expid):
         """
@@ -4514,8 +4536,10 @@ class Autosubmit:
                         raise AutosubmitCritical(f"The plot folder doesn't exists. Make sure that the 'plot'"
                                                  f" folder exists in the following path: {exp_path}", code=6013)
 
-                    update_job = not os.path.exists(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl",
-                                                                 "job_list_" + expid + ".pkl"))
+                    persistence_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")
+                    persistence_file = f'job_list_{expid}.pkl'
+                    job_list_persistence: JobListPersistence = Autosubmit._get_job_list_persistence(expid, as_conf)
+                    update_job = not job_list_persistence.pkl_exists(persistence_path, persistence_file)
                     Autosubmit._create_project_associated_conf(
                         as_conf, False, update_job)
 
@@ -5541,21 +5565,6 @@ class Autosubmit:
             return ParamikoSubmitter()
 
     @staticmethod
-    def _get_job_list_persistence(expid, as_conf):
-        """
-        Returns the JobListPersistence corresponding to the storage type defined on autosubmit's config file
-
-        :return: job_list_persistence
-        :rtype: JobListPersistence
-        """
-        storage_type = as_conf.get_storage_type()
-        if storage_type == 'pkl':
-            return JobListPersistencePkl()
-        elif storage_type == 'db':
-            return JobListPersistenceDb(expid)
-        raise AutosubmitCritical('Storage type not known', 7014)
-
-    @staticmethod
     def _create_json(text):
         """
         Function to parse rerun specification from json format
@@ -5611,6 +5620,24 @@ class Autosubmit:
         sds = {'sds': data}
         result = json.dumps(sds)
         return result
+
+    @staticmethod
+    def _get_job_list_persistence(expid, as_conf) -> JobListPersistence:
+        """
+        Returns the JobListPersistence corresponding to the storage type defined on autosubmit's config file
+
+        :return: job_list_persistence
+        :rtype: JobListPersistence
+        """
+        if BasicConfig.DATABASE_BACKEND != 'sqlite':
+            return JobListPersistenceDb(expid)
+
+        storage_type = as_conf.get_storage_type()
+        if storage_type == 'pkl':
+            return JobListPersistencePkl()
+        elif storage_type == 'db':
+            return JobListPersistenceDb(expid)
+        raise AutosubmitCritical('Storage type not known', 7014)
 
     @staticmethod
     def testcase(description, chunks=None, member=None, start_date=None, hpc=None, copy_id=None, minimal_configuration=False, git_repo=None, git_branch=None, git_as_conf=None, use_local_minimal=False):

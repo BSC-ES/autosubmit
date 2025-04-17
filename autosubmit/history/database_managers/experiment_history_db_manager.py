@@ -17,13 +17,25 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import os
 import textwrap
-from typing import Any, Protocol, cast
 
 import autosubmit.history.utils as HUtils
-from . import database_models as Models
+from autosubmit.history.database_managers import database_models as Models
 from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
-from .database_manager import DatabaseManager, DEFAULT_JOBDATA_DIR
+from autosubmit.history.database_managers.database_manager import (
+    DatabaseManager,
+    DEFAULT_JOBDATA_DIR,
+)
+
+from typing import Any, Optional, Protocol, cast
+from sqlalchemy import Engine, and_, delete, func, inspect, desc, insert, select, update
+from sqlalchemy.schema import CreateTable, CreateSchema
+from autosubmit.database import session
+from autosubmit.database.tables import (
+    ExperimentRunTable,
+    JobDataTable,
+    get_table_with_schema,
+)
 
 CURRENT_DB_VERSION = 19  # Update this if you change the database schema
 DB_EXPERIMENT_HEADER_SCHEMA_CHANGES = 14
@@ -51,7 +63,13 @@ class ExperimentHistoryDbManager(DatabaseManager):
             self.create_historical_database()
 
     def my_database_exists(self):
-        return os.path.exists(self.historicaldb_file_path)
+        if os.path.exists(self.historicaldb_file_path):
+            # Check if the 2 tables exists
+            statement = "SELECT name FROM sqlite_master WHERE type='table' AND (name='job_data' OR name='experiment_run');"
+            table_result = self.get_from_statement(self.historicaldb_file_path, statement)
+            return len(table_result) == 2
+        else:
+            return False
 
     def is_header_ready_db_version(self):
         if self.my_database_exists():
@@ -477,6 +495,8 @@ class ExperimentHistoryDatabaseManager(Protocol):
 
     def update_job_data_dc_by_id(self, job_data_dc): ...
 
+    def update_job_data_dc_by_job_id_name(self, job_data_dc: Any) -> Any: ...
+
     def update_list_job_data_dc_by_each_id(self, job_data_dcs): ...
 
     def get_job_data_dc_unique_latest_by_job_name(self, job_name): ...
@@ -489,9 +509,7 @@ class ExperimentHistoryDatabaseManager(Protocol):
 
     def update_many_job_data_change_status(self, changes): ...
 
-    def _update_job_data_by_id(self, job_data_dc): ...
-
-    def get_job_data_by_name(self, job_name): ...
+    def get_job_data_by_job_id_name(self, job_id: int, job_name: str): ...
 
     def get_job_data_max_counter(self, job_name: str = None) -> int: ...
 
@@ -500,11 +518,388 @@ class ExperimentHistoryDatabaseManager(Protocol):
     def delete_experiment_run(self, run_id): ...
 
 
-def create_experiment_history_db_manager(
-    db_engine: str, **options: Any  # noqa: F841
-) -> ExperimentHistoryDatabaseManager:
-  # pylint: disable=W0613
-  return cast(ExperimentHistoryDatabaseManager, ExperimentHistoryDbManager(
-    options['schema'],
-    options.get('jobdata_dir_path', DEFAULT_JOBDATA_DIR)
-  ))
+class SqlAlchemyExperimentHistoryDbManager:
+    """A SQLAlchemy experiment history database manager.
+    Its interface was designed based on the SQLite database manager,
+    with the following differences:
+    - We do not have the DB migration system that they used, as that
+      used SQLite pragmas, which are not portable across DB engines
+      (i.e. no ``_set_schema_changes()`` nor ``_set_table_queries()``.
+    """
+
+    def __init__(self, schema: Optional[str]):
+        self.engine: Engine = session.create_engine()
+        self.schema = schema
+
+    def initialize(self):
+        # There is no update database in SQLAlchemy (yet), so we just create it.
+        self.create_historical_database()
+
+    def my_database_exists(self):
+        """Return ``True`` if the schema and tables exist in the database. ``False`` otherwise."""
+        engine = session.create_engine()
+        inspector = inspect(engine)
+        return (
+                (self.schema in inspector.get_schema_names())
+                and inspector.has_table(ExperimentRunTable.name, schema=self.schema)
+                and inspector.has_table(JobDataTable.name, schema=self.schema)
+        )
+
+    def is_header_ready_db_version(self):
+        raise NotImplementedError("This feature has not been implemented yet with SQLAlchemy / Alembic.")
+
+    def is_current_version(self):
+        raise NotImplementedError("This feature has not been implemented yet with SQLAlchemy / Alembic.")
+
+    def create_historical_database(self):
+        with self.engine.connect() as conn:
+            conn.execute(CreateSchema(self.schema, if_not_exists=True))
+            conn.execute(CreateTable(get_table_with_schema(self.schema, ExperimentRunTable), if_not_exists=True))
+            conn.execute(CreateTable(get_table_with_schema(self.schema, JobDataTable), if_not_exists=True))
+            conn.commit()
+            # TODO: implement db migrations?
+            # self._set_historical_pragma_version(CURRENT_DB_VERSION)
+
+    def update_historical_database(self):
+        raise NotImplementedError("This feature has not been implemented yet with SQLAlchemy / Alembic.")
+
+    def get_experiment_run_dc_with_max_id(self):
+        run = self._get_experiment_run_with_max_id()
+        return ExperimentRun.from_model(run)
+
+    def register_experiment_run_dc(self, experiment_run_dc):
+        query = (
+            insert(get_table_with_schema(self.schema, ExperimentRunTable)).
+            values(
+                created=HUtils.get_current_datetime(),
+                modified=HUtils.get_current_datetime(),
+                start=experiment_run_dc.start,
+                finish=experiment_run_dc.finish,
+                chunk_unit=experiment_run_dc.chunk_unit,
+                chunk_size=experiment_run_dc.chunk_size,
+                completed=experiment_run_dc.completed,
+                total=experiment_run_dc.total,
+                failed=experiment_run_dc.failed,
+                queuing=experiment_run_dc.queuing,
+                running=experiment_run_dc.running,
+                submitted=experiment_run_dc.submitted,
+                suspended=experiment_run_dc.suspended,
+                metadata=experiment_run_dc.metadata
+            )
+        )
+        with self.engine.connect() as conn:
+            conn.execute(query)
+            conn.commit()
+        return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
+
+    def update_experiment_run_dc_by_id(self, experiment_run_dc):
+        experiment_run_table = get_table_with_schema(self.schema, ExperimentRunTable)
+        query = (
+            update(experiment_run_table).
+            where(experiment_run_table.c.run_id == experiment_run_dc.run_id).  # type: ignore
+            values(
+                finish=experiment_run_dc.finish,
+                chunk_unit=experiment_run_dc.chunk_unit,
+                chunk_size=experiment_run_dc.chunk_size,
+                completed=experiment_run_dc.completed,
+                total=experiment_run_dc.total,
+                failed=experiment_run_dc.failed,
+                queuing=experiment_run_dc.queuing,
+                running=experiment_run_dc.running,
+                submitted=experiment_run_dc.submitted,
+                suspended=experiment_run_dc.suspended,
+                modified=HUtils.get_current_datetime()
+            )
+        )
+        with self.engine.connect() as conn:
+            conn.execute(query)
+            conn.commit()
+        return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
+
+    def _get_experiment_run_with_max_id(self):
+        experiment_run_table = get_table_with_schema(self.schema, ExperimentRunTable)
+        query = (
+            select(experiment_run_table).
+            where(experiment_run_table.c.run_id > 0).
+            order_by(desc(experiment_run_table.c.run_id))
+        )
+        with self.engine.connect() as conn:
+            row = conn.execute(query).first()
+            if not row:
+                raise Exception("No Experiment Runs registered.")
+        return Models.ExperimentRunRow(*row)
+
+    def is_there_a_last_experiment_run(self):
+        experiment_run_table = get_table_with_schema(self.schema, ExperimentRunTable)
+        query = (
+            select(experiment_run_table).
+            where(experiment_run_table.c.run_id > 0).
+            order_by(desc(experiment_run_table.c.run_id))
+        )
+        with self.engine.connect() as conn:
+            result = conn.execute(query).first()
+        return result is not None
+
+    def get_job_data_all(self):
+        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        with self.engine.connect() as conn:
+            job_data_rows = conn.execute(select(job_data_table)).all()
+        return [Models.JobDataRow(*row) for row in job_data_rows]
+
+    def register_submitted_job_data_dc(self, job_data_dc):
+        self._set_current_job_data_rows_last_to_zero_by_job_name(job_data_dc.job_name)
+        self._insert_job_data(job_data_dc)
+        return self.get_job_data_dc_unique_latest_by_job_name(job_data_dc.job_name)
+
+    def _set_current_job_data_rows_last_to_zero_by_job_name(self, job_name):
+        """ Sets the column last = 0 for all job_rows by job_name and last = 1. """
+        job_data_row_last = self._get_job_data_last_by_name(job_name)
+        job_data_dc_list = [JobData.from_model(row) for row in job_data_row_last]
+        for job_data_dc in job_data_dc_list:
+            job_data_dc.last = 0
+            self._update_job_data_by_id(job_data_dc)
+
+    def update_job_data_dc_by_id(self, job_data_dc):
+        """ Update JobData data class. Returns latest last=1 row from job_data by job_name. """
+        self._update_job_data_by_id(job_data_dc)
+        return self.get_job_data_dc_unique_latest_by_job_name(job_data_dc.job_name)
+
+    def update_list_job_data_dc_by_each_id(self, job_data_dcs):
+        """ Return length of updated list. """
+        for job_data_dc in job_data_dcs:
+            self._update_job_data_by_id(job_data_dc)
+        return len(job_data_dcs)
+
+    def get_job_data_dc_unique_latest_by_job_name(self, job_name):
+        job_data_row_last = self._get_job_data_last_by_name(job_name)
+        if len(job_data_row_last) > 0:
+            return JobData.from_model(job_data_row_last[0])
+        return None
+
+    def _get_job_data_last_by_name(self, job_name):
+        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        query = (
+            select(job_data_table).
+            where(
+                and_(job_data_table.c.last == 1, job_data_table.c.job_name == job_name)
+            ).
+            order_by(desc(job_data_table.c.counter))
+        )
+        with self.engine.connect() as conn:
+            job_data_rows_last = conn.execute(query).all()
+        # if previous job didn't finished but a new create has been made
+        if not job_data_rows_last:
+            new_query = (
+                select(job_data_table).
+                where(
+                    and_(job_data_table.c.last == 0, job_data_table.c.job_name == job_name)
+                ).
+                order_by(desc(job_data_table.c.counter))
+            )
+            with self.engine.connect() as conn:
+                job_data_rows_last = conn.execute(new_query).all()
+        return [Models.JobDataRow(*row) for row in job_data_rows_last]
+
+    def get_job_data_dcs_last_by_run_id(self, run_id):
+        job_data_rows = self._get_job_data_last_by_run_id(run_id)
+        return [JobData.from_model(row) for row in job_data_rows]
+
+    def _get_job_data_last_by_run_id(self, run_id):
+        """ Get List of Models.JobDataRow for last=1 and run_id """
+        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        query = (
+            select(job_data_table).
+            where(
+                and_(
+                    job_data_table.c.run_id == run_id,
+                    job_data_table.c.last == 1,
+                    job_data_table.c.rowtype >= 2
+                )
+            ).
+            order_by(job_data_table.c.id)
+        )
+        with self.engine.connect() as conn:
+            job_data_rows = conn.execute(query).all()
+        return [Models.JobDataRow(*row) for row in job_data_rows]
+
+    def get_job_data_dcs_last_by_wrapper_code(self, wrapper_code):
+        if wrapper_code and wrapper_code > 2:
+            return [JobData.from_model(row) for row in self._get_job_data_last_by_wrapper_code(wrapper_code)]
+        else:
+            return []
+
+    def _get_job_data_last_by_wrapper_code(self, wrapper_code):
+        """ Get List of Models.JobDataRow for last=1 and rowtype=wrapper_code """
+        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        query = (
+            select(job_data_table).
+            where(
+                and_(
+                    job_data_table.c.rowtype == wrapper_code,
+                    job_data_table.c.last == 1
+                )
+            ).
+            order_by(job_data_table.c.id)
+        )
+        with self.engine.connect() as conn:
+            job_data_rows = conn.execute(query).all()
+        return [Models.JobDataRow(*row) for row in job_data_rows]
+
+    def get_all_last_job_data_dcs(self):
+        """ Gets JobData data classes in job_data for last=1. """
+        job_data_rows = self._get_all_last_job_data_rows()
+        return [JobData.from_model(row) for row in job_data_rows]
+
+    def _get_all_last_job_data_rows(self):
+        """ Get List of Models.JobDataRow for last=1. """
+        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        query = (
+            select(job_data_table).
+            where(job_data_table.c.last == 1)
+        )
+        with self.engine.connect() as conn:
+            job_data_rows = conn.execute(query).all()
+        return [Models.JobDataRow(*row) for row in job_data_rows]
+
+    def _insert_job_data(self, job_data):
+        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        insert_query = (
+            insert(job_data_table).
+            values(
+                counter=job_data.counter,
+                job_name=job_data.job_name,
+                created=HUtils.get_current_datetime(),
+                modified=HUtils.get_current_datetime(),
+                submit=job_data.submit,
+                start=job_data.start,
+                finish=job_data.finish,
+                status=job_data.status,
+                rowtype=job_data.rowtype,
+                ncpus=job_data.ncpus,
+                wallclock=job_data.wallclock,
+                qos=job_data.qos,
+                energy=job_data.energy,
+                date=job_data.date,
+                section=job_data.section,
+                member=job_data.member,
+                chunk=job_data.chunk,
+                last=job_data.last,
+                platform=job_data.platform,
+                job_id=job_data.job_id,
+                extra_data=job_data.extra_data,
+                nnodes=job_data.nnodes,
+                run_id=job_data.run_id,
+                MaxRSS=job_data.MaxRSS,
+                AveRSS=job_data.AveRSS,
+                out=job_data.out,
+                err=job_data.err,
+                rowstatus=job_data.rowstatus,
+                children=job_data.children,
+                platform_output=job_data.platform_output
+            )
+        )
+        with self.engine.connect() as conn:
+            result = conn.execute(insert_query)
+            conn.commit()
+        return result.lastrowid
+
+    def update_many_job_data_change_status(self, changes):
+        # type : (List[Tuple]) -> None
+        """
+        Update many job_data rows in bulk. Requires a changes list of argument tuples.
+        Only updates finish, modified, status, and rowstatus by id.
+        """
+        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        with self.engine.connect() as conn:
+            for change in changes:
+                query = (
+                    update(job_data_table).
+                    where(job_data_table.c.id == change[3]).
+                    values(
+                        modified=change[0],
+                        status=change[1],
+                        rowstatus=change[2]
+                    )
+                )
+                conn.execute(query)
+            conn.commit()
+
+    def _update_job_data_by_id(self, job_data_dc):
+        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        query = (
+            update(job_data_table).
+            where(job_data_table.c.id == job_data_dc._id).  # type: ignore
+            values(
+                last=job_data_dc.last,
+                submit=job_data_dc.submit,
+                start=job_data_dc.start,
+                finish=job_data_dc.finish,
+                modified=HUtils.get_current_datetime(),
+                job_id=job_data_dc.job_id,
+                status=job_data_dc.status,
+                energy=job_data_dc.energy,
+                extra_data=job_data_dc.extra_data,
+                nnodes=job_data_dc.nnodes,
+                ncpus=job_data_dc.ncpus,
+                rowstatus=job_data_dc.rowstatus,
+                out=job_data_dc.out,
+                err=job_data_dc.err,
+                children=job_data_dc.children,
+                platform_output=job_data_dc.platform_output,
+            )
+        )
+        with self.engine.connect() as conn:
+            conn.execute(query)
+            conn.commit()
+
+    def get_job_data_by_name(self, job_name):
+        """ Get List of Models.JobDataRow for job_name """
+        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        query = (
+            select(job_data_table).
+            where(job_data_table.c.job_name == job_name).
+            order_by(desc(job_data_table.c.counter))
+        )
+        with self.engine.connect() as conn:
+            job_data_rows = conn.execute(query).all()
+        return [Models.JobDataRow(*row) for row in job_data_rows]
+
+    def get_job_data_max_counter(self):
+        """ The max counter is the maximum count value for the count column in job_data. """
+        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        query = select(func.max(job_data_table.c.counter).label("maxcounter"))
+        with self.engine.connect() as conn:
+            result = conn.execute(query).first()
+        if result:
+            max_counter = result.maxcounter
+            return max_counter if max_counter else DEFAULT_MAX_COUNTER
+        else:
+            return DEFAULT_MAX_COUNTER
+
+    def delete_job_data(self, id_):
+        """ Deletes row from job_data by id. Useful for testing. """
+        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        query = delete(job_data_table).where(job_data_table.c.id == id_)
+        with self.engine.connect() as conn:
+            conn.execute(query)
+            conn.commit()
+
+    def delete_experiment_run(self, run_id):
+        """ Deletes row in experiment_run by run_id. Useful for testing. """
+        experiment_run_table = get_table_with_schema(self.schema, ExperimentRunTable)
+        query = delete(experiment_run_table).where(experiment_run_table.c.run_id == run_id)
+        with self.engine.connect() as conn:
+            conn.execute(query)
+            conn.commit()
+
+
+def create_experiment_history_db_manager(db_engine: str, **options: Any) -> ExperimentHistoryDatabaseManager:
+    if db_engine == 'postgres':
+        return cast(ExperimentHistoryDatabaseManager, SqlAlchemyExperimentHistoryDbManager(options['schema']))
+    elif db_engine == 'sqlite':
+        return cast(ExperimentHistoryDatabaseManager, ExperimentHistoryDbManager(
+            options['schema'],
+            options.get('jobdata_dir_path', DEFAULT_JOBDATA_DIR)
+        ))
+    else:
+        raise ValueError(f"Invalid database engine: {db_engine}")

@@ -18,13 +18,18 @@ import gc
 
 import os
 import pickle
+from datetime import datetime
 from sys import setrecursionlimit, getrecursionlimit
 import shutil
 from autosubmit.database.db_manager import create_db_manager
-from log.log import AutosubmitCritical, Log
+from log.log import Log
 from contextlib import suppress
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from networkx import DiGraph
 
 
 class JobListPersistence(object):
@@ -49,6 +54,14 @@ class JobListPersistence(object):
         :param persistence_file: str
         :param persistence_path: str
 
+        """
+        raise NotImplementedError
+
+    def pkl_exists(self, persistence_path, persistence_file):
+        """
+        Check if a pkl file exists
+        :param persistence_file: str
+        :param persistence_path: str
         """
         raise NotImplementedError
 
@@ -93,13 +106,14 @@ class JobListPersistencePkl(JobListPersistence):
 
             return job_list
 
-    def save(self, persistence_path, persistence_file, job_list, graph):
+    def save(self, persistence_path, persistence_file, job_list, graph: 'DiGraph'):
         """
         Persists a job list in a pkl file
         :param job_list: JobList
         :param persistence_file: str
         :param persistence_path: str
-
+        :param graph: networkx graph object
+        :type graph: DiGraph
         """
 
         path = os.path.join(persistence_path, persistence_file + '.pkl' + '.tmp')
@@ -115,6 +129,14 @@ class JobListPersistencePkl(JobListPersistence):
         os.replace(path, path[:-4])
         Log.debug(f'JobList saved in {path[:-4]}')
 
+    def pkl_exists(self, persistence_path, persistence_file):
+        """
+        Check if a pkl file exists
+        :param persistence_file: str
+        :param persistence_path: str
+        """
+        path = os.path.join(persistence_path, persistence_file + '.pkl')
+        return os.path.exists(path)
 
 
 class JobListPersistenceDb(JobListPersistence):
@@ -123,34 +145,19 @@ class JobListPersistenceDb(JobListPersistence):
 
     """
 
-    VERSION = 3
-    JOB_LIST_TABLE = 'job_list'
-    TABLE_FIELDS = [
-        "name",
-        "id",
-        "status",
-        "priority",
-        "section",
-        "date",
-        "member",
-        "chunk",
-        "split",
-        "local_out",
-        "local_err",
-        "remote_out",
-        "remote_err",
-        "wrapper_type",
-    ]
+    VERSION = 4
+    JOB_LIST_TABLE = "job_pkl"
+    TABLE_FIELDS = ["expid", "pkl", "modified"]
 
-    def __init__(self, expid: str):
+    def __init__(self, expid):
         options = {
             "root_path": str(Path(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")),
             "db_name": f"job_list_{expid}",
-            "db_version": self.VERSION,
-            "schema": expid
+            "db_version": self.VERSION
         }
         self.expid = expid
         self.db_manager = create_db_manager(BasicConfig.DATABASE_BACKEND, **options)
+        self.db_manager.create_table(self.JOB_LIST_TABLE, self.TABLE_FIELDS)
 
     def load(self, persistence_path, persistence_file):
         """
@@ -159,28 +166,56 @@ class JobListPersistenceDb(JobListPersistence):
         :param persistence_path: str
 
         """
-        return self.db_manager.select_all(self.JOB_LIST_TABLE)
+        row = self.db_manager.select_first_where(
+            self.JOB_LIST_TABLE,
+            [f"expid = '{self.expid}'"]
+        )
+        if row:
+            pickled_data = row[1]
+            return pickle.loads(pickled_data)
+        return None
 
-    def save(self, persistence_path, persistence_file, job_list, graph):
+    def save(self, persistence_path, persistence_file, job_list, graph: 'DiGraph') -> None:
         """
         Persists a job list in a database
         :param job_list: JobList
         :param persistence_file: str
         :param persistence_path: str
-
+        :param graph: networkx graph object
+        :type graph: DiGraph
         """
-        self._reset_table()
-        jobs_data = [(job.name, job.id, job.status,
-                      job.priority, job.section, job.date,
-                      job.member, job.chunk, job.split,
-                      job.local_logs[0], job.local_logs[1],
-                      job.remote_logs[0], job.remote_logs[1],job.wrapper_type) for job in job_list]
-        self.db_manager.insertMany(self.JOB_LIST_TABLE, jobs_data)
+        # Serialize the job list
+        data = {job.name: job.__getstate__() for job in job_list}
+        pickled_data = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
+        gc.collect()
 
-    def _reset_table(self):
-        """
-        Drops and recreates the database
+        # Delete previous row
+        self.db_manager.delete_where(
+            self.JOB_LIST_TABLE,
+            [f"expid = '{self.expid}'"]
+        )
 
+        # Insert the new row
+        Log.debug("Saving JobList on DB")
+        # Use insertMany as it is a generalization of insert
+        self.db_manager.insertMany(
+            self.JOB_LIST_TABLE,
+            [
+                {
+                    "expid": self.expid,
+                    "pkl": pickled_data,
+                    "modified": str(datetime.now()),
+                }
+            ]
+        )
+        Log.debug("JobList saved in DB")
+
+    def pkl_exists(self, persistence_path, persistence_file):
+        """Check if a pkl file exists
+
+        :param persistence_file: str
+        :param persistence_path: str
         """
-        self.db_manager.drop_table(self.JOB_LIST_TABLE)
-        self.db_manager.create_table(self.JOB_LIST_TABLE, self.TABLE_FIELDS)
+        return self.db_manager.select_first_where(
+            self.JOB_LIST_TABLE, [f"expid = '{self.expid}'"]
+        ) is not None

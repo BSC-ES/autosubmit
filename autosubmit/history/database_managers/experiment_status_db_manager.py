@@ -19,13 +19,21 @@
 
 import os
 import textwrap
-import time
-from typing import Protocol, cast
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 import autosubmit.history.utils as HUtils
-from .database_manager import DatabaseManager, DEFAULT_LOCAL_ROOT_DIR
-from . import database_models as Models
+from autosubmit.history.database_managers.database_manager import DatabaseManager, DEFAULT_LOCAL_ROOT_DIR
+from autosubmit.history.database_managers import database_models as Models
 
+from typing import Optional, Protocol, cast
+from sqlalchemy import Engine, delete, insert, select, update
+from sqlalchemy.schema import CreateTable
+from autosubmit.database import session
+from autosubmit.database.tables import ExperimentStatusTable, ExperimentTable
+
+
+# FIXME: Why re-load the configuration globally here? Callers of this
+#        module are probably responsible for doing that; i.e. not this
+#        module's (or its classes') responsibility.
 BasicConfig.read()
 
 
@@ -165,26 +173,126 @@ class ExperimentStatusDatabaseManager(Protocol):
     def delete_exp_status(self, expid): ...
 
 
-def create_experiment_status_db_manager(
-        db_engine: str, **options  # noqa: F841
-) -> ExperimentStatusDatabaseManager:
-    # pylint: disable=W0613
+class SqlAlchemyExperimentStatusDbManager:
+    """An experiment status database manager using SQLAlchemy.
+    It contains the same public functions as ``ExperimentStatusDbManager``
+    (SQLite only), but uses SQLAlchmey instead of calling database
+    driver functions directly.
+    It can be used with any engine supported by SQLAlchemy, such
+    as Postgres, Mongo, MySQL, etc.
+    Some operations here may raise ``NotImplemented``, as they existed in
+    the ``ExperimentStatusDbManager`` but were never used in Autosubmit (i.e. we can
+    delete that code -- for later).
     """
-    Creates a Postgres or SQLite database manager based on the Autosubmit configuration.
+
+    def __init__(self) -> None:
+        self.engine: Engine = session.create_engine()
+        with self.engine.connect() as conn:
+            conn.execute(CreateTable(ExperimentStatusTable, if_not_exists=True))
+            conn.commit()
+
+    def print_current_table(self):
+        """Not used!"""
+        raise NotImplementedError()
+
+    def is_running(self, time_condition=600):
+        """Not used!"""
+        raise NotImplementedError()
+
+    def set_existing_experiment_status_as_running(self, expid):
+        self.update_exp_status(expid, Models.RunningStatus.RUNNING)
+
+    def create_experiment_status_as_running(self, experiment):
+        self.create_exp_status(experiment.id, experiment.name, Models.RunningStatus.RUNNING)
+
+    def get_experiment_status_row_by_expid(self, expid: str) -> Optional[Models.ExperimentRow]:
+        experiment_row = self.get_experiment_row_by_expid(expid)
+        return self.get_experiment_status_row_by_exp_id(experiment_row.id)
+
+    def get_experiment_row_by_expid(self, expid: str) -> Models.ExperimentRow:
+        query = (
+            select(ExperimentTable).
+            where(ExperimentTable.c.name == expid)  # type: ignore
+        )
+        with self.engine.connect() as conn:
+            row = conn.execute(query).first()
+            if not row:
+                raise ValueError("Experiment {0} not found in Postgres {1}".format(expid, expid))
+        return Models.ExperimentRow(*row)
+
+    def get_experiment_status_row_by_exp_id(self, exp_id: int) -> Optional[Models.ExperimentStatusRow]:
+        query = (
+            select(ExperimentStatusTable).
+            where(ExperimentStatusTable.c.exp_id == exp_id)  # type: ignore
+        )
+        with self.engine.connect() as conn:
+            row = conn.execute(query).first()
+            if not row:
+                return None
+        return Models.ExperimentStatusRow(*row)
+
+    def create_exp_status(self, exp_id: int, expid: str, status: str) -> int:
+        query = (
+            insert(ExperimentStatusTable).
+            values(
+                exp_id=exp_id,
+                name=expid,
+                status=status,
+                seconds_diff=0,
+                modified=HUtils.get_current_datetime()
+            )
+        )
+        with self.engine.connect() as conn:
+            result = conn.execute(query)
+            lastrow_id = result.lastrowid
+            conn.commit()
+        return lastrow_id
+
+    def update_exp_status(self, expid: str, status="RUNNING") -> None:
+        query = (
+            update(ExperimentStatusTable).
+            where(ExperimentStatusTable.c.name == expid).  # type: ignore
+            values(
+                status=status,
+                seconds_diff=0,
+                modified=HUtils.get_current_datetime()
+            )
+        )
+        with self.engine.connect() as conn:
+            conn.execute(query)
+            conn.commit()
+
+    def delete_exp_status(self, expid: str):
+        query = (
+            delete(ExperimentStatusTable).
+            where(ExperimentStatusTable.c.name == expid)  # type: ignore
+        )
+        with self.engine.connect() as conn:
+            conn.execute(query)
+            conn.commit()
+
+
+def create_experiment_status_db_manager(db_engine: str, **options) -> ExperimentStatusDatabaseManager:
+    """Creates a Postgres or SQLite database manager based on the Autosubmit configuration.
+
     Note that you must provide the options even if they are optional, in which case
     you must provide ``options=None``, or you will get a ``KeyError``.
+
     TODO: better example and/or link to DbManager.
+
     :param db_engine: The database engine type.
     :return: An ``ExperimentStatusDatabaseManager``.
     :raises ValueError: If the database engine type is not valid.
     :raises KeyError: If the ``options`` dictionary is missing a required parameter for an engine.
     """
-    return cast(
-        ExperimentStatusDatabaseManager,
-        ExperimentStatusDbManager(
-            expid=options["expid"],
-            db_dir_path=options["db_dir_path"],
-            main_db_name=options["main_db_name"],
-            local_root_dir_path=options["local_root_dir_path"],
-        ),
-    )
+    if db_engine == "postgres":
+        return cast(ExperimentStatusDatabaseManager, SqlAlchemyExperimentStatusDbManager())
+    elif db_engine == "sqlite":
+        return cast(ExperimentStatusDatabaseManager,
+                    ExperimentStatusDbManager(
+                        expid=options['expid'],
+                        db_dir_path=options['db_dir_path'],
+                        main_db_name=options['main_db_name'],
+                        local_root_dir_path=options['local_root_dir_path']))
+    else:
+        raise ValueError(f"Invalid database engine: {db_engine}")

@@ -20,10 +20,11 @@
 import sqlite3
 import os
 from typing import Any, Dict, Iterable, List, Protocol, Union, cast, Optional
-from sqlalchemy import Connection, Engine, delete, insert, select, text
+from sqlalchemy import Connection, Engine, delete, func, insert, select, text
 from autosubmit.database import session
 from autosubmit.database.tables import get_table_from_name
 from sqlalchemy.schema import CreateTable, CreateSchema,  DropTable
+
 
 class DbManager(object):
     """
@@ -249,6 +250,7 @@ class DbManager(object):
             delete_command += " AND " + condition
         return delete_command
 
+
 class DatabaseManager(Protocol):
     """Common interface for database managers.
     We used a protocol here to avoid having to modify the existing
@@ -273,10 +275,11 @@ class DatabaseManager(Protocol):
     def count(self, table_name: str) -> int: ...
     def drop(self): ...
 
+
 class SqlAlchemyDbManager:
     """A database manager using SQLAlchemy.
     It contains the same public functions as ``DbManager``
-    (SQLite only), but uses SQLAlchmey instead of calling database
+    (SQLite only), but uses SQLAlchemy instead of calling database
     driver functions directly.
     It can be used with any engine supported by SQLAlchemy, such
     as Postgres, Mongo, MySQL, etc.
@@ -297,7 +300,7 @@ class SqlAlchemyDbManager:
         # Each time we self.engine.connect(),
         # the engine will create or reuse a connection from the pool
         # Using the connection as a context (with) will safely release it
-        self.connection: Connection = None 
+        self.connection: Optional[Connection] = None
 
     def backup(self):
         pass
@@ -326,14 +329,18 @@ class SqlAlchemyDbManager:
             conn.execute(DropTable(table, if_exists=True))
             conn.commit()
 
-    def insert(self, table_name: str, columns: List[str], values: List[str]):
+    def insert(self, table_name: str, columns: List[str], values: List[str]) -> None:
         """Not implemented.
         In the original ``DbManager`` (SQLite), this function is used
         only to initialize the SQLite database (i.e. no external users).
         """
-        raise NotImplementedError()
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        with self.engine.connect() as conn:
+            values = dict(zip(columns, values))
+            conn.execute(insert(table), values)
+            conn.commit()
 
-    def insertMany(self, table_name: str, data: List[Union[Iterable, Dict]]):
+    def insertMany(self, table_name: str, data: List[Union[Iterable, Dict]]) -> int:
         """
         N.B.: One difference between SQLite and SQLAlchemy here;
               whereas with SQLite you insert a list of values
@@ -349,17 +356,6 @@ class SqlAlchemyDbManager:
         if len(data) == 0:
             return 0
         table = get_table_from_name(schema=self.schema, table_name=table_name)
-        if type(data[0]) is list or type(data[0]) is tuple:
-            # Convert into a dictionary; we know the keys from the
-            # table metadata columns.
-            columns = [column.name for column in cast(list, table.columns)]
-            data = map(lambda values: {
-                key: value
-                for key, value in
-                zip(columns, values)
-            }, cast(list, data))
-            data = list(data)
-
         with self.engine.connect() as conn:
             result = conn.execute(insert(table), data)
             conn.commit()
@@ -381,7 +377,7 @@ class SqlAlchemyDbManager:
         command = DbManager.generate_select_command(table_name, where)
         with self.engine.connect() as conn:
             row = conn.execute(text(command)).first()
-        return row.tuple()
+        return row.tuple() if row else None
 
     def select_all(self, table_name: str):
         table = get_table_from_name(schema=self.schema, table_name=table_name)
@@ -394,8 +390,10 @@ class SqlAlchemyDbManager:
         raise NotImplementedError()
 
     def count(self, table_name: str):
-        """Not used in the original ``DbManager``!"""
-        raise NotImplementedError()
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        with self.engine.connect() as conn:
+            row = conn.execute(select(func.count()).select_from(table))
+            return row.scalar()
 
     def drop(self):
         """Not used in the original ``DbManager``!"""
@@ -413,7 +411,6 @@ class SqlAlchemyDbManager:
             result = conn.execute(delete(table))
             conn.commit()
         return cast(int, result.rowcount)
-
 
 
 def create_db_manager(db_engine: str, **options) -> DatabaseManager:

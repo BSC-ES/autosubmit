@@ -19,6 +19,7 @@
 
 """ Test file for autosubmit/autosubmit.py """
 from contextlib import contextmanager
+from shutil import rmtree
 
 import pytest
 
@@ -63,6 +64,11 @@ def test_expid(mocker, copy_id, expected, tmp_path, autosubmit_config) -> None:
     basic_config.STRUCTURES_DIR = basic_config.LOCAL_ROOT_DIR = str(tmp_path)
     basic_config.JOBDATA_DIR = str(tmp_path)
     basic_config.read()
+
+    # The fixtures create the experiment directories, so we must remove them before calling
+    # expid here.
+    exp_path = tmp_path / 'a000'
+    rmtree(exp_path)
 
     with expected:
         expid = Autosubmit.expid("Test", copy_id=copy_id)

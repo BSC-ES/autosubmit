@@ -174,7 +174,7 @@ class ExperimentDetailsSQLAlchemyRepository(ExperimentDetailsRepository):
     """
 
     def __init__(self):
-        self.table: Table = get_table_from_name("details")
+        self.table: Table = get_table_from_name(schema=None, table_name='details')
         self.engine = create_engine()
 
     def get_details(self, exp_id: int):

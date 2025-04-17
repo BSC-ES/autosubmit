@@ -1,3 +1,23 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+
+from typing import cast, List, Optional
+
 from sqlalchemy import (
     MetaData,
     Integer,
@@ -9,7 +29,6 @@ from sqlalchemy import (
     UniqueConstraint,
     Column,
 )
-from typing import List, cast
 
 metadata_obj = MetaData()
 
@@ -133,6 +152,7 @@ JobDataTable = Table(
     Column("rowstatus", Integer, nullable=False, default=0),
     Column("children", Text, nullable=True),
     Column("platform_output", Text, nullable=True),
+    Column("workflow_commit", Text, nullable=True),
     UniqueConstraint("counter", "job_name", name="unique_counter_and_job_name"),
 )
 
@@ -189,7 +209,7 @@ TABLES = (
 """The tables available in the Autosubmit databases."""
 
 
-def get_table_with_schema(schema: str, table: Table) -> Table:
+def get_table_with_schema(schema: Optional[str], table: Table) -> Table:
     """Get the ``Table`` instance with the metadata modified.
     The metadata will use the given container. This means you can
     have table ``A`` with no schema, then call this function with
@@ -200,7 +220,7 @@ def get_table_with_schema(schema: str, table: Table) -> Table:
     :return: The same table, but with the given schema set as metadata.
     """
     if not isinstance(table, Table):
-        raise RuntimeError("Invalid source type on table schema change")
+        raise ValueError("Invalid source type on table schema change")
 
     metadata = MetaData(schema=schema)
     dest_table = Table(table.name, metadata)
@@ -211,7 +231,7 @@ def get_table_with_schema(schema: str, table: Table) -> Table:
     return dest_table
 
 
-def get_table_from_name(*, schema: str, table_name: str) -> Table:
+def get_table_from_name(*, schema: Optional[str], table_name: str) -> Table:
     """Get the table from a given table name.
     :param schema: The schema name.
     :param table_name: The table name.
@@ -221,8 +241,8 @@ def get_table_from_name(*, schema: str, table_name: str) -> Table:
     if not table_name:
         raise ValueError(f"Missing table name: {table_name}")
 
-    def predicate(table: Table) -> bool:
-        return table.name.lower() == table_name.lower()
+    def predicate(t: Table) -> bool:
+        return t.name.lower() == table_name.lower()
 
     table = next(filter(predicate, TABLES), None)
     return get_table_with_schema(schema, table)

@@ -23,12 +23,12 @@ import textwrap
 import traceback
 import sqlite3
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, cast
 from log.log import Log
 from networkx import DiGraph
 
 from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmit.database.db_manager import DatabaseManager, create_db_manager
+from autosubmit.database.db_manager import DatabaseManager, SqlAlchemyDbManager, create_db_manager
 
 
 def get_structure(exp_id, structures_path):
@@ -72,7 +72,6 @@ def get_structure(exp_id, structures_path):
         Log.printlog("Get structure error: {0}".format(str(exp)), 6014)
         Log.debug(traceback.format_exc())
         
-
 
 def create_connection(db_file):
     """ 
@@ -188,6 +187,7 @@ def _delete_table_content(conn):
 
 # Code added for SQLAlchemy support
 
+
 def get_structure_sqlalchemy(exp_id: str, structures_path: str) -> Dict[str, List[str]]:
     """
     Creates file of database and table of experiment structure if it does not exist. Returns current structure.
@@ -233,10 +233,10 @@ def save_structure_sqlalchemy(graph: DiGraph, exp_id: str, structures_path: str)
     Saves structure using SQLAlchemy.
     This overwrites the old structure if it exists.
     """
-    db_manager: Optional[DatabaseManager] = None
+    db_manager: Optional[SqlAlchemyDbManager] = None
     options = {'schema': exp_id}
     try:
-        db_manager = create_db_manager('postgres', **options)
+        db_manager = cast(SqlAlchemyDbManager, create_db_manager('postgres', **options))
 
         # Create table if it doesn't exist
         db_manager.create_table(
