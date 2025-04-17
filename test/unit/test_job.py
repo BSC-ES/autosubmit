@@ -1101,9 +1101,9 @@ CONFIG:
 
                 fmt = '%Y-%m-%d %H:%M'
                 expected = [
-                    datetime.datetime(1998, 1, 1, 0, 0),
-                    datetime.datetime(1998, 3, 1, 0, 0),
-                    datetime.datetime(1998, 3, 24, 0, 0)
+                    datetime(1998, 1, 1, 0, 0),
+                    datetime(1998, 3, 1, 0, 0),
+                    datetime(1998, 3, 24, 0, 0)
                 ]
 
                 for left, right in zip(lst, expected):
