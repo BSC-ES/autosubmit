@@ -1,14 +1,12 @@
-import locale
 import os
 import pwd
 import re
-import subprocess
 from itertools import zip_longest
-
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from pathlib import Path
 
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
+from autosubmitconfigparser.config.basicconfig import BasicConfig
 from log.log import AutosubmitCritical, Log
 
 
@@ -35,30 +33,6 @@ def check_jobs_file_exists(as_conf, current_section_name=None):
         if missing_files:
             raise AutosubmitCritical(f"Templates not found:\n{missing_files}", 7011)
 
-
-def proccess_id(expid=None, command="run", single_instance=True, platform=None):
-    # Retrieve the process id of the autosubmit process
-    # Bash command: ps -ef | grep "$(whoami)" | grep "autosubmit" | grep "run" | grep "expid" | awk '{print $2}'
-    try:
-        if not platform:
-            command = f'ps -ef | grep "$(whoami)" | grep "autosubmit" | grep "{command}" | grep "{expid}" '
-        else:
-            command = f'ps -ef | grep "$(whoami)" | grep "autosubmit" | grep "{command}" | grep "{expid}" | grep " {platform.lower()} " '
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
-        output, error = process.communicate()
-        output = output.decode(locale.getlocale()[1])
-        output = output.split('\n')
-        # delete noise
-        if output:
-            output = [int(x.split()[1]) for x in output if x and "grep" not in x]
-
-    except Exception as e:
-        raise AutosubmitCritical(
-            "An error occurred while retrieving the process id", 7011, str(e))
-    if single_instance:
-        return output[0] if output else ""
-    else:
-        return output if output else ""
 
 def check_experiment_ownership(expid, basic_config, raise_error=False, logger=None):
     # [A-Za-z09]+ variable is not needed, LOG is global thus it will be read if available
@@ -144,6 +118,7 @@ def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=N
             raise AutosubmitCritical("Private key is encrypted, Autosubmit does not run in interactive mode.\nPlease, add the key to the ssh agent(ssh-add <path_to_key>).\nIt will remain open as long as session is active, for force clean you can prompt ssh-add -D",7073, issues + "\n" + ssh_config_issues)
         else:
             raise AutosubmitCritical("Issues while checking the connectivity of platforms.", 7010, issues + "\n" + ssh_config_issues)
+
 
 # Source: https://github.com/cylc/cylc-flow/blob/a722b265ad0bd68bc5366a8a90b1dbc76b9cd282/cylc/flow/tui/util.py#L226
 class NaturalSort:
@@ -246,3 +221,31 @@ def strtobool(val):
         return 0
     else:
         raise ValueError("invalid truth value %r" % (val,))
+
+
+def get_rc_path(machine: bool, local: bool) -> Path:
+    """Get the ``.autosubmit.rc`` path.
+
+    If the environment variable ``AUTOSUBMIT_CONFIGURATION`` is specified in the
+    system, this function will return a ``Path`` pointing to that value.
+
+    If ``machine`` is ``True``, it will use the file from ``/etc/.autosubmitrc``
+    (pay attention to the dot prefix).
+
+    Else, if ``local`` is ``True``, it will use the file from  ``./.autosubmitrc``
+    (i.e. it will use the current working directory for the process).
+
+    Otherwise, it will load the file from ``~/.autosubmitrc``, for the user
+    currently running Autosubmit.
+    """
+    if 'AUTOSUBMIT_CONFIGURATION' in os.environ:
+        return Path(os.environ['AUTOSUBMIT_CONFIGURATION'])
+
+    if machine:
+        rc_path = '/etc'
+    elif local:
+        rc_path = '.'
+    else:
+        rc_path = Path.home()
+
+    return Path(rc_path) / '.autosubmitrc'

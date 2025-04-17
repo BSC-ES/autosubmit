@@ -8,6 +8,8 @@ Dummy experiments run workflows with inexpensive empty tasks and therefore are i
 
 Real experiments instead run workflows with complex tasks. To read information about how to develop parameterizable tasks for Autosubmit workflows, refer to :ref:`develproject`.
 
+.. _Local Platform:
+
 Pre-requisites
 ==============
 

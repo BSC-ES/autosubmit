@@ -1,0 +1,172 @@
+DEFAULT:
+  EXPID: t0ij
+  HPCARCH: local
+JOBS:
+  LOCAL_SETUP:
+    FILE: hidden
+    TYPE: python
+    PLATFORM: local
+    RUNNING: once
+    NOTIFY_ON:
+      - FAILED
+    DEPENDENCIES: { }
+  LOCAL_SEND_INITIAL:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: { }
+    RUNNING: chunk
+    NOTIFY_ON:
+      - FAILED
+  LOCAL_SEND_SOURCE:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: { }
+    RUNNING: once
+    NOTIFY_ON:
+      - FAILED
+  LOCAL_SEND_STATIC:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: { }
+    RUNNING: once
+  LOCAL_SEND_HERMES:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_SOURCE: { }
+    PLATFORM: local
+    RUNNING: once
+  LOCAL_SEND_EMISSIONS:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: { }
+      LOCAL_SEND_EMISSIONS-1: { }
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    DELAY: '1'
+    NOTIFY_ON:
+      - FAILED
+  LOCAL_SEND_CHEM:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: { }
+      LOCAL_SEND_CHEM-1: { }
+    RUNNING: chunk
+    NOTIFY_ON:
+      - FAILED
+  REMOTE_COMPILE:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_SOURCE: { }
+    RUNNING: once
+    PROCESSORS: '4'
+    WALLCLOCK: 00:50
+    NOTIFY_ON:
+      - FAILED
+  PREPROCFIX:
+    FILE: hidden
+    DEPENDENCIES:
+      REMOTE_COMPILE: { }
+      LOCAL_SEND_STATIC: { }
+    RUNNING: once
+    WALLCLOCK: 00:30
+    NOTIFY_ON:
+      - FAILED
+  PREPROCVAR:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_INITIAL: { }
+      LOCAL_SEND_CHEM: { }
+      PREPROCFIX: { }
+    RUNNING: chunk
+    WALLCLOCK: 00:30
+    NOTIFY_ON:
+      - FAILED
+    CUSTOM_DIRECTIVES: '["#SBATCH --exclusive"]'
+  HERMES_GR_PREPROC:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_HERMES: { }
+      PREPROCFIX: { }
+    RUNNING: member
+    WALLCLOCK: 00:20
+    NOTIFY_ON:
+      - FAILED
+    PROCESSORS: '100'
+    RETRIALS: '4'
+  HERMES_GR:
+    FILE: hidden
+    DEPENDENCIES:
+      HERMES_GR_PREPROC: { }
+      LOCAL_SEND_EMISSIONS: { }
+    RUNNING: chunk
+    WALLCLOCK: 00:40
+    PROCESSORS: '100'
+    DELAY: '1'
+    RETRIALS: '3'
+    NOTIFY_ON:
+      - FAILED
+  SIM:
+    FILE: hidden
+    DEPENDENCIES:
+      PREPROCVAR: { }
+      SIM-1: { }
+      HERMES_GR: { }
+    RUNNING: chunk
+    PROCESSORS: '768'
+    WALLCLOCK: 01:00
+    NOTIFY_ON:
+      - FAILED
+  POSTPROC:
+    FILE: hidden
+    DEPENDENCIES:
+      SIM+1: { }
+      POSTPROC-1: { }
+    RUNNING: chunk
+    PROCESSORS: '48'
+    WALLCLOCK: 00:30
+    NOTIFY_ON:
+      - FAILED
+    RETRIALS: '2'
+  ARCHIVE:
+    FILE: hidden
+    DEPENDENCIES:
+      POSTPROC: { }
+      ARCHIVE-1: { }
+    PLATFORM: local
+    RUNNING: chunk
+    WALLCLOCK: 00:30
+    NOTIFY_ON:
+      - FAILED
+  CLEAN:
+    FILE: hidden
+    DEPENDENCIES:
+      POSTPROC+1: { }
+      ARCHIVE: { }
+    PLATFORM: local
+    RUNNING: chunk
+    WALLCLOCK: 00:10
+    NOTIFY_ON:
+      - FAILED
+EXPERIMENT:
+  DATELIST: '20171215'
+  MEMBERS: '000'
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: 1
+  NUMCHUNKS: 2
+  CHUNKINI: ''
+  CALENDAR: standard
+PROJECT:
+  PROJECT_TYPE: none
+  PROJECT_DESTINATION: auto-monarch
+GIT:
+  PROJECT_ORIGIN: hidden
+  PROJECT_BRANCH: 489-move-the-workflow-to-as4
+  PROJECT_COMMIT: ''
+  PROJECT_SUBMODULES: ''
+  PROJECT_SUBMODULES_DEPTH: '1'
+  FETCH_SINGLE_BRANCH: 'true'

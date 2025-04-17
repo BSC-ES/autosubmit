@@ -1,0 +1,46 @@
+# FOR example https://autosubmit.readthedocs.io/en/master/userguide/defining_workflows/index.html
+
+# TODO CHANGE
+
+experiment:
+  DATELIST: 19900101
+  MEMBERS: "fc0"
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '3'
+  CALENDAR: standard
+JOBS:
+  LOCAL_SETUP:
+    FILE: local_setup.sh
+    RUNNING: once
+    WALLCLOCK: '00:05'
+  REMOTE_SETUP:
+    FILE: remote_setup.sh
+    RUNNING: once
+    WALLCLOCK: '00:05'
+    DEPENDENCIES: LOCAL_SETUP
+  INI:
+    FILE: ini.sh
+    RUNNING: member
+    WALLCLOCK: '00:05'
+    DEPENDENCIES: REMOTE_SETUP
+  SIM:
+    FILE: sim.sh
+    RUNNING: chunk
+    WALLCLOCK: '00:05'
+    DEPENDENCIES: INI SIM-1 CLEAN-2
+  POST:
+    FILE: post.sh
+    RUNNING: chunk
+    WALLCLOCK: '00:05'
+    DEPENDENCIES: SIM
+  CLEAN:
+    FILE: clean.sh
+    RUNNING: chunk
+    WALLCLOCK: '00:05'
+    DEPENDENCIES: POST
+  TRANSFER:
+    FILE: transfer.sh
+    RUNNING: member
+    WALLCLOCK: '00:05'
+    DEPENDENCIES: CLEAN

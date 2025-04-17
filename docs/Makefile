@@ -63,7 +63,7 @@ watch: clean
 			--ignore='*.egg-info' \
 			--ignore='bin' \
 			--ignore='**_includes/**/*.txt' \
-			--watch='autosubmit' \
+			--watch='source' \
 			$(SPHINXOPTS) $(O)
 
 html:

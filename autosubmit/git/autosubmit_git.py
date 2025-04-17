@@ -20,8 +20,11 @@ from os import path
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import locale
 import os
+import re
 import shutil
 import subprocess
+from pathlib import Path
+from ruamel.yaml import YAML
 from shutil import rmtree
 from time import time
 from typing import List, Union
@@ -32,6 +35,13 @@ from log.log import Log, AutosubmitCritical
 
 Log.get_logger("Autosubmit")
 
+_GIT_URL_PATTERN = re.compile(
+    r'''^(
+    (https?://[a-zA-Z0-9.-]+/[a-zA-Z0-9.-]+/[a-zA-Z0-9.-]+\.git) |  # e.g. https://github.com/user/repo
+    (\w+@[a-zA-Z0-9.-]+:[a-zA-Z0-9./-]+\.git) |                     # e.g. git@github.com:user/repo.git
+    (file://.+$)                                                    # e.g. file:///path/to/repo.git/
+    )''', re.VERBOSE)
+"""Regular expression to match Git URL."""
 
 class AutosubmitGit:
     """
@@ -83,42 +93,6 @@ class AutosubmitGit:
                 Log.debug("Not a git repository... SKIPPING!")
         else:
             Log.debug("Not a directory... SKIPPING!")
-        return True
-
-    @staticmethod
-    def check_commit(as_conf):
-        """
-        Function to check uncommitted changes
-
-        :param as_conf: experiment configuration
-        :type as_conf: autosubmitconfigparser.config.AutosubmitConfig
-        """
-        dirname_path = as_conf.get_project_dir()
-        if path.isdir(dirname_path):
-            Log.debug("Checking git directory status...")
-            if path.isdir(os.path.join(dirname_path, '.git')):
-                try:
-                    output = subprocess.check_output("cd {0}; git diff-index HEAD --".format(dirname_path),
-                                                     shell=True)
-                except subprocess.CalledProcessError:
-                    Log.info("This is not a git experiment")
-                    return True
-
-                if output:
-                    Log.printlog(
-                        "There are local changes not committed to git", 3000)
-                    return True
-                else:
-                    output = subprocess.check_output("cd {0}; git log --branches --not --remotes".format(dirname_path),
-                                                     shell=True)
-                    if output:
-                        Log.printlog(
-                            "There are local changes not pushed to git", 3000)
-                        return True
-                    else:
-                        Log.info("Model Git repository is updated")
-                        Log.result("Model Git repository is updated")
-
         return True
 
     @staticmethod
@@ -293,3 +267,37 @@ class AutosubmitGit:
             shutil.rmtree(project_backup_path)
 
         return True
+
+    @staticmethod
+    def is_git_repo(git_repo: str) -> bool:
+        git_repo = git_repo.lower().strip()
+
+        return _GIT_URL_PATTERN.match(git_repo) is not None
+
+    @staticmethod
+    def check_unpushed_changes(expid: str) -> None:
+        """
+        Raises an AutosubmitCritical error if the experiment is operational, the platform is Git, and there are unpushed changes.
+
+        Args: expid (str): The experiment ID.
+
+        Returns: None
+        """
+        if expid[0] == 'o':
+            origin = Path(BasicConfig.expid_dir(expid).joinpath("conf/expdef_{}.yml".format(expid)))
+            with open(origin, 'r') as f:
+                yaml = YAML(typ='rt')
+                data = yaml.load(f)
+                project = data["PROJECT"]["PROJECT_TYPE"]
+
+            version_controls = ["git", 
+                                "git submodule"]
+            arguments = [["status", "--porcelain"],
+                        ["foreach", "'git status --porcelain'"]]
+            for version_control, args in zip(version_controls, arguments):
+                if project == version_control:
+                    output = subprocess.check_output([version_control, args]).decode(locale.getlocale()[1])
+                    if any(status.startswith(code) for code in ["M", "A", "D", "?"] for status in output.splitlines()):
+                        # M: Modified, A: Added, D: Deleted, ?: Untracked
+                        raise AutosubmitCritical("Push local changes to remote repository before running", 7075)
+
