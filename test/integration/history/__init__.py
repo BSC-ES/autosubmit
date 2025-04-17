@@ -15,20 +15,4 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from sqlalchemy import Engine, NullPool, create_engine as sqlalchemy_create_engine
-
-
-def create_engine(connection_url: str) -> Engine:
-    """Create SQLAlchemy Core engine.
-
-    :param connection_url: A SQLAlchemy connection URL.
-    """
-    if not connection_url:
-        raise ValueError(f'Invalid SQLAlchemy connection URL: {connection_url}')
-
-    is_sqlite = connection_url.startswith("sqlite")
-    pool_class = NullPool if is_sqlite else None
-    return sqlalchemy_create_engine(connection_url, poolclass=pool_class)
-
-
-__all__ = ["create_engine"]
+"""Integration tests for the history package."""

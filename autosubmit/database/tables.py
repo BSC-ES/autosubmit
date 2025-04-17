@@ -1,3 +1,23 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+
+from typing import cast, List, Optional
+
 from sqlalchemy import (
     MetaData,
     Integer,
@@ -9,7 +29,6 @@ from sqlalchemy import (
     UniqueConstraint,
     Column,
 )
-from typing import List, cast
 
 metadata_obj = MetaData()
 
@@ -37,6 +56,7 @@ ExperimentStructureTable = Table(
     metadata_obj,
     Column("e_from", Text, nullable=False, primary_key=True),
     Column("e_to", Text, nullable=False, primary_key=True),
+    UniqueConstraint("e_from", "e_to", name="unique_e_from_and_e_to"),
 )
 """Table that holds the structure of the experiment jobs."""
 
@@ -55,8 +75,9 @@ JobPackageTable = Table(
     "job_package",
     metadata_obj,
     Column("exp_id", Text),
-    Column("package_name", Text, primary_key=True),
-    Column("job_name", Text, primary_key=True),
+    Column("package_name", Text),
+    Column("job_name", Text),
+    Column("wallclock", Text)
 )
 """Stores a mapping between the wrapper name and the actual job in SLURM."""
 
@@ -64,8 +85,9 @@ WrapperJobPackageTable = Table(
     "wrapper_job_package",
     metadata_obj,
     Column("exp_id", Text),
-    Column("package_name", Text, primary_key=True),
-    Column("job_name", Text, primary_key=True),
+    Column("package_name", Text),
+    Column("job_name", Text),
+    Column("wallclock", Text)
 )
 """It is a replication.
 It is only created/used when using inspect and create or monitor
@@ -133,6 +155,7 @@ JobDataTable = Table(
     Column("rowstatus", Integer, nullable=False, default=0),
     Column("children", Text, nullable=True),
     Column("platform_output", Text, nullable=True),
+    Column("workflow_commit", Text, nullable=True),
     UniqueConstraint("counter", "job_name", name="unique_counter_and_job_name"),
 )
 
@@ -189,7 +212,7 @@ TABLES = (
 """The tables available in the Autosubmit databases."""
 
 
-def get_table_with_schema(schema: str, table: Table) -> Table:
+def get_table_with_schema(schema: Optional[str], table: Table) -> Table:
     """Get the ``Table`` instance with the metadata modified.
     The metadata will use the given container. This means you can
     have table ``A`` with no schema, then call this function with
@@ -200,18 +223,19 @@ def get_table_with_schema(schema: str, table: Table) -> Table:
     :return: The same table, but with the given schema set as metadata.
     """
     if not isinstance(table, Table):
-        raise RuntimeError("Invalid source type on table schema change")
+        raise ValueError("Invalid source type on table schema change")
 
     metadata = MetaData(schema=schema)
     dest_table = Table(table.name, metadata)
 
+    # TODO: .copy is deprecated, https://github.com/sqlalchemy/sqlalchemy/discussions/8213
     for col in cast(List, table.columns):
         dest_table.append_column(col.copy())
 
     return dest_table
 
 
-def get_table_from_name(*, schema: str, table_name: str) -> Table:
+def get_table_from_name(*, schema: Optional[str], table_name: str) -> Table:
     """Get the table from a given table name.
     :param schema: The schema name.
     :param table_name: The table name.
@@ -221,8 +245,8 @@ def get_table_from_name(*, schema: str, table_name: str) -> Table:
     if not table_name:
         raise ValueError(f"Missing table name: {table_name}")
 
-    def predicate(table: Table) -> bool:
-        return table.name.lower() == table_name.lower()
+    def predicate(t: Table) -> bool:
+        return t.name.lower() == table_name.lower()
 
     table = next(filter(predicate, TABLES), None)
     return get_table_with_schema(schema, table)
