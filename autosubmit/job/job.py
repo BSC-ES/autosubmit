@@ -1539,8 +1539,8 @@ class Job(object):
         :param default_status: status to set if job is not completed. By default, it is FAILED
         :type default_status: Status
         """
-        completed_file = os.path.join(self._tmp_path, self.name + '_COMPLETED')
-        completed_file_location = os.path.join(self._tmp_path, f"LOG_{self.expid}", self.name + '_COMPLETED')
+        completed_file = os.path.join(str(self._tmp_path), self.name + '_COMPLETED')
+        completed_file_location = os.path.join(str(self._tmp_path), f"LOG_{self.expid}", self.name + '_COMPLETED')
         # I'm not fan of this but, it is the only way of doing it without a rework.
         if os.path.exists(completed_file) or os.path.exists(completed_file_location):
             if not over_wallclock:
@@ -2722,7 +2722,14 @@ class WrapperJob(Job):
         self.is_wrapper = True
 
 
-    def _queuing_reason_cancel(self, reason):
+    def _queuing_reason_cancel(self, reason: str) -> bool:
+        """
+        Function return True if a job was cancelled for a listed reason.
+        :param reason: Reason of a job to be cancelled
+        :type reason: str
+        :return: True if a job was cancelled for a known reason, False otherwise
+        :rtype: bool
+        """
         try:
             if len(reason.split('(', 1)) > 1:
                 reason = reason.split('(', 1)[1].split(')')[0]
@@ -2738,7 +2745,13 @@ class WrapperJob(Job):
         except Exception as e:
             return False
 
-    def check_status(self, status):
+    def check_status(self, status: str) -> None:
+        """
+        Update the status of a job, saving its previous status and update the current one, in case of failure
+        it'll log all the files that were correctly created.
+        :param status: Reason of a job to be cancelled
+        :type status: str
+        """
         prev_status = self.status
         self.prev_status = prev_status
         self.status = status
@@ -2787,7 +2800,12 @@ class WrapperJob(Job):
             if not still_running:
                 self.cancel_failed_wrapper_job()
 
-    def check_inner_jobs_completed(self, jobs):
+    def check_inner_jobs_completed(self, jobs: [Job]) -> None:
+        """
+        Will get all the jobs that the status are not completed and check if it was completed or not
+        :param jobs: Jobs inside the wrapper
+        :type jobs: [Job]
+        """
         not_completed_jobs = [
             job for job in jobs if job.status != Status.COMPLETED]
         not_completed_job_names = [job.name for job in not_completed_jobs]
@@ -2812,7 +2830,15 @@ class WrapperJob(Job):
         for job in not_completed_jobs:
             self._check_finished_job(job)
 
-    def _check_inner_jobs_queue(self, prev_status):
+    def _check_inner_jobs_queue(self, prev_status :str) -> None:
+        """
+        Update previous status of a job and updating the job to a new status.
+        If the platform being used is slurm the function will get the status of all the jobs,
+        get the parsed queue reason and cancel and fail jobs that has a known reason.
+        If job is held by admin or user the job will be held to be executed later.
+        :param prev_status: previous status of a job
+        :type prev_status: str
+        """
         reason = str()
         if self._platform.type == 'slurm':
             self._platform.send_command(
@@ -2854,7 +2880,14 @@ class WrapperJob(Job):
                 job.hold = self.hold
                 job.status = self.status
 
-    def _check_inner_job_wallclock(self, job):
+    def _check_inner_job_wallclock(self, job: Job) -> bool:
+        """
+        This will check if the job is running longer than the wallclock was set to be run.
+        :param job: The inner job of a job.
+        :type job: Job
+        :return: True if the job is running longer then wallcloclk, otherwise False.
+        :rtype: bool
+        """
         start_time = self.running_jobs_start[job]
         if self._is_over_wallclock(start_time, job.wallclock):
             if job.wrapper_type != "vertical":
@@ -2863,7 +2896,16 @@ class WrapperJob(Job):
             return True
         return False
 
-    def _check_running_jobs(self):
+    def _check_running_jobs(self) -> None:
+        """
+        Get all jobs that are not "COMPLETED" or "FAILED", for each of the jobs still not completed that are still
+        running a command will be created and executed to either read the first few lines of the _STAT file created or
+        just print the JOB's name if the file don't exist.
+        Depending on the output of the file the status of a job will be set to
+        RUNNING if not over wallclock
+        FAILED if over wallclock and not vertical wrapper
+        If after 5 retries no file is created the status of the job is set to FAIL
+        """
         not_finished_jobs_dict = OrderedDict()
         self.inner_jobs_running = list()
         not_finished_jobs = [job for job in self.job_list if job.status not in [
@@ -2878,7 +2920,7 @@ class WrapperJob(Job):
             not_finished_jobs_names = ' '.join(list(not_finished_jobs_dict.keys()))
             remote_log_dir = self._platform.get_remote_log_dir()
             # PREPARE SCRIPT TO SEND
-            # When a inner_job is running? When the job has an _STAT file
+            # When an inner_job is running? When the job has an _STAT file
             command = textwrap.dedent("""
             cd {1}
             for job in {0}
@@ -2892,10 +2934,8 @@ class WrapperJob(Job):
             done
             """).format(str(not_finished_jobs_names), str(remote_log_dir), '\n'.ljust(13))
 
-            log_dir = os.path.join(
-                self._tmp_path, 'LOG_{0}'.format(self.expid))
-            multiple_checker_inner_jobs = os.path.join(
-                log_dir, "inner_jobs_checker.sh")
+            log_dir = Path(str(self._tmp_path) + f'/LOG_{self.expid}')
+            multiple_checker_inner_jobs = Path(log_dir / "inner_jobs_checker.sh")
             if not os.stat(log_dir):
                 os.mkdir(log_dir)
                 os.chmod(log_dir, 0o770)
@@ -2903,7 +2943,8 @@ class WrapperJob(Job):
             os.chmod(multiple_checker_inner_jobs, 0o770)
             if self.platform.name != "local":  # already "sent"...
                 self._platform.send_file(multiple_checker_inner_jobs, False)
-                command = f"cd {self._platform.get_files_path()}; {os.path.join(self._platform.get_files_path(), 'inner_jobs_checker.sh')}"
+                command = (f"cd {self._platform.get_files_path()}; "
+                           f"{os.path.join(self._platform.get_files_path(), 'inner_jobs_checker.sh')}")
             else:
                 command = f"cd {self._platform.get_files_path()}; ./inner_jobs_checker.sh; cd {os.getcwd()}"
             #
@@ -2918,38 +2959,46 @@ class WrapperJob(Job):
                 for line in content[:-1]:
                     out = line.split()
                     if out:
-                        jobname = out[0]
-                        job = not_finished_jobs_dict[jobname]
+                        job_name = out[0]
+                        job = not_finished_jobs_dict[job_name]
                         if len(out) > 1:
                             if job not in self.running_jobs_start:
                                 start_time = self._check_time(out, 1)
                                 Log.info("Job {0} started at {1}".format(
-                                    jobname, str(parse_date(start_time))))
+                                    job_name, str(parse_date(start_time))))
                                 self.running_jobs_start[job] = start_time
                                 job.new_status = Status.RUNNING
                                 #job.status = Status.RUNNING
                                 job.update_status(self.as_config)
                             if len(out) == 2:
-                                Log.info("Job {0} is RUNNING".format(jobname))
+                                Log.info("Job {0} is RUNNING".format(job_name))
                                 over_wallclock = self._check_inner_job_wallclock(
                                     job)  # messaged included
                                 if over_wallclock:
                                     if job.wrapper_type != "vertical":
                                         job.status = Status.FAILED
                                         Log.printlog(
-                                            "Job {0} is FAILED".format(jobname), 6009)
+                                            "Job {0} is FAILED".format(job_name), 6009)
                             elif len(out) == 3:
                                 end_time = self._check_time(out, 2)
                                 self._check_finished_job(job)
                                 Log.info("Job {0} finished at {1}".format(
-                                    jobname, str(parse_date(end_time))))
+                                    job_name, str(parse_date(end_time))))
                 if content == '':
                     sleep(wait)
                 retries = retries - 1
             if retries == 0 or over_wallclock:
                 self.status = Status.FAILED
 
-    def _check_finished_job(self, job, failed_file=False):
+    def _check_finished_job(self, job :Job, failed_file :bool=False) -> None:
+        """
+        Will set the jobs status to failed, unless they're completed, in which,
+        the function will change it to complete.
+        :param job: The job to have its status updated.
+        :type job: Job
+        :param failed_file: True if system has created a file for a failed execution
+        :type failed_file: bool
+        """
         job.new_status = Status.FAILED
         if not failed_file:
             wait = 2
@@ -2967,7 +3016,13 @@ class WrapperJob(Job):
         job.update_status(self.as_config, failed_file)
         self.running_jobs_start.pop(job, None)
 
-    def update_failed_jobs(self, check_ready_jobs=False):
+    def update_failed_jobs(self, check_ready_jobs :bool=False) -> None:
+        """
+        Check all jobs associated, and update their status either to complete or to Failed,
+        and if job is still running appends it to they inner jobs of the wrapper.
+        :param check_ready_jobs: if true check for running jobs with status "READY", "SUBMITTED", "QUEUING"
+        :type check_ready_jobs: bool
+        """
         running_jobs = self.inner_jobs_running
         real_running = copy.deepcopy(self.inner_jobs_running)
         if check_ready_jobs:
@@ -2981,7 +3036,12 @@ class WrapperJob(Job):
                 if job in real_running:
                     self.inner_jobs_running.append(job)
 
-    def cancel_failed_wrapper_job(self):
+    def cancel_failed_wrapper_job(self) -> None:
+        """
+        When a wrapper is cancelled or run into some problem all its jobs are cancelled,
+        if there are jobs on the list that are not Running, and is not Completed, or Failed set it as WAITING,
+        if not on these status and it is a vertical wrapper it will set the fail_count to the number of retrials.
+        """
         try:
             if self.platform_name == "local":
                 # Check if the job is still running to avoid a misleading message in the logs
@@ -3005,7 +3065,17 @@ class WrapperJob(Job):
                     job.fail_count = job.retrials
 
 
-    def _is_over_wallclock(self, start_time, wallclock):
+    def _is_over_wallclock(self, start_time: str, wallclock: str) -> bool:
+        """
+        This calculates if the job is over its wallclock time,
+        which indicates that a jobs is running for too long
+        :param start_time: When a job started to execute
+        :type start_time: str
+        :param wallclock: Time limit a job should run
+        :type wallclock: str
+        :return: If start_time is bigger than wallclock return True, otherwise False
+        :rtype: bool
+        """
         elapsed = datetime.datetime.now() - parse_date(start_time)
         wallclock = datetime.datetime.strptime(wallclock, '%H:%M')
         total = 0.0
@@ -3026,12 +3096,28 @@ class WrapperJob(Job):
             return True
         return False
 
-    def _parse_timestamp(self, timestamp):
+    def _parse_timestamp(self, timestamp: int) -> datetime:
+        """
+        Parse a date from int to datetime.
+        :param timestamp: time to be converted
+        :type timestamp: int
+        :return: return time converted
+        :rtype: datetime
+        """
         value = datetime.datetime.fromtimestamp(timestamp)
         time = value.strftime('%Y-%m-%d %H:%M:%S')
         return time
 
-    def _check_time(self, output, index):
+    def _check_time(self, output: [str], index: int) -> datetime:
+        """
+        Generate the starting time of a job found by a generated command
+        :param output: The output of a CMD command executed
+        :type output: [str]
+        :param index: line in which the "output" should be pointed at to get the time
+        :type index: int
+        :return: Time in which a job started
+        :rtype: datetime
+        """
         time = int(output[index])
         time = self._parse_timestamp(time)
         return time
