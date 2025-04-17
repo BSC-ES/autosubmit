@@ -31,7 +31,7 @@ jobs:
   #       run: |
   #         ruff check .
 
-  test:
+  test-unit:
     # needs: lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -62,7 +62,7 @@ jobs:
           pytest \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
-            test/unit
+            test/unit -m ""
 
       - name: Coverage report
         run: |
@@ -83,6 +83,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
+        pytest-markers: ["", "postgres"]
 
     steps:
       - name: Checkout code
@@ -110,7 +111,7 @@ jobs:
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
             test/integration \
-            -m ''
+            -m "${{ matrix.pytest-markers }}"
 
       - name: Coverage report
         run: |
@@ -120,7 +121,7 @@ jobs:
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coverage_integration_py-${{ matrix.python-version }}
+          name: coverage_integration_py-${{ matrix.python-version }}-${{ matrix.pytest-markers }}
           path: coverage.xml
           retention-days: 7
 
@@ -171,7 +172,7 @@ jobs:
           retention-days: 7
 
   coverage:
-    needs: [test, test-integration, test-regression]
+    needs: [test-unit, test-integration, test-regression]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

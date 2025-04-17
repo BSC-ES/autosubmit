@@ -17,9 +17,8 @@
 
 import os
 import pwd
-from pathlib import Path
-
 import pytest
+from pathlib import Path
 
 from autosubmit.migrate.migrate import Migrate
 from autosubmitconfigparser.config.basicconfig import BasicConfig

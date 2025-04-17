@@ -21,14 +21,17 @@ import pwd
 from dataclasses import dataclass
 from fileinput import FileInput
 from pathlib import Path
+from random import randint
 from re import sub
 from textwrap import dedent
 from time import time
-from typing import TYPE_CHECKING, Any, Dict, Callable, Protocol, Optional, Type
+from typing import TYPE_CHECKING, Any, Dict, Callable, Protocol, Optional, Type, Generator
 
 import pytest
 from pytest_mock import MockerFixture
 from ruamel.yaml import YAML
+from sqlalchemy import Connection, create_engine, text
+from testcontainers.postgres import PostgresContainer
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
@@ -37,6 +40,11 @@ from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 if TYPE_CHECKING:
     from py._path.local import LocalPath  # type: ignore
+
+
+_PG_USER = 'postgres'
+_PG_PASSWORD = 'postgres'
+_PG_DATABASE = 'autosubmit_test'
 
 
 @dataclass
@@ -374,12 +382,12 @@ def autosubmit_config(
             basic_config=BasicConfig
         )
 
+        config.experiment_data = {**config.experiment_data, **experiment_data}
         # Populate the configuration object's ``experiment_data`` dictionary with the values
         # in ``BasicConfig``. For some reason, some platforms use variables like ``LOCAL_ROOT_DIR``
         # from the configuration object, instead of using ``BasicConfig``.
         for k, v in {k: v for k, v in basic_config.__class__.__dict__.items() if not k.startswith('__')}.items():
             config.experiment_data[k] = v
-        config.experiment_data.update(experiment_data)
 
         # Default values for experiment data
         # TODO: This probably has a way to be initialized in config-parser?
@@ -389,6 +397,8 @@ def autosubmit_config(
                 config.experiment_data[must_exist] = {}
 
         config.experiment_data['CONFIG']['SAFETYSLEEPTIME'] = 0
+        # TODO: one test failed while moving things from unit to integration, but this shouldn't be
+        #       needed, especially if the disk has the valid value?
         config.experiment_data['DEFAULT']['EXPID'] = expid
 
         if 'HPCARCH' not in config.experiment_data['DEFAULT']:
@@ -488,7 +498,7 @@ def as_db_sqlite(monkeypatch: pytest.MonkeyPatch, tmp_path: "LocalPath") -> Type
     """Overwrites the BasicConfig to use SQLite database for testing.
     Args:
         monkeypatch: Monkey Patcher.
-        tmp_path: Temporary path fixture.
+        tmp_path: Temporary path.
     Returns:
         BasicConfig class.
     """
@@ -497,3 +507,77 @@ def as_db_sqlite(monkeypatch: pytest.MonkeyPatch, tmp_path: "LocalPath") -> Type
     monkeypatch.setattr(BasicConfig, "DB_PATH", str(tmp_path / "autosubmit.db"))
 
     return BasicConfig
+
+
+def _setup_pg_db(conn: Connection) -> None:
+    """Reset the database.
+    Drops all schemas except the system ones and restoring the public schema.
+    Args:
+        conn: Database connection.
+    """
+    # Get all schema names that are not from the system
+    results = conn.execute(
+        text("""SELECT schema_name FROM information_schema.schemata
+               WHERE schema_name NOT LIKE 'pg_%'
+               AND schema_name != 'information_schema'""")
+    ).all()
+    schema_names = [res[0] for res in results]
+
+    # Drop all schemas
+    for schema_name in schema_names:
+        conn.execute(text(f"""DROP SCHEMA IF EXISTS "{schema_name}" CASCADE"""))
+
+    # Restore default public schema
+    conn.execute(text("CREATE SCHEMA public"))
+    conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
+    conn.execute(text("GRANT ALL ON SCHEMA public TO postgres"))
+
+
+@pytest.fixture
+def pg_random_port() -> int:
+    return randint(5000, 7000)
+
+
+def _get_pg_connection_url(port):
+    """Get the PostgreSQL connection string."""
+
+    return f'postgresql://{_PG_USER}:{_PG_PASSWORD}@localhost:{port}/{_PG_USER}'
+
+
+@pytest.fixture
+def as_db_postgres(monkeypatch: pytest.MonkeyPatch, pg_random_port: int) -> Generator[BasicConfig, Any, None]:
+    """Fixture to set up and tear down a Postgres database for testing.
+    It will overwrite the ``BasicConfig`` to use Postgres.
+    It uses the environment variable ``PYTEST_DATABASE_CONN_URL`` to connect to the database.
+    If the variable is not set, it uses the default connection URL.
+    Args:
+        monkeypatch: Monkey Patcher.
+        pg_random_port (int): Postgres server random port.
+    Returns:
+        Autosubmit configuration for Postgres.
+    """
+    conn_url = _get_pg_connection_url(pg_random_port)
+
+    # Apply patch BasicConfig
+    monkeypatch.setattr(BasicConfig, "read", _identity_value())
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "postgres")
+    monkeypatch.setattr(
+        BasicConfig,
+        "DATABASE_CONN_URL",
+        conn_url,
+    )
+
+    image = 'postgres:17'
+    with PostgresContainer(
+            image=image,
+            port=5432,
+            username=_PG_USER,
+            password=_PG_PASSWORD,
+            dbname=_PG_DATABASE)\
+            .with_bind_ports(5432, pg_random_port):
+        # Setup database
+        with create_engine(conn_url).connect() as conn:
+            _setup_pg_db(conn)
+            conn.commit()
+
+        yield BasicConfig

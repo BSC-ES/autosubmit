@@ -422,6 +422,7 @@ def test_remote_repo_operational(project_type: str, expid: str, create_as_exp, m
         with pytest.raises(AutosubmitCritical):
             AutosubmitGit.check_unpushed_changes(expid) 
 
+
 @pytest.mark.parametrize(
     "git_repo, expected",
     [
