@@ -1,0 +1,372 @@
+DEFAULT:
+  EXPID: t03k
+  HPCARCH: local
+  CUSTOM_CONFIG: hidden
+JOBS:
+  LOCAL_SETUP:
+    FILE: hidden
+    PLATFORM: local
+    RUNNING: once
+    CHECK: on_submission
+    DEPENDENCIES: {}
+  SYNCHRONIZE:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+    RUNNING: once
+    CHECK: on_submission
+  REMOTE_SETUP:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      SYNCHRONIZE: {}
+    RUNNING: once
+    WALLCLOCK: 02:00
+    CHECK: on_submission
+  DN:
+    FILE: hidden
+    DEPENDENCIES:
+      REMOTE_SETUP:
+        STATUS: COMPLETED
+        ANY_FINAL_STATUS_IS_VALID: false
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+      APP_ENERGY_ONSHORE-1:
+        STATUS: FAILED
+        ANY_FINAL_STATUS_IS_VALID: false
+      APP_HYDROMET-1:
+        STATUS: FAILED
+        ANY_FINAL_STATUS_IS_VALID: false
+      APP_HYDROLAND-1:
+        STATUS: FAILED
+        ANY_FINAL_STATUS_IS_VALID: false
+      APP_WILDFIRES_FWI-1:
+        STATUS: FAILED
+        ANY_FINAL_STATUS_IS_VALID: false
+      APP_ENERGY_OFFSHORE-1:
+        STATUS: FAILED
+        ANY_FINAL_STATUS_IS_VALID: false
+      APP_WILDFIRES_WISE-1:
+        STATUS: FAILED
+        ANY_FINAL_STATUS_IS_VALID: false
+    RUNNING: chunk
+    WALLCLOCK: 02:00
+    PLATFORM: local
+    SPLITS: auto
+    TOTALJOBS: 1
+    CHECK: on_submission
+    RETRIALS: 1
+  OPA_ENERGY_ONSHORE:
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+      OPA_ENERGY_ONSHORE:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+            STATUS: FAILED
+    FILE: hidden
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    RUNNING: chunk
+    NODES: 1
+    PROCESSORS: '%CURRENT_OPA_PROCESSORS%'
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    CUSTOM_DIRECTIVES: '%CURRENT_OPA_CUSTOM_DIRECTIVES%'
+    EXCLUSIVE: '%CURRENT_OPA_EXCLUSIVE%'
+    RETRIALS: '1'
+    NAME: energy_onshore
+    SPLITS: auto
+  OPA_HYDROMET:
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+      OPA_HYDROMET:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+            STATUS: FAILED
+    FILE: hidden
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    RUNNING: chunk
+    NODES: 1
+    PROCESSORS: '%CURRENT_OPA_PROCESSORS%'
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    CUSTOM_DIRECTIVES: '%CURRENT_OPA_CUSTOM_DIRECTIVES%'
+    EXCLUSIVE: '%CURRENT_OPA_EXCLUSIVE%'
+    RETRIALS: '1'
+    NAME: hydromet
+    SPLITS: auto
+  OPA_HYDROLAND:
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+      OPA_HYDROLAND:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+            STATUS: FAILED
+    FILE: hidden
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    RUNNING: chunk
+    NODES: 1
+    PROCESSORS: '%CURRENT_OPA_PROCESSORS%'
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    CUSTOM_DIRECTIVES: '%CURRENT_OPA_CUSTOM_DIRECTIVES%'
+    EXCLUSIVE: '%CURRENT_OPA_EXCLUSIVE%'
+    RETRIALS: '1'
+    NAME: hydroland
+    SPLITS: auto
+  OPA_WILDFIRES_FWI:
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+      OPA_WILDFIRES_FWI:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+            STATUS: FAILED
+    FILE: hidden
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    RUNNING: chunk
+    NODES: 1
+    PROCESSORS: '%CURRENT_OPA_PROCESSORS%'
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    CUSTOM_DIRECTIVES: '%CURRENT_OPA_CUSTOM_DIRECTIVES%'
+    EXCLUSIVE: '%CURRENT_OPA_EXCLUSIVE%'
+    RETRIALS: '1'
+    NAME: wildfires_fwi
+    SPLITS: auto
+  OPA_ENERGY_OFFSHORE:
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+      OPA_ENERGY_OFFSHORE:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+            STATUS: FAILED
+    FILE: hidden
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    RUNNING: chunk
+    NODES: 1
+    PROCESSORS: '%CURRENT_OPA_PROCESSORS%'
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    CUSTOM_DIRECTIVES: '%CURRENT_OPA_CUSTOM_DIRECTIVES%'
+    EXCLUSIVE: '%CURRENT_OPA_EXCLUSIVE%'
+    RETRIALS: '1'
+    NAME: energy_offshore
+    SPLITS: auto
+  OPA_WILDFIRES_WISE:
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+      OPA_WILDFIRES_WISE:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+            STATUS: FAILED
+    FILE: hidden
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    RUNNING: chunk
+    NODES: 1
+    PROCESSORS: '%CURRENT_OPA_PROCESSORS%'
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    CUSTOM_DIRECTIVES: '%CURRENT_OPA_CUSTOM_DIRECTIVES%'
+    EXCLUSIVE: '%CURRENT_OPA_EXCLUSIVE%'
+    RETRIALS: '1'
+    NAME: wildfires_wise
+    SPLITS: auto
+  APP_ENERGY_ONSHORE:
+    FILE: hidden
+    DEPENDENCIES:
+      OPA_ENERGY_ONSHORE:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+            STATUS: FAILED
+      APP_ENERGY_ONSHORE:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+            STATUS: FAILED
+    RUNNING: chunk
+    WALLCLOCK: 00:20
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    NODES: 1
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    NAME: ENERGY_ONSHORE
+    SPLITS: auto
+  APP_HYDROMET:
+    FILE: hidden
+    DEPENDENCIES:
+      OPA_HYDROMET:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+            STATUS: FAILED
+      APP_HYDROMET:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+            STATUS: FAILED
+    RUNNING: chunk
+    WALLCLOCK: 00:20
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    NODES: 1
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    NAME: HYDROMET
+    SPLITS: auto
+  APP_HYDROLAND:
+    FILE: hidden
+    DEPENDENCIES:
+      OPA_HYDROLAND:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+            STATUS: FAILED
+      APP_HYDROLAND:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+            STATUS: FAILED
+    RUNNING: chunk
+    WALLCLOCK: 00:20
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    NODES: 1
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    NAME: HYDROLAND
+    SPLITS: auto
+  APP_WILDFIRES_FWI:
+    FILE: hidden
+    DEPENDENCIES:
+      OPA_WILDFIRES_FWI:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+            STATUS: FAILED
+      APP_WILDFIRES_FWI:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+            STATUS: FAILED
+    RUNNING: chunk
+    WALLCLOCK: 00:20
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    NODES: 1
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    NAME: WILDFIRES_FWI
+    SPLITS: auto
+  APP_ENERGY_OFFSHORE:
+    FILE: hidden
+    DEPENDENCIES:
+      OPA_ENERGY_OFFSHORE:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+            STATUS: FAILED
+      APP_ENERGY_OFFSHORE:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+            STATUS: FAILED
+    RUNNING: chunk
+    WALLCLOCK: 00:20
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    NODES: 1
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    NAME: ENERGY_OFFSHORE
+    SPLITS: auto
+  APP_WILDFIRES_WISE:
+    FILE: hidden
+    DEPENDENCIES:
+      OPA_WILDFIRES_WISE:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+            STATUS: FAILED
+      APP_WILDFIRES_WISE:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+            STATUS: FAILED
+    RUNNING: chunk
+    WALLCLOCK: 00:20
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    NODES: 1
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    NAME: WILDFIRES_WISE
+    SPLITS: auto
+EXPERIMENT:
+  DATELIST: 19900101
+  MEMBERS: fc0
+  CHUNKSIZEUNIT: day
+  SPLITSIZEUNIT: day
+  CHUNKSIZE: 1
+  NUMCHUNKS: 1
+  CALENDAR: standard
+PROJECT:
+  PROJECT_TYPE: none
+  PROJECT_DESTINATION: git_project
+GIT:
+  PROJECT_ORIGIN: hidden
+  PROJECT_BRANCH: main
+  PROJECT_COMMIT: ''
+  PROJECT_SUBMODULES: ''
+  FETCH_SINGLE_BRANCH: true

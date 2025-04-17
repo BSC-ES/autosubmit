@@ -1,0 +1,8 @@
+## String representation of Job List [7]  ##
+a00c_20211024_MONARCH_1_GET_FILES ~ [1 child]
+|  a00c_20211024_1_CALC_STATS
+a00c_20211024_SILAM_1_GET_FILES ~ [1 child]
+a00c_20211024_CAMS_1_GET_FILES ~ [1 child]
+a00c_20211024_MONARCH_1_IT ~ [1 child]
+a00c_20211024_SILAM_1_IT ~ [1 child]
+a00c_20211024_CAMS_1_IT ~ [1 child]

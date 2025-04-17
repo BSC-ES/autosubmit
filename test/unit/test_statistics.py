@@ -1,3 +1,20 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import time
 from datetime import datetime, timedelta
 from random import seed, randint, choice
@@ -6,18 +23,18 @@ from typing import Any, Dict, List, Tuple
 import pytest
 
 from autosubmit.job.job import Job
+from autosubmit.job.job_common import Status
 from autosubmit.statistics.jobs_stat import JobStat
 from autosubmit.statistics.statistics import Statistics
 from autosubmit.statistics.stats_summary import StatsSummary
 from autosubmit.statistics.utils import timedelta2hours
-from autosubmit.job.job_common import Status
 
 NUM_JOBS = 5  # modify this value to test with different job number
 MAX_NUM_RETRIALS_PER_JOB = 20  # modify this value to test with different retrials number
 
 
 @pytest.fixture()
-def job_with_different_retrials():
+def job_with_different_retrials(mocker):
     job_aux = Job(name="example_name", job_id="example_id", status="COMPLETED", priority=0)
     job_aux.processors = "1"
     job_aux.wallclock = '00:05'
@@ -70,7 +87,7 @@ def job_with_different_retrials():
             "FAILED"
         ]
     ]
-    job_aux.get_last_retrials = lambda: retrials
+    mocker.patch("autosubmit.job.job.Job.get_last_retrials", return_value=retrials)
 
     job_stat_aux = JobStat("example_name", 1, float(5) / 60, "example_section",
                            "example_date", "example_member", "example_chunk", "1",
@@ -91,7 +108,7 @@ def job_with_different_retrials():
 
 
 @pytest.fixture()
-def jobs() -> List[Job]:
+def jobs(mocker) -> List[Job]:
     """
     :return: Jobs with random attributes and retrials.
     """
@@ -148,7 +165,7 @@ def jobs() -> List[Job]:
                     else:
                         retrial[3] = job_aux.status
             retrials.append(retrial)
-        job_aux.get_last_retrials = lambda: retrials
+        mocker.patch("autosubmit.job.job.Job.get_last_retrials", return_value=retrials)
         jobs.append(job_aux)
 
     return jobs

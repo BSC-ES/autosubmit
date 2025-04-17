@@ -15,7 +15,7 @@ Concretely, it is currently used at Barcelona Supercomputing Centre (BSC) to run
 
 Get involved or contact us:
 
-    Autosubmit GitLab:	        https://earth.bsc.es/gitlab/es/autosubmit
+    Autosubmit GitHub:	        https://github.com/BSC-ES/autosubmit
     Autosubmit Support:	        support-autosubmit@bsc.es
     
 How to cite Autosubmit:
@@ -45,10 +45,11 @@ HOW TO DEPLOY/SETUP AUTOSUBMIT FRAMEWORK
    * CCA (ECMWF machine)
    * ARCHER (EPCC machine)
 
-- Pre-requisites: These packages (bash, python2, sqlite3, git-scm > 1.8.2, subversion, dialog*) must be available at local
+- Pre-requisites: These packages (bash, python2, sqlite3, git-scm > 1.8.2, subversion, pip >= 24.0, dialog*) must be available at local
   machine. These packages (argparse, dateutil, pyparsing, numpy, pydotplus, matplotlib, paramiko,
   python2-pythondialog*, mock, portalocker) must be available for python runtime. And the machine is also able to access
   HPC platforms via password-less ssh.
+  Pip must be available with version `>= 24.0`.
 
   *: optional
 

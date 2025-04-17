@@ -1,7 +1,24 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import pytest
 from portalocker.exceptions import BaseLockException
 
-from autosubmit import delete_lock_file, exit_from_error
+from autosubmit.scripts.autosubmit import delete_lock_file, exit_from_error
 from log.log import AutosubmitCritical, AutosubmitError
 
 
@@ -25,9 +42,9 @@ def test_log_debug_raises_error(mocker):
     try:
         _fn()
     except BaseException as e:
-        mocker.patch('autosubmit._exit')  # mock this to avoid the system from exiting
-        mocked_log = mocker.patch('autosubmit.Log')
-        mocked_print = mocker.patch('autosubmit.print')
+        mocker.patch('autosubmit.scripts.autosubmit._exit')  # mock this to avoid the system from exiting
+        mocked_log = mocker.patch('autosubmit.scripts.autosubmit.Log')
+        mocked_print = mocker.patch('autosubmit.scripts.autosubmit.print')
 
         mocked_log.debug.side_effect = BaseException()
 
@@ -71,9 +88,9 @@ def test_exit_from_error(
     try:
         _fn()
     except BaseException as e:
-        mocker.patch('autosubmit._exit')  # mock this to avoid the system from exiting
-        mocked_log = mocker.patch('autosubmit.Log')
-        mocked_delete = mocker.patch('autosubmit.delete_lock_file')
+        mocker.patch('autosubmit.scripts.autosubmit._exit')  # mock this to avoid the system from exiting
+        mocked_log = mocker.patch('autosubmit.scripts.autosubmit.Log')
+        mocked_delete = mocker.patch('autosubmit.scripts.autosubmit.delete_lock_file')
 
         exit_from_error(e)
 

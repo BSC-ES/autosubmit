@@ -1,0 +1,19 @@
+CONFIG:
+  # Current version of Autosubmit.
+  AUTOSUBMIT_VERSION: "4.1.10"
+  # Maximum number of jobs permitted in the waiting status.
+  MAXWAITINGJOBS: 20
+  # Total number of jobs in the workflow.
+  TOTALJOBS: 20
+  SAFETYSLEEPTIME: 10
+  RETRIALS: 0
+#wrappers:
+#  wrapper_sim:
+#    TYPE: "vertical"
+#    JOBS_IN_WRAPPER: "SIM"
+MAIL:
+  NOTIFICATIONS: False
+  TO:
+STORAGE:
+  TYPE: pkl
+  COPY_REMOTE_LOGS: true

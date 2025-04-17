@@ -1,0 +1,93 @@
+DEFAULT:
+  EXPID: a2da
+  HPCARCH: local
+  CUSTOM_CONFIG: hidden
+JOBS:
+  LOCAL_SETUP:
+    FILE: hidden
+    PLATFORM: local
+    RUNNING: once
+    CHECK: on_submission
+    DEPENDENCIES: {}
+  SYNCHRONIZE:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+    RUNNING: once
+    CHECK: on_submission
+  REMOTE_SETUP:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      SYNCHRONIZE: {}
+    RUNNING: once
+    WALLCLOCK: 02:00
+    CHECK: on_submission
+  INI:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      REMOTE_SETUP: {}
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: on_submission
+  SIM:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      INI: {}
+      SIM-1: {}
+    RUNNING: chunk
+    WALLCLOCK: 00:50
+    CHECK: on_submission
+    NODES: 4
+    PARTITION: small
+  DN:
+    FILE: hidden
+    DEPENDENCIES:
+      SIM:
+        STATUS: RUNNING
+        ANY_FINAL_STATUS_IS_VALID: true
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+      DN-1:
+    RUNNING: chunk
+    WALLCLOCK: 02:00
+    PLATFORM: local
+    SPLITS: auto
+    TOTALJOBS: 1
+    CHECK: on_submission
+    RETRIALS: 1
+  OPA:
+    FILE: hidden
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+      OPA:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+      OPA-1:
+    RUNNING: chunk
+EXPERIMENT:
+  DATELIST: 19900101
+  MEMBERS: fc0
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: 2
+  NUMCHUNKS: 2
+  CALENDAR: standard
+  SPLITSIZEUNIT: day
+PROJECT:
+  PROJECT_TYPE: none
+  PROJECT_DESTINATION: git_project
+GIT:
+  PROJECT_ORIGIN: hidden
+  PROJECT_BRANCH: v5.0.2
+  PROJECT_COMMIT: ''
+  PROJECT_SUBMODULES: data-portfolio dvc-cache-de340
+  FETCH_SINGLE_BRANCH: true

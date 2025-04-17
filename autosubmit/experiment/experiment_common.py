@@ -21,11 +21,12 @@
 Module containing functions to manage autosubmit's experiments.
 """
 import string
-import autosubmit.database.db_common as db_common
+from autosubmit.database import db_common
 from log.log import Log,AutosubmitCritical
 Log.get_logger("Autosubmit")
 
-def new_experiment(description, version, test=False, operational=False):
+
+def new_experiment(description, version, test=False, operational=False, evaluation=False):
     """
     Stores a new experiment on the database and generates its identifier
 
@@ -40,38 +41,47 @@ def new_experiment(description, version, test=False, operational=False):
     :return: experiment id for the new experiment
     :rtype: str
     """
-    if test:
-        last_exp_name = db_common.last_name_used(True)
-    elif operational:
-        last_exp_name = db_common.last_name_used(False, True)
-    else:
-        last_exp_name = db_common.last_name_used()
-    if last_exp_name == '':
-        return ''
-    if last_exp_name == 'empty':
+    try:
         if test:
-            # test identifier restricted also to 4 characters.
-            new_name = 't000'
+            last_exp_name = db_common.last_name_used(True)
         elif operational:
-            # operational identifier restricted also to 4 characters.
-            new_name = 'o000'
+            last_exp_name = db_common.last_name_used(False, True)
+        elif evaluation:
+            last_exp_name = db_common.last_name_used(False, False, True)
         else:
-            new_name = 'a000'
-    else:
-        new_name = last_exp_name
-        if new_name == '':
+            last_exp_name = db_common.last_name_used()
+        if last_exp_name == '':
             return ''
-    while db_common.check_experiment_exists(new_name, False):
-        new_name = next_experiment_id(new_name)
-        if new_name == '':
+        if last_exp_name == 'empty':
+            if test:
+                # test identifier restricted also to 4 characters.
+                new_name = 't000'
+            elif operational:
+                # operational identifier restricted also to 4 characters.
+                new_name = 'o000'
+            elif evaluation:
+                # evaluation identifier restricted also to 4 characters.
+                new_name = 'e000'
+            else:
+                new_name = 'a000'
+        else:
+            new_name = last_exp_name
+            if new_name == '':
+                return ''
+        while db_common.check_experiment_exists(new_name, False):
+            new_name = next_experiment_id(new_name)
+            if new_name == '':
+                return ''
+        if not db_common.save_experiment(new_name, description, version):
             return ''
-    if not db_common.save_experiment(new_name, description, version):
-        return ''
-    Log.info('The new experiment "{0}" has been registered.', new_name)
-    return new_name
+        Log.info('The new experiment "{0}" has been registered.', new_name)
+        return new_name
+    except Exception as e:
+        raise AutosubmitCritical(f'Error while generating a new experiment in the db: {e}',
+                                 7011) from e
 
 
-def copy_experiment(experiment_id, description, version, test=False, operational=False):
+def copy_experiment(experiment_id, description, version, test=False, operational=False, evaluation=False):
     """
     Creates a new experiment by copying an existing experiment
 
@@ -85,13 +95,20 @@ def copy_experiment(experiment_id, description, version, test=False, operational
     :type test: bool
     :param operational: specifies if it is an operational experiment
     :type operational: bool
+    :param evaluation: specifies if it is an evaluation experiment
+    :type evaluation: bool
     :return: experiment id for the new experiment
     :rtype: str
     """
-    if not db_common.check_experiment_exists(experiment_id):
-        return ''
-    new_name = new_experiment(description, version, test, operational)
-    return new_name
+    try:
+        if not db_common.check_experiment_exists(experiment_id):
+            return ''
+        new_name = new_experiment(description, version, test, operational, evaluation)
+        return new_name
+    except Exception as e:
+        raise AutosubmitCritical(f"Error while copying the experiment {experiment_id} "
+                                 f"as a new experiment in the db: {e}", 7011) from e
+
 
 
 def next_experiment_id(current_id):

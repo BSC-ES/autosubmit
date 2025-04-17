@@ -1,0 +1,13 @@
+## String representation of Job List [12]  ## 
+a2da_LOCAL_SETUP ~ [1 child] [READY] 
+|  a2da_SYNCHRONIZE ~ [1 child] [WAITING] 
+|  |  a2da_REMOTE_SETUP ~ [1 child] [WAITING] 
+|  |  |  a2da_19900101_fc0_INI ~ [1 child] [WAITING] 
+|  |  |  |  a2da_19900101_fc0_1_SIM ~ [2 children] [WAITING] 
+|  |  |  |  |  a2da_19900101_fc0_1_1_DN ~ [1 child] [WAITING] 
+|  |  |  |  |  |  a2da_19900101_fc0_1_2_DN ~ [1 child] [WAITING] 
+|  |  |  |  |  |  |  a2da_19900101_fc0_2_1_DN ~ [1 child] [WAITING] 
+|  |  |  |  |  |  |  |  a2da_19900101_fc0_2_2_DN [WAITING] 
+|  |  |  |  |  a2da_19900101_fc0_2_SIM ~ [1 child] [WAITING] 
+a2da_19900101_fc0_1_OPA ~ [1 child] [READY] 
+|  a2da_19900101_fc0_2_OPA [WAITING] 

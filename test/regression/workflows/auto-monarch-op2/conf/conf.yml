@@ -1,0 +1,345 @@
+DEFAULT:
+  EXPID: t0kd
+  HPCARCH: local
+JOBS:
+  LOCAL_SETUP:
+    FILE: hidden
+    TYPE: python
+    PLATFORM: local
+    DEPENDENCIES:
+      FIRST_CLEAN: {}
+    RUNNING: once
+    NOTIFY_ON:
+    - FAILED
+    WALLCLOCK: 02:00
+  FIRST_CLEAN:
+    FILE: hidden
+    RUNNING: once
+    WALLCLOCK: 00:05
+    NOTIFY_ON:
+    - FAILED
+    DEPENDENCIES: {}
+  LOCAL_SEND_INITIAL:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+      FIRST_CLEAN: {}
+    RUNNING: chunk
+    NOTIFY_ON:
+    - FAILED
+    WALLCLOCK: 02:00
+  LOCAL_SEND_SPINUP:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+      FIRST_CLEAN: {}
+    RUNNING: member
+    NOTIFY_ON:
+    - FAILED
+    WALLCLOCK: 02:00
+  LOCAL_SEND_SOURCE:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+      FIRST_CLEAN: {}
+    RUNNING: once
+    WALLCLOCK: 02:00
+  LOCAL_SEND_STATIC:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+      FIRST_CLEAN: {}
+    RUNNING: once
+    NOTIFY: FAILED
+    WALLCLOCK: 02:00
+  LOCAL_SEND_HERMES:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_SOURCE: {}
+    PLATFORM: local
+    RUNNING: once
+    NOTIFY: FAILED
+    WALLCLOCK: 02:00
+  LOCAL_SEND_EMISSIONS:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+      FIRST_CLEAN: {}
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    NOTIFY_ON:
+    - FAILED
+    WALLCLOCK: 02:00
+  CHECK_GFAS:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SEND_EMISSIONS:
+        STATUS: FAILED
+        ANY_FINAL_STATUS_IS_VALID: false
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    WALLCLOCK: 00:30
+    NOTIFY_ON:
+    - FAILED
+  LOCAL_SEND_OBS:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+      FIRST_CLEAN: {}
+      LOCAL_SEND_OBS-1: {}
+      SIM: {}
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    NOTIFY_ON:
+    - FAILED
+    RETRIALS: '6'
+    DELAY_RETRY_TIME: '600'
+    WALLCLOCK: 02:00
+  REMOTE_COMPILE:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_SOURCE: {}
+    RUNNING: once
+    PROCESSORS: '4'
+    WALLCLOCK: 00:50
+    NOTIFY_ON:
+    - FAILED
+  PREPROCFIX:
+    FILE: hidden
+    DEPENDENCIES:
+      REMOTE_COMPILE: {}
+      LOCAL_SEND_STATIC: {}
+    RUNNING: once
+    WALLCLOCK: 00:30
+    NOTIFY_ON:
+    - FAILED
+  LOCAL_SEND_CHEM:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+      FIRST_CLEAN: {}
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    NOTIFY_ON:
+    - FAILED
+    WALLCLOCK: 02:00
+  CHECK_CAMS:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SEND_CHEM:
+        STATUS: FAILED
+        ANY_FINAL_STATUS_IS_VALID: false
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    WALLCLOCK: 00:30
+    NOTIFY_ON:
+    - FAILED
+  PREPROCVAR:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_INITIAL: {}
+      CHECK_CAMS: {}
+      PREPROCFIX: {}
+    RUNNING: chunk
+    WALLCLOCK: 00:30
+    NOTIFY_ON:
+    - FAILED
+    CUSTOM_DIRECTIVES: '["#SBATCH --exclusive"]'
+  HERMES_GR_PREPROC:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_HERMES: {}
+      PREPROCFIX: {}
+    RUNNING: date
+    WALLCLOCK: 00:20
+    NOTIFY_ON:
+    - FAILED
+    PROCESSORS: '100'
+    RETRIALS: '2'
+  HERMES_GR:
+    FILE: hidden
+    DEPENDENCIES:
+      HERMES_GR_PREPROC: {}
+      CHECK_GFAS: {}
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    WALLCLOCK: 01:00
+    PROCESSORS: '100'
+    RETRIALS: '2'
+    NOTIFY_ON:
+    - FAILED
+  PERTURB_HERMES:
+    FILE: hidden
+    DEPENDENCIES:
+      HERMES_GR: {}
+    RUNNING: chunk
+    WALLCLOCK: 00:20
+    PROCESSORS: '48'
+    NOTIFY_ON:
+    - FAILED
+    CUSTOM_DIRECTIVES: '["#SBATCH --exclusive"]'
+  SIM:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_SPINUP: {}
+      PREPROCVAR: {}
+      SIM-1: {}
+      PERTURB_HERMES: {}
+    RUNNING: chunk
+    PROCESSORS: '96'
+    WALLCLOCK: 01:30
+    RETRIALS: '1'
+    NOTIFY_ON:
+    - FAILED
+  COMPILE_DA:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_SOURCE: {}
+    RUNNING: once
+    WALLCLOCK: 00:10
+    NOTIFY_ON:
+    - FAILED
+  COMPILE_OBSPREPROC:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_SOURCE: {}
+    RUNNING: once
+    WALLCLOCK: 00:10
+    NOTIFY_ON:
+    - FAILED
+  OBS_PREPROC:
+    FILE: hidden
+    DEPENDENCIES:
+      LOCAL_SEND_SOURCE:
+        STATUS: COMPLETED
+        ANY_FINAL_STATUS_IS_VALID: false
+      COMPILE_OBSPREPROC:
+        STATUS: COMPLETED
+        ANY_FINAL_STATUS_IS_VALID: false
+      LOCAL_SEND_OBS:
+        STATUS: FAILED
+        ANY_FINAL_STATUS_IS_VALID: false
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    WALLCLOCK: 00:30
+    DELAY: '0'
+    NOTIFY_ON:
+    - FAILED
+  CHECK_OBS:
+    FILE: hidden
+    DEPENDENCIES:
+      OBS_PREPROC:
+        STATUS: FAILED
+        ANY_FINAL_STATUS_IS_VALID: false
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    WALLCLOCK: 00:30
+    DELAY: '0'
+    SPLITS: '6'
+  DA:
+    FILE: hidden
+    DEPENDENCIES:
+      SIM: {}
+      CHECK_OBS: {}
+      COMPILE_DA: {}
+    SELECT_MEMBERS: SIM*[0:5]
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    WALLCLOCK: 00:40
+    PROCESSORS: '96'
+    RETRIALS: '2'
+    NOTIFY_ON:
+    - FAILED
+    SPLITS: '6'
+  POSTPROC_CTRL:
+    FILE: hidden
+    DEPENDENCIES:
+      SIM: {}
+    RUNNING: chunk
+    SELECT_MEMBERS: SIM*[6]
+    EXCLUDED_MEMBERS: '[0:5]'
+    PROCESSORS: '48'
+    WALLCLOCK: 01:00
+    NOTIFY_ON:
+    - FAILED
+  POSTPROC_AN:
+    FILE: hidden
+    DEPENDENCIES:
+      DA: {}
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    PROCESSORS: '25'
+    WALLCLOCK: 00:30
+    NOTIFY_ON:
+    - FAILED
+    SPLITS: '6'
+  ARCHIVE:
+    FILE: hidden
+    DEPENDENCIES:
+      POSTPROC_CTRL: {}
+      POSTPROC_AN: {}
+    PLATFORM: local
+    RUNNING: chunk
+    WALLCLOCK: 01:00
+    NOTIFY_ON:
+    - FAILED
+  ARCHIVE_CAMS:
+    FILE: hidden
+    DEPENDENCIES:
+      POSTPROC_CTRL: {}
+      POSTPROC_AN: {}
+    PLATFORM: local
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    WALLCLOCK: 01:30
+    NOTIFY_ON:
+    - FAILED
+  CLEAN:
+    FILE: hidden
+    DEPENDENCIES:
+      ARCHIVE: {}
+      ARCHIVE_CAMS: {}
+    PLATFORM: local
+    RUNNING: chunk
+    WALLCLOCK: 00:10
+    NOTIFY_ON:
+    - FAILED
+    RETRIALS: '0'
+  CLEAN_ESARCHIVE:
+    FILE: hidden
+    DEPENDENCIES:
+      ARCHIVE: {}
+      ARCHIVE_CAMS: {}
+    PLATFORM: local
+    RUNNING: chunk
+    WALLCLOCK: 00:10
+    SYNCHRONIZE: member
+    NOTIFY_ON:
+    - FAILED
+EXPERIMENT:
+  DATELIST: '20241008'
+  MEMBERS: 00[0-6]
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: 1
+  NUMCHUNKS: 1
+  CHUNKINI: '1'
+  CALENDAR: standard
+PROJECT:
+  PROJECT_TYPE: none
+  PROJECT_DESTINATION: auto-monarch
+GIT:
+  PROJECT_ORIGIN: hidden
+  PROJECT_BRANCH: 489-move-the-workflow-to-as4
+  PROJECT_COMMIT: ''
+  PROJECT_SUBMODULES: ''
+  PROJECT_SUBMODULES_DEPTH: '1'
+  FETCH_SINGLE_BRANCH: 'true'

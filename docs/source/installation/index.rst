@@ -5,11 +5,13 @@ Installation
 How to install
 ==============
 
-The Autosubmit code is hosted in Git, at the BSC GitLab public repository. The Autosubmit Python package is available through PyPI, the primary source for Python packages.
+The Autosubmit code is hosted in GitHub. The Autosubmit Python package is available through PyPI, the primary source for Python packages.
 
-- Pre-requisites: bash, python3, sqlite3, git-scm > 1.8.2, subversion, dialog, curl, python-tk(tkinter in centOS), graphviz >= 2.41, pip3, rsync
+- Pre-requisites: bash, python >= 3.9, sqlite3, git-scm > 1.8.2, subversion, pip >= 24.0, dialog, curl, python-tk(tkinter in centOS), graphviz >= 2.41, rsync
 
+.. important:: (SYSTEM) Python version has to be at least 3.9 and at most 3.12. 
 .. important:: (SYSTEM) Graphviz version must be >= 2.38 except 2.40(not working). You can check the version using dot -v.
+.. important:: (SYSTEM) Pip version must be >= 24.0. You can check the version using pip -V.
 
 - Python dependencies: configobj>=5.0.6, argparse>=1.4.0 , python-dateutil>=2.8.2, matplotlib==3.4.3, numpy==1.21.6, py3dotplus>=1.1.0, pyparsing>=3.0.7, paramiko>=2.9.2, mock>=4.0.3, six>=1.10, portalocker>=2.3.2, networkx==2.6.3, requests>=2.27.1, bscearth.utils>=0.5.2, cryptography>=36.0.1, setuptools>=60.8.2, xlib>=0.21, pip>=22.0.3, ruamel.yaml, pythondialog, pytest, nose, coverage, PyNaCl==1.4.0, six>=1.10.0, requests, xlib, Pygments, packaging==19, typing>=3.7, autosubmitconfigparser
 
@@ -25,7 +27,7 @@ To install autosubmit, execute the following:
 Or download, unpack and:
 ::
 
-    python3 setup.py install
+    pip install .
 
 .. hint::
     To check if Autosubmit is installed, run ``autosubmit -v.`` This command will print Autosubmit's current version
@@ -50,7 +52,7 @@ The sequence of instructions to install Autosubmit and its dependencies with pip
     export DEBIAN_FRONTEND=noninteractive
 
     # Dependencies
-    apt install wget curl python3 python3-tk python3-dev graphviz -y -q
+    apt install wget curl python3.9 python3.9-tk python3.9-dev graphviz -y -q
 
     # Additional dependencies related with pycrypto
     apt install build-essential libssl-dev libffi-dev -y -q
@@ -115,15 +117,20 @@ If you don't have conda installed yet, we recommend following `Installing Minico
 
     # Download git
     apt install git -y -q
+    
     # Download autosubmit
-    git clone https://earth.bsc.es/gitlab/es/autosubmit.git -b v4.0.0b
+    git clone https://github.com/BSC-ES/autosubmit.git -b v4.0.0b
     cd autosubmit
+
     # Create a Conda environment from YAML with autosubmit dependencies
     conda env create -f environment.yml -n autosubmitenv
+
     # Activate env
     conda activate autosubmitenv
+
     # Install autosubmit
     pip install autosubmit
+
     # Test autosubmit
     autosubmit -v
 

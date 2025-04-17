@@ -69,6 +69,8 @@ This location can be defined by the user in the `DEFAULT.CONFIG_DIR` parameter i
 * You would define your user-specific parameters, for example, platform user, in a different location.
 
 
+.. _create_and_share_config:
+
 How to create and share the configuration
 -------------------------------------------
 

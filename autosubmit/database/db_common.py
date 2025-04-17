@@ -230,7 +230,7 @@ def get_autosubmit_version(expid):
         proc.terminate()
     return result
 
-def last_name_used(test=False, operational=False):
+def last_name_used(test=False, operational=False, evaluation=False):
     """
     Gets last experiment identifier used. Anti-lock version.  
 
@@ -238,11 +238,13 @@ def last_name_used(test=False, operational=False):
     :type test: bool
     :param operational: flag for operational experiments
     :type test: bool
+    :param evaluation: flag for evaluation experiments
+    :type test: bool
     :return: last experiment identifier used, 'empty' if there is none
     :rtype: str
     """
     queue = multiprocessing.Queue(1)
-    proc = multiprocessing.Process(target=fn_wrapper, args=(_last_name_used, queue, test, operational))
+    proc = multiprocessing.Process(target=fn_wrapper, args=(_last_name_used, queue, test, operational, evaluation))
     proc.start()
 
     try:
@@ -272,6 +274,31 @@ def delete_experiment(experiment_id):
     except BaseException:
         raise AutosubmitCritical(
             "The database process exceeded the timeout limit {0}s. Delete experiment {1} failed to complete.".format(TIMEOUT, experiment_id))
+    finally:
+        proc.terminate()
+    return result
+
+def get_experiment_id(name: str) -> int:
+    """
+    Gets the experiment numerical id from the database. Anti-lock version.
+
+    :param name: experiment name
+    :return: experiment numerical id
+    """
+    queue = multiprocessing.Queue(1)
+    proc = multiprocessing.Process(
+        target=fn_wrapper, args=(_get_experiment_id, queue, name)
+    )
+    proc.start()
+
+    try:
+        result = queue.get(True, TIMEOUT)
+    except BaseException:
+        raise AutosubmitCritical(
+            "The database process exceeded the timeout limit {0}s. Get experiment {1} id failed to complete.".format(
+                TIMEOUT, name
+            )
+        )
     finally:
         proc.terminate()
     return result
@@ -451,13 +478,15 @@ def _get_autosubmit_version(expid):
 
 
 
-def _last_name_used(test=False, operational=False):
+def _last_name_used(test=False, operational=False, evaluation=False):
     """
     Gets last experiment identifier used
 
     :param test: flag for test experiments
     :type test: bool
     :param operational: flag for operational experiments
+    :type test: bool
+    :param evaluation: flag for evaluation experiments
     :type test: bool
     :return: last experiment identifier used, 'empty' if there is none
     :rtype: str
@@ -482,11 +511,17 @@ def _last_name_used(test=False, operational=False):
                        'WHERE rowid=(SELECT max(rowid) FROM experiment WHERE name LIKE "o%" AND '
                        'autosubmit_version IS NOT NULL AND '
                        'NOT (autosubmit_version LIKE "%3.0.0b%"))')
+    elif evaluation:
+        cursor.execute('SELECT name '
+                       'FROM experiment '
+                       'WHERE rowid=(SELECT max(rowid) FROM experiment WHERE name LIKE "e%" AND '
+                       'autosubmit_version IS NOT NULL AND '
+                       'NOT (autosubmit_version LIKE "%3.0.0b%"))')
     else:
         cursor.execute('SELECT name '
                        'FROM experiment '
                        'WHERE rowid=(SELECT max(rowid) FROM experiment WHERE name NOT LIKE "t%" AND '
-                       'name NOT LIKE "o%" AND autosubmit_version IS NOT NULL AND '
+                       'name NOT LIKE "o%" AND name NOT LIKE "e%" AND autosubmit_version IS NOT NULL AND '
                        'NOT (autosubmit_version LIKE "%3.0.0b%"))')
     row = cursor.fetchone()
     close_conn(conn, cursor)
@@ -561,6 +596,32 @@ def _update_database(version, cursor):
     Log.info("Update completed")
     return True
 
+def _get_experiment_id(name: str) -> int:
+    """
+    Gets the experiment id from the database
+
+    :param name: experiment name
+    :return: experiment numerical id
+    """
+    if not check_db():
+        return False
+    try:
+        (conn, cursor) = open_conn()
+    except DbException as e:
+        raise AutosubmitCritical(
+            "Could not establish a connection to database", 7001, str(e)
+        )
+    conn.isolation_level = None
+
+    conn.text_factory = str
+    cursor.execute("SELECT id FROM experiment WHERE name=:name", {"name": name})
+    row = cursor.fetchone()
+    close_conn(conn, cursor)
+    if row is None:
+        raise AutosubmitCritical(
+            'The experiment "{0}" does not exist'.format(name), 7005
+        )
+    return row[0]
 
 class DbException(Exception):
     """

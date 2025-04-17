@@ -84,6 +84,7 @@ class EcPlatform(ParamikoPlatform):
         self.check_remote_permissions_cmd = ""
         self.check_remote_permissions_remove_cmd = ""
         self.update_cmds()
+        self.scheduler = scheduler
 
     def update_cmds(self):
         """
@@ -172,6 +173,8 @@ class EcPlatform(ParamikoPlatform):
             self.connected = False
         self.spawn_log_retrieval_process(as_conf)
 
+    def create_a_new_copy(self):
+        return EcPlatform(self.expid, self.name, self.config, self.scheduler)
 
     def restore_connection(self,as_conf):
         """
@@ -195,8 +198,8 @@ class EcPlatform(ParamikoPlatform):
         """
         Tests the connection using the provided configuration.
 
-        Args:
-            as_conf (AutosubmitConfig): The configuration to use for testing the connection.
+        :param as_conf: The configuration to use for testing the connection.
+        :type as_conf: AutosubmitConfig
         """
         self.connect(as_conf)
 

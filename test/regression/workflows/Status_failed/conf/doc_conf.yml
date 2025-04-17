@@ -1,0 +1,27 @@
+# SKIPPABLE example https://autosubmit.readthedocs.io/en/master/userguide/defining_workflows/index.html
+
+experiment:
+  DATELIST: "20211024"
+  MEMBERS: "MONARCH SILAM CAMS"
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '1'
+  CALENDAR: standard
+JOBS:
+    GET_FILES:
+        FILE: templates/fail.sh
+        RUNNING: chunk
+
+    IT:
+        FILE: templates/work.sh
+        RUNNING: chunk
+        QUEUE: debug
+
+    CALC_STATS:
+        FILE: templates/work.sh
+        DEPENDENCIES:
+          IT:
+          GET_FILES:
+            STATUS: FAILED
+        RUNNING: chunk
+        SYNCHRONIZE: member
