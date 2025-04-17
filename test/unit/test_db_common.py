@@ -1,7 +1,24 @@
-import locale
-import pytest
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+from importlib.resources import read_text
 from pathlib import Path
-from pkg_resources import resource_string
+
+import pytest
 
 from autosubmit.database import db_common
 from autosubmitconfigparser.config.basicconfig import BasicConfig
@@ -40,9 +57,7 @@ def test_db_common(tmp_path: Path, db_engine: str, request):
     is_sqlite = db_engine == "sqlite"
     if is_sqlite:
         # Code copied from ``autosubmit.py``.
-        create_db_query = resource_string(
-            "autosubmit.database", "data/autosubmit.sql"
-        ).decode(locale.getlocale()[1])
+        create_db_query = read_text("autosubmit.database.data", "autosubmit.sql")
 
     assert db_common.create_db(create_db_query)
 

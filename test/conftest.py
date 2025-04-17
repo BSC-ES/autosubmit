@@ -21,6 +21,7 @@ import pwd
 from dataclasses import dataclass
 from fileinput import FileInput
 from pathlib import Path
+from random import randint
 from re import sub
 from textwrap import dedent
 from time import time
@@ -30,6 +31,7 @@ import pytest
 from pytest_mock import MockerFixture
 from ruamel.yaml import YAML
 from sqlalchemy import Connection, create_engine, text
+from testcontainers.postgres import PostgresContainer
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
@@ -40,9 +42,9 @@ if TYPE_CHECKING:
     from py._path.local import LocalPath  # type: ignore
 
 
-DEFAULT_DATABASE_CONN_URL = (
-    "postgresql://postgres:mysecretpassword@localhost:5432/autosubmit_test"
-)
+_PG_USER = 'postgres'
+_PG_PASSWORD = 'postgres'
+_PG_DATABASE = 'autosubmit_test'
 
 
 @dataclass
@@ -530,18 +532,29 @@ def _setup_pg_db(conn: Connection) -> None:
 
 
 @pytest.fixture
-def as_db_postgres(monkeypatch: pytest.MonkeyPatch) -> Generator[BasicConfig, Any, None]:
+def pg_random_port() -> int:
+    return randint(5000, 7000)
+
+
+def _get_pg_connection_url(port):
+    """Get the PostgreSQL connection string."""
+
+    return f'postgresql://{_PG_USER}:{_PG_PASSWORD}@localhost:{port}/{_PG_USER}'
+
+
+@pytest.fixture
+def as_db_postgres(monkeypatch: pytest.MonkeyPatch, pg_random_port: int) -> Generator[BasicConfig, Any, None]:
     """Fixture to set up and tear down a Postgres database for testing.
     It will overwrite the ``BasicConfig`` to use Postgres.
     It uses the environment variable ``PYTEST_DATABASE_CONN_URL`` to connect to the database.
     If the variable is not set, it uses the default connection URL.
     Args:
         monkeypatch: Monkey Patcher.
+        pg_random_port (int): Postgres server random port.
     Returns:
         Autosubmit configuration for Postgres.
     """
-
-    conn_url = os.environ.get("PYTEST_DATABASE_CONN_URL", DEFAULT_DATABASE_CONN_URL)
+    conn_url = _get_pg_connection_url(pg_random_port)
 
     # Apply patch BasicConfig
     monkeypatch.setattr(BasicConfig, "read", _identity_value())
@@ -552,14 +565,17 @@ def as_db_postgres(monkeypatch: pytest.MonkeyPatch) -> Generator[BasicConfig, An
         conn_url,
     )
 
-    # Setup database
-    with create_engine(conn_url).connect() as conn:
-        _setup_pg_db(conn)
-        conn.commit()
+    image = 'postgres:17'
+    with PostgresContainer(
+            image=image,
+            port=5432,
+            username=_PG_USER,
+            password=_PG_PASSWORD,
+            dbname=_PG_DATABASE)\
+            .with_bind_ports(5432, pg_random_port):
+        # Setup database
+        with create_engine(conn_url).connect() as conn:
+            _setup_pg_db(conn)
+            conn.commit()
 
-    yield BasicConfig
-
-    # Teardown database
-    with create_engine(conn_url).connect() as conn:
-        _setup_pg_db(conn)
-        conn.commit()
+        yield BasicConfig
