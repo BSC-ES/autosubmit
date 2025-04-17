@@ -34,15 +34,6 @@ class SgePlatform(ParamikoPlatform):
     :type expid: str
     """
 
-    def get_checkAlljobs_cmd(self, jobs_id):
-        pass
-
-    def parse_Alljobs_output(self, output, job_id):
-        pass
-
-    def parse_queue_reason(self, output, job_id):
-        pass
-
     def __init__(self, expid, name, config):
         ParamikoPlatform.__init__(self, expid, name, config)
         self.mkdir_cmd = None
@@ -61,9 +52,6 @@ class SgePlatform(ParamikoPlatform):
                                      'ds', 'dS', 'dT', 'dRs', 'dRS', 'dRT']
         self._pathdir = "\$HOME/LOG_" + self.expid
         self.update_cmds()
-
-    def submit_Script(self, hold=False):
-        pass
 
     def update_cmds(self):
         """

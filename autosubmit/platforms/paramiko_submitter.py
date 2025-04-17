@@ -44,9 +44,6 @@ class ParamikoSubmitter(Submitter):
     def __init__(self):
         self.platforms = None
 
-    def load_platforms_migrate(self, asconf, retries=5):
-        pass  # Add all info related to migrate
-
     def load_local_platform(self, asconf):
         platforms = dict()
         # Build Local Platform Object
