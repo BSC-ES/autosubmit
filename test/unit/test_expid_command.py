@@ -101,7 +101,6 @@ def test_copy_minimal(has_min_yaml, autosubmit_exp, autosubmit):
         content = minimal2.read_text()
         assert content == "test", f"Unexpected content: {content}"
     else:
-        print(minimal_file)
         minimal_file.unlink()
         with pytest.raises(AutosubmitCritical) as exc_info:
             expid2 = autosubmit.expid(
