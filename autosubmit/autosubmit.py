@@ -1367,7 +1367,7 @@ class Autosubmit:
             if git_repo.lower().find("https") != -1:
                 git_repo = ""
             git_branch = ""
-
+            
         exp_id = ""
         root_folder = os.path.join(BasicConfig.LOCAL_ROOT_DIR)
         if description is None:
@@ -1382,8 +1382,14 @@ class Autosubmit:
             copy_id_folder = os.path.join(root_folder, copy_id)
             if not os.path.exists(copy_id_folder):
                 raise AutosubmitCritical(f"Experiment {copy_id} doesn't exists", 7011)
+            if minimal_configuration:
+                conf_dir = Path(copy_id_folder) / "conf"
+                if not list(conf_dir.glob('minimal.y*')):
+                    raise AutosubmitCritical(
+                            "Cannot copy experiment that does not have a minimal.yml file", 7011)
             exp_id = copy_experiment(copy_id, description, Autosubmit.autosubmit_version, testcase, operational,
                                      evaluation)
+
         else:
             # Create a new experiment from scratch
             exp_id = new_experiment(description, Autosubmit.autosubmit_version, testcase, operational, evaluation)
