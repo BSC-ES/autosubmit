@@ -1157,7 +1157,7 @@ class Job(object):
             Log.warning(f"Log file {logname} does not exist")
             return 0
 
-    def _get_from_total_stats(self, index):
+    def _get_from_total_stats(self, index) -> list[datetime]:
         """
         Returns list of values from given column index position in TOTAL_STATS file associated to job
 
@@ -1166,15 +1166,16 @@ class Job(object):
         :return: list of values in column index position
         :rtype: list[datetime.datetime]
         """
-        log_name = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
+        log_name = Path(f"{self._tmp_path}/{self.name}_TOTAL_STATS")
         lst = []
-        if os.path.exists(log_name):
-            f = open(log_name)
-            lines = f.readlines()
-            for line in lines:
-                fields = line.split()
-                if len(fields) >= index + 1:
-                    lst.append(parse_date(fields[index]))
+        if log_name.exists() and log_name.stat().st_size > 0:
+            with open(log_name) as f:
+                lines = f.readlines()
+                for line in lines:
+                    fields = line.split()
+                    if len(fields) >= index + 1:
+                        lst.append(parse_date(fields[index]))
+
         return lst
 
     def check_end_time(self, fail_count=-1):

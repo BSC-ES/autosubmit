@@ -420,4 +420,22 @@ def test_remote_repo_operational(project_type: str, expid: str, create_as_exp, m
         AutosubmitGit.check_unpushed_changes(expid)
     else:
         with pytest.raises(AutosubmitCritical):
-            AutosubmitGit.check_unpushed_changes(expid)
+            AutosubmitGit.check_unpushed_changes(expid) 
+
+@pytest.mark.parametrize(
+    "git_repo, expected",
+    [
+        ("https://github.com/user/repo.git", True),         # valid GH link
+        ("file:///home/user/project", True),                # valid file link
+        ("not-a-repo-link", False),                         # invalid
+        ("git@github.com:user/repo.git", True),             # SSH format
+        ("user@gitserver.com:user/repo.git", True),         # SSH format
+        ("http://bitbucket.org/user/repo.git", True),       # valid git host
+        ("ftp://invalid/protocol/repo.git", False),         # invalid protocol
+        ("", False),                                        # empty string
+        ("file://", False),                                 # incomplete file URL
+        ("https://github.com/user/repo", False),            # missing .git
+    ]
+)
+def test_valid_git_repo_check(git_repo: str, expected: str) -> None:
+    assert AutosubmitGit.is_git_repo(git_repo) == expected

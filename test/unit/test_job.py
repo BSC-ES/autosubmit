@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import builtins
-import datetime
 import inspect
 import os
 import pwd
@@ -152,6 +151,7 @@ class TestJob:
         incremented_fail_count = self.job.fail_count
 
         assert initial_fail_count + 1 == incremented_fail_count
+
 
     @patch('autosubmitconfigparser.config.basicconfig.BasicConfig')
     def test_header_tailer(self, mocked_global_basic_config: Mock):
@@ -440,7 +440,7 @@ CONFIG:
             with open(Path(temp_dir, f'{expid}/conf/experiment_data.yml'), 'w+') as experiment_data:
                 experiment_data.write(dedent(f'''\
                             CONFIG:
-                              RETRIALS: 0 
+                              RETRIALS: 0
                             DEFAULT:
                               EXPID: {expid}
                               HPCARCH: test
@@ -466,7 +466,7 @@ CONFIG:
                                     PLATFORM: test
                                     RUNNING: once
                                     WALLCLOCK: '00:30'
-                                    MEMORY: 
+                                    MEMORY:
                                         - 0
                                         - 0
                                     NODES:
@@ -474,11 +474,11 @@ CONFIG:
                                         - 1
                                     TASKS:
                                         - 32
-                                        - 32 
+                                        - 32
                                     THREADS:
                                         - 4
                                         - 4
-                                    CUSTOM_DIRECTIVES: 
+                                    CUSTOM_DIRECTIVES:
                                         - ['#SBATCH --export=ALL', '#SBATCH --distribution=block:cyclic', '#SBATCH --exclusive']
                                         - ['#SBATCH --export=ALL', '#SBATCH --distribution=block:cyclic:fcyclic', '#SBATCH --exclusive']
                 '''))
@@ -830,7 +830,7 @@ CONFIG:
                 with open(Path(temp_dir, f'{expid}/conf/minimal.yml'), 'w+') as minimal:
                     minimal.write(dedent(f'''\
                     CONFIG:
-                      RETRIALS: 0 
+                      RETRIALS: 0
                     DEFAULT:
                       EXPID: {expid}
                       HPCARCH: test
@@ -1067,6 +1067,51 @@ CONFIG:
         assert "FALSE" == parameters['CHUNK_FIRST']
         assert "FALSE" == parameters['CHUNK_LAST']
 
+    def test_get_from_total_stats(self):
+        """
+        test of the function get_from_total_stats validating the file generation
+        :return:
+        """
+        for creation_file in [False, True]:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                mocked_basic_config = FakeBasicConfig
+                mocked_basic_config.read = MagicMock()
+                mocked_basic_config.LOCAL_ROOT_DIR = str(temp_dir)
+
+                self.job._tmp_path = str(temp_dir)
+
+                log_name = Path(f"{mocked_basic_config.LOCAL_ROOT_DIR}/{self.job.name}_TOTAL_STATS")
+                Path(mocked_basic_config.LOCAL_ROOT_DIR).mkdir(parents=True, exist_ok=True)
+
+                if creation_file:
+                    with open(log_name, 'w+') as f:
+                        f.write(dedent('''\
+                            DEFAULT:
+                                DATE: 1998
+                                EXPID: 199803
+                                HPCARCH: 19980324
+                            '''))
+                        f.flush()
+
+                lst = self.job._get_from_total_stats(1)
+
+            if creation_file:
+                assert len(lst) == 3
+
+                fmt = '%Y-%m-%d %H:%M'
+                expected = [
+                    datetime(1998, 1, 1, 0, 0),
+                    datetime(1998, 3, 1, 0, 0),
+                    datetime(1998, 3, 24, 0, 0)
+                ]
+
+                for left, right in zip(lst, expected):
+                    assert left.strftime(fmt) == right.strftime(fmt)
+            else:
+                assert lst == []
+                assert not log_name.exists()
+
+
     def test_sdate(self):
         """Test that the property getter for ``sdate`` works as expected."""
         for test in [
@@ -1154,7 +1199,7 @@ CONFIG:
             with open(Path(temp_dir, f'{expid}/conf/minimal.yml'), 'w+') as minimal:
                 minimal.write(dedent(f'''\
                 CONFIG:
-                  RETRIALS: 0 
+                  RETRIALS: 0
                 DEFAULT:
                   EXPID: {expid}
                   HPCARCH: test
@@ -1174,7 +1219,7 @@ CONFIG:
                   CHUNKINI: ''
                   # Calendar used for the experiment. Can be standard or noleap.
                   CALENDAR: standard
-                    
+
                 JOBS:
                   A:
                     FILE: a
