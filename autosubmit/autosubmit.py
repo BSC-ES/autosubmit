@@ -1,4 +1,4 @@
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -330,8 +330,6 @@ class Autosubmit:
                                    default=False, help='Disable transitive reduction')
             subparser.add_argument('-v', '--update_version', action='store_true',
                                    default=False, help='Update experiment version')
-            subparser.add_argument('-db', '--database', action='store_true',
-                                   default=False, help='Use database for statistics')
             # Clean
             subparser = subparsers.add_parser(
                 'clean', description="clean specified experiment")
@@ -739,7 +737,7 @@ class Autosubmit:
                                       args.txt_logfiles, args.profile, detail=False)
         elif args.command == 'stats':
             return Autosubmit.statistics(args.expid, args.filter_type, args.filter_period, args.output,
-                                         args.section_summary, args.jobs_summary, args.hide, args.notransitive, args.database)
+                                         args.section_summary, args.jobs_summary, args.hide, args.notransitive)
         elif args.command == 'clean':
             return Autosubmit.clean(args.expid, args.project, args.plot, args.stats)
         elif args.command == 'recovery':
@@ -2880,9 +2878,11 @@ class Autosubmit:
                     Log.info("Plotting stats...")
                     monitor_exp = Monitor()
                     # noinspection PyTypeChecker
-                    monitor_exp.generate_output_stats(expid, jobs, file_format, section_summary, jobs_summary, not hide, period_ini, period_fi, not hide,
-                                                      queue_time_fixes)
-                    Log.result("Stats plot ready")
+                    report_created = monitor_exp.generate_output_stats(expid, jobs, file_format, hide, section_summary,
+                                                                       jobs_summary, period_ini, period_fi,
+                                                                       queue_time_fixes)
+                    report_message = "Statistics plot ready" if report_created else "No statistics plot produced."
+                    Log.result(report_message)
                 except Exception as e:
                     raise AutosubmitCritical(
                         "Stats couldn't be shown", 7061, str(e))
@@ -2893,48 +2893,52 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def clean(expid, project, plot, stats):
-        """
-        Clean experiment's directory to save storage space.
+    def clean(expid: str, project: bool, plot: bool, stats: bool) -> bool:
+        """Clean the experiment directory to save storage space.
+
         It removes project directory and outdated plots or stats.
 
-        :type plot: bool
+        When it deletes plots or stats, it keeps the two newest files
+        (i.e. two newest statistics files, and two newest plot files).
+
+        :param expid: The experiment ID.
+        :type: str
+        :param project: Whether to clean the experiment project folder or not.
         :type project: bool
-        :type expid: str
+        :param plot: Whether to delete plot files (keeping two newest) or not.
+        :type plot: bool
+        :param stats: Whether to delete statistics files (keeping two newest) or not.
         :type stats: bool
-        :param expid: identifier of experiment to clean
-        :param project: set True to delete project directory
-        :param plot: set True to delete outdated plots
-        :param stats: set True to delete outdated stats
+        :return: ``True`` is the command ran successfully and ``False`` otherwise.
+        :rtype: bool
+        :raises: AutosubmitCritical if anything goes wrong cleaning the experiment folders.
         """
-        from .monitor.monitor import Monitor
+        from .monitor.monitor import clean_plot, clean_stats
 
         try:
-            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
-
             if project:
-                autosubmit_config = AutosubmitConfig(
-                    expid, BasicConfig, YAMLParserFactory())
+                autosubmit_config = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
                 autosubmit_config.check_conf_files(False)
 
                 project_type = autosubmit_config.get_project_type()
                 if project_type == "git":
                     Log.info("Registering commit SHA...")
                     autosubmit_config.set_git_project_commit(autosubmit_config)
-                    autosubmit_git = AutosubmitGit(expid[0])
+                    autosubmit_git = AutosubmitGit(expid)
                     Log.info("Cleaning GIT directory...")
                     if not autosubmit_git.clean_git(autosubmit_config):
                         return False
+                    Log.result("Git project cleaned!\n")
                 else:
                     Log.info("No project to clean...\n")
             if plot:
                 Log.info("Cleaning plots...")
-                monitor_autosubmit = Monitor()
-                monitor_autosubmit.clean_plot(expid)
+                clean_plot(expid)
+                Log.result("Plots cleaned!\n")
             if stats:
                 Log.info("Cleaning stats directory...")
-                monitor_autosubmit = Monitor()
-                monitor_autosubmit.clean_stats(expid)
+                clean_stats(expid)
+                Log.result("Plots cleaned!\n")
         except BaseException as e:
             raise AutosubmitCritical("Couldn't clean this experiment, check if you have the correct permissions", 7012,
                                      str(e))
@@ -5342,7 +5346,7 @@ class Autosubmit:
                                     current_length) + " jobs.")
                         else:
                             Log.info(job_list.print_with_status(
-                                statusChange=performed_changes))
+                                status_change=performed_changes))
                 else:
                     Log.warning("No changes were performed.")
 
@@ -5733,9 +5737,9 @@ class Autosubmit:
 
         open(as_conf.experiment_file, 'wb').write(content)
 
-
+    # TODO: To be moved to utils
     @staticmethod
-    def load_job_list(expid, as_conf, notransitive=False, monitor=False, new = True): # To be moved to utils
+    def load_job_list(expid, as_conf, notransitive=False, monitor=False, new=True) -> JobList:
         rerun = as_conf.get_rerun()
         job_list = JobList(expid, as_conf, YAMLParserFactory(),
                            Autosubmit._get_job_list_persistence(expid, as_conf))

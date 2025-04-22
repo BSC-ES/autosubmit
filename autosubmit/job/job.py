@@ -1,30 +1,22 @@
-#!/usr/bin/env python3
-
-# Copyright 2017-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
-# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
-"""
-Main module for Autosubmit. Only contains an interface class to all functionality implemented on Autosubmit
-"""
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/
 
 from collections import OrderedDict
-from pathlib import Path
 
-from autosubmit.job import job_utils
 import copy
 import datetime
 import json
@@ -35,12 +27,14 @@ import textwrap
 import time
 from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, Log, subs_dates
 from functools import reduce
+from pathlib import Path
 from threading import Thread
 from time import sleep
-from typing import List, Union, Dict, Tuple
+from typing import Optional, Tuple
 
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
+from autosubmit.job import job_utils
 from autosubmit.job.job_common import StatisticsSnippetBash, StatisticsSnippetPython
 from autosubmit.job.job_common import StatisticsSnippetR, StatisticsSnippetEmpty
 from autosubmit.job.job_common import Status, Type, increase_wallclock_by_chunk
@@ -208,8 +202,8 @@ class Job(object):
         self._partition = None
         self.retry_delay = None
         #: (str): Type of the job, as given on job configuration file. (job: TASKTYPE)
-        self._section = None # type: str
-        self._wallclock = None # type: str
+        self._section: Optional[str] = None
+        self._wallclock: Optional[str] = None
         self.wchunkinc = None
         self._tasks = None
         self._nodes = None
@@ -249,9 +243,9 @@ class Job(object):
         self.priority = priority
         self._parents = set()
         self._children = set()
-        #: (int) Number of failed attempts to run this job. (FAIL_COUNT)
         self._fail_count = 0
-        self.expid = name.split('_')[0] # type: str
+        """Number of failed attempts to run this job. (FAIL_COUNT)"""
+        self.expid: str = name.split('_')[0]
         self._tmp_path = os.path.join(
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
         self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
@@ -1209,10 +1203,11 @@ class Job(object):
         """
         return self._get_from_total_stats(1)
 
-    def get_last_retrials(self):
-        # type: () -> List[Union[datetime.datetime, str]]
-        """
-        Returns the retrials of a job, including the last COMPLETED run. The selection stops, and does not include, when the previous COMPLETED job is located or the list of registers is exhausted.
+    def get_last_retrials(self) -> list[list[datetime.datetime]]:
+        """Returns the retrials of a job, including the last COMPLETED run.
+
+        The selection stops, and does not include when the previous COMPLETED job
+        is located or the list of registers is exhausted.
 
         :return: list of dates of retrial [submit, start, finish] in datetime format
         :rtype: list of list
@@ -1354,14 +1349,14 @@ class Job(object):
             except BaseException as e:
                 Log.printlog("Trace {0} \n Failed to write the {1} e=6001".format(str(e), self.name))
 
-    def retrieve_logfiles(self, raise_error: bool = False) -> Dict[str, int]:
+    def retrieve_logfiles(self, raise_error: bool = False) -> dict[str, int]:
         """
         Retrieves log files from remote host.
 
         :param raise_error: If True, raises an error if the log files are not retrieved.
         :type raise_error: bool
         :return: Dictionary with finish timestamps per job.
-        :rtype: Dict[str, int]
+        :rtype: dict[str, int]
         """
         backup_logname = copy.copy(self.local_logs)
         if self.wrapper_type == "vertical":

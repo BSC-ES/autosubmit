@@ -1,18 +1,65 @@
-#!/bin/env/python
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 from datetime import datetime, timedelta
-from .utils import timedelta2hours
+from math import ceil
+from typing import Optional
+
+from autosubmit.statistics.utils import timedelta2hours
 from log.log import Log
-import math
+
+
+def _estimate_requested_nodes(nodes, processors, tasks, processors_per_node) -> int:
+    if str(nodes).isdigit():
+        return int(nodes)
+    elif str(tasks).isdigit():
+        return ceil(int(processors) / int(tasks))
+    elif str(processors_per_node).isdigit() and int(processors) > int(processors_per_node):
+        return ceil(int(processors) / int(processors_per_node))
+    else:
+        return 1
+
+
+def _calculate_processing_elements(nodes, processors, tasks, processors_per_node, exclusive) -> int:
+    if str(processors_per_node).isdigit():
+        if str(nodes).isdigit():
+            return int(nodes) * int(processors_per_node)
+        else:
+            estimated_nodes = _estimate_requested_nodes(nodes, processors, tasks, processors_per_node)
+            if not exclusive and estimated_nodes <= 1 and int(processors) <= int(processors_per_node):
+                return int(processors)
+            else:
+                return estimated_nodes * int(processors_per_node)
+    elif str(tasks).isdigit() or str(nodes).isdigit():
+        Log.warning(f'Missing PROCESSORS_PER_NODE. Should be set if TASKS or NODES are defined. '
+                    f'The PROCESSORS will used instead.')
+    return int(processors)
+
 
 class JobStat(object):
-    def __init__(self, name, processors, wallclock, section, date, member, chunk, processors_per_node, tasks, nodes, exclusive ):
-        # type: (str, int, float, str, str, str, str, str, str , str, str) -> None
+    def __init__(self, name: str, processors: int, wallclock: float, section: str, date: str,
+                 member: str, chunk: str, processors_per_node: str, tasks: str, nodes: str,
+                 exclusive: str):
         self._name = name
-        self._processors = self._calculate_processing_elements(nodes, processors, tasks, processors_per_node, exclusive)
+        self._processors = _calculate_processing_elements(nodes, processors, tasks, processors_per_node, exclusive)
         self._wallclock = wallclock
-        self.submit_time = None # type: datetime
-        self.start_time = None # type: datetime
-        self.finish_time = None # type: datetime
+        self.submit_time: Optional[datetime] = None
+        self.start_time: Optional[datetime] = None
+        self.finish_time: Optional[datetime] = None
         self.completed_queue_time = timedelta()
         self.completed_run_time = timedelta()
         self.failed_queue_time = timedelta()
@@ -24,30 +71,6 @@ class JobStat(object):
         self.date = date
         self.member = member
         self.chunk = chunk
-
-    def _estimate_requested_nodes(self,nodes,processors,tasks,processors_per_node) -> int:
-        if str(nodes).isdigit():
-            return int(nodes)
-        elif str(tasks).isdigit():
-            return math.ceil(int(processors) / int(tasks))
-        elif str(processors_per_node).isdigit() and int(processors) > int(processors_per_node):
-            return math.ceil(int(processors) / int(processors_per_node))
-        else:
-            return 1
-
-    def _calculate_processing_elements(self,nodes,processors,tasks,processors_per_node,exclusive) -> int:
-        if str(processors_per_node).isdigit():
-            if str(nodes).isdigit():
-                return int(nodes) * int(processors_per_node)
-            else:
-                estimated_nodes = self._estimate_requested_nodes(nodes,processors,tasks,processors_per_node)
-                if not exclusive and estimated_nodes <= 1 and int(processors) <= int(processors_per_node):
-                    return int(processors)
-                else:
-                    return estimated_nodes * int(processors_per_node)
-        elif (str(tasks).isdigit() or str(nodes).isdigit()):
-            Log.warning(f'Missing PROCESSORS_PER_NODE. Should be set if TASKS or NODES are defined. The PROCESSORS will used instead.')
-        return int(processors)
 
     def inc_retrial_count(self):
         self.retrial_count += 1

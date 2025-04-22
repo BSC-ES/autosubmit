@@ -3028,16 +3028,16 @@ class JobList(object):
             self.update_genealogy()
         del self._dic_jobs
 
-    def print_with_status(self, status_change=None, nocolor=False, existing_list=None) -> str:
+    def print_with_status(self, status_change: Optional[dict[Any, Any]] = None, nocolor=False, existing_list=None) -> str:
         """
         Returns the string representation of the dependency tree of the Job List
 
         :param status_change: List of changes in the list, supplied in set status
-        :type status_change: List of strings
+        :type status_change: dict
         :param nocolor: True if the result should not include color codes
         :type nocolor: Boolean
-        :param existingList: External List of Jobs that will be printed, this excludes the inner list of jobs.
-        :type existingList: List of Job Objects
+        :param existing_list: External List of Jobs that will be printed, this excludes the inner list of jobs.
+        :type existing_list: List of Job Objects
         :return: String representation of the Job List
         :rtype: String
         """
@@ -3046,7 +3046,7 @@ class JobList(object):
         all_jobs = self.get_all() if existing_list is None else existing_list
         # Header
         result = (bcolors.BOLD if nocolor is False else '') + \
-                 "## String representation of Job List [" + str(len(all_jobs)) + "] "
+            "## String representation of Job List [" + str(len(all_jobs)) + "] "
         if status_change is not None and len(str(status_change)) > 0:
             result += ("with " + (bcolors.OKGREEN if nocolor is False else '') +
                        str(len(list(status_change.keys()))) + " Change(s) ##" +
@@ -3069,7 +3069,6 @@ class JobList(object):
             else:
                 result += "\nCannot find root."
         return result
-
 
     def __repr__(self):
         """

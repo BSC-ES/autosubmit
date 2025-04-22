@@ -94,12 +94,20 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install system dependencies
-        run: sudo apt-get install -y graphviz rsync curl
+        run: sudo apt-get install -y curl git graphviz rsync
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip packaging setuptools twine
           pip install --upgrade -e .[all]
+
+      - name: Set up Git
+        run: |
+          # From: https://stackoverflow.com/questions/62960533/how-to-use-git-commands-during-a-github-action
+          # Set up dummy configuration for integration tests.
+          git --version
+          git config --global user.email "test@bsc.es"
+          git config --global user.name "GitHub Actions"
 
       # In GitHub Actions we run all the integration tests, including those that require
       # dependencies such as Docker (see `-m ''`, which means all markers). Read the
@@ -142,7 +150,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install system dependencies
-        run: sudo apt-get install -y graphviz rsync curl
+        run: sudo apt-get install -y curl graphviz rsync
 
       - name: Install dependencies
         run: |

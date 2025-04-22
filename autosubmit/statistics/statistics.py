@@ -1,10 +1,27 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/
+
 from datetime import datetime, timedelta
-from typing import List, Dict, Union
+from typing import Union
 
 from autosubmit.job.job import Job
-from .jobs_stat import JobStat
-from .stats_summary import StatsSummary
-from .utils import timedelta2hours, parse_number_processors
+from autosubmit.statistics.jobs_stat import JobStat
+from autosubmit.statistics.stats_summary import StatsSummary
+from autosubmit.statistics.utils import timedelta2hours, parse_number_processors
 
 _COMPLETED_RETRIAL = 1
 _FAILED_RETRIAL = 0
@@ -14,34 +31,33 @@ class Statistics:
 
     def __init__(
             self,
-            jobs: List[Job],
+            jobs: list[Job],
             start: datetime,
             end: datetime,
-            queue_time_fix: [],
+            queue_time_fix: dict[str, int],
             jobs_stat=None
     ) -> None:
         self._jobs = jobs
         self._start = start
         self._end = end
         self._queue_time_fixes = queue_time_fix
-        self._name_to_jobstat_dict = dict()  # type: Dict[str, JobStat]
-        self.jobs_stat = []
+        self._name_to_jobstat_dict: dict[str, JobStat] = dict()
+        self.jobs_stat = jobs_stat
         # Old format
-        self.max_time = 0.0  # type: float
-        self.max_fail = 0  # type: int
-        self.start_times = []  # type: List[Union[datetime, None]]
-        self.end_times = []  # type: List[Union[datetime, None]]
-        self.queued = []  # type: List[timedelta]
-        self.run = []  # type: List[timedelta]
-        self.failed_jobs = []  # type: List[int]
-        self.fail_queued = []  # type: List[timedelta]
-        self.fail_run = []  # type: List[timedelta]
-        self.wallclocks = []  # type: List[float]
-        self.threshold = 0.0  # type: float
-        self.failed_jobs_dict = {}  # type: Dict[str, int]
+        self.max_time = 0.0
+        self.max_fail = 0
+        self.start_times: list[Union[datetime, None]] = []
+        self.end_times: list[Union[datetime, None]] = []
+        self.queued: list[timedelta] = []
+        self.run: list[timedelta] = []
+        self.failed_jobs: list[int] = []
+        self.fail_queued: list[timedelta] = []
+        self.fail_run: list[timedelta] = []
+        self.wallclocks: list[float] = []
+        self.threshold = 0.0
+        self.failed_jobs_dict: dict[str, int] = {}
         self.summary: StatsSummary = StatsSummary()
         self.totals = [" Description text \n", "Line 1"]
-
 
     def calculate_statistics(self) -> "Statistics":
         for index, job in enumerate(self._jobs):
@@ -98,7 +114,7 @@ class Statistics:
         return self
 
     def make_old_format(self) -> "Statistics":
-        """ Makes old format """
+        """Make the data compatible to the old format."""
         self.start_times = [job.start_time for job in self.jobs_stat]
         self.end_times = [job.finish_time for job in self.jobs_stat]
         self.queued = [timedelta2hours(job.completed_queue_time) for job in self.jobs_stat]

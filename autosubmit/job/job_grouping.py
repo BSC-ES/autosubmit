@@ -20,10 +20,22 @@
 from autosubmit.job.job_common import Status
 from bscearth.utils.date import date2str
 import copy
+from typing import Any, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from autosubmit.job.job import Job
+    from autosubmit.job.job_list import JobList
+
 
 class JobGrouping(object):
 
-    def __init__(self, group_by, jobs, job_list, expand_list=list(), expanded_status=list()):
+    def __init__(self, group_by, jobs: list["Job"], job_list: "JobList", expand_list: Optional[list] = None,
+                 expanded_status: Optional[list] = None):
+        if not expand_list:
+            expand_list = []
+        if not expanded_status:
+            expanded_status = []
+
         self.group_by = group_by
         self.jobs = jobs
         self.job_list = job_list
@@ -34,7 +46,7 @@ class JobGrouping(object):
         self.group_status_dict = dict()
         self.ungrouped_jobs = list()
 
-    def group_jobs(self):
+    def group_jobs(self) -> dict[str, Any]:
         if self.expand_list:
             self._set_expanded_jobs()
 

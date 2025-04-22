@@ -14,19 +14,26 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Tests for the Autosubmit diagram creator class."""
+
 import datetime
 
 import pytest
+from matplotlib.patches import Rectangle
 
 from autosubmit.job.job import Job
-from autosubmit.monitor import diagram
-from autosubmit.monitor.diagram import JobData, JobAggData
+from autosubmit.job.job_common import Status
+from autosubmit.monitor.diagram import (
+    JobData, JobAggData, build_legends, create_bar_diagram, create_csv_stats, create_stats_report, populate_statistics,
+    _get_status, _filter_by_status, _seq
+)
 
-""" Test file for autosubmit/monitor/diagram.py """
+_EXPID = 't001'
 
 
 def test_job_data():
-    """ function to test the Class JobData inside autosubmit/monitor/diagram.py """
+    """Function to test the Class JobData inside autosubmit/monitor/diagram.py"""
     job_data = JobData()
 
     assert job_data.headers() == ['Job Name', 'Queue Time', 'Run Time', 'Status']
@@ -35,7 +42,7 @@ def test_job_data():
 
 
 def test_job_agg_data():
-    """ function to test the Class JobAggData inside autosubmit/monitor/diagram.py """
+    """Function to test the Class JobAggData inside autosubmit/monitor/diagram.py"""
     job_agg = JobAggData()
     assert job_agg.headers() == ['Section', 'Count', 'Queue Sum', 'Avg Queue', 'Run Sum', 'Avg Run']
     assert job_agg.values() == [{}, 0, datetime.timedelta(0), datetime.timedelta(0),
@@ -44,23 +51,21 @@ def test_job_agg_data():
 
 
 def test_seq():
-    """
-    function to test the Class JobData inside autosubmit/monitor/diagram.py
-    """
-    seq = [x for x in diagram._seq(100, 2, 10)]
+    """Function to test the Class JobData inside autosubmit/monitor/diagram.py"""
+    seq = [x for x in _seq(100, 2, 10)]
     assert len(seq) == 9
     assert all([x for x in seq if isinstance(x, int)])
 
 
 @pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
 def test_populate_statistics(create_jobs):
-    """ function to test the Class JobData inside autosubmit/monitor/diagram.py """
+    """Function to test the Class JobData inside autosubmit/monitor/diagram.py"""
 
     date_ini = datetime.datetime.now()
     date_fin = date_ini + datetime.timedelta(10.10)
     queue_time_fixes = {'test': 5, 'test1': 50, 'test2': 500, 'test3': 5000, 'test4': 50000}
 
-    statistics = diagram.populate_statistics(create_jobs, date_ini, date_fin, queue_time_fixes)
+    statistics = populate_statistics(create_jobs, date_ini, date_fin, queue_time_fixes)
     for job_stat in statistics.jobs_stat:
         assert ('example_name_' in job_stat.name and
                 'example_member_' in job_stat.member)
@@ -73,123 +78,200 @@ def test_populate_statistics(create_jobs):
 
 @pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
 def test_create_stats_report(create_jobs, tmp_path, mocker):
-    """ function to test the function create_stats_report inside autosubmit/monitor/diagram.py """
+    """Function to test the function create_stats_report inside autosubmit/monitor/diagram.py"""
 
-    expid = "a000"
     period_ini = datetime.datetime.now()
     period_fi = period_ini + datetime.timedelta(10)
     tmp_path_pdf = tmp_path / "report.pdf"
     tmp_path_csv = tmp_path / "report.csv"
 
     mocker.patch('autosubmit.monitor.diagram._create_table')
-    diagram.create_stats_report(expid, create_jobs, [], str(tmp_path_pdf), True, True, False, period_ini, period_fi, {
-        'test': 1, 'test1': 5, 'test2': 50, 'test3': 500, 'test4': 5000})
+    create_stats_report(
+        expid=_EXPID,
+        jobs_list=create_jobs,
+        output_file=str(tmp_path_pdf),
+        section_summary=True,
+        jobs_summary=True,
+        period_ini=period_ini,
+        period_fi=period_fi,
+        queue_fix_times={'test': 1, 'test1': 5, 'test2': 50, 'test3': 500, 'test4': 5000})
     assert tmp_path.exists()
     assert tmp_path_pdf.exists()
     assert tmp_path_csv.exists()
 
 
 def test_create_csv_stats(tmpdir):
-    """ function to test the Function create_csv_stats inside autosubmit/monitor/diagram.py """
+    """Function to test the Function create_csv_stats inside autosubmit/monitor/diagram.py"""
 
     jobs_data = [
-        Job('test', "a000", "COMPLETED", 200),
-        Job('test', "a000", "COMPLETED", 200),
-        Job('test', "a000", "COMPLETED", 200),
-        Job('test', "a000", "FAILED", 10)
+        Job('test', _EXPID, "COMPLETED", 200),
+        Job('test', _EXPID, "COMPLETED", 200),
+        Job('test', _EXPID, "COMPLETED", 200),
+        Job('test', _EXPID, "FAILED", 10)
     ]
 
     date_ini = datetime.datetime.now()
     date_fin = date_ini + datetime.timedelta(0.10)
-    queue_time_fixes = ['test', 5]
+    queue_time_fixes = {
+        'test': 5
+    }
 
-    statistics = diagram.populate_statistics(jobs_data, date_ini, date_fin, queue_time_fixes)
+    statistics = populate_statistics(jobs_data, date_ini, date_fin, queue_time_fixes)
     file_tmpdir = tmpdir + '.pdf'
-    diagram.create_csv_stats(statistics, jobs_data, str(file_tmpdir))
+    create_csv_stats(statistics, jobs_data, str(file_tmpdir))
 
     tmpdir += '.csv'
     assert tmpdir.exists()
 
 
 def test_build_legends(mocker):
-    """ function to test the function build_legends inside autosubmit/monitor/diagram.py """
+    """Function to test the function build_legends inside autosubmit/monitor/diagram.py"""
 
     jobs_data = [
-        Job('test', "a000", "COMPLETED", 200),
-        Job('test', "a000", "COMPLETED", 200),
-        Job('test', "a000", "COMPLETED", 200),
-        Job('test', "a000", "FAILED", 10)
+        Job('test', _EXPID, "COMPLETED", 200),
+        Job('test', _EXPID, "COMPLETED", 200),
+        Job('test', _EXPID, "COMPLETED", 200),
+        Job('test', _EXPID, "FAILED", 10)
     ]
     date_ini = datetime.datetime.now()
     date_fin = date_ini + datetime.timedelta(0.10)
     queue_time_fixes = {'test': 5}
 
-    statistics = diagram.populate_statistics(jobs_data, date_ini, date_fin, queue_time_fixes)
-    react = [['dummy'], [''], ['test']]
-    general_stats = [('status', 'status2'), ('status', 'status2'), ('status', 'status2')]
+    statistics = populate_statistics(jobs_data, date_ini, date_fin, queue_time_fixes)
+    react = [[Rectangle((0.0, 0.0), 0, 0)], [None], [Rectangle((0.0, 0.0), 0, 0)]]
     plot = mocker.Mock()
 
-    number_of_legends = diagram.build_legends(plot, react, statistics, general_stats)
+    number_of_legends = build_legends(plot, react, statistics)
     assert plot.legend.call_count == number_of_legends
 
 
-@pytest.mark.parametrize("job_stats, failed_jobs, failed_jobs_dict, num_plots, result", [
-    (
-            ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED"],
-            [0, 0, 0, 1],
-            {"a26z": 1},
-            40,
-            True
-    ), (
-            ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED"],
-            [0, 0, 0, 1],
-            {"a26z": 1},
-            0,
-            False
-    ), (
-            ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED", "COMPLETED", "COMPLETED", "COMPLETED",
-             "FAILED", "COMPLETED", "COMPLETED", "COMPLETED", "FAILED", "COMPLETED", "COMPLETED",
-             "COMPLETED", "FAILED", "COMPLETED", "COMPLETED", "COMPLETED", "FAILED", "COMPLETED",
-             "COMPLETED", "COMPLETED", "FAILED", "COMPLETED", "COMPLETED", "COMPLETED", "FAILED",
-             "COMPLETED", "COMPLETED", "COMPLETED", "FAILED"],
-            [0, 0, 0, 1],
-            {"a26z": 1},
-            10,
-            True
-    ), (
-            [],
-            [0, 0, 0, 1],
-            {},
-            40,
-            True
-    ), (
-            [],
-            [],
-            {},
-            40,
-            True
-    ),
-],
-                         ids=['all run', 'divided by zero', 'run with continue', 'fail job_dict', 'no run'])
+@pytest.mark.parametrize(
+    'job_stats,failed_jobs,failed_jobs_dict,num_plots,result',
+    [
+        (
+                ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED"],
+                [0, 0, 0, 1],
+                {"a26z": 1},
+                40,
+                True
+        ), (
+                ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED"],
+                [0, 0, 0, 1],
+                {"a26z": 1},
+                0,
+                False
+        ), (
+                ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED", "COMPLETED", "COMPLETED", "COMPLETED",
+                 "FAILED", "COMPLETED", "COMPLETED", "COMPLETED", "FAILED", "COMPLETED", "COMPLETED",
+                 "COMPLETED", "FAILED", "COMPLETED", "COMPLETED", "COMPLETED", "FAILED", "COMPLETED",
+                 "COMPLETED", "COMPLETED", "FAILED", "COMPLETED", "COMPLETED", "COMPLETED", "FAILED",
+                 "COMPLETED", "COMPLETED", "COMPLETED", "FAILED"],
+                [0, 0, 0, 1],
+                {"a26z": 1},
+                10,
+                True
+        ), (
+                [],
+                [0, 0, 0, 1],
+                {},
+                40,
+                True
+        ), (
+                [],
+                [],
+                {},
+                40,
+                False
+        ),
+    ],
+    ids=[
+        'all run',
+        'divided by zero',
+        'run with continue',
+        'fail job_dict',
+        'no run'
+    ]
+)
 def test_create_bar_diagram(job_stats, failed_jobs, failed_jobs_dict, num_plots, result, mocker):
-    """ function to test the function create_bar_diagram inside autosubmit/monitor/diagram.py """
+    """Function to test the function create_bar_diagram inside autosubmit/monitor/diagram.py"""
 
     jobs_data = [
-        Job('test', "a000", "COMPLETED", 200),
-        Job('test', "a000", "COMPLETED", 200),
-        Job('test', "a000", "COMPLETED", 200),
-        Job('test', "a000", "FAILED", 10)
+        Job('test', _EXPID, "COMPLETED", 200),
+        Job('test', _EXPID, "COMPLETED", 200),
+        Job('test', _EXPID, "COMPLETED", 200),
+        Job('test', _EXPID, "FAILED", 10)
     ]
     date_ini = datetime.datetime.now()
     date_fin = date_ini + datetime.timedelta(0.10)
 
-    queue_time_fixes = {'test', 5}
+    queue_time_fixes = {
+        'test': 5
+    }
 
-    status = ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED"]
-    statistics = diagram.populate_statistics(jobs_data, date_ini, date_fin, queue_time_fixes)
+    statistics = populate_statistics(jobs_data, date_ini, date_fin, queue_time_fixes)
     statistics.jobs_stat = job_stats
     statistics.failed_jobs = failed_jobs
     statistics.failed_jobs_dict = failed_jobs_dict
 
     mocker.patch('autosubmit.monitor.diagram.MAX_NUM_PLOTS', num_plots)
-    assert result == diagram.create_bar_diagram("a000", statistics, jobs_data, status)
+    assert result == create_bar_diagram(_EXPID, statistics, jobs_data)
+
+
+def test_populate_statistics_error_returns_none(mocker):
+    """Previously, the function had no ``return None``. This verifies that."""
+    mocked_log = mocker.patch('autosubmit.monitor.diagram.Log')
+    mocker.patch('autosubmit.monitor.diagram.Statistics', side_effect=ValueError)
+    r = populate_statistics([], datetime.datetime.now(), datetime.datetime.now(), {})
+    assert r is None
+    assert mocked_log.warning.call_count == 1
+
+
+def test_create_stats_report_empty_jobs(tmp_path):
+    """Test that an experiment with no jobs (not created, not executed) returns no report."""
+    assert not create_stats_report(_EXPID, jobs_list=[], output_file=str(tmp_path / 'file.txt'),
+                                   section_summary=False, jobs_summary=False)
+
+
+@pytest.mark.parametrize(
+    'jobs,job_name,status,expected',
+    [
+        ([], '', Status.UNKNOWN, None),
+        ([Job('dummy')], 'street', Status.UNKNOWN, None),
+        ([Job('dummy')], 'dummy', Status.UNKNOWN, 'UNKNOWN'),
+    ],
+    ids=[
+        'no jobs, return None',
+        'jobs, but names do not match',
+        'jobs, and names match'
+    ]
+)
+def test_get_status(jobs: list[Job], job_name: str, status: int, expected: str):
+    """Previously, the function had no ``return None``. This verifies that."""
+    for job in jobs:
+        job.status = status
+    if expected is None:
+        assert _get_status(jobs, job_name) is expected
+    else:
+        assert _get_status(jobs, job_name) == expected
+
+
+@pytest.mark.parametrize(
+    'jobs,expected_length',
+    [
+        ([], 0),
+        ([Job('dummy', 1, Status.UNKNOWN)], 0),
+        ([Job('dummy', 1, Status.UNKNOWN), Job('dummy', 1, Status.COMPLETED)], 1),
+        ([Job('dummy', 1, Status.UNKNOWN), Job('dummy', 1, Status.RUNNING)], 1),
+        ([Job('dummy', 1, Status.COMPLETED), Job('dummy', 1, Status.RUNNING)], 2),
+    ],
+    ids=[
+        'no jobs, empty list',
+        'jobs, but none completed or running',
+        'jobs, one completed',
+        'jobs, one running',
+        'jobs, one completed and one running'
+    ]
+)
+def test_filter_by_status(jobs: list[Job], expected_length: int):
+    """Test that jobs are filtered by status (only completed and running)."""
+    assert len(_filter_by_status(jobs)) == expected_length

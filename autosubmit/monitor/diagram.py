@@ -1,44 +1,41 @@
-#!/usr/bin/env python3
-
-# Copyright 2017-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-""" Diagram generator File """
-
 import itertools
-import math
 import traceback
 from collections import defaultdict
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from math import ceil
+from typing import List, Dict, Union, Any, Optional
 
 import matplotlib as mtp
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
-import matplotlib.patches as mpatches
 from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.patches import Rectangle
+from typing_extensions import LiteralString
 
+from autosubmit.job.job import Job
 from autosubmit.statistics.jobs_stat import JobStat
 from autosubmit.statistics.statistics import Statistics
-from autosubmit.job.job import Job
-
 from log.log import Log
-from datetime import datetime, timedelta
-from typing import List, Dict, Union, Any
-from typing_extensions import LiteralString
+
+"""Diagram generator."""
 
 
 mtp.use('Agg')
@@ -130,8 +127,8 @@ def populate_statistics(
         jobs_list: List[Job],
         period_ini: datetime,
         period_fi: datetime,
-        queue_time_fixes: Dict[str, int]
-) -> Statistics:
+        queue_time_fixes: dict[str, int]
+) -> Optional[Statistics]:
     try:
         return (
             Statistics(jobs_list, period_ini, period_fi, queue_time_fixes).
@@ -142,14 +139,15 @@ def populate_statistics(
         )
     except Exception as exp:
         Log.warning(str(exp))
+        return None
 
 
 def create_stats_report(
-        expid: str, jobs_list: List[Job], general_stats: List, output_file: str,
-        section_summary: bool, jobs_summary: bool, hide: bool, period_ini: datetime = None,
+        expid: str, jobs_list: List[Job], output_file: str,
+        section_summary: bool, jobs_summary: bool, period_ini: datetime = None,
         period_fi: datetime = None, queue_fix_times: Dict[str, int] = None
 ) -> bool:
-    """Function to create the stats report.
+    """Function to create the statistics report.
 
     Produces one or more PDF files, depending on the parameters.
 
@@ -159,96 +157,97 @@ def create_stats_report(
     plt.close('all')
 
     exp_stats = populate_statistics(jobs_list, period_ini, period_fi, queue_fix_times)
-    plot = create_bar_diagram(expid, exp_stats, jobs_list, general_stats)
+    plot = create_bar_diagram(expid, exp_stats, jobs_list)
     create_csv_stats(exp_stats, jobs_list, output_file)
 
-    if plot:
-        if section_summary:
-            jobs_data = _aggregate_jobs_by_section(jobs_list, exp_stats.jobs_stat)
-            job_section_output_file = output_file.replace("statistics", "section_summary")
-            headers = JobAggData.headers()
-            _create_table(
-                jobs_data,
-                headers,
-                doc_title=f"SECTION SUMMARY - {expid}",
-                table_title="Aggregated by Job Section"
-            )
-            _create_csv(
-                jobs_data,
-                job_section_output_file,
-                headers
-            )
-            Log.result(f'Section Summary created')
-        if jobs_summary:
-            jobs_data = _get_job_list_data(jobs_list, exp_stats.jobs_stat)
-            jobs_output_file = output_file.replace("statistics", "jobs_summary")
-            headers = JobData.headers()
-            _create_table(
-                jobs_data,
-                headers,
-                doc_title=f"JOBS SUMMARY - {expid}",
-                table_title="Job List"
-            )
-            _create_csv(
-                jobs_data,
-                jobs_output_file,
-                headers
-            )
-            Log.result(f'Jobs Summary created')
+    if not plot:
+        return False
 
-        with PdfPages(output_file) as pdf:
-            for figure_number in plt.get_fignums():
-                plt.figure(figure_number)
-                pdf.savefig()
-                plt.close()
+    if section_summary:
+        jobs_data = _aggregate_jobs_by_section(jobs_list, exp_stats.jobs_stat)
+        job_section_output_file = output_file.replace("statistics", "section_summary")
+        headers = JobAggData.headers()
+        _create_table(
+            jobs_data,
+            headers,
+            doc_title=f"SECTION SUMMARY - {expid}",
+            table_title="Aggregated by Job Section"
+        )
+        _create_csv(
+            jobs_data,
+            job_section_output_file,
+            headers
+        )
+        Log.result(f'Section Summary created')
+    if jobs_summary:
+        jobs_data = _get_job_list_data(jobs_list, exp_stats.jobs_stat)
+        jobs_output_file = output_file.replace("statistics", "jobs_summary")
+        headers = JobData.headers()
+        _create_table(
+            jobs_data,
+            headers,
+            doc_title=f"JOBS SUMMARY - {expid}",
+            table_title="Job List"
+        )
+        _create_csv(
+            jobs_data,
+            jobs_output_file,
+            headers
+        )
+        Log.result(f'Jobs Summary created')
 
-            d = pdf.infodict()
-            d['expid'] = expid
+    with PdfPages(output_file) as pdf:
+        for figure_number in plt.get_fignums():
+            plt.figure(figure_number)
+            pdf.savefig()
+            plt.close()
 
-        Log.result(f'Stats created at {output_file}')
+        d = pdf.infodict()
+        d['expid'] = expid
 
-    return hide
+    Log.result(f'Stats created at {output_file}')
+    return True
 
 
-def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job],
-                       general_stats: List[str]) -> bool:
+def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job]) -> bool:
     """create_bar_diagram Function
 
-    :param
-    :expid: str with the id of a experiment
-    :exp_stats: Statistics of the jobs of the experiment
-    :jobs_list: List[Job] of jobs in the experiment
-    :general_stats: List[str] of status of the jobs
-
+    :param expid: str with the id of an experiment
+    :param exp_stats: Statistics of the jobs of the experiment
+    :param jobs_list: List[Job] of jobs in the experiment
     :return: bool
     """
     # Error prevention
     normal_plots_count = 0
     failed_jobs_plots_count = 0
     try:
-        normal_plots_count = int(math.ceil(len(exp_stats.jobs_stat) / MAX_JOBS_PER_PLOT))
-        failed_jobs_plots_count = int(math.ceil(len(exp_stats.failed_jobs) / MAX_JOBS_PER_PLOT))
+        normal_plots_count = int(ceil(len(exp_stats.jobs_stat) / MAX_JOBS_PER_PLOT))
+        failed_jobs_plots_count = int(ceil(len(exp_stats.failed_jobs) / MAX_JOBS_PER_PLOT))
     except Exception as exp:
         Log.warning(str(exp))
 
     # Plotting
     total_plots_count = normal_plots_count + failed_jobs_plots_count
+
+    if total_plots_count == 0:
+        Log.info("The experiment specified does not have any jobs executed.")
+        return False
+
     width = 0.16
     # Creating stats figure + sanity check
-    err_message = ("The results are too large to be shown, try narrowing your query.\nUse a filter like -ft where you "
-                   "supply a list of job types, e.g. INI, SIM or use the flag -fp where you supply an integer that "
-                   "represents the number of hours into the past that should be queried:\nSuppose it is noon, if you "
-                   "supply -fp 5 the query will consider changes starting from 7:00 am. If you really wish to query the "
-                   "whole experiment, refer to Autosubmit GUI.")
     if total_plots_count > MAX_NUM_PLOTS:
-        Log.info(err_message)
+        Log.info("The results are too large to be shown, try narrowing your query.\nUse a filter like -ft where you "
+                 "supply a list of job types, e.g. INI, SIM or use the flag -fp where you supply an integer that "
+                 "represents the number of hours into the past that should be queried:\nSuppose it is noon, if you "
+                 "supply -fp 5 the query will consider changes starting from 7:00 am. If you really wish to query the "
+                 "whole experiment, refer to Autosubmit GUI.")
         return False
     fig = plt.figure(figsize=(RATIO * 4, 3 * RATIO * total_plots_count))
     fig.suptitle(f'STATS - {expid}', fontsize=24, fontweight='bold')
 
     # Variables initialization
     ax = []
-    rects = [None] * 5
+    rects: list[Union[None, list[Rectangle]]] = [None] * 5
     grid_spec = gridspec.GridSpec(RATIO * total_plots_count + 2, 1)
     i_plot = 0
     for plot in range(1, normal_plots_count + 1):
@@ -323,7 +322,7 @@ def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job],
 
     try:
         # Building legends
-        build_legends(legends_plot, rects, exp_stats, general_stats)
+        build_legends(legends_plot, rects, exp_stats)
     except Exception as exp:
         print(exp)
         print((traceback.format_exc()))
@@ -334,10 +333,9 @@ def create_csv_stats(exp_stats: Statistics, jobs_list: List[Job],
                      output_file: Union[str, LiteralString, bytes]) -> None:
     """create_csv_stats Function
 
-    :param
-    :exp_stats: Statistics of the jobs of the experiment
-    :jobs_list: List[Job] of jobs in the experiment
-    :output_file: Union[str, LiteralString, bytes] Path to the file (str)
+    :param exp_stats: Statistics of the jobs of the experiment
+    :param jobs_list: List[Job] of jobs in the experiment
+    :param output_file: Union[str, LiteralString, bytes] Path to the file (str)
 
     :return: None
     """
@@ -356,8 +354,7 @@ def create_csv_stats(exp_stats: Statistics, jobs_list: List[Job],
                 job_names[i], start_times[i], end_times[i], queuing_times[i], running_times[i]))
 
 
-def build_legends(plot: Any, rects: list[list[str]], experiment_stats: Statistics,
-                  general_stats: list[tuple[str, str]]) -> int:
+def build_legends(plot: Any, rects: list[list[Optional[Rectangle]]], experiment_stats: Statistics) -> int:
     """build_legends Function
 
     :param plot: Subplot arrangement part of a figure
@@ -366,26 +363,17 @@ def build_legends(plot: Any, rects: list[list[str]], experiment_stats: Statistic
     :type rects: list[list[str]]
     :param experiment_stats: Statistics of the jobs of the experiment
     :type experiment_stats: Statistics
-    :param general_stats: list that contains the status of the jobs
-    :type general_stats: list[tuple[str, str]]
     :returns: Return the length of the legends built
     :rtype: int
     """
     # Main legend with colourful rectangles
-    legend_rects = [[rect[0] for rect in rects]]
+    legend_rects: list[list[Optional[Rectangle]]] = [[rect[0] for rect in rects]]
 
     legend_titles = [
         ['Queued (h)', 'Run (h)', 'Fail Queued (h)', 'Fail Run (h)', 'Max wallclock (h)']
     ]
     legend_locs = ["upper right"]
-    legend_handlelengths = [None]
-
-    # General stats legends, if exists
-    if len(general_stats) > 0:
-        legend_rects.append(get_whites_array(len(general_stats)))
-        legend_titles.append([str(key) + ': ' + str(value) for key, value in general_stats])
-        legend_locs.append("upper center")
-        legend_handlelengths.append(0)
+    legend_handlelengths: list[Optional[int]] = [None]
 
     # Total stats legend
     stats_summary_as_list = experiment_stats.summary_list
@@ -413,8 +401,8 @@ def create_legend(plot, rects, titles, loc, handlelength=None):
     return plot.legend(rects, titles, loc=loc, handlelength=handlelength)
 
 
-def get_whites_array(length):
-    white = mpatches.Rectangle((0, 0), 0, 0, alpha=0.0)
+def get_whites_array(length) -> list[Rectangle]:
+    white = Rectangle((0, 0), 0, 0, alpha=0.0)
     return [white for _ in range(length)]
 
 
@@ -449,11 +437,12 @@ def _filter_by_status(jobs_list: List[Job]) -> List[Job]:
     return ret
 
 
-def _get_status(jobs_list: List[Job], job_name: str) -> str:
+def _get_status(jobs_list: List[Job], job_name: str) -> Optional[str]:
     """Return the status of the job."""
     for job in jobs_list:
         if job.name == job_name:
             return job.status_str
+    return None
 
 
 def _aggregate_jobs_by_section(jobs_list: List['Job'], jobs_stats: List['JobStat']) -> List[JobAggData]:
