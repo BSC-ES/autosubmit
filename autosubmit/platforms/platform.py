@@ -369,7 +369,7 @@ class Platform(object):
                 if only_wrappers or inspect:  # -cw, inspect command
                     self._process_wrappers(package, job_list, packages_persistence, as_conf, hold)
                     any_job_submitted = True
-                else:
+                if not only_wrappers:  # run, inspect command
                     self._process_package_submission(
                         package, as_conf, job_list, valid_packages_to_submit, failed_packages, inspect, hold
                     )

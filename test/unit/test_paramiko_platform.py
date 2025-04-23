@@ -26,6 +26,8 @@ import pytest
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
+from autosubmit.job.job_package_persistence import JobPackagePersistence
+from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.psplatform import PsPlatform
 from log.log import AutosubmitError
@@ -419,18 +421,40 @@ def paramiko_connected_platform(paramiko_platform):
 def test_send_command_success(paramiko_connected_platform, mocker):
     platform = paramiko_connected_platform
     platform._prepare_channel = mocker.Mock()
-
     result = platform.send_command("hello", ignore_log=False, x11=False)
     assert result
     assert platform._ssh_output == "hello"
 
 
+@pytest.fixture
+def create_packages(autosubmit_config, paramiko_connected_platform):
+    as_conf = autosubmit_config(expid='test')
+    simple_jobs = [Job("dummy-1", 1, Status.SUBMITTED, 0)]
+    vertical_jobs = [Job("dummy-1", 1, Status.SUBMITTED, 0), Job("dummy-2", 2, Status.SUBMITTED, 0),
+                     Job("dummy-3", 3, Status.SUBMITTED, 0)]
+    horizontal_jobs = [Job("dummy-1", 1, Status.SUBMITTED, 0), Job("dummy-2", 2, Status.SUBMITTED, 0),
+                       Job("dummy-3", 3, Status.SUBMITTED, 0)]
+    for job in simple_jobs + vertical_jobs + horizontal_jobs:
+        job._platform = paramiko_connected_platform
+        job._platform.name = paramiko_connected_platform.name
+        job.platform_name = paramiko_connected_platform.name
+        job.processors = 2
+        job.section = "dummysection"
+        job._init_runtime_parameters()
+        job.wallclock = "00:01"
+    packages = [
+        JobPackageSimple(simple_jobs),
+        JobPackageVertical(vertical_jobs, configuration=as_conf),
+        JobPackageHorizontal(horizontal_jobs, configuration=as_conf),
+    ]
+    for package in packages:
+        if not isinstance(package, JobPackageSimple):
+            package._name = "wrapped"
+    return packages
 
-def test_submit_ready_jobs(paramiko_connected_platform, autosubmit_config, create_job_list, _create_job_mock):
-    as_conf = autosubmit_config(expid='a000')
+def test_submit_ready_jobs(paramiko_connected_platform, autosubmit_config, create_job_list, create_packages):
+    as_conf = autosubmit_config(expid='test')
     job_list = create_job_list
-
-
-
-
+    packages_persistence = JobPackagePersistence("test")
+    packages_to_submit = create_packages
     paramiko_connected_platform.submit_ready_jobs(as_conf, job_list, packages_persistence, packages_to_submit, False, False, False)
