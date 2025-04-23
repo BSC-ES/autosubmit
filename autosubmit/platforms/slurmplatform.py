@@ -563,7 +563,8 @@ class SlurmPlatform(ParamikoPlatform):
                         submit_script_file.write((export + self._submit_hold_cmd + job_script + "\n").encode(lang))
             except BaseException:
                 pass
-        return export + self.get_submit_cmd_x11(job.x11_options.strip(""), job_script.strip(""))
+        else:
+            return export + self.get_submit_cmd_x11(job.x11_options.strip(""), job_script.strip(""))
 
     def get_checkjob_cmd(self, job_id: str) -> str: # noqa
         """
