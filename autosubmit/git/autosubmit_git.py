@@ -301,3 +301,16 @@ class AutosubmitGit:
                         # M: Modified, A: Added, D: Deleted, ?: Untracked
                         raise AutosubmitCritical("Push local changes to remote repository before running", 7075)
 
+    @staticmethod
+    def check_directory_in_use(dir_path: str) -> bool:
+        """
+        Lists all Open Files in a directory
+        """
+        result = subprocess.run(
+            ['lsof', '+D', dir_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        return bool(result.stdout.strip())
+
