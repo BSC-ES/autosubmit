@@ -16,9 +16,12 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+from io import BytesIO, TextIOWrapper
 from pathlib import Path
+from queue import Queue
 from tempfile import TemporaryDirectory
 
+import paramiko
 import pytest
 
 from autosubmit.job.job import Job
@@ -230,3 +233,172 @@ def test_submit_job(mocker, autosubmit_config, tmpdir):
     job.platform_name = platform.name
     jobs_id = platform.submit_job(job, "dummy")
     assert jobs_id == 10000
+
+
+class DummyInBuffer(Queue):
+    """Queue-like buffer with a len() that returns qsize()."""
+
+    def __len__(self):
+        return self.qsize()
+
+
+class DummyChannel:
+    def __init__(self, stdout_bytes=b"hello\n", stderr_bytes=b""):
+        self._r, self._w = os.pipe()
+        self._stdout_buf = BytesIO(stdout_bytes)
+        self._stderr_buf = BytesIO(stderr_bytes)
+        self.in_buffer = DummyInBuffer()
+        if stdout_bytes:
+            self.in_buffer.put(stdout_bytes)
+
+        self.timeout = None
+        self.closed = False
+
+    def fileno(self):
+        return self._r
+
+    def recv_ready(self):
+        return self._stdout_buf.tell() < len(self._stdout_buf.getvalue())
+
+    def recv(self, n):
+        return self._stdout_buf.read(n)
+
+    def recv_stderr_ready(self):
+        return self._stderr_buf.tell() < len(self._stderr_buf.getvalue())
+
+    def recv_stderr(self, n):
+        return self._stderr_buf.read(n)
+
+    def get_pty(self):
+        print("[dummy] get_pty()")
+
+    def update_environment(self, env):
+        print(f"[dummy] update_environment({env!r})")
+
+    def settimeout(self, t):
+        print(f"[dummy] settimeout({t})")
+        self.timeout = t
+
+    def exec_command(self, command):
+        print(f"[dummy] exec_command({command!r})")
+        out = f"{command}".encode()
+        os.write(self._w, out)
+        os.close(self._w)
+        self._stdout_buf = BytesIO(out)
+        self._stderr_buf = BytesIO(b"")
+        self.closed = True
+
+    def makefile_stdin(self, mode="wb", bufsize=-1):
+        f = BytesIO()
+        f.channel = self
+        return f
+
+    def makefile(self, mode="r", bufsize=-1):
+        self._stdout_buf.seek(0)
+        f = TextIOWrapper(self._stdout_buf, encoding="utf-8")
+        f.channel = self
+        return f
+
+    def makefile_stderr(self, mode="r", bufsize=-1):
+        self._stderr_buf.seek(0)
+        f = TextIOWrapper(self._stderr_buf, encoding="utf-8")
+        f.channel = self
+        return f
+
+    def shutdown_write(self):
+        pass
+
+    def close(self):
+        try:
+            os.close(self._r)
+        except OSError:
+            pass
+        self._stdout_buf.close()
+        self._stderr_buf.close()
+        self.closed = True
+
+
+class DummyTransport:
+    def is_active(self):
+        return True
+
+    def open_session(self):
+        return DummyChannel()
+
+    def close(self):
+        pass
+
+
+class DummySFTPClient:
+    def __init__(self):
+        print("[dummy sftp] session opened")
+
+    def listdir(self, path):
+        print(f"[dummy sftp] listdir({path!r})")
+        return ["file1.txt", "file2.log", "dir_a"]
+
+    def open(self, filename, mode="r"):
+        print(f"[dummy sftp] open({filename!r}, mode={mode!r})")
+        data = b"dummy content of " + filename.encode()
+        return BytesIO(data)
+
+    def get(self, remotepath, localpath):
+        print(f"[dummy sftp] get({remotepath!r} -> {localpath!r})")
+        with open(localpath, "wb") as f:
+            f.write(b"[dummy data]")
+
+    def put(self, localpath, remotepath):
+        print(f"[dummy sftp] put({localpath!r} -> {remotepath!r})")
+
+    def remove(self, path):
+        print(f"[dummy sftp] remove({path!r})")
+
+    def mkdir(self, path):
+        print(f"[dummy sftp] mkdir({path!r})")
+
+    def rmdir(self, path):
+        print(f"[dummy sftp] rmdir({path!r})")
+
+    def get_channel(self):
+        class C:
+            def settimeout(self, t):
+                print(f"[dummy channel] settimeout({t})")
+
+        return C()
+
+    def close(self):
+        print("[dummy sftp] session closed")
+
+
+@pytest.fixture
+def paramiko_connected_platform(paramiko_platform):
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    dummy_tr = DummyTransport()
+    ssh._transport = dummy_tr
+
+    paramiko.SFTPClient.from_transport = (
+        lambda transport, window_size, max_packet_size:
+        DummySFTPClient()
+    )
+    paramiko_platform._ssh = ssh
+    paramiko_platform.transport = dummy_tr
+    paramiko_platform._transport = dummy_tr
+
+    paramiko_platform._ftpChannel = paramiko.SFTPClient.from_transport(
+        paramiko_platform.transport,
+        window_size=pow(4, 12),
+        max_packet_size=pow(4, 12),
+    )
+    paramiko_platform._ftpChannel.get_channel().settimeout(120)
+
+    paramiko_platform.connected = True
+    return paramiko_platform
+
+
+def test_send_command_success(paramiko_connected_platform, mocker):
+    platform = paramiko_connected_platform
+    platform._prepare_channel = mocker.Mock()
+
+    result = platform.send_command("hello", ignore_log=False, x11=False)
+    assert platform._ssh_output == "hello"
