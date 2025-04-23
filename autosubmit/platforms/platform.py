@@ -718,16 +718,16 @@ class Platform(object):
         if count == -1:  # No internal retrials
             filename = job.stat_file + "0"
         else:
-            filename = job.name + '_STAT_{0}'.format(str(count))
+            filename = f'{job.name}_STAT_{job.fail_count}'
         stat_local_path = os.path.join(
             self.config.get("LOCAL_ROOT_DIR"), self.expid, self.config.get("LOCAL_TMP_DIR"), filename)
         if os.path.exists(stat_local_path):
             os.remove(stat_local_path)
         if self.check_file_exists(filename):
             if self.get_file(filename, True):
-                Log.debug('{0}_STAT file have been transferred', job.name)
+                Log.debug(f'{job.name}_STAT_{job.fail_count} file have been transferred')
                 return True
-        Log.warning('{0}_STAT file not found', job.name)
+        Log.warning(f'{job.name}_STAT_{job.fail_count} file not found')
         return False
 
     @autosubmit_parameter(name='current_logdir')

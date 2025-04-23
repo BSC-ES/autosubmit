@@ -129,7 +129,7 @@ class StatisticsSnippetBash:
 
             set -xuve
             job_name_ptrn='%CURRENT_LOGDIR%/%JOBNAME%'
-            echo $(date +%s) > ${job_name_ptrn}_STAT
+            echo $(date +%s) > ${job_name_ptrn}_STAT_%FAIL_COUNT%
 
             ################### 
             # AS CHECKPOINT FUNCTION
@@ -156,7 +156,7 @@ class StatisticsSnippetBash:
                 # Autosubmit tailer
                 ###################
                 set -xuve
-                echo $(date +%s) >> ${job_name_ptrn}_STAT
+                echo $(date +%s) >> ${job_name_ptrn}_STAT_%FAIL_COUNT%
                 touch ${job_name_ptrn}_COMPLETED
                 exit 0
 
@@ -174,7 +174,7 @@ class StatisticsSnippetPython:
 
     def as_header(self, scheduler_header, executable):
         if not executable:
-            executable = "/usr/bin/env python" + str(self.version)
+            executable = f"/usr/bin/env python{str(self.version)}"
         else:
             executable = executable
         return textwrap.dedent("""\
@@ -202,7 +202,7 @@ class StatisticsSnippetPython:
             except Exception as e:
                 locale.setlocale(locale.LC_ALL, 'C')
             job_name_ptrn = '%CURRENT_LOGDIR%/%JOBNAME%'
-            stat_file = open(job_name_ptrn + '_STAT', 'w')
+            stat_file = open(job_name_ptrn + '_STAT_%FAIL_COUNT%', 'w')
             stat_file.write(f'{int(time.time())}\\n')
             stat_file.close()
             ###################
@@ -231,7 +231,7 @@ class StatisticsSnippetPython:
                 # Autosubmit tailer
                 ###################
 
-                stat_file = open(job_name_ptrn + '_STAT', 'a')
+                stat_file = open(job_name_ptrn + '_STAT_%FAIL_COUNT%', 'a')
                 stat_file.write(f'{int(time.time())}\\n')
                 stat_file.close()
                 open(job_name_ptrn + '_COMPLETED', 'a').close()
@@ -276,7 +276,7 @@ class StatisticsSnippetR:
             } 
             options( warn = oldw )
             job_name_ptrn = '%CURRENT_LOGDIR%/%JOBNAME%'
-            fileConn<-file(paste(job_name_ptrn,"_STAT", sep = ''),"w")
+            fileConn<-file(paste(job_name_ptrn,"_STAT_%FAIL_COUNT%", sep = ''),"w")
             writeLines(toString(trunc(as.numeric(Sys.time()))), fileConn)
             close(fileConn)
             ###################
@@ -304,7 +304,7 @@ class StatisticsSnippetR:
             # Autosubmit tailer
             ###################
 
-            fileConn<-file(paste(job_name_ptrn,"_STAT", sep = ''),"a")
+            fileConn<-file(paste(job_name_ptrn,"_STAT_%FAIL_COUNT%", sep = ''),"a")
             writeLines(toString(trunc(as.numeric(Sys.time()))), fileConn)
             close(fileConn)
 
@@ -370,7 +370,7 @@ def parse_output_number(string_number):
 def increase_wallclock_by_chunk(current, increase, chunk):
     """
     Receives the wallclock times an increases it according to a quantity times the number of the current chunk.
-    The result cannot be larger than 48:00.
+    The result cannot be larger than the platform max_wallclock.
     If Chunk = 0 then no increment.
 
     :param current: WALLCLOCK HH:MM
