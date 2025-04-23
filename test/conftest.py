@@ -12,7 +12,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
+# You should hzave received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 # Fixtures available to multiple test files must be created in this file.
@@ -24,13 +24,15 @@ from pathlib import Path
 from re import sub
 from textwrap import dedent
 from time import time
-from typing import TYPE_CHECKING, Any, Dict, Callable, Protocol, Optional, Type
+from typing import TYPE_CHECKING, Any, Dict, Callable, Protocol, Optional, Type, List
 
 import pytest
 from pytest_mock import MockerFixture
 from ruamel.yaml import YAML
 
 from autosubmit.autosubmit import Autosubmit
+from autosubmit.job.job import Job
+from autosubmit.job.job_list import JobList
 from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
@@ -118,6 +120,7 @@ def autosubmit_exp(
 
     TODO: Use minimal to avoid having to juggle with the configuration files.
     """
+
     def _create_autosubmit_exp(
             expid: Optional[str] = None,
             experiment_data: Optional[Dict] = None,
@@ -497,3 +500,35 @@ def as_db_sqlite(monkeypatch: pytest.MonkeyPatch, tmp_path: "LocalPath") -> Type
     monkeypatch.setattr(BasicConfig, "DB_PATH", str(tmp_path / "autosubmit.db"))
 
     return BasicConfig
+
+
+# JOB LIST and JOBS
+
+def _create_job_mock(job_data: Dict[str, Any], mocker) -> Job:
+    """Create a mocked job whose data is merged with the dict provided (as kwargs?).
+
+    Similar to JavaScript's ``Object.assign()``.
+
+    :param job_data: A dictionary containing job data. Each property will be assigned as a mock attribute.
+    """
+    job = mocker.MagicMock(spec=Job)
+    for key, value in job_data.items():
+        setattr(job, key, value)
+    job.id = 'test-job'
+    return job
+
+
+@pytest.fixture
+def create_job_list(mocker) -> Callable[[List[Dict[str, Any]]], JobList]:
+    """Create a mocked job list for the job_utils tests."""
+
+    def _fn(jobs_data: List[Dict[str, Any]]):
+        job_list = mocker.patch('autosubmit.job.job_list.JobList', autospec=True)
+        job_list.jobs = [
+            _create_job_mock(data, mocker) for data in jobs_data
+        ]
+        job_list._job_list = job_list.jobs
+        job_list.get_job_list.return_value = job_list.jobs
+        return job_list
+
+    return _fn

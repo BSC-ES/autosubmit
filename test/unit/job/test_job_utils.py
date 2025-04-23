@@ -31,38 +31,6 @@ _EXPID = 'a000'
 """The expid used throughout the tests."""
 
 
-# TODO: maybe these functions could go into conftest later.
-
-def _create_job_mock(job_data: Dict[str, Any], mocker) -> Job:
-    """Create a mocked job whose data is merged with the dict provided (as kwargs?).
-
-    Similar to JavaScript's ``Object.assign()``.
-
-    :param job_data: A dictionary containing job data. Each property will be assigned as a mock attribute.
-    """
-    job = mocker.MagicMock(spec=Job)
-    for key, value in job_data.items():
-        setattr(job, key, value)
-    job.id = 'test-job'
-    return job
-
-
-@pytest.fixture
-def create_job_list(mocker) -> Callable[[List[Dict[str, Any]]], JobList]:
-    """Create a mocked job list for the job_utils tests."""
-
-    def _fn(jobs_data: List[Dict[str, Any]]):
-        job_list = mocker.patch('autosubmit.job.job_list.JobList', autospec=True)
-        job_list.jobs = [
-            _create_job_mock(data, mocker) for data in jobs_data
-        ]
-        job_list._job_list = job_list.jobs
-        job_list.get_job_list.return_value = job_list.jobs
-        return job_list
-
-    return _fn
-
-
 def test_cancellation_without_target(create_job_list):
     """Test that a cancellation without a target results in an error."""
     job_list = create_job_list([])
