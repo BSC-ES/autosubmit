@@ -236,14 +236,39 @@ def test_submit_job(mocker, autosubmit_config, tmpdir):
 
 
 class DummyInBuffer(Queue):
-    """Queue-like buffer with a len() that returns qsize()."""
+    """A dummy input buffer that extends the Queue class."""
 
     def __len__(self):
+        """Return the size of the queue."""
         return self.qsize()
 
 
+class DummyTransport:
+    """A dummy transport class to simulate an SSH transport."""
+
+    @staticmethod
+    def is_active() -> bool:
+        return True
+
+    @staticmethod
+    def open_session() -> "DummyChannel":
+        return DummyChannel()
+
+    @staticmethod
+    def close() -> None:
+        pass
+
+
 class DummyChannel:
-    def __init__(self, stdout_bytes=b"hello\n", stderr_bytes=b""):
+    """A dummy channel class to simulate an SSH channel."""
+
+    def __init__(self, stdout_bytes: bytes = b"hello\n", stderr_bytes: bytes = b"") -> None:
+        """
+        Initialize the dummy channel.
+
+        :param stdout_bytes: Bytes to simulate standard output.
+        :param stderr_bytes: Bytes to simulate standard error.
+        """
         self._r, self._w = os.pipe()
         self._stdout_buf = BytesIO(stdout_bytes)
         self._stderr_buf = BytesIO(stderr_bytes)
@@ -254,32 +279,43 @@ class DummyChannel:
         self.timeout = None
         self.closed = False
 
-    def fileno(self):
+    def fileno(self) -> int:
+        """Return the file descriptor for the channel."""
         return self._r
 
-    def recv_ready(self):
+    def recv_ready(self) -> bool:
+        """Check if there is data ready to be received."""
         return self._stdout_buf.tell() < len(self._stdout_buf.getvalue())
 
-    def recv(self, n):
+    def recv(self, n: int) -> bytes:
+        """Receive data from the channel."""
         return self._stdout_buf.read(n)
 
-    def recv_stderr_ready(self):
+    def recv_stderr_ready(self) -> bool:
+        """Check if there is stderr data ready to be received."""
         return self._stderr_buf.tell() < len(self._stderr_buf.getvalue())
 
-    def recv_stderr(self, n):
+    def recv_stderr(self, n: int) -> bytes:
+        """Receive stderr data from the channel."""
         return self._stderr_buf.read(n)
 
-    def get_pty(self):
+    @staticmethod
+    def get_pty() -> None:
+        """Simulate getting a pseudo-terminal."""
         print("[dummy] get_pty()")
 
-    def update_environment(self, env):
+    @staticmethod
+    def update_environment(env: dict) -> None:
+        """Update the environment variables."""
         print(f"[dummy] update_environment({env!r})")
 
-    def settimeout(self, t):
+    def settimeout(self, t: float) -> None:
+        """Set the timeout for the channel."""
         print(f"[dummy] settimeout({t})")
         self.timeout = t
 
-    def exec_command(self, command):
+    def exec_command(self, command: str) -> None:
+        """Execute a command on the channel."""
         print(f"[dummy] exec_command({command!r})")
         out = f"{command}".encode()
         os.write(self._w, out)
@@ -288,27 +324,33 @@ class DummyChannel:
         self._stderr_buf = BytesIO(b"")
         self.closed = True
 
-    def makefile_stdin(self, mode="wb", bufsize=-1):
+    def makefile_stdin(self, mode: str = "wb", bufsize: int = -1) -> BytesIO:
+        """Create a file-like object for stdin."""
         f = BytesIO()
         f.channel = self
         return f
 
-    def makefile(self, mode="r", bufsize=-1):
+    def makefile(self, mode: str = "r", bufsize: int = -1) -> TextIOWrapper:
+        """Create a file-like object for stdout."""
         self._stdout_buf.seek(0)
         f = TextIOWrapper(self._stdout_buf, encoding="utf-8")
         f.channel = self
         return f
 
-    def makefile_stderr(self, mode="r", bufsize=-1):
+    def makefile_stderr(self, mode: str = "r", bufsize: int = -1) -> TextIOWrapper:
+        """Create a file-like object for stderr."""
         self._stderr_buf.seek(0)
         f = TextIOWrapper(self._stderr_buf, encoding="utf-8")
         f.channel = self
         return f
 
-    def shutdown_write(self):
+    @staticmethod
+    def shutdown_write() -> None:
+        """Simulate shutting down the write side of the channel."""
         pass
 
-    def close(self):
+    def close(self) -> None:
+        """Close the channel."""
         try:
             os.close(self._r)
         except OSError:
@@ -318,80 +360,58 @@ class DummyChannel:
         self.closed = True
 
 
-class DummyTransport:
-    def is_active(self):
-        return True
-
-    def open_session(self):
-        return DummyChannel()
-
-    def close(self):
-        pass
-
-
 class DummySFTPClient:
-    def __init__(self):
+    """A dummy SFTP client to simulate SFTP operations."""
+
+    def __init__(self) -> None:
         print("[dummy sftp] session opened")
 
-    def listdir(self, path):
+    @staticmethod
+    def listdir(path: str) -> list[str]:
         print(f"[dummy sftp] listdir({path!r})")
         return ["file1.txt", "file2.log", "dir_a"]
 
-    def open(self, filename, mode="r"):
+    @staticmethod
+    def open(filename: str, mode: str = "r") -> BytesIO:
         print(f"[dummy sftp] open({filename!r}, mode={mode!r})")
         data = b"dummy content of " + filename.encode()
         return BytesIO(data)
 
-    def get(self, remotepath, localpath):
+    @staticmethod
+    def get(remotepath: str, localpath: str) -> None:
         print(f"[dummy sftp] get({remotepath!r} -> {localpath!r})")
         with open(localpath, "wb") as f:
             f.write(b"[dummy data]")
 
-    def put(self, localpath, remotepath):
+    @staticmethod
+    def put(localpath: str, remotepath: str) -> None:
         print(f"[dummy sftp] put({localpath!r} -> {remotepath!r})")
 
-    def remove(self, path):
+    @staticmethod
+    def remove(path: str) -> None:
         print(f"[dummy sftp] remove({path!r})")
 
-    def mkdir(self, path):
+    @staticmethod
+    def mkdir(path: str) -> None:
         print(f"[dummy sftp] mkdir({path!r})")
 
-    def rmdir(self, path):
+    @staticmethod
+    def rmdir(path: str) -> None:
         print(f"[dummy sftp] rmdir({path!r})")
 
-    def get_channel(self):
-        class C:
-            def settimeout(self, t):
-                print(f"[dummy channel] settimeout({t})")
-
-        return C()
-
-    def close(self):
+    @staticmethod
+    def close() -> None:
         print("[dummy sftp] session closed")
 
 
 @pytest.fixture
 def paramiko_connected_platform(paramiko_platform):
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    dummy_tr = DummyTransport()
-    ssh._transport = dummy_tr
-
-    paramiko.SFTPClient.from_transport = (
-        lambda transport, window_size, max_packet_size:
-        DummySFTPClient()
-    )
-    paramiko_platform._ssh = ssh
-    paramiko_platform.transport = dummy_tr
-    paramiko_platform._transport = dummy_tr
-
-    paramiko_platform._ftpChannel = paramiko.SFTPClient.from_transport(
-        paramiko_platform.transport,
-        window_size=pow(4, 12),
-        max_packet_size=pow(4, 12),
-    )
-    paramiko_platform._ftpChannel.get_channel().settimeout(120)
-
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client._transport = DummyTransport()
+    paramiko_platform._ssh = client
+    paramiko_platform.transport = client._transport
+    paramiko_platform._ftpChannel = DummySFTPClient()
     paramiko_platform.connected = True
     return paramiko_platform
 
@@ -401,4 +421,16 @@ def test_send_command_success(paramiko_connected_platform, mocker):
     platform._prepare_channel = mocker.Mock()
 
     result = platform.send_command("hello", ignore_log=False, x11=False)
+    assert result
     assert platform._ssh_output == "hello"
+
+
+
+def test_submit_ready_jobs(paramiko_connected_platform, autosubmit_config, create_job_list, _create_job_mock):
+    as_conf = autosubmit_config(expid='a000')
+    job_list = create_job_list
+
+
+
+
+    paramiko_connected_platform.submit_ready_jobs(as_conf, job_list, packages_persistence, packages_to_submit, False, False, False)
