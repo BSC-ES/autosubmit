@@ -211,6 +211,9 @@ team in Git.
 | 7075 | Local changes have not been pushed to remote Git or SVN repo   | Commit and push local changes before running the experiment                                                                           
   |
 +------+-----------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| 7076 | Some file is currently being hold open by a process  | Use ``lsof`` to identify the running processes and kill them  
+  |
++------+-----------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. note::
   Please submit an issue to the Autosubmit team if you have not found your error

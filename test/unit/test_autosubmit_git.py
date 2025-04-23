@@ -18,6 +18,8 @@
 """Tests for ``AutosubmitGit``."""
 
 import pytest
+import time
+import subprocess
 
 from autosubmit.git.autosubmit_git import AutosubmitGit
 from log.log import AutosubmitCritical
@@ -174,3 +176,28 @@ def test_copy_code(autosubmit_config, config, mocker, autosubmit):
     as_conf = autosubmit_config(expid, config)
     mocker.patch('autosubmit.git.autosubmit_git.AutosubmitGit.clone_repository', return_value=True)
     assert autosubmit._copy_code(as_conf, expid, "git", True)
+
+
+def test_git_credential_might_lock_files(tmp_path):
+    """
+    Ensures a directory is correctly identified as having some or none running processes
+    via the AutosubmitGit.check_directory_in_use function
+    """
+    test_file = tmp_path / "testfile.txt"
+    test_file.write_text("This is a test file.")
+
+    # open the file in another process using cat so it stays open
+    proc = subprocess.Popen(['cat'], stdin=subprocess.PIPE)
+    try:
+        with open(test_file, 'rb') as f:
+            proc.stdin.write(f.read())
+            proc.stdin.flush()
+            time.sleep(0.1)
+            assert AutosubmitGit.check_directory_in_use(tmp_path) is True
+    finally:
+        proc.stdin.close()
+        proc.terminate()
+        proc.wait()
+
+    time.sleep(0.2)
+    assert AutosubmitGit.check_directory_in_use(tmp_path) is False

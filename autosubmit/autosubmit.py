@@ -1470,6 +1470,9 @@ class Autosubmit:
         :raises AutosubmitCritical: If the experiment does not exist or if there are insufficient permissions.
         """
         experiment_path = Path(f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}")
+        
+        if not AutosubmitGit.check_directory_in_use(experiment_path):
+            raise AutosubmitCritical("Ensure no processes are running in the experiment directory", 7076)
 
         if experiment_path.exists():
             if force or Autosubmit._user_yes_no_query(f"Do you want to delete {expid} ?"):
