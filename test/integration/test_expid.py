@@ -90,7 +90,6 @@ def test_copy_minimal(has_min_yaml, autosubmit_exp, autosubmit):
     )
     
     minimal_file = Path(BasicConfig.LOCAL_ROOT_DIR) / expid / "conf" / "minimal.yml"
-
     if has_min_yaml:
         minimal_file.write_text("test")
         expid2 = autosubmit.expid(
