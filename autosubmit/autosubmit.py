@@ -1384,9 +1384,9 @@ class Autosubmit:
                 raise AutosubmitCritical(f"Experiment {copy_id} doesn't exists", 7011)
             if minimal_configuration:
                 conf_dir = Path(copy_id_folder) / "conf"
-                if not list(conf_dir.glob('minimal.y*')):
+                if Path(conf_dir, 'minimal.yml').exists() or Path(conf_dir, 'minimal.yaml').exists():
                     raise AutosubmitCritical(
-                            "Cannot copy experiment that does not have a minimal.yml file", 7011)
+                            "Cannot copy an experiment that does not have a minimal.yml file", 7011)
             exp_id = copy_experiment(copy_id, description, Autosubmit.autosubmit_version, testcase, operational,
                                      evaluation)
 
