@@ -20,6 +20,7 @@ from os import path
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import locale
 import os
+import psutil
 import re
 import shutil
 import subprocess
@@ -30,6 +31,7 @@ from time import time
 from typing import List, Union
 
 # from autosubmit import Autosubmit
+from autosubmit.helpers.processes import process_id
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from log.log import Log, AutosubmitCritical
 
@@ -302,15 +304,17 @@ class AutosubmitGit:
                         raise AutosubmitCritical("Push local changes to remote repository before running", 7075)
 
     @staticmethod
-    def check_directory_in_use(dir_path: str) -> bool:
+    def check_directory_in_use(expid: str) -> bool:
         """
-        Lists all Open Files in a directory
+        Checks for open files and unfnished git-credential requests in a directory
         """
-        result = subprocess.run(
-            ['lsof', '+D', dir_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        return bool(result.stdout.strip())
+        if process_id(expid) is not None:
+            return True
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            print(proc)
+            if 'git-credential' in proc.info['name'] or any('git-credential' in arg for arg in proc.info['cmdline']):
+                return True
+        if bool(psutil.Process().open_files()):
+            return True
+        return False 
 

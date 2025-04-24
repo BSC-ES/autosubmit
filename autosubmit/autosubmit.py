@@ -1471,7 +1471,7 @@ class Autosubmit:
         """
         experiment_path = Path(f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}")
         
-        if not AutosubmitGit.check_directory_in_use(experiment_path):
+        if not AutosubmitGit.check_directory_in_use(expid):
             raise AutosubmitCritical("Ensure no processes are running in the experiment directory", 7076)
 
         if experiment_path.exists():

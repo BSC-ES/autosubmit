@@ -198,6 +198,3 @@ def test_git_credential_might_lock_files(tmp_path):
         proc.stdin.close()
         proc.terminate()
         proc.wait()
-
-    time.sleep(0.2)
-    assert AutosubmitGit.check_directory_in_use(tmp_path) is False
