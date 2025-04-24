@@ -2487,9 +2487,10 @@ class Job(object):
         if os.path.exists(path):
             with open(path, 'a') as f:
                 f.write('\n')
-
-        with open(path, 'w') as f:
-            f.write(self.submit_time_timestamp)
+                f.write(self.submit_time_timestamp)
+        else:
+            with open(path, 'w') as f:
+                f.write(self.submit_time_timestamp)
 
         # Writing database
         exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)

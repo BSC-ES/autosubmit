@@ -218,6 +218,8 @@ def check_db_fields(run_tmpdir, expected_entries, final_status) -> dict:
         db_check_list["JOB_DATA_FIELDS"][row_dict["job_name"]][str(counter_by_name[row_dict["job_name"]])][
             "workflow_commit"] = row_dict["workflow_commit"] == "debug-commit-hash"
 
+        # Check that a row that contains the same name
+
         empty_fields = []
         for key in [key for key in row_dict.keys() if
                     key not in ["status", "finish", "submit", "start", "extra_data", "children", "platform_output"]]:
@@ -431,8 +433,8 @@ def init_run(run_tmpdir, jobs_data):
     JOBS:
         job:
             SCRIPT: |
+                sleep 2
                 decho "Hello World with id=FAILED"
-                sleep 1
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
@@ -443,8 +445,8 @@ def init_run(run_tmpdir, jobs_data):
     JOBS:
         job:
             SCRIPT: |
+                sleep 2
                 decho "Hello World with id=FAILED + wrappers"
-                sleep 1
             PLATFORM: local
             DEPENDENCIES: job-1
             RUNNING: chunk
