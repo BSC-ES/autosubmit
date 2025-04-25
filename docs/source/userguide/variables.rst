@@ -64,8 +64,8 @@ Custom directives
 -----------------
 
 There are job variables that Autosubmit automatically converts into
-directives for your batch server. For example, ``NUMTHREADS`` will
-be set in a Slurm platform as ``--SBATCH --cpus-per-task=$NUMTHREADS``.
+directives for your batch server. For example, ``THREADS`` will
+be set in a Slurm platform as ``--SBATCH --cpus-per-task=$THREADS``.
 
 However, the variables in Autosubmit do not contain all the directives
 available in each platform like Slurm. For values that do not have a
