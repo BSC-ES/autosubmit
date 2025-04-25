@@ -1,0 +1,136 @@
+DEFAULT:
+  EXPID: a2da
+  HPCARCH: local
+  CUSTOM_CONFIG: hidden
+JOBS:
+  LOCAL_SETUP:
+    FILE: hidden
+    PLATFORM: local
+    RUNNING: once
+    CHECK: on_submission
+    DEPENDENCIES: {}
+  SYNCHRONIZE:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+    RUNNING: once
+    CHECK: on_submission
+  REMOTE_SETUP:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      SYNCHRONIZE: {}
+    RUNNING: once
+    WALLCLOCK: 02:00
+    CHECK: on_submission
+  INI:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      REMOTE_SETUP: {}
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: on_submission
+  SIM:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      INI: {}
+      SIM-1: {}
+    RUNNING: chunk
+    WALLCLOCK: 00:50
+    CHECK: on_submission
+    NODES: 4
+    PARTITION: small
+  DN:
+    FILE: hidden
+    DEPENDENCIES:
+      SIM:
+        STATUS: RUNNING
+        ANY_FINAL_STATUS_IS_VALID: true
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+      DN-1:
+    RUNNING: chunk
+    WALLCLOCK: 02:00
+    PLATFORM: local
+    SPLITS: auto
+    TOTALJOBS: 1
+    CHECK: on_submission
+    RETRIALS: 1
+  OPA_ENERGY_ONSHORE:
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+      OPA_ENERGY_ONSHORE:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+            STATUS: FAILED
+      OPA_ENERGY_ONSHORE-1:
+    FILE: hidden
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    RUNNING: chunk
+    NODES: 1
+    PROCESSORS: '%CURRENT_OPA_PROCESSORS%'
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    CUSTOM_DIRECTIVES: '%CURRENT_OPA_CUSTOM_DIRECTIVES%'
+    EXCLUSIVE: '%CURRENT_OPA_EXCLUSIVE%'
+    RETRIALS: '1'
+    WALLCLOCK: 00:20
+    NAME: energy_onshore
+    SPLITS: auto
+  APP_ENERGY_ONSHORE:
+    FILE: hidden
+    DEPENDENCIES:
+      OPA_ENERGY_ONSHORE:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\1'
+            STATUS: FAILED
+      APP_ENERGY_ONSHORE:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+            STATUS: FAILED
+      APP_ENERGY_ONSHORE-1:
+    RUNNING: chunk
+    WALLCLOCK: 00:20
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    NODES: 1
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    NAME: ENERGY_ONSHORE
+    SPLITS: auto
+  APP_DATA:
+    PLATFORM: local
+    DEPENDENCIES: {}
+    FILE: ''
+EXPERIMENT:
+  DATELIST: 19900101
+  MEMBERS: fc0
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: 20
+  NUMCHUNKS: 2
+  CALENDAR: standard
+  SPLITSIZEUNIT: day
+PROJECT:
+  PROJECT_TYPE: none
+  PROJECT_DESTINATION: git_project
+GIT:
+  PROJECT_ORIGIN: hidden
+  PROJECT_BRANCH: 1001-dependencies-between-chunk-sections-in-dn-opa-and-apps
+  PROJECT_COMMIT: ''
+  PROJECT_SUBMODULES: data-portfolio dvc-cache-de340
+  FETCH_SINGLE_BRANCH: true

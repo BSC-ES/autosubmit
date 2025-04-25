@@ -1,33 +1,36 @@
-#!/usr/bin/env python3
-import copy
-
-import math
-
-from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
-from log.log import Log, AutosubmitCritical
-from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates, add_hours
-
 # Copyright 2017-2020 Earth Sciences Department, BSC-CNS
-
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import math
 import os
+from typing import Dict, Optional, TYPE_CHECKING
+
+from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates
+from networkx.classes import DiGraph
+
+from autosubmit.job.job_common import Status
 from autosubmit.job.job_package_persistence import JobPackagePersistence
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmitconfigparser.config.basicconfig import BasicConfig
-from typing import Dict
+from log.log import Log, AutosubmitCritical
+
+if TYPE_CHECKING:
+    from autosubmit.job.job_list import JobList
+
 
 CALENDAR_UNITSIZE_ENUM = {
     "hour": 0,
@@ -36,7 +39,8 @@ CALENDAR_UNITSIZE_ENUM = {
     "year": 3
 }
 
-def _get_submitter(as_conf):
+
+def _get_submitter(as_conf) -> ParamikoSubmitter:
     """
     Returns the submitter corresponding to the communication defined on autosubmit's config file
 
@@ -53,17 +57,18 @@ def _get_submitter(as_conf):
         # only paramiko is available right now.
         return ParamikoSubmitter()
 
-def is_leap_year(year):
+
+def is_leap_year(year) -> bool:
     """Determine whether a year is a leap year."""
     return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
 
-def calendar_unitsize_isgreater(split_unit,chunk_unit):
+def calendar_unitsize_isgreater(split_unit,chunk_unit) -> bool:
     """
     Check if the split unit is greater than the chunk unit
     :param split_unit:
     :param chunk_unit:
-    :return:
+    :return: boolean
     """
     split_unit = split_unit.lower()
     chunk_unit = chunk_unit.lower()
@@ -72,10 +77,11 @@ def calendar_unitsize_isgreater(split_unit,chunk_unit):
     except KeyError:
         raise AutosubmitCritical(f"Invalid calendar unit size")
 
-def calendar_unitsize_getlowersize(unitsize):
+
+def calendar_unitsize_getlowersize(unitsize) -> str:
     """
     Get the lower size of a calendar unit
-    :return:
+    :return: str
     """
     unit_size = unitsize.lower()
     unit_value = CALENDAR_UNITSIZE_ENUM[unit_size]
@@ -84,11 +90,12 @@ def calendar_unitsize_getlowersize(unitsize):
     else:
         return list(CALENDAR_UNITSIZE_ENUM.keys())[unit_value - 1]
 
-def calendar_get_month_days(date_str):
+
+def calendar_get_month_days(date_str) -> int:
     """
     Get the number of days in a month
     :param date_str: Date in string format (YYYYMMDD)
-    :return:
+    :return: int
     """
     year = int(date_str[0:4])
     month = int(date_str[4:6])
@@ -102,7 +109,8 @@ def calendar_get_month_days(date_str):
     else:
         return 31
 
-def get_chunksize_in_hours(date_str,chunk_unit,chunk_length):
+
+def get_chunksize_in_hours(date_str,chunk_unit,chunk_length) -> int:
 
     if is_leap_year(int(date_str[0:4])):
         num_days_in_a_year = 366
@@ -117,16 +125,17 @@ def get_chunksize_in_hours(date_str,chunk_unit,chunk_length):
     else:
         chunk_size_in_hours = chunk_length
     return chunk_size_in_hours
-def calendar_split_size_isvalid(date_str, split_size, split_unit, chunk_unit, chunk_length, chunk_size_in_hours):
+
+
+def calendar_split_size_isvalid(date_str, split_size, split_unit,
+                                chunk_size_in_hours) -> bool:
     """
     Check if the split size is valid for the calendar
     :param date_str: Date in string format (YYYYMMDD)
     :param split_size: Size of the split
     :param split_unit: Unit of the split
-    :param chunk_unit: Unit of the chunk
-    :param chunk_length: Size of the chunk
     :param chunk_size_in_hours: chunk size in hours
-    :return: Boolean
+    :return: bool
     """
     if is_leap_year(int(date_str[0:4])):
         num_days_in_a_year = 366
@@ -149,15 +158,12 @@ def calendar_split_size_isvalid(date_str, split_size, split_unit, chunk_unit, ch
     return split_size_in_hours <= chunk_size_in_hours
 
 
-
-
-
-def calendar_chunk_section(exp_data, section, date, chunk):
+def calendar_chunk_section(exp_data, section, date, chunk) -> int:
     """
     Calendar for chunks
     :param section:
     :param parameters:
-    :return:
+    :return: int
     """
     #next_auto_date = date
     splits = 0
@@ -192,7 +198,7 @@ def calendar_chunk_section(exp_data, section, date, chunk):
             num_max_splits = run_days
         split_size = get_split_size(exp_data, section)
         chunk_size_in_hours = get_chunksize_in_hours(date2str(chunk_start),chunk_unit,chunk_length)
-        if not calendar_split_size_isvalid(date2str(chunk_start), split_size, split_unit, chunk_unit, chunk_length, chunk_size_in_hours):
+        if not calendar_split_size_isvalid(date2str(chunk_start), split_size, split_unit, chunk_size_in_hours):
             raise AutosubmitCritical(f"Invalid split size for the calendar. The split size is {split_size} and the unit is {split_unit}.")
         splits = num_max_splits / split_size
         if not splits.is_integer() and split_policy == "flexible":
@@ -203,7 +209,8 @@ def calendar_chunk_section(exp_data, section, date, chunk):
         Log.info(f"For the section {section} with date:{date2str(chunk_start)} the number of splits is {splits}.")
     return splits
 
-def get_split_size_unit(data, section):
+
+def get_split_size_unit(data, section) -> str:
     split_unit = str(data.get('JOBS',{}).get(section,{}).get('SPLITSIZEUNIT', "none")).lower()
     if split_unit == "none":
         split_unit = str(data.get('EXPERIMENT',{}).get("CHUNKSIZEUNIT", "day")).lower()
@@ -218,11 +225,12 @@ def get_split_size_unit(data, section):
     return split_unit
 
 
-def get_split_size(as_conf, section):
+def get_split_size(as_conf, section) -> int:
     job_data = as_conf.get('JOBS', {}).get(section, {})
     return int(job_data.get("SPLITSIZE", 1))
 
-def transitive_reduction(graph):
+
+def transitive_reduction(graph) -> DiGraph:
     """
 
     Returns transitive reduction of a directed graph
@@ -242,12 +250,11 @@ def transitive_reduction(graph):
         graph.nodes[u]["job"].add_children([graph.nodes[v]["job"] for v in graph[u]])
     return graph
 
-def get_job_package_code(expid, job_name):
-    # type: (str, str) -> int
+def get_job_package_code(expid: str, job_name: str) -> int:
     """
     Finds the package code and retrieves it. None if no package.
 
-    :param job_name:
+    :param job_name: String
     :param expid: Experiment ID
     :type expid: String
 
@@ -257,8 +264,8 @@ def get_job_package_code(expid, job_name):
     try:
         basic_conf = BasicConfig()
         basic_conf.read()
-        packages_wrapper = JobPackagePersistence(os.path.join(basic_conf.LOCAL_ROOT_DIR, expid, "pkl"),"job_packages_" + expid).load(wrapper=True)
-        packages_wrapper_plus = JobPackagePersistence(os.path.join(basic_conf.LOCAL_ROOT_DIR, expid, "pkl"),"job_packages_" + expid).load(wrapper=False)
+        packages_wrapper = JobPackagePersistence(expid).load(wrapper=True)
+        packages_wrapper_plus = JobPackagePersistence(expid).load(wrapper=False)
         if packages_wrapper or packages_wrapper_plus:
             packages = packages_wrapper if len(packages_wrapper) > len(packages_wrapper_plus) else packages_wrapper_plus
             for exp, package_name, _job_name in packages:
@@ -276,7 +283,7 @@ class Dependency(object):
 
     """
 
-    def __init__(self, section, distance=None, running=None, sign=None, delay=-1, splits=None,relationships=None):
+    def __init__(self, section, distance=None, running=None, sign=None, delay=-1, splits=None, relationships=None) -> None:
         self.section = section
         self.distance = distance
         self.running = running
@@ -286,23 +293,12 @@ class Dependency(object):
         self.relationships = relationships
 
 
-class SimpleJob(object):
-    """
-    A simple replacement for jobs
-    """
-
-    def __init__(self, name, tmppath, statuscode):
-        self.name = name
-        self._tmp_path = tmppath
-        self.status = statuscode
-
-
 class SubJob(object):
     """
     Class to manage package times
     """
 
-    def __init__(self, name, package=None, queue=0, run=0, total=0, status="UNKNOWN"):
+    def __init__(self, name, package=None, queue=0, run=0, total=0, status="UNKNOWN") -> None:
         self.name = name
         self.package = package
         self.queue = queue
@@ -319,7 +315,7 @@ class SubJobManager(object):
     Class to manage list of SubJobs
     """
 
-    def __init__(self, subjoblist, job_to_package=None, package_to_jobs=None, current_structure=None):
+    def __init__(self, subjoblist, job_to_package=None, package_to_jobs=None, current_structure=None) -> None:
         self.subjobList = subjoblist
         # print("Number of jobs in SubManager : {}".format(len(self.subjobList)))
         self.job_to_package = job_to_package
@@ -330,14 +326,14 @@ class SubJobManager(object):
         self.process_index()
         self.process_times()
 
-    def process_index(self):
+    def process_index(self) -> None:
         """
         Builds a dictionary of jobname -> SubJob object. 
         """
         for subjob in self.subjobList:
             self.subjobindex[subjob.name] = subjob
 
-    def process_times(self):
+    def process_times(self) -> None:
         """
         """
         if self.job_to_package and self.package_to_jobs:
@@ -351,7 +347,7 @@ class SubJobManager(object):
                     # SubJob Name -> SubJob Object
                     local_index = dict()
                     subjobs_in_package = [x for x in self.subjobList if x.package ==
-                                                package]
+                                          package]
                     local_jobs_in_package = [job for job in subjobs_in_package]
                     # Build index
                     for sub in local_jobs_in_package:
@@ -361,7 +357,8 @@ class SubJobManager(object):
                         # If job in current_structure, store children names in dictionary
                         # local_structure: Job Name -> Children (if present in the Job package)
                         local_structure[sub_job.name] = [v for v in self.current_structure[sub_job.name]
-                                                         if v in self.package_to_jobs[package]] if sub_job.name in self.current_structure else list()
+                                                         if v in self.package_to_jobs[
+                                                             package]] if sub_job.name in self.current_structure else list()
                         # Assign children to SubJob in local_jobs_in_package
                         sub_job.children = local_structure[sub_job.name]
                         # Assign sub_job Name as a parent of each of its children
@@ -403,7 +400,7 @@ class SubJobManager(object):
                 for package in self.package_to_jobs:
                     # Filter only jobs in the current package
                     filtered = [x for x in self.subjobList if x.package ==
-                                      package]
+                                package]
                     # Order jobs by total time (queue + run)
                     filtered = sorted(
                         filtered, key=lambda x: x.total, reverse=False)
@@ -448,15 +445,69 @@ class SubJobManager(object):
                     for name in fixes_applied:
                         self.subjobfixes[name] = fixes_applied[name]
 
-    def get_subjoblist(self):
+    def get_subjoblist(self) -> set[SubJob]:
         """
         Returns the list of SubJob objects with their corrected queue times
         in the case of jobs that belong to a wrapper.
         """
         return self.subjobList
 
-    def get_collection_of_fixes_applied(self):
-        # type: () -> Dict[str, int]
+    def get_collection_of_fixes_applied(self) -> Dict[str, int]:
         """
         """
         return self.subjobfixes
+
+
+def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status=Optional[str]) -> None:
+    """Cancel jobs on platforms.
+
+    It receives a list ``active_jobs_filter`` of statuses to filter jobs for their statuses,
+    and the ones that pass the filter are treated as "ACTIVE".
+
+    It also receives a target status, ``target_status``, which is used to change the jobs
+    that were found (with the filter above) to this new status.
+
+    It raises ``ValueError`` if the target status is invalid, and returns immediately if the
+    filter does not find any "ACTIVE" jobs.
+
+    It will iterate the list of active jobs, sending commands to cancel them (varies per platform).
+    After the command was issued, regardless whether successful or not, it finishes by changing
+    the status of the jobs.
+
+    It finishes saving the job list, to persist the jobs with their updated target statuses.
+
+    NOTE: For consistency, an experiment must be stopped before its jobs are cancelled.
+
+    :param job_list: Autosubmit job list object.
+    :type job_list: JobList
+    :param active_jobs_filter: Filter used to identify jobs considered active.
+    :type active_jobs_filter: List[str]
+    :param target_status: Final status of the jobs cancelled.
+    :type target_status: str|None
+    """
+    if not target_status or target_status not in Status.VALUE_TO_KEY.values():
+        raise AutosubmitCritical(f'Cancellation target status of jobs is not valid: {target_status}')
+
+    target_status = target_status.upper()
+
+    if active_jobs_filter is None:
+        active_jobs_filter = []
+
+    active_jobs = [job for job in job_list.get_job_list() if job.status in active_jobs_filter]
+
+    if not active_jobs:
+        Log.info(f"No active jobs found for expid {job_list.expid}")
+        return
+
+    for job in active_jobs:
+        # Cancel from the remote platform
+        Log.info(f'Cancelling job {job.name} on platform {job.platform.name}')
+        try:
+            job.platform.send_command(f'{job.platform.cancel_cmd} {str(job.id)}', ignore_log=True)
+        except Exception as e:
+            Log.warning(f"Failed to cancel job {job.name} on platform {job.platform.name}: {str(e)}")
+
+        Log.info(f"Changing status of job {job.name} to {target_status}")
+        job.status = Status.KEY_TO_VALUE[target_status]
+
+    job_list.save()

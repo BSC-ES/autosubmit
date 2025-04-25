@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+""" Diagram generator File """
+
 import itertools
 import math
 import traceback
@@ -25,7 +27,7 @@ from dataclasses import dataclass, field
 
 import matplotlib as mtp
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
+from matplotlib import gridspec
 import matplotlib.patches as mpatches
 from matplotlib.backends.backend_pdf import PdfPages
 
@@ -67,16 +69,31 @@ class JobAggData:
 
     @staticmethod
     def headers() -> List[str]:
+        """
+            Header function
+            :param
+            :return: List[str]
+        """
         spaced = [k.split('_') for k in JobAggData.__annotations__.keys()]
         return [
             ' '.join([key.capitalize() for key in keys]) for keys in spaced
         ]
 
     def values(self) -> List[Any]:
+        """
+            Values function
+            :param
+            :return: List[Any]
+        """
         return list(self.__dict__.values())
 
     @staticmethod
     def number_of_columns() -> int:
+        """
+            Num of columns function
+            :param
+            :return: int
+        """
         return len(JobAggData.__annotations__)
 
 
@@ -193,7 +210,18 @@ def create_stats_report(
     return hide
 
 
-def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job], general_stats: List[str]) -> bool:
+def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job],
+                       general_stats: List[str]) -> bool:
+    """create_bar_diagram Function
+
+    :param
+    :expid: str with the id of a experiment
+    :exp_stats: Statistics of the jobs of the experiment
+    :jobs_list: List[Job] of jobs in the experiment
+    :general_stats: List[str] of status of the jobs
+
+    :return: bool
+    """
     # Error prevention
     normal_plots_count = 0
     failed_jobs_plots_count = 0
@@ -207,7 +235,6 @@ def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job], 
     total_plots_count = normal_plots_count + failed_jobs_plots_count
     width = 0.16
     # Creating stats figure + sanity check
-    plot = True
     err_message = ("The results are too large to be shown, try narrowing your query.\nUse a filter like -ft where you "
                    "supply a list of job types, e.g. INI, SIM or use the flag -fp where you supply an integer that "
                    "represents the number of hours into the past that should be queried:\nSuppose it is noon, if you "
@@ -215,97 +242,105 @@ def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job], 
                    "whole experiment, refer to Autosubmit GUI.")
     if total_plots_count > MAX_NUM_PLOTS:
         Log.info(err_message)
-        plot = False
-    else:
-        fig = plt.figure(figsize=(RATIO * 4, 3 * RATIO * total_plots_count))
-        fig.suptitle(f'STATS - {expid}', fontsize=24, fontweight='bold')
+        return False
+    fig = plt.figure(figsize=(RATIO * 4, 3 * RATIO * total_plots_count))
+    fig.suptitle(f'STATS - {expid}', fontsize=24, fontweight='bold')
 
-        # Variables initialization
-        ax = []
-        rects = [None] * 5
-        grid_spec = gridspec.GridSpec(RATIO * total_plots_count + 2, 1)
-        i_plot = 0
-        for plot in range(1, normal_plots_count + 1):
-            try:
-                # Calculating jobs inside the given plot
-                l1 = int((plot - 1) * MAX_JOBS_PER_PLOT)
-                l2 = min(int(plot * MAX_JOBS_PER_PLOT), len(exp_stats.jobs_stat))
-                if l2 - l1 <= 0:
-                    continue
-                ind = range(l2 - l1)
-                ind_width = [x + width for x in ind]
-                ind_width_3 = [x + width * 3 for x in ind]
-                ind_width_4 = [x + width * 4 for x in ind]
-
-                # Building plot axis
-                ax.append(fig.add_subplot(grid_spec[RATIO * plot - RATIO + 2:RATIO * plot + 1]))
-                ax[plot - 1].set_ylabel('hours')
-                ax[plot - 1].set_xticks(ind_width)
-                ax[plot - 1].set_xticklabels(
-                    [job.name for job in jobs_list[l1:l2]],
-                    rotation='vertical')
-                ax[plot - 1].set_title(expid, fontsize=20)
-                upper_limit = round(1.10 * exp_stats.max_time, 4)
-                step = round(upper_limit / 10, 4)
-                y_ticks = [round(x, 4) for x in _seq(0, upper_limit + step, step)]
-                ax[plot - 1].set_yticks(y_ticks)
-                ax[plot - 1].set_ylim(0, float(1.10 * exp_stats.max_time))
-
-                # Building reacts
-                rects[0] = ax[plot - 1].bar(ind, exp_stats.queued[l1:l2], width, color='lightpink')
-                rects[1] = ax[plot - 1].bar(ind_width, exp_stats.run[l1:l2], width, color='green')
-                rects[2] = ax[plot - 1].bar(ind_width_3, exp_stats.fail_queued[l1:l2], width, color='lightsalmon')
-                rects[3] = ax[plot - 1].bar(ind_width_4, exp_stats.fail_run[l1:l2], width, color='salmon')
-                rects[4] = ax[plot - 1].plot([0., width * 6 * MAX_JOBS_PER_PLOT],
-                                             [exp_stats.threshold, exp_stats.threshold], "k--", label='wallclock sim')
-                # Building legend
-                i_plot = plot
-            except Exception as exp:
-                print((traceback.format_exc()))
-                print(exp)
-
-        job_names_in_failed = [name for name in exp_stats.failed_jobs_dict]
-        failed_jobs_rects = [None]
-        for j_plot in range(1, failed_jobs_plots_count + 1):
-            try:
-                l1 = int((j_plot - 1) * MAX_JOBS_PER_PLOT)
-                l2 = min(int(j_plot * MAX_JOBS_PER_PLOT), len(job_names_in_failed))
-                if l2 - l1 <= 0:
-                    continue
-                ind = range(l2 - l1)
-                ind_width = [x + width for x in ind]
-                ind_width_2 = [x + width * 2 for x in ind]
-                plot = i_plot + j_plot
-                ax.append(fig.add_subplot(grid_spec[RATIO * plot - RATIO + 2:RATIO * plot + 1]))
-                ax[plot - 1].set_ylabel('# failed attempts')
-                ax[plot - 1].set_xticks(ind_width)
-                ax[plot - 1].set_xticklabels([name for name in job_names_in_failed[l1:l2]], rotation='vertical')
-                ax[plot - 1].set_title(expid, fontsize=20)
-                ax[plot - 1].set_ylim(0, float(1.10 * exp_stats.max_fail))
-                ax[plot - 1].set_yticks(range(0, exp_stats.max_fail + 2))
-                failed_jobs_rects[0] = ax[plot - 1].bar(ind_width_2, [exp_stats.failed_jobs_dict[name] for name in
-                                                                      job_names_in_failed[l1:l2]], width, color='red')
-            except Exception as exp:
-                print((traceback.format_exc()))
-                print(exp)
-
-        # Building legends subplot
-        legends_plot = fig.add_subplot(grid_spec[0, 0])
-        legends_plot.set_frame_on(False)
-        legends_plot.axes.get_xaxis().set_visible(False)
-        legends_plot.axes.get_yaxis().set_visible(False)
-
+    # Variables initialization
+    ax = []
+    rects = [None] * 5
+    grid_spec = gridspec.GridSpec(RATIO * total_plots_count + 2, 1)
+    i_plot = 0
+    for plot in range(1, normal_plots_count + 1):
         try:
-            # Building legends
-            build_legends(legends_plot, rects, exp_stats, general_stats)
+            # Calculating jobs inside the given plot
+            l1 = int((plot - 1) * MAX_JOBS_PER_PLOT)
+            l2 = min(int(plot * MAX_JOBS_PER_PLOT), len(exp_stats.jobs_stat))
+            if l2 - l1 <= 0:
+                continue
+            ind = range(l2 - l1)
+            ind_width = [x + width for x in ind]
+            ind_width_3 = [x + width * 3 for x in ind]
+            ind_width_4 = [x + width * 4 for x in ind]
+
+            # Building plot axis
+            ax.append(fig.add_subplot(grid_spec[RATIO * plot - RATIO + 2:RATIO * plot + 1]))
+            ax[plot - 1].set_ylabel('hours')
+            ax[plot - 1].set_xticks(ind_width)
+            ax[plot - 1].set_xticklabels(
+                [job.name for job in jobs_list[l1:l2]],
+                rotation='vertical')
+            ax[plot - 1].set_title(expid, fontsize=20)
+            upper_limit = round(1.10 * exp_stats.max_time, 4)
+            step = round(upper_limit / 10, 4)
+            y_ticks = [round(x, 4) for x in _seq(0, upper_limit + step, step)]
+            ax[plot - 1].set_yticks(y_ticks)
+            ax[plot - 1].set_ylim(0, float(1.10 * exp_stats.max_time))
+
+            # Building reacts
+            rects[0] = ax[plot - 1].bar(ind, exp_stats.queued[l1:l2], width, color='lightpink')
+            rects[1] = ax[plot - 1].bar(ind_width, exp_stats.run[l1:l2], width, color='green')
+            rects[2] = ax[plot - 1].bar(ind_width_3, exp_stats.fail_queued[l1:l2], width, color='lightsalmon')
+            rects[3] = ax[plot - 1].bar(ind_width_4, exp_stats.fail_run[l1:l2], width, color='salmon')
+            rects[4] = ax[plot - 1].plot([0., width * 6 * MAX_JOBS_PER_PLOT],
+                                         [exp_stats.threshold, exp_stats.threshold], "k--", label='wallclock sim')
+            # Building legend
+            i_plot = plot
         except Exception as exp:
-            print(exp)
             print((traceback.format_exc()))
-    return plot
+            print(exp)
+
+    job_names_in_failed = [name for name in exp_stats.failed_jobs_dict]
+    failed_jobs_rects = [None]
+    for j_plot in range(1, failed_jobs_plots_count + 1):
+        try:
+            l1 = int((j_plot - 1) * MAX_JOBS_PER_PLOT)
+            l2 = min(int(j_plot * MAX_JOBS_PER_PLOT), len(job_names_in_failed))
+            if l2 - l1 <= 0:
+                continue
+            ind = range(l2 - l1)
+            ind_width = [x + width for x in ind]
+            ind_width_2 = [x + width * 2 for x in ind]
+            plot = i_plot + j_plot
+            ax.append(fig.add_subplot(grid_spec[RATIO * plot - RATIO + 2:RATIO * plot + 1]))
+            ax[plot - 1].set_ylabel('# failed attempts')
+            ax[plot - 1].set_xticks(ind_width)
+            ax[plot - 1].set_xticklabels([name for name in job_names_in_failed[l1:l2]], rotation='vertical')
+            ax[plot - 1].set_title(expid, fontsize=20)
+            ax[plot - 1].set_ylim(0, float(1.10 * exp_stats.max_fail))
+            ax[plot - 1].set_yticks(range(0, exp_stats.max_fail + 2))
+            failed_jobs_rects[0] = ax[plot - 1].bar(ind_width_2, [exp_stats.failed_jobs_dict[name] for name in
+                                                                  job_names_in_failed[l1:l2]], width, color='red')
+        except Exception as exp:
+            print((traceback.format_exc()))
+            print(exp)
+
+    # Building legends subplot
+    legends_plot = fig.add_subplot(grid_spec[0, 0])
+    legends_plot.set_frame_on(False)
+    legends_plot.axes.get_xaxis().set_visible(False)
+    legends_plot.axes.get_yaxis().set_visible(False)
+
+    try:
+        # Building legends
+        build_legends(legends_plot, rects, exp_stats, general_stats)
+    except Exception as exp:
+        print(exp)
+        print((traceback.format_exc()))
+    return True
 
 
 def create_csv_stats(exp_stats: Statistics, jobs_list: List[Job],
                      output_file: Union[str, LiteralString, bytes]) -> None:
+    """create_csv_stats Function
+
+    :param
+    :exp_stats: Statistics of the jobs of the experiment
+    :jobs_list: List[Job] of jobs in the experiment
+    :output_file: Union[str, LiteralString, bytes] Path to the file (str)
+
+    :return: None
+    """
     job_names = [job.name for job in exp_stats.jobs_stat]
     start_times = exp_stats.start_times
     end_times = exp_stats.end_times
@@ -321,9 +356,21 @@ def create_csv_stats(exp_stats: Statistics, jobs_list: List[Job],
                 job_names[i], start_times[i], end_times[i], queuing_times[i], running_times[i]))
 
 
-def build_legends(plot, rects, experiment_stats, general_stats):
-    # type: (plt.figure, List[plt.bar], Statistics, List[str]) -> None
+def build_legends(plot: Any, rects: list[list[str]], experiment_stats: Statistics,
+                  general_stats: list[tuple[str, str]]) -> int:
+    """build_legends Function
 
+    :param plot: Subplot arrangement part of a figure
+    :type plot: Any
+    :param rects: A string that contains the legends for the plot
+    :type rects: list[list[str]]
+    :param experiment_stats: Statistics of the jobs of the experiment
+    :type experiment_stats: Statistics
+    :param general_stats: list that contains the status of the jobs
+    :type general_stats: list[tuple[str, str]]
+    :returns: Return the length of the legends built
+    :rtype: int
+    """
     # Main legend with colourful rectangles
     legend_rects = [[rect[0] for rect in rects]]
 
@@ -351,6 +398,7 @@ def build_legends(plot, rects, experiment_stats, general_stats):
     legends = create_legends(plot, legend_rects, legend_titles, legend_locs, legend_handlelengths)
     for legend in legends:
         plt.gca().add_artist(legend)
+    return len(legends)
 
 
 def create_legends(plot, rects, titles, locs, handlelengths):

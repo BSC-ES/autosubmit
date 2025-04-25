@@ -198,12 +198,11 @@ class Log:
 
         level = levels.get(str(level).upper(),"DEBUG")
 
-        max_retrials = 3
-        retrials = 0
+        max_retries = 3
+        retries = 1
         timeout = 5
 
-        while not os.path.exists(file_path) and retrials < max_retrials:
-            sleep(timeout*retrials)
+        while not os.path.exists(file_path) and retries < max_retries:
             try:
                 directory, filename = os.path.split(file_path)
                 if not os.path.exists(directory):
@@ -243,7 +242,7 @@ class Log:
                     Log.log.addHandler(status_file_handler)
                 os.chmod(file_path, 509)
             except Exception: # retry again
-                pass
+                sleep(timeout * retries)
 
     @staticmethod
     def reset_status_file(file_path,type='status', level=WARNING):
@@ -301,6 +300,19 @@ class Log:
         Log.error.level = level
 
     @staticmethod
+    def _verify_args_message(msg: str, *args):
+        """
+        Verify if the message has arguments to format
+
+        :param msg: message to show
+        :param args: arguments for message formatting
+        :return: message formatted
+        """
+        if args:
+            msg = msg.format(*args)
+        return msg
+        
+    @staticmethod
     def debug(msg, *args):
         """
         Sends debug information to the log
@@ -308,7 +320,8 @@ class Log:
         :param msg: message to show
         :param args: arguments for message formating (it will be done using format() method on str)
         """
-        Log.log.log(Log.DEBUG, msg.format(*args))
+        msg = Log._verify_args_message(msg, *args)
+        Log.log.log(Log.DEBUG, msg)
 
     @staticmethod
     def info(msg, *args):
@@ -318,7 +331,8 @@ class Log:
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
         """
-        Log.log.log(Log.INFO, msg.format(*args))
+        msg = Log._verify_args_message(msg, *args)
+        Log.log.log(Log.INFO, msg)
 
     @staticmethod
     def result(msg, *args):
@@ -328,7 +342,8 @@ class Log:
         :param msg: message to show
         :param args: arguments for message formating (it will be done using format() method on str)
         """
-        Log.log.log(Log.RESULT, msg.format(*args))
+        msg = Log._verify_args_message(msg, *args)
+        Log.log.log(Log.RESULT, msg)
 
     @staticmethod
     def warning(msg, *args):
@@ -338,7 +353,8 @@ class Log:
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
         """
-        Log.log.log(Log.WARNING, msg.format(*args))
+        msg = Log._verify_args_message(msg, *args)
+        Log.log.log(Log.WARNING, msg)
 
     @staticmethod
     def error(msg, *args):
@@ -348,7 +364,8 @@ class Log:
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
         """
-        Log.log.log(Log.ERROR, msg.format(*args))
+        msg = Log._verify_args_message(msg, *args)
+        Log.log.log(Log.ERROR, msg)
 
     @staticmethod
     def critical(msg, *args):
@@ -358,7 +375,8 @@ class Log:
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
         """
-        Log.log.log(Log.CRITICAL, msg.format(*args))
+        msg = Log._verify_args_message(msg, *args)
+        Log.log.log(Log.CRITICAL, msg)
 
     @staticmethod
     def status(msg, *args):
@@ -368,7 +386,8 @@ class Log:
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
         """
-        Log.log.log(Log.STATUS, msg.format(*args))
+        msg = Log._verify_args_message(msg, *args)
+        Log.log.log(Log.STATUS, msg)
 
     @staticmethod
     def status_failed(msg, *args):
@@ -378,7 +397,8 @@ class Log:
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
         """
-        Log.log.log(Log.STATUS_FAILED, msg.format(*args))
+        msg = Log._verify_args_message(msg, *args)
+        Log.log.log(Log.STATUS_FAILED, msg)
 
     @staticmethod
     def printlog(message="Generic message", code=4000):

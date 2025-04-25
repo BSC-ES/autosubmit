@@ -1,0 +1,13 @@
+## String representation of Job List [12]  ##
+a008_1_TEST ~ [1 child]
+|  a008_1_TEST2
+a008_2_TEST ~ [1 child]
+a008_3_TEST ~ [1 child]
+|  a008_2_TEST2
+a008_4_TEST ~ [1 child]
+a008_1_TEST3 ~ [2 children]
+|  a008_1_TEST4
+|  a008_2_TEST4
+a008_2_TEST3 ~ [2 children]
+|  a008_3_TEST4
+|  a008_4_TEST4

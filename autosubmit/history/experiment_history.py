@@ -25,7 +25,7 @@ from log.log import Log
 from .data_classes.experiment_run import ExperimentRun
 from .data_classes.job_data import JobData
 from .database_managers.database_manager import DEFAULT_JOBDATA_DIR, DEFAULT_HISTORICAL_LOGS_DIR
-from .database_managers.experiment_history_db_manager import ExperimentHistoryDbManager
+from .database_managers.experiment_history_db_manager import create_experiment_history_db_manager, ExperimentHistoryDatabaseManager
 from .internal_logging import Logging
 from .platform_monitor.slurm_monitor import SlurmMonitor
 from .strategies import PlatformInformationHandler, SingleAssociationStrategy, StraightWrapperAssociationStrategy, \
@@ -41,8 +41,13 @@ class ExperimentHistory:
         self._log = Logging(expid, BasicConfig.HISTORICAL_LOG_DIR)
         self._job_data_dir_path = BasicConfig.JOBDATA_DIR
         self._historiclog_dir_path = BasicConfig.HISTORICAL_LOG_DIR
+        self.manager: ExperimentHistoryDatabaseManager = None
         try:
-            self.manager = ExperimentHistoryDbManager(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR)
+            options = {
+                'jobdata_dir_path': BasicConfig.JOBDATA_DIR,
+                'schema': self.expid
+            }
+            self.manager = create_experiment_history_db_manager(BasicConfig.DATABASE_BACKEND, **options)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
@@ -64,7 +69,7 @@ class ExperimentHistory:
 
     def write_submit_time(self, job_name, submit=0, status="UNKNOWN", ncpus=0, wallclock="00:00", qos="debug", date="",
                           member="", section="", chunk=0, platform="NA", job_id=0, wrapper_queue=None,
-                          wrapper_code=None, children=""):
+                          wrapper_code=None, children="", workflow_commit=""):
 
         try:
             next_counter = self._get_next_counter_by_job_name(job_name)
@@ -85,7 +90,8 @@ class ExperimentHistory:
                                   platform=platform,
                                   job_id=job_id,
                                   children=children,
-                                  run_id=current_experiment_run.run_id)
+                                  run_id=current_experiment_run.run_id,
+                                  workflow_commit=workflow_commit)
             return self.manager.register_submitted_job_data_dc(job_data_dc)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
@@ -95,20 +101,26 @@ class ExperimentHistory:
 
     def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug", job_id: int = 0, wrapper_queue: str = None, wrapper_code: str = None, children: str = "") -> JobData:
         """
-            Updates the start time and other details of a job in the database.
+        Updates the start time and other details of a job in the database.
 
-            Args:
-                job_name (str): The name of the job.
-                start (int, optional): The start time of the job. Default to 0.
-                status (str, optional): The status of the job. Defaults to "UNKNOWN".
-                qos (str, optional): The quality of service. Default to "debug".
-                job_id (int, optional): The job ID. Default to 0.
-                wrapper_queue (Optional[str], optional): The wrapper queue. Defaults to None.
-                wrapper_code (Optional[str], optional): The wrapper code. Defaults to None.
-                children (str, optional): The children. Default to an empty string.
-
-            Returns:
-                JobData: The result of updating the job data, or None if an exception occurs.
+        :param job_name: The name of the job.
+        :type job_name: str
+        :param start: The start time of the job. Default to 0.
+        :type start: int
+        :param status: The status of the job. Defaults to "UNKNOWN".
+        :type status: str
+        :param qos: The quality of service. Default to "debug".
+        :type qos: str
+        :param job_id: The job ID. Default to 0.
+        :type job_id: str
+        :param wrapper_queue: The wrapper queue. Defaults to None.
+        :type wrapper_queue: str
+        :param wrapper_code: The wrapper code. Defaults to None.
+        :type wrapper_code: str
+        :param children: The children. Default to an empty string.
+        :type children: str
+        :return: The result of updating the job data, or None if an exception occurs.
+        :rtype: JobData
         """
         try:
             job_data_dc_last = self.manager.get_job_data_by_job_id_name(job_id, job_name)
@@ -129,16 +141,20 @@ class ExperimentHistory:
         """
         Updates the finish time and other details of a job in the database.
 
-        Args:
-            job_name (str): The name of the job.
-            finish (int, optional): The finish time of the job. Default to 0.
-            status (str, optional): The status of the job. Defaults to "UNKNOWN".
-            job_id (int, optional): The job ID. Default to 0.
-            out_file (Optional[str], optional): The output file path. Defaults to None.
-            err_file (Optional[str], optional): The error file path. Defaults to None.
-
-        Returns:
-            JobData: The result of updating the job data, or None if an exception occurs.
+        :param job_name: The name of the job.
+        :type job_name: str
+        :param finish: The finish time of the job. Default to 0.
+        :type finish: int
+        :param status: The status of the job. Defaults to "UNKNOWN".
+        :type status: str
+        :param job_id: The job ID. Default to 0.
+        :type job_id: int
+        :param out_file: The output file path. Defaults to None.
+        :type out_file: Optional[str]
+        :param err_file: The error file path. Defaults to None.
+        :type err_file: Optional[str]
+        :return: The result of updating the job data, or None if an exception occurs.
+        :rtype: JobData
         """
         try:
             job_data_dc_last = self.manager.get_job_data_by_job_id_name(job_id, job_name)
@@ -217,7 +233,8 @@ class ExperimentHistory:
             try:
                 current_experiment_run_dc = self.manager.get_experiment_run_dc_with_max_id()
                 update_these_changes = self._get_built_list_of_changes(job_list)
-            except:
+            except Exception as exp:
+                Log.debug(str(exp), traceback.format_exc())
                 current_experiment_run_dc = 0
                 update_these_changes = []
                 # ("no runs")

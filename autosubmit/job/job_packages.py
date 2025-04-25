@@ -107,14 +107,14 @@ class JobPackageBase(object):
         return self._platform
 
     @threaded
-    def check_scripts(self, jobs, configuration, parameters, only_generate, hold):
+    def check_scripts(self, jobs, configuration, only_generate, hold):
         for job in jobs:
             if only_generate and not os.path.exists(os.path.join(configuration.get_project_dir(), job.file)):
                 break
             elif not os.path.exists(os.path.join(configuration.get_project_dir(), job.file)):
                 if configuration.get_project_type().lower() != "none" and len(configuration.get_project_type()) > 0:
                     raise AutosubmitCritical(f"Job script:{job.file} does not exists",7014)
-            if not job.check_script(configuration, parameters, show_logs=job.check_warnings):
+            if not job.check_script(configuration, show_logs=job.check_warnings):
                 Log.warning(f'Script {job.name} has some empty variables. An empty value has substituted these variables')
             else:
                 Log.result("Script {0} OK", job.name)
@@ -129,13 +129,11 @@ class JobPackageBase(object):
         pass
 
 
-    def submit_unthreaded(self, configuration, parameters,only_generate=False,hold=False):
+    def submit_unthreaded(self, configuration,only_generate=False,hold=False):
         """
         :param hold:
         :para configuration: Autosubmit basic configuration \n
         :type configuration: AutosubmitConfig object \n
-        :param parameters; Parameters from joblist \n
-        :type parameters: JobList,parameters \n
         :param only_generate: True if coming from generate_scripts_andor_wrappers(). If true, only generates scripts; otherwise, submits. \n
         :type only_generate: Boolean
         """
@@ -147,7 +145,7 @@ class JobPackageBase(object):
                 if configuration.get_project_type().lower() != "none" and len(configuration.get_project_type()) > 0:
                     raise AutosubmitCritical(
                         "Template [ {0} ] using CHECK=On_submission has some empty variable {0}".format(job.name), 7014)
-            if not job.check_script(configuration, parameters, show_logs=job.check_warnings):
+            if not job.check_script(configuration, show_logs=job.check_warnings):
                 Log.warning(
                     f'Script {job.name} has some empty variables. An empty value has substituted these variables')
             else:
@@ -177,7 +175,7 @@ class JobPackageBase(object):
         chunksize = int((len(self.jobs) + thread_number - 1) / thread_number)
         try:
             if len(self.jobs) < thread_number or str(configuration.experiment_data.get("CONFIG",{}).get("ENABLE_WRAPPER_THREADS","False")).lower() == "false":
-                self.submit_unthreaded(configuration, parameters, only_generate, hold)
+                self.submit_unthreaded(configuration, only_generate, hold)
                 Log.debug("Creating Scripts")
                 self._create_scripts(configuration)
             else:
@@ -224,6 +222,7 @@ class JobPackageBase(object):
             job.hold = hold
             job.id = str(job_id)
             job.status = Status.SUBMITTED
+            Log.result(f"Job: {job.name} submitted with job_id: {job.id.strip()} and workflow commit: {job.workflow_commit}")
             if hasattr(self, "name"): # TODO change this check for a property that checks if it is a wrapper or not, the same change has to be done in other parts of the code
                 job.wrapper_name = self.name
 
@@ -256,9 +255,10 @@ class JobPackageSimple(JobPackageBase):
         """
         Submits jobs to the platform, cleans previous run logs and stats files and updates job status.
 
-        Args:
-            job_scripts (Dict[str, str]): Dictionary of job scripts, defaults to an empty string.
-            hold (bool): If True, the job won't immediately start, defaults to False.
+        :param job_scripts: Dictionary of job scripts, defaults to an empty string.
+        :type job_scripts: Dict[str, str]
+        :param hold: If True, the job won't immediately start, defaults to False.
+        :type hold: bool
         """
         if len(job_scripts) == 0:
             job_scripts = self._job_scripts
@@ -365,9 +365,10 @@ class JobPackageArray(JobPackageBase):
         """
         Submits jobs to the platform, cleans previous run logs, and updates job status.
 
-        Args:
-            job_scripts (Optional[Dict[str, str]]): Dictionary of job scripts, defaults to None.
-            hold (bool): If True, holds the job submission, defaults to False.
+        :param job_scripts: Dictionary of job scripts, defaults to None.
+        :type job_scripts: Optional[Dict[str, str]]
+        :param hold: If True, holds the job submission, defaults to False.
+        :type hold: bool
         """
         for job in self.jobs:
             job.update_local_logs()
@@ -601,9 +602,10 @@ class JobPackageThread(JobPackageBase):
         """
         Submits jobs to the platform, cleans previous run logs, and updates job status.
 
-        Args:
-            job_scripts [Dict[str, str]]: Dictionary of job scripts, defaults to None.
-            hold (bool): If True, the job won't start immediately, defaults to False.
+        :param job_scripts: Dictionary of job scripts, defaults to None.
+        :type job_scripts: Dict[str, str]
+        :param hold: If True, the job won't start immediately, defaults to False.
+        :type hold: bool
         """
         if callable(getattr(self.platform, 'remove_multiple_files')):
             filenames = str()
@@ -697,9 +699,10 @@ class JobPackageThreadWrapped(JobPackageThread):
         """
         Submits jobs to the platform, cleans previous run logs, and updates job status.
 
-        Args:
-            job_scripts (Optional[Dict[str, str]]): Dictionary of job scripts, defaults to None.
-            hold (bool): If True, the job won't start immediately, defaults to False.
+        :param job_scripts: Dictionary of job scripts, defaults to None.
+        :type job_scripts: Optional[Dict[str, str]]
+        :param hold: If True, the job won't start immediately, defaults to False.
+        :type hold: bool
         """
         for job in self.jobs:
             job.update_local_logs()

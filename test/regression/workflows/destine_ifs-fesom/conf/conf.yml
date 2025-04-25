@@ -1,0 +1,135 @@
+DEFAULT:
+  EXPID: t03h
+  HPCARCH: local
+  CUSTOM_CONFIG: hidden
+JOBS:
+  INI:
+    DEPENDENCIES:
+      REMOTE_SETUP: {}
+    FILE: hidden
+    PLATFORM: local
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: on_submission
+  LOCAL_SETUP:
+    FILE: hidden
+    PLATFORM: local
+    RUNNING: once
+    CHECK: on_submission
+    DEPENDENCIES: {}
+  REMOTE_SETUP:
+    DEPENDENCIES:
+      SYNCHRONIZE: {}
+    FILE: hidden
+    PLATFORM: local
+    RUNNING: once
+    WALLCLOCK: 03:30
+    CHECK: on_submission
+  SIM:
+    DEPENDENCIES:
+      INI: {}
+      SIM-1: {}
+      DQC_BASIC-10: {}
+    FILE: hidden
+    PLATFORM: local
+    WALLCLOCK: 00:30
+    RUNNING: chunk
+    CHECK: on_submission
+  SYNCHRONIZE:
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+    FILE: hidden
+    PLATFORM: local
+    RUNNING: once
+    CHECK: on_submission
+  DQC_BASIC:
+    FILE: hidden
+    WALLCLOCK: 00:30
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: local
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 16
+    RUNNING: chunk
+    CHECK: on_submission
+    NAME: BASIC
+    DEPENDENCIES:
+      SIM: {}
+    CHECK_STANDARD_COMPLIANCE: 'False'
+    CHECK_SPATIAL_COMPLETENESS: 'True'
+    CHECK_SPATIAL_CONSISTENCY: 'True'
+    CHECK_PHYSICAL_PLAUSIBILITY: 'True'
+  DQC_FULL:
+    FILE: hidden
+    WALLCLOCK: 00:30
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: local
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 16
+    RUNNING: chunk
+    CHECK: on_submission
+    NAME: FULL
+    DEPENDENCIES:
+      DQC_BASIC: {}
+    CHECK_STANDARD_COMPLIANCE: 'True'
+    CHECK_SPATIAL_COMPLETENESS: 'True'
+    CHECK_SPATIAL_CONSISTENCY: 'True'
+    CHECK_PHYSICAL_PLAUSIBILITY: 'True'
+  LRA_GENERATOR:
+    DEPENDENCIES:
+      SIM: {}
+      DQC_BASIC: {}
+    FILE: hidden
+    NODES: 1
+    PROCESSORS: '%CURRENT_PROCESSORS_PER_NODE%'
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    TASKS: 0
+    THREADS: 1
+    PLATFORM: local
+    EXCLUSIVE: 'True'
+    RUNNING: chunk
+    WALLCLOCK: 00:30
+    FREQUENCY: 1
+    CHECK: on_submission
+  AQUA_ANALYSIS:
+    DEPENDENCIES:
+      LRA_GENERATOR: {}
+    FILE: hidden
+    NODES: 1
+    PROCESSORS: '%CURRENT_PROCESSORS_PER_NODE%'
+    TASKS: 0
+    THREADS: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: local
+    EXCLUSIVE: 'True'
+    RUNNING: chunk
+    WALLCLOCK: 00:30
+    FREQUENCY: 1
+    CHECK: on_submission
+  AQUA_PUSH:
+    DEPENDENCIES:
+      AQUA_ANALYSIS: {}
+    FILE: hidden
+    PLATFORM: local
+    RUNNING: chunk
+    WALLCLOCK: 02:00
+    FREQUENCY: 1
+EXPERIMENT:
+  DATELIST: 19900101
+  MEMBERS: fc0
+  CHUNKSIZEUNIT: month
+  CHUNKSIZE: 1
+  NUMCHUNKS: 2
+  CALENDAR: standard
+PROJECT:
+  PROJECT_TYPE: none
+  PROJECT_DESTINATION: git_project
+GIT:
+  PROJECT_ORIGIN: hidden
+  PROJECT_BRANCH: main
+  PROJECT_COMMIT: ''
+  PROJECT_SUBMODULES: gsv_interface one_pass data-portfolio catalog
+  FETCH_SINGLE_BRANCH: true

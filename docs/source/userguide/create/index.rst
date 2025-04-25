@@ -38,8 +38,8 @@ Options:
                             sets the git path to as_conf
       -local, --use_local_minimal
                             uses local minimal file instead of git
-      -op, --operational    creates a new experiment with operational experiment
-                            id
+      -op, --operational    creates a new experiment with operational experiment id
+      -ev, --evaluation     creates a new experiment with evaluation experiment id
       -H HPC, --HPC HPC     specifies the HPC to use for the experiment
       -d DESCRIPTION, --description DESCRIPTION
                             sets a description for the experiment to store in the
