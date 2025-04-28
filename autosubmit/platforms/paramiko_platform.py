@@ -727,8 +727,10 @@ class ParamikoPlatform(Platform):
 
         if job_status in [Status.FAILED, Status.COMPLETED, Status.UNKNOWN]:
             job.updated_log = False
-            # backup for end time in case that the second row of the stat file is not found due a failure
-            job.end_time_timestamp = int(time.time())
+            if not job.start_time_timestamp: # QUEUING -> COMPLETED ( under safetytime )
+                job.start_time_timestamp = int(time.time())
+            # Estimate Time for failed jobs, as they won't have the timestamp in the stat file
+            job.finish_time_timestamp = int(time.time())
         if job_status in [Status.RUNNING, Status.COMPLETED] and job.new_status in [Status.QUEUING, Status.SUBMITTED]:
             # backup for start time in case that the stat file is not found
             job.start_time_timestamp = int(time.time())

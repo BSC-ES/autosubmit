@@ -165,7 +165,7 @@ class Job(object):
         'log_avaliable', 'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        'end_time_timestamp', '_log_recovered', 'packed_during_building', 'workflow_commit'
+        '_log_recovered', 'packed_during_building', 'workflow_commit'
     )
 
     def __setstate__(self, state):
@@ -310,7 +310,6 @@ class Job(object):
         self._scratch_free_space = None
         self._delay_retrials = None
         self._custom_directives = None
-        self.end_time_timestamp = None
         self.packed_during_building = False
         self.workflow_commit = None
         if loaded_data:
@@ -2548,30 +2547,23 @@ class Job(object):
         """
 
         end_time = self.check_end_time(count)
-        path = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
-        f = open(path, 'a')
-        f.write(' ')
         if end_time > 0:
-            # noinspection PyTypeChecker
-            f.write(date2str(datetime.datetime.fromtimestamp(float(end_time)), 'S'))
-            self.finish_time_timestamp = date2str(datetime.datetime.fromtimestamp(end_time),'S')
-            # date2str(datetime.datetime.fromtimestamp(end_time), 'S')
-            finish_time = end_time
-        else:
-            f.write(date2str(datetime.datetime.now(), 'S'))
-            self.finish_time_timestamp = date2str(datetime.datetime.now(), 'S')
-            finish_time = time.time()
-        f.write(' ')
-        if completed:
-            final_status = "COMPLETED"
-            f.write('COMPLETED')
-        else:
-            final_status = "FAILED"
-            f.write('FAILED')
+            self.finish_time_timestamp = end_time
+        with open(Path(self._tmp_path) / f"{self.name}_TOTAL_STATS", 'a') as stat_file:
+            stat_file.write(' ')
+            stat_file.write(date2str(datetime.datetime.fromtimestamp(float(self.finish_time_timestamp)), 'S'))
+            stat_file.write(' ')
+
+            if completed:
+                final_status = "COMPLETED"
+                stat_file.write('COMPLETED')
+            else:
+                final_status = "FAILED"
+                stat_file.write('FAILED')
         out, err = self.local_logs
         # Launch first as simple non-threaded function
         exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-        job_data_dc = exp_history.write_finish_time(self.name, finish=finish_time, status=final_status, job_id=self.id, out_file=out, err_file=err)
+        job_data_dc = exp_history.write_finish_time(self.name, finish=self.finish_time_timestamp, status=final_status, job_id=self.id, out_file=out, err_file=err)
 
         # Launch second as threaded function only for slurm
         if job_data_dc and type(self.platform) is not str and self.platform.type == "slurm":
