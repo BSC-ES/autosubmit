@@ -311,8 +311,9 @@ class AutosubmitGit:
         if process_id(expid) is not None:
             return True
         for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-            print(proc)
-            if 'git-credential' in proc.info['name'] or any('git-credential' in arg for arg in proc.info['cmdline']):
+            name = proc.info.get('name', '')
+            cmdline = proc.info.get('cmdline') or []
+            if 'git-credential' in name or any('git-credential' in arg for arg in cmdline):
                 return True
         if bool(psutil.Process().open_files()):
             return True
