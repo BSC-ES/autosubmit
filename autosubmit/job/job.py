@@ -170,7 +170,8 @@ class Job(object):
 
     def __setstate__(self, state):
         for slot, value in state.items():
-            setattr(self, slot, value)
+            if slot in self.__slots__:
+                setattr(self, slot, value)
 
     def __getstate__(self):
         return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in EXCLUDED])
