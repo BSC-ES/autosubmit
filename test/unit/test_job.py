@@ -29,6 +29,7 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
+from bscearth.utils.date import date2str
 from mock import Mock, MagicMock
 from mock.mock import patch
 
@@ -1340,6 +1341,9 @@ class FakeBasicConfig:
     STRUCTURES_DIR = '/dummy/structures/dir'
 
 
+_EXPID = 't001'
+
+
 def test_update_stat_file():
     job = Job("dummyname", 1, Status.WAITING, 0)
     job.fail_count = 0
@@ -1914,3 +1918,40 @@ def test_get_from_stat(tmpdir, file_exists, index_timestamp, fail_count, expecte
         result = job._get_from_stat(index_timestamp, fail_count)
 
     assert result == expected
+
+
+@pytest.mark.parametrize(
+    'total_stats_exists',
+    [
+        True,
+        False
+    ]
+)
+def test_write_submit_time_ignore_exp_history(total_stats_exists: bool, autosubmit_config, local, mocker):
+    """Test that the job writes the submit time correctly.
+
+    It ignores what happens to the experiment history object."""
+    mocker.patch('autosubmit.job.job.ExperimentHistory')
+
+    as_conf = autosubmit_config(_EXPID, experiment_data={})
+    tmp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, as_conf.basic_config.LOCAL_TMP_DIR)
+
+    job = Job(f'{_EXPID}_dummy', 1, Status.WAITING, 0)
+    job.submit_time_timestamp = date2str(datetime.now(), 'S')
+    job.platform = local
+
+    total_stats = Path(tmp_path, f'{job.name}_TOTAL_STATS')
+    if total_stats_exists:
+        total_stats.touch()
+        total_stats.write_text('First line')
+
+    job.write_submit_time()
+
+    # It will exist regardless of the argument ``total_stats_exists``, as ``write_submit_time()``
+    # must have created it.
+    assert total_stats.exists()
+
+    # When the file already exists, it will append a new line. Otherwise,
+    # a new file is created with a single line.
+    expected_lines = 2 if total_stats_exists else 1
+    assert len(total_stats.read_text().split('\n')) == expected_lines
