@@ -66,7 +66,6 @@ class MetricSpecSelector:
 @dataclass
 class MetricSpec:
     name: str
-    path: str
     filename: str
     selector: MetricSpecSelector
     max_read_size_mb: int = MAX_FILE_SIZE_MB
@@ -76,11 +75,10 @@ class MetricSpec:
         if not isinstance(data, dict):
             raise ValueError("Invalid metric spec")
 
-        if not data.get("NAME") or not data.get("PATH") or not data.get("FILENAME"):
-            raise ValueError("Name, path, and filename are required in metric spec")
+        if not data.get("NAME") or not data.get("FILENAME"):
+            raise ValueError("Name and filename are required in metric spec")
 
         _name = data["NAME"]
-        _path = data["PATH"]
         _filename = data["FILENAME"]
 
         _max_read_size = data.get("MAX_READ_SIZE_MB", MAX_FILE_SIZE_MB)
@@ -90,7 +88,6 @@ class MetricSpec:
 
         return MetricSpec(
             name=_name,
-            path=_path,
             filename=_filename,
             max_read_size_mb=_max_read_size,
             selector=selector,
@@ -194,6 +191,16 @@ class UserMetricProcessor:
         )
         self._processed_metrics[metric_name] = metric_value
 
+    def get_metric_path(self, metric_spec: MetricSpec) -> str:
+        """
+        Get the path to the metric file
+        """
+        return str(
+            Path(self.job.get_metric_folder(self.as_conf)).joinpath(
+                metric_spec.filename
+            )
+        )
+
     def process_metrics(self):
         """
         Process the metrics of the job
@@ -204,9 +211,7 @@ class UserMetricProcessor:
         # Process the metrics specs
         for metric_spec in metrics_specs:
             # Path to the metric file
-            spec_path = str(
-                Path(metric_spec.path).joinpath(self.job.name, metric_spec.filename)
-            )
+            spec_path = self.get_metric_path(metric_spec)
 
             # Read the file from remote platform, it will replace the decoding errors.
             try:

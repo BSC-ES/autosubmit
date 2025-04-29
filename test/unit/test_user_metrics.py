@@ -81,13 +81,11 @@ def test_spec_selector_load_invalid(metric_selector_spec: Any):
         (
             {
                 "NAME": "metric1",
-                "PATH": "/path/to/",
                 "FILENAME": "file1",
                 "MAX_READ_SIZE_MB": MAX_FILE_SIZE_MB,
             },
             MetricSpec(
                 name="metric1",
-                path="/path/to/",
                 filename="file1",
                 selector=MetricSpecSelector(type=MetricSpecSelectorType.TEXT, key=None),
             ),
@@ -95,14 +93,12 @@ def test_spec_selector_load_invalid(metric_selector_spec: Any):
         (
             {
                 "NAME": "metric2",
-                "PATH": "/path/to/",
                 "FILENAME": "file2",
                 "MAX_READ_SIZE_MB": 10,
                 "SELECTOR": {"TYPE": "TEXT"},
             },
             MetricSpec(
                 name="metric2",
-                path="/path/to/",
                 filename="file2",
                 max_read_size_mb=10,
                 selector=MetricSpecSelector(type=MetricSpecSelectorType.TEXT, key=None),
@@ -111,14 +107,12 @@ def test_spec_selector_load_invalid(metric_selector_spec: Any):
         (
             {
                 "NAME": "metric3",
-                "PATH": "/path/to/",
                 "FILENAME": "file3",
                 "MAX_READ_SIZE_MB": 1,
                 "SELECTOR": {"TYPE": "JSON", "KEY": "key1.key2.key3"},
             },
             MetricSpec(
                 name="metric3",
-                path="/path/to/",
                 filename="file3",
                 max_read_size_mb=1,
                 selector=MetricSpecSelector(
@@ -129,13 +123,11 @@ def test_spec_selector_load_invalid(metric_selector_spec: Any):
         (
             {
                 "NAME": "metric4",
-                "PATH": "/path/to/",
                 "FILENAME": "file4",
                 "SELECTOR": {"TYPE": "JSON", "KEY": ["key1", "key2", "key3", "key4"]},
             },
             MetricSpec(
                 name="metric4",
-                path="/path/to/",
                 filename="file4",
                 selector=MetricSpecSelector(
                     type=MetricSpecSelectorType.JSON,
@@ -149,7 +141,6 @@ def test_metric_spec_load_valid(metric_specs: Any, expected: MetricSpec):
     metric_spec = MetricSpec.load(metric_specs)
 
     assert metric_spec.name == expected.name
-    assert metric_spec.path == expected.path
     assert metric_spec.selector.type == expected.selector.type
     assert metric_spec.filename == expected.filename
     assert metric_spec.max_read_size_mb == expected.max_read_size_mb
@@ -163,11 +154,9 @@ def test_metric_spec_load_valid(metric_specs: Any, expected: MetricSpec):
         "invalid",
         None,
         {"NAME": "metric1"},
-        {"PATH": "/path/to/"},
         {"FILENAME": "file1"},
         {
             "NAME": "metric2",
-            "PATH": "/path/to/",
             "FILENAME": "file2",
             "SELECTOR": "invalid",
         },
@@ -184,13 +173,12 @@ def test_read_metrics_specs(disable_metric_repository):
     job = MagicMock()
 
     as_conf.get_section.return_value = [
-        {"NAME": "metric1", "PATH": "/path/to/", "FILENAME": "file1"},
+        {"NAME": "metric1", "FILENAME": "file1"},
         {
             "NAME": "invalid metric",
         },
         {
             "NAME": "metric2",
-            "PATH": "/path/to/",
             "FILENAME": "file2",
             "SELECTOR": {"TYPE": "JSON", "KEY": "key1.key2.key3"},
         },
@@ -204,13 +192,11 @@ def test_read_metrics_specs(disable_metric_repository):
     assert len(metric_specs) == 2
 
     assert metric_specs[0].name == "metric1"
-    assert metric_specs[0].path == "/path/to/"
     assert metric_specs[0].filename == "file1"
     assert metric_specs[0].selector.type == MetricSpecSelectorType.TEXT
     assert metric_specs[0].selector.key is None
 
     assert metric_specs[1].name == "metric2"
-    assert metric_specs[1].path == "/path/to/"
     assert metric_specs[1].filename == "file2"
     assert metric_specs[1].selector.type == MetricSpecSelectorType.JSON
     assert metric_specs[1].selector.key == ["key1", "key2", "key3"]
@@ -232,14 +218,12 @@ def test_process_metrics(disable_metric_repository):
             # The first metric is a text file
             MetricSpec(
                 name="metric1",
-                path="/path/to/",
                 filename="file1",
                 selector=MetricSpecSelector(type=MetricSpecSelectorType.TEXT, key=None),
             ),
             # The second metric is a JSON file
             MetricSpec(
                 name="metric2",
-                path="/path/to/",
                 filename="file2",
                 selector=MetricSpecSelector(
                     type=MetricSpecSelectorType.JSON, key=["key2"]

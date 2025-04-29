@@ -40,6 +40,7 @@ from autosubmit.job.job_common import StatisticsSnippetR, StatisticsSnippetEmpty
 from autosubmit.job.job_common import Status, Type, increase_wallclock_by_chunk
 from autosubmit.job.job_utils import get_job_package_code, get_split_size_unit, get_split_size
 from autosubmit.job.metrics_processor import UserMetricProcessor
+from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
@@ -1564,6 +1565,38 @@ class Job(object):
             else:
                 return default_status
 
+    def get_metric_folder(self, as_conf: AutosubmitConfig = None) -> str:
+        """
+        Returns the default metric folder for the job.
+
+        :return: The metric folder path.
+        :rtype: str
+        """
+        # Get the default path that should be the same as HPCROOTDIR
+        # Check if the job platform is a subclass of ParamikoPlatform
+        if isinstance(self.platform, ParamikoPlatform):
+            base_path = Path(self.platform.remote_log_dir)
+        else:
+            base_path = Path(self.platform.root_dir).joinpath(self.expid)
+
+        # Get the defined metric folder from the configuration if it exists
+        try:
+            config_section: dict = as_conf.experiment_data.get("CONFIG", {})
+            base_path = Path(config_section.get("METRIC_FOLDER", base_path))
+        except Exception as exc:
+            Log.warning(f"Failed to get metric folder from config: {exc}")
+
+        # Construct the metric folder path by adding the job name
+        metric_folder = base_path.joinpath(self.name)
+
+        # Try to create the metric folder
+        try:
+            metric_folder.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            Log.warning(f"Failed to create metric folder {metric_folder}: {exc}")
+
+        return str(metric_folder)
+
     def update_current_parameters(self, as_conf: AutosubmitConfig, parameters: dict) -> dict:
         """
         Update the %CURRENT_*% parameters with the current platform and jobs.
@@ -1580,6 +1613,8 @@ class Job(object):
 
         for key, value in as_conf.jobs_data[self.section].items():
             parameters[f"CURRENT_{key.upper()}"] = value
+
+        parameters["CURRENT_METRIC_FOLDER"] = self.get_metric_folder(as_conf=as_conf)
 
         return parameters
 
