@@ -18,12 +18,38 @@ from multiprocessing.queues import Queue
 import time
 
 
+def recover_platform_job_logs_wrapper(
+        platform: Any,
+        recovery_queue: Queue,
+        worker_event: Event,
+        cleanup_event: Event,
+        as_conf: Any
+) -> None:
+    """
+    Wrapper function to recover platform job logs.
 
-def recover_platform_job_logs_wrapper(platform, recovery_queue, worker_event, cleanup_event):
+    :param platform: The platform object responsible for managing the connection and job recovery.
+    :type platform: Any
+    :param recovery_queue: A multiprocessing queue used to store jobs for recovery.
+    :type recovery_queue: multiprocessing.Queue
+    :param worker_event: An event to signal work availability.
+    :type worker_event: multiprocessing.Event
+    :param cleanup_event: An event to signal cleanup operations.
+    :type cleanup_event: multiprocessing.Event
+    :param as_conf: The Autosubmit configuration object containing experiment data.
+    :type as_conf: Any
+    :return: None
+    :rtype: None
+    """
     platform.recovery_queue = recovery_queue
     platform.work_event = worker_event
     platform.cleanup_event = cleanup_event
-    platform.recover_platform_job_logs()
+    as_conf.experiment_data = {
+        "AS_ENV_PLATFORMS_PATH": as_conf.experiment_data.get("AS_ENV_PLATFORMS_PATH", None),
+        "AS_ENV_SSH_CONFIG_PATH": as_conf.experiment_data.get("AS_ENV_SSH_CONFIG_PATH", None),
+        "ROOTDIR": as_conf.experiment_data.get("ROOTDIR", None),
+    }
+    platform.recover_platform_job_logs(as_conf)
     _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
 
 class CopyQueue(Queue):
@@ -832,10 +858,26 @@ class Platform(object):
             Log.warning(f"Job {job.name} and retry number:{job.fail_count} has no job id. Autosubmit will no record this retry.")
             job.updated_log = True
 
-    def connect(self, as_conf, reconnect=False):
+    def connect(self, as_conf: Any, reconnect: bool = False, log_recovery_process: bool = False) -> None:
+        """
+        Establishes an SSH connection to the host.
+
+        :param as_conf: The Autosubmit configuration object.
+        :param reconnect: Indicates whether to attempt reconnection if the initial connection fails.
+        :param log_recovery_process: Specifies if the call is made from the log retrieval process.
+        :return: None
+        """
         raise NotImplementedError
 
-    def restore_connection(self, as_conf):
+    def restore_connection(self, as_conf: Any, log_recovery_process: bool = False) -> None:
+        """
+        Restores the SSH connection to the platform.
+
+        :param as_conf: The Autosubmit configuration object used to establish the connection.
+        :type as_conf: Any
+        :param log_recovery_process: Indicates that the call is made from the log retrieval process.
+        :type log_recovery_process: bool
+        """
         raise NotImplementedError
 
     def clean_log_recovery_process(self) -> None:
@@ -901,10 +943,10 @@ class Platform(object):
         atexit.register(self.closeConnection)
         return new_platform
 
-    def create_new_process(self, ctx, new_platform) -> None:
+    def create_new_process(self, ctx, new_platform, as_conf) -> None:
         self.log_recovery_process = ctx.Process(
             target=recover_platform_job_logs_wrapper,
-            args=(new_platform, self.recovery_queue, self.work_event, self.cleanup_event),
+            args=(new_platform, self.recovery_queue, self.work_event, self.cleanup_event, as_conf),
             name=f"{self.name}_log_recovery")
         self.log_recovery_process.daemon = True
         self.log_recovery_process.start()
@@ -933,7 +975,7 @@ class Platform(object):
                 self.log_retrieval_process_active = True
                 ctx = self.get_mp_context()
                 new_platform = self.prepare_process(ctx)
-                self.create_new_process(ctx, new_platform)
+                self.create_new_process(ctx, new_platform, as_conf)
                 self.join_new_process()
 
     def send_cleanup_signal(self) -> None:
@@ -1052,7 +1094,7 @@ class Platform(object):
 
         return jobs_pending_to_process
 
-    def recover_platform_job_logs(self) -> None:
+    def recover_platform_job_logs(self, as_conf) -> None:
         """
         Recovers the logs of the jobs that have been submitted.
         When this is executed as a process, the exit is controlled by the work_event and cleanup_events of the main process.
@@ -1064,7 +1106,7 @@ class Platform(object):
             Log.info(f"{identifier} Starting...")
             jobs_pending_to_process = set()
             self.connected = False
-            self.restore_connection(None)
+            self.restore_connection(as_conf, log_recovery_process=True)
             Log.result(f"{identifier} successfully connected.")
             log_recovery_timeout = self.config.get("LOG_RECOVERY_TIMEOUT", 60)
             # Keep alive signal timeout is 5 minutes, but the sleeptime is 60 seconds.

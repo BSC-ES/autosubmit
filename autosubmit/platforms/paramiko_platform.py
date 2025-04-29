@@ -5,6 +5,8 @@ from time import sleep
 import sys
 import socket
 import os
+from typing import Any
+
 import paramiko
 import datetime
 import select
@@ -153,23 +155,30 @@ class ParamikoPlatform(Platform):
             raise AutosubmitCritical(str(e),7051)
             #raise AutosubmitError("[{0}] connection failed for host: {1}".format(self.name, self.host), 6002, e.message)
 
+    def restore_connection(self, as_conf: Any, log_recovery_process: bool = False) -> None:
+        """
+        Restores the SSH connection to the platform.
 
-    def restore_connection(self, as_conf):
+        :param as_conf: The Autosubmit configuration object used to establish the connection.
+        :type as_conf: Any
+        :param log_recovery_process: Indicates that the call is made from the log retrieval process.
+        :type log_recovery_process: bool
+        """
         try:
             self.connected = False
             retries = 2
             retry = 0
             try:
-                self.connect(as_conf)
+                self.connect(as_conf, log_recovery_process=log_recovery_process)
             except Exception as e:
                 if ',' in self.host:
                     Log.printlog(f"Connection Failed to {self.host.split(',')[0]}, will test another host", 6002)
                 else:
                     raise AutosubmitCritical(f"First connection to {self.host} is failed, check host configuration"
-                                             f" or try another login node ", 7050,str(e))
+                                             f" or try another login node ", 7050, str(e))
             while self.connected is False and retry < retries:
                 try:
-                    self.connect(as_conf,True)
+                    self.connect(as_conf, True, log_recovery_process=log_recovery_process)
                 except Exception as e:
                     pass
                 retry += 1
@@ -264,12 +273,14 @@ class ParamikoPlatform(Platform):
         else:
             Log.warning(f"SSH config file {self._user_config_file} not found")
 
-    def connect(self, as_conf, reconnect=False):
+    def connect(self, as_conf: Any, reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """
-        Creates ssh connection to host
+        Establishes an SSH connection to the host.
 
-        :return: True if connection is created, False otherwise
-        :rtype: bool
+        :param as_conf: The Autosubmit configuration object.
+        :param reconnect: Indicates whether to attempt reconnection if the initial connection fails.
+        :param log_recovery_process: Specifies if the call is made from the log retrieval process.
+        :return: None
         """
 
         try:
@@ -346,7 +357,8 @@ class ParamikoPlatform(Platform):
             self._ftpChannel = paramiko.SFTPClient.from_transport(self.transport,window_size=pow(4, 12) ,max_packet_size=pow(4, 12) )
             self._ftpChannel.get_channel().settimeout(120)
             self.connected = True
-            self.spawn_log_retrieval_process(as_conf)
+            if not log_recovery_process:
+                self.spawn_log_retrieval_process(as_conf)
 
 
         except SSHException:

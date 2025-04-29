@@ -154,12 +154,14 @@ class EcPlatform(ParamikoPlatform):
             export += " ; "
         return export + self._submit_cmd + job_script
 
-    def connect(self, as_conf, reconnect=False):
+    def connect(self, as_conf: Any, reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """
-        In this case, it does nothing because connection is established for each command
+        Establishes an SSH connection to the host.
 
-        :return: True
-        :rtype: bool
+        :param as_conf: The Autosubmit configuration object.
+        :param reconnect: Indicates whether to attempt reconnection if the initial connection fails.
+        :param log_recovery_process: Specifies if the call is made from the log retrieval process.
+        :return: None
         """
         output = subprocess.check_output(self._checkvalidcert_cmd, shell=True).decode(locale.getlocale()[1])
         if not output:
@@ -171,17 +173,20 @@ class EcPlatform(ParamikoPlatform):
                 self.connected = False
         except Exception:
             self.connected = False
-        self.spawn_log_retrieval_process(as_conf)
+        if not log_recovery_process:
+            self.spawn_log_retrieval_process(as_conf)
 
     def create_a_new_copy(self):
         return EcPlatform(self.expid, self.name, self.config, self.scheduler)
 
-    def restore_connection(self,as_conf):
+    def restore_connection(self, as_conf: Any, log_recovery_process: bool = False) -> None:
         """
-        In this case, it does nothing because connection is established for each command
+        Restores the SSH connection to the platform.
 
-        :return: True
-        :rtype: bool
+        :param as_conf: The Autosubmit configuration object used to establish the connection.
+        :type as_conf: Any
+        :param log_recovery_process: Indicates that the call is made from the log retrieval process.
+        :type log_recovery_process: bool
         """
         output = subprocess.check_output(self._checkvalidcert_cmd, shell=True).decode(locale.getlocale()[1])
         if not output:
