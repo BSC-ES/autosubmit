@@ -1177,12 +1177,12 @@ class Job(object):
                     lst.append(parse_date(fields[index]))
         return lst
 
-    def check_end_time(self, fail_count=-1):
+    def check_end_time(self, fail_count=-1) -> int:
         """
         Returns end time from stat file
 
         :return: date and time
-        :rtype: str
+        :rtype: int
         """
         return self._get_from_stat(1, fail_count)
 

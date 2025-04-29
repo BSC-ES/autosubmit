@@ -27,6 +27,7 @@ from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from textwrap import dedent
+from time import time
 
 import pytest
 from bscearth.utils.date import date2str
@@ -1954,4 +1955,53 @@ def test_write_submit_time_ignore_exp_history(total_stats_exists: bool, autosubm
     # When the file already exists, it will append a new line. Otherwise,
     # a new file is created with a single line.
     expected_lines = 2 if total_stats_exists else 1
+    assert len(total_stats.read_text().split('\n')) == expected_lines
+
+
+@pytest.mark.parametrize(
+    'completed,existing_lines,count',
+    [
+        (True, 'a\nb\n', -1),
+        (True, None, -1),
+        (False, 'a\n', -1),
+        (False, None, 100)
+    ],
+    ids=[
+        'job completed, two existing lines, no count',
+        'job completed, empty file, no count',
+        'job failed, one existing line, no count',
+        'job failed, empty file, count is 100'
+    ]
+)
+def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str, local, count:int,
+                                           autosubmit_config, mocker):
+    """Test that the job writes the end time correctly.
+
+    It ignores what happens to the experiment history object."""
+    mocker.patch('autosubmit.job.job.ExperimentHistory')
+
+    as_conf = autosubmit_config(_EXPID, experiment_data={})
+    tmp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, as_conf.basic_config.LOCAL_TMP_DIR)
+
+    status = Status.COMPLETED if True else Status.WAITING
+    job = Job(f'{_EXPID}_dummy', 1, status, 0)
+    job.finish_time_timestamp = time()
+    job.platform = local
+
+    total_stats = Path(tmp_path, f'{job.name}_TOTAL_STATS')
+    if existing_lines:
+        total_stats.touch()
+        total_stats.write_text(existing_lines)
+
+    job.write_end_time(completed=completed, count=count)
+
+    # It will exist regardless of the argument ``total_stats_exists``, as ``write_submit_time()``
+    # must have created it.
+    assert total_stats.exists()
+
+    # When the file already exists, it will append new content. It must never
+    # delete the existing lines, so this assertion just verifies the content
+    # written previously (if any) was not removed.
+    existing_lines = len(existing_lines.split('\n')) - 1 if existing_lines else 0
+    expected_lines = existing_lines + 1
     assert len(total_stats.read_text().split('\n')) == expected_lines
