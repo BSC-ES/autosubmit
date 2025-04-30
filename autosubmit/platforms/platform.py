@@ -732,7 +732,7 @@ class Platform(object):
     def get_stat_file(self, job, count=-1):
 
         if count == -1:  # No internal retrials
-            filename = job.stat_file + "0"
+            filename = f"{job.stat_file}{job.fail_count}"
         else:
             filename = job.name + '_STAT_{0}'.format(str(count))
         stat_local_path = os.path.join(
@@ -741,7 +741,7 @@ class Platform(object):
             os.remove(stat_local_path)
         if self.check_file_exists(filename):
             if self.get_file(filename, True):
-                Log.debug('{0}_STAT file have been transferred', job.name)
+                Log.debug(f'{filename} file have been transferred')
                 return True
         Log.warning('{0}_STAT file not found', job.name)
         return False
