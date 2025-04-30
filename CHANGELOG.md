@@ -6,7 +6,8 @@
 - Corrected an issue where `experiment_data` was not saved when using a shared account. [PR](https://github.com/BSC-ES/autosubmit-config-parser/pull/82)
 - Fixed timestamp-related issues in logs and processes. [#2275](https://github.com/BSC-ES/autosubmit/issues/2275), [PR](https://github.com/BSC-ES/autosubmit/pull/2284), [PR](https://github.com/BSC-ES/autosubmit/pull/2329)
 - Reintroduced the `%SCRATCH_DIR%` variable and fixed problems with date variables. [#2248](https://github.com/BSC-ES/autosubmit/issues/2248), [PR](https://github.com/BSC-ES/autosubmit/pull/2292)
-
+- Resolved an authentication issue related to user mapping. [PR #2333](https://github.com/BSC-ES/autosubmit/pull/2333)
+- 
 **Enhancements:**
 - Improved validation for the `expid` flag. [PR](https://github.com/BSC-ES/autosubmit/pull/2309)
 - Made the details database more consistent and reliable. [PR](https://github.com/BSC-ES/autosubmit/pull/2296)
