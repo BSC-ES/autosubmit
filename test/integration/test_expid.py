@@ -59,6 +59,7 @@ def test_copy_experiment(type_flag: str, autosubmit_exp: Callable, autosubmit: A
 
     assert expid
 
+
 @pytest.mark.parametrize(
     'type_flag,',
     [
@@ -88,6 +89,7 @@ def test_expid_mutually_exclusive_arguments(type_flag: str, autosubmit: Autosubm
     )
 
     assert expid
+
 
 @pytest.mark.parametrize(
         'has_min_yaml',
@@ -135,6 +137,7 @@ def test_copy_minimal(has_min_yaml: bool, autosubmit: Autosubmit) -> None:
             assert exc_info.value.code == 7011
             assert "minimal.yml" in str(exc_info.value)
 
+
 def test_create_expid_default_hpc(autosubmit: Autosubmit) -> None:
     """Create expid with the default hcp value (no -H flag defined).
 
@@ -148,10 +151,9 @@ def test_create_expid_default_hpc(autosubmit: Autosubmit) -> None:
     :return: None
     """
     # create default expid
-    platform_name = "local"
     experiment_id = autosubmit.expid(
         'experiment_id',
-        platform_name,
+        "",
         minimal_configuration=True
     )
 
@@ -159,7 +161,8 @@ def test_create_expid_default_hpc(autosubmit: Autosubmit) -> None:
     describe = autosubmit.describe(experiment_id)
     hpc_result  = describe[4].lower()
 
-    assert hpc_result == platform_name
+    assert hpc_result == "local"
+
 
 @pytest.mark.parametrize("fake_hpc, expected_hpc", [
     ("mn5", "mn5"),
@@ -169,8 +172,8 @@ def test_create_expid_flag_hpc(fake_hpc: str, expected_hpc: str, autosubmit: Aut
 
     .. code-block:: console
 
-        autosubmit expid -H ithaca -d "experiment is about..."
-        autosubmit expid -H "" -d "experiment is about..."
+        autosubmit expid -H ithaca -d "experiment"
+        autosubmit expid -H "" -d "experiment"
 
     :param fake_hpc: The value for the -H flag (hpc value).
     :type fake_hpc: str
@@ -205,7 +208,8 @@ def test_copy_expid(fake_hpc: str, expected_hpc: str, autosubmit: Autosubmit) ->
 
     .. code-block:: console
 
-        autosubmit expid -y a000 -d "experiment is about..."
+        autosubmit expid -d "original" -H "<PLATFORM>"
+        autosubmit expid -y a000 -d ""
 
     :param fake_hpc: The value for the -H flag (hpc value).
     :type fake_hpc: str
@@ -233,16 +237,14 @@ def test_copy_expid(fake_hpc: str, expected_hpc: str, autosubmit: Autosubmit) ->
     assert hpc_result_copy == expected_hpc
 
 
-# copy expid with specific hpc should not change the hpc value
-# autosubmit expid -y a000 -h local -d "experiment is about..."
 def test_copy_expid_no(autosubmit: Autosubmit) -> None:
-    """Copy an experiment with specific HPC platform
+    """Copying expid, but choosing another HPC value must create a new experiment with the chosen HPC value
 
     .. code-block:: console
 
         autosubmit expid -y a000 -h local -d "experiment is about..."
 
-    :param autosubmit: Autosubmit interface that instantiate with no experiment.
+    :param autosubmit: Autosubmit interface that instantiates with no experiment.
     :type autosubmit: Autosubmit
 
     :return: None
