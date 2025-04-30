@@ -17,7 +17,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import os
 import subprocess
-from typing import Any
+from typing import TYPE_CHECKING
 
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException
 from log.log import Log,AutosubmitError
@@ -27,6 +27,11 @@ from autosubmit.platforms.headers.slurm_header import SlurmHeader
 from autosubmit.platforms.wrappers.wrapper_factory import EcWrapperFactory
 from time import sleep
 import locale
+
+if TYPE_CHECKING:
+    from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+
+
 class EcPlatform(ParamikoPlatform):
     """
     Class to manage queues with ecaccess
@@ -154,7 +159,7 @@ class EcPlatform(ParamikoPlatform):
             export += " ; "
         return export + self._submit_cmd + job_script
 
-    def connect(self, as_conf: Any, reconnect: bool = False, log_recovery_process: bool = False) -> None:
+    def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """
         Establishes an SSH connection to the host.
 
@@ -179,12 +184,12 @@ class EcPlatform(ParamikoPlatform):
     def create_a_new_copy(self):
         return EcPlatform(self.expid, self.name, self.config, self.scheduler)
 
-    def restore_connection(self, as_conf: Any, log_recovery_process: bool = False) -> None:
+    def restore_connection(self, as_conf: 'AutosubmitConfig', log_recovery_process: bool = False) -> None:
         """
         Restores the SSH connection to the platform.
 
         :param as_conf: The Autosubmit configuration object used to establish the connection.
-        :type as_conf: Any
+        :type as_conf: AutosubmitConfig
         :param log_recovery_process: Indicates that the call is made from the log retrieval process.
         :type log_recovery_process: bool
         """
@@ -199,7 +204,7 @@ class EcPlatform(ParamikoPlatform):
         except Exception:
             self.connected = False
 
-    def test_connection(self, as_conf: Any) -> None:
+    def test_connection(self, as_conf: 'AutosubmitConfig') -> None:
         """
         Tests the connection using the provided configuration.
 

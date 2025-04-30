@@ -5,13 +5,12 @@ from time import sleep
 import sys
 import socket
 import os
-from typing import Any
+from typing import TYPE_CHECKING
 
 import paramiko
 import datetime
 import select
 import re
-from datetime import timedelta
 import random
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_common import Type
@@ -24,6 +23,9 @@ import threading
 import getpass
 from paramiko.agent import Agent
 import time
+
+if TYPE_CHECKING:
+    from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 def threaded(fn):
     def wrapper(*args, **kwargs):
@@ -155,12 +157,12 @@ class ParamikoPlatform(Platform):
             raise AutosubmitCritical(str(e),7051)
             #raise AutosubmitError("[{0}] connection failed for host: {1}".format(self.name, self.host), 6002, e.message)
 
-    def restore_connection(self, as_conf: Any, log_recovery_process: bool = False) -> None:
+    def restore_connection(self, as_conf: 'AutosubmitConfig', log_recovery_process: bool = False) -> None:
         """
         Restores the SSH connection to the platform.
 
         :param as_conf: The Autosubmit configuration object used to establish the connection.
-        :type as_conf: Any
+        :type as_conf: AutosubmitConfig
         :param log_recovery_process: Indicates that the call is made from the log retrieval process.
         :type log_recovery_process: bool
         """
@@ -273,7 +275,7 @@ class ParamikoPlatform(Platform):
         else:
             Log.warning(f"SSH config file {self._user_config_file} not found")
 
-    def connect(self, as_conf: Any, reconnect: bool = False, log_recovery_process: bool = False) -> None:
+    def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """
         Establishes an SSH connection to the host.
 

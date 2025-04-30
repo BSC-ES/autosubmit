@@ -19,7 +19,7 @@
 import locale
 import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 from xml.dom.minidom import parseString
 import subprocess
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
@@ -28,6 +28,9 @@ from autosubmit.platforms.wrappers.wrapper_factory import LocalWrapperFactory
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from time import sleep
 from log.log import Log, AutosubmitError
+
+if TYPE_CHECKING:
+    from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 class LocalPlatform(ParamikoPlatform):
     """
@@ -121,7 +124,7 @@ class LocalPlatform(ParamikoPlatform):
     def get_checkjob_cmd(self, job_id):
         return self.get_pscall(job_id)
 
-    def connect(self, as_conf: Any, reconnect: bool = False, log_recovery_process: bool = False) -> None:
+    def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """
         Establishes an SSH connection to the host.
 
@@ -138,13 +141,12 @@ class LocalPlatform(ParamikoPlatform):
         if not self.connected:
             self.connect(as_conf)
 
-
-    def restore_connection(self, as_conf: Any, log_recovery_process: bool = False) -> None:
+    def restore_connection(self, as_conf: 'AutosubmitConfig', log_recovery_process: bool = False) -> None:
         """
         Restores the SSH connection to the platform.
 
         :param as_conf: The Autosubmit configuration object used to establish the connection.
-        :type as_conf: Any
+        :type as_conf: AutosubmitConfig
         :param log_recovery_process: Indicates that the call is made from the log retrieval process.
         :type log_recovery_process: bool
         """

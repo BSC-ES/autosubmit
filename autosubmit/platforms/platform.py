@@ -1,21 +1,21 @@
 import atexit
 import multiprocessing
 import queue  # only for the exception
-from collections import deque
-from copy import copy
 from os import _exit
 import setproctitle
 import locale
 import os
 import traceback
 from autosubmit.job.job_common import Status
-from typing import List, Union, Set, Any
+from typing import List, Union, Set, Any, TYPE_CHECKING
 from autosubmit.helpers.parameters import autosubmit_parameter
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import AutosubmitCritical, AutosubmitError, Log
 from multiprocessing import Event
 from multiprocessing.queues import Queue
 import time
+
+if TYPE_CHECKING:
+    from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 
 def recover_platform_job_logs_wrapper(
@@ -961,8 +961,7 @@ class Platform(object):
         os.waitpid(self.log_recovery_process.pid, os.WNOHANG)
         Log.result(f"Process {self.log_recovery_process.name} started with pid {self.log_recovery_process.pid}")
 
-
-    def spawn_log_retrieval_process(self, as_conf: Any) -> None:
+    def spawn_log_retrieval_process(self, as_conf: 'AutosubmitConfig') -> None:
         """
         Spawns a process to recover the logs of the jobs that have been completed on this platform.
 

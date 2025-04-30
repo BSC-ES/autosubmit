@@ -19,12 +19,15 @@
 
 import os
 import subprocess
-from typing import Any
+from typing import TYPE_CHECKING
 
 from xml.dom.minidom import parseString
 
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.headers.sge_header import SgeHeader
+
+if TYPE_CHECKING:
+    from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 
 class SgePlatform(ParamikoPlatform):
@@ -115,7 +118,7 @@ class SgePlatform(ParamikoPlatform):
     def get_checkjob_cmd(self, job_id):
         return self.get_qstatjob(job_id)
 
-    def connect(self, as_conf: Any, reconnect: bool = False, log_recovery_process: bool = False) -> None:
+    def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """
         Establishes an SSH connection to the host.
 
@@ -128,8 +131,7 @@ class SgePlatform(ParamikoPlatform):
         if not log_recovery_process:
             self.spawn_log_retrieval_process(as_conf) # This platform may be deprecated, so ignore the change
 
-
-    def restore_connection(self, as_conf: Any, log_recovery_process: bool = False) -> None:
+    def restore_connection(self, as_conf: 'AutosubmitConfig', log_recovery_process: bool = False) -> None:
         """
         Restores the SSH connection to the platform.
 
