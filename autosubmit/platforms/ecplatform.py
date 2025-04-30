@@ -139,15 +139,6 @@ class EcPlatform(ParamikoPlatform):
     def get_submitted_job_id(self, output, x11 = False):
         return output
 
-    def jobs_in_queue(self):
-        """
-        Returns empty list because ecacces does not support this command
-
-        :return: empty list
-        :rtype: list
-        """
-        return ''.split()
-
     def get_checkjob_cmd(self, job_id):
         return self._checkjob_cmd + str(job_id)
 

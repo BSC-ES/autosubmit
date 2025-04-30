@@ -259,6 +259,7 @@ class PJMPlatform(ParamikoPlatform):
         self.get_cmd = "scp"
         self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
 
+    # TODO: Not used, but it's in Slurm. To confirm later if it must stay...
     def hold_job(self, job):
         try:
             cmd = "pjrls {0} ; sleep 2 ; pjhold -R ASHOLD {0}".format(job.id)
@@ -460,6 +461,7 @@ class PJMPlatform(ParamikoPlatform):
     #
         """).ljust(13)
         else:
+            # TODO: Bug here if this code is every called, no such function
             wr_header = self.calculate_wrapper_het_header(kwargs["wrapper_data"])
         if kwargs["method"] == 'srun':
             language = kwargs["executable"]

@@ -27,7 +27,6 @@ import locale
 import os
 from time import sleep
 from typing import List, Union, Any
-from xml.dom.minidom import parseString
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 from autosubmit.job.job_common import Status
@@ -512,18 +511,6 @@ class SlurmPlatform(ParamikoPlatform):
             return jobs_id
         except IndexError as exc:
             raise AutosubmitCritical("Submission failed. There are issues on your config file", 7014) from exc
-
-    @staticmethod
-    def jobs_in_queue() -> list[int]:
-        """
-        list of nodeValue of the firstChild of each element.
-
-        :return: Return the list of values of the children of each job in the list of jobs.
-        :rtype: list[int]
-        """
-        dom = parseString('')
-        jobs_xml = dom.getElementsByTagName("JB_job_number")
-        return [int(element.firstChild.nodeValue) for element in jobs_xml]
 
     def get_submit_cmd(self, job_script: str, job, hold: bool=False, export: str="") -> str:
         """

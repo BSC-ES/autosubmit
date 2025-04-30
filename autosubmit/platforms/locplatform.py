@@ -18,15 +18,15 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import locale
 import os
-from pathlib import Path
-from typing import TYPE_CHECKING
-from xml.dom.minidom import parseString
 import subprocess
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+from pathlib import Path
+from time import sleep
+from typing import TYPE_CHECKING
+
 from autosubmit.platforms.headers.local_header import LocalHeader
+from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.wrappers.wrapper_factory import LocalWrapperFactory
 from autosubmitconfigparser.config.basicconfig import BasicConfig
-from time import sleep
 from log.log import Log, AutosubmitError
 
 if TYPE_CHECKING:
@@ -102,11 +102,6 @@ class LocalPlatform(ParamikoPlatform):
 
     def get_submitted_job_id(self, output, x11 = False):
         return output
-
-    def jobs_in_queue(self):
-        dom = parseString('')
-        jobs_xml = dom.getElementsByTagName("JB_job_number")
-        return [int(element.firstChild.nodeValue) for element in jobs_xml]
 
     def get_submit_cmd(self, job_script, job, hold=False, export=""):
         if job:  # Not intuitive at all, but if it is not a job, it is a wrapper

@@ -341,22 +341,6 @@ class Platform(object):
     def root_dir(self, value):
         self._root_dir = value
 
-    def get_exclusive_directive(self, job):
-        """
-        Returns exclusive directive for the specified job
-
-        :param job: job to create exclusive directive for
-        :type job: Job
-        :return: exclusive directive
-        :rtype: str
-        """
-        # only implemented for slurm
-        return ""
-
-    def get_multiple_jobids(self, job_list, valid_packages_to_submit, failed_packages, error_message="", hold=False):
-        return False, valid_packages_to_submit
-        # raise NotImplementedError
-
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
 

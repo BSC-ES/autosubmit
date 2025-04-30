@@ -15,17 +15,26 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Test for the Autosubmit Local platform."""
-
-from pathlib import Path
+"""Unit tests for the Local Platform."""
 
 import pytest
+from pathlib import Path
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.platforms.locplatform import LocalPlatform
 
-_EXPID = 't000'
+_EXPID = 't001'
+
+
+def test_local_platform_copy():
+    local_platform = LocalPlatform(_EXPID, 'local', {}, auth_password=None)
+
+    copied = local_platform.create_a_new_copy()
+
+    assert local_platform.name == copied.name
+    assert local_platform.expid == copied.expid
+    assert local_platform.get_checkhost_cmd() == copied.get_checkhost_cmd()
 
 
 @pytest.mark.parametrize(
