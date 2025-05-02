@@ -162,6 +162,17 @@ JobPklTable = Table(
     Column("modified", String),
 )
 
+DetailsTable = Table(
+    "details",
+    metadata_obj,
+    Column("exp_id", Integer, primary_key=True),
+    Column("user", Text, nullable=False),
+    Column("created", Text, nullable=False),
+    Column("model", Text, nullable=False),
+    Column("branch", Text, nullable=False),
+    Column("hpc", Text, nullable=False),
+)
+
 TABLES = (
     ExperimentTable,
     ExperimentStatusTable,
@@ -173,6 +184,7 @@ TABLES = (
     JobListTable,
     WrapperJobPackageTable,
     JobPklTable,
+    DetailsTable,
 )
 """The tables available in the Autosubmit databases."""
 

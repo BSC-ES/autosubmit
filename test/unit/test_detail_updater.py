@@ -1,7 +1,8 @@
+import pytest
 from unittest.mock import MagicMock, patch
 from autosubmit.experiment.detail_updater import (
     ExperimentDetails,
-    ExperimentDetailsRepository,
+    create_experiment_details_repository,
 )
 
 
@@ -26,12 +27,20 @@ def test_details_properties(mocker):
     assert exp_details.model == "my_git_origin"
     assert exp_details.branch == "my_git_branch"
 
+@pytest.mark.parametrize(
+    "db_engine",
+    [
+        pytest.param("postgres", marks=[pytest.mark.postgres]),
+        "sqlite",
+    ],
+)
+def test_details_repository(tmpdir, db_engine: str, request: pytest.FixtureRequest):
+    request.getfixturevalue(f"as_db_{db_engine}")
 
-def test_details_repository(tmpdir):
     with patch("autosubmit.experiment.detail_updater.BasicConfig") as mock_basic_config:
         mock_basic_config.DB_PATH = str(tmpdir / "test_details_repository.db")
 
-        details_repo = ExperimentDetailsRepository()
+        details_repo = create_experiment_details_repository()
 
         new_data = {
             "exp_id": 10,
