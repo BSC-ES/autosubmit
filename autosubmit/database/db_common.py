@@ -35,7 +35,7 @@ Log.get_logger("Autosubmit")
 
 
 CURRENT_DATABASE_VERSION = 1
-TIMEOUT = 10
+TIMEOUT = 15
 
 def create_db(qry):
     """
