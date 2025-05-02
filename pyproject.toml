@@ -1,24 +1,22 @@
-#!/usr/bin/env python3
-
-# Copyright 2014-2025 Barcelona Supercomputing Center (https://www.bsc.es/) 
-
+# Copyright 2014-2025 Barcelona Supercomputing Center (https://www.bsc.es/)
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools >= 77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -34,7 +32,7 @@ maintainers = [
 ]
 
 keywords = ["climate", "weather", "workflow", "HPC"]
-license = {text = "GNU GPLv3"} 
+license = {file = "LICENSE"}
 
 classifiers = [
     "Programming Language :: Python :: 3.9",
@@ -47,22 +45,19 @@ classifiers = [
 
 dependencies = [
     "xlib==0.21",
-    "setuptools<=76.0.0",
     "bscearth.utils<=0.5.2",
-    "requests<=2.31.0",
+    "requests<=2.32.3",
     "networkx<=2.6.3",
-    "portalocker<=2.7.0",
+    "portalocker<=3.1.1",
     "paramiko>=3.5.0",
-    "pyparsing==3.2.1",
-    "matplotlib<=3.8.3",
-    "packaging<=24.2",
+    "pyparsing==3.2.3",
+    "matplotlib<=3.9.4",
     "typing_extensions==4.*",
-    "typing<=3.7.4.3",
     "psutil<=7.0.0",
     "py3dotplus==1.1.0",
-    "numpy<2",
+    "numpy<3",
     "rocrate==0.*",
-    "autosubmitconfigparser==1.0.78rc2",
+    "autosubmitconfigparser==1.0.79",
     "configparser",
     "setproctitle",
     "invoke>=2.0"
@@ -84,28 +79,22 @@ tests = [
     "pytest>=8.2,<8.4",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.6.2"
-    # 'testcontainers'  # TODO: pending Postgres MR
+    "ruff==0.11.7",
+    "pytest-xdist",
+    "testcontainers"
 ]
 docs = [
     "livereload",
     "pydata-sphinx-theme==0.15.*",
-    "sphinx==5.*",
-    "sphinx-autobuild==2021.3.*",
+    "sphinx>=5,<9",
+    "sphinx-autobuild>=2021.3,<2024.11",
     "sphinx_rtd_theme",
     "sphinx-reredirects==0.1.*"
 ]
-all = ["psycopg2",
-    "pytest>=8.2,<8.4",
-    "pytest-cov",
-    "pytest-mock",
-    "ruff==0.6.2",
-    "livereload",
-    "pydata-sphinx-theme==0.15.*",
-    "sphinx==5.*",
-    "sphinx-autobuild==2021.3.*",
-    "sphinx_rtd_theme",
-    "sphinx-reredirects==0.1.*"
+all = [
+    "autosubmit[tests]",
+    "autosubmit[docs]"
+    # "autosubmit[postgres]"
 ]
 
 [tool.setuptools.packages.find]

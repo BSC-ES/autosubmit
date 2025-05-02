@@ -1,0 +1,29 @@
+# Frequency example https://autosubmit.readthedocs.io/en/master/userguide/defining_workflows/index.html
+
+experiment:
+  DATELIST: 19900101
+  MEMBERS: "Member1 Member2"
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '5'
+  CALENDAR: standard
+JOBS:
+    ini:
+        FILE: ini.sh
+        RUNNING: member
+
+    sim:
+        FILE: sim.sh
+        DEPENDENCIES: ini sim-1
+        RUNNING: chunk
+
+    postprocess:
+        FILE: postprocess.sh
+        DEPENDENCIES: sim
+        RUNNING: chunk
+        FREQUENCY: 3
+
+    combine:
+        FILE: combine.sh
+        DEPENDENCIES: postprocess
+        RUNNING: member

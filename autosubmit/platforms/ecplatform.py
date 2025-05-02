@@ -198,8 +198,8 @@ class EcPlatform(ParamikoPlatform):
         """
         Tests the connection using the provided configuration.
 
-        Args:
-            as_conf (AutosubmitConfig): The configuration to use for testing the connection.
+        :param as_conf: The configuration to use for testing the connection.
+        :type as_conf: AutosubmitConfig
         """
         self.connect(as_conf)
 

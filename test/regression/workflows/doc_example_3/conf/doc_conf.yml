@@ -1,0 +1,24 @@
+experiment:
+  DATELIST: 20000101 20000201
+  MEMBERS: "Member1 Member2"
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '2'
+  CALENDAR: standard
+JOBS:
+    once:
+        FILE: Once.sh
+    date:
+        FILE: date.sh
+        DEPENDENCIES: once
+        RUNNING: date
+
+    member:
+        FILE: Member.sh
+        DEPENDENCIES: date
+        RUNNING: member
+
+    chunk:
+        FILE: Chunk.sh
+        DEPENDENCIES: member
+        RUNNING: chunk

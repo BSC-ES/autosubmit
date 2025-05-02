@@ -1,0 +1,1170 @@
+CONFIG:
+  MAXWAITINGJOBS: '4'
+  TOTALJOBS: '20'
+  SAFETYSLEEPTIME: '10'
+  RETRIALS: 0
+  OUTPUT: pdf
+  PRESUBMISSION: 'FALSE'
+  AUTOSUBMIT_VERSION: 4.1.13
+DEFAULT:
+  EXPID: a014
+  HPCARCH: local
+PROJECT:
+  PROJECT_TYPE: none
+  PROJECT_DESTINATION: auto-performance-profiling
+GIT:
+  PROJECT_ORIGIN: ""
+  PROJECT_BRANCH: ""
+  PROJECT_COMMIT: ""
+
+
+EXPERIMENT:
+  START_DATE: 19900101
+  END_DATE: 19900102
+  OUTPUT: false
+  DATELIST: '20210811'
+  MEMBERS: CompilationEfficiency HardwareBenchmarks StrongScaling Tracing
+  CHUNKSIZEUNIT: month
+  CHUNKSIZE: 1
+  NUMCHUNKS: 2
+  CALENDAR: standard
+
+JOBS:
+  CLEAN:
+    FILE: autosubmit/templates/clean.sh
+    RUNNING: once
+    WALLCLOCK: 00:10
+    CHECK: 'true'
+    RERUN_ONLY: true
+    DEPENDENCIES: {}
+    ADDITIONAL_FILES: []
+  SYNCHRONIZE:
+    FILE: autosubmit/templates/synchronize.sh
+    RUNNING: once
+    WALLCLOCK: 00:10
+    CHECK: 'true'
+    #PLATFORM: local
+    DEPENDENCIES:
+      CLEAN: {}
+    ADDITIONAL_FILES: []
+  REMOTE_SETUP:
+    FILE: autosubmit/templates/remote_setup.sh
+    DEPENDENCIES:
+      SYNCHRONIZE: {}
+    RUNNING: once
+    WALLCLOCK: 00:30
+    CHECK: 'true'
+    ADDITIONAL_FILES: []
+  REMOTE_INIDATA:
+    FILE: autosubmit/templates/ini.sh
+    DEPENDENCIES:
+      REMOTE_SETUP: {}
+    WALLCLOCK: 00:30
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    ADDITIONAL_FILES: []
+  HW_COMPILATION:
+    FILE: autosubmit/templates/compilation.sh
+    DEPENDENCIES:
+      REMOTE_INIDATA:
+        MEMBERS_FROM:
+          TRACING, WEAKSCALING, COMPILATIONEFFICIENCY, STRONGSCALING:
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+            DATES_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    NOTIFY_ON:
+    - FAILED
+    ADDITIONAL_FILES: []
+  PREPARE_TESTS:
+    FILE: autosubmit/templates/tests.sh
+    DEPENDENCIES:
+      HW_COMPILATION:
+        MEMBERS_FROM:
+          TRACING, WEAKSCALING, COMPILATIONEFFICIENCY, STRONGSCALING:
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+            DATES_TO: None
+      REMOTE_COMPILATION_O3_OMPI_TRACE:
+        MEMBERS_FROM:
+          HARDWAREBENCHMARKS:
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+            DATES_TO: None
+        NAME: O3_ompi_trace
+        TEST_NAME: O3_ompi_trace
+      REMOTE_COMPILATION_O3_OMPI_PROD:
+        MEMBERS_FROM:
+          HARDWAREBENCHMARKS:
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+            DATES_TO: None
+        NAME: O3_ompi_prod
+        TEST_NAME: O3_ompi_prod
+      REMOTE_COMPILATION_O3_IMPI_PROD:
+        MEMBERS_FROM:
+          HARDWAREBENCHMARKS:
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+            DATES_TO: None
+        NAME: O3_impi_prod
+        TEST_NAME: O3_impi_prod
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    ADDITIONAL_FILES: []
+  FUNCTIONS_DIR:
+    FILE: autosubmit/templates/functions_dir.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          HARDWAREBENCHMARKS, WEAKSCALING, COMPILATIONEFFICIENCY, STRONGSCALING:
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+            DATES_TO: None
+    THREADS: '4'
+    RUNNING: member
+    WALLCLOCK: 02:00
+    PROCESSORS: '112'
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    OIFS_PROCS: '%TRACING.USER_FUNCTIONS_OIFS_PROCS%'
+    NEMO_PROCS: '%TRACING.USER_FUNCTIONS_NEMO_PROCS%'
+    ADDITIONAL_FILES: []
+  TRACE_CUT:
+    FILE: autosubmit/templates/trace_cut.sh
+    DEPENDENCIES:
+      REPORT_SETUP:
+        MEMBERS_FROM:
+          HARDWAREBENCHMARKS, WEAKSCALING, COMPILATIONEFFICIENCY, STRONGSCALING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    PROCESSORS: 4
+    ADDITIONAL_FILES: []
+  DIMEMAS_TRACES:
+    FILE: autosubmit/templates/dimemas_traces.sh
+    DEPENDENCIES:
+      TRACE_CUT:
+        MEMBERS_FROM:
+          HARDWAREBENCHMARKS, WEAKSCALING, COMPILATIONEFFICIENCY, STRONGSCALING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    ADDITIONAL_FILES: []
+  DIMEMAS_IMAGES:
+    FILE: autosubmit/templates/dimemas_images.sh
+    DEPENDENCIES:
+      DIMEMAS_TRACES:
+        MEMBERS_FROM:
+          HARDWAREBENCHMARKS, WEAKSCALING, COMPILATIONEFFICIENCY, STRONGSCALING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    ADDITIONAL_FILES: []
+  PARAMEDIR:
+    FILE: autosubmit/templates/paramedir.sh
+    DEPENDENCIES:
+      TRACE_CUT:
+        MEMBERS_FROM:
+          HARDWAREBENCHMARKS, WEAKSCALING, COMPILATIONEFFICIENCY, STRONGSCALING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    ADDITIONAL_FILES: []
+  PARADIM:
+    FILE: autosubmit/templates/paradim.sh
+    DEPENDENCIES:
+      DIMEMAS_TRACES:
+        MEMBERS_FROM:
+          HARDWAREBENCHMARKS, WEAKSCALING, COMPILATIONEFFICIENCY, STRONGSCALING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    ADDITIONAL_FILES: []
+  PARAVER:
+    FILE: autosubmit/templates/paraver.sh
+    DEPENDENCIES:
+      TRACE_CUT:
+        MEMBERS_FROM:
+          HARDWAREBENCHMARKS, WEAKSCALING, COMPILATIONEFFICIENCY, STRONGSCALING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    ADDITIONAL_FILES: []
+  HARDWARE_BENCH_IMAGES:
+    FILE: autosubmit/templates/hardware_bench_images.sh
+    DEPENDENCIES:
+      REPORT_SETUP:
+        MEMBERS_FROM:
+          STRONGSCALING, WEAKSCALING, COMPILATIONEFFICIENCY, STRONGSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    ADDITIONAL_FILES: []
+  MODELFACTORS:
+    FILE: autosubmit/templates/modelfactors.sh
+    DEPENDENCIES:
+      TRACE_CUT:
+        MEMBERS_FROM:
+          HARDWAREBENCHMARKS, COMPILATIONEFFICIENCY, WEAKSCALING, STRONGSCALING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    ADDITIONAL_FILES: []
+  CONFIGURATION_JSON:
+    FILE: autosubmit/templates/configuration_json.sh
+    DEPENDENCIES:
+      PARAMEDIR:
+        MEMBERS_FROM:
+          HARDWAREBENCHMARKS, WEAKSCALING, COMPILATIONEFFICIENCY, STRONGSCALING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+      PARADIM:
+        MEMBERS_FROM:
+          HARDWAREBENCHMARKS, WEAKSCALING, COMPILATIONEFFICIENCY, STRONGSCALING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+      REPORT_SETUP:
+        MEMBERS_FROM:
+          HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    ADDITIONAL_FILES: []
+  REPORT:
+    FILE: autosubmit/templates/report.sh
+    DEPENDENCIES:
+      PARAVER:
+        MEMBERS_TO: Tracing
+      DIMEMAS_IMAGES:
+        MEMBERS_TO: Tracing
+      HARDWARE_BENCH_IMAGES:
+        MEMBERS_TO: HardwareBenchmarks
+      MODELFACTORS:
+        MEMBERS_TO: Tracing
+      CONFIGURATION_JSON:
+        MEMBERS_TO: CompilationEfficiency,WeakScaling,Tracing,StrongScaling
+    WALLCLOCK: 00:30
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    ADDITIONAL_FILES: []
+  REMOTE_COMPILATION_O3_OMPI_TRACE:
+    FILE: autosubmit/templates/compilation.sh
+    DEPENDENCIES:
+      REMOTE_INIDATA: {}
+    WALLCLOCK: 02:00
+    NOTIFY_ON:
+    - FAILED
+    NAME: O3_ompi_trace
+    TEST_NAME: O3_ompi_trace
+    ADDITIONAL_FILES: []
+  REMOTE_COMPILATION_O3_OMPI_PROD:
+    FILE: autosubmit/templates/compilation.sh
+    DEPENDENCIES:
+      REMOTE_INIDATA: {}
+    WALLCLOCK: 02:00
+    NOTIFY_ON:
+    - FAILED
+    NAME: O3_ompi_prod
+    TEST_NAME: O3_ompi_prod
+    ADDITIONAL_FILES: []
+  REMOTE_COMPILATION_O3_IMPI_PROD:
+    FILE: autosubmit/templates/compilation.sh
+    DEPENDENCIES:
+      REMOTE_INIDATA: {}
+    WALLCLOCK: 02:00
+    NOTIFY_ON:
+    - FAILED
+    NAME: O3_impi_prod
+    TEST_NAME: O3_impi_prod
+    ADDITIONAL_FILES: []
+  REPORT_SETUP:
+    FILE: autosubmit/templates/report_setup.sh
+    DEPENDENCIES:
+      OSU_RUN_112:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, WEAKSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: '112'
+        PROCESSORS: '112'
+      OSU_RUN_224:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, WEAKSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: '224'
+        PROCESSORS: '224'
+      OSU_RUN_336:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, WEAKSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: '336'
+        PROCESSORS: '336'
+      STREAM_1:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, WEAKSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: '1'
+        PROCESSORS: '1'
+      STREAM_2:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, WEAKSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: '2'
+        PROCESSORS: '2'
+      STREAM_4:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, WEAKSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: '4'
+        PROCESSORS: '4'
+      STREAM_8:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, WEAKSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: '8'
+        PROCESSORS: '8'
+      STREAM_16:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, WEAKSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: '16'
+        PROCESSORS: '16'
+      STREAM_32:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, WEAKSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: '32'
+        PROCESSORS: '32'
+      STREAM_64:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, WEAKSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: '64'
+        PROCESSORS: '64'
+      STREAM_92:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, WEAKSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: '92'
+        PROCESSORS: '92'
+      STREAM_112:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, WEAKSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: '112'
+        PROCESSORS: '112'
+      SCALABILITY_OMPI_1:
+        MEMBERS_FROM:
+          STRONGSCALING, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: ompi_1
+        TEST_NAME: O3_ompi_prod
+        PROCESSORS: '112'
+      SCALABILITY_OMPI_2:
+        MEMBERS_FROM:
+          STRONGSCALING, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: ompi_2
+        TEST_NAME: O3_ompi_prod
+        PROCESSORS: '224'
+      SCALABILITY_OMPI_3:
+        MEMBERS_FROM:
+          STRONGSCALING, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: ompi_3
+        TEST_NAME: O3_ompi_prod
+        PROCESSORS: '336'
+      SCALABILITY_IMPI_1:
+        MEMBERS_FROM:
+          STRONGSCALING, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: impi_1
+        TEST_NAME: O3_impi_prod
+        PROCESSORS: '112'
+      SCALABILITY_IMPI_2:
+        MEMBERS_FROM:
+          STRONGSCALING, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: impi_2
+        TEST_NAME: O3_impi_prod
+        PROCESSORS: '224'
+      SCALABILITY_IMPI_3:
+        MEMBERS_FROM:
+          STRONGSCALING, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: impi_3
+        TEST_NAME: O3_impi_prod
+        PROCESSORS: '336'
+      SCALABILITY_BENCH_1:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: bench_1
+        TEST_NAME: BENCH
+        PROCESSORS: '112'
+      SCALABILITY_BENCH_2:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: bench_2
+        TEST_NAME: BENCH
+        PROCESSORS: '224'
+      SCALABILITY_BENCH_3:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: bench_3
+        TEST_NAME: BENCH
+        PROCESSORS: '336'
+      SCALABILITY_BENCH_4:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: bench_4
+        TEST_NAME: BENCH
+        PROCESSORS: '168'
+      TRACE_TRACE_1:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, HARDWAREBENCHMARKS, STRONGSCALING:
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+            DATES_TO: None
+        NAME: trace_1
+        TEST_NAME: BENCH
+        PROCESSORS: '112'
+      TRACE_TRACE_2:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, HARDWAREBENCHMARKS, STRONGSCALING:
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+            DATES_TO: None
+        NAME: trace_2
+        TEST_NAME: BENCH
+        PROCESSORS: '224'
+      TRACE_TRACE_3:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, HARDWAREBENCHMARKS, STRONGSCALING:
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+            DATES_TO: None
+        NAME: trace_3
+        TEST_NAME: BENCH
+        PROCESSORS: '336'
+      SCALABILITY_WS_1_1:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: ws_1_1
+        TEST_NAME: ws_1_1
+        PROCESSORS: '1'
+      SCALABILITY_WS_1_2:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: ws_1_2
+        TEST_NAME: ws_1_2
+        PROCESSORS: '1'
+      SCALABILITY_WS_1_3:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: ws_1_3
+        TEST_NAME: ws_1_3
+        PROCESSORS: '1'
+      SCALABILITY_WS_1_4:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+        NAME: ws_1_4
+        TEST_NAME: ws_1_4
+        PROCESSORS: '1'
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    ADDITIONAL_FILES: []
+  OSU_RUN_112:
+    FILE: autosubmit/templates/osu_run.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, STRONGSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 01:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: '112'
+    PROCESSORS: '112'
+    ADDITIONAL_FILES: []
+  OSU_RUN_224:
+    FILE: autosubmit/templates/osu_run.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, STRONGSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 01:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: '224'
+    PROCESSORS: '224'
+    ADDITIONAL_FILES: []
+  OSU_RUN_336:
+    FILE: autosubmit/templates/osu_run.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, STRONGSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 01:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: '336'
+    PROCESSORS: '336'
+    ADDITIONAL_FILES: []
+  STREAM_1:
+    FILE: autosubmit/templates/stream.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, STRONGSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: '1'
+    PROCESSORS: '1'
+    ADDITIONAL_FILES: []
+  STREAM_2:
+    FILE: autosubmit/templates/stream.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, STRONGSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: '2'
+    PROCESSORS: '2'
+    ADDITIONAL_FILES: []
+  STREAM_4:
+    FILE: autosubmit/templates/stream.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, STRONGSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: '4'
+    PROCESSORS: '4'
+    ADDITIONAL_FILES: []
+  STREAM_8:
+    FILE: autosubmit/templates/stream.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, STRONGSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: '8'
+    PROCESSORS: '8'
+    ADDITIONAL_FILES: []
+  STREAM_16:
+    FILE: autosubmit/templates/stream.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, STRONGSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: '16'
+    PROCESSORS: '16'
+    ADDITIONAL_FILES: []
+  STREAM_32:
+    FILE: autosubmit/templates/stream.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, STRONGSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: '32'
+    PROCESSORS: '32'
+    ADDITIONAL_FILES: []
+  STREAM_64:
+    FILE: autosubmit/templates/stream.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, STRONGSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: '64'
+    PROCESSORS: '64'
+    ADDITIONAL_FILES: []
+  STREAM_92:
+    FILE: autosubmit/templates/stream.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, STRONGSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: '92'
+    PROCESSORS: '92'
+    ADDITIONAL_FILES: []
+  STREAM_112:
+    FILE: autosubmit/templates/stream.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, STRONGSCALING, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: '112'
+    PROCESSORS: '112'
+    ADDITIONAL_FILES: []
+  SCALABILITY_OMPI_1:
+    FILE: autosubmit/templates/scalability.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          STRONGSCALING, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: ompi_1
+    TEST_NAME: O3_ompi_prod
+    PROCESSORS: '112'
+    OIFS_PROCS: '55'
+    NEMO_PROCS: '55'
+    XIOS_PROCS: '1'
+    THREADS: '1'
+    ADDITIONAL_FILES: []
+  SCALABILITY_OMPI_2:
+    FILE: autosubmit/templates/scalability.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          STRONGSCALING, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: ompi_2
+    TEST_NAME: O3_ompi_prod
+    PROCESSORS: '224'
+    OIFS_PROCS: '111'
+    NEMO_PROCS: '111'
+    XIOS_PROCS: '1'
+    THREADS: '1'
+    ADDITIONAL_FILES: []
+  SCALABILITY_OMPI_3:
+    FILE: autosubmit/templates/scalability.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          STRONGSCALING, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: ompi_3
+    TEST_NAME: O3_ompi_prod
+    PROCESSORS: '336'
+    OIFS_PROCS: '167'
+    NEMO_PROCS: '167'
+    XIOS_PROCS: '1'
+    THREADS: '1'
+    ADDITIONAL_FILES: []
+  SCALABILITY_IMPI_1:
+    FILE: autosubmit/templates/scalability.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          STRONGSCALING, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: impi_1
+    TEST_NAME: O3_impi_prod
+    PROCESSORS: '112'
+    OIFS_PROCS: '55'
+    NEMO_PROCS: '55'
+    XIOS_PROCS: '1'
+    THREADS: '1'
+    ADDITIONAL_FILES: []
+  SCALABILITY_IMPI_2:
+    FILE: autosubmit/templates/scalability.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          STRONGSCALING, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: impi_2
+    TEST_NAME: O3_impi_prod
+    PROCESSORS: '224'
+    OIFS_PROCS: '111'
+    NEMO_PROCS: '111'
+    XIOS_PROCS: '1'
+    THREADS: '1'
+    ADDITIONAL_FILES: []
+  SCALABILITY_IMPI_3:
+    FILE: autosubmit/templates/scalability.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          STRONGSCALING, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: impi_3
+    TEST_NAME: O3_impi_prod
+    PROCESSORS: '336'
+    OIFS_PROCS: '167'
+    NEMO_PROCS: '167'
+    XIOS_PROCS: '1'
+    THREADS: '1'
+    ADDITIONAL_FILES: []
+  SCALABILITY_BENCH_1:
+    FILE: autosubmit/templates/scalability.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: bench_1
+    TEST_NAME: BENCH
+    PROCESSORS: '112'
+    OIFS_PROCS: '55'
+    NEMO_PROCS: '55'
+    XIOS_PROCS: '1'
+    THREADS: '1'
+    ADDITIONAL_FILES: []
+  SCALABILITY_BENCH_2:
+    FILE: autosubmit/templates/scalability.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: bench_2
+    TEST_NAME: BENCH
+    PROCESSORS: '224'
+    OIFS_PROCS: '111'
+    NEMO_PROCS: '111'
+    XIOS_PROCS: '1'
+    THREADS: '1'
+    ADDITIONAL_FILES: []
+  SCALABILITY_BENCH_3:
+    FILE: autosubmit/templates/scalability.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: bench_3
+    TEST_NAME: BENCH
+    PROCESSORS: '336'
+    OIFS_PROCS: '167'
+    NEMO_PROCS: '167'
+    XIOS_PROCS: '1'
+    THREADS: '1'
+    ADDITIONAL_FILES: []
+  SCALABILITY_BENCH_4:
+    FILE: autosubmit/templates/scalability.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: bench_4
+    TEST_NAME: BENCH
+    PROCESSORS: '168'
+    OIFS_PROCS: '83'
+    NEMO_PROCS: '83'
+    XIOS_PROCS: '1'
+    THREADS: '1'
+    ADDITIONAL_FILES: []
+  TRACE_TRACE_1:
+    FILE: autosubmit/templates/extrae.sh
+    DEPENDENCIES:
+      FUNCTIONS_DIR:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, HARDWAREBENCHMARKS, STRONGSCALING:
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+            DATES_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: trace_1
+    TEST_NAME: BENCH
+    PROCESSORS: '112'
+    OIFS_PROCS: '55'
+    NEMO_PROCS: '55'
+    XIOS_PROCS: '1'
+    THREADS: '1'
+    ADDITIONAL_FILES: []
+  TRACE_TRACE_2:
+    FILE: autosubmit/templates/extrae.sh
+    DEPENDENCIES:
+      FUNCTIONS_DIR:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, HARDWAREBENCHMARKS, STRONGSCALING:
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+            DATES_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: trace_2
+    TEST_NAME: BENCH
+    PROCESSORS: '224'
+    OIFS_PROCS: '111'
+    NEMO_PROCS: '111'
+    XIOS_PROCS: '1'
+    THREADS: '1'
+    ADDITIONAL_FILES: []
+  TRACE_TRACE_3:
+    FILE: autosubmit/templates/extrae.sh
+    DEPENDENCIES:
+      FUNCTIONS_DIR:
+        MEMBERS_FROM:
+          COMPILATIONEFFICIENCY, WEAKSCALING, HARDWAREBENCHMARKS, STRONGSCALING:
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+            DATES_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    NAME: trace_3
+    TEST_NAME: BENCH
+    PROCESSORS: '336'
+    OIFS_PROCS: '167'
+    NEMO_PROCS: '167'
+    XIOS_PROCS: '1'
+    THREADS: '1'
+    ADDITIONAL_FILES: []
+  SCALABILITY_WS_1_1:
+    FILE: autosubmit/templates/scalability.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    #PLATFORM: marenostrum5-login
+    NAME: ws_1_1
+    TEST_NAME: ws_1_1
+    PROCESSORS: '1'
+    XIOS_PROCS: '1'
+    OIFS_RESOLUTION: TCO95L91
+    NEMO_RESOLUTION: eORCA1L75
+    ADDITIONAL_FILES: []
+  SCALABILITY_WS_1_2:
+    FILE: autosubmit/templates/scalability.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    #PLATFORM: marenostrum5-login
+    NAME: ws_1_2
+    TEST_NAME: ws_1_2
+    PROCESSORS: '1'
+    XIOS_PROCS: '1'
+    OIFS_RESOLUTION: TCO95L91
+    NEMO_RESOLUTION: eORCA1L75
+    ADDITIONAL_FILES: []
+  SCALABILITY_WS_1_3:
+    FILE: autosubmit/templates/scalability.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    #PLATFORM: marenostrum5-login
+    NAME: ws_1_3
+    TEST_NAME: ws_1_3
+    PROCESSORS: '1'
+    XIOS_PROCS: '1'
+    OIFS_RESOLUTION: TCO95L91
+    NEMO_RESOLUTION: eORCA1L75
+    ADDITIONAL_FILES: []
+  SCALABILITY_WS_1_4:
+    FILE: autosubmit/templates/scalability.sh
+    DEPENDENCIES:
+      PREPARE_TESTS:
+        MEMBERS_FROM:
+          STRONGSCALING, COMPILATIONEFFICIENCY, HARDWAREBENCHMARKS, TRACING:
+            DATES_TO: None
+            MEMBERS_TO: None
+            CHUNKS_TO: None
+    RUNNING: member
+    WALLCLOCK: 02:00
+    CHECK: 'true'
+    NOTIFY_ON:
+    - FAILED
+    #PLATFORM: marenostrum5-login
+    NAME: ws_1_4
+    TEST_NAME: ws_1_4
+    PROCESSORS: '1'
+    XIOS_PROCS: '1'
+    OIFS_RESOLUTION: TCO95L91
+    NEMO_RESOLUTION: eORCA1L75
+    ADDITIONAL_FILES: []

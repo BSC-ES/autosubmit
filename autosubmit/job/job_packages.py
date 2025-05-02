@@ -222,6 +222,7 @@ class JobPackageBase(object):
             job.hold = hold
             job.id = str(job_id)
             job.status = Status.SUBMITTED
+            Log.result(f"Job: {job.name} submitted with job_id: {job.id.strip()} and workflow commit: {job.workflow_commit}")
             if hasattr(self, "name"): # TODO change this check for a property that checks if it is a wrapper or not, the same change has to be done in other parts of the code
                 job.wrapper_name = self.name
 
@@ -254,9 +255,10 @@ class JobPackageSimple(JobPackageBase):
         """
         Submits jobs to the platform, cleans previous run logs and stats files and updates job status.
 
-        Args:
-            job_scripts (Dict[str, str]): Dictionary of job scripts, defaults to an empty string.
-            hold (bool): If True, the job won't immediately start, defaults to False.
+        :param job_scripts: Dictionary of job scripts, defaults to an empty string.
+        :type job_scripts: Dict[str, str]
+        :param hold: If True, the job won't immediately start, defaults to False.
+        :type hold: bool
         """
         if len(job_scripts) == 0:
             job_scripts = self._job_scripts
@@ -363,9 +365,10 @@ class JobPackageArray(JobPackageBase):
         """
         Submits jobs to the platform, cleans previous run logs, and updates job status.
 
-        Args:
-            job_scripts (Optional[Dict[str, str]]): Dictionary of job scripts, defaults to None.
-            hold (bool): If True, holds the job submission, defaults to False.
+        :param job_scripts: Dictionary of job scripts, defaults to None.
+        :type job_scripts: Optional[Dict[str, str]]
+        :param hold: If True, holds the job submission, defaults to False.
+        :type hold: bool
         """
         for job in self.jobs:
             job.update_local_logs()
@@ -599,9 +602,10 @@ class JobPackageThread(JobPackageBase):
         """
         Submits jobs to the platform, cleans previous run logs, and updates job status.
 
-        Args:
-            job_scripts [Dict[str, str]]: Dictionary of job scripts, defaults to None.
-            hold (bool): If True, the job won't start immediately, defaults to False.
+        :param job_scripts: Dictionary of job scripts, defaults to None.
+        :type job_scripts: Dict[str, str]
+        :param hold: If True, the job won't start immediately, defaults to False.
+        :type hold: bool
         """
         if callable(getattr(self.platform, 'remove_multiple_files')):
             filenames = str()
@@ -695,9 +699,10 @@ class JobPackageThreadWrapped(JobPackageThread):
         """
         Submits jobs to the platform, cleans previous run logs, and updates job status.
 
-        Args:
-            job_scripts (Optional[Dict[str, str]]): Dictionary of job scripts, defaults to None.
-            hold (bool): If True, the job won't start immediately, defaults to False.
+        :param job_scripts: Dictionary of job scripts, defaults to None.
+        :type job_scripts: Optional[Dict[str, str]]
+        :param hold: If True, the job won't start immediately, defaults to False.
+        :type hold: bool
         """
         for job in self.jobs:
             job.update_local_logs()

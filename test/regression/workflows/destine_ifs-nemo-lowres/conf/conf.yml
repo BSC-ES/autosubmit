@@ -1,0 +1,152 @@
+DEFAULT:
+  EXPID: t03f
+  HPCARCH: local
+  CUSTOM_CONFIG: hidden
+JOBS:
+  INI:
+    DEPENDENCIES:
+      REMOTE_SETUP: {}
+    FILE: hidden
+    PLATFORM: local
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: on_submission
+  LOCAL_SETUP:
+    FILE: hidden
+    PLATFORM: local
+    RUNNING: once
+    CHECK: on_submission
+    DEPENDENCIES: {}
+  REMOTE_SETUP:
+    DEPENDENCIES:
+      SYNCHRONIZE: {}
+    FILE: hidden
+    PLATFORM: local
+    RUNNING: once
+    WALLCLOCK: 03:30
+    CHECK: on_submission
+  SIM:
+    DEPENDENCIES:
+      INI: {}
+      SIM-1: {}
+      DQC_BASIC-10: {}
+    FILE: hidden
+    PLATFORM: local
+    WALLCLOCK: 00:30
+    RUNNING: chunk
+    CHECK: on_submission
+    NODES: 4
+    RETRIALS: 2
+  SYNCHRONIZE:
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+    FILE: hidden
+    PLATFORM: local
+    RUNNING: once
+    CHECK: on_submission
+  TRANSFER:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      SIM: {}
+      TRANSFER-1: {}
+    RUNNING: chunk
+    RETRIALS: 20
+    SPLITS: auto
+    WALLCLOCK: 00:30
+    NODES: 1
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+    PARTITION: small
+  CHECK_MEM:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      SIM:
+        STATUS: RUNNING
+        ANY_FINAL_STATUS_IS_VALID: true
+    RUNNING: chunk
+    WALLCLOCK: 00:30
+    CHECK: on_submission
+  DQC_BASIC:
+    FILE: hidden
+    WALLCLOCK: 00:30
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: local
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 16
+    RUNNING: chunk
+    CHECK: on_submission
+    NAME: BASIC
+    DEPENDENCIES:
+      SIM: {}
+    CHECK_STANDARD_COMPLIANCE: 'False'
+    CHECK_SPATIAL_COMPLETENESS: 'True'
+    CHECK_SPATIAL_CONSISTENCY: 'True'
+    CHECK_PHYSICAL_PLAUSIBILITY: 'True'
+  DQC_FULL:
+    FILE: hidden
+    WALLCLOCK: 00:30
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: local
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 16
+    RUNNING: chunk
+    CHECK: on_submission
+    NAME: FULL
+    DEPENDENCIES:
+      DQC_BASIC: {}
+    CHECK_STANDARD_COMPLIANCE: 'True'
+    CHECK_SPATIAL_COMPLETENESS: 'True'
+    CHECK_SPATIAL_CONSISTENCY: 'True'
+    CHECK_PHYSICAL_PLAUSIBILITY: 'True'
+  WIPE:
+    FILE: hidden
+    PLATFORM: local
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    DEPENDENCIES:
+      TRANSFER: {}
+      WIPE-1: {}
+    RUNNING: chunk
+    WALLCLOCK: 00:30
+    NODES: 1
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+  CLEAN:
+    FILE: hidden
+    PLATFORM: local
+    DEPENDENCIES:
+      SIM: {}
+    RUNNING: chunk
+    WALLCLOCK: 00:30
+    TASKS: 1
+    THREADS: 1
+    NODES: 1
+    CHECK: on_submission
+EXPERIMENT:
+  DATELIST: 19900101
+  MEMBERS: fc0 fc1
+  CHUNKSIZEUNIT: month
+  CHUNKSIZE: 1
+  NUMCHUNKS: 1
+  CALENDAR: standard
+  SPLITSIZEUNIT: day
+  SPLITSIZE: 1
+  SPLITPOLICY: flexible
+PROJECT:
+  PROJECT_TYPE: none
+  PROJECT_DESTINATION: git_project
+GIT:
+  PROJECT_ORIGIN: hidden
+  PROJECT_BRANCH: main
+  PROJECT_COMMIT: ''
+  PROJECT_SUBMODULES: aqua catalog ifs-nemo dvc-cache-de340 gsv_interface data-portfolio
+  FETCH_SINGLE_BRANCH: true

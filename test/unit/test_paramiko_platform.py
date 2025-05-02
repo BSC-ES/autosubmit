@@ -1,14 +1,31 @@
-import pytest
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+import os
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from pathlib import Path
+import pytest
 
-from autosubmit.job.job_common import Status
 from autosubmit.job.job import Job
+from autosubmit.job.job_common import Status
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.psplatform import PsPlatform
 from log.log import AutosubmitError
-import paramiko
 
 
 @pytest.fixture
@@ -31,7 +48,8 @@ def paramiko_platform():
 
 @pytest.fixture
 def ps_platform(tmpdir):
-    tmpdir.owner = Path(tmpdir).owner()
+    tmp_path = Path(tmpdir)
+    tmpdir.owner = tmp_path.owner()
     config = {
         "LOCAL_ROOT_DIR": str(tmpdir),
         "LOCAL_TMP_DIR": 'tmp',
@@ -54,6 +72,7 @@ def ps_platform(tmpdir):
     platform.root_dir.mkdir(parents=True, exist_ok=True)
     yield platform, tmpdir
 
+
 def test_paramiko_platform_constructor(paramiko_platform):
     platform = paramiko_platform
     assert platform.name == 'local'
@@ -64,7 +83,7 @@ def test_paramiko_platform_constructor(paramiko_platform):
     assert len(platform.job_status) == 4
 
 
-def test_check_Alljobs_send_command1_raises_autosubmit_error(mocker, paramiko_platform):
+def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_platform):
     mocker.patch('autosubmit.platforms.paramiko_platform.Log')
     mocker.patch('autosubmit.platforms.paramiko_platform.sleep')
 
@@ -89,7 +108,7 @@ def test_check_Alljobs_send_command1_raises_autosubmit_error(mocker, paramiko_pl
     assert cm.value.trace is None
 
 
-def test_check_Alljobs_send_command2_raises_autosubmit_error(mocker, paramiko_platform):
+def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_platform):
     mocker.patch('autosubmit.platforms.paramiko_platform.sleep')
 
     platform = paramiko_platform
@@ -117,37 +136,6 @@ def test_check_Alljobs_send_command2_raises_autosubmit_error(mocker, paramiko_pl
     assert cm.value.trace is None
 
 
-@pytest.mark.skip(reason="Skipping this test until Github transition is complete")
-@pytest.mark.parametrize('filename, check', [
-    ('test1', True),
-    ('anotherdir/test2', True)
-], ids=['filename', 'filename_long_path'])
-def test_send_file(mocker, ps_platform, filename, check):
-    platform, tmp_dir = ps_platform
-    remote_dir = Path(platform.root_dir) / f'LOG_{platform.expid}'
-    remote_dir.mkdir(parents=True, exist_ok=True)
-    Path(platform.tmp_path).mkdir(parents=True, exist_ok=True)
-    # generate file
-    if "/" in filename:
-        filename_dir = Path(filename).parent
-        (Path(platform.tmp_path) / filename_dir).mkdir(parents=True, exist_ok=True)
-        filename = Path(filename).name
-    with open(Path(platform.tmp_path) / filename, 'w') as f:
-        f.write('test')
-    _ssh = paramiko.SSHClient()
-    _ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    _ssh.connect(hostname=platform.host, username=platform.user)
-    platform._ftpChannel = paramiko.SFTPClient.from_transport(_ssh.get_transport(), window_size=pow(4, 12),
-                                                          max_packet_size=pow(4, 12))
-    platform._ftpChannel.get_channel().settimeout(120)
-    platform.connected = True
-    platform.get_send_file_cmd = mocker.Mock()
-    platform.get_send_file_cmd.return_value = 'ls'
-    platform.send_command = mocker.Mock()
-    platform.send_file(filename)
-    assert check == (remote_dir / filename).exists()
-
-
 def test_ps_get_submit_cmd(ps_platform):
     platform, _ = ps_platform
     job = Job('TEST', 'TEST', Status.WAITING, 1)
@@ -162,3 +150,83 @@ def test_ps_get_submit_cmd(ps_platform):
     assert job.wallclock_in_seconds == 60 * 1.3
     assert f"{job.script_name}" in command
     assert f"timeout {job.wallclock_in_seconds}" in command
+
+
+def add_ssh_config_file(tmpdir, user, content):
+    if not tmpdir.join(".ssh").exists():
+        tmpdir.mkdir(".ssh")
+    if user:
+        ssh_config_file = tmpdir.join(f".ssh/config_{user}")
+    else:
+        ssh_config_file = tmpdir.join(".ssh/config")
+    ssh_config_file.write(content)
+
+
+@pytest.fixture(scope="function")
+def generate_all_files(tmpdir):
+    ssh_content = """
+Host mn5-gpp
+    User %change%
+    HostName glogin1.bsc.es
+    ForwardAgent yes
+"""
+    for user in [os.environ["USER"], "dummy-one"]:
+        ssh_content_user = ssh_content.replace("%change%", user)
+        add_ssh_config_file(tmpdir, user, ssh_content_user)
+    return tmpdir
+
+
+@pytest.mark.parametrize("user, env_ssh_config_defined",
+                         [(os.environ["USER"], False),
+                          ("dummy-one", True),
+                          ("dummy-one", False),
+                          ("not-exists", True),
+                          ("not_exists", False)],
+                         ids=["OWNER",
+                              "SUDO USER(exists) + AS_ENV_CONFIG_SSH_PATH(defined)",
+                              "SUDO USER(exists) + AS_ENV_CONFIG_SSH_PATH(not defined)",
+                              "SUDO USER(not exists) + AS_ENV_CONFIG_SSH_PATH(defined)",
+                              "SUDO USER(not exists) + AS_ENV_CONFIG_SSH_PATH(not defined)"])
+def test_map_user_config_file(tmpdir, autosubmit_config, mocker, generate_all_files, user, env_ssh_config_defined):
+    experiment_data = {
+        "ROOTDIR": str(tmpdir),
+        "PROJDIR": str(tmpdir),
+        "LOCAL_TMP_DIR": str(tmpdir),
+        "LOCAL_ROOT_DIR": str(tmpdir),
+        "AS_ENV_CURRENT_USER": user,
+    }
+    if env_ssh_config_defined:
+        experiment_data["AS_ENV_SSH_CONFIG_PATH"] = str(tmpdir.join(f".ssh/config_{user}"))
+    as_conf = autosubmit_config(expid='a000', experiment_data=experiment_data)
+    mocker.patch('autosubmitconfigparser.config.configcommon.AutosubmitConfig.is_current_real_user_owner',
+                 os.environ["USER"] == user)
+    platform = ParamikoPlatform(expid='a000', name='ps', config=experiment_data)
+    platform._ssh_config = mocker.MagicMock()
+    mocker.patch('os.path.expanduser',
+                 side_effect=lambda x: x)  # Easier to test, and also not mess with the real user's config
+    platform.map_user_config_file(as_conf)
+    if not env_ssh_config_defined or not tmpdir.join(f".ssh/config_{user}").exists():
+        assert platform._user_config_file == "~/.ssh/config"
+    else:
+        assert platform._user_config_file == str(tmpdir.join(f".ssh/config_{user}"))
+
+
+def test_submit_job(mocker, autosubmit_config, tmpdir):
+    experiment_data = {
+        "ROOTDIR": str(tmpdir),
+        "PROJDIR": str(tmpdir),
+        "LOCAL_TMP_DIR": str(tmpdir),
+        "LOCAL_ROOT_DIR": str(tmpdir),
+        "AS_ENV_CURRENT_USER": "dummy",
+    }
+    platform = ParamikoPlatform(expid='a000', name='local', config=experiment_data)
+    platform._ssh_config = mocker.MagicMock()
+    platform.get_submit_cmd = mocker.MagicMock(returns="dummy")
+    platform.send_command = mocker.MagicMock(returns="dummy")
+    platform.get_submitted_job_id = mocker.MagicMock(return_value="10000")
+    platform._ssh_output = "10000"
+    job = Job("dummy", 10000, Status.SUBMITTED, 0)
+    job._platform = platform
+    job.platform_name = platform.name
+    jobs_id = platform.submit_job(job, "dummy")
+    assert jobs_id == 10000

@@ -1,8 +1,26 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import mock
 import pytest
+
+from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal
-from autosubmit.job.job import Job
 
 
 @pytest.fixture
@@ -15,7 +33,8 @@ def create_packages(mocker, autosubmit_config):
         }
     }
     as_conf = autosubmit_config("a000", exp_data)
-    jobs = [Job("dummy-1", 1, Status.SUBMITTED, 0), Job("dummy-2", 2, Status.SUBMITTED, 0), Job("dummy-3", 3, Status.SUBMITTED, 0)]
+    jobs = [Job("dummy-1", 1, Status.SUBMITTED, 0), Job("dummy-2", 2, Status.SUBMITTED, 0),
+            Job("dummy-3", 3, Status.SUBMITTED, 0)]
     platform = mocker.MagicMock()
     platform.name = 'dummy'
     platform.serial_platform = mock.MagicMock()
@@ -40,7 +59,8 @@ def create_packages(mocker, autosubmit_config):
 def test_process_jobs_to_submit(create_packages):
     packages = create_packages
     jobs_id = [1, 2, 3]
-    for i, package in enumerate(packages):  # Equivalent to valid_packages_to_submit but without the ghost jobs check etc.
+    for i, package in enumerate(
+            packages):  # Equivalent to valid_packages_to_submit but without the ghost jobs check etc.
         package.process_jobs_to_submit(jobs_id[i], False)
         for job in package.jobs:  # All jobs inside a package must have the same id.
             assert job.hold is False

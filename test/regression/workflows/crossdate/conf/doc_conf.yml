@@ -1,0 +1,95 @@
+experiment:
+  DATELIST: 20120101 20120201
+  MEMBERS: "000 001"
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '3'
+  CALENDAR: standard
+wrappers:
+    wrapper_simda:
+        TYPE: "horizontal-vertical"
+        JOBS_IN_WRAPPER: "SIM DA"
+JOBS:
+  LOCAL_SETUP:
+    FILE: templates/local_setup.sh
+    PLATFORM: marenostrum_archive
+    RUNNING: once
+    NOTIFY_ON: COMPLETED
+    PROCESSORS: '2'
+    TASKS: "45"
+    NODES: "1"
+    THREADS: "2"
+  LOCAL_SEND_SOURCE:
+    FILE: templates/01_local_send_source.sh
+    PLATFORM: marenostrum_archive
+    DEPENDENCIES: LOCAL_SETUP
+    RUNNING: once
+    NOTIFY_ON: FAILED
+  LOCAL_SEND_STATIC:
+    FILE: templates/01b_local_send_static.sh
+    PLATFORM: marenostrum_archive
+    DEPENDENCIES: LOCAL_SETUP
+    RUNNING: once
+    NOTIFY_ON: FAILED
+  REMOTE_COMPILE:
+    FILE: templates/02_compile.sh
+    DEPENDENCIES: LOCAL_SEND_SOURCE
+    RUNNING: once
+    PROCESSORS: '4'
+    WALLCLOCK: 00:50
+    NOTIFY_ON: COMPLETED
+  SIM:
+    FILE: templates/05b_sim.sh
+    DEPENDENCIES:
+      LOCAL_SEND_STATIC:
+      REMOTE_COMPILE:
+      SIM-1:
+      DA-1:
+    RUNNING: chunk
+    PROCESSORS: '68'
+    WALLCLOCK: 00:12
+    NOTIFY_ON: FAILED
+  LOCAL_SEND_INITIAL_DA:
+    FILE: templates/00b_local_send_initial_DA.sh
+    PLATFORM: marenostrum_archive
+    DEPENDENCIES: LOCAL_SETUP LOCAL_SEND_INITIAL_DA-1
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    DELAY: '0'
+  COMPILE_DA:
+    FILE: templates/02b_compile_da.sh
+    DEPENDENCIES: LOCAL_SEND_SOURCE
+    RUNNING: once
+    WALLCLOCK: 00:20
+    NOTIFY_ON: FAILED
+  DA:
+    FILE: templates/05c_da.sh
+    DEPENDENCIES:
+      SIM:
+      LOCAL_SEND_INITIAL_DA:
+        CHUNKS_TO: "all"
+        DATES_TO: "all"
+        MEMBERS_TO: "all"
+      COMPILE_DA:
+        DATES_FROM:
+          "20120101":
+            CHUNKS_FROM:
+                1:
+                  CHUNKS_TO: "1"
+          "20120201":
+            CHUNKS_FROM:
+                all:
+                  CHUNKS_TO: "None"
+      DA:
+        DATES_FROM:
+         "20120201":
+           CHUNKS_FROM:
+            1:
+             DATES_TO: "20120101"
+             CHUNKS_TO: "1"
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    DELAY: '0'
+    WALLCLOCK: 00:12
+    PROCESSORS: '256'
+    NOTIFY_ON: FAILED

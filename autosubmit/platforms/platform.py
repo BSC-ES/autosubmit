@@ -34,11 +34,14 @@ class CopyQueue(Queue):
         """
         Initializes the Queue.
 
-        Args:
-            maxsize (int): Maximum size of the queue. Defaults to -1 (infinite size).
-            block (bool): Whether to block when the queue is full. Defaults to True.
-            timeout (float): Timeout for blocking operations. Defaults to None.
-            ctx (Context): Context for the queue. Defaults to None.
+        :param maxsize: Maximum size of the queue. Defaults to -1 (infinite size).
+        :type maxsize: int
+        :param block: Whether to block when the queue is full. Defaults to True.
+        :type block: bool
+        :param timeout: Timeout for blocking operations. Defaults to None.
+        :type timeout: float
+        :param ctx: Context for the queue. Defaults to None.
+        :type ctx: Context
         """
         self.block = block
         self.timeout = timeout
@@ -49,10 +52,12 @@ class CopyQueue(Queue):
         """
         Puts a job into the queue if it is not a duplicate.
 
-        Args:
-            job (Any): The job to be added to the queue.
-            block (bool): Whether to block when the queue is full. Defaults to True.
-            timeout (float): Timeout for blocking operations. Defaults to None.
+        :param job: The job to be added to the queue.
+        :type job: Any
+        :param block: Whether to block when the queue is full. Defaults to True.
+        :type block: bool
+        :param timeout: Timeout for blocking operations. Defaults to None.
+        :type timeout: float
         """
         super().put(job.__getstate__(), block, timeout)
 
@@ -68,9 +73,17 @@ class Platform(object):
 
     def __init__(self, expid, name, config, auth_password=None):
         """
-        :param config:
-        :param expid:
-        :param name:
+        Initializes the Platform object with the given experiment ID, platform name, configuration,
+        and optional authentication password for two-factor authentication.
+
+        :param expid: The experiment ID associated with the platform.
+        :type expid: str
+        :param name: The name of the platform.
+        :type name: str
+        :param config: Configuration dictionary containing platform-specific settings.
+        :type config: dict
+        :param auth_password: Optional password for two-factor authentication.
+        :type auth_password: str or list, optional
         """
         self.connected = False
         self.expid = expid  # type: str
@@ -270,6 +283,21 @@ class Platform(object):
     def root_dir(self, value):
         self._root_dir = value
 
+    def get_exclusive_directive(self, job):
+        """
+        Returns exclusive directive for the specified job
+
+        :param job: job to create exclusive directive for
+        :type job: Job
+        :return: exclusive directive
+        :rtype: str
+        """
+        # only implemented for slurm
+        return ""
+
+    def get_multiple_jobids(self, job_list, valid_packages_to_submit, failed_packages, error_message="", hold=False):
+        return False, valid_packages_to_submit
+        # raise NotImplementedError
 
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
@@ -385,6 +413,7 @@ class Platform(object):
     def serial_platform(self):
         """
         Platform to use for serial jobs
+
         :return: platform's object
         :rtype: platform
         """
@@ -432,6 +461,7 @@ class Platform(object):
     def serial_partition(self):
         """
         Partition to use for serial jobs
+
         :return: partition's name
         :rtype: str
         """
@@ -447,6 +477,7 @@ class Platform(object):
     def serial_queue(self):
         """
         Queue to use for serial jobs
+
         :return: queue's name
         :rtype: str
         """
@@ -482,8 +513,6 @@ class Platform(object):
 
         :param as_conf: autosubmit config object
         :type as_conf: AutosubmitConfig object
-        :param main_hpc: if it's True, uses HPC instead of NAME_ as prefix for the parameters
-        :type main_hpc: bool
         """
         prefix = 'HPC'
 
@@ -507,6 +536,43 @@ class Platform(object):
 
         as_conf.experiment_data['{0}LOGDIR'.format(prefix)] = self.get_files_path()
 
+    def send_file(self, filename, check=True):
+        """
+        Sends a local file to the platform
+
+        :param check:
+        :param filename: name of the file to send
+        :type filename: str
+        """
+        raise NotImplementedError
+
+    def move_file(self, src, dest):
+        """
+        Moves a file on the platform
+
+        :param src: source name
+        :type src: str
+        :param dest: destination name
+        :type dest: str
+        """
+        raise NotImplementedError
+
+    def get_file(self, filename, must_exist=True, relative_path='', ignore_log=False, wrapper_failed=False):
+        """
+        Copies a file from the current platform to experiment's tmp folder
+
+        :param wrapper_failed:
+        :param ignore_log:
+        :param filename: file name
+        :type filename: str
+        :param must_exist: If True, raises an exception if file can not be copied
+        :type must_exist: bool
+        :param relative_path: relative path inside tmp folder
+        :type relative_path: str
+        :return: True if file is copied successfully, false otherwise
+        :rtype: bool
+        """
+        raise NotImplementedError
 
     def get_files(self, files, must_exist=True, relative_path=''):
         """
@@ -540,6 +606,7 @@ class Platform(object):
     def get_checkpoint_files(self, job):
         """
         Get all the checkpoint files of a job
+
         :param job: Get the checkpoint files
         :type job: Job
         :param max_step: max step possible
@@ -558,7 +625,6 @@ class Platform(object):
     def get_completed_files(self, job_name, retries=0, recovery=False, wrapper_failed=False):
         """
         Get the COMPLETED file of the given job
-
 
         :param wrapper_failed:
         :param recovery:
@@ -584,17 +650,15 @@ class Platform(object):
         """
         Removes STAT files from remote.
 
-        Args:
-            job (Job): Job to check.
-
-        Returns:
-            bool: True if the file was removed, False otherwise.
+        :param job: Job to check.
+        :type job: Job
+        :return: True if the file was removed, False otherwise.
+        :rtype: bool
         """
         if self.delete_file(f"{job.stat_file[:-1]}{job.fail_count}"):
             Log.debug(f"{job.stat_file[:-1]}{job.fail_count} have been removed")
             return True
         return False
-
 
     def remove_completed_file(self, job_name):
         """
@@ -698,33 +762,6 @@ class Platform(object):
 
         except Exception as ex:
             Log.error("Writing Job Id Failed : " + str(ex))
-
-    def write_job_extrainfo(self, job_hdata, complete_path):
-        """[summary]
-
-        :param job_hdata: job extra data 
-        :type job_hdata: str 
-        :param complete_path: complete path to the file, includes filename 
-        :type complete_path: str 
-        :return: Modifies file and returns True, False if file could not be modified 
-        :rtype: Boolean 
-        """
-        try:
-            # footer = "extra_data = {0}".format()
-            # print("Complete path {0}".format(complete_path))
-            if os.path.exists(complete_path):
-                file_type = complete_path[-3:]
-                # print("Detected file type {0}".format(file_type))
-                if file_type == "out" or file_type == "err":
-                    with open(complete_path, "ab") as f:
-                        job_footer_info = "[INFO] HDATA={0}".format(job_hdata)
-                        f.write(job_footer_info)
-                        f.close()
-        except Exception as ex:
-            Log.debug(traceback.format_exc())
-            Log.warning(
-                "Autosubmit has not written extra information into the .out log.")
-            pass
 
     def generate_submit_script(self):
         # type: () -> None
@@ -831,8 +868,8 @@ class Platform(object):
         """
         Spawns a process to recover the logs of the jobs that have been completed on this platform.
 
-        Args:
-            as_conf (AutosubmitConfig): Configuration object for the platform.
+        :param as_conf: Configuration object for the platform.
+        :type as_conf: AutosubmitConfig
         """
         if not self.log_retrieval_process_active and (
                 as_conf is None or str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS',
@@ -858,11 +895,10 @@ class Platform(object):
         """
         Waits for the work_event to be set or the cleanup_event to be set for a mandatory time.
 
-        Args:
-            sleep_time (int): Minimum time to wait in seconds. Defaults to 60.
-
-        Returns:
-            bool: True if there is work to process, False otherwise.
+        :param sleep_time: Minimum time to wait in seconds. Defaults to 60.
+        :type sleep_time: int
+        :return: True if there is work to process, False otherwise.
+        :rtype: bool
         """
         process_log = False
         for _ in range(sleep_time, 0, -1):
@@ -878,11 +914,10 @@ class Platform(object):
         """
         Waits a mandatory time and then waits until there is work, no work to more process or the cleanup event is set.
 
-        Args:
-            sleep_time (int): Maximum time to wait in seconds. Defaults to 60.
-
-        Returns:
-            bool: True if there is work to process, False otherwise.
+        :param sleep_time: Maximum time to wait in seconds. Defaults to 60.
+        :type sleep_time: int
+        :return: True if there is work to process, False otherwise.
+        :rtype: bool
         """
         process_log = self.wait_mandatory_time(sleep_time)
         if not process_log:
@@ -894,11 +929,10 @@ class Platform(object):
         """
         Waits until the timeout is reached or any signal is set to process logs.
 
-        Args:
-            timeout (int): Maximum time to wait in seconds. Defaults to 60.
-
-        Returns:
-            bool: True if there is work to process, False otherwise.
+        :param sleep_time: Maximum time to wait in seconds. Defaults to 60.
+        :type sleep_time: int
+        :return: True if there is work to process, False otherwise.
+        :rtype: bool
         """
         process_log = False
         for _ in range(timeout, 0, -1):
@@ -912,12 +946,12 @@ class Platform(object):
         """
         Recovers log files for jobs from the recovery queue and retry failed jobs.
 
-        Args:
-            identifier (str): Identifier for logging purposes.
-            jobs_pending_to_process (Set[Any]): Set of jobs that had issues during log retrieval.
-
-        Returns:
-            Set[Any]: Updated set of jobs pending to process.
+        :param identifier: Identifier for logging purposes.
+        :type identifier: str
+        :param jobs_pending_to_process: Set of jobs that had issues during log retrieval.
+        :type jobs_pending_to_process: Set[Any]
+        :return: Updated set of jobs pending to process.
+        :rtype: Set[Any]
         """
         job = None
 
@@ -925,7 +959,7 @@ class Platform(object):
             try:
                 from autosubmit.job.job import Job
                 job = Job(loaded_data=self.recovery_queue.get(timeout=1))
-                job.platform_name = self.name # Change the original platform to this process platform.
+                job.platform_name = self.name  # Change the original platform to this process platform.
                 job.platform = self
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
                 try:

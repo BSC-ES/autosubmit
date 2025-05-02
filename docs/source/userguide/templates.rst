@@ -28,11 +28,10 @@ preprocessed and the final script is generated when an Autosubmit
 experiment is :ref:`inspected <inspect_cmd>` or
 :doc:`created </userguide/run/index>`.
 
-When Autosubmit preprocesses the template script, it replaces
-*placeholders* by configuration values. A placeholder is any
-configuration key wrapped by ``%%``. For example, ``%DEFAULT.EXPID%``
-shown below refers to the Autosubmit configuration value
-found in the ``DEFAULT.EXPID`` YAML configuration key.
+When Autosubmit preprocesses the template script, it replaces placeholders with configuration values.
+A placeholder is any configuration key enclosed in %% (in-place) or in %^% ( postloaded).
+For example, %DEFAULT.EXPID% refers to the Autosubmit configuration value specified in the DEFAULT.EXPID key of the YAML configuration file.
+
 
 Assuming that one of the Autosubmit experiment configuration files
 contains the following:
@@ -93,3 +92,49 @@ and the tailer. The configuration keys ``EXTENDED_HEADER_PATH`` and
 of, respectively, the header and tailer scripts used by Autosubmit.
 The location is relative to the project root folder, and the scripts
 are appended after the default header and tailer scripts.
+
+Sustitute placeholders after all files have been loaded
+=======================================================
+
+Autosubmit allows users to define placeholders that are substituted only after all files have been loaded. This is particularly useful when the value of a placeholder is mutable at the time of file loading.
+
+For instance, consider the following YAML files loaded in alphabetical order (`ca.yml`, `conf.yml`, `cz.yml`):
+
+**ca.yml**:
+
+.. code-block:: yaml
+
+  model:
+    version: "first"
+
+**conf.yml**:
+
+.. code-block:: yaml
+
+  other_variable: "something"
+  test_in_place: "%other_variable%/%^model.version%/%another_other_variable%"
+  test_at_the_end: "%other_variable%/%model.version%/%another_other_variable%"
+  another_other_variable: "something"
+
+**cz.yml**:
+
+.. code-block:: yaml
+
+  model:
+    version: "last"
+
+If a placeholder is defined as `%model.version%` in `conf.yml`, the behavior differs based on the enclosing format:
+
+1. **In-place `%%` Enclosing**:
+
+The placeholder's value will correspond to the key defined in the previously loaded file or the file currently being loaded.
+For example, `%model.version%` would resolve to `"first"` (from `ca.yml`) when `conf.yml` is loaded.
+
+2. **Postloaded `%^%` Enclosing**:
+
+The placeholder's value will always correspond to the key defined in the last loaded file.
+For example, `%^model.version%` in `conf.yml` would resolve to `"last"` (from `cz.yml`) after all files are loaded.
+
+In this case, the value of `test_in_place` in `conf.yml` would resolve as: `"something/first/something"`
+
+And, the value of `test_at_the_end` would resolve as:  `"something/last/something"`
