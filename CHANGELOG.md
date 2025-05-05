@@ -12,6 +12,7 @@
 - Improved validation for the `expid` flag. [PR](https://github.com/BSC-ES/autosubmit/pull/2309)
 - Made the details database more consistent and reliable. [PR](https://github.com/BSC-ES/autosubmit/pull/2296)
 - Enhanced the flexibility of workflows, allowing for more adaptable configurations. [#2276](https://github.com/BSC-ES/autosubmit/issues/2276)
+- Improved the log recovery logs. [PR](https://github.com/BSC-ES/autosubmit/pull/2341)
 
 **New features:**
 - Added support for `%^%` variables to improve template customization. [PR](https://github.com/BSC-ES/autosubmit/pull/2288), [Docs](https://autosubmit.readthedocs.io/en/latest/userguide/templates.html#sustitute-placeholders-after-all-files-have-been-loaded)
