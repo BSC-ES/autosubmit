@@ -306,16 +306,13 @@ class AutosubmitGit:
     @staticmethod
     def check_directory_in_use(expid: str) -> bool:
         """
-        Checks for open files and unfnished git-credential requests in a directory
+        Checks for open files and unfinished git-credential requests in a directory
         """
         if process_id(expid) is not None:
             return True
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        for proc in psutil.process_iter(['name']):
             name = proc.info.get('name', '')
-            cmdline = proc.info.get('cmdline') or []
-            if 'git-credential' in name or any('git-credential' in arg for arg in cmdline):
+            if any('*_run.log' in arg for arg in name):
                 return True
-        if bool(psutil.Process().open_files()):
-            return True
         return False 
 
