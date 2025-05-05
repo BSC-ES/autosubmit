@@ -18,9 +18,11 @@
 """This file contains tests for the ``platform``."""
 
 from pathlib import Path
-from test.unit.test_job import TestJob, FakeBasicConfig
+
 import pytest
+
 from autosubmit.platforms.locplatform import LocalPlatform
+from test.unit.test_job import TestJob, FakeBasicConfig
 
 @pytest.mark.parametrize(
     'file_exists,count ',
