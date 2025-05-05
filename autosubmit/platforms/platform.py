@@ -23,10 +23,11 @@ if TYPE_CHECKING:
 
 
 def _init_logs_log_process(as_conf, platform_name):
-    Log.set_console_level(as_conf.experiment_data["LOG_RECOVERY_CONSOLE_LEVEL"])
-    aslogs_path = Path(as_conf.experiment_data["ROOTDIR"], "tmp/ASLOGS")
-    Log.set_file(aslogs_path.joinpath(f'{platform_name.lower()}_log_recovery.log'), "out", as_conf.experiment_data["LOG_RECOVERY_FILE_LEVEL"])
-    Log.set_file(aslogs_path.joinpath(f'{platform_name.lower()}_log_recovery_err.log'), "err")
+    Log.set_console_level(as_conf.experiment_data.get("LOG_RECOVERY_CONSOLE_LEVEL", "DEBUG"))
+    if as_conf.experiment_data["ROOTDIR"]:
+        aslogs_path = Path(as_conf.experiment_data["ROOTDIR"], "tmp/ASLOGS")
+        Log.set_file(aslogs_path.joinpath(f'{platform_name.lower()}_log_recovery.log'), "out", as_conf.experiment_data.get("LOG_RECOVERY_FILE_LEVEL", "EVERYTHING"))
+        Log.set_file(aslogs_path.joinpath(f'{platform_name.lower()}_log_recovery_err.log'), "err")
 
 
 def recover_platform_job_logs_wrapper(
@@ -60,9 +61,12 @@ def recover_platform_job_logs_wrapper(
         "AS_ENV_SSH_CONFIG_PATH": as_conf.experiment_data.get("AS_ENV_SSH_CONFIG_PATH", None),
         "AS_ENV_CURRENT_USER": as_conf.experiment_data.get("AS_ENV_CURRENT_USER", None),
         "ROOTDIR": as_conf.experiment_data.get("ROOTDIR", None),
-        "LOG_RECOVERY_CONSOLE_LEVEL": as_conf.experiment_data.get("LOG_RECOVERY_CONSOLE_LEVEL", "DEBUG"),
-        "LOG_RECOVERY_FILE_LEVEL": as_conf.experiment_data.get("LOG_RECOVERY_FILE_LEVEL", "EVERYTHING"),
+        "LOG_RECOVERY_CONSOLE_LEVEL": as_conf.experiment_data.get("CONFIG", {}).get("LOG_RECOVERY_CONSOLE_LEVEL",
+                                                                                    "DEBUG"),
+        "LOG_RECOVERY_FILE_LEVEL": as_conf.experiment_data.get("CONFIG", {}).get("LOG_RECOVERY_FILE_LEVEL",
+                                                                                 "EVERYTHING"),
     }
+    _init_logs_log_process(as_conf, platform.name)
     platform.recover_platform_job_logs(as_conf)
     _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
 
@@ -1116,7 +1120,6 @@ class Platform(object):
         Recovers the logs of the jobs that have been submitted.
         When this is executed as a process, the exit is controlled by the work_event and cleanup_events of the main process.
         """
-        _init_logs_log_process(as_conf, self.name)
         setproctitle.setproctitle(f"autosubmit log {self.expid} recovery {self.name.lower()}")
         identifier = f"{self.name.lower()}(log_recovery):"
         try:
