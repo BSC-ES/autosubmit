@@ -1,11 +1,15 @@
 import atexit
 import multiprocessing
 import queue  # only for the exception
+from contextlib import suppress
 from os import _exit
 import setproctitle
 import locale
 import os
 import traceback
+
+from pathlib import Path
+
 from autosubmit.job.job_common import Status
 from typing import List, Union, Set, Any, TYPE_CHECKING
 from autosubmit.helpers.parameters import autosubmit_parameter
@@ -16,6 +20,14 @@ import time
 
 if TYPE_CHECKING:
     from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+
+
+def _init_logs_log_process(as_conf, platform_name):
+    Log.set_console_level(as_conf.experiment_data.get("LOG_RECOVERY_CONSOLE_LEVEL", "DEBUG"))
+    if as_conf.experiment_data["ROOTDIR"]:
+        aslogs_path = Path(as_conf.experiment_data["ROOTDIR"], "tmp/ASLOGS")
+        Log.set_file(aslogs_path.joinpath(f'{platform_name.lower()}_log_recovery.log'), "out", as_conf.experiment_data.get("LOG_RECOVERY_FILE_LEVEL", "EVERYTHING"))
+        Log.set_file(aslogs_path.joinpath(f'{platform_name.lower()}_log_recovery_err.log'), "err")
 
 
 def recover_platform_job_logs_wrapper(
@@ -47,10 +59,19 @@ def recover_platform_job_logs_wrapper(
     as_conf.experiment_data = {
         "AS_ENV_PLATFORMS_PATH": as_conf.experiment_data.get("AS_ENV_PLATFORMS_PATH", None),
         "AS_ENV_SSH_CONFIG_PATH": as_conf.experiment_data.get("AS_ENV_SSH_CONFIG_PATH", None),
+        "AS_ENV_CURRENT_USER": as_conf.experiment_data.get("AS_ENV_CURRENT_USER", None),
         "ROOTDIR": as_conf.experiment_data.get("ROOTDIR", None),
+        "LOG_RECOVERY_CONSOLE_LEVEL": as_conf.experiment_data.get("CONFIG", {}).get("LOG_RECOVERY_CONSOLE_LEVEL",
+                                                                                    "DEBUG"),
+        "LOG_RECOVERY_FILE_LEVEL": as_conf.experiment_data.get("CONFIG", {}).get("LOG_RECOVERY_FILE_LEVEL",
+                                                                                 "EVERYTHING"),
     }
+    _init_logs_log_process(as_conf, platform.name)
     platform.recover_platform_job_logs(as_conf)
     _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
+
+
+
 
 class CopyQueue(Queue):
     """
@@ -1099,7 +1120,6 @@ class Platform(object):
         Recovers the logs of the jobs that have been submitted.
         When this is executed as a process, the exit is controlled by the work_event and cleanup_events of the main process.
         """
-        Log.get_logger("Autosubmit")  # Log needs to be initialised in the new process
         setproctitle.setproctitle(f"autosubmit log {self.expid} recovery {self.name.lower()}")
         identifier = f"{self.name.lower()}(log_recovery):"
         try:
@@ -1120,7 +1140,9 @@ class Platform(object):
             Log.error(f"{identifier} {e}")
             Log.debug(traceback.format_exc())
 
-        self.closeConnection()
+        with suppress(Exception):
+            self.closeConnection()
+
         Log.info(f"{identifier} Exiting.")
         _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
 
