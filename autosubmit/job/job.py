@@ -244,7 +244,7 @@ class Job(object):
         self._local_logs = ('', '')
         self._remote_logs = ('', '')
         self.script_name = self.name + ".cmd"
-        self.stat_file = self.script_name[:-4] + "_STAT_"
+        self.stat_file = f"{self.script_name[:-4]}_STAT_"
         self._status = None
         self.status = status
         self.prev_status = status
@@ -387,7 +387,7 @@ class Job(object):
         self.start_time_timestamp = time.time()
         self.processors_per_node = ""
         self.script_name = self.name + ".cmd"
-        self.stat_file = self.script_name[:-4] + "_STAT_"
+        self.stat_file = f"{self.script_name[:-4]}_STAT_"
         self.reservation = ""
         self.current_checkpoint_step = 0
         self.max_checkpoint_step = 0
@@ -2873,19 +2873,19 @@ class WrapperJob(Job):
             not_finished_jobs_names = ' '.join(list(not_finished_jobs_dict.keys()))
             remote_log_dir = self._platform.get_remote_log_dir()
             # PREPARE SCRIPT TO SEND
-            # When a inner_job is running? When the job has an _STAT file
-            command = textwrap.dedent("""
-            cd {1}
-            for job in {0}
+            # When an inner_job is running? When the job has an _STAT file
+            command = textwrap.dedent(f"""
+            cd {str(remote_log_dir)}
+            for job in {str(not_finished_jobs_names)}
             do
-                if [ -f "${{job}}_STAT" ]
+                if [ -f "${{job}}_STAT_{self.fail_count}" ]
                 then
-                        echo ${{job}} $(head ${{job}}_STAT)
+                        echo ${{job}} $(head ${{job}}_STAT_{self.fail_count})
                 else
                         echo ${{job}}
                 fi
             done
-            """).format(str(not_finished_jobs_names), str(remote_log_dir), '\n'.ljust(13))
+            """)
 
             log_dir = os.path.join(
                 self._tmp_path, 'LOG_{0}'.format(self.expid))

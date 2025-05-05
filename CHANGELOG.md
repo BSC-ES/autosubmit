@@ -7,6 +7,7 @@
 - Fixed timestamp-related issues in logs and processes. [#2275](https://github.com/BSC-ES/autosubmit/issues/2275), [PR](https://github.com/BSC-ES/autosubmit/pull/2284), [PR](https://github.com/BSC-ES/autosubmit/pull/2329)
 - Reintroduced the `%SCRATCH_DIR%` variable and fixed problems with date variables. [#2248](https://github.com/BSC-ES/autosubmit/issues/2248), [PR](https://github.com/BSC-ES/autosubmit/pull/2292)
 - Resolved an authentication issue related to user mapping. [PR #2333](https://github.com/BSC-ES/autosubmit/pull/2333)
+- Fixed issues with wrapper not updating status correctly. [#2274](https://github.com/BSC-ES/autosubmit/issues/2274) [PR](https://github.com/BSC-ES/autosubmit/pull/2327)
 
 **Enhancements:**
 - Improved validation for the `expid` flag. [PR](https://github.com/BSC-ES/autosubmit/pull/2309)
