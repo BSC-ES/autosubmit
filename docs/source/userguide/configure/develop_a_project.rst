@@ -139,6 +139,8 @@ Autosubmit configuration
         OUTPUT:pdf
         WRAPPERS_WALLCLOCK: 48:00  # Default max_wallclock for wrappers before getting killed
         JOB_WALLCLOCK: 24:00  # Default max_wallclock for jobs before getting killed
+        LOG_RECOVERY_CONSOLE_LEVEL: "DEBUG"  # Default log level for console output for the log recovery process.
+        LOG_RECOVERY_FILE_LEVEL: "EVERYTHING"  # Default log level for file output for the log recovery process.
     # wrapper definition
     wrappers:
         wrapper_1_v_example:
