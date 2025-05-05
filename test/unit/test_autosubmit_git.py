@@ -183,7 +183,7 @@ def test_git_credential_might_lock_files(tmp_path):
     Ensures a directory is correctly identified as having some or none running processes
     via the AutosubmitGit.check_directory_in_use function
     """
-    test_file = tmp_path / "testfile.txt"
+    test_file = tmp_path / "testfie_run.log"
     test_file.write_text("This is a test file.")
 
     # open the file in another process using cat so it stays open
