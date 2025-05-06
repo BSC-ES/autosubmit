@@ -1143,10 +1143,10 @@ class Job(object):
             int: Value in the index position, or 0 if the file or index does not exist.
         """
         if fail_count == -1:
-            logname = os.path.join(self._log_path, f"{self.stat_file}0")
+            logname = os.path.join(self._tmp_path, f"{self.stat_file}0")
         else:
             fail_count = str(fail_count)
-            logname = os.path.join(self._log_path, f"{self.stat_file}{fail_count}")
+            logname = os.path.join(self._tmp_path, f"{self.stat_file}{fail_count}")
         if os.path.exists(logname):
             lines = open(logname).readlines()
             if len(lines) >= index + 1:
@@ -2549,10 +2549,12 @@ class Job(object):
 
         end_time = self.check_end_time(count)
         if end_time > 0:
-            self.finish_time_timestamp = end_time
+            self.finish_time_timestamp = int(end_time)
+        if not self.finish_time_timestamp:
+            self.finish_time_timestamp = int(time.time())
         with open(Path(self._tmp_path) / f"{self.name}_TOTAL_STATS", 'a') as stat_file:
             stat_file.write(' ')
-            stat_file.write(date2str(datetime.datetime.fromtimestamp(float(self.finish_time_timestamp)), 'S'))
+            stat_file.write(date2str(datetime.datetime.fromtimestamp(int(self.finish_time_timestamp)), 'S'))
             stat_file.write(' ')
 
             if completed:
