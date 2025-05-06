@@ -1063,16 +1063,18 @@ class Platform(object):
                 break
         return process_log
 
-    def recover_job_log(self, identifier: str, jobs_pending_to_process: Set[Any]) -> Set[Any]:
+    def recover_job_log(self, identifier: str, jobs_pending_to_process: Set[Any], as_conf: 'AutosubmitConfig') -> Set[Any]:
         """
-        Recovers log files for jobs from the recovery queue and retry failed jobs.
+        Recovers log files for jobs from the recovery queue and retries failed jobs.
 
-        Args:
-            identifier (str): Identifier for logging purposes.
-            jobs_pending_to_process (Set[Any]): Set of jobs that had issues during log retrieval.
-
-        Returns:
-            Set[Any]: Updated set of jobs pending to process.
+        :param identifier: Identifier for logging purposes.
+        :type identifier: str
+        :param jobs_pending_to_process: Set of jobs that had issues during log retrieval.
+        :type jobs_pending_to_process: Set[Any]
+        :param as_conf: The Autosubmit configuration object containing experiment data.
+        :type as_conf: AutosubmitConfig
+        :return: Updated set of jobs pending to process.
+        :rtype: Set[Any]
         """
         job = None
 
@@ -1093,7 +1095,7 @@ class Platform(object):
                 pass
 
         if len(jobs_pending_to_process) > 0: # Restore the connection if there was an issue with one or more jobs.
-            self.restore_connection(None)
+            self.restore_connection(as_conf, log_recovery_process=True)
 
         # This second while is to keep retring the failed jobs.
         # With the unique queue, the main process won't send the job again, so we have to store it here.
@@ -1111,7 +1113,7 @@ class Platform(object):
             Log.result(
                 f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
         if len(jobs_pending_to_process) > 0:
-            self.restore_connection(None)  # Restore the connection if there was an issue with one or more jobs.
+            self.restore_connection(as_conf, log_recovery_process=True)  # Restore the connection if there was an issue with one or more jobs.
 
         return jobs_pending_to_process
 
@@ -1132,9 +1134,9 @@ class Platform(object):
             # Keep alive signal timeout is 5 minutes, but the sleeptime is 60 seconds.
             self.keep_alive_timeout = max(log_recovery_timeout*5, 60*5)
             while self.wait_for_work(sleep_time=max(log_recovery_timeout, 60)):
-                jobs_pending_to_process = self.recover_job_log(identifier, jobs_pending_to_process)
+                jobs_pending_to_process = self.recover_job_log(identifier, jobs_pending_to_process, as_conf)
                 if self.cleanup_event.is_set():  # Check if the main process is waiting for this child to end.
-                    self.recover_job_log(identifier, jobs_pending_to_process)
+                    self.recover_job_log(identifier, jobs_pending_to_process, as_conf)
                     break
         except Exception as e:
             Log.error(f"{identifier} {e}")

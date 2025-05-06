@@ -1903,14 +1903,14 @@ def test_get_from_stat(tmpdir, file_exists, index_timestamp, fail_count, expecte
 
     job = Job("dummy", 1, Status.WAITING, 0)
     assert job.stat_file == f"{job.name}_STAT_"
-    job._log_path = Path(tmpdir)
-    job._log_path.mkdir(parents=True, exist_ok=True)
+    job._tmp_path = Path(tmpdir)
+    job._tmp_path.mkdir(parents=True, exist_ok=True)
 
     # Generating the timestamp file
     if file_exists:
-        with open(job._log_path.joinpath(f"{job.stat_file}0"), "w") as stat_file:
+        with open(job._tmp_path.joinpath(f"{job.stat_file}0"), "w") as stat_file:
             stat_file.write("19704923\n19704924\n")
-        with open(job._log_path.joinpath(f"{job.stat_file}1"), "w") as stat_file:
+        with open(job._tmp_path.joinpath(f"{job.stat_file}1"), "w") as stat_file:
             stat_file.write("29704923\n29704924\n")
 
     if fail_count is None:
