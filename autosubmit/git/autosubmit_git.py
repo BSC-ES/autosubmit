@@ -310,9 +310,10 @@ class AutosubmitGit:
         """
         if process_id(expid) is not None:
             return True
-        for proc in psutil.process_iter(['name']):
+        for proc in psutil.process_iter(['name', 'cmdline']):
             name = proc.info.get('name', '')
-            if '_run.log' in name: 
+            cmdline = proc.info.get('cmdline', [])
+            if '_run.log' in name or any('run' in arg for arg in cmdline): 
                 return True
         return False 
 
