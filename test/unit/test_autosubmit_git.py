@@ -178,23 +178,25 @@ def test_copy_code(autosubmit_config, config, mocker, autosubmit):
     assert autosubmit._copy_code(as_conf, expid, "git", True)
 
 
-def test_git_credential_might_lock_files(tmp_path):
+@pytest.mark.parametrize("mock_process_names, expected", [
+    (["some_run.log", "other_process"], True),
+    (["normal_process"], False)
+])
+def test_git_credential_might_lock_files(mocker, mock_process_names, expected):
     """
-    Ensures a directory is correctly identified as having some or none running processes
+    Ensures a directory is correctly identified as having some running processes
     via the AutosubmitGit.check_directory_in_use function
     """
-    test_file = tmp_path / "testfie_run.log"
-    test_file.write_text("This is a test file.")
+    mocker.patch("autosubmit.helpers.processes.process_id", return_value=None)
 
-    # open the file in another process using cat so it stays open
-    proc = subprocess.Popen(['cat'], stdin=subprocess.PIPE)
-    try:
-        with open(test_file, 'rb') as f:
-            proc.stdin.write(f.read())
-            proc.stdin.flush()
-            time.sleep(0.1)
-            assert AutosubmitGit.check_directory_in_use(tmp_path) is True
-    finally:
-        proc.stdin.close()
-        proc.terminate()
-        proc.wait()
+    # Create mocked processes with names from the parameter
+    mock_processes = []
+    for name in mock_process_names:
+        proc = mocker.MagicMock()
+        proc.info = {"name": name}
+        mock_processes.append(proc)
+
+    mocker.patch("psutil.process_iter", return_value=mock_processes)
+
+    result = AutosubmitGit.check_directory_in_use("dummy_expid")
+    assert result is expected

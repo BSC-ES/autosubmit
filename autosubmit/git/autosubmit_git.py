@@ -312,7 +312,7 @@ class AutosubmitGit:
             return True
         for proc in psutil.process_iter(['name']):
             name = proc.info.get('name', '')
-            if any('*_run.log' in arg for arg in name):
+            if '_run.log' in name: 
                 return True
         return False 
 
