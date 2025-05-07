@@ -18,8 +18,6 @@
 """Tests for ``AutosubmitGit``."""
 
 import pytest
-import time
-import subprocess
 
 from autosubmit.git.autosubmit_git import AutosubmitGit
 from log.log import AutosubmitCritical
@@ -189,7 +187,6 @@ def test_git_credential_might_lock_files(mocker, mock_process_names, expected):
     """
     mocker.patch("autosubmit.helpers.processes.process_id", return_value=None)
 
-    # Create mocked processes with names from the parameter
     mock_processes = []
     for name in mock_process_names:
         proc = mocker.MagicMock()
