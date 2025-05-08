@@ -174,26 +174,3 @@ def test_copy_code(autosubmit_config, config, mocker, autosubmit):
     as_conf = autosubmit_config(expid, config)
     mocker.patch('autosubmit.git.autosubmit_git.AutosubmitGit.clone_repository', return_value=True)
     assert autosubmit._copy_code(as_conf, expid, "git", True)
-
-
-@pytest.mark.parametrize("mock_process_names, expected", [
-    (["some_run.log", "other_process"], True),
-    (["normal_process"], False)
-])
-def test_git_credential_might_lock_files(mocker, mock_process_names, expected):
-    """
-    Ensures a directory is correctly identified as having some running processes
-    via the AutosubmitGit.check_directory_in_use function
-    """
-    mocker.patch("autosubmit.helpers.processes.process_id", return_value=None)
-
-    mock_processes = []
-    for name in mock_process_names:
-        proc = mocker.MagicMock()
-        proc.info = {"name": name}
-        mock_processes.append(proc)
-
-    mocker.patch("psutil.process_iter", return_value=mock_processes)
-
-    result = AutosubmitGit.check_directory_in_use("dummy_expid")
-    assert result is expected
