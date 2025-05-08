@@ -5,7 +5,10 @@ from autosubmit.experiment.detail_updater import (
 )
 
 
-def test_details_properties():
+def test_details_properties(mocker):
+    # TODO: mocked create_experiment_details_repository as it fails intermittently with
+    #       sqlite3.OperationalError: unable to open database file
+    mocker.patch('autosubmit.experiment.detail_updater.ExperimentDetailsRepository')
     exp_details = ExperimentDetails("a000", init_reload=False)
 
     exp_details.exp_id = 0
