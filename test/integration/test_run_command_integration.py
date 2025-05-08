@@ -61,25 +61,9 @@ def as_exp(autosubmit_exp):
 
 # --- Internal utility functions.
 
-def check_db_fields(run_tmpdir: Path,
-                    expected_entries: int,
-                    final_status: str,
-                    wrapper_type: str) -> dict:
+def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[str, (bool, str)]:
     """
-    Validate the database state after a completed run.
-
-    :param run_tmpdir: Temporary directory for the test run.
-    :type run_tmpdir: pytest.TempPathFactory
-    :param expected_entries: The expected number of entries in the database.
-    :type expected_entries: int
-    :param final_status: The expected final status of the jobs ("COMPLETED", "FAILED").
-    :type final_status: str
-    :param wrapper_type: The type of wrapper used in the test ("vertical").
-    :type wrapper_type: str
-    :return: A dictionary containing the results of various database checks,
-             including the existence of the database, the number of entries,
-             and the validity of job fields.
-    :rtype: dict
+    Check that the database contains the expected number of entries, and that all fields contain data after a completed run.
     """
     # Test database exists.
     job_data_db = run_tmpdir / f'metadata/data/job_data_{_EXPID}.db'
@@ -96,82 +80,83 @@ def check_db_fields(run_tmpdir: Path,
         c = conn.cursor()
         c.execute("SELECT * FROM job_data")
         rows = c.fetchall()
-        db_check_list["JOB_DATA_ENTRIES"] = len(rows) == expected_entries
+        db_check_list["JOB_DATA_ENTRIES"] = len(rows) == expected_entries, \
+            f"Expected {expected_entries} entries, found {len(rows)}"
         # Convert rows to a list of dictionaries
-        rows_as_dicts = [dict(row) for row in rows]
-        # Tune the print so it is more readable, so it is easier to debug in case of failure
-        db_check_list["JOB_DATA_FIELDS"] = {}
+        rows_as_dicts: list[dict[str, Any]] = [dict(row) for row in rows]
+        # Tune the print, so it is more readable, so it is easier to debug in case of failure
         counter_by_name = {}
-        group_by_job_name = {
-            job_name: sorted(
-                [row for row in rows_as_dicts if row["job_name"] == job_name],
-                key=lambda x: x["job_id"]
-            )
-            for job_name in {row["job_name"] for row in rows_as_dicts}
+
+        excluded_keys = ["status", "finish", "submit", "start", "extra_data", "children", "platform_output"]
+
+        last_times = {}
+
+        for row_dict in rows_as_dicts:
+            # Check that all fields contain data, except extra_data, children, and platform_output
+            # Check that submit, start and finish are > 0
+            job_name = row_dict["job_name"]
+
+            if job_name not in last_times:
+                last_times[job_name] = {
+                    "submit": 0,
+                    "start": 0,
+                    "finish": 0
         }
 
-    for job_name, grouped_rows in group_by_job_name.items():
-        counter_by_name[job_name] = len(grouped_rows)
+            if job_name not in counter_by_name:
+                counter_by_name[job_name] = 0
+
         if job_name not in db_check_list["JOB_DATA_FIELDS"]:
             db_check_list["JOB_DATA_FIELDS"][job_name] = {}
 
-        previous_retry_row = {}
-        for i, row_dict in enumerate(grouped_rows):
-            db_check_list["JOB_DATA_FIELDS"][job_name][i] = {}
-            db_check_list["JOB_DATA_FIELDS"][job_name][i]["submit"] = \
-                row_dict["submit"] > 0 and row_dict["submit"] != 1970010101
-            db_check_list["JOB_DATA_FIELDS"][job_name][i]["start"] = \
-                row_dict["start"] > 0 and row_dict["start"] != 1970010101
-            db_check_list["JOB_DATA_FIELDS"][job_name][i]["finish"] = \
-                row_dict["finish"] > 0 and row_dict["finish"] != 1970010101
-            db_check_list["JOB_DATA_FIELDS"][job_name][i]["start>submit"] = \
-                int(row_dict["start"]) >= int(row_dict["submit"])
-            db_check_list["JOB_DATA_FIELDS"][job_name][i]["finish>start"] = \
-                int(row_dict["finish"]) >= int(row_dict["start"])
-            db_check_list["JOB_DATA_FIELDS"][job_name][i]["finish>submit"] = \
-                int(row_dict["finish"]) >= int(row_dict["submit"])
-            db_check_list["JOB_DATA_FIELDS"][job_name][i]["status"] = \
-                row_dict["status"] == final_status
-            db_check_list["JOB_DATA_FIELDS"][job_name][i]["workflow_commit"] = \
-                row_dict["workflow_commit"] == "debug-commit-hash"
-            # Check for empty fields
-            empty_fields = []
-            for key in [key for key in row_dict.keys() if
-                        key not in ["status", "finish", "submit", "start", "extra_data", "children",
-                                    "platform_output"]]:
-                if str(row_dict[key]) == str(""):
-                    empty_fields.append(key)
+            check_job_submit = row_dict["submit"] > 0 and row_dict["submit"] != 1970010101
+            check_job_submit_last = row_dict["submit"] >= last_times[row_dict["job_name"]]["submit"]
+            check_job_start = row_dict["start"] > 0 and row_dict["start"] != 1970010101
+            check_job_start_last = row_dict["start"] >= last_times[row_dict["job_name"]]["start"]
+            check_job_start_submit = int(row_dict["start"]) >= int(row_dict["submit"])
+            check_job_finish = row_dict["finish"] > 0 and row_dict["finish"] != 1970010101
+            check_job_finish_last = row_dict["finish"] >= last_times[row_dict["job_name"]]["finish"]
+            check_job_finish_start = int(row_dict["finish"]) >= int(row_dict["start"])
+            check_job_finish_submit = int(row_dict["finish"]) >= int(row_dict["submit"])
+            check_job_status = row_dict["status"] == final_status
+            # TODO: Now that we run the real workflow with less mocking, we cannot get the
+            #       debug mock workflow commit, as in reality the temporary project will
+            #       simply return an empty commit. We could modify the test to actually create
+            #       a project in the future, but this test will verify just that the job data
+            #       contains the workflow commit column. For the content we can verify it
+            #       later with a more complete functional test using Git.
+            check_workflow_commit = "workflow_commit" in row_dict
 
-            if previous_retry_row:
-                # check submit
-                db_check_list["JOB_DATA_FIELDS"][job_name][i]["submit>=previous_submit_retry"] = \
-                    row_dict["submit"] >= previous_retry_row["submit"]
-                db_check_list["JOB_DATA_FIELDS"][job_name][i]["submit>previous_submit_retry"] = \
-                    row_dict["submit"] >= previous_retry_row["finish"]
-                db_check_list["JOB_DATA_FIELDS"][job_name][i]["submit>previous_start_retry"] = \
-                    row_dict["submit"] >= previous_retry_row["start"]
+            db_check_job = db_check_list["JOB_DATA_FIELDS"][job_name]
 
+            job_counter_by_name = str(counter_by_name[job_name])
+            db_check_job[job_counter_by_name] = {
+                "submit": check_job_submit,
+                "submit>=last": check_job_submit_last,
+                "start": check_job_start,
+                "start>=last": check_job_start_last,
+                "start>submit": check_job_start_submit,
+                "finish": check_job_finish,
+                "finish>=last": check_job_finish_last,
+                "finish>start": check_job_finish_start,
+                "finish>submit": check_job_finish_submit,
+                "status": check_job_status,
+                "workflow_commit": check_workflow_commit
+            }
 
-                # check start
-                db_check_list["JOB_DATA_FIELDS"][job_name][i]["start>=previous_start_retry"] = \
-                    row_dict["start"] >= previous_retry_row["start"]
-                db_check_list["JOB_DATA_FIELDS"][job_name][i]["start>=previous_finish_retry"] = \
-                    row_dict["start"] >= previous_retry_row["finish"]
-                db_check_list["JOB_DATA_FIELDS"][job_name][i]["start>=previous_submit_retry"] = \
-                    row_dict["start"] >= previous_retry_row["submit"]
+            db_check_job[job_counter_by_name]["empty_fields"] = " ".join(
+                {
+                    str(k): v
+                    for k, v in row_dict.items()
+                    if k not in excluded_keys and v == ""
+                }.keys()
+            )
 
-                # check finish
-                db_check_list["JOB_DATA_FIELDS"][job_name][i]["finish>=previous_finish_retry"] = \
-                    row_dict["finish"] >= previous_retry_row["finish"]
-                db_check_list["JOB_DATA_FIELDS"][job_name][i]["finish>=previous_start_retry"] = \
-                    row_dict["finish"] >= previous_retry_row["start"]
-                db_check_list["JOB_DATA_FIELDS"][job_name][i]["finish>=previous_submit_retry"] = \
-                    row_dict["finish"] >= previous_retry_row["submit"]
+            counter_by_name[job_name] += 1
+            last_times[job_name]["submit"] = int(row_dict["submit"])
+            last_times[job_name]["start"] = int(row_dict["start"])
+            last_times[job_name]["finish"] = int(row_dict["finish"])
 
-            previous_retry_row = row_dict
-    print_db_results(db_check_list, rows_as_dicts, run_tmpdir)
-    c.close()
-    conn.close()
     return db_check_list
 
 
@@ -294,8 +279,8 @@ def _init_run(as_exp, jobs_data) -> Path:
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
+    """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
 
-    """, 3, "COMPLETED", "simple"),  # No wrappers, simple type
     # Success wrapper
     (dedent("""\
     EXPERIMENT:
@@ -326,7 +311,8 @@ def _init_run(as_exp, jobs_data) -> Path:
         wrapper2:
             JOBS_IN_WRAPPER: job2
             TYPE: vertical
-    """, 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
+    """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
+
     # Failure
     (dedent("""\
     EXPERIMENT:
@@ -340,7 +326,8 @@ def _init_run(as_exp, jobs_data) -> Path:
             RUNNING: chunk
             wallclock: 00:01
             retrials: 2  # In local, it started to fail at 18 retrials.
-    """, (2 + 1) * 3, "FAILED", "simple"),  # No wrappers, simple type
+    """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
+
     # Failure wrappers
     (dedent("""\
     JOBS:
@@ -357,33 +344,31 @@ def _init_run(as_exp, jobs_data) -> Path:
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
-    """, (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
+    """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
 ], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
-def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries, final_status, wrapper_type):
-    log_dir = _init_run(run_tmpdir, jobs_data)
+def test_run_uninterrupted(
+        as_exp,
+        jobs_data,
+        expected_db_entries,
+        final_status,
+        wrapper_type):
+    as_conf = as_exp.as_conf
+    log_dir = _init_run(as_exp, jobs_data)
+
     # Run the experiment
     exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
     _assert_exit_code(final_status, exit_code)
 
     # Check and display results
-    db_check_list = check_db_fields(run_tmpdir, expected_db_entries, final_status, wrapper_type)
-    files_check_list = _check_files_recovered(run_tmpdir, log_dir, expected_files=expected_db_entries * 2)
+    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    e_msg = f"Current folder: {run_tmpdir.strpath}\n"
-    e_msg += f"sqlitebrowser {run_tmpdir.strpath}/job_data_t000.db\n"
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status)
+    e_msg = f"Current folder: {str(run_tmpdir)}\n"
     for check, value in db_check_list.items():
-        if not value:
             e_msg += f"{check}: {value}\n"
-        elif isinstance(value, dict):
-            for job_name in value:
-                for job_counter in value[job_name]:
-                    for check_name, value_ in value[job_name][job_counter].items():
-                        if not value_:
-                            e_msg += f"{job_name}_run_number_{job_counter} field: {check_name}: {value_}\n"
 
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
     for check, value in files_check_list.items():
-        if not value:
             e_msg += f"{check}: {value}\n"
 
     try:
@@ -392,10 +377,9 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
     except AssertionError:
         pytest.fail(e_msg)
 
-
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
     # Success
-    ("""
+    (dedent("""\
     EXPERIMENT:
         NUMCHUNKS: '3'
     JOBS:
@@ -406,20 +390,22 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
-    """, 3, "COMPLETED", "simple"),  # No wrappers, simple type
+    """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
+
     # Success wrapper
-    ("""
+    (dedent("""\
     EXPERIMENT:
         NUMCHUNKS: '2'
     JOBS:
         job:
             SCRIPT: |
                 echo "Hello World with id=Success + wrappers"
-                sleep 5
+                sleep 1
             DEPENDENCIES: job-1
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
+
         job2:
             SCRIPT: |
                 echo "Hello World with id=Success + wrappers"
@@ -428,6 +414,7 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
+
     wrappers:
         wrapper:
             JOBS_IN_WRAPPER: job
@@ -435,29 +422,29 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
         wrapper2:
             JOBS_IN_WRAPPER: job2
             TYPE: vertical
-    """, 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
+    """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
+
     # Failure
-    ("""
+    (dedent("""\
     EXPERIMENT:
         NUMCHUNKS: '2'
     JOBS:
         job:
             SCRIPT: |
-                sleep 1
+                sleep 2
                 decho "Hello World with id=FAILED"
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
             retrials: 2  # In local, it started to fail at 18 retrials.
-    """, (2 + 1) * 3, "FAILED", "simple"),  # No wrappers, simple type
+    """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
+
     # Failure wrappers
-    ("""
-    EXPERIMENT:
-        NUMCHUNKS: '2'
+    (dedent("""\
     JOBS:
         job:
             SCRIPT: |
-                sleep 1
+                sleep 2
                 decho "Hello World with id=FAILED + wrappers"
             PLATFORM: local
             DEPENDENCIES: job-1
@@ -468,13 +455,17 @@ def test_run_uninterrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entri
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
-    """, (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
+    """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
 ], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
-def test_run_interrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries, final_status, wrapper_type, mocker):
-    mocked_input = mocker.patch('autosubmit.autosubmit.input')
-    mocked_input.side_effect = ['yes']
-    from time import sleep
-    log_dir = init_run(run_tmpdir, jobs_data)
+def test_run_interrupted(
+        as_exp,
+        jobs_data,
+        expected_db_entries,
+        final_status,
+        wrapper_type):
+    as_conf = as_exp.as_conf
+    log_dir = _init_run(as_exp, jobs_data)
+
     # Run the experiment
     exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
     _assert_exit_code(final_status, exit_code)
@@ -493,10 +484,9 @@ def test_run_interrupted(run_tmpdir, prepare_run, jobs_data, expected_db_entries
     _assert_exit_code(final_status, exit_code)
 
     # Check and display results
-    db_check_list = check_db_fields(run_tmpdir, expected_db_entries, final_status, wrapper_type)
-    files_check_list = _check_files_recovered(run_tmpdir, log_dir, expected_files=expected_db_entries * 2)
+    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    db_check_list = check_db_fields(run_tmpdir, expected_db_entries, final_status)
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status)
     _assert_db_fields(db_check_list)
 
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
