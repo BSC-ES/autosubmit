@@ -117,9 +117,6 @@ class PBSPlatform(ParamikoPlatform):
     def get_submitted_job_id(self, output, x11 = False):
         return output.split('.')[0]
 
-    def jobs_in_queue(self):
-        return ''.split()
-
     def get_submit_cmd(self, job_script, job,hold=False, export=""):
         if export == "none" or export == "None" or export is None or export == "":
             export = ""
@@ -131,4 +128,5 @@ class PBSPlatform(ParamikoPlatform):
         if str.startswith(self._version, '11'):
             return self._checkjob_cmd + str(job_id)
         else:
+            # FIXME: this is broken if this ever gets called, no ``qstatjob``.
             return "ssh " + self.host + " " + self.get_qstatjob(job_id)

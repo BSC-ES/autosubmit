@@ -353,7 +353,7 @@ class ExperimentHistory:
     def _get_next_counter_by_job_name(self, job_name):
         """ Return the counter attribute from the latest job data row by job_name. """
         job_data_dc = self.manager.get_job_data_dc_unique_latest_by_job_name(job_name)
-        max_counter = self.manager.get_job_data_max_counter()
+        max_counter = self.manager.get_job_data_max_counter(job_name)
         if job_data_dc:
             return max(max_counter, job_data_dc.counter + 1)
         else:

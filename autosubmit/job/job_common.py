@@ -38,10 +38,12 @@ class Status:
     SUSPENDED = -3
     #######
     # Note: any change on constants must be applied on the dict below!!!
-    VALUE_TO_KEY = {-3: 'SUSPENDED', -2: 'UNKNOWN', -1: 'FAILED', 0: 'WAITING', 1: 'READY',
-                    2: 'SUBMITTED', 3: 'QUEUING', 4: 'RUNNING', 5: 'COMPLETED', 6: 'HELD', 7: 'PREPARED', 8: 'SKIPPED', 9: 'DELAYED'}
-    KEY_TO_VALUE = {'SUSPENDED': -3, 'UNKNOWN': -2, 'FAILED': -1, 'WAITING': 0, 'READY': 1, 'SUBMITTED': 2, 'QUEUING': 3, 'RUNNING': 4, 'COMPLETED': 5, 'HELD': 6, 'PREPARED': 7, 'SKIPPED': 8, 'DELAYED': 9}
-    LOGICAL_ORDER = ["WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING", "SKIPPED", "FAILED", "UNKNOWN", "COMPLETED", "SUSPENDED"]
+    VALUE_TO_KEY = {-3: 'SUSPENDED', -2: 'UNKNOWN', -1: 'FAILED', 0: 'WAITING', 1: 'READY', 2: 'SUBMITTED',
+                    3: 'QUEUING', 4: 'RUNNING', 5: 'COMPLETED', 6: 'HELD', 7: 'PREPARED', 8: 'SKIPPED', 9: 'DELAYED'}
+    KEY_TO_VALUE = {'SUSPENDED': -3, 'UNKNOWN': -2, 'FAILED': -1, 'WAITING': 0, 'READY': 1, 'SUBMITTED': 2,
+                    'QUEUING': 3, 'RUNNING': 4, 'COMPLETED': 5, 'HELD': 6, 'PREPARED': 7, 'SKIPPED': 8, 'DELAYED': 9}
+    LOGICAL_ORDER = ["WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING", "SKIPPED",
+                     "FAILED", "UNKNOWN", "COMPLETED", "SUSPENDED"]
 
     def retval(self, value):
         return getattr(self, value)
@@ -124,7 +126,7 @@ class StatisticsSnippetBash:
                     export LC_ALL=C
                 fi 
             fi
-            
+
             set -xuve
             job_name_ptrn='%CURRENT_LOGDIR%/%JOBNAME%'
             echo $(date +%s) > ${job_name_ptrn}_STAT_%FAIL_COUNT%
@@ -133,7 +135,7 @@ class StatisticsSnippetBash:
             # AS CHECKPOINT FUNCTION
             ###################
             # Creates a new checkpoint file upon call based on the current numbers of calls to the function
-            
+
             AS_CHECKPOINT_CALLS=0
             function as_checkpoint {
                 AS_CHECKPOINT_CALLS=$((AS_CHECKPOINT_CALLS+1))
@@ -166,12 +168,13 @@ class StatisticsSnippetPython:
     Class to handle the statistics snippet of a job. It contains header and tailer for
     local and remote jobs
     """
-    def __init__(self,version="3"):
-        self.version=version
 
-    def as_header(self,scheduler_header, executable):
+    def __init__(self, version="3"):
+        self.version = version
+
+    def as_header(self, scheduler_header, executable):
         if not executable:
-            executable = "/usr/bin/env python"+str(self.version)
+            executable = f"/usr/bin/env python{str(self.version)}"
         else:
             executable = executable
         return textwrap.dedent("""\
@@ -199,7 +202,7 @@ class StatisticsSnippetPython:
             except Exception as e:
                 locale.setlocale(locale.LC_ALL, 'C')
             job_name_ptrn = '%CURRENT_LOGDIR%/%JOBNAME%'
-            stat_file = open(job_name_ptrn + '_STAT', 'w')
+            stat_file = open(job_name_ptrn + '_STAT_%FAIL_COUNT%', 'w')
             stat_file.write(f'{int(time.time())}\\n')
             stat_file.close()
             ###################
@@ -216,7 +219,7 @@ class StatisticsSnippetPython:
             ###################
             # Autosubmit job
             ###################
-            
+
 
             """)
 
@@ -228,7 +231,7 @@ class StatisticsSnippetPython:
                 # Autosubmit tailer
                 ###################
 
-                stat_file = open(job_name_ptrn + '_STAT', 'a')
+                stat_file = open(job_name_ptrn + '_STAT_%FAIL_COUNT%', 'a')
                 stat_file.write(f'{int(time.time())}\\n')
                 stat_file.close()
                 open(job_name_ptrn + '_COMPLETED', 'a').close()
@@ -273,7 +276,7 @@ class StatisticsSnippetR:
             } 
             options( warn = oldw )
             job_name_ptrn = '%CURRENT_LOGDIR%/%JOBNAME%'
-            fileConn<-file(paste(job_name_ptrn,"_STAT", sep = ''),"w")
+            fileConn<-file(paste(job_name_ptrn,"_STAT_%FAIL_COUNT%", sep = ''),"w")
             writeLines(toString(trunc(as.numeric(Sys.time()))), fileConn)
             close(fileConn)
             ###################
@@ -301,7 +304,7 @@ class StatisticsSnippetR:
             # Autosubmit tailer
             ###################
 
-            fileConn<-file(paste(job_name_ptrn,"_STAT", sep = ''),"a")
+            fileConn<-file(paste(job_name_ptrn,"_STAT_%FAIL_COUNT%", sep = ''),"a")
             writeLines(toString(trunc(as.numeric(Sys.time()))), fileConn)
             close(fileConn)
 
@@ -367,17 +370,17 @@ def parse_output_number(string_number):
 def increase_wallclock_by_chunk(current, increase, chunk):
     """
     Receives the wallclock times an increases it according to a quantity times the number of the current chunk.
-    The result cannot be larger than 48:00. 
+    The result cannot be larger than the platform max_wallclock.
     If Chunk = 0 then no increment.
 
-    :param current: WALLCLOCK HH:MM 
-    :type current: str  
-    :param increase: WCHUNKINC HH:MM 
-    :type increase: str  
-    :param chunk: chunk number 
-    :type chunk: int   
-    :return: HH:MM wallclock 
-    :rtype: str 
+    :param current: WALLCLOCK HH:MM
+    :type current: str
+    :param increase: WCHUNKINC HH:MM
+    :type increase: str
+    :param chunk: chunk number
+    :type chunk: int
+    :return: HH:MM wallclock
+    :rtype: str
     """
     # Pipeline is not testing this since mock is not well-made
     try:

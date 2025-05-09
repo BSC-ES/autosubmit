@@ -18,12 +18,13 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-import subprocess
+from typing import TYPE_CHECKING
 
-from xml.dom.minidom import parseString
-
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.headers.sge_header import SgeHeader
+from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+
+if TYPE_CHECKING:
+    from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 
 class SgePlatform(ParamikoPlatform):
@@ -98,12 +99,6 @@ class SgePlatform(ParamikoPlatform):
     def get_submitted_job_id(self, output, x11 = False):
         return output.split(' ')[2]
 
-    def jobs_in_queue(self):
-        output = subprocess.check_output('qstat -xml'.format(self.host), shell=True)
-        dom = parseString(output)
-        jobs_xml = dom.getElementsByTagName("JB_job_number")
-        return [int(element.firstChild.nodeValue) for element in jobs_xml]
-
     def get_submit_cmd(self, job_script, job, hold=False, export=""):
         if (export is None or export.lower() == "none") or len(export) == 0:
             export = ""
@@ -112,25 +107,30 @@ class SgePlatform(ParamikoPlatform):
         return export + self._submit_cmd + job_script
 
     def get_checkjob_cmd(self, job_id):
+        # FIXME: this is broken if this ever gets called, no ``qstatjob``.
         return self.get_qstatjob(job_id)
 
-    def connect(self, as_conf, reconnect=False):
+    def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """
-        In this case, it does nothing because connection is established for each command
+        Establishes an SSH connection to the host.
 
-        :return: True
-        :rtype: bool
+        :param as_conf: The Autosubmit configuration object.
+        :param reconnect: Indicates whether to attempt reconnection if the initial connection fails.
+        :param log_recovery_process: Specifies if the call is made from the log retrieval process.
+        :return: None
         """
         self.connected = True
-        self.spawn_log_retrieval_process(as_conf) # This platform may be deprecated, so ignore the change
+        if not log_recovery_process:
+            self.spawn_log_retrieval_process(as_conf) # This platform may be deprecated, so ignore the change
 
-
-    def restore_connection(self,as_conf):
+    def restore_connection(self, as_conf: 'AutosubmitConfig', log_recovery_process: bool = False) -> None:
         """
-        In this case, it does nothing because connection is established for each command
+        Restores the SSH connection to the platform.
 
-        :return: True
-        :rtype: bool
+        :param as_conf: The Autosubmit configuration object used to establish the connection.
+        :type as_conf: Any
+        :param log_recovery_process: Indicates that the call is made from the log retrieval process.
+        :type log_recovery_process: bool
         """
         self.connected = True
 
@@ -141,5 +141,4 @@ class SgePlatform(ParamikoPlatform):
         :return: True
         :rtype: bool
         """
-        self.connected = True
-        self.connected(as_conf,True) # This platform may be deprecated, so ignore the change
+        self.connect(as_conf, True) # This platform may be deprecated, so ignore the change

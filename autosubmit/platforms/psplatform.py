@@ -18,7 +18,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-from xml.dom.minidom import parseString
 
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.headers.ps_header import PsHeader
@@ -92,11 +91,6 @@ class PsPlatform(ParamikoPlatform):
 
     def get_submitted_job_id(self, output, x11 = False):
         return output
-
-    def jobs_in_queue(self):
-        dom = parseString('')
-        jobs_xml = dom.getElementsByTagName("JB_job_number")
-        return [int(element.firstChild.nodeValue) for element in jobs_xml]
 
     def get_submit_cmd(self, job_script, job, hold=False, export=""):
         if export == "none" or export == "None" or export is None or export == "":

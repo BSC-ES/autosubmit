@@ -5,11 +5,12 @@ from time import sleep
 import sys
 import socket
 import os
+from typing import TYPE_CHECKING
+
 import paramiko
 import datetime
 import select
 import re
-from datetime import timedelta
 import random
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_common import Type
@@ -22,6 +23,9 @@ import threading
 import getpass
 from paramiko.agent import Agent
 import time
+
+if TYPE_CHECKING:
+    from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 def threaded(fn):
     def wrapper(*args, **kwargs):
@@ -153,23 +157,30 @@ class ParamikoPlatform(Platform):
             raise AutosubmitCritical(str(e),7051)
             #raise AutosubmitError("[{0}] connection failed for host: {1}".format(self.name, self.host), 6002, e.message)
 
+    def restore_connection(self, as_conf: 'AutosubmitConfig', log_recovery_process: bool = False) -> None:
+        """
+        Restores the SSH connection to the platform.
 
-    def restore_connection(self, as_conf):
+        :param as_conf: The Autosubmit configuration object used to establish the connection.
+        :type as_conf: AutosubmitConfig
+        :param log_recovery_process: Indicates that the call is made from the log retrieval process.
+        :type log_recovery_process: bool
+        """
         try:
             self.connected = False
             retries = 2
             retry = 0
             try:
-                self.connect(as_conf)
+                self.connect(as_conf, log_recovery_process=log_recovery_process)
             except Exception as e:
                 if ',' in self.host:
                     Log.printlog(f"Connection Failed to {self.host.split(',')[0]}, will test another host", 6002)
                 else:
                     raise AutosubmitCritical(f"First connection to {self.host} is failed, check host configuration"
-                                             f" or try another login node ", 7050,str(e))
+                                             f" or try another login node ", 7050, str(e))
             while self.connected is False and retry < retries:
                 try:
-                    self.connect(as_conf,True)
+                    self.connect(as_conf, True, log_recovery_process=log_recovery_process)
                 except Exception as e:
                     pass
                 retry += 1
@@ -230,12 +241,6 @@ class ParamikoPlatform(Platform):
                     if twofactor_nonpush is None:
                         twofactor_nonpush = input("Please type the 2FA/OTP/token code: ")
                     answers.append(twofactor_nonpush)
-        # This is done from the server
-        # if self.two_factor_method == "push":
-        #     try:
-        #         inputimeout(prompt='Press enter to complete the 2FA PUSH authentication', timeout=self.otp_timeout)
-        #     except:
-        #         pass
         return tuple(answers)
 
     def map_user_config_file(self, as_conf) -> None:
@@ -267,12 +272,14 @@ class ParamikoPlatform(Platform):
         else:
             Log.warning(f"SSH config file {self._user_config_file} not found")
 
-    def connect(self, as_conf, reconnect=False):
+    def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """
-        Creates ssh connection to host
+        Establishes an SSH connection to the host.
 
-        :return: True if connection is created, False otherwise
-        :rtype: bool
+        :param as_conf: The Autosubmit configuration object.
+        :param reconnect: Indicates whether to attempt reconnection if the initial connection fails.
+        :param log_recovery_process: Specifies if the call is made from the log retrieval process.
+        :return: None
         """
 
         try:
@@ -349,7 +356,8 @@ class ParamikoPlatform(Platform):
             self._ftpChannel = paramiko.SFTPClient.from_transport(self.transport,window_size=pow(4, 12) ,max_packet_size=pow(4, 12) )
             self._ftpChannel.get_channel().settimeout(120)
             self.connected = True
-            self.spawn_log_retrieval_process(as_conf)
+            if not log_recovery_process:
+                self.spawn_log_retrieval_process(as_conf)
 
 
         except SSHException:
@@ -555,7 +563,7 @@ class ParamikoPlatform(Platform):
         :param job: job object
         :type job: autosubmit.job.job.Job
         :param script_name: job script's name
-        :rtype scriptname: str
+        :rtype script_name: str
         :param hold: send job hold
         :type hold: boolean
         :return: job id for the submitted job
@@ -597,7 +605,7 @@ class ParamikoPlatform(Platform):
 
     def submit_Script(self, hold=False):
         """
-        Sends a Submitfile Script, exec in platform and retrieve the Jobs_ID.
+        Sends a Submit file Script, exec in platform and retrieve the Jobs_ID.
 
         :param hold: send job hold
         :type hold: boolean
@@ -615,6 +623,7 @@ class ParamikoPlatform(Platform):
         :return: command to get estimated queue time
         """
         raise NotImplementedError
+
     def parse_estimated_time(self, output):
         """
         Parses estimated queue time from output of get_estimated_queue_time_cmd
@@ -675,8 +684,7 @@ class ParamikoPlatform(Platform):
         self.send_command(self.get_checkjob_cmd(job_id))
         while self.get_ssh_output().strip(" ") == "" and retries > 0:
             retries = retries - 1
-            Log.debug(
-                'Retrying check job command: {0}', self.get_checkjob_cmd(job_id))
+            Log.debug('Retrying check job command: {0}', self.get_checkjob_cmd(job_id))
             Log.debug('retries left {0}', retries)
             Log.debug('Will be retrying in {0} seconds', sleep_time)
             sleep(sleep_time)
@@ -730,8 +738,10 @@ class ParamikoPlatform(Platform):
 
         if job_status in [Status.FAILED, Status.COMPLETED, Status.UNKNOWN]:
             job.updated_log = False
-            # backup for end time in case that the second row of the stat file is not found due a failure
-            job.end_time_timestamp = int(time.time())
+            if not job.start_time_timestamp: # QUEUING -> COMPLETED ( under safetytime )
+                job.start_time_timestamp = int(time.time())
+            # Estimate Time for failed jobs, as they won't have the timestamp in the stat file
+            job.finish_time_timestamp = int(time.time())
         if job_status in [Status.RUNNING, Status.COMPLETED] and job.new_status in [Status.QUEUING, Status.SUBMITTED]:
             # backup for start time in case that the stat file is not found
             job.start_time_timestamp = int(time.time())
@@ -742,6 +752,11 @@ class ParamikoPlatform(Platform):
             job.new_status = job_status
 
     def _check_jobid_in_queue(self, ssh_output, job_list_cmd):
+        """
+
+        :param ssh_output: ssh output
+        :type ssh_output: str
+        """
         for job in job_list_cmd[:-1].split(','):
             if job not in ssh_output:
                 return False
@@ -752,8 +767,6 @@ class ParamikoPlatform(Platform):
 
         :param job_list: list of jobs
         :type job_list: list
-        :param ssh_output: ssh output
-        :type ssh_output: str
         :return: job status
         :rtype: str
         """
@@ -768,18 +781,17 @@ class ParamikoPlatform(Platform):
             job_list_cmd=job_list_cmd[:-1]
 
         return job_list_cmd
+
     def check_Alljobs(self, job_list, as_conf, retries=5):
         """
         Checks jobs running status
 
         :param job_list: list of jobs
         :type job_list: list
-        :param job_list_cmd: list of jobs in the queue system
-        :type job_list_cmd: str
-        :param remote_logs: remote logs
-        :type remote_logs: str
+        :param as_conf: config
+        :type as_conf: as_conf
         :param retries: retries
-        :type default_status: bool
+        :type retries: int
         :return: current job status
         :rtype: autosubmit.job.job_common.Status
         """
@@ -873,6 +885,7 @@ class ParamikoPlatform(Platform):
             # job.new_status=job_status
         if slurm_error:
             raise AutosubmitError(e_msg,6000)
+
     def get_jobid_by_jobname(self,job_name,retries=2):
         """
         Get job id by job name
@@ -1189,7 +1202,6 @@ class ParamikoPlatform(Platform):
                     Log.printlog(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6006)
                 else:
                     pass
-                    #Log.debug('Command {0} in {1} successful without message: {2}', command, self.host, self._ssh_output)
             return True
         except AttributeError as e:
             raise AutosubmitError(f'Session not active: {str(e)}', 6005)
@@ -1479,6 +1491,7 @@ class ParamikoPlatform(Platform):
                 return False
         except:
             return False
+
 class ParamikoPlatformException(Exception):
     """
     Exception raised from HPC queues

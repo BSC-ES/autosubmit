@@ -22,6 +22,7 @@ from random import randrange
 
 import networkx
 import pytest
+from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 from networkx import DiGraph  # type: ignore
 
 from autosubmit.job.job import Job
@@ -30,7 +31,6 @@ from autosubmit.job.job_common import Type
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
 """Tests for the ``JobList`` class."""
 
@@ -402,7 +402,7 @@ def test_that_create_job_method_calls_dic_jobs_method_with_increasing_priority(m
 
 
 def test_run_member(job_list, mocker, as_conf, empty_job_list):
-    as_conf.experiment_data= {
+    as_conf.experiment_data = {
         'PLATFORMS': {
             'fake-platform': {
                 'TYPE': 'ps',
@@ -791,3 +791,28 @@ def test_get_jobs_by_section(setup_job_list, section_list, banned_jobs, get_only
     result = setup_job_list.get_jobs_by_section(section_list, banned_jobs, get_only_non_completed)
     assert len(result) == expected_length
     assert all(job.section == expected_section for job in result)
+
+
+@pytest.mark.parametrize(
+    'make_exception,seconds',
+    [
+        (True, True),
+        (False, True),
+        (True, False),
+        (False, False)
+    ]
+)
+def test_retrieve_times(job_list, jobs_as_dict, tmp_path, make_exception, seconds):
+    """testing function retrieve_times from job_list."""
+    #
+    # completed_jobs = jobs_as_dict[Status.COMPLETED]
+    # completed_job = completed_jobs[0]
+    # job = job_list.get_job_by_name(completed_job.name)
+
+    for completed_jobs in jobs_as_dict.values():
+        for job in completed_jobs:
+            job = job_list.get_job_by_name(job.name)
+            retrieve_data = job_list.retrieve_times(job.status, job.name, job._tmp_path, make_exception=make_exception,
+                                                    job_times=None, seconds=seconds, job_data_collection=None)
+            assert retrieve_data.name == job.name
+            assert retrieve_data.status == Status.VALUE_TO_KEY[job.status]

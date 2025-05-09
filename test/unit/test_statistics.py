@@ -15,22 +15,18 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import time
 from datetime import datetime, timedelta
-from random import seed, randint, choice
 from typing import Any, Dict, List, Tuple
 
 import pytest
 
 from autosubmit.job.job import Job
-from autosubmit.job.job_common import Status
 from autosubmit.statistics.jobs_stat import JobStat
 from autosubmit.statistics.statistics import Statistics
 from autosubmit.statistics.stats_summary import StatsSummary
 from autosubmit.statistics.utils import timedelta2hours
 
 NUM_JOBS = 5  # modify this value to test with different job number
-MAX_NUM_RETRIALS_PER_JOB = 20  # modify this value to test with different retrials number
 
 
 @pytest.fixture()
@@ -108,70 +104,6 @@ def job_with_different_retrials(mocker):
 
 
 @pytest.fixture()
-def jobs(mocker) -> List[Job]:
-    """
-    :return: Jobs with random attributes and retrials.
-    """
-    jobs = []
-    seed(time.time())
-    submit_time = datetime(2023, 1, 1, 10, 0, 0)
-    start_time = datetime(2023, 1, 1, 10, 30, 0)
-    end_time = datetime(2023, 1, 1, 11, 0, 0)
-    completed_retrial = [submit_time, start_time, end_time, "COMPLETED"]
-    partial_retrials = [
-        [submit_time, start_time, end_time, ""],
-        [submit_time, start_time, ""],
-        [submit_time, ""],
-        [""]
-    ]
-    job_statuses = Status.LOGICAL_ORDER
-    for i in range(NUM_JOBS):
-        status = job_statuses[i % len(job_statuses)]  # random status
-        job_aux = Job(
-            name="example_name_" + str(i),
-            job_id="example_id_" + str(i),
-            status=status,
-            priority=i
-        )
-
-        # Custom values for job attributes
-        job_aux.processors = str(i)
-        job_aux.wallclock = '00:05'
-        job_aux.section = "example_section_" + str(i)
-        job_aux.member = "example_member_" + str(i)
-        job_aux.chunk = "example_chunk_" + str(i)
-        job_aux.processors_per_node = str(i)
-        job_aux.tasks = str(i)
-        job_aux.nodes = str(i)
-        job_aux.exclusive = "example_exclusive_" + str(i)
-
-        num_retrials = randint(1, MAX_NUM_RETRIALS_PER_JOB)  # random number of retrials, grater than 0
-        retrials = []
-
-        for j in range(num_retrials):
-            if j < num_retrials - 1:
-                retrial = completed_retrial
-            else:
-                if job_aux.status == "COMPLETED":
-                    retrial = completed_retrial
-                else:
-                    retrial = choice(partial_retrials)
-                    if len(retrial) == 1:
-                        retrial[0] = job_aux.status
-                    elif len(retrial) == 2:
-                        retrial[1] = job_aux.status
-                    elif len(retrial) == 3:
-                        retrial[2] = job_aux.status
-                    else:
-                        retrial[3] = job_aux.status
-            retrials.append(retrial)
-        mocker.patch("autosubmit.job.job.Job.get_last_retrials", return_value=retrials)
-        jobs.append(job_aux)
-
-    return jobs
-
-
-@pytest.fixture()
 def job_stats() -> List[JobStat]:
     """Create a list of ``JobStat`` with the same length as the ``NUM_JOBS`` constant."""
     job_stats_list = []
@@ -205,9 +137,9 @@ def job_stats() -> List[JobStat]:
 
 
 @pytest.fixture()
-def statistics(jobs: List[Job], job_stats) -> Statistics:
+def statistics(create_jobs: List[Job], job_stats) -> Statistics:
     return Statistics(
-        jobs=jobs,
+        jobs=create_jobs,
         start=datetime(2023, 1, 1, 10, 0, 0),
         end=datetime(2023, 1, 1, 11, 0, 0),
         queue_time_fix={},
@@ -305,11 +237,12 @@ def failed_jobs(job_stats) -> Dict[str, int]:
 # -- tests --
 
 
-def test_build_statistics_object(jobs: List[Job]) -> None:
+@pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
+def test_build_statistics_object(create_jobs: List[Job]) -> None:
     """Test that building a statistics object by chaining build calls works as expected."""
     exp_stats = (
         Statistics(
-            jobs=jobs,
+            jobs=create_jobs,
             start=datetime(2023, 1, 1, 10, 0, 0),
             end=datetime(2023, 1, 1, 11, 0, 0),
             queue_time_fix={}).
@@ -321,7 +254,9 @@ def test_build_statistics_object(jobs: List[Job]) -> None:
     assert exp_stats.summary_list is not None
 
 
-def test_calculate_statistics(statistics: Statistics, job_with_different_retrials: Tuple[List[Job], JobStat]) -> None:
+@pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
+def test_calculate_statistics(statistics: Statistics, job_with_different_retrials: Tuple[List[Job], JobStat],
+                              create_jobs) -> None:
     """Test that the statistics object is correctly built and obtained values are correct."""
     statistics._jobs = job_with_different_retrials[0]
 
@@ -368,9 +303,11 @@ def test_calculate_statistics(statistics: Statistics, job_with_different_retrial
         assert getattr(this, var) == getattr(that, var)
 
 
-def test_calculate_summary(statistics: Statistics, summary: StatsSummary, job_stats: List[JobStat]) -> None:
+@pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
+def test_calculate_summary(statistics: Statistics, summary: StatsSummary, job_stats: List[JobStat], create_jobs) -> None:
     """Test that the summary is correctly calculated."""
-    statistics.jobs_stat = job_stats  # TODO: Had to assign jobs_stats again here, as otherwise the test would fail -- investigate why"
+    # TODO: Had to assign jobs_stats again here, as otherwise the test would fail -- investigate why"
+    statistics.jobs_stat = job_stats
     statistics.calculate_summary()
     statistics_summary = statistics.summary
     # Counter
@@ -393,7 +330,8 @@ def test_calculate_summary(statistics: Statistics, summary: StatsSummary, job_st
         assert getattr(statistics_summary, var) == getattr(summary, var)
 
 
-def test_get_summary_as_list(statistics: Statistics, summary_as_list: List[str]) -> None:
+@pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
+def test_get_summary_as_list(statistics: Statistics, summary_as_list: List[str], create_jobs) -> None:
     """Test that the summary is correctly converted to a list of strings."""
     statistics.calculate_summary()
     summary_as_list = statistics.summary_list
@@ -401,12 +339,14 @@ def test_get_summary_as_list(statistics: Statistics, summary_as_list: List[str])
     assert summary_as_list == summary_as_list
 
 
-def test_make_old_format(statistics: Statistics, statistics_old_format, job_stats: List[JobStat]) -> None:
+@pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
+def test_make_old_format(statistics: Statistics, statistics_old_format, job_stats: List[JobStat], create_jobs) -> None:
     """Test that attributes of old and new statistics objects have the same value.
 
     Old is a dictionary. New is an object. Check the access method in the assertion.
     """
-    statistics.jobs_stat = job_stats  # TODO: Had to assign jobs_stats again here, as otherwise the test would fail -- investigate why"
+    # TODO: Had to assign jobs_stats again here, as otherwise the test would fail -- investigate why"
+    statistics.jobs_stat = job_stats
     statistics.make_old_format()
 
     for var in [
@@ -416,9 +356,11 @@ def test_make_old_format(statistics: Statistics, statistics_old_format, job_stat
         assert getattr(statistics, var) == statistics_old_format[var]
 
 
-def test_build_failed_job_only(statistics: Statistics, failed_jobs, job_stats: List[JobStat]) -> None:
+@pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
+def test_build_failed_job_only(statistics: Statistics, failed_jobs, job_stats: List[JobStat], create_jobs) -> None:
     """Test that failed jobs are correctly built."""
-    statistics.jobs_stat = job_stats  # TODO: Had to assign jobs_stats again here, as otherwise the test would fail -- investigate why"
+    # TODO: Had to assign jobs_stats again here, as otherwise the test would fail -- investigate why"
+    statistics.jobs_stat = job_stats
     statistics.make_old_format()
     statistics.build_failed_jobs()
 
