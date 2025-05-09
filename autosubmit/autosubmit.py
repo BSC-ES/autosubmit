@@ -15,22 +15,50 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import argparse
 import collections
+import copy
+import datetime
+import json
 import locale
+import os
 import platform
-
-from bscearth.utils.date import date2str
+import pwd
+import random
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import tarfile
+import time
+from collections import defaultdict
 from configparser import ConfigParser
+from contextlib import suppress
+from importlib.metadata import version
+# import log.fd_show as fd_show
+from importlib.resources import files as read_files
 from pathlib import Path
-from ruamel.yaml import YAML
+from time import sleep
 from typing import Dict, Set, Tuple, Union, Any, List, Optional
 
-from autosubmit.database.db_common import update_experiment_descrip_version
-from autosubmit.experiment.detail_updater import ExperimentDetails
-from autosubmit.helpers.utils import strtobool
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from bscearth.utils.date import date2str
+from portalocker import Lock
+from portalocker.exceptions import BaseLockException
+from pyparsing import nestedExpr
+from ruamel.yaml import YAML
+
+import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
+import autosubmit.history.utils as HUtils
+import autosubmit.statistics.utils as StatisticsUtils
+from autosubmit.database.db_common import update_experiment_descrip_version
+from autosubmit.experiment.detail_updater import ExperimentDetails
+from autosubmit.helpers.processes import process_id
+from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path
+from autosubmit.helpers.utils import strtobool
 from log.log import Log, AutosubmitError, AutosubmitCritical
 from .database.db_common import create_db
 from .database.db_common import delete_experiment, get_experiment_descrip
@@ -39,6 +67,8 @@ from .database.db_structure import get_structure
 from .experiment.experiment_common import copy_experiment
 from .experiment.experiment_common import new_experiment
 from .git.autosubmit_git import AutosubmitGit
+from .history.experiment_history import ExperimentHistory
+from .history.experiment_status import ExperimentStatus
 from .job.job_common import Status
 from .job.job_grouping import JobGrouping
 from .job.job_list import JobList
@@ -47,43 +77,11 @@ from .job.job_list_persistence import JobListPersistencePkl
 from .job.job_package_persistence import JobPackagePersistence
 from .job.job_packager import JobPackager
 from .job.job_utils import SubJob, SubJobManager
+from .migrate.migrate import Migrate
 from .notifications.mail_notifier import MailNotifier
 from .notifications.notifier import Notifier
 from .platforms.paramiko_submitter import ParamikoSubmitter
 from .platforms.platform import Platform
-from .migrate.migrate import Migrate
-
-from time import sleep
-import argparse
-import subprocess
-import json
-import tarfile
-import time
-import copy
-import os
-import pwd
-import sys
-import shutil
-import re
-import random
-import signal
-import datetime
-# import log.fd_show as fd_show
-from importlib.resources import files as read_files
-from importlib.metadata import version
-from collections import defaultdict
-from portalocker import Lock
-from portalocker.exceptions import BaseLockException
-from pyparsing import nestedExpr
-from .history.experiment_status import ExperimentStatus
-from .history.experiment_history import ExperimentHistory
-import autosubmit.history.utils as HUtils
-import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
-import autosubmit.statistics.utils as StatisticsUtils
-from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path
-from autosubmit.helpers.processes import process_id
-
-from contextlib import suppress
 
 dialog = None
 

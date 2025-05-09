@@ -19,17 +19,17 @@
 
 import sqlite3
 import tempfile
+from collections.abc import Callable
 from getpass import getuser
 from itertools import permutations, product
-from textwrap import dedent
-from collections.abc import Callable
 from pathlib import Path
+from textwrap import dedent
 
 import pytest
-from autosubmit.autosubmit import Autosubmit
-
-from autosubmit.experiment.experiment_common import new_experiment, copy_experiment
 from autosubmitconfigparser.config.basicconfig import BasicConfig
+
+from autosubmit.autosubmit import Autosubmit
+from autosubmit.experiment.experiment_common import new_experiment, copy_experiment
 from log.log import AutosubmitCritical, AutosubmitError
 
 _EXPID = 't000'
