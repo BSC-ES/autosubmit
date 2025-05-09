@@ -285,7 +285,7 @@ class Job(object):
         self.log_recovered = False
         self.submit_time_timestamp = None # for wrappers, all jobs inside a wrapper are submitted at the same time
         self.start_time_timestamp = None
-        self.finish_time_timestamp = None
+        self.finish_time_timestamp = None # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
         self._script = None # Inline code to be executed
         self._log_recovery_retries = None
         self.ready_date = None
