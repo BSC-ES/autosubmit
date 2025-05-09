@@ -1471,7 +1471,7 @@ class Autosubmit:
         :raises AutosubmitCritical: If the experiment does not exist or if there are insufficient permissions.
         """
         # if not AutosubmitGit.check_directory_in_use(expid):
-        if process_id(expid) is None:
+        if process_id(expid) is not None:
             raise AutosubmitCritical("Ensure no processes are running in the experiment directory", 7076)
 
         experiment_path = Path(f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}")

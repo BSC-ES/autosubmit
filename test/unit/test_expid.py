@@ -312,7 +312,7 @@ def test_expid_generated_correctly(create_as_exp, autosubmit):
 def test_delete_experiment(mocker, create_as_exp, autosubmit):
     as_exp = create_as_exp(_EXPID)
     run_dir = as_exp.as_conf.basic_config.LOCAL_ROOT_DIR
-    mocker.patch("autosubmit.autosubmit.process_id", return_value=0) # Not None
+    mocker.patch("autosubmit.autosubmit.process_id", return_value=None)
     autosubmit.delete(expid=f'{_EXPID}', force=True)
     assert all(_EXPID not in Path(f).name for f in Path(f"{run_dir}").iterdir())
     assert all(_EXPID not in Path(f).name for f in Path(f"{run_dir}/metadata/data").iterdir())
@@ -335,7 +335,7 @@ def test_delete_experiment_not_owner(mocker, create_as_exp, autosubmit):
     run_dir = as_exp.as_conf.basic_config.LOCAL_ROOT_DIR
     mocker.patch('autosubmit.autosubmit.Autosubmit._user_yes_no_query', return_value=True)
     mocker.patch('pwd.getpwuid', side_effect=TypeError)
-    mocker.patch("autosubmit.autosubmit.process_id", return_value=0) # Not None
+    mocker.patch("autosubmit.autosubmit.process_id", return_value=None)
     _, _, current_owner = autosubmit._check_ownership(_EXPID)
     assert current_owner is None
     # test not owner not eadmin
