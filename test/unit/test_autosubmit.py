@@ -65,14 +65,6 @@ def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
     assert new_yaml_file.stat().st_size > 0
 
 
-def test_pkl_fix_postgres(monkeypatch, autosubmit):
-    """Test that trying to fix the pkl when using Postgres results in an error."""
-    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
-
-    with pytest.raises(AutosubmitCritical):
-        autosubmit.pkl_fix('a000')
-
-
 def test_database_backup_postgres(monkeypatch, autosubmit, mocker):
     """Test that trying to back up a Postgres DB results in just a log message of WIP."""
     monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')

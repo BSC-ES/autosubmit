@@ -182,6 +182,7 @@ class Log:
     def init_variables(self, file_path="") -> None:
         self.file_path = file_path
 
+
     @staticmethod
     def shutdown_logger() -> None:
         """
