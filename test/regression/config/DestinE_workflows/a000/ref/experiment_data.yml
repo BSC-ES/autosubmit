@@ -2146,9 +2146,9 @@ JOBS:
       DN-1: {}
       REMOTE_SETUP:
         STATUS: COMPLETED
-        ANY_FINAL_STATUS_IS_VALID: False
+        OPTIONAL: False
     FILE: templates/dn.sh
-    PLATFORM: MARENOSTRUM5-login
+    PLATFORM: MARENOSTRUM5-LOGIN
     RETRIALS: 3
     RUNNING: chunk
     SPLITS: '1'
@@ -2196,7 +2196,7 @@ JOBS:
     DEPENDENCIES:
       REMOTE_SETUP: {}
     FILE: templates/ini.sh
-    PLATFORM: MARENOSTRUM5-login
+    PLATFORM: MARENOSTRUM5-LOGIN
     RUNNING: member
     WALLCLOCK: 00:30
   LOCAL_SETUP:
@@ -2380,7 +2380,7 @@ JOBS:
     DEPENDENCIES:
       SYNCHRONIZE: {}
     FILE: templates/remote_setup.sh
-    PLATFORM: MARENOSTRUM5-login
+    PLATFORM: MARENOSTRUM5-LOGIN
     RUNNING: once
     WALLCLOCK: 02:00
   SIM:
@@ -3118,7 +3118,8 @@ RUN:
   PROCESSOR_UNIT: cpu
   TYPE: test
   WORKFLOW: end-to-end
-STORAGE: {}
+STORAGE:
+  TYPE: 'sqlite'
 URBAN:
   '1':
     GSVREQUEST:

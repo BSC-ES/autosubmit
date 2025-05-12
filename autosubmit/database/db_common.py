@@ -24,10 +24,10 @@ from contextlib import suppress
 from pathlib import Path
 from typing import List, Optional, cast
 
-from autosubmit.config.basicconfig import BasicConfig
 from sqlalchemy import delete, select, Connection, insert, text, update, func
 from sqlalchemy.schema import CreateTable
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import tables, session
 from autosubmit.log.log import Log, AutosubmitCritical
 
@@ -73,6 +73,7 @@ def check_db() -> None:
         raise AutosubmitCritical(f'DB path does not exist: {BasicConfig.DB_PATH}', 7003)
 
 
+
 def open_conn(check_version=True):
     """
     Opens a connection to database
@@ -96,22 +97,16 @@ def open_conn(check_version=True):
             version = row[0]
         except sqlite3.OperationalError:
             # If this exception is thrown it's because db_version does not exist.
-            # Database is from 2.x or 3.0 beta releases
-            try:
-                cursor.execute('SELECT type FROM experiment;')
-                # If type field exists, it's from 2.x
-                version = -1
-            except sqlite3.Error:
-                # If raises and error , it's from 3.0 beta releases
-                version = 0
+            version = 0
+            Log.warning("Database version table does not exist. Assuming version 0.")
 
         # If database version is not the expected, update database....
-        if version < CURRENT_DATABASE_VERSION:
+        if int(version) < int(CURRENT_DATABASE_VERSION):
             if not _update_database(version, cursor):
                 raise AutosubmitCritical('Database version does not match', 7001)
 
         # ... or ask for autosubmit upgrade
-        elif version > CURRENT_DATABASE_VERSION:
+        elif int(version) > int(CURRENT_DATABASE_VERSION):
             raise AutosubmitCritical('Database version is not compatible with this autosubmit version. '
                                      'Please execute pip install autosubmit --upgrade', 7002)
     return conn, cursor
@@ -159,9 +154,9 @@ def save_experiment(name: str, description: Optional[str], version: Optional[str
 
     try:
         result = queue.get(True, TIMEOUT)
-    except Exception:
-        raise AutosubmitCritical(f"The database process exceeded the timeout limit {TIMEOUT}s. "
-                                 f"Your experiment {name} couldn't be stored in the database.")
+    except BaseException:
+        raise AutosubmitCritical(
+            "The database process exceeded the timeout limit {0}s. Your experiment {1} couldn't be stored in the database.".format(TIMEOUT, name))
     finally:
         proc.terminate()
     return result
@@ -246,9 +241,9 @@ def get_autosubmit_version(expid):
 
     try:
         result = queue.get(True, TIMEOUT)
-    except Exception:
+    except Exception as e:
         raise AutosubmitCritical(f"The database process exceeded the timeout limit {TIMEOUT}s. "
-                                 f"Get experiment {expid} version failed to complete.")
+                                 f"Get experiment {expid} version failed to complete. {str(e)}")
     finally:
         proc.terminate()
     return result
@@ -408,10 +403,8 @@ def _check_experiment_exists(name, error_on_inexistence=True):
 def get_experiment_description(expid: str):
     if BasicConfig.DATABASE_BACKEND == 'postgres':
         return _get_experiment_description_sqlalchemy(expid)
-
-    check_db()
-
     try:
+        check_db()
         (conn, cursor) = open_conn()
     except DbException as e:
         raise AutosubmitCritical(
@@ -862,3 +855,13 @@ def get_connection_url(db_path: Optional['Path'] = None) -> str:
         raise ValueError('For SQLite databases you MUST provide a database file.')
 
     return f'sqlite:///{str(Path(db_path).resolve())}'
+
+
+def check_db_path(db_path: Optional[Path], must_exists: bool = True) -> bool:
+    """Check if the database path exists."""
+    if db_path and not db_path.exists() and must_exists:
+        raise ValueError(f'Database path not found {str(db_path)}!')
+    elif db_path and not db_path.exists() and not must_exists:
+        return False
+    else:
+        return True

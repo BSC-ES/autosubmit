@@ -20,6 +20,8 @@ import sqlite3
 import traceback
 from abc import ABCMeta
 
+from pathlib import Path
+
 import autosubmit.history.database_managers.database_models as Models
 import autosubmit.history.utils as HUtils
 from autosubmit.log.log import Log
@@ -54,6 +56,10 @@ class DatabaseManager(metaclass=ABCMeta):
         # type : (str) -> None
         """ creates a database files with full permissions """
         os.umask(0)
+        if not Path(path).parent.exists():
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            os.chmod(Path(path).parent, 0o777)
+
         os.open(path, os.O_WRONLY | os.O_CREAT, 0o776)
 
 
