@@ -22,15 +22,30 @@ the ``test/integration/test_db_common.py`` for more tests.
 """
 
 import inspect
+import os
 
 import pytest
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 
 from autosubmit.database import db_common
 from log.log import AutosubmitCritical
+from test.conftest import _initialize_autosubmitrc
 
 
-def test_db_common_sqlite_multiprocessing_queue_error(mocker):
+@pytest.mark.parametrize(
+    "fn",
+    [
+        "check_experiment_exists",
+        "delete_experiment",
+        "get_autosubmit_version",
+        "get_experiment_description",
+        "get_experiment_id",
+        "last_name_used",
+        "save_experiment",
+        "update_experiment_description_version",
+    ],
+)
+def test_db_common_sqlite_multiprocessing_queue_error(mocker, fn: str, tmp_path) -> None:
     """Test the queue timeout error path for ``db_common`` functions.
 
     ``db_common`` uses multiprocessing and a ``Queue`` to launch database operations (SQLite).
@@ -44,25 +59,16 @@ def test_db_common_sqlite_multiprocessing_queue_error(mocker):
     mocked_queue = mocker.patch('multiprocessing.Queue')
     mocker.patch('multiprocessing.Queue', return_value=mocked_queue)
     mocker.patch('multiprocessing.Process')
-
+    autosubmitrc = _initialize_autosubmitrc(tmp_path)
+    os.environ['AUTOSUBMIT_CONFIGURATION'] = str(autosubmitrc)
+    BasicConfig.read()
     mocked_queue.get.side_effect = [Exception]
 
-    for fn in [
-        'check_experiment_exists',
-        'delete_experiment',
-        'get_autosubmit_version',
-        'get_experiment_description',
-        'get_experiment_id',
-        'last_name_used',
-        'save_experiment',
-        'update_experiment_description_version'
-    ]:
-        with pytest.raises(AutosubmitCritical):
-            db_common_fn = getattr(db_common, fn)
-            sig = inspect.signature(db_common_fn)
-            params = ['' for _ in range(len(sig.parameters))]
-            db_common_fn(*params)
-
+    db_common_fn = getattr(db_common, fn)
+    sig = inspect.signature(db_common_fn)
+    params = ['' for _ in range(len(sig.parameters))]
+    with pytest.raises(AutosubmitCritical):
+        db_common_fn(*params)
 
 def test_save_experiment_sqlite_open_conn_error(monkeypatch, tmp_path, mocker):
     """Test the ``open_conn`` error path for ``db_common`` functions.
