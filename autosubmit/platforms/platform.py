@@ -344,7 +344,7 @@ class Platform(object):
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
 
-    def submit_ready_jobs(self, as_conf, job_list, platforms_to_test, packages_persistence, packages_to_submit,
+    def submit_ready_jobs(self, as_conf, job_list, platforms_to_test, packages_to_submit,
                           inspect=False, only_wrappers=False, hold=False):
 
         """
@@ -358,8 +358,6 @@ class Platform(object):
         :type job_list: JobList object  \n
         :param platforms_to_test: platforms used  \n
         :type platforms_to_test: set of Platform Objects, e.g. SgePlatform(), SlurmPlatform().  \n
-        :param packages_persistence: Handles database per experiment. \n
-        :type packages_persistence: JobPackagePersistence object \n
         :param inspect: True if coming from generate_scripts_andor_wrappers(). \n
         :type inspect: Boolean \n
         :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw. \n
@@ -372,7 +370,7 @@ class Platform(object):
         failed_packages = list()
         error_message = ""
         if not inspect:
-            job_list.save()
+            job_list.save_jobs()
         if not hold:
             Log.debug("\nJobs ready for {1}: {0}", len(
                 job_list.get_ready(self, hold=hold)), self.name)
@@ -394,7 +392,7 @@ class Platform(object):
                                                  package._wallclock, package._num_processors,
                                                  package.platform, as_conf, hold)
                         job_list.job_package_map[package.jobs[0].id] = wrapper_job
-                        packages_persistence.save(package, inspect)
+                        # TODO save wrapper
                     for innerJob in package._jobs:
                         any_job_submitted = True
                         # Setting status to COMPLETED, so it does not get stuck in the loop that calls this function
@@ -407,7 +405,7 @@ class Platform(object):
                         package.submit(as_conf, job_list.parameters, inspect, hold=hold)
                         save = True
                         if not inspect:
-                            job_list.save()
+                            job_list.save_jobs()
                         if package.x11 != "true":
                             valid_packages_to_submit.append(package)
                         # Log.debug("FD end-submit: {0}".format(log.fd_show.fd_table_status_str(open()))
@@ -662,8 +660,6 @@ class Platform(object):
 
         :param job: Get the checkpoint files
         :type job: Job
-        :param max_step: max step possible
-        :type max_step: int
         """
 
         if job.current_checkpoint_step < job.max_checkpoint_step:

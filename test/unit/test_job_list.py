@@ -30,7 +30,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_common import Type
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
+from autosubmit.database.job_list_persistence import JobListPersistencePkl
 
 """Tests for the ``JobList`` class."""
 
@@ -47,7 +47,7 @@ def as_conf(autosubmit_config):
 
 @pytest.fixture(scope='function')
 def setup_job_list(as_conf, tmpdir, mocker):
-    job_list = JobList(_EXPID, as_conf, YAMLParserFactory(), JobListPersistencePkl())
+    job_list = JobList(_EXPID, as_conf, YAMLParserFactory())
     dummy_serial_platform = mocker.MagicMock()
     dummy_serial_platform.name = 'serial'
     dummy_platform = mocker.MagicMock()
@@ -117,7 +117,7 @@ def job_list(as_conf, mocker, jobs_as_dict):
     as_conf.load_parameters = mocker.Mock(return_value=parameters)
     as_conf.default_parameters = {}
     joblist_persistence = JobListPersistencePkl()
-    job_list = JobList(_EXPID, as_conf, YAMLParserFactory(), joblist_persistence)
+    job_list = JobList(_EXPID, as_conf, YAMLParserFactory())
 
     for status, jobs in jobs_as_dict.items():
         job_list._job_list.extend(jobs)
@@ -139,7 +139,7 @@ def empty_job_list(tmp_path, as_conf, mocker):
                       'fake-key2': 'fake-value2'}
         as_conf.load_parameters = mocker.Mock(return_value=parameters)
         as_conf.default_parameters = {}
-        job_list = JobList(_EXPID, as_conf, as_conf.parser_factory, JobListPersistencePkl())
+        job_list = JobList(_EXPID, as_conf, as_conf.parser_factory)
         pickle_directory = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, 'pkl')
         pickle_directory.mkdir(parents=True, exist_ok=True)
         job_list._persistence_path = str(pickle_directory)

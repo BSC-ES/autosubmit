@@ -21,7 +21,7 @@ from random import randrange
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistenceDb
+from autosubmit.database.job_list_persistence import JobListPersistenceDb
 from autosubmit.monitor.monitor import Monitor
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
