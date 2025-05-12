@@ -36,7 +36,6 @@ from collections import defaultdict
 from configparser import ConfigParser
 from contextlib import suppress
 from importlib.metadata import version
-# import log.fd_show as fd_show
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
@@ -60,28 +59,28 @@ from autosubmit.helpers.processes import process_id
 from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path
 from autosubmit.helpers.utils import strtobool
 from log.log import Log, AutosubmitError, AutosubmitCritical
-from .database.db_common import create_db
-from .database.db_common import delete_experiment, get_experiment_descrip
-from .database.db_common import get_autosubmit_version, check_experiment_exists
-from .database.db_structure import get_structure
-from .experiment.experiment_common import copy_experiment
-from .experiment.experiment_common import new_experiment
-from .git.autosubmit_git import AutosubmitGit
-from .history.experiment_history import ExperimentHistory
-from .history.experiment_status import ExperimentStatus
-from .job.job_common import Status
-from .job.job_grouping import JobGrouping
-from .job.job_list import JobList
-from .job.job_list_persistence import JobListPersistenceDb
-from .job.job_list_persistence import JobListPersistencePkl
-from .job.job_package_persistence import JobPackagePersistence
-from .job.job_packager import JobPackager
-from .job.job_utils import SubJob, SubJobManager
-from .migrate.migrate import Migrate
-from .notifications.mail_notifier import MailNotifier
-from .notifications.notifier import Notifier
-from .platforms.paramiko_submitter import ParamikoSubmitter
-from .platforms.platform import Platform
+from autosubmit.database.db_common import create_db
+from autosubmit.database.db_common import delete_experiment, get_experiment_descrip
+from autosubmit.database.db_common import get_autosubmit_version, check_experiment_exists
+from autosubmit.database.db_structure import get_structure
+from autosubmit.experiment.experiment_common import copy_experiment
+from autosubmit.experiment.experiment_common import new_experiment
+from autosubmit.git.autosubmit_git import AutosubmitGit
+from autosubmit.history.experiment_history import ExperimentHistory
+from autosubmit.history.experiment_status import ExperimentStatus
+from autosubmit.job.job_common import Status
+from autosubmit.job.job_grouping import JobGrouping
+from autosubmit.job.job_list import JobList
+from autosubmit.job.job_list_persistence import JobListPersistenceDb
+from autosubmit.job.job_list_persistence import JobListPersistencePkl
+from autosubmit.job.job_package_persistence import JobPackagePersistence
+from autosubmit.job.job_packager import JobPackager
+from autosubmit.job.job_utils import SubJob, SubJobManager
+from autosubmit.migrate.migrate import Migrate
+from autosubmit.notifications.mail_notifier import MailNotifier
+from autosubmit.notifications.notifier import Notifier
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
+from autosubmit.platforms.platform import Platform
 
 dialog = None
 
@@ -1176,9 +1175,9 @@ class Autosubmit:
             # if ends with .conf convert it to AS4 yaml file
             if conf_file.endswith(".conf"):
                 try:
-                    AutosubmitConfig.ini_to_yaml(BasicConfig.LOCAL_ROOT_DIR / Path(exp_id + "/conf"),
-                                                 BasicConfig.LOCAL_ROOT_DIR / Path(exp_id + "/conf/" +
-                                                                                   conf_file.replace(copy_id, exp_id)))
+                    AutosubmitConfig.ini_to_yaml(Path(BasicConfig.LOCAL_ROOT_DIR, exp_id, 'conf'),
+                                                 Path(BasicConfig.LOCAL_ROOT_DIR, exp_id, "conf",
+                                                      conf_file.replace(copy_id, exp_id)))
                 except Exception as e:
                     Log.warning(f"Error converting {conf_file.replace(copy_id, exp_id)} to yml: {str(e)}")
 
