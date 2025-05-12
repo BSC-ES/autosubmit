@@ -24,7 +24,8 @@ from pytest_mock import MockerFixture
 from ruamel.yaml import YAML
 
 from autosubmit.autosubmit import Autosubmit
-
+from ruamel.yaml import YAML
+import re
 _EXPIDS = ['z000', 'z001']
 
 
@@ -71,9 +72,18 @@ def test_describe(
         get_from_user=get_from_user
     )
 
-    # Log.printlog is only called when an experiment is not described
-    # TODO: We could re-design the class to make this behaviour clearer.
-    assert mocked_log.printlog.call_count == (1 if not_described else 0)
+    # Now we can call printlog more than once without raising a false negative.
+    warning_calls = [
+        call for call in Log.printlog.call_args_list
+        if call.args and
+           isinstance(call.args[0], str) and
+           re.search(r"Could not describe the following experiments", call.args[0])
+    ]
+    if not_described:
+        assert len(warning_calls) == 1
+        assert warning_calls[0].args[1] == Log.WARNING
+    else:
+        assert not warning_calls
 
     if exps and not not_described:
         location_lines = [
@@ -81,9 +91,7 @@ def test_describe(
             for line_tuple in mocked_log.result.mock_calls
             if line_tuple[1][0].startswith('Location: ')
         ]
-
         assert len(location_lines) == len(exps)
-
         for exp in exps:
             assert f'Location: {exp.exp_path}' in location_lines
 
@@ -93,7 +101,7 @@ def test_run_command_describe(autosubmit_exp: Callable, autosubmit, mocker):
 
     ``sys.argv`` is mocked to return what ``argparse`` would parse for a command
     such as ``autosubmit -lc ERROR -lf WARNING describe z000``.
-    
+
     This triggers the log initialization, and verifies that log levels work too,
     as documented.
 

@@ -19,6 +19,13 @@
 import os
 from collections import defaultdict
 
+from log.log import Log, AutosubmitError, AutosubmitCritical
+from .platform import Platform
+
+from .submitter import Submitter
+from autosubmit.platforms.psplatform import PsPlatform
+from autosubmit.platforms.pbsplatform import PBSPlatform
+from autosubmit.platforms.sgeplatform import SgePlatform
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
@@ -38,6 +45,20 @@ class ParamikoSubmitter(Submitter):
 
     def __init__(self):
         self.platforms = None
+
+    @property
+    def platforms_object(self) -> list[Platform]:
+        """
+        Returns a list of all the platforms objects used by the experiment.
+        :return: List of platform objects
+        :rtype: list[Platform]
+        """
+        return list(self.platforms.values())
+
+    @platforms_object.setter
+    def platforms_object(self, value):
+        """Prevent direct modification of the platforms_object."""
+        raise AttributeError("platforms_object is a dynamic view and cannot be directly modified.")
 
     def load_local_platform(self, asconf):
         platforms = dict()
