@@ -301,36 +301,3 @@ def test_update_description(db_engine: str, autosubmit, autosubmit_exp, mocker, 
     assert autosubmit.update_description(exp.expid, new_description)
 
     assert new_description == get_experiment_description(exp.expid)[0][0]
-
-
-def test_autosubmit_pklfix_no_backup(autosubmit_exp, mocker, tmp_path):
-    exp = autosubmit_exp(_EXPID)
-    mocker.patch('sys.argv', ['autosubmit', 'pklfix', exp.expid])
-
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
-
-    assert 0 == main()
-
-    assert mocked_log.info.called
-    assert mocked_log.info.call_args[0][0].startswith('Backup file not found')
-
-
-def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
-    exp = autosubmit_exp(_EXPID)
-
-    pkl_path = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, exp.expid, 'pkl')
-    current = pkl_path / f'job_list_{exp.expid}.pkl'
-    backup = pkl_path / f'job_list_{exp.expid}_backup.pkl'
-
-    copy(current, backup)
-
-    mocker.patch('sys.argv', ['autosubmit', 'pklfix', exp.expid])
-
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
-
-    mocker.patch('autosubmit.autosubmit.Autosubmit._user_yes_no_query', return_value=True)
-
-    assert 0 == main()
-
-    assert mocked_log.result.called
-    assert mocked_log.result.call_args[0][0].startswith('Pkl restored')

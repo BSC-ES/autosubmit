@@ -44,6 +44,7 @@ class Status:
                     'QUEUING': 3, 'RUNNING': 4, 'COMPLETED': 5, 'HELD': 6, 'PREPARED': 7, 'SKIPPED': 8, 'DELAYED': 9}
     LOGICAL_ORDER = ["WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING", "SKIPPED",
                      "FAILED", "UNKNOWN", "COMPLETED", "SUSPENDED"]
+    LOGICAL_ORDER_SUCCESS_WORKFLOW = ["WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING", "SKIPPED", "COMPLETED"]
 
     def retval(self, value):
         return getattr(self, value)

@@ -19,6 +19,7 @@ import os
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 
 def create_database(env):
@@ -27,7 +28,7 @@ def create_database(env):
     Autosubmit.install()
 
 
-def init_expid(env, platform="local", expid=None, create=True, test_type="normal", plot=False):
+def init_expid(env, platform="local", expid=None, full_load=True, test_type="normal", plot=False):
     os.environ['AUTOSUBMIT_CONFIGURATION'] = env
     if not expid:
         if test_type == "normal":
@@ -46,6 +47,9 @@ def init_expid(env, platform="local", expid=None, create=True, test_type="normal
             expid = Autosubmit.expid("pytest", hpc=platform, copy_id='', dummy=True, minimal_configuration=False,
                                      git_repo="", git_branch="", git_as_conf="", operational=False, testcase=False,
                                      evaluation=True, use_local_minimal=False)
-    if create:
+    if full_load:
+        as_conf = AutosubmitConfig(expid)
+        Autosubmit._check_folders(expid, as_conf)
         Autosubmit.create(expid, not plot, False, force=True, detail=True)
+
     return expid

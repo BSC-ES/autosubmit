@@ -17,15 +17,15 @@
 
 import shutil
 from random import randrange
-from unittest.mock import patch
 
 import pytest
+from networkx import DiGraph
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistenceDb
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from typing import Dict, Any, Tuple
 
 _EXPID = 't000'
 
@@ -40,8 +40,7 @@ def setup_job_list(autosubmit_exp, tmpdir, mocker):
 
     basic_config = as_conf.basic_config
 
-    with patch('autosubmit.job.job_list_persistence.BasicConfig', basic_config):
-        job_list = JobList(_EXPID, basic_config, YAMLParserFactory(), JobListPersistenceDb(_EXPID))
+    job_list = JobList(_EXPID, basic_config, YAMLParserFactory())
 
     dummy_serial_platform = mocker.MagicMock()
     dummy_serial_platform.name = 'serial'
@@ -59,8 +58,12 @@ def setup_job_list(autosubmit_exp, tmpdir, mocker):
         "waiting": [_create_dummy_job_with_status(Status.WAITING, dummy_platform) for _ in range(2)],
         "unknown": [_create_dummy_job_with_status(Status.UNKNOWN, dummy_platform)]
     }
+    # add nodes
+    job_list.graph = DiGraph()
+    for job_status, jobs_ in jobs.items():
+        for job in jobs_:
+            job_list.add_job(job)
 
-    job_list._job_list = [job for job_list in jobs.values() for job in job_list]
     waiting_job = jobs["waiting"][0]
     waiting_job.parents.update(
         jobs["ready"] + jobs["completed"] + jobs["failed"] + jobs["submitted"] + jobs["running"] + jobs["queuing"])
@@ -78,55 +81,139 @@ def _create_dummy_job_with_status(status, platform):
     return job
 
 
-def test_add_edge_job(setup_job_list):
-    _, waiting_job, _ = setup_job_list
-    special_variables = {"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0}
-    for p in waiting_job.parents:
-        waiting_job.add_edge_info(p, special_variables)
-    for parent in waiting_job.parents:
-        assert waiting_job.edge_info[special_variables["STATUS"]][parent.name] == (
-            parent, special_variables.get("FROM_STEP", 0))
+@pytest.fixture
+def init_jobs(setup_job_list: Tuple[Any, Any, Dict[str, Any]]) -> Tuple[Job, Job, Job]:
+    """
+    Initialize jobs for testing.
 
-
-def test_add_edge_info_joblist(setup_job_list):
-    job_list, waiting_job, jobs = setup_job_list
-    special_conditions = {"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0}
-    job_list._add_edges_map_info(waiting_job, special_conditions["STATUS"])
-    assert len(job_list.jobs_edges.get(Status.VALUE_TO_KEY[Status.COMPLETED], [])) == 1
-    job_list._add_edges_map_info(jobs["waiting"][1], special_conditions["STATUS"])
-    assert len(job_list.jobs_edges.get(Status.VALUE_TO_KEY[Status.COMPLETED], [])) == 2
-
-
-def test_check_special_status(setup_job_list):
+    :param setup_job_list: Pytest fixture providing job list, waiting job, and jobs dict.
+    :type setup_job_list: Tuple[Any, Any, Dict[str, Any]]
+    :return: Tuple of job A, job B, and job C.
+    :rtype: Tuple[Job, Job, Job]
+    """
     job_list, _, jobs = setup_job_list
     job_list.jobs_edges = dict()
     job_a = jobs["completed"][0]
     job_b = jobs["running"][0]
     job_c = jobs["waiting"][0]
+    job_a.children = set()
+    job_a.add_children([job_c])
+    job_b.add_children([job_c])
     job_c.parents = set()
     job_c.parents.add(job_a)
     job_c.parents.add(job_b)
-    # C can start when A is completed and B is running
-    job_c.edge_info = {Status.VALUE_TO_KEY[Status.COMPLETED]: {job_a.name: (job_a, 0)},
-                       Status.VALUE_TO_KEY[Status.RUNNING]: {job_b.name: (job_b, 0)}}
-    special_conditions = {"STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0}
-    # Test: { A: COMPLETED, B: RUNNING }
-    job_list._add_edges_map_info(job_c, special_conditions["STATUS"])
-    # This function should return the jobs that can start
-    # (they will be put in Status.ready in the update_list function)
-    assert job_c in job_list.check_special_status()
-    # Test: { A: RUNNING, B: RUNNING }, A condition is default ( completed ) and B is running
-    job_a.status = Status.RUNNING
-    assert job_c not in job_list.check_special_status()
-    # Test: { A: RUNNING, B: RUNNING }, setting B and A condition to running
-    job_c.edge_info = {Status.VALUE_TO_KEY[Status.RUNNING]: {job_b.name: (job_b, 0), job_a.name: (job_a, 0)}}
-    assert job_c in job_list.check_special_status()
-    # Test: { A: COMPLETED, B: COMPLETED } # This should always work.
-    job_a.status = Status.COMPLETED
-    job_b.status = Status.COMPLETED
-    assert job_c in job_list.check_special_status()
-    # Test: { A: FAILED, B: COMPLETED }
-    job_a.status = Status.FAILED
-    job_b.status = Status.COMPLETED
-    # This may change in #1316
-    assert job_c in job_list.check_special_status()
+    job_list.graph.add_edge(job_a.name, job_c.name)
+    job_list.graph.add_edge(job_b.name, job_c.name)
+    return job_list, job_a, job_b, job_c
+
+
+@pytest.mark.parametrize(
+    'job_a_edge_info,job_b_edge_info',
+    [
+        ({"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0},
+         {"STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0}),
+        ({"STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0},
+         {"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0}),
+        ({"STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0},
+         {"STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0}),
+        ({"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0},
+         {"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0}),
+        ({"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0},
+         {"STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0}),
+        ({"STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0},
+         {"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0}),
+        ({"STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0},
+         {"STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0}),
+        ({"STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0},
+         {"STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0}),
+        ({"STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0},
+         {"STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0}),
+        ({"STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0},
+         {"STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0}),
+        ({"STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0},
+         {"STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0}),
+        ({"STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0},
+         {"STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0}),
+        ({"STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0},
+         {"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0}),
+        ({"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0},
+         {"STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0}),
+        ({"STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0},
+         {"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0}),
+        ({"STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0},
+         {"STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0}),
+    ],
+    ids=[
+        "JOB A COMPLETED, JOB B RUNNING",
+        "JOB A RUNNING, JOB B COMPLETED",
+        "JOB A RUNNING, JOB B RUNNING",
+        "JOB A COMPLETED, JOB B COMPLETED",
+        "JOB A COMPLETED, JOB B WAITING",
+        "JOB A WAITING, JOB B COMPLETED",
+        "JOB A WAITING, JOB B RUNNING",
+        "JOB A WAITING, JOB B WAITING",
+        "JOB A FAILED, JOB B WAITING",
+        "JOB A WAITING, JOB B FAILED",
+        "JOB A FAILED, JOB B RUNNING",
+        "JOB A RUNNING, JOB B FAILED",
+        "JOB A FAILED, JOB B COMPLETED",
+        "JOB A COMPLETED, JOB B FAILED",
+        "JOB A FAILED, JOB B COMPLETED",
+        "JOB A FAILED, JOB B FAILED",
+    ]
+)
+def test_handle_special_checkpoint_jobs_matching_parent_status_with_target_and_not_optional(
+        job_a_edge_info: Dict[str, Any],
+        job_b_edge_info: Dict[str, Any],
+        init_jobs: Tuple[JobList, Any, Any, Any]
+) -> None:
+    """
+    Test special checkpoint job handling for various parent job status combinations.
+
+    :param job_a_edge_info: Edge info dictionary for job A.
+    :type job_a_edge_info: Dict[str, Any]
+    :param job_b_edge_info: Edge info dictionary for job B.
+    :type job_b_edge_info: Dict[str, Any]
+    :param init_jobs: Fixture providing initialized jobs and job list.
+    :type init_jobs: Tuple[JobList, Job, Job, Job]
+    :return: None
+    :rtype: None
+    """
+    job_list, job_a, job_b, job_c = init_jobs
+
+    def get_completed_status(status_key: str) -> str:
+        """
+        Determine the completed status for the edge based on the status key.
+
+        :param status_key: Status key from edge info.
+        :type status_key: str
+        :return: Completed status value.
+        :rtype: str
+        """
+        if status_key in (Status.VALUE_TO_KEY[Status.COMPLETED], Status.VALUE_TO_KEY[Status.WAITING]):
+            return status_key
+        return Status.VALUE_TO_KEY[Status.RUNNING]
+
+    job_list.graph.edges[job_a.name, job_c.name].update(
+        status=job_a_edge_info["STATUS"],
+        from_step=job_a_edge_info["FROM_STEP"],
+        optional=False,
+        completed=get_completed_status(job_a_edge_info["STATUS"])
+    )
+    job_list.graph.edges[job_b.name, job_c.name].update(
+        status=job_b_edge_info["STATUS"],
+        from_step=job_b_edge_info["FROM_STEP"],
+        optional=False,
+        completed=get_completed_status(job_b_edge_info["STATUS"])
+    )
+
+    job_a.status = Status.KEY_TO_VALUE[job_a_edge_info["STATUS"]]
+    job_b.status = Status.KEY_TO_VALUE[job_b_edge_info["STATUS"]]
+    job_list._handle_special_checkpoint_jobs()
+    assert job_c.status == Status.READY
+
+# TODO: missing scenarios
+# 1) Cases when job_c.status remains in WAITING.
+# 2) Cases when job_a or job_b status doesn't match the edge_info target status.
+# 3) OPTIONAL edges and their handling.
+# 4) From step higher than 0. (update job.checkpoint)

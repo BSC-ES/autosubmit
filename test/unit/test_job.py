@@ -37,7 +37,6 @@ from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.job.job_utils import get_job_package_code, SubJob, SubJobManager
 from autosubmit.platforms.platform import Platform
@@ -173,7 +172,7 @@ class TestJob:
             Path(temp_dir, expid).mkdir()
             # FIXME: (Copied from Bruno) Not sure why but the submitted and Slurm were using the $expid/tmp/ASLOGS folder?
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                         f'{expid}/conf', f'{expid}/proj/project_files']:
+                         f'{expid}/conf', f'{expid}/proj/project_files', f'{expid}/db']:
                 Path(temp_dir, path).mkdir()
             # loop over the host script's type
             for script_type in ["Bash", "Python", "Rscript"]:
@@ -335,9 +334,8 @@ CONFIG:
                         # act
 
                         parameters = config.load_parameters()
-                        joblist_persistence = JobListPersistencePkl()
 
-                        job_list_obj = JobList(expid, config, YAMLParserFactory(), joblist_persistence)
+                        job_list_obj = JobList(expid, config, YAMLParserFactory())
 
                         job_list_obj.generate(
                             as_conf=config,
@@ -353,6 +351,7 @@ CONFIG:
                             new=True,
                             run_only_members=config.get_member_list(run_only=True),
                             show_log=True,
+                            full_load=True
                         )
                         job_list = job_list_obj.get_job_list()
 
@@ -437,7 +436,7 @@ CONFIG:
             BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
             Path(temp_dir, expid).mkdir()
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                         f'{expid}/conf']:
+                         f'{expid}/conf', f'{expid}/db']:
                 Path(temp_dir, path).mkdir()
             with open(Path(temp_dir, f'{expid}/conf/experiment_data.yml'), 'w+') as experiment_data:
                 experiment_data.write(dedent(f'''\
@@ -492,8 +491,7 @@ CONFIG:
             config = AutosubmitConfig(expid, basic_config=basic_config, parser_factory=YAMLParserFactory())
             config.reload(True)
             parameters = config.load_parameters()
-            job_list_obj = JobList(expid, config, YAMLParserFactory(),
-                                   Autosubmit._get_job_list_persistence(expid, config))
+            job_list_obj = JobList(expid, config, YAMLParserFactory())
 
             job_list_obj.generate(
                 as_conf=config,
@@ -510,10 +508,10 @@ CONFIG:
                 run_only_members=[],
                 # config.get_member_list(run_only=True),
                 show_log=True,
-                create=True,
+                full_load=True,
             )
 
-            job_list = job_list_obj.get_job_list()
+            job_list = job_list_obj.job_list
             assert 1 == len(job_list)
 
             submitter = Autosubmit._get_submitter(config)
@@ -553,7 +551,7 @@ CONFIG:
             Path(temp_dir, expid).mkdir()
             # FIXME: (Copied from Bruno) Not sure why but the submitted and Slurm were using the $expid/tmp/ASLOGS folder?
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                         f'{expid}/conf', f'{expid}/proj/project_files']:
+                         f'{expid}/conf', f'{expid}/proj/project_files', f'{expid}/db']:
                 Path(temp_dir, path).mkdir()
             # loop over the host script's type
             for script_type in ["Bash", "Python", "Rscript"]:
@@ -715,9 +713,8 @@ CONFIG:
                         # act
 
                         parameters = config.load_parameters()
-                        joblist_persistence = JobListPersistencePkl()
 
-                        job_list_obj = JobList(expid, config, YAMLParserFactory(), joblist_persistence)
+                        job_list_obj = JobList(expid, config, YAMLParserFactory())
 
                         job_list_obj.generate(
                             as_conf=config,
@@ -733,7 +730,7 @@ CONFIG:
                             new=True,
                             run_only_members=config.get_member_list(run_only=True),
                             show_log=True,
-                            create=True,
+                            full_load=True,
                         )
                         job_list = job_list_obj.get_job_list()
 
@@ -827,7 +824,7 @@ CONFIG:
                 Path(temp_dir, expid).mkdir()
                 # FIXME: Not sure why but the submitted and Slurm were using the $expid/tmp/ASLOGS folder?
                 for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                             f'{expid}/conf']:
+                             f'{expid}/conf', f'{expid}/db']:
                     Path(temp_dir, path).mkdir()
                 with open(Path(temp_dir, f'{expid}/conf/minimal.yml'), 'w+') as minimal:
                     minimal.write(dedent(f'''\
@@ -864,8 +861,7 @@ CONFIG:
                 config.reload(True)
                 parameters = config.load_parameters()
 
-                job_list_obj = JobList(expid, config, YAMLParserFactory(),
-                                       Autosubmit._get_job_list_persistence(expid, config))
+                job_list_obj = JobList(expid, config, YAMLParserFactory())
                 job_list_obj.generate(
                     as_conf=config,
                     date_list=[],
@@ -880,7 +876,7 @@ CONFIG:
                     new=True,
                     run_only_members=config.get_member_list(run_only=True),
                     show_log=True,
-                    create=True,
+                    full_load=True,
                 )
                 job_list = job_list_obj.get_job_list()
                 assert 1 == len(job_list)
@@ -1196,7 +1192,7 @@ CONFIG:
             BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
             Path(temp_dir, expid).mkdir()
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                         f'{expid}/conf']:
+                         f'{expid}/conf', f'{expid}/db']:
                 Path(temp_dir, path).mkdir()
             with open(Path(temp_dir, f'{expid}/conf/minimal.yml'), 'w+') as minimal:
                 minimal.write(dedent(f'''\
@@ -1251,8 +1247,7 @@ CONFIG:
             config.reload(True)
             parameters = config.load_parameters()
 
-            job_list = JobList(expid, config, YAMLParserFactory(),
-                               Autosubmit._get_job_list_persistence(expid, config))
+            job_list = JobList(expid, config, YAMLParserFactory())
             job_list.generate(
                 as_conf=config,
                 date_list=[datetime.strptime("20000101", "%Y%m%d")],
@@ -1267,7 +1262,7 @@ CONFIG:
                 new=True,
                 run_only_members=config.get_member_list(run_only=True),
                 show_log=True,
-                create=True,
+                full_load=True,
             )
             job_list = job_list.get_job_list()
             assert 24 == len(job_list)
@@ -1752,19 +1747,6 @@ def test_no_start_time(autosubmit_config, experiment_data):
     job.update_parameters(as_conf, set_attributes=True)
     assert isinstance(job.start_time, datetime)
 
-
-def test_get_job_package_code(autosubmit_config):
-    autosubmit_config('dummy', {})
-    experiment_id = 'dummy'
-    job = Job(experiment_id, '1', 0, 1)
-
-    with patch("autosubmit.job.job_utils.JobPackagePersistence") as mock_persistence:
-        mock_persistence.return_value.load.return_value = [
-            ['dummy', '0005_job_packages', 'dummy']
-        ]
-        code = get_job_package_code(job.expid, job.name)
-
-        assert code == 5
 
 
 def test_sub_job_instantiation(tmp_path, autosubmit_config):

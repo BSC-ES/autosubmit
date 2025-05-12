@@ -35,11 +35,12 @@ def _write_test_files(expid, local_root_dir: Path):
 
     exp_tmp_dir = local_root_dir / expid / 'tmp'
     aslogs_dir = local_root_dir / expid / 'ASLOGS'
-
     # Add each platform to test
     with platforms_path.open('w') as f:
         f.write(
             dedent(f"""\
+                STORAGE:
+                    TYPE: sqlite
                 LOCAL_ROOT_DIR: {str(local_root_dir)}
                 LOCAL_ASLOG_DIR: {aslogs_dir}
                 LOCAL_TMP_DIR: {exp_tmp_dir}

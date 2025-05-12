@@ -30,7 +30,7 @@ from functools import reduce
 from pathlib import Path
 from threading import Thread
 from time import sleep
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import List, Optional, Tuple, TYPE_CHECKING, Any, Dict
 
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
@@ -54,7 +54,32 @@ Log.get_logger("Autosubmit")
 # A wrapper for encapsulate threads , TODO: Python 3+ to be replaced by the < from concurrent.futures >
 
 EXCLUDED = ["_platform", "_children", "_parents", "submitter"]
-
+# TODO MOVE OUTSIDE OF JOB CLASS
+PERSISTENT_ATTRIBUTES = (
+    "name",
+    "id",
+    "script_name",
+    "priority",
+    "status",
+    "frequency",
+    "synchronize",
+    "section",
+    "chunk",
+    "member",
+    "splits",
+    "split",
+    "date",
+    "date_split",
+    "max_checkpoint_step",
+    "start_time_timestamp",
+    "submit_time_timestamp",
+    "finish_time_timestamp",
+    "ready_date",
+    "local_logs",
+    "remote_logs",
+    "updated_log",
+    "packed",
+)
 
 def threaded(fn):
     def wrapper(*args, **kwargs):
@@ -162,16 +187,56 @@ class Job(object):
         'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        '_log_recovered', 'packed_during_building', 'workflow_commit'
+        '_log_recovered', 'packed_during_building', 'workflow_commit', 'updated'
     )
 
-    def __setstate__(self, state):
-        for slot, value in state.items():
-            if slot in self.__slots__:
-                setattr(self, slot, value)
 
-    def __getstate__(self):
-        return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in EXCLUDED])
+    def __setstate__(self, state, log_process=False):
+        for slot, value in state.items():
+            if log_process and slot in self.__slots__:
+                setattr(self, slot, value)
+            elif slot in ['local_logs_out', 'remote_logs_err', 'remote_logs_out', 'local_logs_err', 'status', 'date']:
+                continue
+            elif slot in self.__slots__:
+                setattr(self, slot, value)
+            else:
+                slot = self.internal_slot_name(slot)
+                if slot in self.__slots__:
+                    setattr(self, slot, value)
+
+        if not log_process:
+            self.local_logs = (state.get('local_logs_out', ''), state.get('local_logs_err', ''))
+            self.remote_logs = (state.get('remote_logs_out', ''), state.get('remote_logs_err', ''))
+            self.status = Status.KEY_TO_VALUE[state['status']]
+            self.date = datetime.datetime.fromisoformat(state['date']) if state.get('date', None) else None
+
+    def internal_slot_name(self, slot) -> str:
+        """
+        Normalize the slot name to match the expected format.
+        This is useful for ensuring that the slot names are consistent
+        when loading the job state.
+        """
+        if not slot.startswith('_'):
+            return f"_{slot}"
+
+    def __getstate__(self, log_process=False):
+        if log_process:
+            return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in EXCLUDED])
+        else:  # Normalize data to store in the database
+            job_data = dict([(k, getattr(self, k, None)) for k in PERSISTENT_ATTRIBUTES])
+            job_data["status"] = Status.VALUE_TO_KEY[self.status]
+            job_data["local_logs_out"] = self.local_logs[0] if self.local_logs[0] else None
+            job_data["local_logs_err"] = self.local_logs[1] if self.local_logs[1] else None
+            job_data["remote_logs_out"] = self.remote_logs[0] if self.remote_logs[0] else None
+            job_data["remote_logs_err"] = self.remote_logs[1] if self.remote_logs[1] else None
+            if job_data["date"]:
+                job_data["date"] = job_data["date"].isoformat()
+
+            del job_data["local_logs"]
+            del job_data["remote_logs"]
+            return job_data
+
+
 
     CHECK_ON_SUBMISSION = 'on_submission'
 
@@ -190,14 +255,7 @@ class Job(object):
     def __repr__(self):
         return "{0} STATUS: {1}".format(self.name, self.status)
 
-    def __init__(self, name=None, job_id=None, status=None, priority=None, loaded_data=None):
-
-        if loaded_data:
-            name = loaded_data['_name']
-            job_id = loaded_data['id']
-            status = loaded_data['_status']
-            priority = loaded_data['priority']
-
+    def __init__(self, name=None, job_id=None, status=None, priority=None, loaded_data=None, log_process=False):
         self.rerun_only = False
         self.delay_end = None
         self.wrapper_type = None
@@ -227,7 +285,6 @@ class Job(object):
         self._synchronize = None
         self.skippable = False
         self.repacked = 0
-        self._name = name
         self._long_name = None
         self.date_format = ''
         self.type = Type.BASH
@@ -239,8 +296,6 @@ class Job(object):
         self.executable = None
         self._local_logs = ('', '')
         self._remote_logs = ('', '')
-        self.script_name = self.name + ".cmd"
-        self.stat_file = f"{self.script_name[:-4]}_STAT_"
         self._status = None
         self.status = status
         self.prev_status = status
@@ -249,11 +304,6 @@ class Job(object):
         self._parents = set()
         self._children = set()
         self._fail_count = 0
-        """Number of failed attempts to run this job. (FAIL_COUNT)"""
-        self.expid: str = name.split('_')[0]
-        self._tmp_path = os.path.join(
-            BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
-        self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
         self._platform = None
         self.check = 'true'
         self.check_warnings = False
@@ -267,7 +317,6 @@ class Job(object):
         self.start_time = None
         self.ext_header_path = None
         self.ext_tailer_path = None
-        self.edge_info = dict()
         self.total_jobs = None
         self.max_waiting_jobs = None
         self.exclusive = ""
@@ -306,66 +355,20 @@ class Job(object):
         self._custom_directives = None
         self.packed_during_building = False
         self.workflow_commit = None
+        self._name = name
+        self.name = name
         if loaded_data:
-            self.__setstate__(loaded_data)
-            self.status = Status.WAITING if self.status in [Status.DELAYED,
-                                                            Status.PREPARED,
-                                                            Status.READY] else \
-                self.status
+            self.__setstate__(loaded_data, log_process=log_process)
+        self.script_name = self.name + ".cmd"
+        self.stat_file = f"{self.script_name[:-4]}_STAT_"
+        """Number of failed attempts to run this job. (FAIL_COUNT)"""
+        self.expid: str = self.name.split('_')[0]
+        BasicConfig.read()
+        self._tmp_path = os.path.join(
+            BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
+        self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
+        self.updated = False
 
-    def clean_attributes(self):
-        if self.status == Status.FAILED and self.fail_count >= self.retrials:
-            return None
-        self.rerun_only = False
-        self.delay_end = None
-        self.wrapper_type = None
-        self._wrapper_queue = None
-        self._queue = None
-        self._partition = None
-        self.retry_delay = None
-        self._wallclock = None
-        self.wchunkinc = None
-        self._tasks = None
-        self._nodes = None
-        self._threads = None
-        self._processors = None
-        self._memory = None
-        self._memory_per_task = None
-        self.undefined_variables = None
-        self.executable = None
-        self.packed = False
-        self.hold = False
-        self.export = None
-        self.start_time = None
-        self.total_jobs = None
-        self.max_waiting_jobs = None
-        self.exclusive = None
-        self.current_checkpoint_step = None
-        self.max_checkpoint_step = None
-        self.reservation = None
-        self.het = None
-        self.updated_log = False
-        self._script = None
-        self._log_recovery_retries = None
-        self.wrapper_name = None
-        self.is_wrapper = False
-        self._wallclock_in_seconds = None
-        self._notify_on = None
-        self._processors_per_node = None
-        self._shape = None
-        self._x11 = False
-        self._x11_options = None
-        self._hyperthreading = None
-        self._scratch_free_space = None
-        self._delay_retrials = None
-        self._custom_directives = None
-        self.packed_during_building = False
-        # Tentative
-        self.dependencies = None
-        self.local_logs = None
-        self.remote_logs = None
-        self.script_name = None
-        self.stat_file = None
 
     def _init_runtime_parameters(self):
         # hetjobs
@@ -390,6 +393,7 @@ class Job(object):
         self.dependencies = ""
         self.packed_during_building = False
         self.packed = False
+
 
     @property
     def wallclock_in_seconds(self):
@@ -1083,20 +1087,6 @@ class Job(object):
         :type new_child: Job
         """
         self.children.add(new_child)
-
-    def add_edge_info(self, parent, special_conditions):
-        """
-        Adds edge information to the job
-
-        :param parent: parent job
-        :type parent: Job
-        :param special_conditions: special variables
-        :type special_conditions: dict
-        """
-        if special_conditions["STATUS"] not in self.edge_info:
-            self.edge_info[special_conditions["STATUS"]] = {}
-
-        self.edge_info[special_conditions["STATUS"]][parent.name] = (parent, special_conditions.get("FROM_STEP", 0))
 
     def delete_parent(self, parent):
         """
@@ -1989,12 +1979,14 @@ class Job(object):
                 self.retrials = wrapper_data.get("RETRIALS", self.retrials)
         if not self.splits:
             self.splits = as_conf.jobs_data.get(self.section, {}).get("SPLITS", None)
+        if isinstance(self.splits, dict):
+            self.splits = self.splits[date2str(self.date, "%Y%m%d")][self.chunk-1]
         self.delete_when_edgeless = as_conf.jobs_data.get(self.section, {}).get("DELETE_WHEN_EDGELESS", True)
         self.dependencies = str(as_conf.jobs_data.get(self.section, {}).get("DEPENDENCIES", ""))
         self.running = as_conf.jobs_data.get(self.section, {}).get("RUNNING", "once")
         self.platform_name = as_conf.jobs_data.get(self.section, {}).get("PLATFORM",
                                                                          as_conf.experiment_data.get("DEFAULT", {}).get(
-                                                                             "HPCARCH", None))
+                                                                             "HPCARCH", "LOCAL"))
         self.file = as_conf.jobs_data.get(self.section, {}).get("FILE", None)
         self.additional_files = as_conf.jobs_data.get(self.section, {}).get("ADDITIONAL_FILES", [])
 
@@ -2016,7 +2008,7 @@ class Job(object):
 
     def update_check_variables(self, as_conf):
         job_data = as_conf.jobs_data.get(self.section, {})
-        job_platform_name = job_data.get("PLATFORM", as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", None))
+        job_platform_name = job_data.get("PLATFORM", as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL"))
         job_platform = job_data.get("PLATFORMS", {}).get(job_platform_name, {})
         self.check = job_data.get("CHECK", True)
         self.check_warnings = job_data.get("CHECK_WARNINGS", False)
@@ -2167,7 +2159,24 @@ class Job(object):
                 parameters['CHUNK_LAST'] = 'FALSE'
         return parameters
 
-    def update_job_parameters(self, as_conf, parameters, set_attributes):
+    def update_job_parameters(
+            self,
+            as_conf: Any,
+            parameters: Dict[str, Any],
+            set_attributes: bool
+    ) -> Dict[str, Any]:
+        """
+        Update job parameters and optionally set job attributes.
+
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: Any
+        :param parameters: Dictionary of parameters to update.
+        :type parameters: Dict[str, Any]
+        :param set_attributes: Whether to set job attributes from parameters.
+        :type set_attributes: bool
+        :return: Updated parameters dictionary.
+        :rtype: Dict[str, Any]
+        """
         if set_attributes:
             if self.splits == "auto":
                 self.splits = parameters.get("CURRENT_SPLITS", None)
@@ -2182,6 +2191,7 @@ class Job(object):
             if self.checkpoint:  # To activate placeholder sustitution per <empty> in the template
                 parameters["AS_CHECKPOINT"] = self.checkpoint
             self.wchunkinc = as_conf.get_wchunkinc(self.section)
+            self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT", {}).get("WORKFLOW_COMMIT", "")
 
         parameters['JOBNAME'] = self.name
         parameters['FAIL_COUNT'] = str(self.fail_count)
@@ -2206,6 +2216,7 @@ class Job(object):
         parameters['EXPORT'] = self.export
         parameters['PROJECT_TYPE'] = as_conf.get_project_type()
         parameters['X11'] = self.x11
+        parameters['WORKFLOW_COMMIT'] = self.workflow_commit
         return parameters
 
     def update_job_variables_final_values(self, parameters):
@@ -2258,6 +2269,8 @@ class Job(object):
         :type reset_logs: bool
         :return: None
         """
+        #if parameters_updated and not as_conf.needs_reload():
+        #    continue
         if not set_attributes and as_conf.needs_reload():
             set_attributes = True
 
@@ -2285,6 +2298,7 @@ class Job(object):
         for event in self.platform.worker_events:  # keep alive log retrieval workers.
             if not event.is_set():
                 event.set()
+        self.updated = True
         return parameters
 
 

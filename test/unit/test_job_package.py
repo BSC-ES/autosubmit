@@ -22,7 +22,6 @@ from mock import MagicMock
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistenceDb
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical
 from autosubmit.job.job_packages import jobs_in_wrapper_str
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
@@ -105,7 +104,7 @@ def create_job_package_wrapper(jobs, as_conf):
 
 @pytest.fixture
 def joblist(tmp_path, as_conf):
-    job_list = JobList('a000', as_conf, YAMLParserFactory(), JobListPersistenceDb(as_conf.expid))
+    job_list = JobList('a000', as_conf, YAMLParserFactory())
     job_list._ordered_jobs_by_date_member["WRAPPERS"] = dict()
     return job_list
 

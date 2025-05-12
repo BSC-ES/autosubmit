@@ -429,7 +429,8 @@ class ParamikoPlatform(Platform):
         :param filename: name of the file to send
         :type filename: str
         """
-
+        local_path = None
+        remote_path = None
         if check:
             self.check_remote_log_dir()
             self.delete_file(filename)
@@ -441,8 +442,8 @@ class ParamikoPlatform(Platform):
             self._ftpChannel.chmod(remote_path, os.stat(local_path).st_mode)
             return True
         except IOError as e:
-            raise AutosubmitError(f'Can not send file {os.path.join(self.tmp_path, filename)} to '
-                                  f'{os.path.join(self.get_files_path(), filename)}', 6004, str(e))
+            raise AutosubmitError(f'Can not send file {local_path} to '
+                                  f'{remote_path}', 6004, str(e))
         except BaseException as e:
             raise AutosubmitError(
                 'Send file failed. Connection seems to no be active', 6004)

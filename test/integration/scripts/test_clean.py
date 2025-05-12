@@ -176,7 +176,7 @@ def test_clean_git_project(
     Path(git_project, 'test.sh').touch()
 
     chdir(git_project)
-    check_output(['git', 'init', '--initial-branch=test'])
+    check_output(['git', 'init'])
     check_output(['git', 'add', '.'])
     check_output(['git', 'commit', '-m', 'Initial commit'])
 

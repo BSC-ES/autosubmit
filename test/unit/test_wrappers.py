@@ -32,8 +32,6 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistenceDb
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_packager import JobPackager
 from autosubmit.job.job_packages import JobPackageHorizontal, JobPackageHorizontalVertical, \
     JobPackageVerticalHorizontal, JobPackageSimple
@@ -2009,19 +2007,19 @@ class TestWrappers:
             if running == 'once':
                 name = 'expid_' + section
                 job = self._createDummyJob(name, wallclock, section)
-                self.job_list._job_list.append(job)
+                self.job_list.add_job(job)
             elif running == 'date':
                 for date in date_list:
                     name = 'expid_' + date + "_" + section
                     job = self._createDummyJob(name, wallclock, section, date)
-                    self.job_list._job_list.append(job)
+                    self.job_list.add_job(job)
             elif running == 'member':
                 for date in date_list:
                     for member in member_list:
                         name = 'expid_' + date + "_" + member + "_" + section
                         job = self._createDummyJob(
                             name, wallclock, section, date, member)
-                        self.job_list._job_list.append(job)
+                        self.job_list.add_job(job)
             elif running == 'chunk':
                 synchronize_type = section_dict['SYNCHRONIZE'] if 'SYNCHRONIZE' in section_dict else None
                 if synchronize_type == 'date':
@@ -2029,7 +2027,7 @@ class TestWrappers:
                         name = 'expid_' + str(chunk) + "_" + section
                         job = self._createDummyJob(
                             name, wallclock, section, None, None, chunk)
-                        self.job_list._job_list.append(job)
+                        self.job_list.add_job(job)
                 elif synchronize_type == 'member':
                     for date in date_list:
                         for chunk in chunk_list:
@@ -2037,7 +2035,7 @@ class TestWrappers:
                                    str(chunk) + "_" + section
                             job = self._createDummyJob(
                                 name, wallclock, section, date, None, chunk)
-                            self.job_list._job_list.append(job)
+                            self.job_list.add_job(job)
                 else:
                     for date in date_list:
                         for member in member_list:
@@ -2046,7 +2044,7 @@ class TestWrappers:
                                        "_" + str(chunk) + "_" + section
                                 job = self._createDummyJob(
                                     name, wallclock, section, date, member, chunk)
-                                self.job_list._job_list.append(job)
+                                self.job_list.add_job(job)
 
         self.job_list._date_list = date_list
         self.job_list._member_list = member_list
@@ -2152,8 +2150,7 @@ def setup(autosubmit_config, tmpdir):
     as_conf.experiment_data["WRAPPERS"]["WRAPPERS"]["JOBS_IN_WRAPPER"] = "SECTION1"
     as_conf.experiment_data["WRAPPERS"]["WRAPPERS"]["TYPE"] = "vertical"
     Path(tmpdir / experiment_id / "tmp").mkdir(parents=True, exist_ok=True)
-    job_list = JobList(experiment_id, as_conf, YAMLParserFactory(),
-                       JobListPersistencePkl())
+    job_list = JobList(experiment_id, as_conf, YAMLParserFactory())
 
     platform = SlurmPlatform(experiment_id, 'dummy-platform', as_conf.experiment_data)
 
@@ -2164,18 +2161,16 @@ def setup(autosubmit_config, tmpdir):
     job.wallclock = "00:20"
     job.section = "SECTION1"
     job.platform = platform
-    job_list._job_list.append(job)
+    job_list.add_job(job)
     job = Job("job2", "2", Status.SUBMITTED, 0)
     job._init_runtime_parameters()
     job.wallclock = "00:20"
     job.section = "SECTION1"
     job.platform = platform
-    job_list._job_list.append(job)
-    wrapper_jobs = copy.deepcopy(job_list.get_job_list())
-    for job in wrapper_jobs:
-        job.platform = platform
+    job_list.add_job(job)
+    job_list._add_edge_and_parent({"e_from": "job2", "e_to": "job1"})
     job_packager = JobPackager(as_conf, platform, job_list)
-    vertical_package = JobPackageVertical(wrapper_jobs, configuration=as_conf)
+    vertical_package = JobPackageVertical(job_list.get_job_list(), configuration=as_conf)
     yield job_packager, vertical_package
 
 
@@ -2199,7 +2194,7 @@ def test_is_deadlock_jobs_in_queue(setup, any_simple_packages, not_wrappeable_pa
 def test_is_deadlock_no_jobs_in_queue(setup, any_simple_packages, not_wrappeable_package_info, built_packages_tmp,
                                       expected):
     job_packager, _ = setup
-    for job in job_packager._jobs_list._job_list:
+    for job in job_packager._jobs_list.get_job_list():
         job.status = Status.COMPLETED
     deadlock = job_packager.is_deadlock(any_simple_packages, not_wrappeable_package_info, built_packages_tmp)
     assert deadlock == expected
@@ -2232,7 +2227,9 @@ def test_process_not_wrappeable_packages_no_more_remaining_jobs(setup, not_wrapp
         policy = "mixed"
     elif unparsed_policy.endswith("_one_job"):
         policy = unparsed_policy.split("_")[0]
-        job_packager._jobs_list._job_list = [job for job in job_packager._jobs_list._job_list if job.name == "job1"]
+        job = job_packager._jobs_list.get_job_by_name("job1")
+        job_packager._jobs_list.clear()
+        job_packager._jobs_list.add_job(job)
         vertical_package = JobPackageVertical([vertical_package.jobs[0]], configuration=job_packager._as_config)
     else:
         policy = unparsed_policy
@@ -2278,7 +2275,7 @@ def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wr
     not_wrappeable_package_info[0][0] = vertical_package
 
     for job in vertical_package.jobs:
-        job.status = Status.READY
+         job.status = Status.READY
     if unparsed_policy == "mixed_failed":
         vertical_package.jobs[0].fail_count = 1
     job = Job("job3", "3", Status.WAITING, 0)
@@ -2286,7 +2283,9 @@ def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wr
     job.wallclock = "00:20"
     job.section = "SECTION1"
     job.platform = job_packager._platform
-    job_packager._jobs_list._job_list.append(job)
+    job_packager._jobs_list.add_job(job)
+    job_packager._jobs_list._add_edge_and_parent({"e_from": "job3", "e_to": "job2"})
+
     if unparsed_policy in ["flexible", "mixed_failed", "flexible_one_job"]:
         result = job_packager.process_not_wrappeable_packages(not_wrappeable_package_info, packages_to_submit,
                                                               max_jobs_to_submit, wrapper_limits)
