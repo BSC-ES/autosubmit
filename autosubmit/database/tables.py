@@ -28,6 +28,8 @@ from sqlalchemy import (
     LargeBinary,
     UniqueConstraint,
     Column,
+    DateTime,
+    Boolean, ForeignKey,
 )
 
 metadata_obj = MetaData()
@@ -51,15 +53,6 @@ DBVersionTable = Table(
     Column("version", Integer, nullable=False, primary_key=True),
 )
 
-ExperimentStructureTable = Table(
-    "experiment_structure",
-    metadata_obj,
-    Column("e_from", Text, nullable=False, primary_key=True),
-    Column("e_to", Text, nullable=False, primary_key=True),
-    UniqueConstraint("e_from", "e_to", name="unique_e_from_and_e_to"),
-)
-"""Table that holds the structure of the experiment jobs."""
-
 ExperimentStatusTable = Table(
     "experiment_status",
     metadata_obj,
@@ -71,30 +64,6 @@ ExperimentStatusTable = Table(
 )
 """Stores the status of the experiments."""
 
-JobPackageTable = Table(
-    "job_package",
-    metadata_obj,
-    Column("exp_id", Text),
-    Column("package_name", Text),
-    Column("job_name", Text),
-    Column("wallclock", Text)
-)
-"""Stores a mapping between the wrapper name and the actual job in SLURM."""
-
-WrapperJobPackageTable = Table(
-    "wrapper_job_package",
-    metadata_obj,
-    Column("exp_id", Text),
-    Column("package_name", Text),
-    Column("job_name", Text),
-    Column("wallclock", Text)
-)
-"""It is a replication.
-It is only created/used when using inspect and create or monitor
-with flag -cw in Autosubmit.
-This replication is used to not interfere with the current
-autosubmit run of that experiment since wrapper_job_package
-will contain a preview, not the real wrapper packages."""
 
 # NOTE: The column ``metadata`` has a name that is reserved in
 #       SQLAlchemy ORM. It works for SQLAlchemy Core, here, but
@@ -121,6 +90,8 @@ ExperimentRunTable = Table(
     Column("metadata", Text),
 )
 
+
+"""Table that holds the structure of the experiment jobs."""
 JobDataTable = Table(
     "job_data",
     metadata_obj,
@@ -159,31 +130,70 @@ JobDataTable = Table(
     UniqueConstraint("counter", "job_name", name="unique_counter_and_job_name"),
 )
 
-JobListTable = Table(
-    "job_list",
+# Jobs table
+JobsTable = Table(
+    "jobs",
     metadata_obj,
-    Column("name", String, primary_key=True),
+    Column("name", String, nullable=False, primary_key=True),
     Column("id", Integer),
-    Column("status", Integer),
+    Column("script_name", String),
     Column("priority", Integer),
+    Column("status", String),
+    Column("frequency", String),
+    Column("synchronize", Boolean),
     Column("section", String),
-    Column("date", String),
-    Column("member", String),
     Column("chunk", Integer),
+    Column("splits", Integer),
     Column("split", Integer),
-    Column("local_out", String),
-    Column("local_err", String),
-    Column("remote_out", String),
-    Column("remote_err", String),
+    Column("date", String),
+    Column("date_split", String),
+    Column("edge_info", Text),
+    Column("max_checkpoint_step", Integer),
+    Column("start_time", DateTime),
+    Column("end_time_timestamp", Float),
+    Column("submit_time_timestamp", Float),
+    Column("finish_time_timestamp", Float),
+    Column("ready_date", DateTime),
+    Column("local_logs", String),
+    Column("remote_logs", String),
+    Column("log_available", Boolean),
+    Column("updated_log", Boolean),
+    Column("packed", Boolean),
 )
 
-JobPklTable = Table(
-    "job_pkl",
+# ExperimentStructureTable with dependencies
+ExperimentStructureTable = Table(
+    "experiment_structure",
     metadata_obj,
-    Column("expid", String, primary_key=True),
-    Column("pkl", LargeBinary),
-    Column("modified", String),
+    Column("e_from", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True),
+    Column("e_to", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True),
+    Column("edge_info", Text, nullable=True),
+    Column("current_checkpoint_step", Integer),
+    UniqueConstraint("e_from", "e_to", name="unique_e_from_and_e_to"),
+
+
 )
+WrapperTable = Table(
+    "wrappers",
+    metadata_obj,
+    Column("package_name", Text, primary_key=True),
+    Column("job_name", Text, primary_key=True),
+)
+"""Stores a mapping between the wrapper name and the actual job in SLURM."""
+
+PreviewWrapperTable = Table(
+    "preview_wrappers",
+    metadata_obj,
+    Column("package_name", Text, primary_key=True),
+    Column("job_name", Text, primary_key=True),
+)
+"""It is a replication.
+It is only created/used when using inspect and create or monitor
+with flag -cw in Autosubmit.
+This replication is used to not interfere with the current
+autosubmit run of that experiment since wrapper_job_package
+will contain a preview, not the real wrapper packages."""
+
 
 DetailsTable = Table(
     "details",
@@ -202,12 +212,12 @@ TABLES = (
     ExperimentStructureTable,
     ExperimentRunTable,
     DBVersionTable,
-    JobPackageTable,
     JobDataTable,
-    JobListTable,
-    WrapperJobPackageTable,
-    JobPklTable,
     DetailsTable,
+    JobsTable,
+    ExperimentStructureTable,
+    WrapperTable,
+    PreviewWrapperTable,
 )
 """The tables available in the Autosubmit databases."""
 
