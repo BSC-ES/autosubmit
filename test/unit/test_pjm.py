@@ -180,7 +180,7 @@ def test_process_batch_ready_jobs_valid_packages_to_submit(mocker, pjm_platform,
     for i, package in enumerate(valid_packages_to_submit):
         for job in package.jobs:
             assert job.hold is False
-            assert job.id == str(jobs_id[i])
+            assert job.id == jobs_id[i]
             assert job.status == Status.SUBMITTED
             if not isinstance(package, JobPackageSimple):
                 assert job.wrapper_name == "wrapped"

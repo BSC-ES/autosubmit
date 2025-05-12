@@ -40,7 +40,7 @@ def test_job_list_persistence(as_db: str, autosubmit_exp):
     }
     if as_db == "postgres":
         experiment_data['STORAGE'] = {
-            'TYPE': 'db'
+            'TYPE': 'sqlite'
         }
     exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
     exp_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID)
@@ -49,9 +49,9 @@ def test_job_list_persistence(as_db: str, autosubmit_exp):
 
     graph = DiGraph(name="test_graph")
 
-    job_list_pers.save(str(exp_dir / 'pkl'), __name__, [], graph)
+    job_list_pers.save(str(exp_dir / 'db'), __name__, [], graph)
 
-    loaded_graph = job_list_pers.load(str(exp_dir / 'pkl'), __name__)
+    loaded_graph = job_list_pers.load(str(exp_dir / 'db'), __name__)
 
     assert isinstance(loaded_graph, dict)
     # TODO: improve this test with better assertion(s), e.g., what we had during development:

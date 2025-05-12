@@ -24,6 +24,9 @@ from shutil import copy
 from typing import TYPE_CHECKING
 
 import pytest
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
@@ -31,6 +34,7 @@ from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import get_experiment_description
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.scripts.autosubmit import main
+from autosubmit.log.log import AutosubmitCritical
 
 if TYPE_CHECKING:
     from test.integration.conftest import AutosubmitExperimentFixture
@@ -325,7 +329,6 @@ def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
     assert mocked_log.result.called
     assert mocked_log.result.call_args[0][0].startswith('Pkl restored')
 
-
 @pytest.mark.parametrize('experiment_data,context_mgr', [
     ({
          'JOBS': {
@@ -362,4 +365,3 @@ def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experim
     as_conf = exp.as_conf
     with context_mgr:
         as_conf.reload(force_load=True)
-

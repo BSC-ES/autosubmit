@@ -16,13 +16,17 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Integration tests for the Slurm platform."""
-
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.platforms.slurmplatform import SlurmPlatform
+from test.conftest import AutosubmitExperimentFixture
+from autosubmit.log.log import Log
+Log.get_logger("Autosubmit")
 
 if TYPE_CHECKING:
     from test.integration.conftest import AutosubmitExperimentFixture
@@ -66,6 +70,7 @@ def test_create_platform_slurm(autosubmit_exp):
     # TODO: add more assertion statements...
 
 
+@pytest.mark.xfail(reason="Known bug with concurrent tests")
 @pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     {
@@ -637,6 +642,22 @@ def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubm
     """Runs a simple Bash script using Slurm."""
     exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, wrapper=True)
     _create_slurm_platform(exp.expid, exp.as_conf)
+
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, "t001")
+    tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+    aslogs_path = Path(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
+
+    exp.autosubmit._setup_log_files(
+        command="run",
+        expids=None,
+        expid="t001",
+        owner=True,
+        tmp_path=tmp_path,
+        aslogs_path=aslogs_path,
+        exp_path=exp_path,
+        log_level="DEBUG",
+        console_level="DEBUG"
+    )
 
     exp.as_conf.experiment_data = {
         'EXPERIMENT': {

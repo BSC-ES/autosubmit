@@ -23,6 +23,7 @@ from typing import cast, TYPE_CHECKING
 import pytest
 from sqlalchemy import inspect
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.tables import ExperimentStatusTable
 from autosubmit.history.database_managers.database_models import ExperimentRow, ExperimentStatusRow
 from autosubmit.history.database_managers.experiment_status_db_manager import (
