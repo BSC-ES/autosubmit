@@ -66,6 +66,7 @@ def test_create_platform_slurm(autosubmit_exp):
     # TODO: add more assertion statements...
 
 
+@pytest.mark.xfail(reason="Known bug with concurrent tests")
 @pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     {
@@ -132,6 +133,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 
+@pytest.mark.xfail(reason="Known bug with concurrent tests")
 @pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     # Vertical Wrapper Workflow

@@ -48,7 +48,6 @@ if TYPE_CHECKING:
     # noinspection PyProtectedMember
     from py._path.local import LocalPath  # type: ignore
 
-
 _PG_USER = 'postgres'
 _PG_PASSWORD = 'postgres'
 _PG_DATABASE = 'autosubmit_test'
@@ -67,7 +66,7 @@ class AutosubmitExperiment:
     platform: ParamikoPlatform
 
 
-def _initialize_autosubmitrc(folder: Path) -> Path:
+def _initialize_autosubmitrc(folder: Path, backend: str):
     """Initialize the ``autosubmit.rc`` file.
 
     This function should populate enough information so ``BasicConfig.read()`` works
@@ -78,35 +77,45 @@ def _initialize_autosubmitrc(folder: Path) -> Path:
     This function can be called multiple times.
 
     :param folder: Folder to sve the ``.autosubmitrc`` file in.
+    :param backend: Database backend, either 'sqlite' or 'postgres'.
     :return: Path to the ``.autosubmitrc`` file.
     """
     autosubmitrc = folder / '.autosubmitrc'
     autosubmitrc.write_text(
         dedent(f'''\
-                [database]
-                path = {folder}
-                filename = tests.db
+[database]
+path = {folder / "exp_root"}
+filename = debug.db
 
-                [local]
-                path = {folder}
+[local]
+path = {folder / "exp_root"}
 
-                [globallogs]
-                path = {folder / "logs"}
+[globallogs]
+path = {folder / "global_logs"}
 
-                [structures]
-                path = {folder / "metadata/structures"}
+[structures]
+path = {folder / "metadata/structures"}
 
-                [historicdb]
-                path = {folder / "metadata/data"}
+[historicdb]
+path = {folder / "metadata/data"}
 
-                [historiclog]
-                path = {folder / "metadata/logs"}
+[historiclog]
+path = {folder / "metadata/logs"}
 
-                [defaultstats]
-                path = {folder / "as_output/stats"}
-                ''')
+[defaultstats]
+path = {folder / "as_output/stats"}
+
+[conf]
+jobs = {folder / "exp_root/conf"}
+
+[database_backend]
+backend = {backend}
+
+                    ''')
     )
-    return autosubmitrc
+    os.environ['AUTOSUBMIT_CONFIGURATION'] = str(autosubmitrc)
+    BasicConfig.read()
+    BasicConfig.generate_dirs()
 
 
 class AutosubmitExperimentFixture(Protocol):
@@ -153,48 +162,35 @@ def autosubmit_exp(
     def _create_autosubmit_exp(
             expid: Optional[str] = None,
             experiment_data: Optional[Dict] = None,
+            wrapper=False,
+            reload=True,
+            create=True,
             mock_last_name_used=True,
+            db_backend='sqlite',
             *_,
             **kwargs
     ):
         if experiment_data is None:
             experiment_data = {}
 
-        autosubmitrc = _initialize_autosubmitrc(tmp_path)
-        os.environ['AUTOSUBMIT_CONFIGURATION'] = str(autosubmitrc)
+        _initialize_autosubmitrc(tmp_path, db_backend)
 
-        BasicConfig.read()
-
-        is_postgres = hasattr(BasicConfig, 'DATABASE_BACKEND') and BasicConfig.DATABASE_BACKEND == 'postgres'
+        is_postgres = db_backend == 'postgres'
         if is_postgres or not Path(BasicConfig.DB_PATH).exists():
             autosubmit.install()
-            autosubmit.configure(
-                advanced=False,
-                database_path=BasicConfig.DB_DIR,  # type: ignore
-                database_filename=BasicConfig.DB_FILE,  # type: ignore
-                local_root_path=str(tmp_path),
-                platforms_conf_path=None,  # type: ignore
-                jobs_conf_path=None,  # type: ignore
-                smtp_hostname=None,  # type: ignore
-                mail_from=None,  # type: ignore
-                machine=False,
-                local=False,
-                database_backend="postgres" if is_postgres else "sqlite",
-                database_conn_url=BasicConfig.DATABASE_CONN_URL if is_postgres else ""
-            )
 
         operational = False
         evaluation = False
         testcase = True
         if expid:
+            # mkdir dir
             if mock_last_name_used:
                 mocker.patch('autosubmit.experiment.experiment_common.db_common.last_name_used',
                              return_value=expid)
             operational = expid.startswith('o')
             evaluation = expid.startswith('e')
             testcase = expid.startswith('t')
-
-        expid = autosubmit.expid(
+        generated_expid = autosubmit.expid(
             description=f"Pytest experiment (delete me)",
             hpc="local",
             copy_id="",
@@ -208,6 +204,10 @@ def autosubmit_exp(
             evaluation=evaluation,
             use_local_minimal=False
         )
+        if expid and generated_expid != expid:
+            raise ValueError(f"Experiment ID '{expid}' already exists")
+        expid = generated_expid
+
         exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
         conf_dir = exp_path / "conf"
         global_logs = Path(BasicConfig.GLOBAL_LOG_DIR)
@@ -225,13 +225,14 @@ def autosubmit_exp(
 
         config.experiment_data = {**config.experiment_data, **experiment_data}
 
-        if 'CONFIG' not in config.experiment_data:
-            config.experiment_data['CONFIG'] = {}
-        if not config.experiment_data.get('CONFIG').get('AUTOSUBMIT_VERSION', ''):
-            try:
-                config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = version('autosubmit')
-            except PackageNotFoundError:
-                config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = ''
+        # TODO it is getting the version from "testcontainers" and it is raising 4.1.14 instead of 4.1.15
+        # if 'CONFIG' not in config.experiment_data:
+        #     config.experiment_data['CONFIG'] = {}
+        # if not config.experiment_data.get('CONFIG').get('AUTOSUBMIT_VERSION', ''):
+        #     try:
+        #         config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = version('autosubmit')
+        #     except PackageNotFoundError:
+        #         config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = ''
 
         key_file = {
             'JOBS': 'jobs',
@@ -256,13 +257,9 @@ def autosubmit_exp(
         if reload:
             config.reload(force_load=True)
 
-        # TBD: this is not set in ``AutosubmitConfig``, but
-        # maybe it should be? Ignore linter errors for now.
-        config.autosubmitrc = autosubmitrc
-
         # Default values for experiment data
         # TODO: This probably has a way to be initialized in config-parser?
-        must_exists = ['DEFAULT', 'JOBS', 'PLATFORMS']
+        must_exists = ['DEFAULT', 'JOBS', 'PLATFORMS', 'CONFIG']
         for must_exist in must_exists:
             if must_exist not in config.experiment_data:
                 config.experiment_data[must_exist] = {}
@@ -316,12 +313,16 @@ def autosubmit_exp(
     return _create_autosubmit_exp
 
 
-@pytest.fixture(scope='module')
-def autosubmit() -> Autosubmit:
+@pytest.fixture(scope='function')
+def autosubmit(tmp_path) -> Autosubmit:
     """Create an instance of ``Autosubmit``.
 
     Useful when you need ``Autosubmit`` but do not need any experiments."""
-    return Autosubmit()
+    _initialize_autosubmitrc(tmp_path, "sqlite")
+
+    autosubmit_instance = Autosubmit()
+    autosubmit_instance.install()
+    return autosubmit_instance
 
 
 # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
@@ -355,10 +356,35 @@ def autosubmit_config(
     cleaned (see ``finalizer`` below).
     """
 
+    # Mock this as otherwise BasicConfig.read resets our other mocked values above.
+    # mocker.patch.object(BasicConfig, "read", autospec=True)
+
+    def _prepare_basic_config(folder: Path) -> BasicConfig:
+        """Sets up ``BasicConfig`` using a given temporary directory as root dir."""
+        basic_conf = BasicConfig()
+        BasicConfig.DB_DIR = folder / "exp_root"
+        BasicConfig.DB_FILE = "debug.db"
+        BasicConfig.DB_PATH = BasicConfig.DB_DIR / BasicConfig.DB_FILE
+        BasicConfig.LOCAL_ROOT_DIR = folder / "exp_root"
+        BasicConfig.LOCAL_TMP_DIR = "tmp"
+        BasicConfig.LOCAL_ASLOG_DIR = "ASLOGS"
+        BasicConfig.LOCAL_PROJ_DIR = "proj"
+        BasicConfig.DEFAULT_PLATFORMS_CONF = ""
+        BasicConfig.CUSTOM_PLATFORMS_PATH = ""
+        BasicConfig.DEFAULT_JOBS_CONF = ""
+        BasicConfig.SMTP_SERVER = ""
+        BasicConfig.MAIL_FROM = ""
+        BasicConfig.ALLOWED_HOSTS = ""
+        BasicConfig.DENIED_HOSTS = ""
+        BasicConfig.CONFIG_FILE_FOUND = True
+        BasicConfig.GLOBAL_LOG_DIR = folder / "global_logs"
+        return basic_conf
+
     def _create_autosubmit_config(
             expid: str,
             experiment_data: dict = None,
             include_basic_config: bool = True,
+            backend: str = 'sqlite',
             *_,
             **kwargs
     ) -> AutosubmitConfig:
@@ -381,15 +407,7 @@ def autosubmit_config(
         if experiment_data is None:
             experiment_data = {}
 
-        autosubmitrc = _initialize_autosubmitrc(tmp_path)
-        os.environ['AUTOSUBMIT_CONFIGURATION'] = str(autosubmitrc)
-
-        BasicConfig.read()
-
-        is_postgres = hasattr(BasicConfig, 'DATABASE_BACKEND') and BasicConfig.DATABASE_BACKEND == 'postgres'
-        if is_postgres or not Path(BasicConfig.DB_PATH).exists():
-            autosubmit.install()
-
+        _initialize_autosubmitrc(tmp_path, backend)
         exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, expid)
         # <expid>/tmp/
         exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
@@ -402,20 +420,18 @@ def autosubmit_config(
         conf_dir = exp_path / "conf"
         Path(aslogs_dir).mkdir(exist_ok=True)
         Path(conf_dir).mkdir(exist_ok=True)
-        # <expid>/pkl
-        pkl_dir = exp_path / "pkl"
-        Path(pkl_dir).mkdir(exist_ok=True)
-        # ~/autosubmit/autosubmit.db
+        # <expid>/db
+        db_dir = exp_path / "db"
+        Path(db_dir).mkdir(exist_ok=True)
         is_postgres = hasattr(BasicConfig, 'DATABASE_BACKEND') and BasicConfig.DATABASE_BACKEND == 'postgres'
-        db_path = Path(BasicConfig.DB_PATH)
-        if not is_postgres:
-            db_path.touch()
         # <TEMP>/global_logs
         global_logs = Path(BasicConfig.GLOBAL_LOG_DIR)
         global_logs.mkdir(parents=True, exist_ok=True)
         job_data_dir = Path(BasicConfig.JOBDATA_DIR)
         job_data_dir.mkdir(parents=True, exist_ok=True)
-
+        if is_postgres or not Path(BasicConfig.DB_PATH).exists():
+            Path(BasicConfig.DB_DIR).mkdir(parents=True, exist_ok=True)
+            autosubmit.install()
         config = AutosubmitConfig(
             expid=expid,
             basic_config=BasicConfig
@@ -426,28 +442,16 @@ def autosubmit_config(
         # in ``BasicConfig``. For some reason, some platforms use variables like ``LOCAL_ROOT_DIR``
         # from the configuration object, instead of using ``BasicConfig``.
         if include_basic_config:
-
-            for k, v in {k: v for k, v in BasicConfig.__dict__.items() if not k.startswith('__')}.items():
-                config.experiment_data[k] = v
-
-            if 'CONFIG' not in config.experiment_data:
-                config.experiment_data['CONFIG'] = {}
-            if not config.experiment_data.get('CONFIG').get('AUTOSUBMIT_VERSION', ''):
-                try:
-                    config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = version('autosubmit')
-                except PackageNotFoundError:
-                    config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = ''
+            config.experiment_data.update(BasicConfig().props())
 
         # Default values for experiment data
         # TODO: This probably has a way to be initialized in config-parser?
-        must_exists = ['DEFAULT', 'JOBS', 'PLATFORMS']
+        must_exists = ['DEFAULT', 'JOBS', 'PLATFORMS', 'CONFIG']
         for must_exist in must_exists:
             if must_exist not in config.experiment_data:
                 config.experiment_data[must_exist] = {}
 
         config.experiment_data['CONFIG']['SAFETYSLEEPTIME'] = 0
-        # TODO: one test failed while moving things from unit to integration, but this shouldn't be
-        #       needed, especially if the disk has the valid value?
         config.experiment_data['DEFAULT']['EXPID'] = expid
 
         if 'HPCARCH' not in config.experiment_data['DEFAULT']:
@@ -537,6 +541,11 @@ def local(prepare_test):
     return local
 
 
+def _identity_value(value=None):
+    """A type of identity function; returns a function that returns ``value``."""
+    return lambda *ignore_args, **ignore_kwargs: value
+
+
 @pytest.fixture
 def as_db_sqlite(monkeypatch: pytest.MonkeyPatch, autosubmit_config, tmp_path: "LocalPath") -> Type[BasicConfig]:
     """Overwrites the BasicConfig to use SQLite database for testing.
@@ -548,9 +557,10 @@ def as_db_sqlite(monkeypatch: pytest.MonkeyPatch, autosubmit_config, tmp_path: "
         BasicConfig class.
     """
     monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "sqlite")
-    autosubmit_config('___')  # NOT USED! DO NOT USE THIS EXPID!
 
-    return BasicConfig
+    autosubmit_config('___', backend="sqlite")  # NOT USED! DO NOT USE THIS EXPID!
+
+    yield BasicConfig
 
 
 def _setup_pg_db(conn: Connection) -> None:
@@ -561,9 +571,10 @@ def _setup_pg_db(conn: Connection) -> None:
     """
     # Get all schema names that are not from the system
     results = conn.execute(
-        text("""SELECT schema_name FROM information_schema.schemata
-               WHERE schema_name NOT LIKE 'pg_%'
-               AND schema_name != 'information_schema'""")
+        text("""SELECT schema_name
+                FROM information_schema.schemata
+                WHERE schema_name NOT LIKE 'pg_%'
+                  AND schema_name != 'information_schema'""")
     ).all()
     schema_names = [res[0] for res in results]
 
@@ -588,7 +599,8 @@ def _get_pg_connection_url(port):
 
 
 @pytest.fixture
-def as_db_postgres(monkeypatch: pytest.MonkeyPatch, autosubmit_config, pg_random_port: int) -> Generator[BasicConfig, Any, None]:
+def as_db_postgres(monkeypatch: pytest.MonkeyPatch, autosubmit_config, pg_random_port: int) -> Generator[
+    BasicConfig, Any, None]:
     """Fixture to set up and tear down a Postgres database for testing.
     It will overwrite the ``BasicConfig`` to use Postgres.
     It uses the environment variable ``PYTEST_DATABASE_CONN_URL`` to connect to the database.
@@ -616,14 +628,14 @@ def as_db_postgres(monkeypatch: pytest.MonkeyPatch, autosubmit_config, pg_random
             port=5432,
             username=_PG_USER,
             password=_PG_PASSWORD,
-            dbname=_PG_DATABASE)\
+            dbname=_PG_DATABASE) \
             .with_bind_ports(5432, pg_random_port):
         # Setup database
         with create_engine(conn_url).connect() as conn:
             _setup_pg_db(conn)
             conn.commit()
 
-        autosubmit_config('___')  # NOT USED! DO NOT USE THIS EXPID!
+        autosubmit_config('___', backend="postgres")  # NOT USED! DO NOT USE THIS EXPID!
 
         yield BasicConfig
 

@@ -23,6 +23,7 @@ from typing import cast, Union, TYPE_CHECKING
 import pytest
 from sqlalchemy import inspect
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.tables import ExperimentStatusTable
 from autosubmit.history.database_managers.database_models import ExperimentRow, ExperimentStatusRow
 from autosubmit.history.database_managers.experiment_status_db_manager import (
@@ -57,28 +58,26 @@ def test_create_experiment_status_db_manager_invalid_value():
         # sqlite
         pytest.param(
             "sqlite",
-            {"expid": _EXPID, "main_db_name": "tests.db"},
+            {"expid": _EXPID},
             ExperimentStatusDbManager,
         )
     ],
 )
 def test_experiment_status_db_manager(
-    tmp_path: 'LocalPath',
-    db_engine: str,
-    options: dict,
-    clazz: Union[type[SqlAlchemyExperimentStatusDbManager], type[ExperimentStatusDbManager]],
-    request: pytest.FixtureRequest,
+        tmp_path: 'LocalPath',
+        db_engine: str,
+        options: dict,
+        clazz: Union[type[SqlAlchemyExperimentStatusDbManager], type[ExperimentStatusDbManager]],
+        request: pytest.FixtureRequest,
 ):
     """Test status database manager using the old (SQLite) and new (SQLAlchemy) implementations."""
     request.getfixturevalue(f"as_db_{db_engine}")
 
-    tmp_test_dir = tmp_path / "test_status"
-    tmp_test_dir.mkdir()
-
     is_sqlalchemy = db_engine == "sqlite"
     if is_sqlalchemy:
-        options["db_dir_path"] = tmp_test_dir
-        options["local_root_dir_path"] = tmp_test_dir
+        options["db_dir_path"] = BasicConfig.DB_DIR
+        options["main_db_name"] = BasicConfig.DB_FILE
+        options["local_root_dir_path"] = BasicConfig.LOCAL_ROOT_DIR
 
     # Assert type of database manager
     database_manager = create_experiment_status_db_manager(db_engine, **options)  # type: clazz
@@ -123,27 +122,26 @@ def test_experiment_status_db_manager(
         # sqlite
         pytest.param(
             "sqlite",
-            {"expid": _EXPID, "main_db_name": "tests.db"},
+            {"expid": _EXPID},
             ExperimentStatusDbManager,
         )
     ],
 )
 def test_get_experiment_status_row_by_expid(
-    tmp_path: 'LocalPath',
-    db_engine: str,
-    options: dict,
-    autosubmit_exp,
-    clazz: Union[type[SqlAlchemyExperimentStatusDbManager], type[ExperimentStatusDbManager]],
-    request: pytest.FixtureRequest,
+        tmp_path: 'LocalPath',
+        db_engine: str,
+        options: dict,
+        autosubmit_exp,
+        clazz: Union[type[SqlAlchemyExperimentStatusDbManager], type[ExperimentStatusDbManager]],
+        request: pytest.FixtureRequest,
 ):
     request.getfixturevalue(f"as_db_{db_engine}")
 
-    tmp_test_dir = tmp_path
-
     is_sqlalchemy = db_engine == "sqlite"
     if is_sqlalchemy:
-        options["db_dir_path"] = tmp_test_dir
-        options["local_root_dir_path"] = tmp_test_dir
+        options["db_dir_path"] = BasicConfig.DB_DIR
+        options["main_db_name"] = BasicConfig.DB_FILE
+        options["local_root_dir_path"] = BasicConfig.LOCAL_ROOT_DIR
 
     database_manager = create_experiment_status_db_manager(db_engine, **options)
 
