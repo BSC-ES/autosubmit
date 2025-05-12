@@ -22,11 +22,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
-from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
+from typing import TYPE_CHECKING, Any, Optional
+
 from sqlalchemy.schema import CreateTable, CreateSchema
 
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.database import session, tables
 from autosubmit.log.log import Log
 

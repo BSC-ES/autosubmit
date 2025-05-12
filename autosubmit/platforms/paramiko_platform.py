@@ -456,6 +456,14 @@ class ParamikoPlatform(Platform):
         return ""
 
     def send_file(self, filename, check=True) -> bool:
+        """
+        Sends a local file to the platform
+        :param check:
+        :param filename: name of the file to send
+        :type filename: str
+        """
+        local_path = None
+        remote_path = None
         if check:
             self.check_remote_log_dir()
             self.delete_file(filename)
@@ -467,10 +475,12 @@ class ParamikoPlatform(Platform):
             self._ftpChannel.chmod(remote_path, os.stat(local_path).st_mode)
             return True
         except IOError as e:
-            raise AutosubmitError(f'Can not send file {os.path.join(self.tmp_path, filename)} to '
-                                  f'{os.path.join(self.get_files_path(), filename)}', 6004, str(e))
+            raise AutosubmitError(f'Can not send file {local_path} to '
+                                  f'{remote_path}', 6004, str(e))
         except Exception as e:
             raise AutosubmitError(f'Failed to send file, the SSH connection may be inactive: {str(e)}', 6004)
+
+
 
     def get_list_of_files(self):
         return self._ftpChannel.get(self.get_files_path)
