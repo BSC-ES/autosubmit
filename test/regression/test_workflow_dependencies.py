@@ -101,7 +101,7 @@ def prepare_workflow_runs(current_tmpdir: Path) -> Path:
         if not experiment.is_file():
             experiment.joinpath("proj").mkdir(parents=True, exist_ok=True)
             experiment.joinpath("conf").mkdir(parents=True, exist_ok=True)
-            experiment.joinpath("pkl").mkdir(parents=True, exist_ok=True)
+            experiment.joinpath("db").mkdir(parents=True, exist_ok=True)
             experiment.joinpath("plot").mkdir(parents=True, exist_ok=True)
             experiment.joinpath("status").mkdir(parents=True, exist_ok=True)
             as_tmp = experiment.joinpath("tmp")

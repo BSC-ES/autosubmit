@@ -318,9 +318,9 @@ def test_autosubmit_pklfix_no_backup(autosubmit_exp, mocker, tmp_path):
 def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
     exp = autosubmit_exp(_EXPID)
 
-    pkl_path = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, exp.expid, 'pkl')
-    current = pkl_path / f'job_list_{exp.expid}.pkl'
-    backup = pkl_path / f'job_list_{exp.expid}_backup.pkl'
+    db_path = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, exp.expid, 'pkl')
+    current = db_path / f'job_list_{exp.expid}.pkl'
+    backup = db_path / f'job_list_{exp.expid}_backup.pkl'
 
     copy(current, backup)
 

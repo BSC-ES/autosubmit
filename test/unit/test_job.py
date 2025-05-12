@@ -37,7 +37,7 @@ from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
+from autosubmit.database.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.job.job_utils import get_job_package_code, SubJob, SubJobManager
 from autosubmit.platforms.platform import Platform

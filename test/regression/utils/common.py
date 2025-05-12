@@ -19,6 +19,7 @@ import os
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 
 def create_database(env):
@@ -47,5 +48,8 @@ def init_expid(env, platform="local", expid=None, create=True, test_type="normal
                                      git_repo="", git_branch="", git_as_conf="", operational=False, testcase=False,
                                      evaluation=True, use_local_minimal=False)
     if create:
+        as_conf = AutosubmitConfig(expid)
+        Autosubmit._check_folders(expid, as_conf)
         Autosubmit.create(expid, not plot, False, force=True, detail=True)
+
     return expid

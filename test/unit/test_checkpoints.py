@@ -24,7 +24,7 @@ import pytest
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistenceDb
+from autosubmit.database.job_list_persistence import JobListPersistenceDb
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
 _EXPID = 't000'
@@ -80,7 +80,7 @@ def _create_dummy_job_with_status(status, platform):
 
 def test_add_edge_job(setup_job_list):
     _, waiting_job, _ = setup_job_list
-    special_variables = {"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0}
+    special_variables = {"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": -1}
     for p in waiting_job.parents:
         waiting_job.add_edge_info(p, special_variables)
     for parent in waiting_job.parents:
@@ -90,7 +90,7 @@ def test_add_edge_job(setup_job_list):
 
 def test_add_edge_info_joblist(setup_job_list):
     job_list, waiting_job, jobs = setup_job_list
-    special_conditions = {"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0}
+    special_conditions = {"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": -1}
     job_list._add_edges_map_info(waiting_job, special_conditions["STATUS"])
     assert len(job_list.jobs_edges.get(Status.VALUE_TO_KEY[Status.COMPLETED], [])) == 1
     job_list._add_edges_map_info(jobs["waiting"][1], special_conditions["STATUS"])
@@ -109,7 +109,7 @@ def test_check_special_status(setup_job_list):
     # C can start when A is completed and B is running
     job_c.edge_info = {Status.VALUE_TO_KEY[Status.COMPLETED]: {job_a.name: (job_a, 0)},
                        Status.VALUE_TO_KEY[Status.RUNNING]: {job_b.name: (job_b, 0)}}
-    special_conditions = {"STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0}
+    special_conditions = {"STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": -1}
     # Test: { A: COMPLETED, B: RUNNING }
     job_list._add_edges_map_info(job_c, special_conditions["STATUS"])
     # This function should return the jobs that can start

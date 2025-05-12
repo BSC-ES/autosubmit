@@ -9,7 +9,7 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistenceDb
+from autosubmit.database.job_list_persistence import JobListPersistenceDb
 from autosubmit.job.job_utils import Dependency
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
@@ -695,7 +695,7 @@ def test_job_dict_get_jobs_filtered(mocker, joblist):
     as_conf.experiment_data = {
         'CONFIG': {'AUTOSUBMIT_VERSION': '4.1.2', 'MAXWAITINGJOBS': 20, 'TOTALJOBS': 20, 'SAFETYSLEEPTIME': 10,
                    'RETRIALS': 0}, 'MAIL': {'NOTIFICATIONS': False, 'TO': None},
-        'STORAGE': {'TYPE': 'pkl', 'COPY_REMOTE_LOGS': True},
+        'STORAGE': {'TYPE': 'db', 'COPY_REMOTE_LOGS': True},
         'DEFAULT': {'EXPID': 'a03b', 'HPCARCH': 'marenostrum4'},
         'EXPERIMENT': {'DATELIST': '20000101', 'MEMBERS': 'fc0', 'CHUNKSIZEUNIT': 'month', 'CHUNKSIZE': 4,
                        'NUMCHUNKS': 5, 'CHUNKINI': '', 'CALENDAR': 'standard'},
