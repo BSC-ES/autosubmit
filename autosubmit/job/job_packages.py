@@ -48,6 +48,7 @@ def threaded(fn):
         thread.name = "data_processing"
         thread.start()
         return thread
+
     return wrapper
 
 

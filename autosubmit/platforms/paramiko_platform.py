@@ -457,6 +457,14 @@ class ParamikoPlatform(Platform):
         return ""
 
     def send_file(self, filename, check=True) -> bool:
+        """
+        Sends a local file to the platform
+        :param check:
+        :param filename: name of the file to send
+        :type filename: str
+        """
+        local_path = None
+        remote_path = None
         if check:
             self.check_remote_log_dir()
             self.delete_file(filename)
@@ -468,8 +476,8 @@ class ParamikoPlatform(Platform):
             self._ftpChannel.chmod(remote_path, os.stat(local_path).st_mode)
             return True
         except IOError as e:
-            raise AutosubmitError(f'Can not send file {os.path.join(self.tmp_path, filename)} to '
-                                  f'{os.path.join(self.get_files_path(), filename)}', 6004, str(e))
+            raise AutosubmitError(f'Can not send file {local_path} to '
+                                  f'{remote_path}', 6004, str(e))
         except Exception as e:
             raise AutosubmitError(f'Failed to send file, the SSH connection may be inactive: {str(e)}', 6004)
 
@@ -681,6 +689,21 @@ class ParamikoPlatform(Platform):
                 except Exception as e:
                     Log.debug(f"Error cancelling job {job.id}: {str(e)}")
         return job_status
+
+    def get_completed_job_names(self) -> List[str]:
+        """
+        Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
+
+        :return: List of job names with COMPLETED files
+        :rtype: List[str]
+        """
+        # TODO: After log compression from @luiggi, this method should be updated to handle compressed files.
+        cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_COMPLETED' -type f"
+        self.send_command(cmd)
+        output = self.get_ssh_output()
+        completed_files = output.strip().split('\n') if output else []
+        job_names = [Path(file).name.replace('_COMPLETED', '') for file in completed_files]
+        return job_names
 
     def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
         """
