@@ -807,6 +807,30 @@ class Autosubmit:
             return Autosubmit.cat_log(args.ID, args.file, args.mode, args.inspect)
         elif args.command == 'stop':
             return Autosubmit.stop(args.expid, args.force, args.all, args.force_all, args.cancel, args.filter_status, args.target)
+
+    @staticmethod
+    def _check_folders(expid, as_conf):
+        exp_folder = as_conf.experiment_data.get("ROOTDIR", None)
+        if exp_folder and Path(exp_folder).exists():
+            # Create directories
+            exp_folder_path = Path(exp_folder)
+            (exp_folder_path / "conf").mkdir(parents=True, exist_ok=True)
+            (exp_folder_path / "db").mkdir(parents=True, exist_ok=True)
+            (exp_folder_path / "tmp" / "ASLOGS").mkdir(parents=True, exist_ok=True)
+            (exp_folder_path / "tmp" / f"LOG_{expid}").mkdir(parents=True, exist_ok=True)
+            (exp_folder_path / "plot").mkdir(parents=True, exist_ok=True)
+            (exp_folder_path / "status").mkdir(parents=True, exist_ok=True)
+
+            # Set permissions
+            exp_folder_path.chmod(0o755)
+            (exp_folder_path / "conf").chmod(0o755)
+            (exp_folder_path / "db").chmod(0o755)
+            (exp_folder_path / "tmp").chmod(0o755)
+            (exp_folder_path / "tmp" / "ASLOGS").chmod(0o755)
+            (exp_folder_path / "tmp" / f"LOG_{expid}").chmod(0o755)
+            (exp_folder_path / "plot").chmod(0o775)
+            (exp_folder_path / "status").chmod(0o775)
+
     @staticmethod
     def _init_logs(args, console_level='INFO', log_level='DEBUG', expid='None'):
         Log.set_console_level(console_level)
@@ -990,8 +1014,11 @@ class Autosubmit:
             Log.info("Locale C.utf8 is not found, using 'C' as fallback")
             locale.setlocale(locale.LC_ALL, 'C')
 
+        if owner:
+            Autosubmit._check_folders(expid, as_conf)
         Log.info(
             "Autosubmit is running with {0}", Autosubmit.autosubmit_version)
+
 
     @staticmethod
     def _check_ownership_and_set_last_command(as_conf, expid, command):
