@@ -30,7 +30,7 @@ from functools import reduce
 from pathlib import Path
 from threading import Thread
 from time import sleep
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple, TYPE_CHECKING
 
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
@@ -45,6 +45,9 @@ from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import Log, AutosubmitCritical
+
+if TYPE_CHECKING:
+    from autosubmit.platforms.platform import Platform
 
 Log.get_logger("Autosubmit")
 
@@ -839,7 +842,7 @@ class Job(object):
         return not self.nodes and (not self.processors or str(self.processors) == '1')
 
     @property
-    def platform(self) -> Platform:
+    def platform(self) -> "Platform":
         """
         Returns the platform to be used by the job. Chooses between serial and parallel platforms
 
@@ -2769,7 +2772,7 @@ class WrapperJob(Job):
         job_list: List[Job],
         total_wallclock: str,
         num_processors: int,
-        platform: Platform,
+        platform: "Platform",
         as_config: AutosubmitConfig,
         hold: bool,
     ):
