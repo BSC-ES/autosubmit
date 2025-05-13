@@ -1592,12 +1592,6 @@ class Job(object):
         # Construct the metric folder path by adding the job name
         metric_folder = base_path.joinpath(self.name)
 
-        # Try to create the metric folder
-        try:
-            metric_folder.mkdir(parents=True, exist_ok=True)
-        except Exception as exc:
-            Log.warning(f"Failed to create metric folder {metric_folder}: {exc}")
-
         return str(metric_folder)
 
     def update_current_parameters(self, as_conf: AutosubmitConfig, parameters: dict) -> dict:

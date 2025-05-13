@@ -1,5 +1,7 @@
 from typing import Any
 import pytest
+from pathlib import Path
+from autosubmit.job.job import Job
 from autosubmit.job.metrics_processor import (
     MAX_FILE_SIZE_MB,
     MetricSpecSelector,
@@ -8,6 +10,8 @@ from autosubmit.job.metrics_processor import (
     UserMetricProcessor,
 )
 from unittest.mock import MagicMock, patch
+
+from autosubmit.platforms.locplatform import LocalPlatform
 
 
 @pytest.fixture
@@ -249,3 +253,57 @@ def test_process_metrics(disable_metric_repository):
             )
             assert mock_store_metric.call_args_list[1][0][0] == "metric2"
             assert mock_store_metric.call_args_list[1][0][1] == "value2"
+
+
+def test_get_current_metric_folder(autosubmit_config):
+    JOB_NAME = "t123"
+    as_conf = autosubmit_config(
+        JOB_NAME,
+        {
+            "CONFIG": {
+                "METRIC_FOLDER": "/foo/bar",
+            },
+            "JOBS": {
+                "DUMMY_SECTION": {},
+            },
+        },
+    )
+
+    job = Job(JOB_NAME, "1", 0, 1)
+    job.section = "DUMMY_SECTION"
+
+    parameters = job.update_parameters(as_conf)
+
+    assert parameters["CURRENT_METRIC_FOLDER"] == str(
+        Path("/foo/bar").joinpath(JOB_NAME)
+    )
+
+
+def test_get_current_metric_folder_placeholder(autosubmit_config, local: LocalPlatform):
+    JOB_NAME = "t123"
+    as_conf = autosubmit_config(
+        JOB_NAME,
+        {
+            "CONFIG": {
+                "METRIC_FOLDER": "%CURRENT_ROOTDIR%/my_metrics_folder",
+            },
+            "JOBS": {
+                "DUMMY_SECTION": {},
+            },
+        },
+    )
+
+    job = Job(JOB_NAME, "1", 0, 1)
+    job.section = "DUMMY_SECTION"
+    job.platform = local
+
+    parameters = job.update_parameters(as_conf)
+
+    assert (
+        isinstance(parameters["CURRENT_ROOTDIR"], str)
+        and len(parameters["CURRENT_ROOTDIR"]) > 0
+    )
+
+    assert parameters["CURRENT_METRIC_FOLDER"] == str(
+        Path(parameters["CURRENT_ROOTDIR"]).joinpath("my_metrics_folder", JOB_NAME)
+    )

@@ -195,11 +195,9 @@ class UserMetricProcessor:
         """
         Get the path to the metric file
         """
-        return str(
-            Path(self.job.get_metric_folder(self.as_conf)).joinpath(
-                metric_spec.filename
-            )
-        )
+        parameters = self.job.update_parameters(self.as_conf)
+        metric_folder = parameters.get("CURRENT_METRIC_FOLDER")
+        return str(Path(metric_folder).joinpath(metric_spec.filename))
 
     def process_metrics(self):
         """
