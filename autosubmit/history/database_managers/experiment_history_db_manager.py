@@ -17,24 +17,27 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import os
 import textwrap
-
-import autosubmit.history.utils as HUtils
-from autosubmit.history.database_managers import database_models as Models
-from autosubmit.history.data_classes.job_data import JobData
-from autosubmit.history.data_classes.experiment_run import ExperimentRun
-from autosubmit.history.database_managers.database_manager import (
-    DatabaseManager,
-    DEFAULT_JOBDATA_DIR,
-)
-
+from pathlib import Path
 from typing import Any, Optional, Protocol, cast
+
+from autosubmitconfigparser.config.basicconfig import BasicConfig
 from sqlalchemy import Engine, and_, delete, func, inspect, desc, insert, select, update
 from sqlalchemy.schema import CreateTable, CreateSchema
+
+import autosubmit.history.utils as HUtils
 from autosubmit.database import session
+from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.tables import (
     ExperimentRunTable,
     JobDataTable,
     get_table_with_schema,
+)
+from autosubmit.history.data_classes.experiment_run import ExperimentRun
+from autosubmit.history.data_classes.job_data import JobData
+from autosubmit.history.database_managers import database_models as Models
+from autosubmit.history.database_managers.database_manager import (
+    DatabaseManager,
+    DEFAULT_JOBDATA_DIR,
 )
 
 CURRENT_DB_VERSION = 19  # Update this if you change the database schema
@@ -528,7 +531,8 @@ class SqlAlchemyExperimentHistoryDbManager:
     """
 
     def __init__(self, schema: Optional[str]):
-        self.engine: Engine = session.create_engine()
+        connection_url = get_connection_url(Path(BasicConfig.DATABASE_CONN_URL))
+        self.engine = session.create_engine(connection_url=connection_url)
         self.schema = schema
 
     def initialize(self):
@@ -537,7 +541,8 @@ class SqlAlchemyExperimentHistoryDbManager:
 
     def my_database_exists(self):
         """Return ``True`` if the schema and tables exist in the database. ``False`` otherwise."""
-        engine = session.create_engine()
+        connection_url = get_connection_url(Path(BasicConfig.DATABASE_CONN_URL))
+        engine = session.create_engine(connection_url=connection_url)
         inspector = inspect(engine)
         return (
                 (self.schema in inspector.get_schema_names())

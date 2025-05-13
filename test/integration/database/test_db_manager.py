@@ -17,10 +17,13 @@
 
 """Integration tests for Autosubmit ``DbManager``."""
 
-import pytest
-from typing import cast, TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING
 
-from autosubmit.database.db_manager import DatabaseManager, DbManager, SqlAlchemyDbManager
+import pytest
+
+from autosubmit.database.db_common import get_connection_url
+from autosubmit.database.db_manager import DbManager
 from autosubmit.database.tables import DBVersionTable
 
 if TYPE_CHECKING:
@@ -28,19 +31,14 @@ if TYPE_CHECKING:
     from _pytest._py.path import LocalPath
 
 
-def _create_db_manager(root_path: "LocalPath", engine: str) -> DatabaseManager:
-    if engine == 'sqlite':
-        return cast(DatabaseManager, DbManager(str(root_path), 'test-db', 1))
-    return cast(DatabaseManager, SqlAlchemyDbManager(schema=''))
+def _create_db_manager(db_path: Path):
+    connection_url = get_connection_url(db_path=db_path)
+    return DbManager(connection_url=connection_url)
 
 
 def test_db_manager_has_made_correct_initialization(tmp_path: "LocalPath", as_db_sqlite) -> None:
-    # TODO: Only SQLite has ``db_name`` and ``db_version``, is that correct?
-    db_manager = cast(DbManager, _create_db_manager(tmp_path, 'sqlite'))
-    name = db_manager.select_first_where('db_options', ['option_name="name"'])[1]
-    version = db_manager.select_first_where('db_options', ['option_name="version"'])[1]
-    assert db_manager.db_name == name
-    assert db_manager.db_version == int(version)
+    db_manager = _create_db_manager(Path(tmp_path, f'{__name__}.db'))
+    assert db_manager.engine.name.startswith('sqlite')
 
 
 @pytest.mark.parametrize(
@@ -54,8 +52,8 @@ def test_db_manager_has_made_correct_initialization(tmp_path: "LocalPath", as_db
 )
 def test_after_create_table_command_then_it_returns_0_rows(tmp_path: "LocalPath", db_engine: str, request):
     request.getfixturevalue(f"as_db_{db_engine}")
-    db_manager = _create_db_manager(tmp_path, db_engine)
-    db_manager.create_table(DBVersionTable.name, ['version'])
+    db_manager = _create_db_manager(Path(tmp_path, f'{__name__}.db'))
+    db_manager.create_table(DBVersionTable.name)
     count = db_manager.count(DBVersionTable.name)
     assert 0 == count
 
@@ -69,13 +67,11 @@ def test_after_create_table_command_then_it_returns_0_rows(tmp_path: "LocalPath"
         pytest.param("sqlite")
     ],
 )
-def test_after_3_inserts_into_a_table_then_it_has_3_rows(
-        tmp_path: "LocalPath", db_engine: str, request):
+def test_after_3_inserts_into_a_table_then_it_has_3_rows(tmp_path: "LocalPath", db_engine: str, request):
     request.getfixturevalue(f"as_db_{db_engine}")
-    db_manager = _create_db_manager(tmp_path, db_engine)
-    columns = ['version']
-    db_manager.create_table(DBVersionTable.name, columns)
+    db_manager = _create_db_manager(Path(tmp_path, f'{__name__}.db'))
+    db_manager.create_table(DBVersionTable.name)
     for i in range(3):
-        db_manager.insert(DBVersionTable.name, columns, [str(i)])
+        db_manager.insert(DBVersionTable.name, {'version': str(i)})
     count = db_manager.count(DBVersionTable.name)
     assert 3 == count

@@ -1,35 +1,35 @@
-#!/usr/bin/env python3
-
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
 import textwrap
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-import autosubmit.history.utils as HUtils
-from autosubmit.history.database_managers.database_manager import DatabaseManager, DEFAULT_LOCAL_ROOT_DIR
-from autosubmit.history.database_managers import database_models as Models
-
+from pathlib import Path
 from typing import Optional, Protocol, cast
-from sqlalchemy import Engine, delete, insert, select, update
-from sqlalchemy.schema import CreateTable
-from autosubmit.database import session
-from autosubmit.database.tables import ExperimentStatusTable, ExperimentTable
 
+from autosubmitconfigparser.config.basicconfig import BasicConfig
+from sqlalchemy import delete, insert, select, update
+from sqlalchemy.schema import CreateTable
+
+import autosubmit.history.utils as HUtils
+from autosubmit.database import session
+from autosubmit.database.db_common import get_connection_url
+from autosubmit.database.tables import ExperimentStatusTable, ExperimentTable
+from autosubmit.history.database_managers import database_models as Models
+from autosubmit.history.database_managers.database_manager import DatabaseManager, DEFAULT_LOCAL_ROOT_DIR
 
 # FIXME: Why re-load the configuration globally here? Callers of this
 #        module are probably responsible for doing that; i.e. not this
@@ -186,7 +186,8 @@ class SqlAlchemyExperimentStatusDbManager:
     """
 
     def __init__(self) -> None:
-        self.engine: Engine = session.create_engine()
+        connection_url = get_connection_url(Path(BasicConfig.DATABASE_CONN_URL))
+        self.engine = session.create_engine(connection_url=connection_url)
         with self.engine.connect() as conn:
             conn.execute(CreateTable(ExperimentStatusTable, if_not_exists=True))
             conn.commit()

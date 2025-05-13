@@ -56,6 +56,7 @@ ExperimentStructureTable = Table(
     metadata_obj,
     Column("e_from", Text, nullable=False, primary_key=True),
     Column("e_to", Text, nullable=False, primary_key=True),
+    UniqueConstraint("e_from", "e_to", name="unique_e_from_and_e_to"),
 )
 """Table that holds the structure of the experiment jobs."""
 
@@ -74,8 +75,9 @@ JobPackageTable = Table(
     "job_package",
     metadata_obj,
     Column("exp_id", Text),
-    Column("package_name", Text, primary_key=True),
-    Column("job_name", Text, primary_key=True),
+    Column("package_name", Text),
+    Column("job_name", Text),
+    Column("wallclock", Text)
 )
 """Stores a mapping between the wrapper name and the actual job in SLURM."""
 
@@ -83,8 +85,9 @@ WrapperJobPackageTable = Table(
     "wrapper_job_package",
     metadata_obj,
     Column("exp_id", Text),
-    Column("package_name", Text, primary_key=True),
-    Column("job_name", Text, primary_key=True),
+    Column("package_name", Text),
+    Column("job_name", Text),
+    Column("wallclock", Text)
 )
 """It is a replication.
 It is only created/used when using inspect and create or monitor

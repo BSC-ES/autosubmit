@@ -54,8 +54,8 @@ import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 import autosubmit.history.utils as HUtils
 import autosubmit.statistics.utils as StatisticsUtils
 from autosubmit.database.db_common import (
-    create_db, delete_experiment, get_experiment_descrip, get_autosubmit_version, check_experiment_exists,
-    update_experiment_descrip_version
+    create_db, delete_experiment, get_experiment_description, get_autosubmit_version, check_experiment_exists,
+    update_experiment_description_version
 )
 from autosubmit.database.db_structure import get_structure
 from autosubmit.experiment.detail_updater import ExperimentDetails
@@ -945,7 +945,7 @@ class Autosubmit:
                                 "The {2} experiment {0} version is being updated to {1} for match autosubmit version",
                                 as_conf.get_version(), Autosubmit.autosubmit_version, expid)
                             as_conf.set_version(Autosubmit.autosubmit_version)
-                            update_experiment_descrip_version(expid, version=Autosubmit.autosubmit_version)
+                            update_experiment_description_version(expid, version=Autosubmit.autosubmit_version)
 
                     else:
                         if as_conf.get_version() is not None and as_conf.get_version() != Autosubmit.autosubmit_version:
@@ -2872,7 +2872,7 @@ class Autosubmit:
                                                                                                    job_list.get_job_list()])
             queue_time_fixes = {}
             if job_to_package:
-                current_table_structure = get_structure(expid, BasicConfig.STRUCTURES_DIR)
+                current_table_structure = get_structure(expid, Path(BasicConfig.STRUCTURES_DIR))
                 subjobs = []
                 for job in job_list.get_job_list():
                     job_info = JobList.retrieve_times(job.status, job.name, job._tmp_path, make_exception=True,
@@ -3426,7 +3426,7 @@ class Autosubmit:
                 if len(submitter.platforms) == 0:
                     return False
                 hpc = as_conf.get_platform()
-                description = get_experiment_descrip(experiment_id)
+                description = get_experiment_description(experiment_id)
                 Log.result("Describing {0}", experiment_id)
 
                 Log.result("Owner: {0}", user)
@@ -3872,7 +3872,7 @@ class Autosubmit:
         Log.info("Changing {0} experiment version from {1} to  {2}",
                  expid, as_conf.get_version(), Autosubmit.autosubmit_version)
         as_conf.set_version(Autosubmit.autosubmit_version)
-        update_experiment_descrip_version(expid, version=Autosubmit.autosubmit_version)
+        update_experiment_description_version(expid, version=Autosubmit.autosubmit_version)
 
         return True
 
@@ -3882,7 +3882,7 @@ class Autosubmit:
         check_experiment_exists(expid)
         Log.info("Experiment found.")
         Log.info(f"Setting {expid} description to '{new_description}'")
-        result = update_experiment_descrip_version(
+        result = update_experiment_description_version(
             expid, description=new_description)
         if result:
             Log.info("Update completed successfully.")
@@ -4036,7 +4036,7 @@ class Autosubmit:
         Log.info(f"Changing {expid} experiment version from {as_conf.get_version()} to "
                  f"{Autosubmit.autosubmit_version}")
         as_conf.set_version(Autosubmit.autosubmit_version)
-        update_experiment_descrip_version(expid, version=Autosubmit.autosubmit_version)
+        update_experiment_description_version(expid, version=Autosubmit.autosubmit_version)
 
     @staticmethod
     def pkl_fix(expid):

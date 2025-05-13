@@ -49,13 +49,13 @@ def test_db_structure(
     expid = "ut01"
 
     # Table does not exist
-    assert db_structure.get_structure(expid, str(tmp_path)) == {}
+    assert db_structure.get_structure(expid, tmp_path) == {}
 
     # Save table
-    db_structure.save_structure(graph, expid, str(tmp_path))
+    db_structure.save_structure(graph, expid, tmp_path)
 
     # Get correct data
-    structure_data = db_structure.get_structure(expid, str(tmp_path))
+    structure_data = db_structure.get_structure(expid, tmp_path)
     assert sorted(structure_data) == sorted({
         "a": ["b", "d"],
         "b": ["c"],
@@ -94,10 +94,10 @@ def test_db_structure_db_already_exists(
     expid = "ut01"
 
     # Save table
-    db_structure.save_structure(graph, expid, str(tmp_path))
+    db_structure.save_structure(graph, expid, tmp_path)
 
     # Table not exists
-    structure_data = db_structure.get_structure(expid, str(tmp_path))
+    structure_data = db_structure.get_structure(expid, tmp_path)
     assert sorted(structure_data) == sorted({
         "a": ["b", "d"],
         "b": ["c"],

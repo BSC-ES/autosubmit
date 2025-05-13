@@ -1,41 +1,41 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""
-Module containing functions to manage autosubmit's database.
-"""
+"""Module containing functions to manage autosubmit's database."""
+
+import multiprocessing
 import os
 import sqlite3
-import multiprocessing
-from log.log import Log, AutosubmitCritical
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from pathlib import Path
+from typing import List, Optional, cast
 
-from autosubmit.database import tables, session
+from autosubmitconfigparser.config.basicconfig import BasicConfig
 from sqlalchemy import delete, select, Connection, insert, text, update, func
 from sqlalchemy.schema import CreateTable
-from typing import List, Optional, cast
+
+from autosubmit.database import tables, session
+from log.log import Log, AutosubmitCritical
 
 Log.get_logger("Autosubmit")
 
 
 CURRENT_DATABASE_VERSION = 1
 TIMEOUT = 15
+
 
 def create_db(qry):
     """
@@ -92,16 +92,14 @@ def open_conn(check_version=True):
     # Getting database version
     if check_version:
         try:
-            cursor.execute('SELECT version '
-                           'FROM db_version;')
+            cursor.execute('SELECT version FROM db_version;')
             row = cursor.fetchone()
             version = row[0]
         except sqlite3.OperationalError:
             # If this exception is thrown it's because db_version does not exist.
             # Database is from 2.x or 3.0 beta releases
             try:
-                cursor.execute('SELECT type '
-                               'FROM experiment;')
+                cursor.execute('SELECT type FROM experiment;')
                 # If type field exists, it's from 2.x
                 version = -1
             except sqlite3.Error:
@@ -135,11 +133,13 @@ def close_conn(conn, cursor):
     conn.close()
     return
 
+
 def fn_wrapper(database_fn, queue, *args):
     # TODO: We can also implement the anti-lock mechanism as function decorators in a next iteration.
     result = database_fn(*args)
     queue.put(result)
     queue.close()
+
 
 def save_experiment(name, description, version):
     """
@@ -169,6 +169,7 @@ def save_experiment(name, description, version):
         proc.terminate()
     return result
 
+
 def check_experiment_exists(name, error_on_inexistence=True):
     """ 
     Checks if exist an experiment with the given name. Anti-lock version.  
@@ -197,7 +198,8 @@ def check_experiment_exists(name, error_on_inexistence=True):
         proc.terminate()
     return result
 
-def update_experiment_descrip_version(name, description=None, version=None):
+
+def update_experiment_description_version(name, description=None, version=None):
     """
     Updates the experiment's description and/or version. Anti-lock version.  
 
@@ -210,9 +212,9 @@ def update_experiment_descrip_version(name, description=None, version=None):
     :return: If description has been update, True; otherwise, False.  
     :rtype: bool
     """
-    fn = _update_experiment_descrip_version
+    fn = _update_experiment_description_version
     if BasicConfig.DATABASE_BACKEND == 'postgres':
-        fn = _update_experiment_descrip_version_sqlalchemy
+        fn = update_experiment_description_version_sqlalchemy
 
     queue = multiprocessing.Queue(1)
     proc = multiprocessing.Process(target=fn_wrapper, args=(fn, queue, name, description, version))
@@ -226,6 +228,7 @@ def update_experiment_descrip_version(name, description=None, version=None):
     finally:
         proc.terminate()
     return result
+
 
 def get_autosubmit_version(expid):
     """
@@ -253,6 +256,7 @@ def get_autosubmit_version(expid):
         proc.terminate()
     return result
 
+
 def last_name_used(test=False, operational=False, evaluation=False):
     """
     Gets last experiment identifier used. Anti-lock version.  
@@ -271,7 +275,7 @@ def last_name_used(test=False, operational=False, evaluation=False):
         fn = _last_name_used_sqlalchemy
 
     queue = multiprocessing.Queue(1)
-    proc = multiprocessing.Process(target=fn_wrapper, args=(fn, queue, test, operational))
+    proc = multiprocessing.Process(target=fn_wrapper, args=(fn, queue, test, operational, evaluation))
     proc.start()
 
     try:
@@ -282,6 +286,7 @@ def last_name_used(test=False, operational=False, evaluation=False):
     finally:
         proc.terminate()
     return result
+
 
 def delete_experiment(experiment_id):
     """
@@ -308,6 +313,7 @@ def delete_experiment(experiment_id):
     finally:
         proc.terminate()
     return result
+
 
 def get_experiment_id(name: str) -> int:
     """
@@ -337,6 +343,7 @@ def get_experiment_id(name: str) -> int:
     finally:
         proc.terminate()
     return result
+
 
 def _save_experiment(name, description, version):
     """
@@ -405,15 +412,16 @@ def _check_experiment_exists(name, error_on_inexistence=True):
         if os.path.exists(os.path.join(BasicConfig.LOCAL_ROOT_DIR, name)):
             try:
                 _save_experiment(name, 'No description', "3.14.0")
-            except  BaseException:
+            except BaseException:
                 pass
             return True
         return False
     return True
 
-def get_experiment_descrip(expid):
+
+def get_experiment_description(expid):
     if BasicConfig.DATABASE_BACKEND == 'postgres':
-        return get_experiment_descrip_sqlalchemy(expid)
+        return get_experiment_description_sqlalchemy(expid)
     
     if not check_db():
         return False
@@ -431,7 +439,7 @@ def get_experiment_descrip(expid):
     return [row for row in cursor]
 
 
-def _update_experiment_descrip_version(name, description=None, version=None):
+def _update_experiment_description_version(name, description=None, version=None):
     """
     Updates the experiment's description and/or version
 
@@ -587,7 +595,7 @@ def _delete_experiment(experiment_id):
     """
     if not check_db():
         return False
-    if not _check_experiment_exists(experiment_id, False): # Reference the no anti-lock version.
+    if not _check_experiment_exists(experiment_id, False):  # Reference the no anti-lock version.
         return True
     try:
         (conn, cursor) = open_conn()
@@ -634,6 +642,7 @@ def _update_database(version, cursor):
     Log.info("Update completed")
     return True
 
+
 def _get_experiment_id(name: str) -> int:
     """
     Gets the experiment id from the database
@@ -661,6 +670,7 @@ def _get_experiment_id(name: str) -> int:
         )
     return row[0]
 
+
 class DbException(Exception):
     """
     Exception class for database errors
@@ -681,7 +691,7 @@ def _get_sqlalchemy_conn() -> Connection:
     intact.
     """
     try:
-        return session.create_engine().connect()
+        return session.create_engine(BasicConfig.DATABASE_CONN_URL).connect()
     except Exception as e:
         raise AutosubmitCritical(
             "Could not establish a connection to database", 7001, str(e)
@@ -740,7 +750,7 @@ def _check_experiment_exists_sqlalchemy(name: str, error_on_inexistence=True) ->
     with _get_sqlalchemy_conn() as conn:
         try:
             query = select(tables.ExperimentTable).where(
-                tables.ExperimentTable.c.name == name
+                tables.ExperimentTable.c.name == name  # type: ignore
             )
             row = conn.execute(query).one_or_none()
         except AutosubmitCritical:
@@ -765,10 +775,10 @@ def _check_experiment_exists_sqlalchemy(name: str, error_on_inexistence=True) ->
     return True
 
 
-def get_experiment_descrip_sqlalchemy(expid) -> List[List[str]]:
+def get_experiment_description_sqlalchemy(expid) -> List[List[str]]:
     with _get_sqlalchemy_conn() as conn:
         query = select(tables.ExperimentTable).where(
-            tables.ExperimentTable.c.name == expid
+            tables.ExperimentTable.c.name == expid  # type: ignore
         )
         row = conn.execute(query).one_or_none()
 
@@ -777,14 +787,14 @@ def get_experiment_descrip_sqlalchemy(expid) -> List[List[str]]:
     return []
 
 
-def _update_experiment_descrip_version_sqlalchemy(
+def update_experiment_description_version_sqlalchemy(
     name: str, description: Optional[str] = None, version: Optional[str] = None
 ) -> bool:
     # Conditional update statement
     if description is None and version is None:
         raise AutosubmitCritical("Not enough data to update {}.".format(name), 7005)
 
-    query = update(tables.ExperimentTable).where(tables.ExperimentTable.c.name == name)
+    query = update(tables.ExperimentTable).where(tables.ExperimentTable.c.name == name)  # type: ignore
     vals = {}
     if isinstance(description, str):
         vals["description"] = description
@@ -804,7 +814,7 @@ def _update_experiment_descrip_version_sqlalchemy(
 def _get_autosubmit_version_sqlalchemy(expid) -> str:
     with _get_sqlalchemy_conn() as conn:
         query = select(tables.ExperimentTable).where(
-            tables.ExperimentTable.c.name == expid
+            tables.ExperimentTable.c.name == expid  # type: ignore
         )
         row = conn.execute(query).one_or_none()
 
@@ -815,11 +825,13 @@ def _get_autosubmit_version_sqlalchemy(expid) -> str:
     return row.autosubmit_version
 
 
-def _last_name_used_sqlalchemy(test=False, operational=False) -> str:
+def _last_name_used_sqlalchemy(test=False, operational=False, evaluation=False) -> str:
     if test:
         condition = tables.ExperimentTable.c.name.like("t%")
     elif operational:
         condition = tables.ExperimentTable.c.name.like("o%")
+    elif evaluation:
+        condition = tables.ExperimentTable.c.name.like("e%")
     else:
         condition = tables.ExperimentTable.c.name.not_like(
             "t%"
@@ -835,7 +847,7 @@ def _last_name_used_sqlalchemy(test=False, operational=False) -> str:
         .scalar_subquery()
     )
     query = select(tables.ExperimentTable.c.name).where(
-        tables.ExperimentTable.c.id == sub_query
+        tables.ExperimentTable.c.id == sub_query  # type: ignore
     )
 
     with _get_sqlalchemy_conn() as conn:
@@ -863,7 +875,7 @@ def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:
     with _get_sqlalchemy_conn() as conn:
         # Delete from experiment table
         query = delete(tables.ExperimentTable).where(
-            tables.ExperimentTable.c.name == experiment_id
+            tables.ExperimentTable.c.name == experiment_id  # type: ignore
         )
         result = conn.execute(query)
         conn.commit()
@@ -875,7 +887,7 @@ def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:
         # Delete from experiment_status table
         try:
             query = delete(tables.ExperimentStatusTable).where(
-                tables.ExperimentStatusTable.c.name == experiment_id
+                tables.ExperimentStatusTable.c.name == experiment_id  # type: ignore
             )
             conn.execute(query)
             conn.commit()
@@ -889,7 +901,7 @@ def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:
 
 def _get_experiment_id_sqlalchemy(name: str) -> int:
     query = select(tables.ExperimentTable.c.name).where(
-        tables.ExperimentTable.c.name == name
+        tables.ExperimentTable.c.name == name  # type: ignore
     )
 
     with _get_sqlalchemy_conn() as conn:
@@ -899,3 +911,14 @@ def _get_experiment_id_sqlalchemy(name: str) -> int:
         raise AutosubmitCritical(f'The experiment "{name}" does not exist', 7005)
 
     return row[0]
+
+
+def get_connection_url(db_path: Optional['Path'] = None) -> str:
+    """Return a SQLAlchemy connection URL."""
+    if BasicConfig.DATABASE_BACKEND == "postgres":
+        return BasicConfig.DATABASE_CONN_URL
+
+    if not db_path:
+        raise ValueError('For SQLite databases you MUST provide a database file.')
+
+    return f'sqlite:///{str(Path(db_path).resolve())}'

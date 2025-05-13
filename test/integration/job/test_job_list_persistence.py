@@ -40,7 +40,7 @@ def test_job_list_persistence(db_engine: str, autosubmit_exp, request):
     # Dynamically load the fixture for that DB,
     # ref: https://stackoverflow.com/a/64348247.
     request.getfixturevalue(f"as_db_{db_engine}")
-    experiment_data = {
+    experiment_data: dict = {
         'JOBS': {
             'A': {
                 'RUNNING': 'once',

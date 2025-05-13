@@ -404,7 +404,7 @@ def test_generate_output(
             monitor.generate_output(
                 expid=_EXPID,
                 joblist=job_list.get_job_list(),
-                path=exp_path / f'tmp/LOG_{_EXPID}',
+                path=str(exp_path / f'tmp/LOG_{_EXPID}'),
                 output_format=output_format,
                 show=show,
                 groups=None,
@@ -418,7 +418,7 @@ def test_generate_output(
         monitor.generate_output(
             expid=_EXPID,
             joblist=job_list.get_job_list(),
-            path=exp_path / f'tmp/LOG_{_EXPID}',
+            path=str(exp_path / f'tmp/LOG_{_EXPID}'),
             output_format=output_format,
             show=show,
             groups=None,

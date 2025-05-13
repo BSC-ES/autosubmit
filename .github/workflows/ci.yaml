@@ -48,9 +48,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          # See: https://github.com/actions/setup-python#caching-packages-dependencies
+          cache: 'pip' # caching pip dependencies
 
-      - name: Install system dependencies
-        run: sudo apt-get install -y graphviz rsync curl
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: curl graphviz rsync
+          # Change version when the packages change
+          version: 'unit-test-deps-1.1'
 
       - name: Install dependencies
         run: |
@@ -83,7 +88,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
-        pytest-markers: ["", "postgres"]
+        pytest-markers: ["not postgres", "postgres"]
 
     steps:
       - name: Checkout code
@@ -93,9 +98,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          # See: https://github.com/actions/setup-python#caching-packages-dependencies
+          cache: 'pip' # caching pip dependencies
 
-      - name: Install system dependencies
-        run: sudo apt-get install -y curl git graphviz rsync
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: curl git graphviz rsync
+          # Change version when the packages change
+          version: 'integration-test-deps-1.1'
 
       - name: Install dependencies
         run: |

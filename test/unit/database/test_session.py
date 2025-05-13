@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
+from typing import Union
 
 import pytest
 
@@ -23,18 +23,17 @@ from autosubmit.database.session import create_engine
 
 
 @pytest.mark.parametrize(
-    'backend,url,expected_name',
+    'url,expected',
     [
-        ('postgres', 'postgresql://user:pass@host:1984/db', 'postgresql'),
-        ('sqlite', 'sqlite://', 'sqlite'),
-        (None, 'sqlite://', 'sqlite')
+        ('postgresql://user:pass@host:1984/db', 'postgresql'),
+        ('sqlite://', 'sqlite'),
+        (None, ValueError)
     ]
 )
-def test_create_engine(backend: Optional[str], url: str, expected_name: str, mocker):
-    mocked_basic_config = mocker.patch('autosubmit.database.session.BasicConfig')
-    mocked_basic_config.DATABASE_BACKEND = backend
-    mocked_basic_config.DATABASE_CONN_URL = url
-
-    engine = create_engine()
-
-    assert engine.name == expected_name
+def test_create_engine(url: str, expected: Union[str, Exception]):
+    if type(expected) is not str:
+        with pytest.raises(expected):  # type: ignore
+            create_engine(connection_url=url)
+    else:
+        engine = create_engine(connection_url=url)
+        assert engine.name == expected

@@ -94,26 +94,26 @@ def test_db_common(db_engine: str, request):
         == new_exp["autosubmit_version"]
     )
     new_version = "v4.1.0"
-    db_common.update_experiment_descrip_version(new_exp["name"], version=new_version)
+    db_common.update_experiment_description_version(new_exp["name"], version=new_version)
     assert db_common.get_autosubmit_version(new_exp["name"]) == new_version
 
     # Update description
     assert (
-        db_common.get_experiment_descrip(new_exp["name"])[0][0]
+        db_common.get_experiment_description(new_exp["name"])[0][0]
         == new_exp["description"]
     )
     new_desc = "New Description"
-    db_common.update_experiment_descrip_version(new_exp["name"], description=new_desc)
-    assert db_common.get_experiment_descrip(new_exp["name"])[0][0] == new_desc
+    db_common.update_experiment_description_version(new_exp["name"], description=new_desc)
+    assert db_common.get_experiment_description(new_exp["name"])[0][0] == new_desc
 
     # Update back both: description and version
-    db_common.update_experiment_descrip_version(
+    db_common.update_experiment_description_version(
         new_exp["name"],
         description=new_exp["description"],
         version=new_exp["autosubmit_version"],
     )
     assert (
-        db_common.get_experiment_descrip(new_exp["name"])[0][0]
+        db_common.get_experiment_description(new_exp["name"])[0][0]
         == new_exp["description"]
         and db_common.get_autosubmit_version(new_exp["name"])
         == new_exp["autosubmit_version"]

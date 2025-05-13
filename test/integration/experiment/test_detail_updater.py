@@ -21,6 +21,7 @@ import pytest
 from sqlalchemy.schema import CreateTable
 
 from autosubmit.database import session
+from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.tables import DetailsTable
 from autosubmit.experiment.detail_updater import (
     ExperimentDetails,
@@ -67,7 +68,8 @@ def test_details_properties(mocker):
 def test_details_repository(tmpdir, db_engine: str, request: pytest.FixtureRequest):
     request.getfixturevalue(f"as_db_{db_engine}")
 
-    with session.create_engine().connect() as conn:
+    connection_url = get_connection_url(tmpdir / 'details.db')
+    with session.create_engine(connection_url=connection_url).connect() as conn:
         conn.execute(CreateTable(DetailsTable, if_not_exists=True))
         conn.commit()
 
