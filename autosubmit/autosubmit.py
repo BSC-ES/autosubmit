@@ -344,7 +344,7 @@ class Autosubmit:
             subparser.add_argument(
                 '-np', '--noplot', action='store_true', default=False, help='omit plot')
             subparser.add_argument('--all', action="store_true", default=False,
-                                   help='Get completed files to synchronize pkl')
+                                   help='Get completed files to synchronize the graph')
             subparser.add_argument(
                 '-s', '--save', action="store_true", default=False, help='Save changes to disk')
             subparser.add_argument('--hide', action='store_true', default=False,
@@ -585,9 +585,10 @@ class Autosubmit:
                 'dbfix', description='tries to fix a corrupted jobs database')
             subparser.add_argument('expid', help='experiment identifier')
 
-            # Pkl Fix
+            # sqlite Fix
+            # TODO job_list_to_db change fix command ( or remove )
             subparser = subparsers.add_parser(
-                'pklfix', description='restore the backup of your pkl')
+                'sqlitefix', description='restore the backup of your sqlite')
             subparser.add_argument('expid', help='experiment identifier')
 
             # Update Description
@@ -798,8 +799,8 @@ class Autosubmit:
             return False
         elif args.command == 'dbfix':
             return Autosubmit.database_fix(args.expid)
-        elif args.command == 'pklfix':
-            return Autosubmit.pkl_fix(args.expid)
+        elif args.command == 'sqlitefix': # TODO job_list_to_db
+            return Autosubmit.sqlite_fix(args.expid) # TODO job_list_to_db
         elif args.command == 'updatedescrip':
             return Autosubmit.update_description(args.expid, args.description)
         elif args.command == 'cat-log':
@@ -1444,7 +1445,7 @@ class Autosubmit:
             # Setting folders and permissions
             dir_mode = 0o755
             exp_folder.mkdir(mode=dir_mode)
-            required_dirs = ["conf", "pkl", "tmp", "tmp/ASLOGS", f"tmp/LOG_{exp_id}", "plot", "status"]
+            required_dirs = ["conf", "db", "tmp", "tmp/ASLOGS", f"tmp/LOG_{exp_id}", "plot", "status"]
             for required_dir in required_dirs:
                 Path(exp_folder / required_dir).mkdir(mode=dir_mode)
             Log.info(f"Experiment folder: {exp_folder}")
@@ -1596,7 +1597,7 @@ class Autosubmit:
             Log.debug("Sleep: {0}", safetysleeptime)
             packages_persistence = JobPackagePersistence(expid)
             os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid,
-                                  "pkl", "job_packages_" + expid + ".db"), 0o644)
+                                  "db", "job_packages_" + expid + ".db"), 0o644)
 
             packages_persistence.reset_table(True)
             job_list = Autosubmit.load_job_list(
@@ -2022,10 +2023,10 @@ class Autosubmit:
             Log.debug("Sleep: {0}", safetysleeptime)
             Log.debug("Default retrials: {0}", retrials)
             # Is where Autosubmit stores the job_list and wrapper packages to the disc.
-            pkl_dir = os.path.join(
-                BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl')
+            db_dir = os.path.join(
+                BasicConfig.LOCAL_ROOT_DIR, expid, 'db')
             Log.debug(
-                "Starting from job list restored from {0} files", pkl_dir)
+                "Starting from job list restored from {0} files", db_dir)
 
         # Loads the communication lib, always paramiko.
         # Paramiko is the only way to communicate with the remote machines. Previously we had also Saga.
@@ -2092,7 +2093,7 @@ class Autosubmit:
         # Check if the user wants to continue using wrappers and loads the appropriate info.
         if as_conf.experiment_data.get("WRAPPERS",None) is not None:
             os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR,
-                                  expid, "pkl", "job_packages_" + expid + ".db"), 0o644)
+                                  expid, "db", "job_packages_" + expid + ".db"), 0o644)
             try:
                 packages = packages_persistence.load()
             except IOError as e:
@@ -2675,10 +2676,10 @@ class Autosubmit:
             as_conf.check_conf_files(False)
             # Getting output type from configuration
             output_type = as_conf.get_output_type()
-            pkl_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl')
+            db_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'db')
             job_list = Autosubmit.load_job_list(
                 expid, as_conf, notransitive=notransitive, monitor=True, new=False)
-            Log.debug("Job list restored from {0} files", pkl_dir)
+            Log.debug("Job list restored from {0} files", db_dir)
         except AutosubmitError as e:
             if profile:
                 profiler.stop()
@@ -2759,7 +2760,7 @@ class Autosubmit:
                 # Class constructor creates table if it does not exist
                 packages_persistence = JobPackagePersistence(expid)
                 # Permissions
-                os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl", "job_packages_" + expid + ".db"), 0o644)
+                os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "db", "job_packages_" + expid + ".db"), 0o644)
                 # Database modification
                 packages_persistence.reset_table(True)
                 # Load another job_list to go through that goes through the jobs, but we want to monitor the other one
@@ -2859,12 +2860,12 @@ class Autosubmit:
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             as_conf.check_conf_files(False)
 
-            pkl_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl')
+            db_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'db')
             job_list = Autosubmit.load_job_list(expid, as_conf, notransitive=notransitive, new=False)
             for job in job_list.get_job_list():
                 job._init_runtime_parameters()
                 job.update_dict_parameters(as_conf)
-            Log.debug("Job list restored from {0} files", pkl_dir)
+            Log.debug("Job list restored from {0} files", db)
             jobs = StatisticsUtils.filter_by_section(job_list.get_job_list(), filter_type)
             jobs, period_ini, period_fi = StatisticsUtils.filter_by_time_period(jobs, filter_period)
             # Package information
@@ -2994,7 +2995,7 @@ class Autosubmit:
             as_conf.check_conf_files(True)
 
             Log.info(f'Recovering experiment {expid}')
-            pkl_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl')
+            db_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'db')
             job_list = Autosubmit.load_job_list(
                 expid, as_conf, notransitive=notransitive, new=False, monitor=True)
 
@@ -3030,7 +3031,7 @@ class Autosubmit:
                     raise AutosubmitCritical(f"Experiment can't be recovered due being {len(current_active_jobs)} "
                                              f"active jobs in your experiment, If you want to recover the experiment,"
                                              f" please use the flag -f and all active jobs will be cancelled",7000)
-            Log.debug("Job list restored from {0} files", pkl_dir)
+            Log.debug("Job list restored from {0} files", db_dir)
         except Exception:
             raise
         Log.info(f'Recovering experiment {expid}')
@@ -3197,11 +3198,11 @@ class Autosubmit:
             if len(submitter.platforms) == 0:
                 return False
 
-            pkl_dir = os.path.join(
-                BasicConfig.LOCAL_ROOT_DIR, experiment_id, 'pkl')
+            db_dir = os.path.join(
+                BasicConfig.LOCAL_ROOT_DIR, experiment_id, 'db')
             job_list = Autosubmit.load_job_list(
                 experiment_id, as_conf, notransitive=notransitive)
-            Log.debug("Job list restored from {0} files", pkl_dir)
+            Log.debug("Job list restored from {0} files", db_dir)
 
             Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
 
@@ -4039,9 +4040,9 @@ class Autosubmit:
         update_experiment_description_version(expid, version=Autosubmit.autosubmit_version)
 
     @staticmethod
-    def pkl_fix(expid):
+    def sqlite_fix(expid):
         """
-        Tries to find a backup of the pkl file and restores it. Verifies that autosubmit is not running on this experiment.  
+        Tries to find a backup of the sqlite file and restores it. Verifies that autosubmit is not running on this experiment.
 
         :param expid: experiment identifier
         :type expid: str
@@ -4052,62 +4053,62 @@ class Autosubmit:
             raise AutosubmitCritical("This operation is only available when Autosubmit database backend is set to sqlite", 7000)
         exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
         tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
-        pkl_folder_path = os.path.join(exp_path, "pkl")
-        current_pkl_path = os.path.join(
-            pkl_folder_path, f"job_list_{expid}.pkl")
-        backup_pkl_path = os.path.join(
-            pkl_folder_path, f"job_list_{expid}_backup.pkl")
+        db_folder_path = os.path.join(exp_path, "db")
+        current_db_path = os.path.join(
+            db_folder_path, f"job_list_{expid}.db")
+        backup_db_path = os.path.join(
+            db_folder_path, f"job_list_{expid}_backup.db")
         try:
             with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
                 # Not locked
-                Log.info(f"Looking for backup file {backup_pkl_path}")
-                if os.path.exists(backup_pkl_path):
+                Log.info(f"Looking for backup file {backup_db_path}")
+                if os.path.exists(backup_db_path):
                     # Backup file exists
                     Log.info("Backup file found.")
                     # Make sure backup file is not empty
-                    _stat_b = os.stat(backup_pkl_path)
+                    _stat_b = os.stat(backup_db_path)
                     if _stat_b.st_size <= 6:
                         # It is empty -> Return
                         Log.info(
-                            f"The backup file {backup_pkl_path} is empty. Pkl restore operation stopped."
+                            f"The backup file {backup_db_path} is empty. db restore operation stopped."
                             f" No changes have been made.")
                         return
-                    if os.path.exists(current_pkl_path):
-                        # Pkl file exists
-                        Log.info(f"Current pkl file {current_pkl_path} found.")
-                        _stat = os.stat(current_pkl_path)
+                    if os.path.exists(current_db_path):
+                        # db file exists
+                        Log.info(f"Current db file {current_db_path} found.")
+                        _stat = os.stat(current_db_path)
                         if _stat.st_size > 6:
                             # Greater than 6 bytes -> Not empty
                             if not Autosubmit._user_yes_no_query(
-                                    f"The current pkl file {current_pkl_path} is not empty. Do you want to continue?"):
+                                    f"The current db file {current_db_path} is not empty. Do you want to continue?"):
                                 # The user chooses not to continue. Operation stopped.
                                 Log.info(
-                                    "Pkl restore operation stopped. No changes have been made.")
+                                    "db restore operation stopped. No changes have been made.")
                                 return
                             # File not empty: Archive
-                            archive_pkl_name = os.path.join(pkl_folder_path,
+                            archive_db_name = os.path.join(db_folder_path,
                                                             f"{datetime.datetime.today().strftime('%d%m%Y%H%M%S')}"
-                                                            f"_job_list_{expid}.pkl")
+                                                            f"_job_list_{expid}.db")
                             # Waiting for completion
                             subprocess.call(
-                                ["cp", current_pkl_path, archive_pkl_name])
+                                ["cp", current_db_path, archive_db_name])
 
-                            if os.path.exists(archive_pkl_name):
-                                Log.result(f"File {current_pkl_path} archived as {archive_pkl_name}.")
+                            if os.path.exists(archive_db_name):
+                                Log.result(f"File {current_db_path} archived as {archive_db_name}.")
                         else:
                             # File empty: Delete
-                            result = os.popen(f"rm {current_pkl_path}")
+                            result = os.popen(f"rm {current_db_path}")
                             if result is not None:
-                                Log.info(f"File {current_pkl_path} deleted.")
+                                Log.info(f"File {current_db_path} deleted.")
                     # Restore backup file
-                    Log.info(f"Restoring {backup_pkl_path} into {current_pkl_path}")
-                    subprocess.call(["mv", backup_pkl_path, current_pkl_path])
+                    Log.info(f"Restoring {backup_db_path} into {current_db_path}")
+                    subprocess.call(["mv", backup_db_path, current_db_path])
 
-                    if os.path.exists(current_pkl_path):
-                        Log.result("Pkl restored.")
+                    if os.path.exists(current_db_path):
+                        Log.result("db restored.")
                 else:
                     Log.info(
-                        "Backup file not found. Pkl restore operation stopped. No changes have been made.")
+                        "Backup file not found. db restore operation stopped. No changes have been made.")
         except AutosubmitCritical as e:
             raise AutosubmitCritical(e.message, e.code, e.trace)
 
@@ -4529,17 +4530,17 @@ class Autosubmit:
                         raise AutosubmitCritical(f'Job list is empty\nCheck if there are YML files in {as_conf.experiment_data.get("DEFAULT","").get("CUSTOM_CONFIG","")}', code=7015)
                     output_type = as_conf.get_output_type()
 
-                    if not os.path.exists(os.path.join(exp_path, "pkl")):
-                        raise AutosubmitCritical(f"The pkl folder doesn't exists. Make sure that the 'pkl'"
+                    if not os.path.exists(os.path.join(exp_path, "db")):
+                        raise AutosubmitCritical(f"The db folder doesn't exists. Make sure that the 'db'"
                                                  f" folder exists in the following path: {exp_path}", code=6013)
                     if not os.path.exists(os.path.join(exp_path, "plot")):
                         raise AutosubmitCritical(f"The plot folder doesn't exists. Make sure that the 'plot'"
                                                  f" folder exists in the following path: {exp_path}", code=6013)
 
-                    persistence_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")
-                    persistence_file = f'job_list_{expid}.pkl'
+                    persistence_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "db")
+                    persistence_file = f'job_list_{expid}.db'
                     job_list_persistence: JobListPersistence = Autosubmit._get_job_list_persistence(expid, as_conf)
-                    update_job = not job_list_persistence.pkl_exists(persistence_path, persistence_file)
+                    update_job = not job_list_persistence.db_exists(persistence_path, persistence_file)
                     Autosubmit._create_project_associated_conf(
                         as_conf, False, update_job)
 
@@ -5629,13 +5630,11 @@ class Autosubmit:
         :return: job_list_persistence
         :rtype: JobListPersistence
         """
-        if BasicConfig.DATABASE_BACKEND != 'sqlite':
-            return JobListPersistenceDb(expid)
 
         storage_type = as_conf.get_storage_type()
-        if storage_type == 'pkl':
-            return JobListPersistencePkl()
-        elif storage_type == 'db':
+        if storage_type == 'postgress':
+            return JobListPersistenceDb(expid)
+        elif storage_type == 'sqlite':
             return JobListPersistenceDb(expid)
         raise AutosubmitCritical('Storage type not known', 7014)
 

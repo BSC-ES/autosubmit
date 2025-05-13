@@ -61,111 +61,44 @@ class JobListPersistence(object):
         """
         raise NotImplementedError
 
-    def pkl_exists(self, persistence_path, persistence_file):
+    def sqlite_exists(self, persistence_path, persistence_file):
         """
-        Check if a pkl file exists
+        Check if a sqlite db file exists
         :param persistence_file: str
         :param persistence_path: str
         """
         raise NotImplementedError
 
-
-class JobListPersistencePkl(JobListPersistence):
-    """
-    Class to manage the pickle persistence of the job lists
-
-    """
-
-    EXT = '.pkl'
-
-    def load(self, persistence_path, persistence_file):
-        """
-        Loads a job list from a pkl file
-        :param persistence_file: str
-        :param persistence_path: str
-
-        """
-        path = os.path.join(persistence_path, persistence_file + '.pkl')
-        path_tmp = os.path.join(persistence_path[:-3]+"tmp", persistence_file + f'.pkl.tmp_{os.urandom(8).hex()}')
-
-        try:
-            open(path).close()
-        except PermissionError:
-            Log.warning(f'Permission denied to read {path}')
-            raise
-        except FileNotFoundError:
-            Log.warning(f'File {path} does not exist. ')
-            raise
-        else:
-            # copy the path to a tmp file random seed to avoid corruption
-            try:
-                shutil.copy(str(path), str(path_tmp))
-                with open(path_tmp, 'rb') as fd:
-                    current_limit = getrecursionlimit()
-                    setrecursionlimit(100000)
-                    job_list = pickle.load(fd)
-                    setrecursionlimit(current_limit)
-            finally:
-                os.remove(path_tmp)
-
-            return job_list
-
-    def save(self, persistence_path, persistence_file, job_list, graph: 'DiGraph'):
-        """
-        Persists a job list in a pkl file
-        :param job_list: JobList
-        :param persistence_file: str
-        :param persistence_path: str
-        :param graph: networkx graph object
-        :type graph: DiGraph
-        """
-
-        path = os.path.join(persistence_path, persistence_file + '.pkl' + '.tmp')
-        with suppress(FileNotFoundError, PermissionError):
-            os.remove(path)
-        Log.debug("Saving JobList: " + str(path))
-        with open(path, 'wb') as fd:
-            current_limit = getrecursionlimit()
-            setrecursionlimit(100000)
-            pickle.dump({job.name: job.__getstate__() for job in job_list}, fd, pickle.HIGHEST_PROTOCOL)  # type: ignore
-            setrecursionlimit(current_limit)
-            # profiler shows memory leak if we remove this.
-            gc.collect()
-        os.replace(path, path[:-4])
-        Log.debug(f'JobList saved in {path[:-4]}')
-
-    def pkl_exists(self, persistence_path, persistence_file):
-        """
-        Check if a pkl file exists
-        :param persistence_file: str
-        :param persistence_path: str
-        """
-        path = os.path.join(persistence_path, persistence_file + '.pkl')
-        return os.path.exists(path)
-
-
 class JobListPersistenceDb(JobListPersistence):
-    """Class to manage the database persistence of the job lists."""
+    """
+    Class to manage the database persistence of the job lists
 
-    # TODO: Was this actually used anywhere? Couldn't locate where...
+    """
+    # TODO job_list_to_db
     VERSION = 4
+    JOB_LIST_TABLE = "job_pkl"  # TODO to clarify for what is this?
+    TABLE_FIELDS = ["expid", "pkl", "modified"]
 
     def __init__(self, expid):
+        options = {
+            "root_path": str(Path(BasicConfig.LOCAL_ROOT_DIR, expid, "db")), # folder renamed
+            "db_name": f"job_list_{expid}",
+            "db_version": self.VERSION
+        }
         self.expid = expid
-        database_file = Path(BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl', f'job_list_{expid}.db')
-        connection_url = get_connection_url(db_path=database_file)
-        self.db_manager = DbManager(connection_url=connection_url)
-        self.db_manager.create_table(JobPklTable.name)
+        self.db_manager = create_db_manager(BasicConfig.DATABASE_BACKEND, **options)
+        self.db_manager.create_table(self.JOB_LIST_TABLE, self.TABLE_FIELDS)
 
     def load(self, persistence_path, persistence_file):
-        """Loads a job list from a database.
-
+        """
+        Loads a job list from a database
         :param persistence_file: str
         :param persistence_path: str
+
         """
         row = self.db_manager.select_first_where(
-            JobPklTable.name,
-            {'expid': self.expid}
+            self.JOB_LIST_TABLE,
+            [f"expid = '{self.expid}'"]
         )
         if row:
             pickled_data = row[1]
@@ -173,8 +106,8 @@ class JobListPersistenceDb(JobListPersistence):
         return None
 
     def save(self, persistence_path, persistence_file, job_list, graph: 'DiGraph') -> None:
-        """Persists a job list in a database.
-        
+        """
+        Persists a job list in a database
         :param job_list: JobList
         :param persistence_file: str
         :param persistence_path: str
@@ -187,16 +120,19 @@ class JobListPersistenceDb(JobListPersistence):
         gc.collect()
 
         # Delete previous row
-        self.db_manager.delete_where(
-            JobPklTable.name,
-            {'expid': self.expid}
-        )
+        try:
+            self.db_manager.delete_where(
+                self.JOB_LIST_TABLE,
+                [f"expid = '{self.expid}'"]
+            )
+        except Exception:
+            Log.debug("No previous row to delete")
 
         # Insert the new row
         Log.debug("Saving JobList on DB")
         # Use insertMany as it is a generalization of insert
-        self.db_manager.insert_many(
-            JobPklTable.name,
+        self.db_manager.insertMany(
+            self.JOB_LIST_TABLE,
             [
                 {
                     "expid": self.expid,
@@ -208,11 +144,21 @@ class JobListPersistenceDb(JobListPersistence):
         Log.debug("JobList saved in DB")
 
     def pkl_exists(self, persistence_path, persistence_file):
-        """Check if a pickle file exists.
+        """Check if a pkl file exists
 
         :param persistence_file: str
         :param persistence_path: str
         """
         return self.db_manager.select_first_where(
-            JobPklTable.name, {'expid': self.expid}
+            self.JOB_LIST_TABLE, [f"expid = '{self.expid}'"]
         ) is not None
+
+    """
+    # TODO job_list_to_db
+    JOB_LIST_TABLE = "job_pkl"  # TODO to clarify for what is this?
+    TABLE_FIELDS = ["expid", "pkl", "modified"]
+        options = {
+            "root_path": str(Path(BasicConfig.LOCAL_ROOT_DIR, expid, "db")), # folder renamed
+            "db_name": f"job_list_{expid}",
+            "db_version": self.VERSION
+        }

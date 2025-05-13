@@ -53,9 +53,9 @@ class JobList(object):
     """
 
     def __init__(self, expid, config, parser_factory, job_list_persistence):
-        self._persistence_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")
+        self._persistence_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "db")
         self._update_file = "updated_list_" + expid + ".txt"
-        self._failed_file = "failed_job_list_" + expid + ".pkl"
+        self._failed_file = "failed_job_list_" + expid + ".txt"
         self._persistence_file = "job_list_" + expid
         self._job_list = list()
         self._base_job_list = list()
@@ -189,10 +189,10 @@ class JobList(object):
             force = True
         if force:
             Log.debug("Resetting the workflow graph to a zero state")
-            if os.path.exists(os.path.join(self._persistence_path, self._persistence_file + ".pkl")):
-                os.remove(os.path.join(self._persistence_path, self._persistence_file + ".pkl"))
-            if os.path.exists(os.path.join(self._persistence_path, self._persistence_file + "_backup.pkl")):
-                os.remove(os.path.join(self._persistence_path, self._persistence_file + "_backup.pkl"))
+            if os.path.exists(os.path.join(self._persistence_path, self._persistence_file + ".db")):
+                os.remove(os.path.join(self._persistence_path, self._persistence_file + ".db"))
+            if os.path.exists(os.path.join(self._persistence_path, self._persistence_file + "_backup.db")):
+                os.remove(os.path.join(self._persistence_path, self._persistence_file + "_backup.db"))
         self._parameters = parameters
         self._date_list = date_list
         self._member_list = member_list
@@ -212,17 +212,17 @@ class JobList(object):
                                                     len(loaded_job_list) == 0 and not create):
             raise AutosubmitCritical(
                 "Autosubmit couldn't load the workflow graph. Please run autosubmit create first."
-                "If the pkl file exists and was generated with Autosubmit v4.1+, try again.",
+                "If the job_list.db file exists and was generated with Autosubmit v4.1+, try again.",
                 7013)
         elif loaded_job_list and len(loaded_job_list) == 0 and create:
             new = True
             Log.info(
-                "Removing previous pkl file due to empty graph, "
+                "Removing previous job_list.db file due to empty graph, "
                 "likely due using an Autosubmit 4.0.XXX version")
             with suppress(FileNotFoundError):
-                os.remove(os.path.join(self._persistence_path, self._persistence_file + ".pkl"))
+                os.remove(os.path.join(self._persistence_path, self._persistence_file + ".db"))
             with suppress(FileNotFoundError):
-                os.remove(os.path.join(self._persistence_path, self._persistence_file + "_backup.pkl"))
+                os.remove(os.path.join(self._persistence_path, self._persistence_file + "_backup.db"))
         if loaded_job_list:
             self._dic_jobs._job_list = loaded_job_list
 
@@ -2328,11 +2328,11 @@ class JobList(object):
         except ValueError as e:
             if not create:
                 raise AutosubmitCritical(
-                    f'JobList could not be loaded due pkl being saved with a different version '
+                    f'JobList could not be loaded due db being saved with a different version '
                     f'of Autosubmit or Python version. {e}')
             else:
                 Log.warning(
-                    f'Job list will be created from scratch due pkl being saved with a different '
+                    f'Job list will be created from scratch due db being saved with a different '
                     f'version of Autosubmit or Python version. {e}')
         except PermissionError as e:
             if not create:
@@ -3414,7 +3414,7 @@ class JobList(object):
 
         current_status = values[3] if (len(values) > 3 and len(
             values[3]) != 14) else status_from_job
-        # TOTAL_STATS last line has more than 3 items, status is different from pkl,
+        # TOTAL_STATS last line has more than 3 items, status is different from db,
         # and status is not "NA"
         if len(values) > 3 and current_status != status_from_job and current_status != "NA":
             current_status = "SUSPICIOUS"

@@ -32,14 +32,19 @@ class JobPackagePersistence:
     """Class that handles packages workflow.
 
     Create Packages Table, Wrappers Table.
-    """
 
+    :param persistence_path: Path to the persistence folder db. \n
+    :type persistence_path: String \n
+    :param persistence_file: Name of the persistence db file. \n
+    :type persistence_file: String
+    """
+    # TODO job_list_to_db
     VERSION = 1
 
     def __init__(self, expid: str):
-        database_file = Path(BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl', f'job_packages_{expid}.db')
+        database_file = Path(BasicConfig.LOCAL_ROOT_DIR, expid, 'db', f'job_packages_{expid}.db')
         connection_url = get_connection_url(db_path=database_file)
-        
+
         self.db_manager = DbManager(connection_url=connection_url)
         self.db_manager.create_table(JobPackageTable.name)
         self.db_manager.create_table(WrapperJobPackageTable.name)
