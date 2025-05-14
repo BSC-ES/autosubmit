@@ -55,7 +55,7 @@ import autosubmit.history.utils as HUtils
 import autosubmit.statistics.utils as StatisticsUtils
 from autosubmit.database.db_common import (
     create_db, delete_experiment, get_experiment_description, get_autosubmit_version, check_experiment_exists,
-    update_experiment_description_version
+    update_experiment_description_version, check_db_path
 )
 from autosubmit.database.db_structure import get_structure
 from autosubmit.experiment.detail_updater import ExperimentDetails
@@ -68,8 +68,7 @@ from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_grouping import JobGrouping
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistence, JobListPersistenceDb, JobListPersistencePkl
-from autosubmit.job.job_package_persistence import JobPackagePersistence
+import autosubmit.database.db_job_list as dbjoblist
 from autosubmit.job.job_packager import JobPackager
 from autosubmit.job.job_utils import SubJob, SubJobManager
 from autosubmit.migrate.migrate import Migrate
@@ -4564,10 +4563,10 @@ class Autosubmit:
                         raise AutosubmitCritical(f"The plot folder doesn't exists. Make sure that the 'plot'"
                                                  f" folder exists in the following path: {exp_path}", code=6013)
 
-                    persistence_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "db")
-                    persistence_file = f'job_list_{expid}.db'
-                    job_list_persistence: JobListPersistence = Autosubmit._get_job_list_persistence(expid, as_conf)
-                    update_job = not job_list_persistence.db_exists(persistence_path, persistence_file)
+                    persistence_file = 'job_list.db'
+                    persistence_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid / "db"
+
+                    update_job = not check_db_path(persistence_path / persistence_file, must_exists = False)
                     Autosubmit._create_project_associated_conf(
                         as_conf, False, update_job)
 
@@ -4589,7 +4588,7 @@ class Autosubmit:
                     rerun = as_conf.get_rerun()
 
                     Log.info("\nCreating the jobs list...")
-                    job_list = JobList(expid, as_conf, YAMLParserFactory(),Autosubmit._get_job_list_persistence(expid, as_conf))
+                    job_list = JobList(expid, as_conf, YAMLParserFactory())
                     date_format = ''
                     if as_conf.get_chunk_size_unit() == 'hour':
                         date_format = 'H'
@@ -5650,22 +5649,6 @@ class Autosubmit:
         return result
 
     @staticmethod
-    def _get_job_list_persistence(expid, as_conf) -> JobListPersistence:
-        """
-        Returns the JobListPersistence corresponding to the storage type defined on autosubmit's config file
-
-        :return: job_list_persistence
-        :rtype: JobListPersistence
-        """
-
-        storage_type = as_conf.get_storage_type()
-        if storage_type == 'postgress':
-            return JobListPersistenceDb(expid)
-        elif storage_type == 'sqlite':
-            return JobListPersistenceDb(expid)
-        raise AutosubmitCritical('Storage type not known', 7014)
-
-    @staticmethod
     def testcase(description, chunks=None, member=None, start_date=None, hpc=None, copy_id=None, minimal_configuration=False, git_repo=None, git_branch=None, git_as_conf=None, use_local_minimal=False):
         """
         Method to conduct a test for a given experiment. It creates a new experiment for a given experiment with a
@@ -5801,8 +5784,7 @@ class Autosubmit:
     @staticmethod
     def load_job_list(expid, as_conf, notransitive=False, monitor=False, new=True) -> JobList:
         rerun = as_conf.get_rerun()
-        job_list = JobList(expid, as_conf, YAMLParserFactory(),
-                           Autosubmit._get_job_list_persistence(expid, as_conf))
+        job_list = JobList(expid, as_conf, YAMLParserFactory())
         run_only_members = as_conf.get_member_list(run_only=True)
         date_list = as_conf.get_date_list()
         date_format = ''

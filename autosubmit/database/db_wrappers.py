@@ -24,7 +24,7 @@ from autosubmitconfigparser.config.basicconfig import BasicConfig
 
 from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager import DbManager
-from autosubmit.database.tables import JobPackageTable, WrapperJobPackageTable
+from autosubmit.database.tables import WrapperInfoTable, WrapperJobsTable, PreviewWrapperInfoTable, PreviewWrapperJobsTable
 from log.log import AutosubmitCritical
 
 
@@ -46,8 +46,10 @@ class JobPackagePersistence:
         connection_url = get_connection_url(db_path=database_file)
 
         self.db_manager = DbManager(connection_url=connection_url)
-        self.db_manager.create_table(JobPackageTable.name)
-        self.db_manager.create_table(WrapperJobPackageTable.name)
+        self.db_manager.create_table(WrapperInfoTable.name)
+        self.db_manager.create_table(WrapperJobsTable.name)
+        self.db_manager.create_table(PreviewWrapperInfoTable.name)
+        self.db_manager.create_table(PreviewWrapperInfoTable.name)
 
     def load(self, wrapper=False) -> List[Any]:
         """

@@ -173,8 +173,8 @@ JobsTable = Table(
 )
 
 """Table that holds the structure of the experiment jobs."""
-GraphTable = Table(
-    "graph",
+ExperimentStructureTable = Table(
+    "experiment_structure",
     metadata_obj,
     Column("e_from", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True),
     Column("e_to", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True),
@@ -221,7 +221,7 @@ TABLES = (
     JobDataTable,
     DetailsTable,
     JobsTable,
-    GraphTable,
+    ExperimentStructureTable,
     WrapperInfoTable,
     WrapperJobsTable,
     PreviewWrapperInfoTable,

@@ -110,3 +110,24 @@ class DbManager:
             result = conn.execute(query)
             conn.commit()
         return cast(int, result.rowcount)
+
+
+class JobsDbManager(DbManager):
+    """A database manager for the jobs table using SQLAlchemy.
+
+    It can be used with any engine supported by SQLAlchemy, such
+    as Postgres, Mongo, MySQL, etc.
+    """
+
+    def __init__(self, connection_url: str, schema: Optional[str] = None) -> None:
+        super().__init__(connection_url=connection_url, schema=schema)
+
+    # select active jobs
+
+    def select_active_jobs(self, table_name: str) -> list[Any]:
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        active_statuses = ['READY', 'SUBMITTED', 'QUEUING', 'HELD', 'RUNNING']
+
+        with self.engine.connect() as conn:
+            rows = conn.execute(select(table).where(table.c.status.in_(active_statuses))).all()
+        return [row.tuple() for row in rows]

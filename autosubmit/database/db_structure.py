@@ -17,7 +17,7 @@
 
 """Code to manage the structure of tables.
 
-It uses the ``db_manager`` code to manage the database.
+It uses the db_manager code to manage the database.
 """
 
 import traceback
@@ -43,7 +43,7 @@ def _get_db_manager(sqlite_db_file: Optional[Path]) -> DbManager:
     return DbManager(connection_url=connection_url)
 
 
-def get_structure(expid: str, structures_path: Path) -> Optional[dict[str, list[str]]]:
+def get_structure(job_list_path: Path) -> Optional[dict[str, list[str]]]:
     """Return the current structure for the experiment identified by the given ``expid``.
 
     If the database used is SQLite, the structure database file will be created.
@@ -59,12 +59,9 @@ def get_structure(expid: str, structures_path: Path) -> Optional[dict[str, list[
         structure persisted in the database.
     """
     try:
-        _check_structures_path(structures_path)
-        db_manager = _get_db_manager(None if not structures_path else structures_path / f"structure_{expid}.db")
-
-        db_manager.create_table(ExperimentStructureTable.name)
-
+        db_manager = _get_db_manager(None if not job_list_path else job_list_path / f"job_list.db")
         current_structure = db_manager.select_all('experiment_structure')
+        db_manager.create_table(ExperimentStructureTable.name)
 
         current_table_structure = {}
         for item in current_structure:
@@ -79,10 +76,10 @@ def get_structure(expid: str, structures_path: Path) -> Optional[dict[str, list[
     return None
 
 
-def save_structure(graph: DiGraph, expid: str, structures_path: Optional[Path]):
+def save_new_structure(graph: DiGraph, job_list_path: Optional[Path]):
     """Save the experiment structure into the database."""
-    _check_structures_path(structures_path)
-    db_manager = _get_db_manager(structures_path / f"structure_{expid}.db")
+    _check_structures_path(job_list_path)
+    db_manager = _get_db_manager(None if not job_list_path else job_list_path / f"job_list.db")
 
     # Create table if it doesn't exist
     db_manager.create_table(ExperimentStructureTable.name)

@@ -31,6 +31,9 @@ import math
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
 
+from autosubmit.database.db_common import check_db_path
+from autosubmit.database.db_structure import save_new_structure, save_structure
+
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
@@ -40,7 +43,7 @@ from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
-from autosubmit.job.job_package_persistence import JobPackagePersistence
+import autosubmit.database.db_job_list
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency, _get_submitter
 import autosubmit.database.db_structure as DbStructure
@@ -52,11 +55,12 @@ class JobList(object):
 
     """
 
-    def __init__(self, expid, config, parser_factory, job_list_persistence):
-        self._persistence_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "db")
+    def __init__(self, expid, config, parser_factory):
+        self._persistence_path = Path(BasicConfig.LOCAL_ROOT_DIR, expid, "db")
         self._update_file = "updated_list_" + expid + ".txt"
         self._failed_file = "failed_job_list_" + expid + ".txt"
-        self._persistence_file = "job_list_" + expid
+        self._persistence_file = Path("job_list.db")
+        self._persistence_full_path = Path(self._persistence_path, self._persistence_file)
         self._job_list = list()
         self._base_job_list = list()
         self.jobs_edges = {}
@@ -69,10 +73,8 @@ class JobList(object):
         self._member_list = []
         self._chunk_list = []
         self._dic_jobs = dict()
-        self._persistence = job_list_persistence
         self.packages_dict = dict()
         self._ordered_jobs_by_date_member = dict()
-
         self.packages_id = dict()
         self.job_package_map = dict()
         self.sections_checked = set()
@@ -189,10 +191,10 @@ class JobList(object):
             force = True
         if force:
             Log.debug("Resetting the workflow graph to a zero state")
-            if os.path.exists(os.path.join(self._persistence_path, self._persistence_file + ".db")):
-                os.remove(os.path.join(self._persistence_path, self._persistence_file + ".db"))
-            if os.path.exists(os.path.join(self._persistence_path, self._persistence_file + "_backup.db")):
-                os.remove(os.path.join(self._persistence_path, self._persistence_file + "_backup.db"))
+            if check_db_path(self._persistence_full_path, must_exists=False):
+                os.remove(self._persistence_full_path)
+
+
         self._parameters = parameters
         self._date_list = date_list
         self._member_list = member_list
@@ -2366,6 +2368,8 @@ class JobList(object):
             self.update_status_log()
 
             try:
+                save_new_structure()
+                save_jobs(self._job_list, self._persistence_path, self._persistence_file)
                 self._persistence.save(self._persistence_path, self._persistence_file,
                                        self._job_list if self.run_members is None or
                                                          job_list is None else job_list, self.graph)

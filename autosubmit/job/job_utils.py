@@ -16,14 +16,13 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import math
-import os
 from typing import Dict, Optional, TYPE_CHECKING
 
 from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates
 from networkx.classes import DiGraph
 
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_package_persistence import JobPackagePersistence
+import autosubmit.database.db_job_list
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from log.log import Log, AutosubmitCritical
