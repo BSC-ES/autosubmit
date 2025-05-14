@@ -35,6 +35,8 @@ from log.log import Log
 if TYPE_CHECKING:
     from networkx import DiGraph
 
+from autosubmit.database.tables import JobsTable, GraphTable, WrapperJobsTable, WrapperInfoTable, metadata_obj, PreviewWrapperJobsTable, PreviewWrapperInfoTable
+
 
 class JobListPersistence(object):
     """
@@ -69,26 +71,25 @@ class JobListPersistence(object):
         """
         raise NotImplementedError
 
+
 class JobListPersistenceDb(JobListPersistence):
     """
     Class to manage the database persistence of the job lists
 
     """
-    # TODO job_list_to_db
-    VERSION = 4
-    JOB_LIST_TABLE = "job_pkl"  # TODO to clarify for what is this?
-    TABLE_FIELDS = ["expid", "pkl", "modified"]
+    VERSION = 1
 
     def __init__(self, expid):
         options = {
-            "root_path": str(Path(BasicConfig.LOCAL_ROOT_DIR, expid, "db")), # folder renamed
-            "db_name": f"job_list_{expid}",
+            "root_path": str(Path(BasicConfig.LOCAL_ROOT_DIR, expid, "db")),  # folder renamed
+            "db_name": f"graph_{expid}",
             "db_version": self.VERSION
         }
         self.expid = expid
-        self.db_manager = create_db_manager(BasicConfig.DATABASE_BACKEND, **options)
-        self.db_manager.create_table(self.JOB_LIST_TABLE, self.TABLE_FIELDS)
 
+        self.db_manager = create_db_manager(BasicConfig.DATABASE_BACKEND, **options)
+        metadata_obj.create_all(self.db_manager, tables=[JobsTable, GraphTable, WrapperJobsTable, WrapperInfoTable, PreviewWrapperJobsTable, PreviewWrapperInfoTable])
+        pass
     def load(self, persistence_path, persistence_file):
         """
         Loads a job list from a database
@@ -136,29 +137,9 @@ class JobListPersistenceDb(JobListPersistence):
             [
                 {
                     "expid": self.expid,
-                    "pkl": pickled_data,
+                    "sqlite": pickled_data,
                     "modified": str(datetime.now()),
                 }
             ]
         )
         Log.debug("JobList saved in DB")
-
-    def pkl_exists(self, persistence_path, persistence_file):
-        """Check if a pkl file exists
-
-        :param persistence_file: str
-        :param persistence_path: str
-        """
-        return self.db_manager.select_first_where(
-            self.JOB_LIST_TABLE, [f"expid = '{self.expid}'"]
-        ) is not None
-
-    """
-    # TODO job_list_to_db
-    JOB_LIST_TABLE = "job_pkl"  # TODO to clarify for what is this?
-    TABLE_FIELDS = ["expid", "pkl", "modified"]
-        options = {
-            "root_path": str(Path(BasicConfig.LOCAL_ROOT_DIR, expid, "db")), # folder renamed
-            "db_name": f"job_list_{expid}",
-            "db_version": self.VERSION
-        }

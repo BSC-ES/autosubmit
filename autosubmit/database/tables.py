@@ -31,9 +31,9 @@ from sqlalchemy import (
     DateTime,
     Boolean, ForeignKey,
 )
+from sqlalchemy.orm import foreign
 
 metadata_obj = MetaData()
-
 
 ExperimentTable = Table(
     "experiment",
@@ -64,7 +64,6 @@ ExperimentStatusTable = Table(
 )
 """Stores the status of the experiments."""
 
-
 # NOTE: The column ``metadata`` has a name that is reserved in
 #       SQLAlchemy ORM. It works for SQLAlchemy Core, here, but
 #       if you plan to use ORM, be warned that you will have to
@@ -90,6 +89,16 @@ ExperimentRunTable = Table(
     Column("metadata", Text),
 )
 
+DetailsTable = Table(
+    "details",
+    metadata_obj,
+    Column("exp_id", Integer, primary_key=True),
+    Column("user", Text, nullable=False),
+    Column("created", Text, nullable=False),
+    Column("model", Text, nullable=False),
+    Column("branch", Text, nullable=False),
+    Column("hpc", Text, nullable=False),
+)
 
 """Table that holds the structure of the experiment jobs."""
 JobDataTable = Table(
@@ -130,7 +139,9 @@ JobDataTable = Table(
     UniqueConstraint("counter", "job_name", name="unique_counter_and_job_name"),
 )
 
+"""All these tables will go inside the $expid/db/job_list.db."""
 # Jobs table
+"""Table that holds the minium neccesary info about the experiment jobs."""
 JobsTable = Table(
     "jobs",
     metadata_obj,
@@ -138,7 +149,7 @@ JobsTable = Table(
     Column("id", Integer),
     Column("script_name", String),
     Column("priority", Integer),
-    Column("status", String),
+    Column("status", String), # TODO Add Custom status column?
     Column("frequency", String),
     Column("synchronize", Boolean),
     Column("section", String),
@@ -161,63 +172,60 @@ JobsTable = Table(
     Column("packed", Boolean),
 )
 
-# ExperimentStructureTable with dependencies
-ExperimentStructureTable = Table(
-    "experiment_structure",
+"""Table that holds the structure of the experiment jobs."""
+GraphTable = Table(
+    "graph",
     metadata_obj,
     Column("e_from", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True),
     Column("e_to", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True),
     Column("edge_info", Text, nullable=True),
+    Column("edge_status", Text, nullable=True),
     Column("current_checkpoint_step", Integer),
     UniqueConstraint("e_from", "e_to", name="unique_e_from_and_e_to"),
 
 
 )
-WrapperTable = Table(
-    "wrappers",
-    metadata_obj,
-    Column("package_name", Text, primary_key=True),
-    Column("job_name", Text, primary_key=True),
-)
-"""Stores a mapping between the wrapper name and the actual job in SLURM."""
-
-PreviewWrapperTable = Table(
-    "preview_wrappers",
-    metadata_obj,
-    Column("package_name", Text, primary_key=True),
-    Column("job_name", Text, primary_key=True),
-)
-"""It is a replication.
-It is only created/used when using inspect and create or monitor
-with flag -cw in Autosubmit.
-This replication is used to not interfere with the current
-autosubmit run of that experiment since wrapper_job_package
-will contain a preview, not the real wrapper packages."""
 
 
-DetailsTable = Table(
-    "details",
-    metadata_obj,
-    Column("exp_id", Integer, primary_key=True),
-    Column("user", Text, nullable=False),
-    Column("created", Text, nullable=False),
-    Column("model", Text, nullable=False),
-    Column("branch", Text, nullable=False),
-    Column("hpc", Text, nullable=False),
-)
+def create_wrapper_tables(name, metadata_obj_):
+    """Create a wrapper table for the given name."""
+    table_package_info = Table(
+        f"{name}_info",
+        metadata_obj_,
+        Column("package_name", Text, primary_key=True),
+        Column("script_name", Text),
+        Column("type", Text),
+        Column("status", Text),  # TODO Add Custom status column?
+    )
+    if name == "preview_wrappers":
+        table_package_info.append_column(Column("id", Text, nullable=True))
+    else:
+        table_package_info.append_column(Column("id", Text, nullable=False))
+    table_jobs_inside_wrapper = Table(
+        f"{name}_jobs",
+        metadata_obj_,
+        Column("package_name", String, ForeignKey(f"{name}.package_name"), nullable=False, primary_key=True),
+        Column("job_name", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True),
+    )
+    return table_package_info, table_jobs_inside_wrapper
+
+
+WrapperInfoTable, WrapperJobsTable = create_wrapper_tables("wrappers", metadata_obj)
+PreviewWrapperInfoTable, PreviewWrapperJobsTable = create_wrapper_tables("preview_wrappers", metadata_obj)
 
 TABLES = (
     ExperimentTable,
     ExperimentStatusTable,
-    ExperimentStructureTable,
     ExperimentRunTable,
     DBVersionTable,
     JobDataTable,
     DetailsTable,
     JobsTable,
-    ExperimentStructureTable,
-    WrapperTable,
-    PreviewWrapperTable,
+    GraphTable,
+    WrapperInfoTable,
+    WrapperJobsTable,
+    PreviewWrapperInfoTable,
+    PreviewWrapperJobsTable,
 )
 """The tables available in the Autosubmit databases."""
 
