@@ -1,3 +1,9 @@
+### 4.1.15 (Not released)
+
+**Bug fixes:**
+
+- Removed PBS and SGE platforms as they are not working in AS4 #2349
+
 ### 4.1.14: Bug fixes, enhancements, and new features
 
 **Bug fixes:**

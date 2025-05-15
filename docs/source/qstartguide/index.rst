@@ -213,7 +213,7 @@ Now open platforms.yml. Note: This will be an example for marenostrum4
 
     PLATFORMS:
         marenostrum4:
-            # Queue type. Options: ps, SGE, SLURM, PBS, eceaccess
+            # Queue type. Options: ps, SLURM, eceaccess
             # scheduler type
             TYPE: slurm
             HOST: mn1.bsc.es,mn2.bsc.es,mn3.bsc.es

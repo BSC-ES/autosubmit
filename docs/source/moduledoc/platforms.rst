@@ -6,9 +6,6 @@ autosubmit.platform
 .. automodule:: autosubmit.platforms.ecplatform
    :show-inheritance:
    :members:
-.. automodule:: autosubmit.platforms.pbsplatform
-   :show-inheritance:
-   :members:
 .. automodule:: autosubmit.platforms.pjmplatform
    :show-inheritance:
    :members:
