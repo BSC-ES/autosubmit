@@ -167,6 +167,7 @@ class UserMetricProcessor:
                 self.as_conf.deep_normalize(metric) for metric in raw_metrics
             ]
         except Exception as exc:
+            Log.printlog("Invalid or missing metrics section", code=6019)
             raise ValueError(f"Invalid or missing metrics section: {str(exc)}")
 
         metrics_specs: List[MetricSpec] = []
@@ -178,7 +179,7 @@ class UserMetricProcessor:
                 spec = MetricSpec.load(raw_metric)
                 metrics_specs.append(spec)
             except Exception:
-                Log.warning("Invalid metric spec: {}", str(raw_metric))
+                Log.printlog(f"Invalid metric spec: {str(raw_metric)}", code=6019)
 
         return metrics_specs
 
@@ -221,7 +222,9 @@ class UserMetricProcessor:
                     encoding=locale.getlocale()[1], errors="replace"
                 ).strip()
             except Exception as exc:
-                Log.warning(f"Error reading metric file at {spec_path}: {str(exc)}")
+                Log.printlog(
+                    f"Error reading metric file at {spec_path}: {str(exc)}", code=6018
+                )
                 continue
 
             # Process the content based on the selector type
@@ -240,12 +243,15 @@ class UserMetricProcessor:
                             value = value[k]
                     self.store_metric(metric_spec.name, value)
                 except json.JSONDecodeError:
-                    Log.warning(f"Invalid JSON content in file {spec_path}")
+                    Log.printlog(f"Invalid JSON content in file {spec_path}", code=6018)
                 except Exception:
-                    Log.warning(f"Error processing JSON content in file {spec_path}")
+                    Log.printlog(
+                        f"Error processing JSON content in file {spec_path}", code=6018
+                    )
             else:
-                Log.warning(
-                    f"Unsupported selector type {metric_spec.selector.type} for metric {metric_spec.name}"
+                Log.printlog(
+                    f"Invalid Metric Spec: Unsupported selector type {metric_spec.selector.type} for metric {metric_spec.name}",
+                    code=6019,
                 )
 
         return self._processed_metrics

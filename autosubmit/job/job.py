@@ -1518,7 +1518,11 @@ class Job(object):
                 metric_procesor.process_metrics()
             except Exception as exc:
                 # Warn if metrics are not processed
-                Log.warning(f"Error processing metrics for job {self.name}: {exc}")
+                Log.printlog(
+                    f"Error processing metrics for job {self.name}: {exc}.\n"
+                    + "Try reviewing your configuration file and template, then re-run the job.",
+                    code=6017,
+                )
 
         return self.status
 
@@ -1587,7 +1591,7 @@ class Job(object):
             config_section: dict = as_conf.experiment_data.get("CONFIG", {})
             base_path = Path(config_section.get("METRIC_FOLDER", base_path))
         except Exception as exc:
-            Log.warning(f"Failed to get metric folder from config: {exc}")
+            Log.printlog(f"Failed to get metric folder from config: {exc}", code=6019)
 
         # Construct the metric folder path by adding the job name
         metric_folder = base_path.joinpath(self.name)
