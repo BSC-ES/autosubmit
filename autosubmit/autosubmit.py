@@ -1531,7 +1531,7 @@ class Autosubmit:
         :param job_list: Handles the list as a unique entity.\n
         :type job_list: JobList() object\n
         :param platforms: List of platforms related to the experiment.\n
-        :type platforms: List() of Platform Objects. e.g EcPlatform(), SgePlatform().
+        :type platforms: List() of Platform Objects. e.g EcPlatform(), SlurmPlatform().
         :return: Nothing, modifies input.
         """
 

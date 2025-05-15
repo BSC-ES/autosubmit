@@ -7,6 +7,7 @@
 - Fixed an issue with Autosubmit's CITATION.cff that prevented Zenodo from automatically
   adding new deposits via its webhook #2401
 - Deleted command `autosubmit test` that was not working in Autosubmit 4 #2386
+- Removed PBS and SGE platforms as they are not working in AS4 #2349
 
 **Enhancements:**
 

@@ -286,7 +286,7 @@ This will create a platform named *new_platform*. The options specified are all 
     * - Parameter
       - Description
     * - ``TYPE``
-      - Queue type for the platform. Options supported are PBS, SGE, PS, ecaccess and SLURM.
+      - Queue type for the platform. Options supported are PS, ecaccess and SLURM.
     * - ``HOST``
       - Hostname of the platform.
     * - ``PROJECT``
@@ -303,7 +303,7 @@ This will create a platform named *new_platform*. The options specified are all 
       - Queue for the ecaccess platform. (hpc, ecs).
 
 .. warning:: With some platform types, Autosubmit may also need the version, forcing you to add the parameter
-    VERSION. These platforms are PBS (options: 10, 11, 12) and ecaccess (options: pbs, loadleveler, slurm).
+    VERSION. For example, ecaccess (options: pbs, loadleveler, slurm).
 
 .. list-table::
     :widths: 25 75
