@@ -22,7 +22,7 @@ It uses the db_manager code to manage the database.
 
 import traceback
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple, Set
 
 from networkx import DiGraph
 
@@ -97,3 +97,44 @@ def save_new_structure(graph: DiGraph, job_list_path: Optional[Path]):
     # save
     edges = [{"e_from": e[0], "e_to": e[1]} for e in data]
     db_manager.insert_many(ExperimentStructureTable.name, edges)
+
+
+def update_structure(job_list_path: Path, job_data: dict[str, dict]):
+    """Update the experiment structure in the database."""
+    _check_structures_path(job_list_path)
+    db_manager = _get_db_manager(None if not job_list_path else job_list_path / f"job_list.db")
+
+    # Create table if it doesn't exist
+    db_manager.create_table(ExperimentStructureTable.name)
+
+    # Modify edges if needed
+
+    # Save structure
+    data = [(k, v) for k, v in job_data.items()]
+    # save
+    edges = [{"e_from": e[0], "e_to": e[1]} for e in data]
+    db_manager.insert_many(ExperimentStructureTable.name, edges)
+
+
+def get_children_parents_job_names(job_list_path: Path, job_name: str) -> Tuple[Set[str], Set[str]]:
+    """
+    Returns two sets: (children, parents) for the given job_name.
+    Children: jobs where e_from == job_name
+    Parents: jobs where e_to == job_name
+    """
+    _check_structures_path(job_list_path)
+    db_manager = _get_db_manager(None if not job_list_path else job_list_path / f"job_list.db")
+
+    children = set()
+    parents = set()
+    # Get children (edges where e_from == job_name)
+    child_rows = db_manager.select_where('experiment_structure', {'e_from': job_name})
+    for row in child_rows:
+        children.add(row[1])  # e_to
+
+    # Get parents (edges where e_to == job_name)
+    parent_rows = db_manager.select_where('experiment_structure', {'e_to': job_name})
+    for row in parent_rows:
+        parents.add(row[0])  # e_from
+
+    return children, parents

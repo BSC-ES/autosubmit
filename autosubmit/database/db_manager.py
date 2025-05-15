@@ -84,6 +84,15 @@ class DbManager:
             rows = conn.execute(select(table)).all()
         return [row.tuple() for row in rows]
 
+    def select_where(self, table_name: str, where: dict[str, Any]) -> list[Any]:
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        query = select(table)
+        for key, value in where.items():
+            query = query.where(getattr(table.c, key) == value)
+        with self.engine.connect() as conn:
+            rows = conn.execute(query).all()
+        return [row.tuple() for row in rows]
+
     def count(self, table_name: str) -> int:
         table = get_table_from_name(schema=self.schema, table_name=table_name)
         with self.engine.connect() as conn:
@@ -110,24 +119,3 @@ class DbManager:
             result = conn.execute(query)
             conn.commit()
         return cast(int, result.rowcount)
-
-
-class JobsDbManager(DbManager):
-    """A database manager for the jobs table using SQLAlchemy.
-
-    It can be used with any engine supported by SQLAlchemy, such
-    as Postgres, Mongo, MySQL, etc.
-    """
-
-    def __init__(self, connection_url: str, schema: Optional[str] = None) -> None:
-        super().__init__(connection_url=connection_url, schema=schema)
-
-    # select active jobs
-
-    def select_active_jobs(self, table_name: str) -> list[Any]:
-        table = get_table_from_name(schema=self.schema, table_name=table_name)
-        active_statuses = ['READY', 'SUBMITTED', 'QUEUING', 'HELD', 'RUNNING']
-
-        with self.engine.connect() as conn:
-            rows = conn.execute(select(table).where(table.c.status.in_(active_statuses))).all()
-        return [row.tuple() for row in rows]

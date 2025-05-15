@@ -28,23 +28,30 @@ from autosubmit.database.db_manager import DbManager
 from autosubmit.database.tables import JobsTable
 
 
+ACTIVE_STATUSES = ['READY', 'SUBMITTED', 'QUEUING', 'HELD', 'RUNNING']
+
 def _get_db_manager(sqlite_db_file: Optional[Path]) -> DbManager:
     """Create a ``db_manager`` with the given parameters."""
     connection_url = get_connection_url(db_path=sqlite_db_file)
     return DbManager(connection_url=connection_url)
 
 
+
 def save_jobs(job_list_path, job_list):
-    # Job_list should only be the active ones now
+    """Save the job list to the database. Normally this will save the current active jobs"""
     check_db_path(job_list_path)
     db_manager = _get_db_manager(job_list_path / f"job_list.db")
     db_manager.create_table(JobsTable.name)
-    job_data = {job.name: job.__getstate__() for job in job_list}
-    # db_manager.insert_many(JobsTable.name, job_data)
+    job_data = {job.name: job.__getstate__(structure=True, log_process=False) for job in job_list}
+    db_manager.insert_many(JobsTable.name, job_data)
+    #update_structure(job_list_path, job_data)
     pass
 
+def load_active_and_children_jobs():
+    """Load all active jobs ( READY, SUBMITTED, QUEUING, RUNNING ) and their children from the database."""
 
 def load_all_jobs(job_list_path, job_list):
+    """Load all jobs from the database. Used in generate"""
     check_db_path(job_list_path)
     db_manager = _get_db_manager(job_list_path / f"job_list.db")
     db_manager.create_table(JobsTable.name)
@@ -58,3 +65,38 @@ def load_active_jobs(job_list_path, job_list):
     db_manager.create_table(JobsTable.name)
     job_data = db_manager.load(JobsTable.name)
     return job_data
+
+
+def select_active_jobs(job_list_path: Path) -> dict:
+    """
+    Returns a dict of active jobs: {job_name: job_data} for jobs with status in ACTIVE_STATUSES.
+    """
+    check_db_path(job_list_path)
+    db_manager = _get_db_manager(job_list_path / "job_list.db")
+    db_manager.create_table(JobsTable.name)
+
+    active_jobs = {}
+    for status in ACTIVE_STATUSES:
+        rows = db_manager.select_where(JobsTable.name, {"status": status})
+        for row in rows:
+            # Assuming the first column is job_name
+            job_name = row[0]
+            active_jobs[job_name] = row
+    return active_jobs
+
+def select_children_of_active_jobs(job_list_path: Path) -> dict:
+    """
+    Returns a dict of active jobs: {job_name: job_data} for jobs with status in ACTIVE_STATUSES.
+    """
+    check_db_path(job_list_path)
+    db_manager = _get_db_manager(job_list_path / "job_list.db")
+    db_manager.create_table(JobsTable.name)
+
+    active_jobs = {}
+    for status in ACTIVE_STATUSES:
+        rows = db_manager.select_where(JobsTable.name, {"status": status})
+        for row in rows:
+            # Assuming the first column is job_name
+            job_name = row[0]
+            active_jobs[job_name] = row
+    return active_jobs

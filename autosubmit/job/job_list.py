@@ -33,7 +33,7 @@ from networkx import DiGraph
 
 from autosubmit.database.db_common import check_db_path
 from autosubmit.database.db_structure import save_new_structure
-
+from autosubmit.database.db_job_list import save_jobs
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
@@ -43,10 +43,8 @@ from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
-import autosubmit.database.db_job_list
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency, _get_submitter
-import autosubmit.database.db_structure as DbStructure
 
 
 class JobList(object):
@@ -300,6 +298,7 @@ class JobList(object):
                         job.platform = submitter.platforms[job.platform_name]
 
     def clear_generate(self):
+        save_new_structure(self.graph, self._persistence_path)
         self.dependency_map = {}
         self.parameters = {}
         self._parameters = {}
@@ -2366,15 +2365,7 @@ class JobList(object):
                     if job.name not in job_names:
                         job_list.append(job)
             self.update_status_log()
-
-            try:
-                save_new_structure(self.job_list, self._persistence_path)
-                save_jobs(self._job_list, self._persistence_path, self._persistence_file)
-                self._persistence.save(self._persistence_path, self._persistence_file,
-                                       self._job_list if self.run_members is None or
-                                                         job_list is None else job_list, self.graph)
-            except BaseException as e:
-                raise AutosubmitError(str(e), 6040, "Failure while saving the job_list")
+            save_jobs(self._persistence_path, self._job_list)
         except AutosubmitError as e:
             raise
         except BaseException as e:

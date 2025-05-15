@@ -32,6 +32,7 @@ from threading import Thread
 from time import sleep
 from typing import Optional, Tuple
 
+from autosubmit.database.db_structure import get_children_parents_job_names
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job import job_utils
@@ -160,13 +161,46 @@ class Job(object):
         '_log_recovered', 'packed_during_building', 'workflow_commit'
     )
 
-    def __setstate__(self, state):
+    PERSISTENT_ATTRIBUTES = (
+        "name",
+        "id",
+        "script_name",
+        "priority",
+        "status",
+        "frequency",
+        "synchronize",
+        "section",
+        "chunk",
+        "splits",
+        "split",
+        "date",
+        "date_split",
+        "edge_info",
+        "max_checkpoint_step",
+        "start_time_timestamp",
+        "end_time_timestamp",
+        "submit_time_timestamp",
+        "finish_time_timestamp",
+        "ready_date",
+        "local_logs",
+        "remote_logs",
+        "log_available",
+        "updated_log",
+        "packed",
+    )
+
+    def __setstate__(self, state, structure = False):
         for slot, value in state.items():
             if slot in self.__slots__:
                 setattr(self, slot, value)
+        if structure:
+            self.children, self.parents = get_children_parents_job_names(self.name)
 
-    def __getstate__(self):
-        return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in EXCLUDED])
+    def __getstate__(self, log_process = False):
+        if log_process:
+            return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in EXCLUDED])
+        else:
+            return dict([(k, getattr(self, k, None)) for k in self.PERSISTENT_ATTRIBUTES])
 
     CHECK_ON_SUBMISSION = 'on_submission'
 

@@ -16,7 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import cast, List, Optional
+from typing import cast, List, Optional, Tuple, Set
 
 from sqlalchemy import (
     MetaData,
@@ -149,7 +149,7 @@ JobsTable = Table(
     Column("id", Integer),
     Column("script_name", String),
     Column("priority", Integer),
-    Column("status", String), # TODO Add Custom status column?
+    Column("status", String), # TODO Add Custom status type?
     Column("frequency", String),
     Column("synchronize", Boolean),
     Column("section", String),
