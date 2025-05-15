@@ -2369,7 +2369,7 @@ class JobList(object):
         except AutosubmitError as e:
             raise
         except BaseException as e:
-            raise AutosubmitError(str(e), 6040, "Unknown failure while saving the job_list")
+            raise
 
     def backup_save(self):
         """

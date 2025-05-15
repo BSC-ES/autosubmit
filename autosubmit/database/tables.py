@@ -158,7 +158,6 @@ JobsTable = Table(
     Column("split", Integer),
     Column("date", String),
     Column("date_split", String),
-    Column("edge_info", Text),
     Column("max_checkpoint_step", Integer),
     Column("start_time", DateTime),
     Column("end_time_timestamp", Float),

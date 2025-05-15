@@ -45,6 +45,7 @@ from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from log.log import Log, AutosubmitCritical
 
+
 Log.get_logger("Autosubmit")
 
 # A wrapper for encapsulate threads , TODO: Python 3+ to be replaced by the < from concurrent.futures >
@@ -175,7 +176,6 @@ class Job(object):
         "split",
         "date",
         "date_split",
-        "edge_info",
         "max_checkpoint_step",
         "start_time_timestamp",
         "end_time_timestamp",
@@ -200,7 +200,15 @@ class Job(object):
         if log_process:
             return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in EXCLUDED])
         else:
-            return dict([(k, getattr(self, k, None)) for k in self.PERSISTENT_ATTRIBUTES])
+            job_data = dict([(k, getattr(self, k, None)) for k in self.PERSISTENT_ATTRIBUTES])
+            job_data["status"] = Status.VALUE_TO_KEY[self.status]
+            if job_data["local_logs"][0] == "":
+                job_data["local_logs"] = None
+
+            if job_data["remote_logs"][0] == "":
+                job_data["remote_logs"] = None
+
+            return job_data
 
     CHECK_ON_SUBMISSION = 'on_submission'
 

@@ -42,7 +42,7 @@ def save_jobs(job_list_path, job_list):
     check_db_path(job_list_path)
     db_manager = _get_db_manager(job_list_path / f"job_list.db")
     db_manager.create_table(JobsTable.name)
-    job_data = {job.name: job.__getstate__(structure=True, log_process=False) for job in job_list}
+    job_data = [job.__getstate__(log_process=False) for job in job_list]
     db_manager.insert_many(JobsTable.name, job_data)
     #update_structure(job_list_path, job_data)
     pass
