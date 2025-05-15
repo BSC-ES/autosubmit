@@ -164,7 +164,7 @@ JobsTable = Table(
     Column("submit_time_timestamp", Float),
     Column("finish_time_timestamp", Float),
     Column("ready_date", DateTime),
-    Column("local_logs", String),
+    Column("local_logs", String), # tuple, to modify double value in two
     Column("remote_logs", String),
     Column("log_available", Boolean),
     Column("updated_log", Boolean),
