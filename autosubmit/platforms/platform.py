@@ -357,7 +357,7 @@ class Platform(object):
         :param job_list: job list to check  \n
         :type job_list: JobList object  \n
         :param platforms_to_test: platforms used  \n
-        :type platforms_to_test: set of Platform Objects, e.g. SgePlatform(), SlurmPlatform().  \n
+        :type platforms_to_test: set of Platform Objects, e.g. EcPlatform(), SlurmPlatform().  \n
         :param packages_persistence: Handles database per experiment. \n
         :type packages_persistence: JobPackagePersistence object \n
         :param inspect: True if coming from generate_scripts_andor_wrappers(). \n
