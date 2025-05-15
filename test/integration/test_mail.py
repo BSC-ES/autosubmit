@@ -1,5 +1,6 @@
 import pytest
 import requests
+from typing import List
 from testcontainers.core.container import DockerContainer
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.job.job_common import Status
@@ -54,7 +55,19 @@ def mail_notifier(fake_smtp_server, tmp_path):
     return MailNotifier(config)
 
 
-def test_notify_status_change_and_experiment_status(mail_notifier, fake_smtp_server):
+def check_metadata(emails: List[str], expected_subject: str, expid: str, sender: str, recipients: List[str])-> None:
+    subject = [email["Content"]["Headers"]["Subject"][0] for email in emails]   
+    assert (expected_subject in s for s in subject)
+    body = [email["Content"]["Body"] for email in emails]
+    assert (expid in b for b in body)
+    
+    for email in emails:
+        assert sender in email["Raw"]["From"]
+        for recipient in recipients:
+            assert recipient in email["Raw"]["To"]
+
+
+def test_notify_status_change(mail_notifier, fake_smtp_server):
     api_base = fake_smtp_server["api_base"]
     expid = 'a000'
     job_name = 'SIM'
@@ -63,11 +76,24 @@ def test_notify_status_change_and_experiment_status(mail_notifier, fake_smtp_ser
 
     mail_notifier.notify_status_change(
         expid, job_name,
-        Status.VALUE_TO_KEY[Status.RUNNING],
-        Status.VALUE_TO_KEY[Status.FAILED],
+        Status.VALUE_TO_KEY[Status.RUNNING], # previous status
+        Status.VALUE_TO_KEY[Status.FAILED], # new status
         to_email
     )
 
+    resp = requests.get(f"{api_base}/api/v2/messages")
+    emails = resp.json()["items"]
+    assert len(emails) == 1 
+    check_metadata(emails, "status has changed to FAILED", expid, 'notifier@localhost', to_email)
+
+
+def test_experiment_status(mail_notifier, fake_smtp_server):
+    api_base = fake_smtp_server["api_base"]
+    expid = 'a000'
+    job_name = 'SIM'
+    to_email = ['test@example.com']
+    requests.delete(f"{api_base}/api/v2/messages")
+    
     platform = cast("Platform", type('', (), {'host': 'localhost', 'name': 'fake-local'}))
     mail_notifier.notify_experiment_status(
         expid,
@@ -76,21 +102,32 @@ def test_notify_status_change_and_experiment_status(mail_notifier, fake_smtp_ser
     )
 
     resp = requests.get(f"{api_base}/api/v2/messages")
-    print("Email API status:", resp.status_code)
-    print("Email API response:", repr(resp.text))
     emails = resp.json()["items"]
-    assert len(emails) == 2
-
-    subjects = [
-        email["Content"]["Headers"]["Subject"][0]
-        for email in emails
-    ]   
-    print(subjects)
-    # assert any("RUNNING" in s and "FAILED" in s for s in subjects)
-    # assert any(expid in s for s in subjects)
+    assert len(emails) == 1 
+    check_metadata(emails, "platform is malfunctioning", expid, 'notifier@localhost', to_email)
     
-    '''
-    for email in emails:
-        assert email["To"] == to_email
-        assert "notifier@localhost" in email["From"]
-    '''
+    bodies = [
+            email["Content"]["Body"]
+            for email in emails
+            ]
+    assert ('Name="dummy_run.log.zip"' in b for b in bodies)
+    # TODO: test content of compressed file?
+
+# empty list, invalid mail (regex?), multiple recipients
+@pytest.mark.parametrize(
+    "list_recipients, expected",
+    [([], False), (['test'], False), (['test@mail.com', 'test2@mail.com'], True)]
+)
+def test_recipients_list(mail_notifier, fake_smtp_server, list_recipients, expected):
+    api_base = fake_smtp_server["api_base"]
+    expid = 'a000'
+    job_name = 'SIM'
+    requests.delete(f"{api_base}/api/v2/messages")
+
+    mail_notifier.notify_status_change(
+        expid, job_name,
+        Status.VALUE_TO_KEY[Status.RUNNING], # previous status
+        Status.VALUE_TO_KEY[Status.FAILED], # new status
+        list_recipients 
+    )
+
