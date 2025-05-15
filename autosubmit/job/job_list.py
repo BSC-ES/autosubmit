@@ -32,7 +32,7 @@ from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
 
 from autosubmit.database.db_common import check_db_path
-from autosubmit.database.db_structure import save_new_structure, save_structure
+from autosubmit.database.db_structure import save_new_structure
 
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
@@ -2368,7 +2368,7 @@ class JobList(object):
             self.update_status_log()
 
             try:
-                save_new_structure()
+                save_new_structure(self.job_list, self._persistence_path)
                 save_jobs(self._job_list, self._persistence_path, self._persistence_file)
                 self._persistence.save(self._persistence_path, self._persistence_file,
                                        self._job_list if self.run_members is None or
