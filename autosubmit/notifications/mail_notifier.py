@@ -208,8 +208,8 @@ class MailNotifier:
                 message)
         except BaseException as e:
             Log.printlog(
-                f'Trace:{str(e)}\nAn error has occurred while sending a mail for '
-                f'warn about remote_platform', 6011)
+                f'Trace:{str(e)}\nAn error has occurred while sending a warning mail '
+                f'about remote_platform', 6011)
 
     def notify_status_change(
             self,
@@ -239,19 +239,8 @@ class MailNotifier:
                 message)
         except BaseException as e:
             Log.printlog(
-                f'Trace:{str(e)}\nAn error has occurred while sending a mail for '
-                f'warn about remote_platform', 6011)
-
-        '''
-        for mail in mail_to:  # expects a list
-            message['To'] = email.utils.formataddr((mail, mail))
-            try:
-                self._send_mail(self.config.MAIL_FROM, mail, message)
-            except BaseException as e:
-                Log.printlog(
-                    f'Trace:{str(e)}\nAn error has occurred while sending a mail '
-                    f'for the job {job_name}', 6011)
-        '''
+                f'Trace:{str(e)}\nAn error has occurred while sending a warning mail '
+                f'about remote_platform', 6011)
 
     def _send_mail(self, mail_from, mail_to, message):
         server = smtplib.SMTP(self.config.SMTP_SERVER, timeout=60)
