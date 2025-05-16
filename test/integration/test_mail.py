@@ -72,7 +72,7 @@ def test_notify_status_change(mail_notifier, fake_smtp_server):
     expid = 'a000'
     job_name = 'SIM'
     to_email = ['test@example.com']
-    requests.delete(f"{api_base}/api/v2/messages")
+    requests.delete(f"{api_base}/api/v1/messages")
 
     mail_notifier.notify_status_change(
         expid, job_name,
@@ -92,9 +92,12 @@ def test_experiment_status(mail_notifier, fake_smtp_server):
     expid = 'a000'
     job_name = 'SIM'
     to_email = ['test@example.com']
-    requests.delete(f"{api_base}/api/v2/messages")
-    
-    platform = cast("Platform", type('', (), {'host': 'localhost', 'name': 'fake-local'}))
+    requests.delete(f"{api_base}/api/v1/messages")
+
+    platform = cast(
+        "Platform", type(
+            '', (), {
+                'host': 'localhost', 'name': 'fake-local'}))
     mail_notifier.notify_experiment_status(
         expid,
         to_email,
@@ -102,8 +105,8 @@ def test_experiment_status(mail_notifier, fake_smtp_server):
     )
 
     resp = requests.get(f"{api_base}/api/v2/messages")
+    assert resp.json()["count"] == 1
     emails = resp.json()["items"]
-    assert len(emails) == 1 
     check_metadata(emails, "platform is malfunctioning", expid, 'notifier@localhost', to_email)
     
     bodies = [
