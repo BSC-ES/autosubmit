@@ -131,7 +131,8 @@ def test_experiment_status(mail_notifier, fake_smtp_server):
 
 @pytest.mark.parametrize(
     "list_recipients, expected_error_message",
-    [([], "Empty recipient list"),
+    [("test", "Recipients of mail notifications must be a list of emails!"),
+        ([], "Empty recipient list"),
         (['test'], "Invalid email in recipient list"),
         (['test@mail.com', 'test2@mail.com'], None)]
 )
