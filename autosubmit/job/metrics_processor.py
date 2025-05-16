@@ -242,8 +242,6 @@ class UserMetricProcessor:
                         for k in key:
                             value = value[k]
                     self.store_metric(metric_spec.name, value)
-                except json.JSONDecodeError:
-                    Log.printlog(f"Invalid JSON content in file {spec_path}", code=6018)
                 except Exception:
                     Log.printlog(
                         f"Error processing JSON content in file {spec_path}", code=6018

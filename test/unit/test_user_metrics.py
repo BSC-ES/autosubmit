@@ -1,3 +1,4 @@
+import sqlite3
 from typing import Any
 import pytest
 from pathlib import Path
@@ -8,10 +9,12 @@ from autosubmit.job.metrics_processor import (
     MetricSpecSelectorType,
     MetricSpec,
     UserMetricProcessor,
+    UserMetricRepository,
 )
 from unittest.mock import MagicMock, patch
 
 from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmitconfigparser.config.basicconfig import BasicConfig
 
 
 @pytest.fixture
@@ -235,24 +238,31 @@ def test_process_metrics(disable_metric_repository):
             ),
         ]
 
-        with patch(
-            "autosubmit.job.metrics_processor.UserMetricProcessor.store_metric"
-        ) as mock_store_metric:
-            user_metric_processor = UserMetricProcessor(as_conf, job)
-            user_metric_processor.process_metrics()
+        # Mocking the repository
+        mock_store_metric = MagicMock()
+        mock_repo = MagicMock()
+        mock_repo.store_metric = mock_store_metric
 
-            assert mock_read_metrics_specs.call_count == 1
+        user_metric_processor = UserMetricProcessor(as_conf, job)
+        user_metric_processor.user_metric_repository = mock_repo
+        user_metric_processor.process_metrics()
 
-            assert job.platform.read_file.call_count == 2
+        assert mock_read_metrics_specs.call_count == 1
 
-            assert mock_store_metric.call_count == 2
-            assert mock_store_metric.call_args_list[0][0][0] == "metric1"
-            assert (
-                mock_store_metric.call_args_list[0][0][1]
-                == '{"key1": "value1", "key2": "value2"}'
-            )
-            assert mock_store_metric.call_args_list[1][0][0] == "metric2"
-            assert mock_store_metric.call_args_list[1][0][1] == "value2"
+        assert job.platform.read_file.call_count == 2
+
+        assert mock_store_metric.call_count == 2
+
+        assert mock_store_metric.call_args_list[0][0][1] == "test_job"
+        assert mock_store_metric.call_args_list[0][0][2] == "metric1"
+        assert (
+            mock_store_metric.call_args_list[0][0][3]
+            == '{"key1": "value1", "key2": "value2"}'
+        )
+
+        assert mock_store_metric.call_args_list[1][0][1] == "test_job"
+        assert mock_store_metric.call_args_list[1][0][2] == "metric2"
+        assert mock_store_metric.call_args_list[1][0][3] == "value2"
 
 
 def test_get_current_metric_folder(autosubmit_config):
@@ -307,3 +317,33 @@ def test_get_current_metric_folder_placeholder(autosubmit_config, local: LocalPl
     assert parameters["CURRENT_METRIC_FOLDER"] == str(
         Path(parameters["CURRENT_ROOTDIR"]).joinpath("my_metrics_folder", JOB_NAME)
     )
+
+
+def test_store_metric(tmp_path):
+    EXPID = "t123"
+    with patch("autosubmit.job.metrics_processor.BasicConfig.LOCAL_ROOT_DIR", tmp_path):
+        Path(tmp_path).joinpath(EXPID, BasicConfig.LOCAL_TMP_DIR).mkdir(
+            parents=True, exist_ok=True
+        )
+
+        user_metric_repository = UserMetricRepository(EXPID)
+        user_metric_repository.store_metric(
+            run_id=1,
+            job_name="test_job",
+            metric_name="test_metric",
+            metric_value="test_value",
+        )
+
+        # Check if the metric is stored in the database
+        with sqlite3.connect(user_metric_repository.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT metric_value FROM user_metrics
+                WHERE run_id = ? AND job_name = ? AND metric_name = ?;
+                """,
+                (1, "test_job", "test_metric"),
+            )
+            result = cursor.fetchone()
+            assert result is not None
+            assert result[0] == "test_value"

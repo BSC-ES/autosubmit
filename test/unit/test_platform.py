@@ -69,3 +69,16 @@ def test_get_stat_file(file_exists, count, tmp_path):
     assert Path(f"{basic_config.LOCAL_ROOT_DIR}/{filename}").exists() == file_exists
     assert Path(f"{basic_config.LOCAL_ROOT_DIR}/LOG_t000/{filename}").exists() == file_exists
     assert platform.get_stat_file(job, count) == file_exists
+
+
+def test_local_platform_read_file(tmp_path):
+    basic_config = FakeBasicConfig()
+    basic_config.LOCAL_ROOT_DIR = str(tmp_path)
+    basic_config.LOCAL_TMP_DIR = str(tmp_path)
+
+    platform = LocalPlatform("t001", "platform", basic_config.props())
+
+    path_not_exists = Path(tmp_path).joinpath("foo", "bar")
+
+    assert platform.get_file_size(path_not_exists) is None
+    assert platform.read_file(path_not_exists) is None
