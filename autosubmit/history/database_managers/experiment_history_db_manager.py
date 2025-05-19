@@ -222,7 +222,10 @@ class ExperimentHistoryDbManager(DatabaseManager):
         return False
 
     def get_job_data_all(self):
-        """ Gets all content from job_data as list of Models.JobDataRow from database. """
+        """Used for tests only.\
+
+        Gets all content from job_data as list of Models.JobDataRow from database.
+        """
         statement = self.get_built_select_statement("job_data")
         job_data_rows = self.get_from_statement(self.historicaldb_file_path, statement)
         return [Models.JobDataRow(*row) for row in job_data_rows]
@@ -240,11 +243,6 @@ class ExperimentHistoryDbManager(DatabaseManager):
         for job_data_dc in job_data_dc_list:
             job_data_dc.last = 0
             self._update_job_data_by_id(job_data_dc)
-
-    def update_job_data_dc_by_id(self, job_data_dc):
-        """ Update JobData data class. Returns latest last=1 row from job_data by job_name. """
-        self._update_job_data_by_id(job_data_dc)
-        return self.get_job_data_dc_unique_latest_by_job_name(job_data_dc.job_name)
 
     def update_job_data_dc_by_job_id_name(self, job_data_dc: Any) -> Any:
         """
@@ -282,13 +280,6 @@ class ExperimentHistoryDbManager(DatabaseManager):
             job_data_rows_last = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement,
                                                                         arguments)
         return [Models.JobDataRow(*row) for row in job_data_rows_last]
-
-    def _get_job_data_last_by_run_id(self, run_id):
-        """ Get List of Models.JobDataRow for last=1 and run_id """
-        statement = self.get_built_select_statement("job_data", "run_id=? and last=1 and rowtype >= 2 ORDER BY id")
-        arguments = (run_id,)
-        job_data_rows = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
-        return [Models.JobDataRow(*row) for row in job_data_rows]
 
     def get_job_data_dcs_last_by_wrapper_code(self, wrapper_code):
         if wrapper_code and wrapper_code > 2:
@@ -392,14 +383,6 @@ class ExperimentHistoryDbManager(DatabaseManager):
                      experiment_run_dc.suspended, HUtils.get_current_datetime(), experiment_run_dc.run_id)
         self.execute_statement_with_arguments_on_dbfile(self.historicaldb_file_path, statement, arguments)
 
-    def _get_job_data_last_by_run_id_and_finished(self, run_id):
-        """ Get List of Models.JobDataRow for last=1, finished > 0 and run_id   """
-        statement = self.get_built_select_statement("job_data",
-                                                    "run_id=? and last=1 and finish > 0 and rowtype >= 2 ORDER BY id")
-        arguments = (run_id,)
-        job_data_rows = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
-        return [Models.JobDataRow(*row) for row in job_data_rows]
-
     def get_job_data_by_job_id_name(self, job_id: int, job_name: str) -> JobData:
         """
         Get the latest JobData for a given job_id and job_name.
@@ -430,12 +413,12 @@ class ExperimentHistoryDbManager(DatabaseManager):
         if job_name:
             statement = "SELECT MAX(counter) as maxcounter FROM job_data WHERE job_name = ?"
             arguments = (job_name,)
-            counter_result = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
+            counter_result: list[tuple[Optional[int]]] = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
         else:
             statement = "SELECT MAX(counter) as maxcounter FROM job_data"
-            counter_result = self.get_from_statement(self.historicaldb_file_path, statement)
+            counter_result: list[tuple[Optional[int]]] = self.get_from_statement(self.historicaldb_file_path, statement)
 
-        if len(counter_result) <= 0:
+        if not counter_result[0][0]:
             return DEFAULT_MAX_COUNTER
         else:
             max_counter = Models.MaxCounterRow(*counter_result[0]).maxcounter
@@ -450,10 +433,12 @@ class ExperimentHistoryDbManager(DatabaseManager):
         """ Gets current pragma version as int. """
         statement = "pragma user_version;"
         pragma_result = self.get_from_statement(self.historicaldb_file_path, statement)
-        if len(pragma_result) <= 0:
+        # First row, first column -- single value.
+        pragma_value = pragma_result[0][0]
+        if pragma_value <= 0:
             raise Exception(
                 "Error while getting the pragma version. This might be a signal of a deeper problem. Review previous errors.")
-        return Models.PragmaVersion(*pragma_result[0]).version
+        return Models.PragmaVersion(pragma_value).version
 
 
 class ExperimentHistoryDatabaseManager(Protocol):
@@ -480,8 +465,6 @@ class ExperimentHistoryDatabaseManager(Protocol):
     def get_job_data_all(self): ...
 
     def register_submitted_job_data_dc(self, job_data_dc): ...
-
-    def update_job_data_dc_by_id(self, job_data_dc): ...
 
     def update_job_data_dc_by_job_id_name(self, job_data_dc: Any) -> Any: ...
 
@@ -643,11 +626,6 @@ class SqlAlchemyExperimentHistoryDbManager:
             job_data_dc.last = 0
             self._update_job_data_by_id(job_data_dc)
 
-    def update_job_data_dc_by_id(self, job_data_dc):
-        """ Update JobData data class. Returns latest last=1 row from job_data by job_name. """
-        self._update_job_data_by_id(job_data_dc)
-        return self.get_job_data_dc_unique_latest_by_job_name(job_data_dc.job_name)
-
     def update_job_data_dc_by_job_id_name(self, job_data_dc: Any) -> Any:
         """
         Update JobData data class. Returns the latest row from job_data by job_name.
@@ -696,24 +674,6 @@ class SqlAlchemyExperimentHistoryDbManager:
             with self.engine.connect() as conn:
                 job_data_rows_last = conn.execute(new_query).all()
         return [Models.JobDataRow(*row) for row in job_data_rows_last]
-
-    def _get_job_data_last_by_run_id(self, run_id):
-        """ Get List of Models.JobDataRow for last=1 and run_id """
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
-        query = (
-            select(job_data_table).
-            where(
-                and_(
-                    job_data_table.c.run_id == run_id,
-                    job_data_table.c.last == 1,
-                    job_data_table.c.rowtype >= 2
-                )
-            ).
-            order_by(job_data_table.c.id)
-        )
-        with self.engine.connect() as conn:
-            job_data_rows = conn.execute(query).all()
-        return [Models.JobDataRow(*row) for row in job_data_rows]
 
     def get_job_data_dcs_last_by_wrapper_code(self, wrapper_code):
         if wrapper_code and wrapper_code > 2:
@@ -859,17 +819,16 @@ class SqlAlchemyExperimentHistoryDbManager:
             result = conn.execute(query).first()
             return JobData.from_model(result)
 
-    def get_job_data_max_counter(self):
+    def get_job_data_max_counter(self, job_name: str = None):
         """ The max counter is the maximum count value for the count column in job_data. """
         job_data_table = get_table_with_schema(self.schema, JobDataTable)
         query = select(func.max(job_data_table.c.counter).label("maxcounter"))
+        if job_name:
+            query = query.where(job_data_table.c.job_name == job_name)  # type: ignore
         with self.engine.connect() as conn:
             result = conn.execute(query).first()
-        if result:
-            max_counter = result.maxcounter
-            return max_counter if max_counter else DEFAULT_MAX_COUNTER
-        else:
-            return DEFAULT_MAX_COUNTER
+        max_counter = result.maxcounter
+        return max_counter if max_counter else DEFAULT_MAX_COUNTER
 
 
 def create_experiment_history_db_manager(db_engine: str, **options: Any) -> ExperimentHistoryDatabaseManager:

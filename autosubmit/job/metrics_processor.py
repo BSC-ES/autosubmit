@@ -1,15 +1,34 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+import copy
+import json
+import locale
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-import json
-import copy
-import locale
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from typing import TYPE_CHECKING, Any, Optional
+
 from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmit.database import session, tables
+from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from sqlalchemy.schema import CreateTable, CreateSchema
+
+from autosubmit.database import session, tables
 from log.log import Log
 
 if TYPE_CHECKING:
@@ -28,10 +47,10 @@ class MetricSpecSelectorType(Enum):
 @dataclass
 class MetricSpecSelector:
     type: MetricSpecSelectorType
-    key: Optional[List[str]]
+    key: Optional[list[str]]
 
     @staticmethod
-    def load(data: Optional[Dict[str, Any]]) -> "MetricSpecSelector":
+    def load(data: Optional[dict[str, Any]]) -> "MetricSpecSelector":
         if data is None:
             _type = MetricSpecSelectorType.TEXT
             return MetricSpecSelector(type=_type, key=None)
@@ -72,7 +91,7 @@ class MetricSpec:
     max_read_size_mb: int = MAX_FILE_SIZE_MB
 
     @staticmethod
-    def load(data: Dict[str, Any]) -> "MetricSpec":
+    def load(data: dict[str, Any]) -> "MetricSpec":
         if not isinstance(data, dict):
             raise ValueError("Invalid metric spec")
 
@@ -163,21 +182,22 @@ class UserMetricProcessor:
         self.user_metric_repository = UserMetricRepository(job.expid)
         self._processed_metrics = {}
 
-    def read_metrics_specs(self) -> List[MetricSpec]:
+    def read_metrics_specs(self) -> list[MetricSpec]:
         try:
-            raw_metrics: List[Dict[str, Any]] = self.as_conf.get_section(
+            # TODO: Remove ignored type once AS config parser has been moved back and types have been added there.
+            raw_metrics = self.as_conf.get_section(  # type: ignore
                 ["JOBS", self.job.section, "METRICS"]
             )
 
             # Normalize the parameters keys
-            raw_metrics = [
+            raw_metrics: list[dict[str, Any]] = [
                 self.as_conf.deep_normalize(metric) for metric in raw_metrics
             ]
         except Exception as exc:
             Log.printlog("Invalid or missing metrics section", code=6019)
             raise ValueError(f"Invalid or missing metrics section: {str(exc)}")
 
-        metrics_specs: List[MetricSpec] = []
+        metrics_specs: list[MetricSpec] = []
         for raw_metric in raw_metrics:
             """
             Read the metrics specs of the job
@@ -185,8 +205,8 @@ class UserMetricProcessor:
             try:
                 spec = MetricSpec.load(raw_metric)
                 metrics_specs.append(spec)
-            except Exception:
-                Log.printlog(f"Invalid metric spec: {str(raw_metric)}", code=6019)
+            except Exception as e:
+                Log.printlog(f"Invalid metric spec: {str(raw_metric)}: {str(e)}", code=6019)
 
         return metrics_specs
 
@@ -249,14 +269,14 @@ class UserMetricProcessor:
                         for k in key:
                             value = value[k]
                     self.store_metric(metric_spec.name, value)
-                except Exception:
+                except Exception as e:
                     Log.printlog(
-                        f"Error processing JSON content in file {spec_path}", code=6018
+                        f"Error processing JSON content in file {spec_path}: {str(e)}", code=6018
                     )
             else:
                 Log.printlog(
-                    f"Invalid Metric Spec: Unsupported selector type {metric_spec.selector.type} for metric {metric_spec.name}",
-                    code=6019,
+                    f"Invalid Metric Spec: Unsupported selector type {metric_spec.selector.type} "
+                    f"for metric {metric_spec.name}", code=6019,
                 )
 
         return self._processed_metrics

@@ -15,7 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-# Fixtures available to multiple test files must be created in this file.
+"""Fixtures available to multiple test files must be created in this file."""
+
 import os
 import pwd
 from dataclasses import dataclass
@@ -27,6 +28,8 @@ from re import sub
 from textwrap import dedent
 from time import time
 from typing import TYPE_CHECKING, Any, Dict, Callable, Protocol, Optional, Type, List, Generator
+
+from importlib.metadata import version, PackageNotFoundError
 
 import pytest
 from autosubmitconfigparser.config.basicconfig import BasicConfig
@@ -194,6 +197,8 @@ def autosubmit_exp(
         exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
         aslogs_dir = exp_tmp_dir / BasicConfig.LOCAL_ASLOG_DIR
         status_dir = exp_path / 'status'
+        job_data_dir = Path(BasicConfig.JOBDATA_DIR)
+        job_data_dir.mkdir(parents=True, exist_ok=True)
 
         config = AutosubmitConfig(
             expid=expid,
@@ -201,6 +206,14 @@ def autosubmit_exp(
         )
 
         config.experiment_data = {**config.experiment_data, **experiment_data}
+
+        if 'CONFIG' not in config.experiment_data:
+            config.experiment_data['CONFIG'] = {}
+        if not config.experiment_data.get('CONFIG').get('AUTOSUBMIT_VERSION', ''):
+            try:
+                config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = version('autosubmit')
+            except PackageNotFoundError:
+                config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = ''
 
         key_file = {
             'JOBS': 'jobs',
@@ -230,7 +243,7 @@ def autosubmit_exp(
 
         # Default values for experiment data
         # TODO: This probably has a way to be initialized in config-parser?
-        must_exists = ['DEFAULT', 'JOBS', 'PLATFORMS', 'CONFIG']
+        must_exists = ['DEFAULT', 'JOBS', 'PLATFORMS']
         for must_exist in must_exists:
             if must_exist not in config.experiment_data:
                 config.experiment_data[must_exist] = {}
@@ -371,6 +384,8 @@ def autosubmit_config(
         # <TEMP>/global_logs
         global_logs = Path(BasicConfig.GLOBAL_LOG_DIR)
         global_logs.mkdir(parents=True, exist_ok=True)
+        job_data_dir = Path(BasicConfig.JOBDATA_DIR)
+        job_data_dir.mkdir(parents=True, exist_ok=True)
 
         config = AutosubmitConfig(
             expid=expid,
@@ -384,9 +399,17 @@ def autosubmit_config(
         for k, v in {k: v for k, v in BasicConfig.__dict__.items() if not k.startswith('__')}.items():
             config.experiment_data[k] = v
 
+        if 'CONFIG' not in config.experiment_data:
+            config.experiment_data['CONFIG'] = {}
+        if not config.experiment_data.get('CONFIG').get('AUTOSUBMIT_VERSION', ''):
+            try:
+                config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = version('autosubmit')
+            except PackageNotFoundError:
+                config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = ''
+
         # Default values for experiment data
         # TODO: This probably has a way to be initialized in config-parser?
-        must_exists = ['DEFAULT', 'JOBS', 'PLATFORMS', 'CONFIG']
+        must_exists = ['DEFAULT', 'JOBS', 'PLATFORMS']
         for must_exist in must_exists:
             if must_exist not in config.experiment_data:
                 config.experiment_data[must_exist] = {}

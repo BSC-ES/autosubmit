@@ -137,7 +137,7 @@ def fn_wrapper(database_fn, queue, *args):
     queue.close()
 
 
-def save_experiment(name, description, version):
+def save_experiment(name: str, description: Optional[str], version: Optional[str]):
     """
     Stores experiment in database. Anti-lock version.  
 
@@ -210,7 +210,7 @@ def update_experiment_description_version(name, description=None, version=None):
     """
     fn = _update_experiment_description_version
     if BasicConfig.DATABASE_BACKEND == 'postgres':
-        fn = update_experiment_description_version_sqlalchemy
+        fn = _update_experiment_description_version_sqlalchemy
 
     queue = multiprocessing.Queue(1)
     proc = multiprocessing.Process(target=fn_wrapper, args=(fn, queue, name, description, version))
@@ -404,9 +404,9 @@ def _check_experiment_exists(name, error_on_inexistence=True):
     return True
 
 
-def get_experiment_description(expid):
+def get_experiment_description(expid: str):
     if BasicConfig.DATABASE_BACKEND == 'postgres':
-        return get_experiment_description_sqlalchemy(expid)
+        return _get_experiment_description_sqlalchemy(expid)
     
     check_db()
 
@@ -546,13 +546,9 @@ def _last_name_used(test=False, operational=False, evaluation=False):
         return 'empty'
 
     # If starts by number (during 3.0 beta some jobs starting with numbers where created), returns empty.
-    try:
-        if row[0][0].isnumeric():
-            return 'empty'
-        else:
-            return row[0]
-    except ValueError:
-        return row[0]
+    if row[0][0].isnumeric():
+        return 'empty'
+    return row[0]
 
 
 def _delete_experiment(experiment_id):
@@ -599,16 +595,15 @@ def _update_database(version, cursor):
                                  'ALTER TABLE experiment_backup RENAME TO experiment;')
         if version <= 0:
             # Autosubmit beta version. Create db_version table
-            cursor.executescript('CREATE TABLE db_version(version INTEGER NOT NULL);'
-                                 'INSERT INTO db_version (version) VALUES (1);'
-                                 'ALTER TABLE experiment ADD COLUMN autosubmit_version VARCHAR;'
-                                 'UPDATE experiment SET autosubmit_version = "3.0.0b" '
-                                 'WHERE autosubmit_version NOT NULL;')
-        cursor.execute('UPDATE db_version SET version={0};'.format(
-            CURRENT_DATABASE_VERSION))
+            cursor.executescript(
+                'CREATE TABLE db_version(version INTEGER NOT NULL);'
+                'INSERT INTO db_version (version) VALUES (1);'
+                'ALTER TABLE experiment ADD COLUMN autosubmit_version VARCHAR;'
+                'UPDATE experiment SET autosubmit_version = "3.0.0b" WHERE autosubmit_version NOT NULL;'
+            )
+        cursor.execute(f'UPDATE db_version SET version={CURRENT_DATABASE_VERSION};')
     except sqlite3.Error as e:
-        raise AutosubmitCritical(
-            'unable to update database version', 7001, str(e))
+        raise AutosubmitCritical('unable to update database version', 7001, str(e))
     Log.info("Update completed")
     return True
 
@@ -696,8 +691,6 @@ def _save_experiment_sqlalchemy(name: str, description: str, version: str) -> bo
                 )
             )
             conn.commit()
-        except AutosubmitCritical:
-            raise
         except Exception as exc:
             conn.rollback()
             raise AutosubmitCritical("Could not register experiment", 7005, str(exc))
@@ -707,14 +700,10 @@ def _save_experiment_sqlalchemy(name: str, description: str, version: str) -> bo
 def _check_experiment_exists_sqlalchemy(name: str, error_on_inexistence=True) -> bool:
     row = None
     with _get_sqlalchemy_conn() as conn:
-        try:
-            query = select(tables.ExperimentTable).where(
-                tables.ExperimentTable.c.name == name  # type: ignore
-            )
-            row = conn.execute(query).one_or_none()
-        except Exception as exc:
-            conn.rollback()
-            raise AutosubmitCritical(f"Error querying DB for experiment {name}", 7005, str(exc))
+        query = select(tables.ExperimentTable).where(
+            tables.ExperimentTable.c.name == name  # type: ignore
+        )
+        row = conn.execute(query).one_or_none()
 
     if row is None:
         if error_on_inexistence:
@@ -724,14 +713,14 @@ def _check_experiment_exists_sqlalchemy(name: str, error_on_inexistence=True) ->
         # FIXME: what if this is issued from another server/VM?
         if Path(BasicConfig.LOCAL_ROOT_DIR, name).exists():
             with suppress(Exception):
-                _save_experiment(name, "No description", "3.14.0")
+                save_experiment(name, "No description", "3.14.0")
             return True
         return False
 
     return True
 
 
-def get_experiment_description_sqlalchemy(expid) -> List[List[str]]:
+def _get_experiment_description_sqlalchemy(expid) -> List[List[str]]:
     with _get_sqlalchemy_conn() as conn:
         query = select(tables.ExperimentTable).where(
             tables.ExperimentTable.c.name == expid  # type: ignore
@@ -743,7 +732,7 @@ def get_experiment_description_sqlalchemy(expid) -> List[List[str]]:
     return []
 
 
-def update_experiment_description_version_sqlalchemy(
+def _update_experiment_description_version_sqlalchemy(
     name: str, description: Optional[str] = None, version: Optional[str] = None
 ) -> bool:
     # Conditional update statement
@@ -811,13 +800,9 @@ def _last_name_used_sqlalchemy(test=False, operational=False, evaluation=False) 
         return "empty"
 
     # If starts by number (during 3.0 beta some jobs starting with numbers where created), returns empty.
-    try:
-        if row.name.isnumeric():
-            return "empty"
-        else:
-            return row.name
-    except ValueError:
-        return row.name
+    if row.name.isnumeric():
+        return "empty"
+    return row.name
 
 
 def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:

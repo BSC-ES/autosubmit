@@ -41,7 +41,6 @@ from pathlib import Path
 from time import sleep
 from autosubmit.job.job import Job
 from autosubmit.platforms.submitter import Submitter
-from ruamel.yaml import YAML
 from typing import Dict, Set, Tuple, Union, Any, List, Optional
 
 from autosubmitconfigparser.config.basicconfig import BasicConfig
@@ -62,7 +61,7 @@ from autosubmit.database.db_common import (
 )
 from autosubmit.database.db_structure import get_structure
 from autosubmit.experiment.detail_updater import ExperimentDetails
-from autosubmit.experiment.experiment_common import copy_experiment, new_experiment
+from autosubmit.experiment.experiment_common import copy_experiment, new_experiment, create_required_folders
 from autosubmit.git.autosubmit_git import AutosubmitGit
 from autosubmit.helpers.processes import process_id
 from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, strtobool
@@ -809,6 +808,7 @@ class Autosubmit:
             return Autosubmit.cat_log(args.ID, args.file, args.mode, args.inspect)
         elif args.command == 'stop':
             return Autosubmit.stop(args.expid, args.force, args.all, args.force_all, args.cancel, args.filter_status, args.target)
+
     @staticmethod
     def _init_logs(args, console_level='INFO', log_level='DEBUG', expid='None'):
         Log.set_console_level(console_level)
@@ -833,8 +833,6 @@ class Autosubmit:
                             raise AutosubmitCritical(
                                 'Experiments database {0} not writable. Please check permissions.'.format(
                                     BasicConfig.DB_PATH), 7007)
-
-
 
         expid_less = ["expid", "describe", "testcase", "install", "-v",
                       "readme", "changelog", "configure", "unarchive",
@@ -879,13 +877,6 @@ class Autosubmit:
                 expids = expid.split(" ")
             expids = [x.strip() for x in expids]
             for expid in expids:
-                as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
-                as_conf.reload(force_load=True)
-
-                if len(as_conf.experiment_data) == 0:
-                    if args.command not in ["expid", "upgrade"]:
-                        raise AutosubmitCritical(f"Experiment {expid} has no yml data. Please, if you really wish to use "
-                                                 f"AS 4 prompt:\nautosubmit upgrade {expid}",7012)
                 exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
                 tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
                 aslogs_path = os.path.join(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
@@ -893,7 +884,21 @@ class Autosubmit:
                     if BasicConfig.DATABASE_BACKEND == 'sqlite':
                         raise AutosubmitCritical("Experiment does not exist", 7012)
                     else:
-                        os.mkdir(exp_path)
+                        # TODO: This needs #1352 issue, to have the workflow configuration fully
+                        #       loaded from version control -- we have that ``main.yml`` in ClimateDT
+                        #       and other quirks to fix... we should document for now so users are
+                        #       at least aware of this. But replicating ``autosubmit expid`` here is
+                        #       as good as we can do for now.
+                        create_required_folders(expid, Path(exp_path))
+
+                as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
+                as_conf.reload(force_load=True)
+
+                if args.command not in ["expid", "upgrade"] and len(as_conf.experiment_data) == 0:
+                    raise AutosubmitCritical(
+                        f"Experiment {expid} has no yml data. Please, if you really wish to use "
+                        f"AS 4 prompt:\nautosubmit upgrade {expid}", 7012)
+
                 # delete is treated differently
                 owner, eadmin, current_owner = Autosubmit._check_ownership_and_set_last_command(as_conf, expid, args.command)
             if not os.path.exists(tmp_path):
@@ -1444,18 +1449,11 @@ class Autosubmit:
 
         exp_folder = root_folder / Path(exp_id)
         try:
-            # Setting folders and permissions
-            dir_mode = 0o755
-            exp_folder.mkdir(mode=dir_mode)
-            required_dirs = ["conf", "pkl", "tmp", "tmp/ASLOGS", f"tmp/LOG_{exp_id}", "plot", "status"]
-            for required_dir in required_dirs:
-                Path(exp_folder / required_dir).mkdir(mode=dir_mode)
             Log.info(f"Experiment folder: {exp_folder}")
+            create_required_folders(exp_id, exp_folder)
         except OSError as e:
-            try:
+            with suppress(Exception):
                 Autosubmit._delete_expid(exp_id, True)
-            except Exception:
-                pass
             raise AutosubmitCritical(f"Error while creating the experiment structure: {str(e)}", 7011)
 
         # Create the experiment configuration
@@ -3830,10 +3828,7 @@ class Autosubmit:
 
     @staticmethod
     def install():
-        """
-        Creates a new database instance for autosubmit at the configured path
-
-        """
+        """Creates a new database instance for autosubmit at the configured path."""
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
             if not os.path.exists(BasicConfig.DB_PATH):
                 Log.info("Creating autosubmit database...")
@@ -3911,13 +3906,7 @@ class Autosubmit:
         check_experiment_exists(expid)
         Log.info("Experiment found.")
         Log.info(f"Setting {expid} description to '{new_description}'")
-        result = update_experiment_description_version(
-            expid, description=new_description)
-        if result:
-            Log.info("Update completed successfully.")
-        else:
-            Log.critical("Update failed.")
-        return True
+        return update_experiment_description_version(expid, description=new_description)
 
     # fastlook
     @staticmethod
@@ -4137,6 +4126,7 @@ class Autosubmit:
                 else:
                     Log.info(
                         "Backup file not found. Pkl restore operation stopped. No changes have been made.")
+            return 0
         except AutosubmitCritical as e:
             raise AutosubmitCritical(e.message, e.code, e.trace)
 

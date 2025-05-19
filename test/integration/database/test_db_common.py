@@ -257,6 +257,26 @@ def test_get_experiment_description(db_engine, request, monkeypatch, autosubmit_
         pytest.param("sqlite")
     ],
 )
+def test_get_experiment_description_invalid_id(db_engine, request, monkeypatch, autosubmit_exp):
+    request.getfixturevalue(f"as_db_{db_engine}")
+
+    monkeypatch.setattr(db_common, 'TIMEOUT', 5)
+
+    autosubmit_exp(_EXPID)
+
+    description = db_common.get_experiment_description('z999')
+    assert len(description) == 0
+
+
+@pytest.mark.parametrize(
+    "db_engine",
+    [
+        # postgres
+        pytest.param("postgres", marks=[pytest.mark.postgres]),
+        # sqlite
+        pytest.param("sqlite")
+    ],
+)
 def test_get_experiment_id(db_engine, request, monkeypatch, autosubmit_exp):
     request.getfixturevalue(f"as_db_{db_engine}")
 
@@ -266,6 +286,26 @@ def test_get_experiment_id(db_engine, request, monkeypatch, autosubmit_exp):
 
     experiment_id: int = db_common.get_experiment_id(exp.expid)
     assert experiment_id > 0
+
+
+@pytest.mark.parametrize(
+    "db_engine",
+    [
+        # postgres
+        pytest.param("postgres", marks=[pytest.mark.postgres]),
+        # sqlite
+        pytest.param("sqlite")
+    ],
+)
+def test_get_experiment_id_invalid(db_engine, request, monkeypatch, autosubmit_exp):
+    request.getfixturevalue(f"as_db_{db_engine}")
+
+    monkeypatch.setattr(db_common, 'TIMEOUT', 5)
+
+    autosubmit_exp(_EXPID)
+
+    with pytest.raises(AutosubmitCritical):
+        db_common.get_experiment_id('z999')
 
 
 @pytest.mark.parametrize(
@@ -333,11 +373,11 @@ def test_delete_experiment(db_engine, request, monkeypatch, autosubmit_exp):
         pytest.param("postgres", 'e000', False, False, True, marks=[pytest.mark.postgres]),
         pytest.param("postgres", 'o000', False, True, False, marks=[pytest.mark.postgres]),
         # sqlite
-        pytest.param("sqlite", 't000', True, False, False, marks=[pytest.mark.postgres]),
-        pytest.param("sqlite", 'z000', False, False, False, marks=[pytest.mark.postgres]),
-        pytest.param("sqlite", 'a000', False, False, False, marks=[pytest.mark.postgres]),
-        pytest.param("sqlite", 'e000', False, False, True, marks=[pytest.mark.postgres]),
-        pytest.param("sqlite", 'o000', False, True, False, marks=[pytest.mark.postgres]),
+        pytest.param("sqlite", 't000', True, False, False),
+        pytest.param("sqlite", 'z000', False, False, False),
+        pytest.param("sqlite", 'a000', False, False, False),
+        pytest.param("sqlite", 'e000', False, False, True),
+        pytest.param("sqlite", 'o000', False, True, False),
     ],
 )
 def test_last_name_used(db_engine, expid: str, test: bool, operational: bool, evaluation: bool,
@@ -369,6 +409,28 @@ def test_last_name_used_empty(db_engine, request, monkeypatch, autosubmit_exp):
     autosubmit_exp(_EXPID, mock_last_name_used=False)
 
     # ``_EXPID`` is a test experiment ID, but we are looking for an operational one... which hasn't been used!
+    last_name_used = db_common.last_name_used(test=False, operational=True, evaluation=False)
+    assert last_name_used == 'empty'
+
+
+@pytest.mark.parametrize(
+    "db_engine",
+    [
+        # postgres
+        pytest.param("postgres", marks=[pytest.mark.postgres]),
+        # sqlite
+        pytest.param("sqlite")
+    ],
+)
+def test_last_name_used_is_numeric(db_engine, request, monkeypatch, autosubmit_exp):
+    """Apparently, from the comment in the code, AS used to returned numeric expid's in previous versions.
+    This test verifies that the code handles that corner case."""
+    request.getfixturevalue(f"as_db_{db_engine}")
+
+    monkeypatch.setattr(db_common, 'TIMEOUT', 5)
+
+    autosubmit_exp('42', mock_last_name_used=False)
+
     last_name_used = db_common.last_name_used(test=False, operational=True, evaluation=False)
     assert last_name_used == 'empty'
 
@@ -418,6 +480,97 @@ def test_update_experiment_description_version(
     else:
         with pytest.raises(error):  # type: ignore
             db_common.update_experiment_description_version(exp.expid, description=description, version=version)
+
+
+@pytest.mark.parametrize(
+    "db_engine",
+    [
+        # postgres
+        pytest.param("postgres", marks=[pytest.mark.postgres]),
+        # sqlite
+        pytest.param("sqlite")
+    ]
+)
+def test_update_experiment_description_version_wrong_expid(
+        db_engine: str,
+        request,
+        monkeypatch,
+        autosubmit_exp
+):
+    request.getfixturevalue(f"as_db_{db_engine}")
+
+    monkeypatch.setattr(db_common, 'TIMEOUT', 5)
+
+    autosubmit_exp(_EXPID, mock_last_name_used=False)
+
+    with pytest.raises(AutosubmitCritical) as cm:  # type: ignore
+        db_common.update_experiment_description_version('0000', description="Not used", version="Not Used")
+
+    assert '0000' in str(cm.value.message)
+
+
+@pytest.mark.parametrize(
+    "db_engine",
+    [
+        # postgres
+        pytest.param("postgres", marks=[pytest.mark.postgres]),
+        # sqlite
+        pytest.param("sqlite")
+    ]
+)
+def test_save_experiment(
+        db_engine: str,
+        request,
+        monkeypatch,
+        autosubmit_exp
+):
+    request.getfixturevalue(f"as_db_{db_engine}")
+
+    monkeypatch.setattr(db_common, 'TIMEOUT', 5)
+
+    # Needed to mock BasicConfig, ...
+    autosubmit_exp(_EXPID, mock_last_name_used=False)
+
+    new_expid = 'z000'
+    new_description = 'Chough'
+    new_version = 'v42'
+
+    assert db_common.save_experiment(name=new_expid, description=new_description, version=new_version)
+
+    retrieved_description = db_common.get_experiment_description(new_expid)
+    retrieved_version = db_common.get_autosubmit_version(new_expid)
+
+    assert new_description == retrieved_description[0][0]
+    assert new_version == retrieved_version
+
+
+@pytest.mark.parametrize(
+    "db_engine",
+    [
+        # postgres
+        pytest.param("postgres", marks=[pytest.mark.postgres]),
+        # sqlite
+        pytest.param("sqlite")
+    ]
+)
+def test_save_experiment_error_expid_is_none(
+        db_engine: str,
+        request,
+        monkeypatch,
+        autosubmit_exp
+):
+    request.getfixturevalue(f"as_db_{db_engine}")
+
+    monkeypatch.setattr(db_common, 'TIMEOUT', 5)
+
+    # Needed to mock BasicConfig, ...
+    autosubmit_exp(_EXPID, mock_last_name_used=False)
+
+    new_description = 'Chough'
+    new_version = 'v42'
+
+    with pytest.raises(AutosubmitCritical):
+        assert db_common.save_experiment(name=None, description=new_description, version=new_version)  # type: ignore
 
 
 def test_get_connection_url_invalid_sqlite_db():
