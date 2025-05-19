@@ -139,8 +139,7 @@ def test__init_logs_sqlite_exp_path_does_not_exist(autosubmit, autosubmit_exp, m
 
     with pytest.raises(AutosubmitCritical) as cm:
         autosubmit.run_command(args)
-
-    assert 'Experiment does not exist' == str(cm.value.message)
+    assert "Experiment does not exist" == str(cm.value.message)
 
 
 def test__init_logs_postgres_exp_path_does_not_exist_no_yaml_data(autosubmit, autosubmit_exp, mocker, monkeypatch):
@@ -149,7 +148,7 @@ def test__init_logs_postgres_exp_path_does_not_exist_no_yaml_data(autosubmit, au
     autosubmit_exp()
 
     args = mocker.MagicMock()
-    args.expid = '0000'
+    args.expid = '0001'
     args.logconsole = 'DEBUG'
     args.logfile = 'DEBUG'
     args.command = 'setstatus'
@@ -159,8 +158,45 @@ def test__init_logs_postgres_exp_path_does_not_exist_no_yaml_data(autosubmit, au
 
     with pytest.raises(AutosubmitCritical) as cm:
         autosubmit.run_command(args)
+    assert "Experiment 0001 has no yml data." in str(cm.value.message)
 
-    assert 'has no yml data' in str(cm.value.message)
+
+def test_deleting_non_existent_experiments(autosubmit, autosubmit_exp, mocker, monkeypatch):
+    """Test that a new experiment is created for Postgres when the directory is empty,
+    but an error is raised when the experiment data is empty."""
+    autosubmit_exp()
+
+    args = mocker.MagicMock()
+    args.expid = '0000,0001,0002'
+    args.logconsole = 'DEBUG'
+    args.logfile = 'DEBUG'
+    args.command = 'delete'
+
+    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
+    mocker.patch('autosubmit.config.configcommon.AutosubmitConfig.reload')
+
+    with pytest.raises(AutosubmitCritical) as cm:
+        autosubmit.run_command(args)
+    assert "Experiment 0000 has no yml data." in str(cm.value.message)
+
+
+def test_deleting_existent_and_non_existent_experiments(autosubmit, autosubmit_exp, mocker, monkeypatch):
+    """Test that a new experiment is created for Postgres when the directory is empty,
+    but an error is raised when the experiment data is empty."""
+    autosubmit_exp('t000', {})
+
+    args = mocker.MagicMock()
+    args.expid = 't000,0000,0001,0002'
+    args.logconsole = 'DEBUG'
+    args.logfile = 'DEBUG'
+    args.command = 'delete'
+
+    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
+    mocker.patch('autosubmit.config.configcommon.AutosubmitConfig.reload')
+
+    with pytest.raises(AutosubmitCritical) as cm:
+        autosubmit.run_command(args)
+    assert "Experiment t000 has no yml data." in str(cm.value.message)
 
 
 def test__init_logs_sqlite_mismatch_as_version_upgrade_it(autosubmit, autosubmit_exp, mocker):
