@@ -134,7 +134,7 @@ def _delete_experiment(expid: str, force: bool) -> None:
 
     experiment_path = Path(f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}")
     if not experiment_path.exists():
-        raise AutosubmitCritical("Experiment does not exist", 7012)
+        raise False
 
     confirm_removal = force or user_yes_no_query(f"Do you want to delete {expid} ?")
 
