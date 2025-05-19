@@ -5,10 +5,11 @@ import json
 import copy
 import locale
 from pathlib import Path
-import sqlite3
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.database import session, tables
+from sqlalchemy.schema import CreateTable, CreateSchema
 from log.log import Log
 
 if TYPE_CHECKING:
@@ -96,24 +97,29 @@ class MetricSpec:
 
 class UserMetricRepository:
     def __init__(self, expid: str):
-        exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
-        tmp_path = Path(exp_path).joinpath(BasicConfig.LOCAL_TMP_DIR)
-        self.db_path = tmp_path.joinpath(f"metrics_{expid}.db")
+        self.expid = expid
 
-        with sqlite3.connect(self.db_path) as conn:
-            # Create the metrics table if it does not exist
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS user_metrics (
-                    user_metric_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    run_id INTEGER,
-                    job_name TEXT,
-                    metric_name TEXT,
-                    metric_value TEXT,
-                    modified TEXT
-                );
-                """
-            )
+        if BasicConfig.DATABASE_BACKEND == "postgres":
+            # Postgres backend
+            self.connection_url = BasicConfig.DATABASE_CONN_URL
+            self.schema = self.expid
+        else:
+            # SQLite backend
+            exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
+            tmp_path = Path(exp_path).joinpath(BasicConfig.LOCAL_TMP_DIR)
+            db_path = tmp_path.joinpath(f"metrics_{expid}.db")
+            self.connection_url = f"sqlite:///{db_path}"
+            self.schema = None
+
+        self.table = tables.get_table_from_name(
+            schema=self.schema, table_name="user_metrics"
+        )
+        self.engine = session.create_engine(self.connection_url)
+
+        with self.engine.connect() as conn:
+            if self.schema:
+                conn.execute(CreateSchema(self.schema, if_not_exists=True))
+            conn.execute(CreateTable(self.table, if_not_exists=True))
             conn.commit()
 
     def store_metric(
@@ -122,26 +128,27 @@ class UserMetricRepository:
         """
         Store the metric value in the database. Will overwrite the value if it already exists.
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with self.engine.connect() as conn:
+            # Delete the existing metric
             conn.execute(
-                """
-                DELETE FROM user_metrics
-                WHERE run_id = ? AND job_name = ? AND metric_name = ?;
-                """,
-                (run_id, job_name, metric_name),
+                self.table.delete().where(
+                    self.table.c.run_id == run_id,
+                    self.table.c.job_name == job_name,
+                    self.table.c.metric_name == metric_name,
+                )
             )
+
+            # Insert the new metric
             conn.execute(
-                """
-                INSERT INTO user_metrics (run_id, job_name, metric_name, metric_value, modified)
-                VALUES (?, ?, ?, ?, ?);
-                """,
-                (
-                    run_id,
-                    job_name,
-                    metric_name,
-                    str(metric_value),
-                    datetime.now(tz=timezone.utc).isoformat(timespec="seconds"),
-                ),
+                self.table.insert().values(
+                    run_id=run_id,
+                    job_name=job_name,
+                    metric_name=metric_name,
+                    metric_value=str(metric_value),
+                    modified=datetime.now(tz=timezone.utc).isoformat(
+                        timespec="seconds"
+                    ),
+                )
             )
             conn.commit()
 

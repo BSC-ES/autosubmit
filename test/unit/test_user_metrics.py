@@ -1,4 +1,3 @@
-import sqlite3
 from typing import Any
 import pytest
 from pathlib import Path
@@ -319,7 +318,18 @@ def test_get_current_metric_folder_placeholder(autosubmit_config, local: LocalPl
     )
 
 
-def test_store_metric(tmp_path):
+@pytest.mark.parametrize(
+    "db_engine",
+    [
+        # postgres
+        pytest.param("postgres", marks=[pytest.mark.postgres]),
+        # sqlite
+        pytest.param("sqlite"),
+    ],
+)
+def test_store_metric(db_engine: str, request: pytest.FixtureRequest, tmp_path: Path):
+    request.getfixturevalue(f"as_db_{db_engine}")
+
     EXPID = "t123"
     with patch("autosubmit.job.metrics_processor.BasicConfig.LOCAL_ROOT_DIR", tmp_path):
         Path(tmp_path).joinpath(EXPID, BasicConfig.LOCAL_TMP_DIR).mkdir(
@@ -335,15 +345,13 @@ def test_store_metric(tmp_path):
         )
 
         # Check if the metric is stored in the database
-        with sqlite3.connect(user_metric_repository.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT metric_value FROM user_metrics
-                WHERE run_id = ? AND job_name = ? AND metric_name = ?;
-                """,
-                (1, "test_job", "test_metric"),
-            )
-            result = cursor.fetchone()
+        with user_metric_repository.engine.connect() as conn:
+            result = conn.execute(
+                user_metric_repository.table.select().where(
+                    user_metric_repository.table.c.run_id == 1,
+                    user_metric_repository.table.c.job_name == "test_job",
+                    user_metric_repository.table.c.metric_name == "test_metric",
+                )
+            ).first()
             assert result is not None
-            assert result[0] == "test_value"
+            assert result.metric_value == "test_value"

@@ -196,6 +196,17 @@ DetailsTable = Table(
     Column("hpc", Text, nullable=False),
 )
 
+UserMetricsTable = Table(
+    "user_metrics",
+    metadata_obj,
+    Column("user_metric_id", Integer, primary_key=True),
+    Column("run_id", Integer),
+    Column("job_name", Text),
+    Column("metric_name", Text),
+    Column("metric_value", Text),
+    Column("modified", Text),
+)
+
 TABLES = (
     ExperimentTable,
     ExperimentStatusTable,
@@ -208,6 +219,7 @@ TABLES = (
     WrapperJobPackageTable,
     JobPklTable,
     DetailsTable,
+    UserMetricsTable,
 )
 """The tables available in the Autosubmit databases."""
 
