@@ -22,7 +22,7 @@ import sys
 from contextlib import suppress
 from itertools import zip_longest
 from pathlib import Path
-from typing import Iterable, Optional, Union, TYPE_CHECKING
+from typing import Iterable, Optional, Union, TYPE_CHECKING, cast
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical, Log

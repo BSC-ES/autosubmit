@@ -97,7 +97,7 @@ def new_experiment(description, version, test=False, operational=False, evaluati
                                  7011) from e
 
 
-def delete_experiment(expids: str, force: bool) -> bool:
+def delete_experiment(expids: list[str], force: bool) -> bool:
     """Deletes an experiment from the database,
     the experiment's folder database entry and all the related metadata files.
 
@@ -109,12 +109,10 @@ def delete_experiment(expids: str, force: bool) -> bool:
     # expid will come from argparse, which provides nix-style comma-separated values,
     # so here we parse the comma-separated values. ``.fromkeys`` keeps order and removes
     # duplicates.
-    expid_list = expids.replace(',', ' ').split(' ')
-    expid_list = [expid.lower() for expid in filter(lambda x: x, expid_list)]
 
     failed: list[str] = []
 
-    for expid in expid_list:
+    for expid in expids:
         try:
             _delete_experiment(expid, force)
         except Exception as e:
@@ -134,7 +132,7 @@ def _delete_experiment(expid: str, force: bool) -> None:
 
     experiment_path = Path(f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}")
     if not experiment_path.exists():
-        raise AutosubmitCritical("Experiment does not exist", 7012)
+        raise False
 
     confirm_removal = force or user_yes_no_query(f"Do you want to delete {expid} ?")
 

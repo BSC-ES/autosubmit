@@ -126,6 +126,7 @@ def test__init_logs_sqlite_db_not_writable(autosubmit, autosubmit_exp, mocker, m
 
 def test__init_logs_sqlite_exp_path_does_not_exist(autosubmit, autosubmit_exp, mocker, monkeypatch):
     """Test that an error is raised when the experiment path does not exist and SQLite is used."""
+    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
     autosubmit_exp()
 
     args = mocker.MagicMock()
@@ -136,15 +137,15 @@ def test__init_logs_sqlite_exp_path_does_not_exist(autosubmit, autosubmit_exp, m
 
     monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
 
-    with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit.run_command(args)
-
-    assert 'Experiment does not exist' == str(cm.value.message)
+    autosubmit.run_command(args)
+    assert mocked_log.error.call_count > 0
+    assert "does not exist" in mocked_log.error.call_args[0][0]
 
 
 def test__init_logs_postgres_exp_path_does_not_exist_no_yaml_data(autosubmit, autosubmit_exp, mocker, monkeypatch):
     """Test that a new experiment is created for Postgres when the directory is empty,
     but an error is raised when the experiment data is empty."""
+    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
     autosubmit_exp()
 
     args = mocker.MagicMock()
@@ -156,10 +157,49 @@ def test__init_logs_postgres_exp_path_does_not_exist_no_yaml_data(autosubmit, au
     monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
     mocker.patch('autosubmit.config.configcommon.AutosubmitConfig.reload')
 
-    with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit.run_command(args)
+    autosubmit.run_command(args)
+    assert mocked_log.error.call_count > 0
+    assert "does not exist" in mocked_log.error.call_args[0][0]
 
-    assert 'has no yml data' in str(cm.value.message)
+
+def test_deleting_non_existent_experiments(autosubmit, autosubmit_exp, mocker, monkeypatch):
+    """Test that a new experiment is created for Postgres when the directory is empty,
+    but an error is raised when the experiment data is empty."""
+    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
+    autosubmit_exp()
+
+    args = mocker.MagicMock()
+    args.expid = '0000,0001,0002'
+    args.logconsole = 'DEBUG'
+    args.logfile = 'DEBUG'
+    args.command = 'delete'
+
+    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
+    mocker.patch('autosubmit.config.configcommon.AutosubmitConfig.reload')
+
+    autosubmit.run_command(args)
+    assert mocked_log.error.call_count > 0
+    assert "Experiment 0000 0001 0002 does not exist" == mocked_log.error.call_args[0][0]
+
+
+def test_deleting_existent_and_non_existent_experiments(autosubmit, autosubmit_exp, mocker, monkeypatch):
+    """Test that a new experiment is created for Postgres when the directory is empty,
+    but an error is raised when the experiment data is empty."""
+    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
+    autosubmit_exp()
+
+    args = mocker.MagicMock()
+    args.expid = 't001,0000,0001,0002'
+    args.logconsole = 'DEBUG'
+    args.logfile = 'DEBUG'
+    args.command = 'delete'
+
+    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
+    mocker.patch('autosubmit.config.configcommon.AutosubmitConfig.reload')
+
+    autosubmit.run_command(args)
+    assert mocked_log.error.call_count > 0
+    assert "Experiment 0000 0001 0002 does not exist" == mocked_log.error.call_args[0][0]
 
 
 def test__init_logs_sqlite_mismatch_as_version_upgrade_it(autosubmit, autosubmit_exp, mocker):
