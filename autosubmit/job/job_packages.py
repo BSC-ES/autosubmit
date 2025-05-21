@@ -244,8 +244,8 @@ class JobPackageSimple(JobPackageBase):
     def _send_files(self):
         for job in self.jobs:
             self.platform.send_file(self._job_scripts[job.name])
-            # TODO Ugly fix quick fix until figure another option, this is to avoid to delete the Additional file in local before sending it due sharing the same directory
-            if self.platform.type.upper() != "LOCAL":
+            # If file is not already in the tmp_path, send it #fix for esarchive
+            if self.platform.tmp_path != self._tmp_path:
                 for file_n in range(len(job.additional_files)):
                     filename = os.path.basename(os.path.splitext(job.additional_files[file_n])[0])
                     full_path = os.path.join(self._tmp_path,filename ) + "_" + job.name[5:]
