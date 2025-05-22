@@ -24,6 +24,7 @@ import traceback
 from pathlib import Path
 from typing import Optional
 
+from autosubmitconfigparser.config.basicconfig import BasicConfig
 from networkx import DiGraph
 
 from autosubmit.database.db_common import get_connection_url
@@ -37,10 +38,14 @@ def _check_structures_path(db_path: Path):
         raise ValueError(f'Structures folder not found {str(db_path)}!')
 
 
-def _get_db_manager(sqlite_db_file: Optional[Path]) -> DbManager:
+def _get_db_manager(expid: str, sqlite_db_file: Optional[Path]) -> DbManager:
     """Create a ``db_manager`` with the given parameters."""
     connection_url = get_connection_url(db_path=sqlite_db_file)
-    return DbManager(connection_url=connection_url)
+    if BasicConfig.DATABASE_BACKEND == "postgres":
+        _schema = expid
+    else:
+        _schema = None
+    return DbManager(connection_url=connection_url, schema=_schema)
 
 
 def get_structure(expid: str, structures_path: Path) -> Optional[dict[str, list[str]]]:
@@ -60,7 +65,7 @@ def get_structure(expid: str, structures_path: Path) -> Optional[dict[str, list[
     """
     try:
         _check_structures_path(structures_path)
-        db_manager = _get_db_manager(None if not structures_path else structures_path / f"structure_{expid}.db")
+        db_manager = _get_db_manager(expid, None if not structures_path else structures_path / f"structure_{expid}.db")
 
         db_manager.create_table(ExperimentStructureTable.name)
 
@@ -82,7 +87,7 @@ def get_structure(expid: str, structures_path: Path) -> Optional[dict[str, list[
 def save_structure(graph: DiGraph, expid: str, structures_path: Optional[Path]):
     """Save the experiment structure into the database."""
     _check_structures_path(structures_path)
-    db_manager = _get_db_manager(structures_path / f"structure_{expid}.db")
+    db_manager = _get_db_manager(expid, structures_path / f"structure_{expid}.db")
 
     # Create table if it doesn't exist
     db_manager.create_table(ExperimentStructureTable.name)
