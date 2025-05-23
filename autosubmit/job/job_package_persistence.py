@@ -39,8 +39,13 @@ class JobPackagePersistence:
     def __init__(self, expid: str):
         database_file = Path(BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl', f'job_packages_{expid}.db')
         connection_url = get_connection_url(db_path=database_file)
-        
-        self.db_manager = DbManager(connection_url=connection_url)
+
+        if BasicConfig.DATABASE_BACKEND == "postgres":
+            _schema = expid
+        else:
+            _schema = None
+
+        self.db_manager = DbManager(connection_url=connection_url, schema=_schema)
         self.db_manager.create_table(JobPackageTable.name)
         self.db_manager.create_table(WrapperJobPackageTable.name)
 
