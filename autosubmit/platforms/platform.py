@@ -665,7 +665,10 @@ class Platform(object):
         :param max_step: max step possible
         :type max_step: int
         """
-
+        if not job.current_checkpoint_step:
+            job.current_checkpoint_step = 0
+        if not job.max_checkpoint_step:
+            job.max_checkpoint_step = 0
         if job.current_checkpoint_step < job.max_checkpoint_step:
             remote_checkpoint_path = f'{self.get_files_path()}/CHECKPOINT_'
             self.get_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}', False, ignore_log=True)
