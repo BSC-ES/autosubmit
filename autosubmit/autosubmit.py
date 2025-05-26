@@ -1699,7 +1699,7 @@ class Autosubmit:
 
             if isinstance(jobs, type([])):
                 for job in jobs:
-                    file_paths += f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}/tmp/{job.name}.cmd\n"
+                    file_paths += f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}/tmp/{job.name}.cmd | {job.file}\n"
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, jobs, packages_persistence, False)
@@ -1709,6 +1709,8 @@ class Autosubmit:
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, jobs_cw, packages_persistence, False)
+
+            # obtain base script
 
             Log.info("No more scripts to generate, you can proceed to check them manually")
             Log.result(file_paths)

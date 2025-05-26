@@ -27,6 +27,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from textwrap import dedent
 from time import time
+from typing import Any
 
 import pytest
 from bscearth.utils.date import date2str
@@ -153,7 +154,6 @@ class TestJob:
         incremented_fail_count = self.job.fail_count
 
         assert initial_fail_count + 1 == incremented_fail_count
-
 
     @patch('autosubmitconfigparser.config.basicconfig.BasicConfig')
     def test_header_tailer(self, mocked_global_basic_config: Mock):
@@ -1113,7 +1113,6 @@ CONFIG:
                 assert lst == []
                 assert not log_name.exists()
 
-
     def test_sdate(self):
         """Test that the property getter for ``sdate`` works as expected."""
         for test in [
@@ -1430,7 +1429,34 @@ def test_pytest_check_script(mocker):
     assert checked
 
 
-def test_create_script(mocker):
+@pytest.mark.parametrize(
+    "file_name,job_name,expid,expected",
+    [
+        ("testfile.txt", "job1", "exp123", "testfile_job1"),
+        ("exp123_testfile.txt", "job2", "exp123", "testfile_job2"),
+        ("anotherfile.py", "job3", "exp999", "anotherfile_job3"),
+    ]
+)
+def test_construct_real_additional_file_name(file_name: str, job_name: str, expid: str, expected: str) -> None:
+    """
+    Test the construct_real_additional_file_name method for various file name patterns.
+
+    :param file_name: The input file name.
+    :type file_name: str
+    :param job_name: The job name to use.
+    :type job_name: str
+    :param expid: The experiment id to use.
+    :type expid: str
+    :param expected: The expected output file name.
+    :type expected: str
+    """
+    job = Job(name=job_name)
+    job.expid = expid
+    result = job.construct_real_additional_file_name(file_name)
+    assert result == expected
+
+
+def test_create_script(mocker, tmpdir):
     # arrange
     job = Job("job1", "1", Status.READY, 0)
     # arrange
@@ -1439,34 +1465,31 @@ def test_create_script(mocker):
     parameters['NUMTHREADS'] = 777
     parameters['NUMTASK'] = 666
 
-    job._tmp_path = '/dummy/tmp/path'
-    job.additional_files = '/dummy/tmp/path_additional_file'
+    job.name = "job1"
+    job._tmp_path = tmpdir.strpath
+    job.section = "DUMMY"
+    job.additional_files = ['dummy_file1', 'dummy_file2']
     mocker.patch("autosubmit.job.job.Job.update_content", return_value=(
         'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK% %% %%',
-        ['some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK% %% %%']))
+        ['some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK% %% %%',
+         'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK% %% %%']))
     mocker.patch("autosubmit.job.job.Job.update_parameters", return_value=parameters)
 
     config = Mock(spec=AutosubmitConfig)
     config.default_parameters = {}
-
+    config.dynamic_variables = {}
     config.get_project_dir = Mock(return_value='/project/dir')
-
-    chmod_mock = Mock()
-    sys.modules['os'].chmod = chmod_mock
-
-    write_mock = Mock().write = Mock()
-    open_mock = Mock(return_value=write_mock)
-    with patch.object(builtins, "open", open_mock):
-        # act
-        job.create_script(config)
-    # TODO asserts _slots_
-    # # assert
-    # update_content_mock.assert_called_with(config)
-    # # TODO add assert for additional files
-    # open_mock.assert_called_with(os.path.join(job._tmp_path, job.name + '.cmd'), 'wb')
-    # # Expected values: %% -> %, %KEY% -> KEY.VALUE without %
-    # write_mock.write.assert_called_with(b'some-content: 999, 777, 666 % %')
-    # chmod_mock.assert_called_with(os.path.join(job._tmp_path, job.name + '.cmd'), 0o755)
+    name_without_expid = job.name.replace(f'{job.expid}_', '') if job.expid else job.name
+    job.create_script(config)
+    # list tmpdir and ensure that each file is created
+    assert len(tmpdir.listdir()) == 3  # job script + additional files
+    assert tmpdir.join('job1.cmd').check()
+    assert tmpdir.join(f'dummy_file1_{name_without_expid}').check()
+    assert tmpdir.join(f'dummy_file2_{name_without_expid}').check()
+    # assert that the script content is correct
+    with open(tmpdir.join('job1.cmd'), 'r') as f:
+        content = f.read()
+        assert 'some-content: 999, 777, 666' in content
 
 
 def test_reset_logs(autosubmit_config):
@@ -1943,7 +1966,6 @@ def _check_parents_array(job, assertions, jobs):
     ],
 )
 def test_get_from_stat(tmpdir, file_exists, index_timestamp, fail_count, expected):
-
     job = Job("dummy", 1, Status.WAITING, 0)
     assert job.stat_file == f"{job.name}_STAT_"
     job._tmp_path = Path(tmpdir)
@@ -2016,7 +2038,7 @@ def test_write_submit_time_ignore_exp_history(total_stats_exists: bool, autosubm
         'job failed, empty file, count is 100'
     ]
 )
-def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str, local, count:int,
+def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str, local, count: int,
                                            autosubmit_config, mocker):
     """Test that the job writes the end time correctly.
 

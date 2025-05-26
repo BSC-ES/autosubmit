@@ -511,16 +511,17 @@ class ParamikoPlatform(Platform):
         :return: True if successful or file does not exist
         :rtype: bool
         """
-
+        # TODO: pytests when the slurm container is avaliable
+        remote_file = Path(self.get_files_path()) / filename
         try:
-            self._ftpChannel.remove(os.path.join(
-                self.get_files_path(), filename))
+            self._ftpChannel.remove(str(remote_file))
             return True
         except IOError as e:
             return False
         except BaseException as e:
-            Log.error(f'Could not remove file {os.path.join(self.get_files_path(), filename)} due a '
-                      f'wrong configuration')
+            # Change to Path
+            Log.error(f'Could not remove file {str(remote_file)}, something went wrong with the platform', 6004, str(e))
+
             if str(e).lower().find("garbage") != -1:
                 raise AutosubmitCritical(
                     "Wrong User or invalid .ssh/config. Or invalid user in the definition of PLATFORMS in YAML or public key not set ", 7051, str(e))

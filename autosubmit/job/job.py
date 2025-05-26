@@ -2406,69 +2406,106 @@ class Job(object):
                 return True
         return False
 
-    def create_script(self, as_conf):
+    def create_script(self, as_conf: AutosubmitConfig) -> str:
         """
-        Creates script file to be run for the job
+        Create the script file to be run for the job.
 
-        :param as_conf: configuration object
+        :param as_conf: Configuration object.
         :type as_conf: AutosubmitConfig
-        :return: script's filename
+        :return: Script's filename.
         :rtype: str
         """
-
-        lang = locale.getlocale()[1]
-        if lang is None:
-            lang = locale.getdefaultlocale()[1]
-            if lang is None:
-                lang = 'UTF-8'
+        lang = locale.getlocale()[1] or locale.getdefaultlocale()[1] or 'UTF-8'
         parameters = self.update_parameters(as_conf, set_attributes=False)
-        template_content,additional_templates = self.update_content(as_conf, parameters)
-        #enumerate and get value
-        #TODO regresion test
+        template_content, additional_templates = self.update_content(as_conf, parameters)
+
         for additional_file, additional_template_content in zip(self.additional_files, additional_templates):
-            # append to a list all names don't matter the location, inside additional_template_content that  starts with % and ends with %
-            placeholders_inside_additional_template = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', additional_template_content,flags=re.IGNORECASE)
-            for placeholder in placeholders_inside_additional_template:
-                if placeholder in as_conf.default_parameters.values():
-                    continue
-                placeholder = placeholder[1:-1]
-                value = str(parameters.get(placeholder.upper(),""))
-                if not value:
-                    additional_template_content = re.sub('%(?<!%%)' + placeholder + '%(?!%%)', '',
-                                                         additional_template_content, flags=re.I)
-                else:
-                    if "\\" in value:
-                        value = re.escape(value)
-                    additional_template_content = re.sub('%(?<!%%)' + placeholder + '%(?!%%)', value, additional_template_content,flags=re.I)
-            additional_template_content = additional_template_content.replace("%%", "%")
-            #Write to file
-            try:
-                filename = os.path.basename(os.path.splitext(additional_file)[0])
-                full_path = os.path.join(self._tmp_path,filename ) + "_" + self.name[5:]
-                open(full_path, 'wb').write(additional_template_content.encode(lang))
-            except:
-                pass
-        for key, value in parameters.items():
-            # parameters[key] can have '\\' characters that are interpreted as escape characters
-            # by re.sub. To avoid this, we use re.escape
-            if "*\\" in str(parameters[key]):
-                final_sub = re.escape(str(parameters[key]))
-            else:
-                final_sub = str(parameters[key])
-            template_content = re.sub(
-                '%(?<!%%)' + key + '%(?!%%)', final_sub, template_content,flags=re.I)
-        if self.undefined_variables:
-            for variable in self.undefined_variables:
-                template_content = re.sub(
-                    '%(?<!%%)' + variable + '%(?!%%)', '', template_content,flags=re.I)
-        template_content = template_content.replace("%%", "%")
-        script_name = '{0}.cmd'.format(self.name)
-        self.script_name = '{0}.cmd'.format(self.name)
+            processed_content = self._substitute_placeholders(additional_template_content, parameters, as_conf)
+            self._write_additional_file(additional_file, processed_content, lang)
 
-        open(os.path.join(self._tmp_path, script_name),'wb').write(template_content.encode(lang))
-
-        os.chmod(os.path.join(self._tmp_path, script_name), 0o755)
+        template_content = self._substitute_placeholders(
+            template_content, parameters, as_conf, self.undefined_variables
+        )
+        script_name = f'{self.name}.cmd'
+        self.script_name = script_name
+        script_path = Path(self._tmp_path) / script_name
+        with open(script_path, 'wb') as f:
+            f.write(template_content.encode(lang))
+        Path(script_path).chmod(0o755)
         return script_name
+
+    def _substitute_placeholders(
+            self,
+            content: str,
+            parameters: dict,
+            as_conf: AutosubmitConfig,
+            undefined_variables: list[str] = None
+    ) -> str:
+        """
+        Replace placeholders in the template content.
+
+        :param content: Template content with placeholders.
+        :type content: str
+        :param parameters: Dictionary of parameters for substitution.
+        :type parameters: dict
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: AutosubmitConfig
+        :param undefined_variables: List of undefined variable names to remove.
+        :type undefined_variables: list[str], optional
+        :return: Content with placeholders substituted.
+        :rtype: str
+        """
+        # TODO quick fix for 4.1.15 release, to see why it is needed
+        if as_conf.dynamic_variables:
+            parameters = as_conf.substitute_dynamic_variables(parameters, max_deep=25, in_the_end=True)
+
+        placeholders = re.findall(r'%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', content, flags=re.IGNORECASE)
+        for placeholder in placeholders:
+            if placeholder in as_conf.default_parameters.values():
+                continue
+            key = placeholder[1:-1]
+            value = str(parameters.get(key.upper(), ""))
+            if not value:
+                content = re.sub(r'%(?<!%%)' + key + r'%(?!%%)', '', content, flags=re.I)
+            else:
+                if "\\" in value:
+                    value = re.escape(value)
+                content = re.sub(r'%(?<!%%)' + key + r'%(?!%%)', value, content, flags=re.I)
+        if undefined_variables:
+            for variable in undefined_variables:
+                content = re.sub(r'%(?<!%%)' + variable + r'%(?!%%)', '', content, flags=re.I)
+        return content.replace("%%", "%")
+
+    def _write_additional_file(self, additional_file: str, content: str, lang: str) -> None:
+        """
+        Write additional file with processed content.
+
+        :param additional_file: Path to the additional file.
+        :type additional_file: str
+        :param content: Content to write.
+        :type content: str
+        :param lang: Encoding language.
+        :type lang: str
+        :return: None
+        """
+        tmp_path = Path(self._tmp_path)
+        full_path = tmp_path.joinpath(self.construct_real_additional_file_name(additional_file))
+        with full_path.open('wb') as f:
+            f.write(content.encode(lang))
+
+    def construct_real_additional_file_name(self, file_name: str) -> str:
+        """
+        Constructs the real name of the file to be sent to the platform.
+
+        :param file_name: The name of the file to be sent.
+        :type file_name: str
+        :return: The full path of the file to be sent.
+        :rtype: str
+        """
+        real_name = str(f"{Path(file_name).stem}_{self.name}")
+        real_name = real_name.replace(f"{self.expid}_", "")
+        return real_name
+
 
     def create_wrapped_script(self, as_conf, wrapper_tag='wrapped'):
         parameters = self.update_parameters(as_conf, set_attributes=False)
