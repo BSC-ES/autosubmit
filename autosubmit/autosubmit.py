@@ -1148,7 +1148,10 @@ class Autosubmit:
         :rtype: str
         """
         error_message = ""
-        Log.info("Deleting experiment from database...")
+
+        is_sqlite = BasicConfig.DATABASE_BACKEND == 'sqlite'
+
+        Log.info(f"Deleting experiment from {BasicConfig.DATABASE_BACKEND} database...")
         try:
             ret = delete_experiment(expid_delete)
             if ret:
@@ -1162,22 +1165,24 @@ class Autosubmit:
         except BaseException as e:
             error_message += f"Cannot delete directory: {e}\n"
 
-        Log.info("Removing Structure db...")
-        try:
-            os.remove(structure_db_path)
-        except BaseException as e:
-            error_message += f"Cannot delete structure: {e}\n"
 
-        Log.info("Removing job_data db...")
-        try:
-            db_path = job_data_db_path.with_suffix(".db")
-            sql_path = job_data_db_path.with_suffix(".sql")
-            if db_path.exists():
-                os.remove(db_path)
-            if sql_path.exists():
-                os.remove(sql_path)
-        except BaseException as e:
-            error_message += f"Cannot delete job_data: {e}\n"
+        if is_sqlite:
+            Log.info("Removing Structure db...")
+            try:
+                os.remove(structure_db_path)
+            except BaseException as e:
+                error_message += f"Cannot delete structure: {e}\n"
+
+            Log.info("Removing job_data db...")
+            try:
+                db_path = job_data_db_path.with_suffix(".db")
+                sql_path = job_data_db_path.with_suffix(".sql")
+                if db_path.exists():
+                    os.remove(db_path)
+                if sql_path.exists():
+                    os.remove(sql_path)
+            except BaseException as e:
+                error_message += f"Cannot delete job_data: {e}\n"
 
         return error_message
 
