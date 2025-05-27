@@ -677,7 +677,7 @@ def _create_db_pg() -> bool:
             conn.execute(insert(tables.DBVersionTable).values({"version": 1}))
             conn.commit()
     except Exception as exc:
-        raise AutosubmitCritical("Database can not be created", 7004, str(exc))
+        raise AutosubmitCritical(f"Database can not be created: {str(exc)}", 7004, str(exc))
 
     return True
 
