@@ -68,6 +68,8 @@ Create an external DB, for example:
 
 ```bash
 $ docker run --rm \
+  -v /tmp/autosubmit/database:/app/autosubmit/database \
+  -v /tmp/autosubmit/experiments:/app/autosubmit/experiments \
   ${USER}/autosubmit:latest \
   autosubmit install
 ```

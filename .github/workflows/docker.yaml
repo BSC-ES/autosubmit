@@ -1,4 +1,4 @@
-name: DOCKER
+name: docker
 
 on:
   pull_request:
@@ -22,7 +22,7 @@ jobs:
       autosubmit:
         image: autosubmit/autosubmit
         ports:
-          - 8080:22
+          - 2022:22
         options: --name autosubmit-container --link slurm-container autosubmit/autosubmit:latest
 
     steps:
