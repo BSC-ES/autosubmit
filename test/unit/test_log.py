@@ -15,6 +15,11 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import pytest
+import os
+import tempfile
+import subprocess
+from pathlib import Path
 from log.log import AutosubmitError, AutosubmitCritical, Log
 
 """Tests for the log module."""
@@ -65,3 +70,22 @@ def test_log_not_format():
     # Format messages
     msg = "Test {foo, bar}"
     _send_messages(msg)
+
+def test_logfile_compression(tmpdir):
+    with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+        tmp_file.write(b"Some content to compress.\n")
+        tmp_file_path = Path(tmp_file.name)
+
+    try:
+        Log.compress_logfile(str(tmp_file_path))
+
+        assert not tmp_file_path.exists()
+
+        compressed_path = tmp_file_path.with_suffix(tmp_file_path.suffix + ".xz")
+        assert compressed_path.exists()
+        assert compressed_path.stat().st_size > 0
+
+    finally:
+        compressed_path = tmp_file_path.with_suffix(tmp_file_path.suffix + ".xz")
+        if compressed_path.exists():
+            os.remove(compressed_path)

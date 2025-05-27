@@ -196,6 +196,8 @@ class Autosubmit:
                                 help="sets file's log level.")
             parser.add_argument('-lc', '--logconsole', choices=log_levels, default='WARNING', type=str,
                                 help="sets console's log level")
+            parser.add_argument('--compress_logs', action='store_true', default=False,  
+                                help='Compress log files after writing')
 
             subparsers = parser.add_subparsers(dest='command')
             # Run
@@ -891,35 +893,35 @@ class Autosubmit:
             if args.command == "stop":
                 exp_id = "_".join(expids)
                 Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                          args.command + exp_id + '.log'), "out", log_level)
+                                          args.command + exp_id + '.log'), "out", args.compress_logs, log_level)
                 Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                          args.command + exp_id + '_err.log'), "err")
+                                          args.command + exp_id + '_err.log'), "err", args.compress_logs)
             else:
                 if owner:
                     os.chmod(tmp_path, 0o775)
                     with suppress(PermissionError, FileNotFoundError, Exception): # for -txt option
                         os.chmod(f'{exp_path}/status', 0o775)
 
-                    Log.set_file(os.path.join(aslogs_path, args.command + '.log'), "out", log_level)
-                    Log.set_file(os.path.join(aslogs_path, args.command + '_err.log'), "err")
+                    Log.set_file(os.path.join(aslogs_path, args.command + '.log'), "out", args.compress_logs, log_level)
+                    Log.set_file(os.path.join(aslogs_path, args.command + '_err.log'), "err", args.compress_logs)
                     if args.command in ["run"]:
                         if os.path.exists(os.path.join(aslogs_path, 'jobs_active_status.log')):
                             os.remove(os.path.join(aslogs_path, 'jobs_active_status.log'))
                         if os.path.exists(os.path.join(aslogs_path, 'jobs_failed_status.log')):
                             os.remove(os.path.join(aslogs_path, 'jobs_failed_status.log'))
-                            Log.set_file(os.path.join(aslogs_path, 'jobs_active_status.log'), "status")
-                            Log.set_file(os.path.join(aslogs_path, 'jobs_failed_status.log'), "status_failed")
+                            Log.set_file(os.path.join(aslogs_path, 'jobs_active_status.log'), "status", args.compress_logs)
+                            Log.set_file(os.path.join(aslogs_path, 'jobs_failed_status.log'), "status_failed", args.compress_logs)
                 else:
                     st = os.stat(tmp_path)
                     oct_perm = str(oct(st.st_mode))[-3:]
                     if int(oct_perm[1]) in [6, 7] or int(oct_perm[2]) in [6, 7]:
-                        Log.set_file(os.path.join(tmp_path, args.command + '.log'), "out", log_level)
-                        Log.set_file(os.path.join(tmp_path, args.command + '_err.log'), "err")
+                        Log.set_file(os.path.join(tmp_path, args.command + '.log'), "out", args.compress_logs, log_level)
+                        Log.set_file(os.path.join(tmp_path, args.command + '_err.log'), "err", args.compress_logs)
                     else:
                         Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                                  args.command + expid + '.log'), "out", log_level)
+                                                  args.command + expid + '.log'), "out", args.compress_logs, log_level)
                         Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                                  args.command + expid + '_err.log'), "err")
+                                                  args.command + expid + '_err.log'), "err", args.compress_logs)
                         Log.printlog(f"Permissions of {tmp_path} are {oct_perm}. The log is being written in the "
                                      f"{BasicConfig.GLOBAL_LOG_DIR} path instead of {oct_perm}. "
                                      f"Please tell to the owner to fix the permissions")
@@ -958,9 +960,9 @@ class Autosubmit:
                 if not os.path.exists(exp_path):
                     raise AutosubmitCritical("Experiment does not exist", 7012)
             Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                      args.command + exp_id + '.log'), "out", log_level)
+                                      args.command + exp_id + '.log'), "out", args.compress_logs, log_level)
             Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                      args.command + exp_id + '_err.log'), "err")
+                                      args.command + exp_id + '_err.log'), "err", args.compress_logs)
         # Enforce LANG=UTF-8
         try:
             try:
