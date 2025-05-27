@@ -115,9 +115,9 @@ $ docker run --rm \
   -ti \
   -p 2222:22 \
   -e DISPLAY=$DISPLAY \
-  -v ~/.ssh/id_rsa:/home/autosubmit/.ssh/id_rsa \
-  -v ~/.ssh/id_rsa.pub:/home/autosubmit/.ssh/id_rsa.pub \
-  -v ~/.ssh/authorized_keys:/home/autosubmit/.ssh/authorized_keys \
+  -v $(pwd -P)/id_rsa:/home/autosubmit/.ssh/id_rsa \
+  -v $(pwd -P)/id_rsa.pub:/home/autosubmit/.ssh/id_rsa.pub \
+  -v $(pwd -P)/authorized_keys:/home/autosubmit/.ssh/authorized_keys \
   -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
   ${USER}/autosubmit:latest /bin/bash
 ```
