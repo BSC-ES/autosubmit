@@ -1,0 +1,38 @@
+name: docker
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      slurm:
+        image: autosubmit/slurm-openssh-container:23-02-7-1
+        ports:
+          - 2222:2222
+        options: --name slurm-container
+
+      autosubmit:
+        image: autosubmit/autosubmit
+        ports:
+          - 2022:22
+        options: --name autosubmit-container --link slurm-container autosubmit/autosubmit:latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Copy access key
+        run: |
+          docker cp slurm-container:/root/.ssh/container_root_pubkey /tmp/container_root_pubkey
+          docker cp /tmp/container_root_pubkey autosubmit-container:/root/.ssh/container_root_pubkey
