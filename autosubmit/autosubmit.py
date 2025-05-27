@@ -1596,8 +1596,10 @@ class Autosubmit:
             Log.debug("The Experiment name is: {0}", expid)
             Log.debug("Sleep: {0}", safetysleeptime)
             packages_persistence = JobPackagePersistence(expid)
-            os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid,
-                                  "pkl", "job_packages_" + expid + ".db"), 0o644)
+
+            if BasicConfig.DATABASE_BACKEND == 'sqlite':
+                os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid,
+                                      "pkl", "job_packages_" + expid + ".db"), 0o644)
 
             packages_persistence.reset_table(True)
             job_list = Autosubmit.load_job_list(
