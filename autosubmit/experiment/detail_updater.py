@@ -239,7 +239,9 @@ class ExperimentDetails:
 
     def __init__(self, expid: str, init_reload: bool = True):
         self.expid = expid
-        self._details_repo = create_experiment_details_repository()
+        self._details_repo = create_experiment_details_repository(
+            db_engine=BasicConfig.DATABASE_BACKEND
+        )
         if init_reload:
             self.reload()
 

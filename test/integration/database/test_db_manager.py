@@ -52,7 +52,7 @@ def test_db_manager_has_made_correct_initialization(tmp_path: "LocalPath", as_db
 )
 def test_after_create_table_command_then_it_returns_1_row(tmp_path: "LocalPath", db_engine: str, request):
     request.getfixturevalue(f"as_db_{db_engine}")
-    db_manager = _create_db_manager(Path(tmp_path, f'tests.db'))
+    db_manager = _create_db_manager(Path(tmp_path, 'tests.db'))
     db_manager.create_table(DBVersionTable.name)
     count = db_manager.count(DBVersionTable.name)
     assert 1 == count
@@ -69,10 +69,35 @@ def test_after_create_table_command_then_it_returns_1_row(tmp_path: "LocalPath",
 )
 def test_after_3_inserts_into_a_table_then_it_has_4_rows(tmp_path: "LocalPath", db_engine: str, request):
     request.getfixturevalue(f"as_db_{db_engine}")
-    db_manager = _create_db_manager(Path(tmp_path, f'tests.db'))
+    db_manager = _create_db_manager(Path(tmp_path, 'tests.db'))
     db_manager.create_table(DBVersionTable.name)
     # It already has the first version, so we are adding versions 2, 3, 4...
     for i in range(2, 5):
         db_manager.insert(DBVersionTable.name, {'version': str(i)})
     count = db_manager.count(DBVersionTable.name)
     assert 4 == count
+
+
+@pytest.mark.parametrize(
+    "db_engine",
+    [
+        # postgres
+        pytest.param("postgres", marks=[pytest.mark.postgres]),
+        # sqlite
+        pytest.param("sqlite")
+    ],
+)
+def test_select_first_where(tmp_path: "LocalPath", db_engine: str, request):
+    request.getfixturevalue(f"as_db_{db_engine}")
+    db_manager = _create_db_manager(Path(tmp_path, 'tests.db'))
+    db_manager.create_table(DBVersionTable.name)
+    # It already has the first version, so we are adding versions 2, 3, 4...
+    for i in range(2, 5):
+        db_manager.insert(DBVersionTable.name, {'version': str(i)})
+    first_value = db_manager.select_first_where(DBVersionTable.name, where=None)
+    # We are getting the first version, that was already in the database
+    assert 1 == first_value[0]
+    
+    last_value = db_manager.select_first_where(DBVersionTable.name, where={'version': '4'})
+    assert 4 == last_value[0]
+
