@@ -6,6 +6,7 @@
   prevented the command from working correctly if the experiment process appeared after a zombie in the list #2394
 - Fixed an issue with Autosubmit's CITATION.cff that prevented Zenodo from automatically
   adding new deposits via its webhook #2401
+- Deleted command `autosubmit test` that was not working in Autosubmit 4 #2386
 
 **Enhancements:**
 
