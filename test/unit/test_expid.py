@@ -23,6 +23,7 @@ from contextlib import contextmanager
 import pytest
 
 from autosubmit.autosubmit import Autosubmit
+from autosubmit.database import db_common
 from log.log import AutosubmitCritical
 
 
@@ -58,8 +59,9 @@ def test_expid(mocker, copy_id, expected, tmp_path, autosubmit_config, monkeypat
     """
     current_experiment_id = "empty"
 
+    monkeypatch.setattr(db_common, 'TIMEOUT', 1)
+
     db_common_mock = mocker.patch('autosubmit.experiment.experiment_common.db_common')
-    monkeypatch.setattr(db_common_mock, 'TIMEOUT', 2)
     build_db_mock(current_experiment_id, db_common_mock, mocker)
 
     basic_config = autosubmit_config('a000').basic_config
