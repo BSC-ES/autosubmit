@@ -24,7 +24,6 @@ import locale
 import os
 import platform
 import pwd
-import random
 import re
 import shutil
 import signal
@@ -39,9 +38,6 @@ from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
-from autosubmit.job.job import Job
-from autosubmit.platforms.submitter import Submitter
-from ruamel.yaml import YAML
 from typing import Dict, Set, Tuple, Union, Any, List, Optional
 
 from autosubmitconfigparser.config.basicconfig import BasicConfig
@@ -56,21 +52,21 @@ from ruamel.yaml import YAML
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 import autosubmit.history.utils as HUtils
 import autosubmit.statistics.utils as StatisticsUtils
-from autosubmit.database.db_common import update_experiment_descrip_version
-from autosubmit.experiment.detail_updater import ExperimentDetails
-from autosubmit.helpers.processes import process_id
-from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path
-from autosubmit.helpers.utils import strtobool
-from log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmit.database.db_common import create_db
 from autosubmit.database.db_common import delete_experiment, get_experiment_descrip
 from autosubmit.database.db_common import get_autosubmit_version, check_experiment_exists
+from autosubmit.database.db_common import update_experiment_descrip_version
 from autosubmit.database.db_structure import get_structure
+from autosubmit.experiment.detail_updater import ExperimentDetails
 from autosubmit.experiment.experiment_common import copy_experiment
 from autosubmit.experiment.experiment_common import new_experiment
 from autosubmit.git.autosubmit_git import AutosubmitGit
+from autosubmit.helpers.processes import process_id
+from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path
+from autosubmit.helpers.utils import strtobool
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.experiment_status import ExperimentStatus
+from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_grouping import JobGrouping
 from autosubmit.job.job_list import JobList
@@ -84,6 +80,8 @@ from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
+from autosubmit.platforms.submitter import Submitter
+from log.log import Log, AutosubmitError, AutosubmitCritical
 
 dialog = None
 
@@ -776,8 +774,6 @@ class Autosubmit:
                                          args.check_wrapper, args.detail)
         elif args.command == 'testcase':
             return Autosubmit.testcase(args.description, args.chunks, args.member, args.stardate, args.HPC, args.copy,args.minimal_configuration,args.git_repo,args.git_branch,args.git_as_conf,args.use_local_minimal)
-        elif args.command == 'test':
-            return Autosubmit.test(args.expid, args.chunks, args.member, args.stardate, args.HPC, args.branch)
         elif args.command == 'refresh':
             return Autosubmit.refresh(args.expid, args.model_conf, args.jobs_conf)
         elif args.command == 'updateversion':
@@ -5671,107 +5667,10 @@ class Autosubmit:
         :return: experiment identifier
         :rtype: str
         """
-
-
-
         testcaseid = Autosubmit.expid(description, hpc, copy_id, False, minimal_configuration, git_repo, git_branch, git_as_conf, use_local_minimal=use_local_minimal, testcase=True)
         if testcaseid == '':
             return False
-        # Disabled for now
-        # Autosubmit._change_conf(
-        #     testcaseid, hpc, start_date, member, chunks, None, False)
-
         return testcaseid
-
-    @staticmethod
-    def test(expid, chunks, member=None, start_date=None, hpc=None, branch=None):
-        """
-        Method to conduct a test for a given experiment. It creates a new experiment for a given experiment with a
-        given number of chunks with a random start date and a random member to be run on a random HPC.
-
-
-        :param expid: experiment identifier
-        :type expid: str
-        :param chunks: number of chunks to be run by the experiment
-        :type chunks: int
-        :param member: member to be used by the test. If None, it uses a random one from which are defined on
-                       the experiment.
-        :type member: str
-        :param start_date: start date to be used by the test. If None, it uses a random one from which are defined on
-                         the experiment.
-        :type start_date: str
-        :param hpc: HPC to be used by the test. If None, it uses a random one from which are defined on
-                    the experiment.
-        :type hpc: str
-        :param branch: branch or revision to be used by the test. If None, it uses configured branch.
-        :type branch: str
-        :return: True if test was successful, False otherwise
-        :rtype: bool
-        """
-        testid = Autosubmit.expid('test', f'test experiment for {expid}', expid, False, True)
-        if testid == '':
-            return False
-
-        Autosubmit._change_conf(testid, hpc, start_date, member, chunks, branch, True)
-
-        Autosubmit.create(testid, False, True)
-        if not Autosubmit.run_experiment(testid):
-            return False
-        return True
-
-    @staticmethod
-    def _change_conf(testid, hpc, start_date, member, chunks, branch, random_select=False):
-        #TODO
-        as_conf = AutosubmitConfig(testid, BasicConfig, YAMLParserFactory())
-
-        if as_conf.experiment_data.get("RERUN", False):
-            if str(as_conf.experiment_data["RERUN"].get("RERUN", "False")).lower() != "true":
-                raise AutosubmitCritical('Can not test a RERUN experiment', 7014)
-
-        content = open(as_conf.experiment_file).read()
-        if random_select:
-            if hpc is None:
-                platforms_parser = as_conf.get_parser(
-                    YAMLParserFactory(), as_conf.platforms_file)
-                test_platforms = list()
-                for section in platforms_parser.sections():
-                    if as_conf.experiment_data["PLATFORMS"][section].get('TEST_SUITE', 'false').lower() == 'true':
-                        test_platforms.append(section)
-                if len(test_platforms) == 0:
-                    raise AutosubmitCritical(
-                        "Missing hpcarch setting in expdef", 7014)
-
-                hpc = random.choice(test_platforms)
-            if member is None:
-                member = random.choice(str(as_conf.experiment_data['EXPERIMENT'].get('MEMBERS')).split(' '))
-            if start_date is None:
-                start_date = random.choice(str(as_conf.experiment_data['EXPERIMENT'].get('DATELIST')).split(' '))
-            if chunks is None:
-                chunks = 1
-
-        # Experiment
-        content = content.replace(re.search('EXPID:.*', content, re.MULTILINE).group(0),
-                                  "EXPID: " + testid)
-        if start_date is not None:
-            content = content.replace(re.search('DATELIST:.*', content, re.MULTILINE).group(0),
-                                      "DATELIST: " + start_date)
-        if member is not None:
-            content = content.replace(re.search('MEMBERS:.*', content, re.MULTILINE).group(0),
-                                      "MEMBERS: " + member)
-        if chunks is not None:
-            # noinspection PyTypeChecker
-            content = content.replace(re.search('NUMCHUNKS:.*', content, re.MULTILINE).group(0),
-                                      "NUMCHUNKS: " + chunks)
-        if hpc is not None:
-            content = content.replace(re.search('HPCARCH:.*', content, re.MULTILINE).group(0),
-                                      "HPCARCH: " + hpc)
-        if branch is not None:
-            content = content.replace(re.search('PROJECT_BRANCH:.*', content, re.MULTILINE).group(0),
-                                      "PROJECT_BRANCH: " + branch)
-            content = content.replace(re.search('PROJECT_REVISION:.*', content, re.MULTILINE).group(0),
-                                      "PROJECT_REVISION: " + branch)
-
-        open(as_conf.experiment_file, 'wb').write(content)
 
     # TODO: To be moved to utils
     @staticmethod
