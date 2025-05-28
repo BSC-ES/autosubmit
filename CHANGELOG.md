@@ -1,5 +1,11 @@
 ### 4.1.15: Unreleased
 
+The filter `-fp` of the command `autosubmit stats` changed in this release.
+Previously, a `-fp 0` would not raise any errors, and would bring all the
+jobs, just like when no filter is provided. Now both negative numbers and
+`0` (zero) raise an error, and only values greater than `0` are used to compute
+the filter the jobs. Not using any value for `-fp` still returns all jobs.
+
 **Bug fixes:**
 
 - Corrected the logic for handling `ZombieProcess` errors in `psutil` calls done in `autosubmit stop`, which
@@ -13,6 +19,8 @@
 
 - EDITO Autosubmit-Demo container updated to install API in different environment #2398
 - Update portalocker requirement from <=3.1.1 to <=3.2.0 #2423
+- Fixed a `ZeroDivisionError` when using RO-Crate or `stats`, and also an issue
+  where the message said `None` could not be iterable. #2389
 
 ### 4.1.14: Bug fixes, enhancements, and new features
 

@@ -527,7 +527,7 @@ Options:
       -ft FILTER_TYPE, --filter_type FILTER_TYPE
                             Select the job type to filter the list of jobs
       -fp FILTER_PERIOD, --filter_period FILTER_PERIOD
-                           Select the period to filter jobs from current time to the past in number of hours back
+                           Select the period to filter jobs from current time to the past in number of hours back (must be greater than 0)
       -o {pdf,png,ps,svg}, --output {pdf,png,ps,svg}
                             type of output for generated plot
       --hide                hides plot window

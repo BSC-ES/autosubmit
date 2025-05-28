@@ -313,9 +313,9 @@ class Autosubmit:
             subparser.add_argument('expid', help='experiment identifier')
             subparser.add_argument('-ft', '--filter_type', type=str, help='Select the job type to filter '
                                                                           'the list of jobs')
-            subparser.add_argument('-fp', '--filter_period', type=int, help='Select the period to filter jobs '
-                                                                            'from current time to the past '
-                                                                            'in number of hours back')
+            subparser.add_argument('-fp', '--filter_period', type=int,
+                                   help='Select the period to filter jobs from current time to the past in'
+                                        'number of hours back (must be greater than 0)')
             subparser.add_argument('-o', '--output', choices=('pdf', 'png', 'ps', 'svg'), default='pdf',
                                    help='type of output for generated plot')
             subparser.add_argument('--section_summary', action='store_true', default=False,
