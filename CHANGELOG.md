@@ -1,3 +1,10 @@
+### 4.1.15: Unreleased
+
+**Bug fixes:**
+
+- Fixed a `ZeroDivisionError` when using RO-Crate or `stats`, and also an issue
+  where the message said `None` could not be iterable. #2389
+
 ### 4.1.14: Bug fixes, enhancements, and new features
 
 **Bug fixes:**
