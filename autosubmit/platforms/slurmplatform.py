@@ -1,32 +1,31 @@
-#!/usr/bin/env python3
-
-# Copyright 2017-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-"""
-Slurm Platform File
 
-This Files is responsible to generate the interactions between Autosubmit and a Slurm Platform creating commands
-being responsible for executing them as needed but the Jobs.
+"""Slurm Platform.
+
+This file contains code that interfaces between Autosubmit and a Slurm Platform.
 """
-from contextlib import suppress
+
 import locale
 import os
+from contextlib import suppress
 from time import sleep
 from typing import List, Union, Any, TYPE_CHECKING
+
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 from autosubmit.job.job_common import Status
@@ -39,14 +38,12 @@ if TYPE_CHECKING:
     # Avoid circular imports
     from autosubmit.job.job import Job
 
-class SlurmPlatform(ParamikoPlatform):
-    """
-    Class to manage jobs to host using SLURM scheduler.
-    """
 
-    def __init__(self, expid: str, name: str, config: dict, auth_password: str=None) -> None:
-        """
-        Initialization of the Class SlurmPlatform.
+class SlurmPlatform(ParamikoPlatform):
+    """Class to manage jobs to host using SLURM scheduler."""
+
+    def __init__(self, expid: str, name: str, config: dict, auth_password: str = None) -> None:
+        """Initialization of the Class SlurmPlatform.
 
         :param expid: ID of the experiment which will instantiate the SlurmPlatform.
         :type expid: str
@@ -56,10 +53,9 @@ class SlurmPlatform(ParamikoPlatform):
         :type config: dict
         :param auth_password: Authenticator's password.
         :type auth_password: str
-
         :rtype: None
         """
-        ParamikoPlatform.__init__(self, expid, name, config, auth_password = auth_password)
+        ParamikoPlatform.__init__(self, expid, name, config, auth_password=auth_password)
         self.mkdir_cmd = None
         self.get_cmd = None
         self.put_cmd = None
@@ -127,7 +123,7 @@ class SlurmPlatform(ParamikoPlatform):
         self._submit_script_path = self._submit_script_base_name + os.urandom(16).hex() + ".sh"
 
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages: list[str],
-                                 error_message: str="", hold: bool=False) -> tuple[bool, list]:
+                                 error_message: str = "", hold: bool = False) -> tuple[bool, list]:
         """
         Retrieve multiple jobs identifiers.
 
@@ -144,7 +140,7 @@ class SlurmPlatform(ParamikoPlatform):
         :rtype: tuple[bool, list[JobPackageBase]]
         """
         try:
-            valid_packages_to_submit = [ package for package in valid_packages_to_submit if package.x11 is not True]
+            valid_packages_to_submit = [package for package in valid_packages_to_submit if package.x11 is not True]
             if len(valid_packages_to_submit) > 0:
                 duplicated_jobs_already_checked = False
                 platform = valid_packages_to_submit[0].jobs[0].platform
@@ -153,20 +149,18 @@ class SlurmPlatform(ParamikoPlatform):
                 except AutosubmitError as e:
                     job_names = []
                     duplicated_jobs_already_checked = True
-                    try:
+                    with suppress(Exception):
                         for package_ in valid_packages_to_submit:
                             if hasattr(package_,"name"):
-                                job_names.append(package_.name) # wrapper_name
+                                job_names.append(package_.name)  # wrapper_name
                             else:
-                                job_names.append(package_.jobs[0].name) # job_name
+                                job_names.append(package_.jobs[0].name)  # job_name
                         Log.error(f'TRACE:{e.trace}\n{e.message} JOBS:{job_names}')
                         for job_name in job_names:
                             jobid = self.get_jobid_by_jobname(job_name)
-                            #cancel bad submitted job if jobid is encountered
+                            # cancel bad submitted job if jobid is encountered
                             for id_ in jobid:
                                 self.send_command(self.cancel_job(id_))
-                    except:
-                        pass
                     jobs_id = None
                     self.connected = False
                     if e.trace is not None:
@@ -183,21 +177,27 @@ class SlurmPlatform(ParamikoPlatform):
                                 if job_tmp.section not in error_msg:
                                     error_msg += job_tmp.section + "&"
                         if has_trace_bad_parameters:
-                            error_message+=(f"Check job and queue specified in your JOBS definition in YAML. Sections "
-                                            f"that could be affected: {error_msg[:-1]}")
+                            error_message += (
+                                f"Check job and queue specified in your JOBS definition in YAML. Sections "
+                                f"that could be affected: {error_msg[:-1]}"
+                            )
                         else:
-                            error_message+=(f"\ncheck that {self.name} platform has set the correct scheduler. "
-                                            f"Sections that could be affected: {error_msg[:-1]}")
+                            error_message += (
+                                f"\ncheck that {self.name} platform has set the correct scheduler. "
+                                f"Sections that could be affected: {error_msg[:-1]}"
+                            )
 
                         raise AutosubmitCritical(error_message, 7014, e.error_message) from e
                 except IOError as e:
                     raise AutosubmitError("IO issues ", 6016, str(e)) from e
                 except BaseException as e:
                     if str(e).find("scheduler") != -1:
-                        raise AutosubmitCritical(f"Are you sure that [{self.type.upper()}] scheduler is the "
-                                    f"correct type for platform [{self.name.upper()}]?.\n Please, double check that "
-                                    f"{self.type.upper()} is loaded for {self.name.upper()} before "
-                                    f"autosubmit launch any job.",7070) from e
+                        raise AutosubmitCritical(
+                            f"Are you sure that [{self.type.upper()}] scheduler is the "
+                            f"correct type for platform [{self.name.upper()}]?.\n Please, double check that "
+                            f"{self.type.upper()} is loaded for {self.name.upper()} before "
+                            f"autosubmit launch any job.",7070
+                        ) from e
                     raise AutosubmitError(
                         "Submission failed, this can be due a failure on the platform", 6015, str(e)) from e
                 if jobs_id is None or len(jobs_id) <= 0:
@@ -243,13 +243,13 @@ class SlurmPlatform(ParamikoPlatform):
                     if not duplicated_jobs_already_checked:
                         job_name = package.name if hasattr(package, "name") else package.jobs[0].name
                         jobid = self.get_jobid_by_jobname(job_name)
-                        if len(jobid) > 1: # Cancel each job that is not the associated
+                        if len(jobid) > 1:  # Cancel each job that is not the associated
                             ids_to_check = [package.jobs[0].id]
                             if package.jobs[0].het:
                                 for i in range(1,package.jobs[0].het.get("HETSIZE",1)): # noqa
                                     ids_to_check.append(str(int(ids_to_check[0]) + i))
                             # TODO to optimize cancel all jobs at once
-                            for id_ in [ jobid for jobid in jobid if jobid not in ids_to_check]:
+                            for id_ in [jobid for jobid in jobid if jobid not in ids_to_check]:
                                 self.send_command(self.cancel_job(id_))
                                 Log.debug(f'Job {id_} with the assigned name: {job_name} has been cancelled')
                             Log.debug(f'Job {package.jobs[0].id} with the assigned name: {job_name} has been submitted')
@@ -290,7 +290,7 @@ class SlurmPlatform(ParamikoPlatform):
         os.chmod(self._submit_script_path, 0o750)
         return self._submit_script_path
 
-    def submit_job(self, job, script_name: str, hold: bool=False, export: str="none") -> Union[int, None]:
+    def submit_job(self, job, script_name: str, hold: bool = False, export: str = "none") -> Union[int, None]:
         """
         Submit a job from a given job object.
 
@@ -324,7 +324,7 @@ class SlurmPlatform(ParamikoPlatform):
             return int(job_id)
         return None
 
-    def submit_Script(self, hold: bool=False) -> Union[List[int], int]:
+    def submit_Script(self, hold: bool = False) -> Union[List[int], int]:
         """
         Sends a Submit file Script with sbatch instructions, execute it in the platform and
         retrieves the Jobs_ID of all jobs at once.
@@ -372,8 +372,10 @@ class SlurmPlatform(ParamikoPlatform):
                 if self.send_command(self.get_mkdir_cmd()):
                     Log.debug(f'{self.remote_log_dir} has been created on {self.host}.')
                 else:
-                    raise AutosubmitError("SFTP session not active ", 6007,
-                                  f"Could not create the DIR {self.remote_log_dir} on HPC {self.host}") from io_err
+                    raise AutosubmitError(
+                        "SFTP session not active ", 6007,
+                        f"Could not create the DIR {self.remote_log_dir} on HPC {self.host}"
+                    ) from io_err
             except BaseException as e:
                 raise AutosubmitError("SFTP session not active ", 6007, str(e)) from e
 
@@ -483,11 +485,9 @@ class SlurmPlatform(ParamikoPlatform):
 
     def parse_Alljobs_output(self, output, job_id):
         status = ""
-        try:
+        with suppress(Exception):
             status = [x.split()[1] for x in output.splitlines()
                       if x.split()[0][:len(str(job_id))] == str(job_id)]
-        except BaseException:
-            pass
         if len(status) == 0:
             return status
         return status[0]
@@ -516,9 +516,8 @@ class SlurmPlatform(ParamikoPlatform):
         except IndexError as exc:
             raise AutosubmitCritical("Submission failed. There are issues on your config file", 7014) from exc
 
-    def get_submit_cmd(self, job_script: str, job, hold: bool=False, export: str="") -> str:
+    def get_submit_cmd(self, job_script: str, job, hold: bool = False, export: str = "") -> str:
         """
-
         :param job_script: Name of the script of the job.
         :type job_script: str
         :param job: Job object.
@@ -527,7 +526,6 @@ class SlurmPlatform(ParamikoPlatform):
         :type hold: bool
         :param export: Set within the jobs.yaml, used to export environment script to use before the job is launched.
         :type export: str
-
         :return: Submit command for the script.
         :rtype: str
         """
@@ -541,7 +539,7 @@ class SlurmPlatform(ParamikoPlatform):
             x11 = job.x11
 
         if not x11:
-            try:
+            with suppress(Exception):
                 lang = locale.getlocale()[1]
                 if lang is None:
                     lang = locale.getdefaultlocale()[1]
@@ -552,8 +550,6 @@ class SlurmPlatform(ParamikoPlatform):
                         submit_script_file.write((export + self._submit_cmd + job_script + "\n").encode(lang))
                     else:
                         submit_script_file.write((export + self._submit_hold_cmd + job_script + "\n").encode(lang))
-            except BaseException:
-                pass
         else:
             return export + self.get_submit_cmd_x11(job.x11_options.strip(""), job_script.strip(""))
 
@@ -681,7 +677,7 @@ class SlurmPlatform(ParamikoPlatform):
         queue_status = self._ssh_output
         for job in in_queue_jobs:
             reason = self.parse_queue_reason(queue_status, job.id)
-            if job.queuing_reason_cancel(reason): # this should be a platform method to be implemented
+            if job.queuing_reason_cancel(reason):  # this should be a platform method to be implemented
                 Log.error(
                     f"Job {job.name} will be cancelled and set to FAILED as it was queuing due to {reason}")
                 self.send_command(
@@ -718,7 +714,8 @@ class SlurmPlatform(ParamikoPlatform):
         """
         return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
 
-    def check_file_exists(self, src: str, wrapper_failed: bool=False, sleeptime: int=5, max_retries: int=3) -> bool:
+    def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5,
+                          max_retries: int = 3) -> bool:
         """
         Checks if a file exists on the FTP server.
         :param src: The name of the file to check.
