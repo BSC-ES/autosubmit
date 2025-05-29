@@ -26,7 +26,7 @@ from random import seed, randint, choice
 from re import sub
 from textwrap import dedent
 from time import time
-from typing import TYPE_CHECKING, Any, Dict, Callable, Protocol, Optional, Type, List
+from typing import TYPE_CHECKING, Any, Dict, Protocol, Optional, Type, List
 
 import pytest
 from autosubmitconfigparser.config.basicconfig import BasicConfig
@@ -40,6 +40,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
 
 if TYPE_CHECKING:
+    # noinspection PyProtectedMember
     from py._path.local import LocalPath  # type: ignore
 
 
@@ -98,13 +99,25 @@ def _initialize_autosubmitrc(folder: Path) -> Path:
     return autosubmitrc
 
 
+class AutosubmitExperimentFixture(Protocol):
+    """Type for ``autosubmit_exp`` fixture."""
+    def __call__(
+            self,
+            expid: Optional[str] = None,
+            experiment_data: Optional[Dict] = None,
+            *args: Any,
+            **kwargs: Any
+    ) -> AutosubmitExperiment:
+        ...
+
+
 @pytest.fixture(scope='function')
 def autosubmit_exp(
         autosubmit: Autosubmit,
         request: pytest.FixtureRequest,
         tmp_path: "LocalPath",
         mocker: "MockerFixture",
-) -> Callable:
+) -> AutosubmitExperimentFixture:
     """Create an instance of ``Autosubmit`` with an experiment.
 
     If an ``expid`` is provided, it will create an experiment with that ID.
