@@ -27,8 +27,6 @@ from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 
 from .submitter import Submitter
 from autosubmit.platforms.psplatform import PsPlatform
-from autosubmit.platforms.pbsplatform import PBSPlatform
-from autosubmit.platforms.sgeplatform import SgePlatform
 from autosubmit.platforms.ecplatform import EcPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from autosubmit.platforms.pjmplatform import PJMPlatform
@@ -126,13 +124,7 @@ class ParamikoSubmitter(Submitter):
             platform_version = platform_data[section].get('VERSION', '')
 
             try:
-                if platform_type == 'pbs':
-                    remote_platform = PBSPlatform(
-                        asconf.expid, section, exp_data, platform_version)
-                elif platform_type == 'sge':
-                    remote_platform = SgePlatform(
-                        asconf.expid, section, exp_data)
-                elif platform_type == 'ps':
+                if platform_type == 'ps':
                     remote_platform = PsPlatform(
                         asconf.expid, section, exp_data)
                 elif platform_type == 'ecaccess':

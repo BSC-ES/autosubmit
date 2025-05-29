@@ -211,9 +211,9 @@ Platform configuration
         # Example platform with all options specified
         ## Platform name
         # PLATFORM:
-        ## Queue type. Options: PBS, SGE, PS, ecaccess, SLURM
+        ## Queue type. Options: PS, ecaccess, SLURM
         # TYPE:
-        ## Version of queue manager to use. Needed only in PBS (options: 10, 11, 12) and ecaccess (options: pbs, loadleveler)
+        ## Version of queue manager to use. Needed only in ecaccess (options: pbs, loadleveler)
         # VERSION:
         ## Hostname of the HPC
         # HOST:
@@ -247,15 +247,6 @@ Platform configuration
         ## Default: 6
         # TOTAL_JOBS: 6
 
-    ithaca:
-        # Queue type. Options: ps, SGE, SLURM, PBS, eceaccess
-        TYPE: SGE
-        HOST: ithaca
-        PROJECT: cfu
-        ADD_PROJECT_TO_HOST: true
-        USER: dbeltran
-        SCRATCH_DIR: /scratch/cfu
-        TEST_SUITE: True
 
 Proj configuration
 ==================
@@ -545,7 +536,7 @@ In this section, we describe the platform configuration using `-QOS` and also `P
             SCRATCH_DIR: /gpfs/scratch
 
         marenostrum4:
-            # Queue type. Options: ps, SGE, SLURM, PBS, eceaccess
+            # Queue type. Options: ps, SLURM, eceaccess
             TYPE: slurm
             HOST: mn1.bsc.es,mn2.bsc.es,mn3.bsc.es
             PROJECT: bsc32
