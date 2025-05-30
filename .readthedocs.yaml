@@ -20,13 +20,18 @@ build:
       # - https://earth.bsc.es/gitlab/es/autosubmit/-/merge_requests/340/
       # - https://yaml.readthedocs.io/en/latest/api.html
       - pip uninstall ruamel.yaml.clib -y
+      - autosubmit configure
+      - autosubmit install
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
    configuration: docs/source/conf.py
 
 # Optionally build your docs in additional formats such as PDF and ePub
-formats: all
+formats:
+  - htmlzip
+  - epub
+  - pdf
 
 # Optionally declare the Python requirements required to build your docs
 # https://docs.readthedocs.io/en/stable/config-file/v2.html#packages
