@@ -73,8 +73,11 @@ def test_retrieve_expids(mocker, expids: List[str], expected_retrieved: int, use
     assert len(found) == expected_retrieved
 
 
-def test_retrieve_expids_but_listing_raises_zombies(mocker):
-    mocker.patch('autosubmit.helpers.processes.process_iter', side_effect=ZombieProcess(1984))
+def test_retrieve_expids_but_there_are_zombies_during_listing(mocker):
+    """Test that when we see a ``ZombieProcess`` error during the listing the function returns as expected."""
+    mocked_process = mocker.MagicMock()
+    mocked_process.username.side_effect = ZombieProcess(0)
+    mocker.patch('autosubmit.helpers.processes.process_iter', return_value=[mocked_process])
     expids = retrieve_expids()
     assert type(expids) is list and len(expids) == 0
 
@@ -136,7 +139,9 @@ def test_process_id_multiple_found(mocker):
 
 def test_process_id_but_there_are_zombies(mocker):
     """Test that if the listing of process crashes due to zombies, we get an empty list."""
-    mocker.patch('autosubmit.helpers.processes.process_iter', side_effect=ZombieProcess(1984))
+    mocked_process = mocker.MagicMock()
+    mocked_process.username.side_effect = ZombieProcess(0)
+    mocker.patch('autosubmit.helpers.processes.process_iter', return_value=mocked_process)
 
     pid_found = process_id('a000')
 

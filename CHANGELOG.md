@@ -1,3 +1,10 @@
+### 4.1.15: Unreleased
+
+**Bug fixes:**
+
+- Corrected the logic for handling `ZombieProcess` errors in `psutil` calls done in `autosubmit stop`, which
+  prevented the command from working correctly if the experiment process appeared after a zombie in the list #2394
+
 ### 4.1.14: Bug fixes, enhancements, and new features
 
 **Bug fixes:**

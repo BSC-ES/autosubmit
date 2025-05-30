@@ -146,9 +146,9 @@ def retrieve_expids() -> List[str]:
     expids: List[str] = []
     # NOTE: psutil may raise ``ZombieProcess`` in some cases, even when other exceptions happen in the
     #       case when a process is a zombie (e.g. got a IO error, but the process is zombie)
-    with suppress(ZombieProcess):
-        for process in [p for p in process_iter(['pid', 'cmdline', 'username']) if p.username() == user]:
-            with suppress(ZombieProcess):
+    for process in process_iter(['pid', 'cmdline', 'username']):
+        with suppress(ZombieProcess):
+            if process.username() == user:
                 expid = _match_autosubmit_cmdline(process.cmdline())
                 if expid:
                     expids.append(expid)
@@ -170,16 +170,13 @@ def process_id(expid: str, command="run") -> Optional[int]:
     :rtype: Optional[int]
     """
     user: str = getuser()
-    try:
-        processes = [
-            p for p
-            in process_iter(['pid', 'cmdline', 'username'])
-            if p.username() == user and _match_autosubmit_cmdline(p.cmdline(), command, expid)
-        ]
-    except ZombieProcess:
+    processes = []
+    for process in process_iter(['pid', 'cmdline', 'username']):
         # NOTE: psutil may raise ``ZombieProcess`` in some cases, even when other exceptions happen in the
         #       case when a process is a zombie (e.g. got a IO error, but the process is zombie)
-        return None
+        with suppress(ZombieProcess):
+            if process.username() == user and _match_autosubmit_cmdline(process.cmdline(), command, expid):
+                processes.append(process)
 
     if not processes:
         return None
