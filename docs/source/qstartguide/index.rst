@@ -64,7 +64,7 @@ Description of most used commands
 Create a new experiment
 =======================
 
-    ``autosubmit expid -dm -H "local" -d "Tutorial"``
+.. runcmd:: autosubmit expid -dm -H "local" -d "Tutorial"``
 
 - *-dm: Generates a dummy experiment.*
 - *-H: Sets the principal experiment platform.*
@@ -92,6 +92,8 @@ The output of the command will show the <EXPID> of the experiment and generate t
 
 Then, execute ``autosubmit create <EXPID> -np`` and Autosubmit will generate the workflow graph.
 
+.. runcmd:: autosubmit create a000 -o png --hide
+
 Run and monitoring
 ==================
 
@@ -103,7 +105,9 @@ Run and monitoring
 
 While the experiment is running, it can be visualized via ``autosubmit monitor <EXPID>``.
 
-.. figure:: dummy.png
+.. runcmd:: find /home/docs/autosubmit/a000/plot/ -iname "*a000_*.png" -true -exec mv -- {} /home/docs/checkouts/readthedocs.org/user_builds/autosubmit/checkouts/4/docs/source/qstartguide/dummy.pdf \;
+
+.. figure:: dummy.pdf
    :name: dummy_workflow
    :width: 100%
    :align: center
