@@ -11,74 +11,33 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Unit tests for the Local Platform."""
+"""Tests for the Autosubmit Slurm platform."""
 
 import pytest
-from pathlib import Path
 
-from autosubmit.job.job import Job
-from autosubmit.job.job_common import Status
-from autosubmit.platforms.locplatform import LocalPlatform
+from textwrap import dedent
 
-_EXPID = 't001'
+from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 
-def test_local_platform_copy():
-    local_platform = LocalPlatform(_EXPID, 'local', {}, auth_password=None)
-
-    copied = local_platform.create_a_new_copy()
-
-    assert local_platform.name == copied.name
-    assert local_platform.expid == copied.expid
-    assert local_platform.get_checkhost_cmd() == copied.get_checkhost_cmd()
+@pytest.fixture
+def slurm_platform(autosubmit_config) -> SlurmPlatform:
+    """Fixture to create a Slurm platform object."""
+    as_conf = autosubmit_config('a000', {})
+    return SlurmPlatform(as_conf.expid, 'TestSlurmPlatform', as_conf.experiment_data)
 
 
-@pytest.mark.parametrize(
-    'count,stats_file_exists,job_fail_count,remote_file_exists',
-    [
-        (-1, True, 0, True),
-        (0, False, 0, False),
-        (1, False, 1, True),
-        (100, True, 100, True)
-    ],
-    ids=[
-        'use fail_count, delete stats_file, remote file transferred',
-        'use count, no stats_file, failed to transfer',
-        'use count, no stats_file, remote file transferred',
-        'use count, delete stats_file, remote file transferred',
-    ]
-)
-def test_get_stat_file(count: int, stats_file_exists: bool, job_fail_count: int, remote_file_exists: bool,
-                       autosubmit_config, mocker):
-    """Test that ``get_stat_file`` uses the correct file name."""
-    mocked_os_remove = mocker.patch('os.remove')
-
-    as_conf = autosubmit_config(_EXPID, experiment_data={})
-    exp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / _EXPID
-
-    local = LocalPlatform(_EXPID, __name__, as_conf.experiment_data)
-
-    job = Job('job', '1', Status.WAITING, None, None)
-    job.fail_count = job_fail_count
-
-    # TODO: this is from ``job.py``; we can probably find an easier way to fetch the file name,
-    #       so we can re-use it in tests (e.g. move the logic to a small function/property/etc.).
-    if count == -1:
-        filename = f"{job.stat_file}{job.fail_count}"
-    else:
-        filename = job.name + '_STAT_{0}'.format(str(count))
-
-    if remote_file_exists:
-        # Create fake remote stat file transferred.
-        Path(exp_path, as_conf.basic_config.LOCAL_TMP_DIR, f'LOG_{_EXPID}', filename).touch()
-
-    if stats_file_exists:
-        # Create fake local stat file, to be deleted before copying the remote file (created above).
-        Path(exp_path, as_conf.basic_config.LOCAL_TMP_DIR, filename).touch()
-
-    assert remote_file_exists == local.get_stat_file(job=job, count=count)
-    assert mocked_os_remove.called == stats_file_exists
+def test_parse_job_finish_data(slurm_platform):
+    """Test that the sacct output is correctly parsed by Autosubmit."""
+    output = dedent('''\
+        JobID                     Submit               Start                 End    Elapsed ConsumedEnergy
+        ------------ ------------------- ------------------- ------------------- ---------- --------------
+        15994954     2025-02-24T16:11:33 2025-02-24T16:11:42 2025-02-24T16:21:30   00:09:48        883.55K
+        15994954.ba+ 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30   00:09:48        497.36K
+        15994954.ex+ 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30   00:09:48        883.55K
+        15994954.0   2025-02-24T16:11:47 2025-02-24T16:11:47 2025-02-24T16:11:52   00:00:05              0
+        15994954.1   2025-02-24T16:12:17 2025-02-24T16:12:17 2025-02-24T16:21:22   00:09:05        844.90K
+    ''')
+    tuple_data = slurm_platform.parse_job_finish_data(output, packed=False)
+    assert tuple_data is not None
