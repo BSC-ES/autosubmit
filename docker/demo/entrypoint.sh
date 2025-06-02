@@ -11,4 +11,4 @@ else
 fi
 
 # Run the command passed by docker run
-autosubmit_api start -b 0.0.0.0:8000
+/apps/autosubmit-api/bin/autosubmit_api start -b 0.0.0.0:8000

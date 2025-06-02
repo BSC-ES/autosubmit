@@ -9,13 +9,19 @@ RUN  sudo ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime &&\
      sudo rm -rf /var/lib/apt/lists/*
 
 # Install Autosubmit
-ARG AUTOSUBMIT_VERSION=4.1.10
-ARG AUTOSUBMIT_API_VERSION=4.0.0
+ARG AUTOSUBMIT_VERSION=4.1.14
+ARG AUTOSUBMIT_API_VERSION=4.1.0b1
 
 RUN pip3 install \
     autosubmit==${AUTOSUBMIT_VERSION} \
-    autosubmit-api==${AUTOSUBMIT_API_VERSION} \
     jupyterlab
+
+WORKDIR /apps
+
+# Create virtual environment for the Autosubmit API
+RUN python3 -m venv /apps/autosubmit-api &&\
+    /apps/autosubmit-api/bin/pip install --upgrade pip &&\
+    /apps/autosubmit-api/bin/pip install autosubmit-api==${AUTOSUBMIT_API_VERSION}
 
 # Set the environment variables
 ENV PROTECTION_LEVEL=NONE
