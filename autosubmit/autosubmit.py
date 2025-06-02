@@ -2116,21 +2116,6 @@ class Autosubmit:
             as_conf, job_list, submitter.platforms)
         Log.debug("Checking experiment templates...")
         platforms_to_test = set()
-        hpcarch = as_conf.get_platform()
-        # Load only platforms used by the experiment, by looking at JOBS.$JOB.PLATFORM. So Autosubmit only establishes connections to the machines that are used.
-        # Also, it ignores platforms used by "COMPLETED/FAILED" jobs as they are no need any more. ( in case of recovery or run a workflow that were already running )
-        for job in job_list.get_job_list():
-            if job.platform_name is None or job.platform_name == "":
-                job.platform_name = hpcarch
-            # noinspection PyTypeChecker
-            try:
-                job.platform = submitter.platforms[job.platform_name.upper()]
-            except Exception as e:
-                raise AutosubmitCritical(f"hpcarch={job.platform_name} not found in the platforms configuration file",
-                    7014)
-            # noinspection PyTypeChecker
-            if job.status not in (Status.COMPLETED, Status.SUSPENDED):
-                platforms_to_test.add(job.platform)
         # This function, looks at %JOBS.$JOB.FILE% ( mandatory ) and %JOBS.$JOB.CHECK% ( default True ).
         # Checks the contents of the .sh/.py/r files and looks for AS placeholders.
         try:
@@ -2293,7 +2278,7 @@ class Autosubmit:
                 max_recovery_retrials = as_conf.experiment_data.get("CONFIG",{}).get("RECOVERY_RETRIALS",3650)  # (72h - 122h )
                 recovery_retrials = 0
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
-                while job_list.get_active():
+                while job_list.continue_run():
                     try:
                         if Autosubmit.exit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)

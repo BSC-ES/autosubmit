@@ -191,6 +191,7 @@ class Job(object):
     )
 
     def __setstate__(self, state, log_process=False):
+        # TODO REMOVE DEBUG STUFF
         debug = []
         for slot, value in state.items():
             if slot in ['local_logs_out', 'remote_logs_err', 'remote_logs_out', 'local_logs_err', 'status']:
@@ -1980,7 +1981,7 @@ class Job(object):
         self.running = as_conf.jobs_data.get(self.section, {}).get("RUNNING", "once")
         self.platform_name = as_conf.jobs_data.get(self.section, {}).get("PLATFORM",
                                                                          as_conf.experiment_data.get("DEFAULT", {}).get(
-                                                                             "HPCARCH", None))
+                                                                             "HPCARCH", "LOCAL"))
         self.file = as_conf.jobs_data.get(self.section, {}).get("FILE", None)
         self.additional_files = as_conf.jobs_data.get(self.section, {}).get("ADDITIONAL_FILES", [])
 
@@ -2002,7 +2003,7 @@ class Job(object):
 
     def update_check_variables(self, as_conf):
         job_data = as_conf.jobs_data.get(self.section, {})
-        job_platform_name = job_data.get("PLATFORM", as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", None))
+        job_platform_name = job_data.get("PLATFORM", as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL"))
         job_platform = job_data.get("PLATFORMS", {}).get(job_platform_name, {})
         self.check = job_data.get("CHECK", True)
         self.check_warnings = job_data.get("CHECK_WARNINGS", False)

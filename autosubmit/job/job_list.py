@@ -65,7 +65,7 @@ class JobList(object):
         self._update_file = "updated_list_" + expid + ".txt"
         self._failed_file = "failed_job_list_" + expid + ".txt"
         self._expid = expid
-        self._config = config
+        self._asconf = config
         self._parser_factory = parser_factory
         self._stat_val = Status()
         self._parameters = []
@@ -89,10 +89,15 @@ class JobList(object):
         self.dbmanager = JobsDbManager(get_connection_url(self._persistence_full_path),
                                        schema=None)  # TODO, from where I get the schema?
         self.run_mode = run_mode
-        self._INACTIVE_STATUSES = ['DELAYED', 'SUSPENDED', 'WAITING']
-        self._ACTIVE_STATUSES = ['READY', 'SUBMITTED', 'QUEUING', 'HELD', 'RUNNING']
-        self._IN_SCHEDULER = ['SUBMITTED', 'QUEUING', 'HELD', 'RUNNING']
-        self._FINAL_STATUSES = ['COMPLETED', 'FAILED', 'SKIPPED']
+        self._INACTIVE_STATUSES = [Status.DELAYED, Status.SUSPENDED, Status.WAITING]
+        self._ACTIVE_STATUSES = [Status.READY, Status.SUBMITTED, Status.QUEUING,
+                                 Status.HELD, Status.RUNNING]
+        self._IN_SCHEDULER = [Status.SUBMITTED, Status.QUEUING, Status.HELD, Status.RUNNING]
+        self._FINAL_STATUSES = [Status.COMPLETED, Status.FAILED, Status.SKIPPED]
+        self._submitter = _get_submitter(self._asconf)
+        self._submitter.load_platforms(self._asconf)
+
+
 
     @property
     def graph_dict(self):
@@ -217,11 +222,12 @@ class JobList(object):
         )
         if full_load and self.check_split_set_to_auto(as_conf):
             force = True
+
         if force:
+            # TODO delete or clean tables not delete the file
             self._reset_workflow_graph()
-            self.graph = DiGraph()
         else:
-            self.graph = self._load_last_graph(full_load)
+            self._load_graph(full_load)
 
         if not self.run_mode:
             self._create_and_add_jobs(show_log, default_job_type, date_list, member_list)
@@ -254,28 +260,63 @@ class JobList(object):
         self._chunk_list = list(range(chunk_ini, num_chunks + 1))
         self._dic_jobs = DicJobs(date_list, member_list, self._chunk_list, date_format, default_retrials, as_conf)
 
-    @staticmethod
-    def _recreate_graph(nodes, edges):
-        graph = DiGraph()
+    def _recreate_graph(
+            self,
+            nodes: list[dict[str, any]],
+            edges: list[dict[str, any]],
+            full_load: bool
+    ) -> None:
+        """
+        Recreates the internal dependency graph from lists of nodes and edges.
+
+        :param nodes: List of node dictionaries, each representing a job node.
+        :type nodes: list[dict[str, any]]
+        :param edges: List of edge dictionaries, each representing a dependency edge.
+        :type edges: list[dict[str, any]]
+        :param full_load: Whether to load all jobs and edges.
+        :type full_load: bool
+        :return: None
+        """
+
+        if full_load:
+            self.graph.clear()
+            self.graph.clear_edges()
+
+        if self._asconf.needs_reload():
+            self._asconf.reload()
+            self._submitter.load_platforms(self._asconf)
+
         for node in nodes:
-            graph.add_node(node["name"], job=Job(loaded_data=node))
+            self.graph.add_node(node["name"], job=Job(loaded_data=node))
+            job = self.graph.nodes[node["name"]]["job"]
+            if not node.get("platform_name", None):
+                node["platform_name"] = self._asconf.jobs_data.get(job.section, {}).get("PLATFORM", self._asconf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL"))
+            if not job.platform_name:
+                job.platform_name = node.get("platform_name", self._asconf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL"))
+            self.graph.nodes[node["name"]]["job"].platform = self._submitter.platforms.get(job.platform_name, self._asconf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL"))
 
         for edge in edges:
-            if edge["e_to"] in graph.nodes:  # Prevent adding nodes that are not in the graph
-                graph.add_edge(edge["e_from"], edge["e_to"], status=edge["status"],
-                               from_step=edge["from_step"])
+            if edge["e_to"] in self.graph.nodes:  # Prevent adding nodes that are not in the graph
+                self.graph.add_edge(edge["e_from"], edge["e_to"], status=edge["status"],
+                                    from_step=edge["from_step"])
                 # I would like to avoid this, and only rely in calls on the job_list,
                 # but not feasible changing all the related code
-                graph.nodes[edge["e_to"]]["job"].add_parent(
-                    graph.nodes[edge["e_from"]]["job"])
-        return graph
+                self.graph.nodes[edge["e_to"]]["job"].add_parent(
+                    self.graph.nodes[edge["e_from"]]["job"])
+        pass
 
-    def _load_last_graph(self, full_load: bool) -> Optional[List[Job]]:
+    def _load_graph(self, full_load: bool ) -> Optional[List[Job]]:
+        """
+        Loads the job graph from the database, creating nodes and edges.
+        :param full_load: If True, loads all jobs and edges, otherwise loads only the necessary ones.
+        :return: None
+        """
         nodes = self.load_jobs(full_load)
         edges = self.load_edges(nodes, full_load)
-        graph = self._recreate_graph(nodes, edges)
+        self._recreate_graph(nodes, edges, full_load)
+
         Log.result("Load finished")
-        return graph
+
 
     def _create_and_add_jobs(
             self, show_log: bool, default_job_type: str, date_list: List[str], member_list: List[str]) -> None:
@@ -1615,7 +1656,7 @@ class JobList(object):
 
             for section in wrapper_jobs:
                 # RUNNING = once, as default. This value comes from jobs_.yml
-                sections_running_type_map[section] = str(self._config.experiment_data["JOBS"].
+                sections_running_type_map[section] = str(self._asconf.experiment_data["JOBS"].
                                                          get(section, {}).get("RUNNING", 'once'))
 
             # Select only relevant jobs, those belonging to the sections defined in the wrapper
@@ -2237,6 +2278,20 @@ class JobList(object):
         if wrapper:
             return [job for job in in_queue if job.packed is False]
         return in_queue
+
+    def continue_run(self):
+        """
+        Loads the next possible jobs and edges from the database and checks if there are active jobs in the workflow.
+        Checks if there are active jobs in the workflow.
+        If there are active jobs, it returns True, otherwise it returns False.
+        """
+
+        self._load_graph(full_load=False)
+        #self.unload_completed_jobs()
+        if len(self.get_active()) > 0:
+            return True
+        else:
+            return False
 
     def get_active(self, platform=None, wrapper=False):
         """
@@ -3095,7 +3150,7 @@ class JobList(object):
         jobs_parser = self._parser_factory.create_parser()
         jobs_parser.optionxform = str
         jobs_parser.load(
-            os.path.join(self._config.LOCAL_ROOT_DIR, self._expid,
+            os.path.join(self._asconf.LOCAL_ROOT_DIR, self._expid,
                          'conf', "jobs_" + self._expid + ".yaml"))
         return jobs_parser
 

@@ -176,6 +176,7 @@ JobsTable = Table(
     Column("updated_log", Boolean),
     Column("packed", Boolean),
     Column("current_checkpoint_step", Integer, nullable=False, default=0),
+    Column("platform_name", String),
 )
 
 """Table that holds the structure of the experiment jobs."""
