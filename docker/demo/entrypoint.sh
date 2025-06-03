@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Prepare Autosubmit
+autosubmit configure
+autosubmit install
+
 # Execute /load_ssh_private_key.sh
 /load_ssh_private_key.sh
 

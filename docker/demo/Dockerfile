@@ -10,26 +10,26 @@ RUN  sudo ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime &&\
 
 # Install Autosubmit
 ARG AUTOSUBMIT_VERSION=4.1.14
-ARG AUTOSUBMIT_API_VERSION=4.1.0b1
+ARG AUTOSUBMIT_GIT_REF
+ARG AUTOSUBMIT_API_VERSION=4.1.0
+ARG AUTOSUBMIT_API_GIT_REF
 
-RUN pip3 install \
-    autosubmit==${AUTOSUBMIT_VERSION} \
-    jupyterlab
+RUN pip3 install --upgrade pip &&\
+    pip3 install jupyterlab \
+    $( [ -n "${AUTOSUBMIT_GIT_REF}" ] && echo "git+https://github.com/BSC-ES/autosubmit.git@${AUTOSUBMIT_GIT_REF}" || echo "autosubmit==${AUTOSUBMIT_VERSION}" )
+
 
 WORKDIR /apps
 
 # Create virtual environment for the Autosubmit API
 RUN python3 -m venv /apps/autosubmit-api &&\
     /apps/autosubmit-api/bin/pip install --upgrade pip &&\
-    /apps/autosubmit-api/bin/pip install autosubmit-api==${AUTOSUBMIT_API_VERSION}
+    /apps/autosubmit-api/bin/pip install \
+    $( [ -n "${AUTOSUBMIT_API_GIT_REF}" ] && echo "git+https://github.com/BSC-ES/autosubmit-api.git@${AUTOSUBMIT_API_GIT_REF}" || echo "autosubmit-api==${AUTOSUBMIT_API_VERSION}" )
 
 # Set the environment variables
 ENV PROTECTION_LEVEL=NONE
 ENV JUPYTER_TOKEN=""
-
-# Install Autosubmit
-RUN autosubmit configure &&\
-    autosubmit install
 
 # Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh
