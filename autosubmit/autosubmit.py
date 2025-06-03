@@ -481,8 +481,22 @@ class Autosubmit:
                                                                        "display dialog boxes (if installed)")
             subparser.add_argument(
                 '--advanced', action="store_true", help="Open advanced configuration of autosubmit")
-            subparser.add_argument('-db', '--databasepath', default=None, help='path to database. If not supplied, '
-                                                                               'it will prompt for it')
+            subparser.add_argument(
+                "--database-backend",
+                choices=("sqlite", "postgres"),
+                default="sqlite",
+                help="Select the database backend to use. Default is sqlite.",
+            )
+            subparser.add_argument(
+                "--database-conn-url", default=None, help="Database connection URL string. Required for postgres backend."
+            )
+            subparser.add_argument(
+                "-db",
+                "--databasepath",
+                default=None,
+                help="path to SQLite database. If not supplied, "
+                "it will prompt for it. Required for SQLite backend.",
+            )
             subparser.add_argument(
                 '-dbf', '--databasefilename', default=None, help='database filename')
             subparser.add_argument('-lr', '--localrootpath', default=None, help='path to store experiments. If not '
@@ -757,9 +771,20 @@ class Autosubmit:
                                      args.expand_status, args.notransitive, args.check_wrapper, args.detail, args.profile, args.force)
         elif args.command == 'configure':
             if not args.advanced or (args.advanced and dialog is None):
-                return Autosubmit.configure(args.advanced, args.databasepath, args.databasefilename,
-                                            args.localrootpath, args.platformsconfpath, args.jobsconfpath,
-                                            args.smtphostname, args.mailfrom, args.all, args.local)
+                return Autosubmit.configure(
+                    args.advanced,
+                    args.databasepath,
+                    args.databasefilename,
+                    args.localrootpath,
+                    args.platformsconfpath,
+                    args.jobsconfpath,
+                    args.smtphostname,
+                    args.mailfrom,
+                    args.all,
+                    args.local,
+                    args.database_backend,
+                    args.database_conn_url,
+                )
             else:
                 return Autosubmit.configure_dialog()
         elif args.command == 'install':
@@ -3481,8 +3506,20 @@ class Autosubmit:
             Log.result(f"No experiments found for expid={input_experiment_list} and user {get_from_user}")
 
     @staticmethod
-    def configure(advanced, database_path, database_filename, local_root_path, platforms_conf_path, jobs_conf_path,
-                  smtp_hostname, mail_from, machine: bool, local: bool):
+    def configure(
+        advanced,
+        database_path,
+        database_filename,
+        local_root_path,
+        platforms_conf_path,
+        jobs_conf_path,
+        smtp_hostname,
+        mail_from,
+        machine: bool,
+        local: bool,
+        database_backend: str = "sqlite",
+        database_conn_url: str = "",
+    ):
         """
         Configure several paths for autosubmit: database, local root and others. Can be configured at system,
         user or local levels. Local level configuration precedes user level and user level precedes system
@@ -3521,18 +3558,19 @@ class Autosubmit:
                 historiclog_path = home_path / 'autosubmit/metadata/logs'
                 database_filename = "autosubmit.db"
 
-            while database_path is None:
-                database_path = input("Introduce Database path: ")
-                if database_path.find("~/") < 0:
-                    database_path = None
-                    Log.error("Not a valid path. You must include '~/' at the beginning.")
-            database_path = Path(database_path).expanduser().resolve()
-            # if not os.path.exists(database_path):
-            HUtils.create_path_if_not_exists(database_path)
-            # Log.error("Database path does not exist.")
-            # return False
-            while database_filename is None:
-                database_filename = input("Introduce Database name: ")
+            if database_backend == "sqlite":
+                while database_path is None:
+                    database_path = input("Introduce Database path: ")
+                    if database_path.find("~/") < 0:
+                        database_path = None
+                        Log.error("Not a valid path. You must include '~/' at the beginning.")
+                database_path = Path(database_path).expanduser().resolve()
+                # if not os.path.exists(database_path):
+                HUtils.create_path_if_not_exists(database_path)
+                # Log.error("Database path does not exist.")
+                # return False
+                while database_filename is None:
+                    database_filename = input("Introduce Database name: ")
 
             while local_root_path is None:
                 local_root_path = input("Introduce path to experiments: ")
@@ -3569,9 +3607,17 @@ class Autosubmit:
                 try:
                     parser = ConfigParser()
                     parser.add_section('database')
-                    parser.set('database', 'path', str(database_path))
-                    if database_filename is not None and len(str(database_filename)) > 0:
-                        parser.set('database', 'filename', str(database_filename))
+                    parser.set('database', 'backend', database_backend)
+                    if database_backend == "postgres":
+                        if database_conn_url is None:
+                            raise AutosubmitCritical(
+                                "You must provide a connection URL for the PostgreSQL database. "
+                                "Try adding --database-conn-url=[YOUR_URL] to your configure command.", 7014)
+                        parser.set('database', 'connection_url', str(database_conn_url))
+                    else:
+                        parser.set('database', 'path', str(database_path))
+                        if database_filename is not None and len(str(database_filename)) > 0:
+                            parser.set('database', 'filename', str(database_filename))
                     parser.add_section('local')
                     parser.set('local', 'path', str(local_root_path))
                     if (jobs_conf_path is not None and len(str(jobs_conf_path)) > 0) or (
@@ -3611,7 +3657,7 @@ class Autosubmit:
                     raise AutosubmitCritical(
                         "Can not write config file: {0}", 7012, e.message)
         except (AutosubmitCritical, AutosubmitError) as e:
-            raise
+            raise e
         except BaseException as e:
             raise AutosubmitCritical(str(e), 7014)
         return True

@@ -163,6 +163,8 @@ def autosubmit_exp(
                 mail_from=None,  # type: ignore
                 machine=False,
                 local=False,
+                database_backend="postgres" if is_postgres else "sqlite",
+                database_conn_url=BasicConfig.DATABASE_CONN_URL if is_postgres else ""
             )
 
         operational = False
