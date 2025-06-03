@@ -76,7 +76,7 @@ readme = {file = "README_PIP.md"}
 [project.optional-dependencies]
 postgres = ["psycopg2"]
 tests = [
-    "pytest>=8.2,<8.4",
+    "pytest>=8.2,<8.5",
     "pytest-cov",
     "pytest-mock",
     "ruff==0.11.12",
