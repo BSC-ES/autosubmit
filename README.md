@@ -1,5 +1,6 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/e9b46f9e6b3047d58f004f024c4971bb)](https://www.codacy.com/app/BSC-Earth/autosubmit?utm_source=earth.bsc.es&amp;utm_medium=referral&amp;utm_content=gitlab/es/autosubmit&amp;utm_campaign=Badge_Grade)
-
+[![codecov](https://codecov.io/gh/BSC-ES/autosubmit/graph/badge.svg?token=WEDBP1A6LG)](https://codecov.io/gh/BSC-ES/autosubmit)
+[![DOI](https://zenodo.org/badge/902494505.svg)](https://zenodo.org/badge/latestdoi/902494505)
 
 Autosubmit is a lightweight workflow manager designed to meet climate research necessities. Unlike other workflow solutions in the domain, it integrates the capabilities of an experiment manager, workflow orchestrator and monitor in a self-contained application. The experiment manager allows for defining and configuring experiments, supported by a hierarchical database that ensures reproducibility and traceability. The orchestrator is designed to run complex workflows in research and operational mode by managing their dependencies and interfacing with local and remote hosts. These multi-scale workflows can involve from a few to thousands of steps and from one to multiple platforms.
 
