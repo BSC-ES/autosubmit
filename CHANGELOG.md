@@ -4,6 +4,12 @@
 
 - Corrected the logic for handling `ZombieProcess` errors in `psutil` calls done in `autosubmit stop`, which
   prevented the command from working correctly if the experiment process appeared after a zombie in the list #2394
+- Fixed an issue with Autosubmit's CITATION.cff that prevented Zenodo from automatically
+  adding new deposits via its webhook #2401
+
+**Enhancements:**
+
+- EDITO Autosubmit-Demo container updated to install API in different environment #2398
 
 ### 4.1.14: Bug fixes, enhancements, and new features
 
@@ -21,7 +27,6 @@
 - Made the details database more consistent and reliable. [PR](https://github.com/BSC-ES/autosubmit/pull/2296)
 - Enhanced the flexibility of workflows, allowing for more adaptable configurations. [#2276](https://github.com/BSC-ES/autosubmit/issues/2276)
 - Improved the log recovery logs. [PR](https://github.com/BSC-ES/autosubmit/pull/2341)
-- EDITO Autosubmit-Demo container updated to install API in different environment [#2398](https://github.com/BSC-ES/autosubmit/issues/2398)
 
 **New features:**
 - Added support for `%^%` variables to improve template customization. [PR](https://github.com/BSC-ES/autosubmit/pull/2288), [Docs](https://autosubmit.readthedocs.io/en/latest/userguide/templates.html#sustitute-placeholders-after-all-files-have-been-loaded)

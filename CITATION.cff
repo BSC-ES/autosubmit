@@ -1,5 +1,70 @@
 cff-version: 1.2.0
+title: Autosubmit
 message: "If you use this software, please cite it using these metadata."
+license: GPL-3.0
+type: software
+abstract: "Autosubmit is a lightweight workflow manager designed to meet climate research necessities."
+authors:
+  - given-names: "Daniel"
+    family-names: "Beltrán Mora"
+    affiliation: "Barcelona Supercomputing Center"
+    orcid: "https://orcid.org/0000-0003-1442-3197"
+  - given-names: "Miguel"
+    family-names: "Castrillo Melguizo"
+    affiliation: "Barcelona Supercomputing Center"
+    orcid: "https://orcid.org/0000-0003-1826-623X"
+  - given-names: "Manuel"
+    family-names: "Giménez de Castro Marciani"
+    affiliation: "Barcelona Supercomputing Center"
+    orcid: "https://orcid.org/0000-0002-9852-3322"
+  - given-names: "Bruno"
+    family-names: "de Paula Kinoshita"
+    affiliation: "Barcelona Supercomputing Center"
+    orcid: "https://orcid.org/0000-0001-8250-4074"
+  - given-names: "Luiggi Gianpiere"
+    family-names: "Tenório Ku"
+    affiliation: "Barcelona Supercomputing Center"
+    orcid: "https://orcid.org/0000-0001-6086-9494"
+  - given-names: "Irene"
+    family-names: "Simó Muñoz"
+    affiliation: "Barcelona Supercomputing Center"
+    orcid: "https://orcid.org/0009-0000-8752-8366"
+  - given-names: "Erick"
+    family-names: "Lopes"
+    affiliation: "Barcelona Supercomputing Center"
+    orcid: "https://orcid.org/0009-0005-9441-5438"
+  - given-names: "Pablo"
+    family-names: "Goitia González"
+    affiliation: "Barcelona Supercomputing Center"
+    orcid: "https://orcid.org/0009-0004-2011-6462"
+  - given-names: "Aina"
+    family-names: "Gaya i Àvila"
+    affiliation: "Barcelona Supercomputing Center"
+    orcid: "https://orcid.org/0000-0001-6987-8901"
+  - given-names: "Pierre-Antoine"
+    family-names: "Bretonnière"
+    affiliation: "Barcelona Supercomputing Center"
+    orcid: "https://orcid.org/0000-0002-3066-6685"
+  - given-names: "Francesca"
+    family-names: "Macchia"
+    affiliation: "Barcelona Supercomputing Center"
+    orcid: "https://orcid.org/0000-0003-4952-5994"
+  - given-names: "Laura"
+    family-names: "Herrero"
+    affiliation: "Barcelona Supercomputing Center"
+    orcid: "https://orcid.org/0009-0006-1888-5443"
+  - given-names: "Francesc"
+    family-names: "Roura Adserias"
+    affiliation: "Barcelona Supercomputing Center"
+    orcid: "https://orcid.org/0000-0002-5307-2935"
+
+keywords:
+  - earth system modelling
+  - climate
+  - weather
+  - high performance computing
+  - workflow manager
+
 preferred-citation:
   type: article
   authors:
@@ -11,14 +76,16 @@ preferred-citation:
     given-names: "Chloe"
   - family-names: "Mula-Valls"
     given-names: "Oriol"
-  - family-name: "J. Doblas-Reyes"
-    given-name: "Francisco"
+  - family-names: "J. Doblas-Reyes"
+    given-names: "Francisco"
   journal: "2016 International Conference on High Performance Computing & Simulation (HPCS)"
   start: 895 # First page number
   end: 900 # Last page number
   title: "Seamless management of ensemble climate prediction experiments on HPC platforms"
   year: 2016
-  publisher: "IEEE"
+  publisher:
+    alias: IEEE
+    name: Institute of Electrical and Electronics Engineers
   keywords:
     - earth system modelling
     - climate
