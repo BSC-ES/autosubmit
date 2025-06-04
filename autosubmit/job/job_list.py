@@ -2286,8 +2286,9 @@ class JobList(object):
         for job in self.job_list:
             if not job.platform:
                 self._assign_platforms(self._as_conf, job, create=False, new=False, submitter=submitter)
-            if job.status not in (self._IN_SCHEDULER + self._FINAL_STATUSES):
-                job.update_parameters(self._as_conf, set_attributes=True, reset_logs=True)
+            # if job.status not in (self._IN_SCHEDULER + self._FINAL_STATUSES):
+            if not job.updated:
+                job.update_parameters(self._as_conf, set_attributes=True, reset_logs=False if job.status in (self._IN_SCHEDULER + self._FINAL_STATUSES) else True)
 
         # self.unload_completed_jobs()
         if len(self.get_active()) > 0:

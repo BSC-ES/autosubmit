@@ -186,7 +186,7 @@ class Job(object):
         'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        '_log_recovered', 'packed_during_building', 'workflow_commit'
+        '_log_recovered', 'packed_during_building', 'workflow_commit', 'updated'
     )
 
 
@@ -259,7 +259,7 @@ class Job(object):
     def __repr__(self):
         return "{0} STATUS: {1}".format(self.name, self.status)
 
-    def __init__(self, name=None, job_id=None, status=None, priority=None, loaded_data=None):
+    def __init__(self, name=None, job_id=None, status=None, priority=None, loaded_data=None, log_process=False):
         self.rerun_only = False
         self.delay_end = None
         self.wrapper_type = None
@@ -362,7 +362,7 @@ class Job(object):
         self._name = name
         self.name = name
         if loaded_data:
-            self.__setstate__(loaded_data)
+            self.__setstate__(loaded_data, log_process=log_process)
         self.script_name = self.name + ".cmd"
         self.stat_file = f"{self.script_name[:-4]}_STAT_"
         """Number of failed attempts to run this job. (FAIL_COUNT)"""
@@ -371,6 +371,8 @@ class Job(object):
         self._tmp_path = os.path.join(
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
         self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
+        self.updated = False
+
 
     def _init_runtime_parameters(self):
         # hetjobs
@@ -2250,6 +2252,8 @@ class Job(object):
         :type reset_logs: bool
         :return: None
         """
+        #if parameters_updated and not as_conf.needs_reload():
+        #    continue
         if not set_attributes and as_conf.needs_reload():
             set_attributes = True
 
@@ -2277,6 +2281,7 @@ class Job(object):
         for event in self.platform.worker_events:  # keep alive log retrieval workers.
             if not event.is_set():
                 event.set()
+        self.updated = True
         return parameters
 
 

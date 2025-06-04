@@ -107,7 +107,8 @@ class CopyQueue(Queue):
         :param timeout: Timeout for blocking operations. Defaults to None.
         :type timeout: float
         """
-        super().put(job.__getstate__(), block, timeout)
+        super().put(job.__getstate__(log_process=True), block, timeout)
+
 
 
 class Platform(object):
@@ -1071,7 +1072,7 @@ class Platform(object):
         while not self.recovery_queue.empty():
             try:
                 from autosubmit.job.job import Job
-                job = Job(loaded_data=self.recovery_queue.get(timeout=1))
+                job = Job(loaded_data=self.recovery_queue.get(timeout=1), log_process=True)
                 job.platform_name = self.name  # Change the original platform to this process platform.
                 job.platform = self
                 job._log_recovery_retries = 0  # Reset the log recovery retries.

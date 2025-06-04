@@ -2377,7 +2377,7 @@ class Autosubmit:
                             job_list.update_as_conf(as_conf)
                             for p in platforms_to_test:
                                 p.update_as_conf(as_conf)
-                        time.sleep(safetysleeptime)
+                        time.sleep(0)
                         #Log.debug(f"FD endsubmit: {fd_show.fd_table_status_str()}")
 
 
