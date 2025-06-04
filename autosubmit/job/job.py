@@ -54,7 +54,31 @@ Log.get_logger("Autosubmit")
 # A wrapper for encapsulate threads , TODO: Python 3+ to be replaced by the < from concurrent.futures >
 
 EXCLUDED = ["_platform", "_children", "_parents", "submitter"]
-
+# TODO MOVE OUTSIDE OF JOB CLASS
+PERSISTENT_ATTRIBUTES = (
+    "name",
+    "id",
+    "script_name",
+    "priority",
+    "status",
+    "frequency",
+    "synchronize",
+    "section",
+    "chunk",
+    "splits",
+    "split",
+    "date",
+    "date_split",
+    "max_checkpoint_step",
+    "start_time_timestamp",
+    "submit_time_timestamp",
+    "finish_time_timestamp",
+    "ready_date",
+    "local_logs",
+    "remote_logs",
+    "updated_log",
+    "packed",
+)
 
 def threaded(fn):
     def wrapper(*args, **kwargs):
@@ -164,37 +188,13 @@ class Job(object):
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
         '_log_recovered', 'packed_during_building', 'workflow_commit'
     )
-    # TODO MOVE OUTSIDE OF JOB CLASS
-    PERSISTENT_ATTRIBUTES = (
-        "name",
-        "id",
-        "script_name",
-        "priority",
-        "status",
-        "frequency",
-        "synchronize",
-        "section",
-        "chunk",
-        "splits",
-        "split",
-        "date",
-        "date_split",
-        "max_checkpoint_step",
-        "start_time_timestamp",
-        "submit_time_timestamp",
-        "finish_time_timestamp",
-        "ready_date",
-        "local_logs",
-        "remote_logs",
-        "updated_log",
-        "packed",
-    )
+
 
     def __setstate__(self, state, log_process=False):
         # TODO REMOVE DEBUG STUFF
         debug = []
         for slot, value in state.items():
-            if slot in ['local_logs_out', 'remote_logs_err', 'remote_logs_out', 'local_logs_err', 'status']:
+            if slot in ['local_logs_out', 'remote_logs_err', 'remote_logs_out', 'local_logs_err', 'status', 'date']:
                 continue
             elif slot in self.__slots__:
                 setattr(self, slot, value)
@@ -204,10 +204,12 @@ class Job(object):
                     setattr(self, slot, value)
                 else:
                     debug.append(f"Slot {slot} not found in Job class. Value: {value}")
+
         if not log_process:
             self.local_logs = (state.get('local_logs_out', ''), state.get('local_logs_err', ''))
             self.remote_logs = (state.get('remote_logs_out', ''), state.get('remote_logs_err', ''))
             self.status = Status.KEY_TO_VALUE[state['status']]
+            self.date = datetime.datetime.fromisoformat(state['date']) if state.get('date', None) else None
 
         if debug:
             from pprint import pprint
@@ -223,17 +225,19 @@ class Job(object):
         if not slot.startswith('_'):
             return f"_{slot}"
 
-
     def __getstate__(self, log_process=False):
         if log_process:
             return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in EXCLUDED])
         else:  # Normalize data to store in the database
-            job_data = dict([(k, getattr(self, k, None)) for k in self.PERSISTENT_ATTRIBUTES])
+            job_data = dict([(k, getattr(self, k, None)) for k in PERSISTENT_ATTRIBUTES])
             job_data["status"] = Status.VALUE_TO_KEY[self.status]
             job_data["local_logs_out"] = self.local_logs[0] if self.local_logs[0] else None
             job_data["local_logs_err"] = self.local_logs[1] if self.local_logs[1] else None
             job_data["remote_logs_out"] = self.remote_logs[0] if self.remote_logs[0] else None
             job_data["remote_logs_err"] = self.remote_logs[1] if self.remote_logs[1] else None
+            if job_data["date"]:
+                job_data["date"] = job_data["date"].isoformat()
+
             del job_data["local_logs"]
             del job_data["remote_logs"]
             return job_data
@@ -363,6 +367,7 @@ class Job(object):
         self.stat_file = f"{self.script_name[:-4]}_STAT_"
         """Number of failed attempts to run this job. (FAIL_COUNT)"""
         self.expid: str = self.name.split('_')[0]
+        BasicConfig.read()
         self._tmp_path = os.path.join(
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
         self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")

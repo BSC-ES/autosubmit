@@ -49,8 +49,8 @@ class JobsDbManager(DbManager):
         """Save the job list to the database. Normally this will save the current active jobs."""
         self.create_table(JobsTable.name)
         persistent_data = [job.__getstate__(log_process=False) for job in job_list]
-        from pprint import pprint
-        pprint(persistent_data)  # TODO remove Debug
+        # from pprint import pprint
+        # pprint(persistent_data)  # TODO remove Debug
 
         pkeys = ['name']
         self.upsert_many(JobsTable.name, persistent_data, pkeys)

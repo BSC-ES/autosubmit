@@ -912,6 +912,9 @@ class Platform(object):
         self.log_recovery_process = None
         self.processed_wrapper_logs = set()
 
+    def update_as_conf(self, as_conf: 'AutosubmitConfig') -> None:
+        self.config = as_conf.experiment_data
+
     def load_process_info(self, platform):
 
         platform.host = self.host
@@ -1092,13 +1095,14 @@ class Platform(object):
             try:
                 job.retrieve_logfiles(raise_error=True)
                 job._log_recovery_retries += 1
+                Log.result(
+                    f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
             except:
                 if job._log_recovery_retries < 5:
                     jobs_pending_to_process.add(job)
                 Log.warning(
                     f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry '{job.fail_count}'.")
-            Log.result(
-                f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
+
         if len(jobs_pending_to_process) > 0:
             self.restore_connection(as_conf, log_recovery_process=True)  # Restore the connection if there was an issue with one or more jobs.
 

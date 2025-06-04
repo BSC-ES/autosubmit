@@ -65,7 +65,7 @@ class JobList(object):
         self._update_file = "updated_list_" + expid + ".txt"
         self._failed_file = "failed_job_list_" + expid + ".txt"
         self._expid = expid
-        self._asconf = config
+        self._as_conf = config
         self._parser_factory = parser_factory
         self._stat_val = Status()
         self._parameters = []
@@ -94,10 +94,6 @@ class JobList(object):
                                  Status.HELD, Status.RUNNING]
         self._IN_SCHEDULER = [Status.SUBMITTED, Status.QUEUING, Status.HELD, Status.RUNNING]
         self._FINAL_STATUSES = [Status.COMPLETED, Status.FAILED, Status.SKIPPED]
-        self._submitter = _get_submitter(self._asconf)
-        self._submitter.load_platforms(self._asconf)
-
-
 
     @property
     def graph_dict(self):
@@ -281,31 +277,29 @@ class JobList(object):
         if full_load:
             self.graph.clear()
             self.graph.clear_edges()
-
-        if self._asconf.needs_reload():
-            self._asconf.reload()
-            self._submitter.load_platforms(self._asconf)
-
-        for node in nodes:
+        for node in [ node for node in nodes if node.get("name", "") not in self.graph.nodes]:
             self.graph.add_node(node["name"], job=Job(loaded_data=node))
             job = self.graph.nodes[node["name"]]["job"]
             if not node.get("platform_name", None):
-                node["platform_name"] = self._asconf.jobs_data.get(job.section, {}).get("PLATFORM", self._asconf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL"))
+                node["platform_name"] = self._as_conf.jobs_data.get(job.section, {}).get("PLATFORM",
+                                                                                        self._as_conf.experiment_data.get(
+                                                                                            "DEFAULT", {}).get(
+                                                                                            "HPCARCH", "LOCAL"))
             if not job.platform_name:
-                job.platform_name = node.get("platform_name", self._asconf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL"))
-            self.graph.nodes[node["name"]]["job"].platform = self._submitter.platforms.get(job.platform_name, self._asconf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL"))
+                job.platform_name = node.get("platform_name",
+                                             self._as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL"))
 
-        for edge in edges:
-            if edge["e_to"] in self.graph.nodes:  # Prevent adding nodes that are not in the graph
+        for edge in (edge for edge in edges if edge.get("e_from", "") in self.graph.nodes and
+                                               edge.get("e_to", "") in self.graph.nodes):
+            if not self.graph.has_edge(edge["e_from"], edge["e_to"]):
                 self.graph.add_edge(edge["e_from"], edge["e_to"], status=edge["status"],
                                     from_step=edge["from_step"])
                 # I would like to avoid this, and only rely in calls on the job_list,
                 # but not feasible changing all the related code
                 self.graph.nodes[edge["e_to"]]["job"].add_parent(
                     self.graph.nodes[edge["e_from"]]["job"])
-        pass
 
-    def _load_graph(self, full_load: bool ) -> Optional[List[Job]]:
+    def _load_graph(self, full_load: bool) -> Optional[List[Job]]:
         """
         Loads the job graph from the database, creating nodes and edges.
         :param full_load: If True, loads all jobs and edges, otherwise loads only the necessary ones.
@@ -316,7 +310,6 @@ class JobList(object):
         self._recreate_graph(nodes, edges, full_load)
 
         Log.result("Load finished")
-
 
     def _create_and_add_jobs(
             self, show_log: bool, default_job_type: str, date_list: List[str], member_list: List[str]) -> None:
@@ -383,7 +376,8 @@ class JobList(object):
         self.save_jobs()
         self.save_edges()
         self._process_wrapper_jobs(wrapper_jobs)
-        self._assign_platforms(as_conf, create, new)
+        for job in self.job_list:
+            self._assign_platforms(as_conf, job, create, new)
 
     def _process_wrapper_jobs(self, wrapper_jobs: Dict[str, Any]) -> None:
         for wrapper_section in wrapper_jobs:
@@ -401,17 +395,14 @@ class JobList(object):
                     str(e),
                 )
 
-    def _assign_platforms(self, as_conf: AutosubmitConfig, create: bool, new: bool) -> None:
-        job_list_per_platform = self.split_by_platform()
-        submitter = _get_submitter(as_conf)
-        submitter.load_platforms(as_conf)
-
-        for platform in job_list_per_platform:
-            for job in job_list_per_platform[platform]:
-                if create or new:
-                    job.reset_logs(as_conf)
-                    if job.platform_name and job.platform_name in submitter.platforms:
-                        job.platform = submitter.platforms[job.platform_name]
+    def _assign_platforms(self, as_conf: AutosubmitConfig, job: Job, create: bool, new: bool, submitter: Any = None ) -> None:
+        if not submitter:
+            submitter = _get_submitter(as_conf)
+            submitter.load_platforms(as_conf)
+        if create or new:
+            job.reset_logs(as_conf)
+        if job.platform_name and job.platform_name in submitter.platforms:
+            job.platform = submitter.platforms[job.platform_name]
 
     def clear_generate(self):
         self.dependency_map = {}
@@ -1656,7 +1647,7 @@ class JobList(object):
 
             for section in wrapper_jobs:
                 # RUNNING = once, as default. This value comes from jobs_.yml
-                sections_running_type_map[section] = str(self._asconf.experiment_data["JOBS"].
+                sections_running_type_map[section] = str(self._as_conf.experiment_data["JOBS"].
                                                          get(section, {}).get("RUNNING", 'once'))
 
             # Select only relevant jobs, those belonging to the sections defined in the wrapper
@@ -2279,7 +2270,7 @@ class JobList(object):
             return [job for job in in_queue if job.packed is False]
         return in_queue
 
-    def continue_run(self):
+    def continue_run(self, submitter):
         """
         Loads the next possible jobs and edges from the database and checks if there are active jobs in the workflow.
         Checks if there are active jobs in the workflow.
@@ -2287,11 +2278,21 @@ class JobList(object):
         """
 
         self._load_graph(full_load=False)
+        for job in self.job_list:
+            if not job.platform:
+                self._assign_platforms(self._as_conf, job, create=False, new=False, submitter=submitter)
+            if job.status not in (self._IN_SCHEDULER + self._FINAL_STATUSES):
+                job.update_parameters(self._as_conf, set_attributes=True, reset_logs=True)
+
+
         #self.unload_completed_jobs()
         if len(self.get_active()) > 0:
             return True
         else:
             return False
+
+    def unload_completed_jobs(self):
+        pass
 
     def get_active(self, platform=None, wrapper=False):
         """
@@ -2541,7 +2542,8 @@ class JobList(object):
         for current_job in [current_job for current_job in self.job_list if current_job.status == Status.WAITING]:
             self._check_checkpoint(current_job)
             parents_edge_info = self.get_parents_edges(current_job.name)
-            parents_nodes = {parent_name: self.graph.nodes[parent_name]["job"] for parent_name in parents_edge_info.keys()}
+            parents_nodes = {parent_name: self.graph.nodes[parent_name]["job"] for parent_name in
+                             parents_edge_info.keys()}
             non_completed, completed = self._count_parents_status(current_job, parents_edge_info, parents_nodes)
             if len(non_completed) == 0 and len(completed) > 0:
                 # If all parents are completed, we can run the job
@@ -2904,8 +2906,8 @@ class JobList(object):
         if as_conf.get_remote_dependencies() == "true":
             for job in self.get_prepared():
                 tmp = [parent for parent in job.parents if
-                        parent.status == Status.COMPLETED or parent.status == Status.SKIPPED
-                        or parent.status == Status.FAILED]
+                       parent.status == Status.COMPLETED or parent.status == Status.SKIPPED
+                       or parent.status == Status.FAILED]
                 tmp2 = [parent for parent in job.parents if
                         parent.status == Status.SKIPPED or parent.status == Status.FAILED]
                 if len(tmp) == len(job.parents) and len(tmp2) != len(job.parents):
@@ -3150,7 +3152,7 @@ class JobList(object):
         jobs_parser = self._parser_factory.create_parser()
         jobs_parser.optionxform = str
         jobs_parser.load(
-            os.path.join(self._asconf.LOCAL_ROOT_DIR, self._expid,
+            os.path.join(self._as_conf.LOCAL_ROOT_DIR, self._expid,
                          'conf', "jobs_" + self._expid + ".yaml"))
         return jobs_parser
 
@@ -3569,3 +3571,6 @@ class JobList(object):
             return datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
         else:
             return None
+
+    def update_as_conf(self, as_conf: 'AutosubmitConfig') -> None:
+        self._as_conf = as_conf
