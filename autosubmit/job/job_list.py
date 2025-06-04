@@ -94,6 +94,9 @@ class JobList(object):
                                  Status.HELD, Status.RUNNING]
         self._IN_SCHEDULER = [Status.SUBMITTED, Status.QUEUING, Status.HELD, Status.RUNNING]
         self._FINAL_STATUSES = [Status.COMPLETED, Status.FAILED, Status.SKIPPED]
+        self.total_size = 0
+        self.completed_size = 0
+        self.failed_size = 0
 
     @property
     def graph_dict(self):
@@ -277,14 +280,14 @@ class JobList(object):
         if full_load:
             self.graph.clear()
             self.graph.clear_edges()
-        for node in [ node for node in nodes if node.get("name", "") not in self.graph.nodes]:
+        for node in [node for node in nodes if node.get("name", "") not in self.graph.nodes]:
             self.graph.add_node(node["name"], job=Job(loaded_data=node))
             job = self.graph.nodes[node["name"]]["job"]
             if not node.get("platform_name", None):
                 node["platform_name"] = self._as_conf.jobs_data.get(job.section, {}).get("PLATFORM",
-                                                                                        self._as_conf.experiment_data.get(
-                                                                                            "DEFAULT", {}).get(
-                                                                                            "HPCARCH", "LOCAL"))
+                                                                                         self._as_conf.experiment_data.get(
+                                                                                             "DEFAULT", {}).get(
+                                                                                             "HPCARCH", "LOCAL"))
             if not job.platform_name:
                 job.platform_name = node.get("platform_name",
                                              self._as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL"))
@@ -298,6 +301,7 @@ class JobList(object):
                 # but not feasible changing all the related code
                 self.graph.nodes[edge["e_to"]]["job"].add_parent(
                     self.graph.nodes[edge["e_from"]]["job"])
+
 
     def _load_graph(self, full_load: bool) -> Optional[List[Job]]:
         """
@@ -395,7 +399,8 @@ class JobList(object):
                     str(e),
                 )
 
-    def _assign_platforms(self, as_conf: AutosubmitConfig, job: Job, create: bool, new: bool, submitter: Any = None ) -> None:
+    def _assign_platforms(self, as_conf: AutosubmitConfig, job: Job, create: bool, new: bool,
+                          submitter: Any = None) -> None:
         if not submitter:
             submitter = _get_submitter(as_conf)
             submitter.load_platforms(as_conf)
@@ -2284,8 +2289,7 @@ class JobList(object):
             if job.status not in (self._IN_SCHEDULER + self._FINAL_STATUSES):
                 job.update_parameters(self._as_conf, set_attributes=True, reset_logs=True)
 
-
-        #self.unload_completed_jobs()
+        # self.unload_completed_jobs()
         if len(self.get_active()) > 0:
             return True
         else:
@@ -2424,7 +2428,9 @@ class JobList(object):
         """
         Loads the job list
         """
-        return self.dbmanager.load_jobs(full_load)
+        nodes = self.dbmanager.load_jobs(full_load)
+        self.total_size, self.completed_size, self.failed_size = self.dbmanager.get_job_list_size()
+        return nodes
 
     def save_edges(self):
         """

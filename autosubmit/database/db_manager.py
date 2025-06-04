@@ -180,3 +180,13 @@ class DbManager:
 
         # Return the number of rows affected
         return cast(int, result.rowcount)
+
+    def count_where(self, table_name: str, where: dict[str, Any]) -> int:
+        """Count the number of rows in a table that match a given condition."""
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        query = select(func.count()).select_from(table)
+        for key, value in where.items():
+            query = query.where(getattr(table.c, key) == value)
+        with self.engine.connect() as conn:
+            row = conn.execute(query).scalar()
+        return cast(int, row) if row is not None else 0

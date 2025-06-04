@@ -17,7 +17,7 @@
 
 """Contains code to manage a database via SQLAlchemy."""
 
-from typing import Any, Optional, List, Dict, TYPE_CHECKING, Union
+from typing import Any, Optional, List, Dict, TYPE_CHECKING, Union, Tuple
 
 from sqlalchemy import Engine
 from sqlalchemy.orm import relationship
@@ -66,6 +66,16 @@ class JobsDbManager(DbManager):
 
         # return modificable list of dicts so it is easier to save later
         return [dict(job) for job in job_list]
+
+    def get_job_list_size(self) -> Tuple[int, int, int]:
+        """
+        Return the number of jobs in the database.
+        """
+        self.create_table(JobsTable.name)
+        job_list_size = self.count(JobsTable.name)
+        complete_job_list_size = self.count_where(JobsTable.name, {'status': "COMPLETED"})
+        failed_job_list_size = self.count_where(JobsTable.name, {'status': "FAILED"})
+        return job_list_size, complete_job_list_size, failed_job_list_size
 
     def select_all_jobs(self) -> List[dict[str, Any]]:
         """

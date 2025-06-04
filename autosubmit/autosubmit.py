@@ -2198,26 +2198,28 @@ class Autosubmit:
         else:
             return job_list, submitter, None, None, as_conf, platforms_to_test, True
 
-
     @staticmethod
-    def get_iteration_info(as_conf,job_list):
+    def get_iteration_info(as_conf, job_list):
         """
         Prints the current iteration information
         :param as_conf: autosubmit configuration object
         :param job_list: job list object
         :return: common parameters for the iteration
         """
-        total_jobs = len(job_list.get_job_list())
-        Log.info(f"\n\n{(total_jobs - len(job_list.get_completed()))} of {total_jobs} jobs remaining "
-                 f"({time.strftime('%H:%M')})")
-        if len(job_list.get_failed()) > 0:
-            Log.info(f"{len(job_list.get_failed())} jobs has been  failed ({time.strftime('%H:%M')})")
+        remaining_jobs = job_list.total_size - job_list.completed_size
+        Log.info(
+            f"\n\n{remaining_jobs} of {job_list.total_size} jobs remaining ({time.strftime('%H:%M')})"
+        )
+        if job_list.failed_size > 0:
+            Log.warning(
+                f"{job_list.failed_size} jobs have failed ({time.strftime('%H:%M')})"
+            )
         safetysleeptime = as_conf.get_safetysleeptime()
         default_retrials = as_conf.get_retrials()
         check_wrapper_jobs_sleeptime = as_conf.get_wrapper_check_time()
         Log.debug("Sleep: {0}", safetysleeptime)
         Log.debug("Number of retrials: {0}", default_retrials)
-        return total_jobs, safetysleeptime, default_retrials, check_wrapper_jobs_sleeptime
+        return job_list.total_size, safetysleeptime, default_retrials, check_wrapper_jobs_sleeptime
 
     @staticmethod
     def check_logs_status(job_list, as_conf, new_run):
