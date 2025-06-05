@@ -113,6 +113,7 @@ class JobList(object):
                 "status": attributes.get("status", "COMPLETED"),
                 "from_step": attributes.get("from_step", 0),
                 "optional": attributes.get("optional", True),
+                "completed": attributes.get("completed", False),  # check if the edge completion status is fullfilled or not
                 # TODO this should be False once this is fixed: related to  https://github.com/BSC-ES/autosubmit/pull/2006 https://github.com/BSC-ES/autosubmit/issues/2373
             })
         return edges_dict
@@ -296,12 +297,12 @@ class JobList(object):
                                                edge.get("e_to", "") in self.graph.nodes):
             if not self.graph.has_edge(edge["e_from"], edge["e_to"]):
                 self.graph.add_edge(edge["e_from"], edge["e_to"], status=edge["status"],
+                                    completed=edge["completed"],
                                     from_step=edge["from_step"])
                 # I would like to avoid this, and only rely in calls on the job_list,
                 # but not feasible changing all the related code
                 self.graph.nodes[edge["e_to"]]["job"].add_parent(
                     self.graph.nodes[edge["e_from"]]["job"])
-
 
     def _load_graph(self, full_load: bool) -> Optional[List[Job]]:
         """
@@ -1140,17 +1141,17 @@ class JobList(object):
                 if job.section == parent.section:
                     if not self.actual_job_depends_on_previous_chunk:
                         if parent.section not in self.dependency_map[job.section]:
-                            graph.add_edge(parent.name, job.name)
+                            graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
                 else:
                     if self.actual_job_depends_on_special_chunk and not self.actual_job_depends_on_previous_chunk:
                         if parent.section not in self.dependency_map[job.section]:
                             if parent.running == job.running:
-                                graph.add_edge(parent.name, job.name)
+                                graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
                     elif not self.actual_job_depends_on_previous_chunk:
-                        graph.add_edge(parent.name, job.name)
+                        graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
                     elif not self.actual_job_depends_on_special_chunk and self.actual_job_depends_on_previous_chunk:
                         if job.running == "chunk" and job.chunk == 1 or job.running == "member" and parent.running == "member" or job.running == "chunk" and parent.running == "chunk":
-                            graph.add_edge(parent.name, job.name)
+                            graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
             else:
                 if job.section == parent.section:
                     if self.actual_job_depends_on_previous_chunk:
@@ -1173,15 +1174,15 @@ class JobList(object):
                                     skip = False
                         if not skip:
                             problematic_dependencies.add(parent.name)
-                            graph.add_edge(parent.name, job.name)
+                            graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
                 else:
                     if job.running == parent.running:
                         skip = False
                         problematic_dependencies.add(parent.name)
-                        graph.add_edge(parent.name, job.name)
+                        graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
                     if parent.running == "chunk":
                         if parent.chunk > (len(chunk_list) - max_distance):
-                            graph.add_edge(parent.name, job.name)
+                            graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
         JobList.handle_frequency_interval_dependencies(chunk, chunk_list, date, date_list, dic_jobs, job,
                                                        member,
                                                        member_list, dependency.section, natural_parents)
@@ -1194,7 +1195,7 @@ class JobList(object):
                     if found:
                         continue
                 problematic_dependencies.add(parent.name)
-                graph.add_edge(parent.name, job.name)
+                graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
 
         return problematic_dependencies
 
@@ -1258,12 +1259,12 @@ class JobList(object):
                 if not job.splits or int(job.splits) > 0:
                     self.depends_on_previous_split[job.section] = int(parent.split)
             if self.actual_job_depends_on_previous_chunk and parent.section == job.section:
-                graph.add_edge(parent.name, job.name)
+                graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
                 edge_added = True
             else:
                 if parent.name not in self.depends_on_previous_special_section.get(
                         job.section, set()) or job.split > 0:
-                    graph.add_edge(parent.name, job.name)
+                    graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
                     edge_added = True
             if parent.section == job.section:
                 self.actual_job_depends_on_special_chunk = True
@@ -2288,16 +2289,35 @@ class JobList(object):
                 self._assign_platforms(self._as_conf, job, create=False, new=False, submitter=submitter)
             # if job.status not in (self._IN_SCHEDULER + self._FINAL_STATUSES):
             if not job.updated:
-                job.update_parameters(self._as_conf, set_attributes=True, reset_logs=False if job.status in (self._IN_SCHEDULER + self._FINAL_STATUSES) else True)
+                self.update_parents_edge_completeness(job, ready_job=False if job.status in [Status.WAITING, Status.SUSPENDED] else True)
+                job.update_parameters(self._as_conf, set_attributes=True, reset_logs=False if job.status in (
+                        self._IN_SCHEDULER + self._FINAL_STATUSES) else True)
 
-        # self.unload_completed_jobs()
+        self.unload_completed_jobs()
+        Log.debug(f"Jobs loaded: {len(self.job_list)}")
+        Log.debug(f"Edges loaded: {len(self.graph_dict)}")
         if len(self.get_active()) > 0:
             return True
         else:
             return False
 
     def unload_completed_jobs(self):
-        pass
+        """
+        Unloads completed jobs and edges from the memory
+        This method removes jobs that are in the completed state and logs are recovered.
+        """
+        jobs_to_unload = [
+            job for job in self.job_list
+            if job.updated_log and (
+                    (job.status == Status.FAILED and job.fail_count >= job.retrials) or
+                    (job.status in self._FINAL_STATUSES)
+            )
+        ]
+        for job in (job for job in jobs_to_unload):
+            for parent in job.parents:
+                if self.graph.has_edge(parent.name, job.name):
+                    self.graph.remove_edge(parent.name, job.name)
+                self.graph.remove_node(job.name)
 
     def get_active(self, platform=None, wrapper=False):
         """
@@ -2739,10 +2759,42 @@ class JobList(object):
             save |= self._update_held_jobs(as_conf)
             save |= self._skip_jobs(as_conf)
         for job in self.get_ready():
+            self.update_parents_edge_completeness(job, ready_job=True)
             job.set_ready_date()
         self.update_two_step_jobs()
         Log.debug('Update finished')
         return save
+
+    def update_parents_edge_completeness(self, job: Job, ready_job: bool) -> None:
+        """
+        Update the 'completed' status of all edges from each parent to the given job.
+
+        :param job: The job whose parent edges will be updated.
+        :type job: Job
+        :param ready_job: The status to set for the edge's 'completed' field.
+        :type ready_job: bool
+        """
+        for parent in job.parents:
+            self.update_edge_completed(
+                e_from=parent.name,
+                e_to=job.name,
+                completed=ready_job
+            )
+
+    def update_edge_completed(self, e_from: str, e_to: str, completed: bool) -> None:
+        """
+        Update the 'completed' status of the edge between two jobs in the graph.
+
+        :param e_from: Name of the parent job.
+        :type e_from: str
+        :param e_to: Name of the child job.
+        :type e_to: str
+        :param completed: The status to set for the edge's 'completed' field.
+        :type completed: bool
+        """
+        if e_from in self.graph_dict and e_to in self.graph_dict[e_from]:
+            self.graph_dict[e_from][e_to]["completed"] = completed
+            Log.debug(f"Edge from {e_from} to {e_to} set to COMPLETED.")
 
     def _update_failed_jobs(self, as_conf: AutosubmitConfig) -> bool:
         """

@@ -186,6 +186,7 @@ ExperimentStructureTable = Table(
     Column("e_from", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True),
     Column("e_to", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True),
     Column("status", String),
+    Column("completed", String),
     Column("from_step", Integer),
     Column("optional", Boolean),
     UniqueConstraint("e_from", "e_to", name="unique_e_from_and_e_to"),

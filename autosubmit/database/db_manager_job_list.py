@@ -120,8 +120,8 @@ class JobsDbManager(DbManager):
     def save_edges(self, graph: List[Dict[str, Any]]) -> None:
         """Save the experiment structure into the database."""
         self.create_table(ExperimentStructureTable.name)
-        self.delete_all(ExperimentStructureTable.name)
-        self.insert_many(ExperimentStructureTable.name, graph)
+        pkeys = ['e_from', 'e_to']
+        self.upsert_many(ExperimentStructureTable.name, graph, pkeys)
 
     def load_edges(self, job_list: List[dict[str, Any]], full_load: bool) -> List[dict[str, Any]]:
         self.create_table(ExperimentStructureTable.name)
