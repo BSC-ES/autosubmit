@@ -30,7 +30,7 @@ import re
 from log.log import AutosubmitCritical
 
 
-class DicJobs:
+class DicJobs: # To rename to JobBuilder or something like that
     """
     Class to create and build jobs from conf file and to find jobs by start date, member and chunk
 
@@ -67,7 +67,7 @@ class DicJobs:
 
     @job_list.setter
     def job_list(self, job_list):
-        self._job_list = {job.name: job for job in job_list}
+        self._job_list = job_list
 
     def read_section(self, section, priority, default_job_type):
         """

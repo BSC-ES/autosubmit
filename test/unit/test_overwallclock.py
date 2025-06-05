@@ -23,7 +23,7 @@ from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
+from autosubmit.database.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform

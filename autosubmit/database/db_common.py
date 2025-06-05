@@ -30,7 +30,6 @@ from sqlalchemy.schema import CreateTable
 
 from autosubmit.database import tables, session
 from log.log import Log, AutosubmitCritical
-
 Log.get_logger("Autosubmit")
 
 
@@ -861,3 +860,13 @@ def get_connection_url(db_path: Optional['Path'] = None) -> str:
         raise ValueError('For SQLite databases you MUST provide a database file.')
 
     return f'sqlite:///{str(Path(db_path).resolve())}'
+
+
+def check_db_path(db_path: Optional[Path], must_exists: bool = True) -> bool:
+    """Check if the database path exists."""
+    if db_path and not db_path.exists() and must_exists:
+        raise ValueError(f'Database path not found {str(db_path)}!')
+    elif db_path and not db_path.exists() and not must_exists:
+        return False
+    else:
+        return True

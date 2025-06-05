@@ -21,7 +21,6 @@ import pytest
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_packages import JobPackageVertical
-from autosubmit.job.job_package_persistence import JobPackagePersistence
 
 _EXPID = 't000'
 
