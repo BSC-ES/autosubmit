@@ -11,7 +11,7 @@ RUN  sudo ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime &&\
 # Install Autosubmit
 ARG AUTOSUBMIT_VERSION=4.1.14
 ARG AUTOSUBMIT_GIT_REF
-ARG AUTOSUBMIT_API_VERSION=4.1.0
+ARG AUTOSUBMIT_API_VERSION=4.1.1
 ARG AUTOSUBMIT_API_GIT_REF
 
 RUN pip3 install --upgrade pip &&\
@@ -30,6 +30,7 @@ RUN python3 -m venv /apps/autosubmit-api &&\
 # Set the environment variables
 ENV PROTECTION_LEVEL=NONE
 ENV JUPYTER_TOKEN=""
+ENV AS_PG_CONN_URL=""
 
 # Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh
