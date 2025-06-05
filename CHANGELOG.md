@@ -1,3 +1,9 @@
+### 4.1.14: Unreleased
+
+**Bug fixes:**
+
+- Deleted command `autosubmit test` that was not working in Autosubmit 4 #2386
+
 ### 4.1.14: Bug fixes, enhancements, and new features
 
 **Bug fixes:**
