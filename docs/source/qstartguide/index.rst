@@ -43,7 +43,7 @@ Description of most used commands
 
     * - Command
       - Short description
-    * - **expid**
+    * - **EXPID**
       - Creates a new experiment and generates a new entry in the database by giving it a serial id composed of 4 letters. In addition, it also creates the folder experiment and the basic folder structure.
     * - **create <EXPID>**
       - Generates the experiment workflow.
@@ -64,7 +64,7 @@ Description of most used commands
 Create a new experiment
 =======================
 
-.. runcmd:: autosubmit expid -dm -H "local" -d "Tutorial"``
+.. runcmd:: autosubmit EXPID -dm -H "local" -d "Tutorial"
 
 - *-dm: Generates a dummy experiment.*
 - *-H: Sets the principal experiment platform.*
@@ -123,25 +123,14 @@ Autosubmit keeps logs at ``ASLOGS`` and ``LOG_<EXPID>`` folders, which are fille
 Viewing the logs
 ================
 
-The ``autosubmit`` commands such as ``expid``, ``run``, ``monitor``, all may produce
+The ``autosubmit`` commands such as ``EXPID``, ``run``, ``monitor``, all may produce
 log files on the user's file system. To save the user from having to navigate to the
 log file, or to memorize the location of these files, Autosubmit provides the
 ``autosubmit cat-log`` command.
 
 .. TODO: add a link to complete docs of ``cat-log`` (we must have similar page(s) for each AS sub-command).
 
-.. code-block:: bash
-
-    $ autosubmit cat-log a000
-    Autosubmit is running with 4.0.0b
-    2023-02-27 21:45:47,863 Autosubmit is running with 4.0.0b
-    2023-02-27 21:45:47,872
-    Checking configuration files...
-    2023-02-27 21:45:47,900 expdef_a000.yml OK
-    2023-02-27 21:45:47,904 platforms_a000.yml OK
-    2023-02-27 21:45:47,905 jobs_a000.yml OK
-    2023-02-27 21:45:47,906 autosubmit_a000.yml OK
-    2023-02-27 21:45:47,907 Configuration files OK
+.. runcmd:: autosubmit cat-log a000
 
 .. note::
     The ``-f`` (``--file``) option is for the file type, not the file path.
@@ -197,45 +186,13 @@ Final step: Modify and run
 
  Open expdef_<EXPID>.yml
 
-.. code-block:: yaml
-
-    DEFAULT:
-        # Don't change
-        EXPID: "a000"
-        # Change for your new main platform name, ej. marenostrum4
-        HPCARCH: "local"
-        # Locate and  change these parameters, per ej. numchunks: 3
-        EXPERIMENT:
-            DATELIST: 20000101
-            MEMBERS: fc0
-            NUMCHUNKS: 1
-        (...)
+.. runcmd:: cat /home/docs/autosubmit/a000/conf/expdef_a000.yml
 
 Now open platforms_<EXPID>.yml. Note: This will be an example for marenostrum4
 
-.. code-block:: yaml
+.. runcmd:: cat /home/docs/autosubmit/a000/conf/platforms_a000.yml
 
-    PLATFORMS:
-        marenostrum4:
-            # Queue type. Options: ps, SGE, SLURM, PBS, eceaccess
-            # scheduler type
-            TYPE: slurm
-            HOST: mn1.bsc.es,mn2.bsc.es,mn3.bsc.es
-            # your project
-            PROJECT: bsc32
-            # <- your user
-            USER: bsc32070
-            SCRATCH_DIR: /gpfs/scratch
-            ADD_PROJECT_TO_HOST: False
-            # use 72:00 if you are using a PRACE account, 48:00 for the bsc account
-            MAX_WALLCLOCK: 02:00
-            # use 19200 if you are using a PRACE account, 2400 for the bsc account
-            MAX_PROCESSORS: 2400
-            PROCESSORS_PER_NODE: 48
-            SERIAL_QUEUE: debug
-            QUEUE: debug
-
-``autosubmit create <EXPID>** (without -np)`` will generate the new workflow and ``autosubmit run <expid>`` will run the experiment with the latest changes.
+``autosubmit create <EXPID>** (without -np)`` will generate the new workflow and ``autosubmit run <EXPID>`` will run the experiment with the latest changes.
 
 .. warning::
     If you are using an encrypted key, you will need to add it to the ssh-agent before running the experiment. To do so, run ``ssh-add <path_to_key>``.

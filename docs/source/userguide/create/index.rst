@@ -129,4 +129,6 @@ add the ``--profile`` (or ``-p``) flag to your ``autosubmit create`` command, as
 
     autosubmit create --profile <EXPID>
 
+.. runcmd:: autosubmit create --profile a000
+
 .. include:: ../../_include/profiler_common.rst
