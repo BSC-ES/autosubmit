@@ -93,8 +93,8 @@ of, respectively, the header and tailer scripts used by Autosubmit.
 The location is relative to the project root folder, and the scripts
 are appended after the default header and tailer scripts.
 
-Sustitute placeholders after all files have been loaded
-=======================================================
+Substitute placeholders after all files have been loaded
+========================================================
 
 Autosubmit allows users to define placeholders that are substituted only after all files have been loaded. This is particularly useful when the value of a placeholder is mutable at the time of file loading.
 

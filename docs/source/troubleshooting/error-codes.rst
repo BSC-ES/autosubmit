@@ -41,7 +41,7 @@ case there is a minor issue with your configuration such as a deprecated call.
 The two levels that normally appear with traceback and important log messages
 are either ``ERROR`` or ``CRITICAL``.
 
-Autosubmit has two error types. ``AutosubmitError`` uses the ``ERRORR`` level,
+Autosubmit has two error types. ``AutosubmitError`` uses the ``ERROR`` level,
 and is raised for minor errors where the program execution may be able to
 recover. ``AutosubmitCritical`` uses the ``CRITICAL`` level and is for errors
 that abort the program execution.

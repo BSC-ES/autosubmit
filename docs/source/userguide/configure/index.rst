@@ -26,7 +26,7 @@ For more information on adding jobs see :ref:`add-new-job` and :ref:`add-het-job
 *platforms_expid.yml* contains:
     - HPC, fat-nodes and supporting computers configuration.
 
-For more information on adding a new platofrm to the experiment configuration, see :ref:`add-new-plat-exp`.
+For more information on adding a new platform to the experiment configuration, see :ref:`add-new-plat-exp`.
 
 .. note:: *platforms_expid.yml* is usually provided by technicians, users will only have to change login and accounting options for HPCs.
 
@@ -166,7 +166,7 @@ How to add a new heterogeneous job
 ----------------------------------
 
 .. important::
-    This feature is only available for SLURM platforms. It is automatically enabled when the processors or nodes paramater is a yaml list
+    This feature is only available for SLURM platforms. It is automatically enabled when the processors or nodes parameter is a yaml list
 
 An heterogeneous job or hetjob is a job for whcih each component has virtually all job options available including partition, account and QOS (Quality Of Service). For example, part of a job might require four cores and 4 GB for each of 128 tasks while another part of the job would require 16 GB of memory and one CPU.
 
@@ -315,7 +315,7 @@ This will create a platform named *new_platform*. The options specified are all 
       - Determines de version of the platform type.
 
 .. warning:: With some platforms, 2FA authentication is required. If this is the case, you have to add the parameter
-    2FA. These platforms are ecaccess (options: True, False). There may be some autosubmit functions that are not avaliable when using an interactive auth method.
+    2FA. These platforms are ecaccess (options: True, False). There may be some autosubmit functions that are not available when using an interactive auth method.
 
 .. list-table::
     :widths: 25 75

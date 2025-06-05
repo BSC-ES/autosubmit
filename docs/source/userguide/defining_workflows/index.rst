@@ -32,7 +32,7 @@ be finished before launching the job that has the DEPENDENCIES attribute.
       DEPENDENCIES: One
 
 
-The resulting workflow can be seen in Fi165gure :numref:`simple`
+The resulting workflow can be seen in Figure :numref:`simple`
 
 .. figure:: fig/simple.png
    :name: simple

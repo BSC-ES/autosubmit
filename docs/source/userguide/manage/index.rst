@@ -210,7 +210,7 @@ Migrate file example: $expid/conf/migrate.yml
             user: new_user # can change
             project: new_project  # can change
             scratch_dir: "/tmp/scratch"
-            temp_dir: "/tmp/scratch/migrate_tmp_dir" # must be in the same fileystem
+            temp_dir: "/tmp/scratch/migrate_tmp_dir" # must be in the same filesystem
             same_user: False # If the user is the same in the new platform, set this flag to True
 
 
@@ -257,7 +257,7 @@ To only pick the remote files, the user B, must do
 How to synchronize with the project's latest changes
 ----------------------------------------------------
 
-Autosubmit supports directly feching files from the repository, which could be local or remote.
+Autosubmit supports directly fetching files from the repository, which could be local or remote.
 
 In order to synchronize with remote, use the command:
 

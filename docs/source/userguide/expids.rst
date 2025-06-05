@@ -9,7 +9,7 @@ and have at least four alpha-numerical characters, using digits from
 ``0`` to ``9`` and the ``26`` letters from the English alphabet, from ``a``
 to ``z``. Autosubmit also supports three types of special experiments; 
 operational, test and evaluation, with experiment IDs starting with ``o``,
-``t`` and ``o`` repsectively.
+``t`` and ``o`` respectively.
 
 Internally, experiment ID’s are case insensitive, but for Autosubmit
 commands this may not always be true, i.e. ``autosubmit monitor a000``
@@ -33,7 +33,7 @@ last available experiment ID. The code below shows an example of the latter:
     print(expid)  # prints 'a001’
 
     expid = next_experiment_id('jedi’)
-    print(expid)  # prints 'jedj’
+    print(expid)  # prints 'jedi’
 
     expid = next_experiment_id('zzzz’)
     print(expid)  # prints '10000’
