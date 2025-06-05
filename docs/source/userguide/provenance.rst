@@ -7,7 +7,7 @@ findability, accessibility, interoperability, and reusability. It
 supports and uses open standards such as YAML, RO-Crate, as well as
 other standards such as ISO-8601.
 
-Each Autosubmit experiment is assigned a :doc:`unique experiment ID <expids>`
+Each Autosubmit experiment is assigned a :doc:`unique experiment ID <EXPIDS>`
 (also called expid). It also provides a central database and utilities
 that permit experiments to be referenced.
 

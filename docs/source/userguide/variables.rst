@@ -17,7 +17,7 @@ You can review all variables at any given time by using the
 .. code-block:: console
     :caption: Example usage of ``autosubmit report``
 
-    $ autosubmit report $expid -all
+    $ autosubmit report <EXPID> -all
 
 The command will save the list of variables available to a file
 in the experiment area. The groups of variables of Autosubmit are
