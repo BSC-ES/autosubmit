@@ -1,5 +1,6 @@
 import logging
 import os
+import subprocess
 import sys
 from time import sleep
 from datetime import datetime
@@ -177,7 +178,7 @@ class Log:
         logging.getLogger(name)
 
     @staticmethod
-    def set_file(file_path, type='out', level="WARNING"):
+    def set_file(file_path, type='out', level="WARNING", compress=False):
         """
         Configure the file to store the log. If another file was specified earlier, new messages will only go to the
         new file.
@@ -240,6 +241,8 @@ class Log:
                     status_file_handler.setFormatter(LogFormatter(False))
                     status_file_handler.addFilter(custom_filter)
                     Log.log.addHandler(status_file_handler)
+                if compress:
+                    compress_logfile(file_path)
                 os.chmod(file_path, 509)
             except Exception: # retry again
                 sleep(timeout * retries)
@@ -273,6 +276,26 @@ class Log:
                 Log.log.addHandler(status_file_handler)
         except Exception:  # retry again
             pass
+    
+    @staticmethod
+    def compress_logfile(file_path):
+        """
+        Replaces original logfile with a compressed version of it using 'xz -9 -T4 -e'
+        """
+
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f"The file '{file_path}' does not exist.")
+    
+        try:
+            subprocess.run(
+                ["xz", "-9", "-T4", "-e", file_path],
+                check=True
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"Compression failed: {e}")
+            # write better error
+
+
     @staticmethod
     def set_console_level(level):
         """
