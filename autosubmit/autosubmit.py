@@ -3685,7 +3685,7 @@ class Autosubmit:
         while True:
             try:
                 code, database_path = d.dselect(database_path, width=80, height=20,
-                                                title='\Zb\Z1Select path to database\Zn', colors='enable')
+                                                title='\\Zb\\Z1Select path to database\\Zn', colors='enable')
             except dialog.DialogError:
                 raise AutosubmitCritical(
                     "Graphical visualization failed, not enough screen size", 7060)
@@ -3703,7 +3703,7 @@ class Autosubmit:
         while True:
             try:
                 code, local_root_path = d.dselect(local_root_path, width=80, height=20,
-                                                  title='\Zb\Z1Select path to experiments repository\Zn',
+                                                  title='\\Zb\\Z1Select path to experiments repository\\Zn',
                                                   colors='enable')
             except dialog.DialogError:
                 raise AutosubmitCritical(
@@ -3730,7 +3730,7 @@ class Autosubmit:
                                      height=20,
                                      width=80,
                                      form_height=10,
-                                     title='\Zb\Z1Just a few more options:\Zn', colors='enable')
+                                     title='\\Zb\\Z1Just a few more options:\\Zn', colors='enable')
             except dialog.DialogError:
                 raise AutosubmitCritical(
                     "Graphical visualization failed, not enough screen size", 7060)
@@ -3766,7 +3766,7 @@ class Autosubmit:
                                      height=20,
                                      width=80,
                                      form_height=10,
-                                     title='\Zb\Z1Mail notifications configuration:\Zn', colors='enable')
+                                     title='\\Zb\\Z1Mail notifications configuration:\\Zn', colors='enable')
             except dialog.DialogError:
                 raise AutosubmitCritical(
                     "Graphical visualization failed, not enough screen size", 7060)

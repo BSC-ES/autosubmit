@@ -77,7 +77,7 @@ class SlurmPlatform(ParamikoPlatform):
         self.job_status['QUEUING'] = ['PENDING', 'CONFIGURING', 'RESIZING']
         self.job_status['FAILED'] = ['FAILED', 'CANCELLED', 'CANCELLED+', 'NODE_FAIL',
                                      'PREEMPTED', 'SUSPENDED', 'TIMEOUT', 'OUT_OF_MEMORY', 'OUT_OF_ME+', 'OUT_OF_ME']
-        self._pathdir = "\$HOME/LOG_" + self.expid
+        self._pathdir = "\\$HOME/LOG_" + self.expid
         self._allow_arrays = False
         self._allow_wrappers = True
         self.update_cmds()
