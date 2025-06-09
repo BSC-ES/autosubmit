@@ -60,7 +60,7 @@ class SgePlatform(ParamikoPlatform):
         self.job_status['QUEUING'] = ['qw', 'hqw', 'hRwq', 'Rs', 'Rts', 'RS', 'RtS', 'RT', 'RtT']
         self.job_status['FAILED'] = ['Eqw', 'Ehqw', 'EhRqw', 's', 'ts', 'S', 'tS', 'T', 'tT', 'dr', 'dt', 'dRr', 'dRt',
                                      'ds', 'dS', 'dT', 'dRs', 'dRS', 'dRT']
-        self._pathdir = "\$HOME/LOG_" + self.expid
+        self._pathdir = "\\$HOME/LOG_" + self.expid
         self.update_cmds()
 
     def submit_Script(self, hold=False):

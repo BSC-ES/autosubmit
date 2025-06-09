@@ -215,9 +215,10 @@ class ParamikoPlatform(Platform):
         try:
             self._ssh._agent = Agent()
             for key in self._ssh._agent.get_keys():
-                if not hasattr(key,"public_blob"):
+                if not hasattr(key, "public_blob"):
                     key.public_blob = None
-            self._ssh.connect(self._host_config['hostname'], port=port, username=self.user, timeout=60, banner_timeout=60)
+            self._ssh.connect(self._host_config['hostname'], port=port, username=self.user, timeout=60,
+                              banner_timeout=60)
         except BaseException as e:
             Log.debug(f'Failed to authenticate with ssh-agent due to {e}')
             Log.debug('Trying to authenticate with other methods')
@@ -255,7 +256,8 @@ class ParamikoPlatform(Platform):
         """
         self._user_config_file = os.path.expanduser("~/.ssh/config")
         if not as_conf.is_current_real_user_owner:  # Using shared account
-            if 'AS_ENV_SSH_CONFIG_PATH' not in self.config:  # if not defined in the ENV variables, use the default + current user
+            if 'AS_ENV_SSH_CONFIG_PATH' not in self.config:
+                # if not defined in the ENV variables, use the default + current user
                 mapped_config_file = os.path.expanduser(f"~/.ssh/config_{self.config['AS_ENV_CURRENT_USER']}")
             else:
                 mapped_config_file = self.config['AS_ENV_SSH_CONFIG_PATH']
@@ -320,18 +322,21 @@ class ParamikoPlatform(Platform):
                         self._proxy = paramiko.ProxyCommand(self._host_config['proxycommand'])
                         try:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
-                                              key_filename=self._host_config_id, sock=self._proxy, timeout=60 , banner_timeout=60)
+                                              key_filename=self._host_config_id, sock=self._proxy, timeout=60,
+                                              banner_timeout=60)
                         except Exception as e:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, sock=self._proxy, timeout=60,
-                                              banner_timeout=60, disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
+                                              banner_timeout=60, disabled_algorithms={'pubkeys': ['rsa-sha2-256',
+                                                                                                  'rsa-sha2-512']})
                     else:
                         try:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, timeout=60 , banner_timeout=60)
                         except Exception as e:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
-                                              key_filename=self._host_config_id, timeout=60 , banner_timeout=60,disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
+                                              key_filename=self._host_config_id, timeout=60 , banner_timeout=60,
+                                              disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
                 self.transport = self._ssh.get_transport()
                 self.transport.banner_timeout = 60
             else:
@@ -355,7 +360,8 @@ class ParamikoPlatform(Platform):
                 else:
                     self.transport.close()
                     raise SSHException
-            self._ftpChannel = paramiko.SFTPClient.from_transport(self.transport,window_size=pow(4, 12) ,max_packet_size=pow(4, 12) )
+            self._ftpChannel = paramiko.SFTPClient.from_transport(self.transport, window_size=pow(4, 12),
+                                                                  max_packet_size=pow(4, 12))
             self._ftpChannel.get_channel().settimeout(120)
             self.connected = True
             if not log_recovery_process:
