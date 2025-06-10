@@ -38,7 +38,7 @@ def filter_by_section(jobs: list[Job], section: Optional[str]) -> list[Job]:
     :param section: A job section name.
     :return: List of jobs, filtered by the optional section name (``"Any"`` section is ignored).
     """
-    if section and section != "Any":
+    if section and section.lower() != "any":
         return [job for job in jobs if job.section == section]
     return jobs
 

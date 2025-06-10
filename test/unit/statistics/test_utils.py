@@ -35,6 +35,9 @@ DEFAULT_NUMBER_PROCESSORS = 1
         (None, 10),
         ('', 10),
         ('Any', 10),
+        ('any', 10),
+        ('ANY', 10),
+        ('aNY', 10),
         ('SIM', 5),
         ('RASPBERRY', 0)
     ]
