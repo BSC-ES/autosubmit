@@ -145,7 +145,10 @@ def test_timedelta2hours():
     'n,expected',
     [
         (None, DEFAULT_NUMBER_PROCESSORS),
-        ('0', 0),
+        ('', DEFAULT_NUMBER_PROCESSORS),
+        ('   ', DEFAULT_NUMBER_PROCESSORS),
+        ('0', DEFAULT_NUMBER_PROCESSORS),
+        ('  0  ', DEFAULT_NUMBER_PROCESSORS),
         ('10', 10),
         ('1.1', 1),
         ('1:2:3', 108)

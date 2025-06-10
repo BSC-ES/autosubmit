@@ -116,11 +116,13 @@ def parse_number_processors(processors: str) -> int:
     if not processors:
         return 1
 
+    processors = processors.strip()
+
     if ':' in processors:
         components = processors.split(":")
         return int(sum([ceil(float(x) / 36.0) * 36.0 for x in components]))
 
-    if processors.isdigit():
+    if processors.isdigit() and '0' != processors:
         return int(processors)
 
     return 1
