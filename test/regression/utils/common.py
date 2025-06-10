@@ -47,7 +47,7 @@ def init_expid(env, platform="local", expid=None, full_load=True, test_type="nor
             expid = Autosubmit.expid("pytest", hpc=platform, copy_id='', dummy=True, minimal_configuration=False,
                                      git_repo="", git_branch="", git_as_conf="", operational=False, testcase=False,
                                      evaluation=True, use_local_minimal=False)
-    if create:
+    if full_load:
         as_conf = AutosubmitConfig(expid)
         Autosubmit._check_folders(expid, as_conf)
         Autosubmit.create(expid, not plot, False, force=True, detail=True)
