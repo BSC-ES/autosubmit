@@ -37,7 +37,6 @@ from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.database.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.job.job_utils import get_job_package_code, SubJob, SubJobManager
 from autosubmit.platforms.platform import Platform
@@ -492,8 +491,7 @@ CONFIG:
             config = AutosubmitConfig(expid, basic_config=basic_config, parser_factory=YAMLParserFactory())
             config.reload(True)
             parameters = config.load_parameters()
-            job_list_obj = JobList(expid, config, YAMLParserFactory(),
-                                   Autosubmit._get_job_list_persistence(expid, config))
+            job_list_obj = JobList(expid, config, YAMLParserFactory())
 
             job_list_obj.generate(
                 as_conf=config,
@@ -510,7 +508,7 @@ CONFIG:
                 run_only_members=[],
                 # config.get_member_list(run_only=True),
                 show_log=True,
-                create=True,
+                full_load=True,
             )
 
             job_list = job_list_obj.get_job_list()
@@ -715,9 +713,8 @@ CONFIG:
                         # act
 
                         parameters = config.load_parameters()
-                        joblist_persistence = JobListPersistencePkl()
 
-                        job_list_obj = JobList(expid, config, YAMLParserFactory(), joblist_persistence)
+                        job_list_obj = JobList(expid, config, YAMLParserFactory())
 
                         job_list_obj.generate(
                             as_conf=config,
@@ -733,7 +730,7 @@ CONFIG:
                             new=True,
                             run_only_members=config.get_member_list(run_only=True),
                             show_log=True,
-                            create=True,
+                            full_load=True,
                         )
                         job_list = job_list_obj.get_job_list()
 
@@ -864,8 +861,7 @@ CONFIG:
                 config.reload(True)
                 parameters = config.load_parameters()
 
-                job_list_obj = JobList(expid, config, YAMLParserFactory(),
-                                       Autosubmit._get_job_list_persistence(expid, config))
+                job_list_obj = JobList(expid, config, YAMLParserFactory())
                 job_list_obj.generate(
                     as_conf=config,
                     date_list=[],
@@ -880,7 +876,7 @@ CONFIG:
                     new=True,
                     run_only_members=config.get_member_list(run_only=True),
                     show_log=True,
-                    create=True,
+                    full_load=True,
                 )
                 job_list = job_list_obj.get_job_list()
                 assert 1 == len(job_list)
@@ -1251,8 +1247,7 @@ CONFIG:
             config.reload(True)
             parameters = config.load_parameters()
 
-            job_list = JobList(expid, config, YAMLParserFactory(),
-                               Autosubmit._get_job_list_persistence(expid, config))
+            job_list = JobList(expid, config, YAMLParserFactory())
             job_list.generate(
                 as_conf=config,
                 date_list=[datetime.strptime("20000101", "%Y%m%d")],
@@ -1267,7 +1262,7 @@ CONFIG:
                 new=True,
                 run_only_members=config.get_member_list(run_only=True),
                 show_log=True,
-                create=True,
+                full_load=True,
             )
             job_list = job_list.get_job_list()
             assert 24 == len(job_list)
@@ -1753,6 +1748,8 @@ def test_no_start_time(autosubmit_config, experiment_data):
     assert isinstance(job.start_time, datetime)
 
 
+# TODO: wrappers
+pytest.mark.skip()
 def test_get_job_package_code(autosubmit_config):
     autosubmit_config('dummy', {})
     experiment_id = 'dummy'

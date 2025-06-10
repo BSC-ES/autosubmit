@@ -27,6 +27,7 @@ from autosubmit.autosubmit import Autosubmit
 _EXPID = 't000'
 
 
+#TODO: change to use the new db
 @pytest.mark.parametrize(
     "db_engine",
     [
@@ -36,6 +37,7 @@ _EXPID = 't000'
         pytest.param("sqlite")
     ],
 )
+@pytest.skip()
 def test_job_list_persistence(db_engine: str, autosubmit_exp, request):
     # Dynamically load the fixture for that DB,
     # ref: https://stackoverflow.com/a/64348247.

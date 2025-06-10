@@ -32,7 +32,6 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
-from autosubmit.database.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_packager import JobPackager
 from autosubmit.job.job_packages import JobPackageHorizontal, JobPackageHorizontalVertical, \
     JobPackageVerticalHorizontal, JobPackageSimple
@@ -2151,8 +2150,7 @@ def setup(autosubmit_config, tmpdir):
     as_conf.experiment_data["WRAPPERS"]["WRAPPERS"]["JOBS_IN_WRAPPER"] = "SECTION1"
     as_conf.experiment_data["WRAPPERS"]["WRAPPERS"]["TYPE"] = "vertical"
     Path(tmpdir / experiment_id / "tmp").mkdir(parents=True, exist_ok=True)
-    job_list = JobList(experiment_id, as_conf, YAMLParserFactory(),
-                       JobListPersistencePkl())
+    job_list = JobList(experiment_id, as_conf, YAMLParserFactory())
 
     platform = SlurmPlatform(experiment_id, 'dummy-platform', as_conf.experiment_data)
 
@@ -2163,13 +2161,13 @@ def setup(autosubmit_config, tmpdir):
     job.wallclock = "00:20"
     job.section = "SECTION1"
     job.platform = platform
-    job_list._job_list.append(job)
+    job_list.graph.add_node(job.name, job=job)
     job = Job("job2", "2", Status.SUBMITTED, 0)
     job._init_runtime_parameters()
     job.wallclock = "00:20"
     job.section = "SECTION1"
     job.platform = platform
-    job_list._job_list.append(job)
+    job_list.graph.add_node(job.name, job=job)
     wrapper_jobs = copy.deepcopy(job_list.get_job_list())
     for job in wrapper_jobs:
         job.platform = platform

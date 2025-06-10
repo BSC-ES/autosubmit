@@ -24,7 +24,6 @@ import pytest
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.database.job_list_persistence import JobListPersistenceDb
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
 _EXPID = 't000'
@@ -40,8 +39,7 @@ def setup_job_list(autosubmit_exp, tmpdir, mocker):
 
     basic_config = as_conf.basic_config
 
-    with patch('autosubmit.job.job_list_persistence.BasicConfig', basic_config):
-        job_list = JobList(_EXPID, basic_config, YAMLParserFactory(), JobListPersistenceDb(_EXPID))
+    job_list = JobList(_EXPID, basic_config, YAMLParserFactory())
 
     dummy_serial_platform = mocker.MagicMock()
     dummy_serial_platform.name = 'serial'

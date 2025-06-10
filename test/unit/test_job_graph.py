@@ -21,7 +21,6 @@ from random import randrange
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.database.job_list_persistence import JobListPersistenceDb
 from autosubmit.monitor.monitor import Monitor
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
@@ -47,8 +46,7 @@ def job_list(autosubmit_config, tmp_path):
         'JOBS': {},
         'PLATFORMS': {},
     })
-    job_list_persistence = JobListPersistenceDb(_EXPID)
-    job_list = JobList(_EXPID, as_conf, YAMLParserFactory(), job_list_persistence)
+    job_list = JobList(_EXPID, as_conf, YAMLParserFactory())
     # Basic workflow with SETUP, INI, SIM, POST, CLEAN
     setup_job = _create_dummy_job('expid_SETUP', Status.READY)
     job_list.get_job_list().append(setup_job)

@@ -23,7 +23,6 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_grouping import JobGrouping
 from autosubmit.job.job_list import JobList
-from autosubmit.database.job_list_persistence import JobListPersistenceDb
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
 
@@ -46,8 +45,7 @@ def job_list(autosubmit_config, tmp_path):
         'JOBS': {},
         'PLATFORMS': {}
     })
-    job_list_persistence = JobListPersistenceDb('a000')
-    job_list = JobList(as_conf.expid, as_conf, YAMLParserFactory(), job_list_persistence)
+    job_list = JobList(as_conf.expid, as_conf, YAMLParserFactory())
 
     # Basic workflow with SETUP, INI, SIM, POST, CLEAN
     _create_dummy_job('expid_SETUP', Status.READY)

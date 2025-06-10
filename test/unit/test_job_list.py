@@ -30,7 +30,6 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_common import Type
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
-from autosubmit.database.job_list_persistence import JobListPersistencePkl
 
 """Tests for the ``JobList`` class."""
 
@@ -116,7 +115,6 @@ def job_list(as_conf, mocker, jobs_as_dict):
                   'fake-key2': 'fake-value2'}
     as_conf.load_parameters = mocker.Mock(return_value=parameters)
     as_conf.default_parameters = {}
-    joblist_persistence = JobListPersistencePkl()
     job_list = JobList(_EXPID, as_conf, YAMLParserFactory())
 
     for status, jobs in jobs_as_dict.items():
@@ -171,7 +169,7 @@ def test_load(mocker, as_conf, empty_job_list):
         default_job_type=Type.BASH,
         wrapper_jobs={},
         new=True,
-        create=True,
+        full_load=True,
     )
     job_list.save()
     # Test load
@@ -364,7 +362,7 @@ def test_that_create_method_makes_the_correct_calls(mocker, empty_job_list, as_c
         default_job_type=Type.BASH,
         wrapper_jobs={},
         new=True,
-        create=True,
+        full_load=True,
     )
 
     # assert
@@ -444,7 +442,7 @@ def test_run_member(job_list, mocker, as_conf, empty_job_list):
         default_job_type=Type.BASH,
         wrapper_jobs={},
         new=True,
-        create=True,
+        full_load=True,
     )
     job_list._job_list[0].member = "fake-member1"
     job_list._job_list[1].member = "fake-member2"
@@ -499,7 +497,7 @@ def test_create_dictionary(job_list, mocker, as_conf, empty_job_list):
         default_job_type=Type.BASH,
         wrapper_jobs={},
         new=True,
-        create=True
+        full_load=True
     )
     job_list._job_list[0].section = "fake-section"
     job_list._job_list[0].date = "fake-date1"
@@ -566,7 +564,7 @@ def test_generate_job_list_from_monitor_run(as_conf, mocker, empty_job_list):
         default_job_type=Type.BASH,
         wrapper_jobs={},
         new=True,
-        create=True,
+        full_load=True,
     )
     job_list.save()
     job_list2 = empty_job_list()
@@ -583,7 +581,7 @@ def test_generate_job_list_from_monitor_run(as_conf, mocker, empty_job_list):
         default_job_type=Type.BASH,
         wrapper_jobs={},
         new=False,
-        create=True,
+        full_load=True,
     )
 
     # return False
@@ -650,7 +648,7 @@ def test_generate_job_list_from_monitor_run(as_conf, mocker, empty_job_list):
         default_job_type=Type.BASH,
         wrapper_jobs={},
         new=False,
-        create=True,
+        full_load=True,
     )
     # assert update_genealogy called with right values
     # When using an 4.0 experiment, the pkl has to be recreated and act as a new one.

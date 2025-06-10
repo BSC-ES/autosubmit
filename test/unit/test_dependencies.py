@@ -9,7 +9,6 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
-from autosubmit.database.job_list_persistence import JobListPersistenceDb
 from autosubmit.job.job_utils import Dependency
 from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
@@ -130,8 +129,7 @@ def joblist(tmp_path):
     as_conf.experiment_data["JOBS"] = dict()
     as_conf.jobs_data = as_conf.experiment_data["JOBS"]
     as_conf.experiment_data["PLATFORMS"] = dict()
-    job_list_persistence = JobListPersistenceDb(_EXPID)
-    joblist = JobList(experiment_id, as_conf, YAMLParserFactory(), job_list_persistence)
+    joblist = JobList(experiment_id, as_conf, YAMLParserFactory())
     joblist._date_list = _DATE_LIST
     joblist._member_list = _MEMBER_LIST
     joblist._chunk_list = _CHUNK_LIST
@@ -366,7 +364,8 @@ def test_check_dates(joblist, test_job, relationships_dates, relationships_chunk
         "DATES_TO": "20020201",
         "MEMBERS_TO": "fc2",
         "CHUNKS_TO": "all",
-        "SPLITS_TO": "1"
+        "SPLITS_TO": "1",
+        "STATUS": "COMPLETED"
     }
     assert result == expected_output
 
@@ -379,7 +378,8 @@ def test_check_dates(joblist, test_job, relationships_dates, relationships_chunk
         "DATES_TO": "none",
         "MEMBERS_TO": "none",
         "CHUNKS_TO": "none",
-        "SPLITS_TO": "none"
+        "SPLITS_TO": "none",
+        "STATUS": "COMPLETED"
     }
     assert result == expected_output
 
@@ -401,7 +401,8 @@ def test_check_members(joblist, test_job, relationships_members, relationships_c
         "DATES_TO": "20020201",
         "MEMBERS_TO": "fc2",
         "CHUNKS_TO": "all",
-        "SPLITS_TO": "1"
+        "SPLITS_TO": "1",
+        "STATUS": "COMPLETED"
     }
     assert result == expected_output
 
@@ -412,7 +413,9 @@ def test_check_members(joblist, test_job, relationships_members, relationships_c
         "DATES_TO": "20020201",
         "MEMBERS_TO": "fc2",
         "CHUNKS_TO": "all",
-        "SPLITS_TO": "1"
+        "SPLITS_TO": "1",
+        "STATUS": "COMPLETED"
+
     }
     assert result == expected_output
 
@@ -424,7 +427,8 @@ def test_check_members(joblist, test_job, relationships_members, relationships_c
         "DATES_TO": "none",
         "MEMBERS_TO": "none",
         "CHUNKS_TO": "none",
-        "SPLITS_TO": "none"
+        "SPLITS_TO": "none",
+        "STATUS": "COMPLETED"
     }
     assert result == expected_output
 
@@ -447,7 +451,8 @@ def test_check_splits(joblist, test_job, relationships_splits):
         "DATES_TO": "20020201",
         "MEMBERS_TO": "fc2",
         "CHUNKS_TO": "all",
-        "SPLITS_TO": "1"
+        "SPLITS_TO": "1",
+        "STATUS": "COMPLETED"
     }
     assert result == expected_output
     test_job.split = 2
@@ -475,7 +480,7 @@ def test_check_chunks(joblist, test_job, relationships_chunks):
     }
 
     result = joblist._check_chunks(chunks, test_job)
-    expected_output = {'SPLITS_TO': '4'}
+    expected_output = {'SPLITS_TO': '4', "STATUS": "COMPLETED"}
 
     assert result == expected_output
     chunks = {
@@ -485,7 +490,8 @@ def test_check_chunks(joblist, test_job, relationships_chunks):
     }
 
     result = joblist._check_chunks(chunks, test_job)
-    expected_output = {'DATES_TO': 'none', 'MEMBERS_TO': 'none', 'CHUNKS_TO': 'none', 'SPLITS_TO': 'none'}
+    expected_output = {'DATES_TO': 'none', 'MEMBERS_TO': 'none', 'CHUNKS_TO': 'none', 'SPLITS_TO': 'none',
+        "STATUS": "COMPLETED"}
     assert result == expected_output
 
     test_job.chunk = 2
@@ -517,41 +523,41 @@ def test_check_general(joblist, test_job, relationships_general):
 
 def test_check_relationship(joblist):
     relationships = {'MEMBERS_FROM': {
-        'TestMember,   TestMember2,TestMember3   ': {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None,
-                                                     'MEMBERS_TO': 'None', 'STATUS': None}}}
+        'TestMember,   TestMember2,TestMember3   ': {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0,
+                                                     'MEMBERS_TO': 'None', 'STATUS': 'COMPLETED'}}}
     level_to_check = "MEMBERS_FROM"
     value_to_check = "TestMember"
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None, 'MEMBERS_TO': 'None', 'STATUS': None}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None', 'STATUS': "COMPLETED"}]
     assert result == expected_output
     value_to_check = "TestMember2"
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None, 'MEMBERS_TO': 'None', 'STATUS': None}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None', 'STATUS': 'COMPLETED'}]
     assert result == expected_output
     value_to_check = "TestMember3"
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None, 'MEMBERS_TO': 'None', 'STATUS': None}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None', 'STATUS': 'COMPLETED'}]
     assert result == expected_output
     value_to_check = "TestMember   "
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None, 'MEMBERS_TO': 'None', 'STATUS': None}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None', 'STATUS': 'COMPLETED'}]
     assert result == expected_output
     value_to_check = "   TestMember"
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None, 'MEMBERS_TO': 'None', 'STATUS': None}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None', 'STATUS': 'COMPLETED'}]
     assert result == expected_output
     relationships = {'DATES_FROM': {
-        '20000101, 20000102, 20000103 ': {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None,
-                                          'MEMBERS_TO': 'None', 'STATUS': True}}}
+        '20000101, 20000102, 20000103 ': {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0,
+                                          'MEMBERS_TO': 'None', 'STATUS': 'COMPLETED'}}}
     value_to_check = datetime(2000, 1, 1)
     result = joblist._check_relationship(relationships, "DATES_FROM", value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None, 'MEMBERS_TO': 'None', 'STATUS': True}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None', 'STATUS': 'COMPLETED'}]
     assert result == expected_output
 
 
@@ -766,8 +772,7 @@ def test_normalize_auto_keyword(as_conf, mocker):
     job_list = JobList(
         as_conf.expid,
         as_conf,
-        YAMLParserFactory(),
-        Autosubmit._get_job_list_persistence(as_conf.expid, as_conf)
+        YAMLParserFactory()
     )
     dependency = Dependency("test")
 

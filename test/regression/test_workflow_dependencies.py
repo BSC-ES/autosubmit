@@ -268,7 +268,7 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
     if PROFILE:
         profiler.enable()
 
-    init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, create=True, test_type='test')
+    init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, full_load=True, test_type='test')
 
     with open(Path(f"{current_tmpdir}/workflows/{expid}/tmp/ASLOGS/jobs_active_status.log"), "r") as new_file:
         new_lines = new_file.readlines()
@@ -304,7 +304,7 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
             differences.extend(compare_and_print_differences(new_root, ref_root))
 
     if show_workflow_plot and expid in expids_to_plot:
-        init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, create=True, test_type='test',
+        init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, full_load=True, test_type='test',
                    plot=show_workflow_plot)
     if differences:
         pytest.fail("\n".join(differences))

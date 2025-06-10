@@ -4694,7 +4694,7 @@ class Autosubmit:
                                                            chunk_unit=as_conf.get_chunk_size_unit(),
                                                            chunk_size=as_conf.get_chunk_size(),
                                                            current_config=as_conf.get_full_config_as_json(),
-                                                           create=True)
+                                                           full_load=True)
                         Autosubmit.database_backup(expid)
                     except BaseException as e:
                         Log.printlog("Historic database seems corrupted, AS will repair it and resume the run",

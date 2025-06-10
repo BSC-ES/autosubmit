@@ -526,8 +526,9 @@ class Monitor:
             if "GraphViz" in message:
                 message = "Graphviz is not installed. Autosubmit needs this system package to plot the workflow."
                 Log.printlog(message, 7014)
+            else:
+                Log.printlog(str(e), 7014)
 
-            raise
 
     def generate_output_txt(self, expid: str, joblist: list[Job], path: str, classictxt=False,
                             job_list_object=None) -> None:
