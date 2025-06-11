@@ -37,7 +37,7 @@ _EXPID = 't000'
         pytest.param("sqlite")
     ],
 )
-@pytest.skip()
+@pytest.mark.skip() # TODO: change to use the new db
 def test_job_list_persistence(db_engine: str, autosubmit_exp, request):
     # Dynamically load the fixture for that DB,
     # ref: https://stackoverflow.com/a/64348247.
