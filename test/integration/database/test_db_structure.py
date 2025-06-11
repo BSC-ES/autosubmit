@@ -20,7 +20,9 @@ from pathlib import Path
 import networkx as nx
 import pytest
 
-from autosubmit.database import db_structure
+from autosubmit.database.db_common import check_db_path, get_connection_url
+from autosubmit.database import db_manager_job_list
+
 
 
 @pytest.mark.parametrize(
@@ -44,18 +46,20 @@ def test_db_structure(
 
     graph = nx.DiGraph([("a", "b"), ("b", "c"), ("a", "d")])
     graph.add_node("z")
+    if db_engine == 'sqlite':
+        db_manager_job_list.JobsDbManager(get_connection_url(f"{tmp_path}/test_db_manager.db"), schema=None)
 
     # Creates a new SQLite db file
     expid = "ut01"
 
     # Table does not exist
-    assert db_structure.get_structure(expid, tmp_path) == {}
+    assert db_manager_job_list.get_structure(expid, tmp_path) == {}
 
     # Save table
-    db_structure.save_structure(graph, expid, tmp_path)
+    db_manager_job_list.save_structure(graph, expid, tmp_path)
 
     # Get correct data
-    structure_data = db_structure.get_structure(expid, tmp_path)
+    structure_data = db_manager_job_list.get_structure(expid, tmp_path)
     assert sorted(structure_data) == sorted({
         "a": ["b", "d"],
         "b": ["c"],

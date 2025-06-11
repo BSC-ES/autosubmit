@@ -45,6 +45,40 @@ class JobsDbManager(DbManager):
         self._ACTIVE_STATUSES = ['READY', 'SUBMITTED', 'QUEUING', 'HELD', 'RUNNING']
         self._FINAL_STATUSES = ['COMPLETED', 'FAILED']
 
+    def get_job_list(expid: str, structures_path: Path) -> Optional[dict[str, list[str]]]:
+        """Return the current structure for the experiment identified by the given ``expid``.
+
+        If the database used is SQLite, the structure database file will be created.
+        However, if the SQLIte database file parent directory does not exist, it will
+        raise an error instead.
+
+        For Postgres or other database systems, it will simply create the table if it
+        does not exist yet.
+
+        :param expid: The experiment identifier.
+        :param structures_path: The path to the database structure file (only used for SQLite).
+        :return: The experiment graph structure (from=>to) or ``None`` if there is no
+            structure persisted in the database.
+        """
+        try:
+            db_manager = _get_db_manager(expid, None if not structures_path else structures_path / f"structure_{expid}.db")
+
+            db_manager.create_table(ExperimentStructureTable.name)
+
+            current_structure = db_manager.select_all('experiment_structure')
+
+            current_table_structure = {}
+            for item in current_structure:
+                _from, _to = item
+                current_table_structure.setdefault(_from, []).append(_to)
+                current_table_structure.setdefault(_to, [])
+
+            return current_table_structure
+        except Exception as exp:
+            Log.printlog("Get structure error: {0}".format(str(exp)), 6014)
+            Log.debug(traceback.format_exc())
+        return None
+
     def save_jobs(self, job_list: List[Job]) -> None:
         """Save the job list to the database. Normally this will save the current active jobs."""
         self.create_table(JobsTable.name)
