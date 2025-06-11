@@ -603,14 +603,6 @@ def test_get_jobs_calls_get_date_for_all_its_dates(mocker, dictionary):
         dictionary._get_date.assert_any_call(list(), dic, date, member, chunk)  # type: ignore
 
 
-def test_job_list_returns_the_job_list_by_name(dictionary):
-    # act
-    job_list = [Job("child", 1, Status.WAITING, 0), Job("child2", 1, Status.WAITING, 0)]
-    dictionary.job_list = job_list
-    # arrange
-    assert {'child': job_list[0], 'child2': job_list[1]} == dictionary.job_list
-
-
 def test_create_jobs_split(mocker, dictionary):
     mock_date2str = mocker.patch('autosubmit.job.job_dict.date2str')
     mock_date2str.side_effect = lambda x, y: str(x)

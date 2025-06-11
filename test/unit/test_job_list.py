@@ -57,13 +57,13 @@ def setup_job_list(as_conf, tmpdir, mocker):
     # add some jobs to the job list
     job = Job("job1", "1", Status.COMPLETED, 0)
     job.section = "SECTION1"
-    job_list._job_list.append(job)
+    job_list.add_job(job)
     job = Job("job2", "2", Status.WAITING, 0)
     job.section = "SECTION1"
-    job_list._job_list.append(job)
+    job_list.add_job(job)
     job = Job("job3", "3", Status.COMPLETED, 0)
     job.section = "SECTION2"
-    job_list._job_list.append(job)
+    job_list.add_job(job)
     return job_list
 
 
@@ -118,7 +118,8 @@ def job_list(as_conf, mocker, jobs_as_dict):
     job_list = JobList(_EXPID, as_conf, YAMLParserFactory())
 
     for status, jobs in jobs_as_dict.items():
-        job_list._job_list.extend(jobs)
+        for job in jobs:
+            job_list.add_job(job)
     return job_list
 
 

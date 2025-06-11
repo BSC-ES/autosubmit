@@ -560,7 +560,7 @@ def test_check_relationship(joblist):
         {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None', 'STATUS': 'COMPLETED'}]
     assert result == expected_output
 
-
+# TODO: Remade this
 def test_add_special_conditions(mocker, joblist):
     # Method from job_list
     job = Job("child", 1, Status.READY, 1)

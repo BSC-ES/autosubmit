@@ -49,13 +49,12 @@ def job_list(autosubmit_config, tmp_path):
     job_list = JobList(_EXPID, as_conf, YAMLParserFactory())
     # Basic workflow with SETUP, INI, SIM, POST, CLEAN
     setup_job = _create_dummy_job('expid_SETUP', Status.READY)
-    job_list.get_job_list().append(setup_job)
-
+    job_list.add_job(setup_job)
     for date in ['d1', 'd2']:
         for member in ['m1', 'm2']:
             job = _create_dummy_job('expid_' + date + '_' + member + '_' + 'INI', Status.WAITING, date, member)
             job.add_parent(setup_job)
-            job_list.get_job_list().append(job)
+            job_list.add_job(job)
 
     sections = ['SIM', 'POST', 'CLEAN']
     for section in sections:
@@ -76,7 +75,7 @@ def job_list(autosubmit_config, tmp_path):
                     elif section == 'CLEAN':
                         job.add_parent(job_list.get_job_by_name(
                             'expid_' + date + '_' + member + '_' + str(chunk) + '_POST'))
-                    job_list.get_job_list().append(job)
+                    job_list.add_job(job)
     return job_list
 
 
@@ -266,7 +265,7 @@ def test_synchronize_member(job_list):
             for member in ['m1', 'm2']:
                 job.add_parent(
                     job_list.get_job_by_name('expid_' + date + '_' + member + '_' + str(chunk) + '_SIM'))
-            job_list.get_job_list().append(job)
+            job_list.add_job(job)
 
     nodes = [
         "expid_SETUP", "expid_d1_m1_INI", "expid_d1_m2_INI", "expid_d2_m1_INI", "expid_d2_m2_INI",
@@ -343,7 +342,7 @@ def test_synchronize_date(job_list):
             for member in ['m1', 'm2']:
                 job.add_parent(
                     job_list.get_job_by_name('expid_' + date + '_' + member + '_' + str(chunk) + '_SIM'))
-        job_list.get_job_list().append(job)
+        job_list.add_job(job)
 
     nodes = [
         "expid_SETUP", "expid_d1_m1_INI", "expid_d1_m2_INI", "expid_d2_m1_INI", "expid_d2_m2_INI",
@@ -434,7 +433,7 @@ def test_synchronize_member_group_member(job_list):
                 job.add_parent(
                     job_list.get_job_by_name('expid_' + date + '_' + member + '_' + str(chunk) + '_SIM'))
 
-            job_list.get_job_list().append(job)
+            job_list.add_job(job)
 
     groups_dict = dict()
     groups_dict['status'] = {'d1_m1': Status.WAITING,
@@ -503,7 +502,7 @@ def test_synchronize_member_group_chunk(job_list):
             for member in ['m1', 'm2']:
                 job.add_parent(
                     job_list.get_job_by_name('expid_' + date + '_' + member + '_' + str(chunk) + '_SIM'))
-            job_list.get_job_list().append(job)
+            job_list.add_job(job)
 
     groups_dict = dict()
     groups_dict['status'] = {'d1_m1_1': Status.WAITING, 'd1_m1_2': Status.WAITING,
@@ -581,7 +580,7 @@ def test_synchronize_member_group_date(job_list):
                 job.add_parent(
                     job_list.get_job_by_name('expid_' + date + '_' + member + '_' + str(chunk) + '_SIM'))
 
-            job_list.get_job_list().append(job)
+            job_list.add_job(job)
 
     groups_dict = dict()
     groups_dict['status'] = {'d1': Status.WAITING,
@@ -642,7 +641,7 @@ def test_synchronize_date_group_member(job_list):
                 job.add_parent(
                     job_list.get_job_by_name('expid_' + date + '_' + member + '_' + str(chunk) + '_SIM'))
 
-        job_list.get_job_list().append(job)
+        job_list.add_job(job)
 
     groups_dict = dict()
     groups_dict['status'] = {'d1_m1': Status.WAITING,
@@ -709,7 +708,7 @@ def test_synchronize_date_group_chunk(job_list):
                 job.add_parent(
                     job_list.get_job_by_name('expid_' + date + '_' + member + '_' + str(chunk) + '_SIM'))
 
-        job_list.get_job_list().append(job)
+        job_list.add_job(job)
 
     groups_dict = dict()
     groups_dict['status'] = {'d1_m1_1': Status.WAITING, 'd1_m1_2': Status.WAITING,
@@ -763,7 +762,7 @@ def test_synchronize_date_group_date(job_list):
                 job.add_parent(
                     job_list.get_job_by_name('expid_' + date + '_' + member + '_' + str(chunk) + '_SIM'))
 
-        job_list.get_job_list().append(job)
+        job_list.add_job(job)
 
     groups_dict = dict()
     groups_dict['status'] = {'d1': Status.WAITING,

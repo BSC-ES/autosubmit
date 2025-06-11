@@ -3633,3 +3633,6 @@ class JobList(object):
 
     def update_as_conf(self, as_conf: 'AutosubmitConfig') -> None:
         self._as_conf = as_conf
+
+    def add_job(self, job: Job):
+        self.graph.add_node(job.name, job=job)

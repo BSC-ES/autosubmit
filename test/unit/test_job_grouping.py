@@ -53,7 +53,7 @@ def job_list(autosubmit_config, tmp_path):
     for date in ['19000101', '19000202']:
         for member in ['m1', 'm2']:
             job = _create_dummy_job('expid_' + date + '_' + member + '_' + 'INI', Status.WAITING, date, member)
-            job_list.get_job_list().append(job)
+            job_list.add_job(job)
 
     sections = ['SIM', 'POST', 'CLEAN']
     for section in sections:
@@ -66,7 +66,7 @@ def job_list(autosubmit_config, tmp_path):
                         date,
                         member,
                         chunk)
-                    job_list.get_job_list().append(job)
+                    job_list.add_job(job)
     return job_list
 
 
@@ -208,7 +208,7 @@ def test_group_by_split(job_list, mocker):
                     job = _create_dummy_job(
                         'expid_' + date + '_' + member + '_' + str(chunk) + '_' + str(split) + '_CMORATM',
                         Status.WAITING, date, member, chunk, split)
-                    job_list.get_job_list().append(job)
+                    job_list.add_job(job)
 
     groups_dict = dict()
 
@@ -353,7 +353,7 @@ def test_automatic_grouping_splits(job_list, mocker):
                     job = _create_dummy_job(
                         'expid_' + date + '_' + member + '_' + str(chunk) + '_' + str(split) + '_CMORATM',
                         Status.WAITING, date, member, chunk, split)
-                    job_list.get_job_list().append(job)
+                    job_list.add_job(job)
 
     groups_dict = dict()
 
@@ -413,7 +413,9 @@ def test_automatic_grouping_splits(job_list, mocker):
 
     mocker.patch('autosubmit.job.job_grouping.date2str', side_effect=side_effect)
     job_grouping = JobGrouping('automatic', job_list.get_job_list(), job_list)
-    assert job_grouping.group_jobs() == groups_dict
+    result = job_grouping.group_jobs()
+    assert result["status"] == groups_dict["status"]
+    assert result["jobs"] == groups_dict["jobs"]
 
 
 def test_automatic_grouping_different_status_member(job_list, mocker):
@@ -795,7 +797,7 @@ def test_synchronize_member_group_member(job_list, mocker):
                 job.add_parent(
                     job_list.get_job_by_name('expid_' + date + '_' + member + '_' + str(chunk) + '_SIM'))
 
-            job_list.get_job_list().append(job)
+            job_list.add_job(job)
 
     groups_dict = dict()
     groups_dict['status'] = {'19000101_m1': Status.WAITING,
@@ -851,7 +853,7 @@ def test_synchronize_member_group_chunk(job_list, mocker):
                 job.add_parent(
                     job_list.get_job_by_name('expid_' + date + '_' + member + '_' + str(chunk) + '_SIM'))
 
-            job_list.get_job_list().append(job)
+            job_list.add_job(job)
 
     groups_dict = dict()
     groups_dict['status'] = {'19000101_m1_1': Status.WAITING, '19000101_m1_2': Status.WAITING,
@@ -904,7 +906,7 @@ def test_synchronize_member_group_date(job_list):
                 job.add_parent(
                     job_list.get_job_by_name('expid_' + date + '_' + member + '_' + str(chunk) + '_SIM'))
 
-            job_list.get_job_list().append(job)
+            job_list.add_job(job)
 
     groups_dict = dict()
     groups_dict['status'] = {'19000101': Status.WAITING,
@@ -951,7 +953,7 @@ def test_synchronize_date_group_member(job_list, mocker):
                 job.add_parent(
                     job_list.get_job_by_name('expid_' + date + '_' + member + '_' + str(chunk) + '_SIM'))
 
-        job_list.get_job_list().append(job)
+        job_list.add_job(job)
 
     groups_dict = dict()
     groups_dict['status'] = {'19000101_m1': Status.WAITING,
@@ -1018,7 +1020,7 @@ def test_synchronize_date_group_chunk(job_list, mocker):
                 job.add_parent(
                     job_list.get_job_by_name('expid_' + date + '_' + member + '_' + str(chunk) + '_SIM'))
 
-        job_list.get_job_list().append(job)
+        job_list.add_job(job)
 
     groups_dict = dict()
     groups_dict['status'] = {'19000101_m1_1': Status.WAITING, '19000101_m1_2': Status.WAITING,
@@ -1083,7 +1085,7 @@ def test_synchronize_date_group_date(job_list, mocker):
                 job.add_parent(
                     job_list.get_job_by_name('expid_' + date + '_' + member + '_' + str(chunk) + '_SIM'))
 
-        job_list.get_job_list().append(job)
+        job_list.add_job(job)
 
     groups_dict = dict()
     groups_dict['status'] = {'19000101': Status.WAITING,

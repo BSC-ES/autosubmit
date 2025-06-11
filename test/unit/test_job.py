@@ -172,7 +172,7 @@ class TestJob:
             Path(temp_dir, expid).mkdir()
             # FIXME: (Copied from Bruno) Not sure why but the submitted and Slurm were using the $expid/tmp/ASLOGS folder?
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                         f'{expid}/conf', f'{expid}/proj/project_files']:
+                         f'{expid}/conf', f'{expid}/proj/project_files', f'{expid}/db']:
                 Path(temp_dir, path).mkdir()
             # loop over the host script's type
             for script_type in ["Bash", "Python", "Rscript"]:
@@ -334,9 +334,8 @@ CONFIG:
                         # act
 
                         parameters = config.load_parameters()
-                        joblist_persistence = JobListPersistencePkl()
 
-                        job_list_obj = JobList(expid, config, YAMLParserFactory(), joblist_persistence)
+                        job_list_obj = JobList(expid, config, YAMLParserFactory())
 
                         job_list_obj.generate(
                             as_conf=config,
@@ -352,6 +351,7 @@ CONFIG:
                             new=True,
                             run_only_members=config.get_member_list(run_only=True),
                             show_log=True,
+                            full_load=True
                         )
                         job_list = job_list_obj.get_job_list()
 
@@ -436,7 +436,7 @@ CONFIG:
             BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
             Path(temp_dir, expid).mkdir()
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                         f'{expid}/conf']:
+                         f'{expid}/conf', f'{expid}/db']:
                 Path(temp_dir, path).mkdir()
             with open(Path(temp_dir, f'{expid}/conf/experiment_data.yml'), 'w+') as experiment_data:
                 experiment_data.write(dedent(f'''\
@@ -511,7 +511,7 @@ CONFIG:
                 full_load=True,
             )
 
-            job_list = job_list_obj.get_job_list()
+            job_list = job_list_obj.job_list
             assert 1 == len(job_list)
 
             submitter = Autosubmit._get_submitter(config)
@@ -551,7 +551,7 @@ CONFIG:
             Path(temp_dir, expid).mkdir()
             # FIXME: (Copied from Bruno) Not sure why but the submitted and Slurm were using the $expid/tmp/ASLOGS folder?
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                         f'{expid}/conf', f'{expid}/proj/project_files']:
+                         f'{expid}/conf', f'{expid}/proj/project_files', f'{expid}/db']:
                 Path(temp_dir, path).mkdir()
             # loop over the host script's type
             for script_type in ["Bash", "Python", "Rscript"]:
@@ -824,7 +824,7 @@ CONFIG:
                 Path(temp_dir, expid).mkdir()
                 # FIXME: Not sure why but the submitted and Slurm were using the $expid/tmp/ASLOGS folder?
                 for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                             f'{expid}/conf']:
+                             f'{expid}/conf', f'{expid}/db']:
                     Path(temp_dir, path).mkdir()
                 with open(Path(temp_dir, f'{expid}/conf/minimal.yml'), 'w+') as minimal:
                     minimal.write(dedent(f'''\
@@ -1192,7 +1192,7 @@ CONFIG:
             BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
             Path(temp_dir, expid).mkdir()
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                         f'{expid}/conf']:
+                         f'{expid}/conf', f'{expid}/db']:
                 Path(temp_dir, path).mkdir()
             with open(Path(temp_dir, f'{expid}/conf/minimal.yml'), 'w+') as minimal:
                 minimal.write(dedent(f'''\
