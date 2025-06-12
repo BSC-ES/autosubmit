@@ -219,6 +219,8 @@ def _create_node(job, groups, hide_groups) -> Optional[pydotplus.Node]:
 
 
 def _check_final_status(job: Job, child: Job) -> tuple[Optional[str], Optional[int]]:
+    # TODO this won't work needs to obtain the edge_info from somewhere else (self.graph)
+    return None, None
     # order of _MONITOR_STATUS_TO_COLOR
     if not child.edge_info:
         return None, None
@@ -523,12 +525,10 @@ class Monitor:
             message = str(e)
             if "GraphViz" in message:
                 message = "Graphviz is not installed. Autosubmit needs this system package to plot the workflow."
+                Log.printlog(message, 7014)
+            else:
+                Log.printlog(str(e), 7014)
 
-            message = (f'{message}\nSpecified output does not have an available viewer installed, '
-                       f'or graphviz is not installed. The output was only written in'
-                       f'txt.')
-
-            Log.printlog(message, 7014)
 
     def generate_output_txt(self, expid: str, joblist: list[Job], path: str, classictxt=False,
                             job_list_object=None) -> None:
