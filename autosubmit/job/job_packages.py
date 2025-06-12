@@ -245,7 +245,7 @@ class JobPackageSimple(JobPackageBase):
         for job in self.jobs:
             self.platform.send_file(self._job_scripts[job.name])
             # If file is not already in the tmp_path, send it #fix for esarchive
-            if self.platform.tmp_path != self._tmp_path:
+            if job.platform.remote_log_dir != self._tmp_path:
                 for file_n in range(len(job.additional_files)):
                     filename = os.path.basename(os.path.splitext(job.additional_files[file_n])[0])
                     full_path = os.path.join(self._tmp_path,filename ) + "_" + job.name[5:]
