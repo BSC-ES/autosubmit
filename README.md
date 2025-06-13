@@ -1,4 +1,3 @@
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/e9b46f9e6b3047d58f004f024c4971bb)](https://www.codacy.com/app/BSC-Earth/autosubmit?utm_source=earth.bsc.es&amp;utm_medium=referral&amp;utm_content=gitlab/es/autosubmit&amp;utm_campaign=Badge_Grade)
 [![codecov](https://codecov.io/gh/BSC-ES/autosubmit/graph/badge.svg?token=WEDBP1A6LG)](https://codecov.io/gh/BSC-ES/autosubmit)
 [![DOI](https://zenodo.org/badge/902494505.svg)](https://zenodo.org/badge/latestdoi/902494505)
 
