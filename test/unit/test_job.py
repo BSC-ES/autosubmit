@@ -1430,7 +1430,7 @@ def test_pytest_check_script(mocker):
     assert checked
 
 
-def test_create_script(mocker):
+def test_create_script(mocker, tmpdir):
     # arrange
     job = Job("job1", "1", Status.READY, 0)
     # arrange
@@ -1439,11 +1439,13 @@ def test_create_script(mocker):
     parameters['NUMTHREADS'] = 777
     parameters['NUMTASK'] = 666
 
-    job._tmp_path = '/dummy/tmp/path'
-    job.additional_files = '/dummy/tmp/path_additional_file'
+    job.name = "job1"
+    job._tmp_path = tmpdir.strpath
+    job.section = "DUMMY"
+    job.additional_files = ['dummy_file1', 'dummy_file2']
     mocker.patch("autosubmit.job.job.Job.update_content", return_value=(
         'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK% %% %%',
-        ['some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK% %% %%']))
+        ['some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK% %% %%','some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK% %% %%']))
     mocker.patch("autosubmit.job.job.Job.update_parameters", return_value=parameters)
 
     config = Mock(spec=AutosubmitConfig)
@@ -1451,22 +1453,17 @@ def test_create_script(mocker):
 
     config.get_project_dir = Mock(return_value='/project/dir')
 
-    chmod_mock = Mock()
-    sys.modules['os'].chmod = chmod_mock
+    job.create_script(config)
+    # list tmpdir and ensure that each file is created
+    assert len(tmpdir.listdir()) == 3  # job script + additional files
+    assert tmpdir.join('job1.cmd').check()
+    assert tmpdir.join(f'dummy_file1_{job.section}').check()
+    assert tmpdir.join(f'dummy_file2_{job.section}').check()
+    # assert that the script content is correct
+    with open(tmpdir.join('job1.cmd'), 'r') as f:
+        content = f.read()
+        assert 'some-content: 999, 777, 666' in content
 
-    write_mock = Mock().write = Mock()
-    open_mock = Mock(return_value=write_mock)
-    with patch.object(builtins, "open", open_mock):
-        # act
-        job.create_script(config)
-    # TODO asserts _slots_
-    # # assert
-    # update_content_mock.assert_called_with(config)
-    # # TODO add assert for additional files
-    # open_mock.assert_called_with(os.path.join(job._tmp_path, job.name + '.cmd'), 'wb')
-    # # Expected values: %% -> %, %KEY% -> KEY.VALUE without %
-    # write_mock.write.assert_called_with(b'some-content: 999, 777, 666 % %')
-    # chmod_mock.assert_called_with(os.path.join(job._tmp_path, job.name + '.cmd'), 0o755)
 
 
 def test_reset_logs(autosubmit_config):
