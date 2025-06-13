@@ -209,6 +209,7 @@ class Platform(object):
             platform_total_jobs = self.config.get("PLATFORMS", {}).get('TOTAL_JOBS', config_total_jobs)
             log_queue_size = int(platform_total_jobs) * 2
         self.log_queue_size = log_queue_size
+        self.remote_log_dir = None
 
     @classmethod
     def update_workers(cls, event_worker):
@@ -773,11 +774,10 @@ class Platform(object):
         :rtype: str
         """
         if self.type == "local":
-            path = os.path.join(
-                self.root_dir, self.config.get("LOCAL_TMP_DIR"), 'LOG_{0}'.format(self.expid))
+            path = Path(self.root_dir) / self.config.get("LOCAL_TMP_DIR") / f'LOG_{self.expid}'
         else:
-            path = os.path.join(self.root_dir, 'LOG_{0}'.format(self.expid))
-        return path
+            path = Path(self.remote_log_dir)
+        return str(path)
 
     def submit_job(self, job, script_name, hold=False, export="none"):
         """
