@@ -77,6 +77,7 @@ def ps_platform(tmpdir):
     platform.user = tmpdir.owner
     platform.root_dir = Path(tmpdir) / "remote"
     platform.root_dir.mkdir(parents=True, exist_ok=True)
+    platform.remote_log_dir = platform.root_dir / 'LOG_a000'
     yield platform, tmpdir
 
 
