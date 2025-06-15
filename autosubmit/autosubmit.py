@@ -38,7 +38,7 @@ from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
-from typing import Generator, Optional, Union
+from typing import Generator, Optional, Union 
 
 from bscearth.utils.date import date2str
 from portalocker import Lock
@@ -79,6 +79,7 @@ from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
+from autosubmit.generators import Engine, get_engine_generator
 
 dialog = None
 
@@ -733,6 +734,17 @@ class Autosubmit:
                                    help='Select the status (one or more) to filter the list of jobs.')
             subparser.add_argument('-t', '--target', type=str, default="FAILED", metavar='STATUS',
                                    help='Final status of killed jobs. Default is FAILED.')
+            subparser = subparsers.add_parser(
+                'generate', description='Generate a workflow definition for a different workflow engine',
+                argument_default=argparse.SUPPRESS)
+            subparser.add_argument('expid', help='experiment identifier')
+            subsubparser = subparser.add_subparsers(title="engines", dest='engine', required=True, description='Workflow engine identifier')
+            for engine in Engine:
+                generator_class = get_engine_generator(engine)
+                parser_engine = subsubparser.add_parser(engine.value, help=f"{generator_class.get_engine_name()}")
+                generator_class.add_parse_args(parser_engine)
+
+
             args, unknown = parser.parse_known_args()
             if args.version:
                 Log.info(Autosubmit.autosubmit_version)
@@ -868,6 +880,8 @@ class Autosubmit:
         elif args.command == 'stop':
             return Autosubmit.stop(args.expid, args.force, args.all, args.force_all, args.cancel, args.filter_status,
                                    args.target, args.yes)
+        elif args.command == 'generate':
+            return Autosubmit.generate_workflow(args.expid, Engine(args.engine), args)
 
     @staticmethod
     def _init_logs(args, console_level='INFO', log_level='DEBUG', expid='None'):
@@ -6007,3 +6021,46 @@ class Autosubmit:
                 job_list, _, _, _, _, _, _, _ = Autosubmit.prepare_run(expid, check_scripts=False)
                 cancel_jobs(job_list, active_jobs_filter=current_status, target_status=status)
         return True
+
+    @staticmethod
+    def generate_workflow(expid: str, engine: Engine, args: argparse.Namespace) -> None:
+        """Generate the workflow configuration for a different backend engine."""
+        Log.info(f'Generate workflow configuration for {engine}')
+
+        try:
+            Log.info("Getting job list...")
+            as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
+            as_conf.check_conf_files(False)
+
+            submitter = Autosubmit._get_submitter(as_conf)
+            submitter.load_platforms(as_conf)
+            if len(submitter.platforms) == 0:
+                raise ValueError('Missing platform!')
+
+            packages_persistence = JobPackagePersistence(expid)
+            job_list = Autosubmit.load_job_list(expid, as_conf, monitor=False)
+
+            Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
+
+            hpc_architecture = as_conf.get_platform()
+            for job in job_list.get_job_list():
+                if job.platform_name is None or job.platform_name == '':
+                    job.platform_name = hpc_architecture
+                job.platform = submitter.platforms[job.platform_name]
+                job.update_parameters(as_conf, job_list.parameters)
+
+            job_list.check_scripts(as_conf)
+        except AutosubmitError as e:
+            raise AutosubmitCritical(e.message, e.code, e.trace)
+        except AutosubmitCritical as e:
+            raise
+        except BaseException as e:
+            raise AutosubmitCritical("Error while checking the configuration files or loading the job_list", 7040,
+                                     str(e))
+
+        generator_class = get_engine_generator(engine)
+        parser = argparse.ArgumentParser()
+        generator_class.add_parse_args(parser)
+        generator_input_keys = vars(parser.parse_args('')).keys()
+        generator_kwargs = {key: args.__getattribute__(key) for key in generator_input_keys} 
+        generator_class.generate(job_list, as_conf, **generator_kwargs)
