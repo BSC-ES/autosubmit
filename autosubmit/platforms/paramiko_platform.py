@@ -1439,6 +1439,20 @@ class ParamikoPlatform(Platform):
                     '%HYPERTHREADING_DIRECTIVE%', self.header.get_hyperthreading_directive(job, parameters))
         return header
 
+    @staticmethod
+    def parse_time(wallclock):
+        # noinspection Annotator
+        regex = re.compile(r'(((?P<hours>\d+):)((?P<minutes>\d+)))(:(?P<seconds>\d+))?')
+        parts = regex.match(wallclock)
+        if not parts:
+            return
+        parts = parts.groupdict()
+        time_params = {}
+        for name, param in parts.items():
+            if param:
+                time_params[name] = int(param)
+        return timedelta(**time_params)
+
     def closeConnection(self):
         # Ensure to delete all references to the ssh connection, so that it frees all the file descriptors
         with suppress(Exception):
