@@ -12,6 +12,7 @@
 **Enhancements:**
 
 - EDITO Autosubmit-Demo container updated to install API in different environment #2398
+- Update portalocker requirement from <=3.1.1 to <=3.2.0 #2423
 
 ### 4.1.14: Bug fixes, enhancements, and new features
 
