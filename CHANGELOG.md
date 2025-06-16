@@ -14,6 +14,7 @@ the filter the jobs. Not using any value for `-fp` still returns all jobs.
   adding new deposits via its webhook #2401
 - Deleted command `autosubmit test` that was not working in Autosubmit 4 #2386
 - Removed PBS and SGE platforms as they are not working in AS4 #2349
+- Log levels in the command line now accept `ERROR` #2412
 
 **Enhancements:**
 

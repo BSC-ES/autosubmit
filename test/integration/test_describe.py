@@ -15,13 +15,15 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import pytest
+from getpass import getuser
 from pathlib import Path
-from pytest_mock import MockerFixture
 from typing import Callable
 
-from autosubmit.autosubmit import Autosubmit
+import pytest
+from pytest_mock import MockerFixture
 from ruamel.yaml import YAML
+
+from autosubmit.autosubmit import Autosubmit
 
 _EXPIDS = ['z000', 'z001']
 
@@ -42,7 +44,7 @@ def test_describe(
         not_described,
         autosubmit_exp: Callable,
         mocker: MockerFixture) -> None:
-    Log = mocker.patch('autosubmit.autosubmit.Log')
+    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
 
     expids = filter(lambda e: e in _EXPIDS, input_experiment_list.replace(',', ' ').split(' '))
 
@@ -64,7 +66,6 @@ def test_describe(
         )
         exps.append(exp)
 
-
     Autosubmit.describe(
         input_experiment_list=input_experiment_list,
         get_from_user=get_from_user
@@ -72,12 +73,12 @@ def test_describe(
 
     # Log.printlog is only called when an experiment is not described
     # TODO: We could re-design the class to make this behaviour clearer.
-    assert Log.printlog.call_count == (1 if not_described else 0)
+    assert mocked_log.printlog.call_count == (1 if not_described else 0)
 
     if exps and not not_described:
         location_lines = [
             line_tuple.args[0].format(line_tuple.args[1])
-            for line_tuple in Log.result.mock_calls
+            for line_tuple in mocked_log.result.mock_calls
             if line_tuple[1][0].startswith('Location: ')
         ]
 
@@ -85,3 +86,34 @@ def test_describe(
 
         for exp in exps:
             assert f'Location: {exp.exp_path}' in location_lines
+
+
+def test_run_command_describe(autosubmit_exp: Callable, autosubmit, mocker):
+    """Test the ``describe`` command calling it from the ``Autosubmit.run_command``.
+
+    ``sys.argv`` is mocked to return what ``argparse`` would parse for a command
+    such as ``autosubmit -lc ERROR -lf WARNING describe z000``.
+    
+    This triggers the log initialization, and verifies that log levels work too,
+    as documented.
+
+    `Ref <https://github.com/BSC-ES/autosubmit/issues/2412>`_.
+    """
+    fake_jobs: dict = YAML().load(Path(__file__).resolve().parents[1] / "files/fake-jobs.yml")
+    fake_platforms: dict = YAML().load(Path(__file__).resolve().parents[1] / "files/fake-platforms.yml")
+    exp = autosubmit_exp(
+        _EXPIDS[0],
+        experiment_data={
+            'DEFAULT': {
+                'HPCARCH': 'ARM'
+            },
+            **fake_jobs,
+            **fake_platforms
+        }
+    )
+
+    mocker.patch('sys.argv', ['autosubmit', '-lc', 'ERROR', '-lf', 'WARNING', 'describe', exp.expid])
+    _, args = autosubmit.parse_args()
+    output = autosubmit.run_command(args=args)
+
+    assert getuser() == output[0]

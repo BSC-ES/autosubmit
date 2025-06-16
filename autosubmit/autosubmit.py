@@ -191,11 +191,10 @@ class Autosubmit:
                 description='Main executable for autosubmit. ')
             parser.add_argument('-v', '--version', dest='version', action='store_true')
 
-            parser.add_argument('-lf', '--logfile', choices=('NO_LOG', 'INFO', 'WARNING', 'DEBUG'),
-                                default='DEBUG', type=str,
+            log_levels = ('NO_LOG', 'INFO', 'WARNING', 'DEBUG', 'ERROR')
+            parser.add_argument('-lf', '--logfile', choices=log_levels, default='DEBUG', type=str,
                                 help="sets file's log level.")
-            parser.add_argument('-lc', '--logconsole', choices=('NO_LOG', 'INFO', 'WARNING', 'DEBUG'),
-                                default='WARNING', type=str,
+            parser.add_argument('-lc', '--logconsole', choices=log_levels, default='WARNING', type=str,
                                 help="sets console's log level")
 
             subparsers = parser.add_subparsers(dest='command')
@@ -808,15 +807,16 @@ class Autosubmit:
             return Autosubmit.cat_log(args.ID, args.file, args.mode, args.inspect)
         elif args.command == 'stop':
             return Autosubmit.stop(args.expid, args.force, args.all, args.force_all, args.cancel, args.filter_status, args.target)
+
     @staticmethod
     def _init_logs(args, console_level='INFO', log_level='DEBUG', expid='None'):
         Log.set_console_level(console_level)
         if args.command != "configure":
             if not BasicConfig.CONFIG_FILE_FOUND:
-                raise AutosubmitCritical('No configuration file(autosubmitrc) found in this filesystem. Please run "autosubmit configure" first.',7006)
+                raise AutosubmitCritical('No configuration file(autosubmitrc) found in this filesystem. Please run "autosubmit configure" first.', 7006)
             if args.command != "install":
                 if not os.path.exists(BasicConfig.DB_PATH):
-                    raise AutosubmitCritical('Experiments database not found in this filesystem. Please run "autosubmit install" first.',7072)
+                    raise AutosubmitCritical('Experiments database not found in this filesystem. Please run "autosubmit install" first.', 7072)
                 else:
                     permissions = os.access(BasicConfig.DB_PATH, os.R_OK)  # Check for read access
                     if not permissions:
@@ -826,8 +826,6 @@ class Autosubmit:
                     if not permissions:
                         raise AutosubmitCritical(f'Experiments database {BasicConfig.DB_PATH} not writable.'
                                                  f' Please check permissions.',7007)
-
-
 
         expid_less = ["expid", "describe", "testcase", "install", "-v",
                       "readme", "changelog", "configure", "unarchive",
@@ -3374,7 +3372,7 @@ class Autosubmit:
                                      7040, str(e))
 
     @staticmethod
-    def describe(input_experiment_list="*",get_from_user=""):
+    def describe(input_experiment_list="*", get_from_user=""):
         """
         Show details for specified experiment
 
@@ -3389,22 +3387,22 @@ class Autosubmit:
         not_described_experiments = []
         if get_from_user == "*" or get_from_user == "":
             get_from_user = pwd.getpwuid(os.getuid())[0]
-        user =""
-        created=""
-        model=""
-        branch=""
-        hpc=""
+        user = ""
+        created= ""
+        model = ""
+        branch = ""
+        hpc = ""
         if ',' in experiments_ids:
             experiments_ids = experiments_ids.split(',')
         elif '*' in experiments_ids:
             experiments_ids = []
             basic_conf = BasicConfig()
             for f in Path(basic_conf.LOCAL_ROOT_DIR).glob("????"):
-                try:
+                # If it reaches there it means that f.owner() doesn't exist
+                # anymore( owner is an id) so we just skip it and continue.
+                with suppress(Exception):
                     if f.is_dir() and f.owner() == get_from_user:
                         experiments_ids.append(f.name)
-                except Exception:
-                    pass # if it reaches there it means that f.owner() doesn't exist anymore( owner is an id) so we just skip it and continue
         else:
             experiments_ids = experiments_ids.split(' ')
         for experiment_id in experiments_ids:
@@ -3412,8 +3410,7 @@ class Autosubmit:
                 experiment_id = experiment_id.strip(" ")
                 exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, experiment_id)
 
-                as_conf = AutosubmitConfig(
-                    experiment_id, BasicConfig, YAMLParserFactory())
+                as_conf = AutosubmitConfig(experiment_id, BasicConfig, YAMLParserFactory())
                 as_conf.check_conf_files(False,no_log=True)
                 user = os.stat(as_conf.conf_folder_yaml).st_uid
                 try:
@@ -3423,8 +3420,7 @@ class Autosubmit:
                         "The user does not exist anymore in the system, using id instead")
                     continue
 
-                created = datetime.datetime.fromtimestamp(
-                    os.path.getmtime(as_conf.conf_folder_yaml))
+                created = datetime.datetime.fromtimestamp(os.path.getmtime(as_conf.conf_folder_yaml))
 
                 if as_conf.get_svn_project_url():
                     model = as_conf.get_svn_project_url()
@@ -3452,10 +3448,11 @@ class Autosubmit:
                 Log.result("Branch: {0}", branch)
                 Log.result("HPC: {0}", hpc)
                 Log.result("Description: {0}", description[0][0])
-            except BaseException as e:
+            except Exception:
                 not_described_experiments.append(experiment_id)
         if len(not_described_experiments) > 0:
-            Log.printlog(f"Could not describe the following experiments:\n{not_described_experiments}",Log.WARNING)
+            Log.printlog(f"Could not describe the following experiments:\n"
+                         f"{not_described_experiments}", Log.WARNING)
         if len(experiments_ids) == 1:
             # for backward compatibility or GUI
             return user, created, model, branch, hpc
