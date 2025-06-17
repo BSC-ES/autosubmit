@@ -1,4 +1,4 @@
-### 4.1.15: Unreleased
+### 4.1.15: Bug fixes, enhancements, and new features
 
 The filter `-fp` of the command `autosubmit stats` changed in this release.
 Previously, a `-fp 0` would not raise any errors, and would bring all the
@@ -15,6 +15,8 @@ the filter the jobs. Not using any value for `-fp` still returns all jobs.
 - Deleted command `autosubmit test` that was not working in Autosubmit 4 #2386
 - Removed PBS and SGE platforms as they are not working in AS4 #2349
 - Log levels in the command line now accept `ERROR` #2412
+- Fix setstatus command to work in all cases #2381
+- Fix PS platform to work with the local machine #2374
 
 **Enhancements:**
 
