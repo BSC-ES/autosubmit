@@ -1,3 +1,8 @@
+### 4.1.16: Unreleased
+
+- autosubmit/autosubmit container now includes the `$USER` environment variable
+  via its entrypoint #2359
+
 ### 4.1.15: Unreleased
 
 The filter `-fp` of the command `autosubmit stats` changed in this release.

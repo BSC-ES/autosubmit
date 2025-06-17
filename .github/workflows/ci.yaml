@@ -7,6 +7,8 @@ on:
     branches:
       - main
       - master
+permissions:
+  contents: read
 
 jobs:
   # lint: # Turn on when linting issues are resolved
