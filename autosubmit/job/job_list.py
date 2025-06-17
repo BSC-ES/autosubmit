@@ -128,7 +128,14 @@ class JobList(object):
     @property
     def job_list(self) -> List[Job]:
         """Dynamically return a list of all 'job' attributes from the graph nodes."""
-        return [data['job'] for _, data in self.graph.nodes(data=True)]
+        try:
+            return [data['job'] for _, data in self.graph.nodes(data=True)]
+        except BaseException as e:
+            err_msg = ""
+            for node in self.graph.nodes:
+                if not isinstance(self.graph.nodes[node], dict) or 'job' not in self.graph.nodes[node]:
+                    err_msg += f"Node {node} does not have a 'job' attribute.\n"
+            raise AutosubmitCritical(f"Error retrieving job list: {err_msg}", 7013, str(e))
 
     @job_list.setter
     def job_list(self, value):

@@ -107,14 +107,32 @@ class DbManager:
         return [row.tuple() for row in rows]
 
     def select_where_with_columns(self, table_name: str, where: dict[str, Any]) -> list[tuple[str, Any]]:
-        """Select rows from a table with specific columns. Return a list of hasheable tuples."""
+        """
+        Select rows from a table with specific columns. Return a list of hasheable tuples.
+
+        :param table_name: Name of the table to select from
+        :type table_name: str
+        :param where: Dictionary of column:value pairs to filter by
+        :type where: dict[str, Any]
+        :return: List of tuples containing column-value pairs
+        :rtype: list[tuple[str, Any]]
+        """
         table = get_table_from_name(schema=self.schema, table_name=table_name)
+        self.create_table(table_name)  # Ensure the table exists
+
         query = select(table)
+
+        # Get available column names
+        columns = table.c.keys()
+
+        # Only add where clauses for existing columns as a job could not have a dependency
         for key, value in where.items():
-            query = query.where(getattr(table.c, key) == value)
+            if key in columns:
+                query = query.where(getattr(table.c, key) == value)
+
         with self.engine.connect() as conn:
             rows = conn.execute(query).fetchall()
-        columns = table.c.keys()
+
         return [tuple(zip(columns, row)) for row in rows]
 
     def count(self, table_name: str) -> int:

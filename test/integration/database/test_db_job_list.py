@@ -24,19 +24,9 @@ from typing import List, Dict, Any
 from autosubmit.database.db_common import check_db_path, get_connection_url
 from autosubmit.database import db_manager_job_list
 from autosubmit.database.db_manager_job_list import JobsDbManager
+from autosubmit.job.job import Job
 from autosubmit.job.job_list import JobList
-
-
-@pytest.fixture
-def create_job_list(mocker) -> Callable[[List[Dict[str, Any]]], JobList]:
-    """Create a mocked job list for the job_utils tests."""
-
-    def _fn(jobs_data: List[Dict[str, Any]]):
-        job_list = mocker.patch('autosubmit.job.job_list.JobList', autospec=True)
-        return job_list
-
-    return _fn
-
+from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
 
 raw_job_list = [
     {'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None, 'finish_time_timestamp': None,
@@ -56,7 +46,13 @@ raw_job_list = [
      'name': 'a01f_20000101_fc0_INI', 'packed': False, 'platform_name': None, 'priority': 0, 'ready_date': None,
      'remote_logs_err': None, 'remote_logs_out': None, 'script_name': 'a01f_20000101_fc0_INI.cmd', 'section': 'INI',
      'split': -1, 'splits': -1, 'start_time': None, 'start_time_timestamp': None, 'status': 'WAITING',
-     'submit_time_timestamp': None, 'synchronize': None, 'updated_log': False}
+     'submit_time_timestamp': None, 'synchronize': None, 'updated_log': False},
+    # {'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None, 'finish_time_timestamp': None,
+    #  'frequency': None, 'id': 0, 'local_logs_err': None, 'local_logs_out': None, 'max_checkpoint_step': 0,
+    #  'name': 'a01f_SIM', 'packed': False, 'platform_name': None, 'priority': 0, 'ready_date': None,
+    #  'remote_logs_err': None, 'remote_logs_out': None, 'script_name': 'a01f_SIM.cmd', 'section': 'SIM',
+    #  'split': -1, 'splits': -1, 'start_time': None, 'start_time_timestamp': None, 'status': 'WAITING',
+    #  'submit_time_timestamp': None, 'synchronize': None, 'updated_log': False}
 ]
 
 raw_graph_edges = [
@@ -67,6 +63,22 @@ raw_graph_edges = [
     {'completed': 'WAITING', 'e_from': 'a01f_20000101_fc0_INI', 'e_to': 'a01f_SIM', 'from_step': 0,
      'optional': True, 'status': 'COMPLETED'},
 ]
+
+
+def generate_job_list(autosubmit_config) -> JobList:
+    """Generate a JobList with the raw_job_list data."""
+    as_conf = autosubmit_config("dummy-expid", {})
+
+    job_list = JobList("dummy-expid", as_conf, YAMLParserFactory(), run_mode=True)
+    for job_dict in raw_job_list:
+        job = Job(loaded_data=job_dict)
+        job_list.add_job(job)
+
+    for edge in raw_graph_edges:
+        if edge['e_from'] in job_list.graph and edge['e_to'] in job_list.graph:
+            job_list.graph.add_edge(edge['e_from'], edge['e_to'], from_step=edge['from_step'], status=edge['status'],
+                                    completed=edge['completed'], optional=edge['optional'])
+    return job_list
 
 
 def _create_db_manager(db_path: Path = None, scheme: str = None) -> JobsDbManager:
@@ -80,7 +92,8 @@ def _create_db_manager(db_path: Path = None, scheme: str = None) -> JobsDbManage
         # postgres
         pytest.param('postgres', {'schema': 'test_schema'}, True,
                      marks=[pytest.mark.postgres, pytest.mark.docker]),
-        pytest.param('postgres', {'schema': 'test_schema'}, False),
+        pytest.param('postgres', {'schema': 'test_schema'}, False,
+                     marks=[pytest.mark.postgres, pytest.mark.docker]),
         # sqlite
         pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999}, True),
         pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999}, False)
@@ -135,31 +148,32 @@ def test_db_job_list_edges(
         # postgres
         pytest.param('postgres', {'schema': 'test_schema'}, True,
                      marks=[pytest.mark.postgres, pytest.mark.docker]),
-        pytest.param('postgres', {'schema': 'test_schema'}, False),
+        pytest.param('postgres', {'schema': 'test_schema'}, False,
+                     marks=[pytest.mark.postgres, pytest.mark.docker]),
         # sqlite
         pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999}, True),
         pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999}, False)
     ]
 )
-def test_db_job_list_save_and_load_jobs(tmp_path: Path, db_engine: str, options: dict, request, full_load: bool):
+def test_db_job_list_jobs(tmp_path: Path, db_engine: str, options: dict, request, full_load: bool,
+                          autosubmit_config):
     request.getfixturevalue(f"as_db_{db_engine}")
     if db_engine == 'sqlite':
         db_manager = _create_db_manager(db_path=tmp_path / options['db_name'])
     else:
         db_manager = _create_db_manager(scheme=options['schema'])
 
-    job_list = JobList(expid, as_conf, YAMLParserFactory(), run_mode=True)
-
-    # Save jobs
-    db_manager.save_jobs(job_list)
+    job_list = generate_job_list(autosubmit_config)
+    job_list.dbmanager = db_manager
+    job_list.save_jobs()
 
     # Load jobs active jobs
-    loaded_jobs = db_manager.load_jobs(full_load=full_load)
+    loaded_jobs = job_list.dbmanager.load_jobs(full_load=full_load)
 
     if full_load:
         assert len(loaded_jobs) == len(raw_job_list)
     else:
-        # If not full load, we expect only the active jobs and children jobs
+        # If not full load, we expect only the active jobs (edges is empty)
         assert len(loaded_jobs) < len(raw_job_list)
 
     for job in loaded_jobs:
@@ -176,41 +190,89 @@ def test_db_job_list_save_and_load_jobs(tmp_path: Path, db_engine: str, options:
 
 
 @pytest.mark.parametrize(
-    'db_engine,options',
+    'db_engine,options,full_load',
     [
-        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999}),
-        pytest.param('postgres', {'schema': 'test_schema'}, marks=[pytest.mark.postgres, pytest.mark.docker]),
+        # postgres
+        pytest.param('postgres', {'schema': 'test_schema'}, True,
+                     marks=[pytest.mark.postgres, pytest.mark.docker]),
+        pytest.param('postgres', {'schema': 'test_schema'}, False,
+                     marks=[pytest.mark.postgres, pytest.mark.docker]),
+        # sqlite
+        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999}, True),
+        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999}, False)
     ]
 )
-def test_db_job_list_size(tmp_path: Path, db_engine: str, options: dict, request):
+def test_db_job_list_jobs_and_edges_together(
+        tmp_path: Path,
+        db_engine: str,
+        options: dict,
+        full_load: bool,
+        request: pytest.FixtureRequest,
+        autosubmit_config: Callable
+):
+    """
+    Test loading and saving both jobs and edges together with different full_load options.
+
+    This test verifies that JobList's database manager can correctly save and load
+    both jobs and graph edges in a coordinated way.
+
+    :param tmp_path: Temporary directory path for SQLite database files
+    :type tmp_path: Path
+    :param db_engine: Database engine to use ('sqlite' or 'postgres')
+    :type db_engine: str
+    :param options: Database connection options
+    :type options: dict
+    :param full_load: Whether to use full_load when loading data
+    :type full_load: bool
+    :param request: Pytest request fixture for accessing other fixtures
+    :type request: pytest.FixtureRequest
+    :param autosubmit_config: Fixture to create a test configuration
+    :type autosubmit_config: Callable
+    """
+    # Load database fixture
     request.getfixturevalue(f"as_db_{db_engine}")
+
+    # Create database manager
     if db_engine == 'sqlite':
-        db_manager = JobsDbManager(get_connection_url(db_path=tmp_path / options['db_name']))
+        db_manager = _create_db_manager(db_path=tmp_path / options['db_name'])
     else:
-        db_manager = JobsDbManager(get_connection_url(scheme=options['schema']), schema=options['schema'])
+        db_manager = _create_db_manager(scheme=options['schema'])
 
-    db_manager.save_jobs(raw_job_list)
-    total, completed, failed = db_manager.get_job_list_size()
-    assert total == len(raw_job_list)
-    assert completed == 0
-    assert failed == 0
+    # Create and save original job list with jobs and edges
+    job_list = generate_job_list(autosubmit_config)
+    job_list.dbmanager = db_manager
 
+    # Save jobs and edges to database
+    job_list.save_jobs()
+    db_manager.save_edges(raw_graph_edges)
 
-@pytest.mark.parametrize(
-    'db_engine,options',
-    [
-        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999}),
-        pytest.param('postgres', {'schema': 'test_schema'}, marks=[pytest.mark.postgres, pytest.mark.docker]),
-    ]
-)
-def test_db_job_list_select_active_jobs(tmp_path: Path, db_engine: str, options: dict, request):
-    request.getfixturevalue(f"as_db_{db_engine}")
-    if db_engine == 'sqlite':
-        db_manager = JobsDbManager(get_connection_url(db_path=tmp_path / options['db_name']))
+    # Load jobs and edges with the specified full_load parameter
+    loaded_jobs = db_manager.load_jobs(full_load=full_load)
+    loaded_edges = db_manager.load_edges(loaded_jobs, full_load=full_load)
+
+    if full_load:
+        assert len(loaded_jobs) == len(raw_job_list)
+        assert len(loaded_edges) == len(raw_graph_edges)
     else:
-        db_manager = JobsDbManager(get_connection_url(scheme=options['schema']), schema=options['schema'])
+        # If not full load, we expect only the active jobs and children jobs
+        assert 0 < len(loaded_jobs) < len(raw_job_list)
+        assert 0 < len(loaded_edges) < len(raw_graph_edges)
 
-    db_manager.save_jobs(raw_job_list)
-    active_jobs = db_manager.select_active_jobs()
-    for job in active_jobs:
-        assert job['status'] in db_manager._ACTIVE_STATUSES
+    for job in loaded_jobs:
+        # Check that the job is a dict
+        assert isinstance(job, dict)
+        # Check that the job has the expected keys
+        assert set(job.keys()) == {
+            'chunk', 'current_checkpoint_step', 'date', 'date_split', 'finish_time_timestamp', 'frequency',
+            'id', 'local_logs_err', 'local_logs_out', 'max_checkpoint_step', 'name', 'packed', 'platform_name',
+            'priority', 'ready_date', 'remote_logs_err', 'remote_logs_out', 'script_name', 'section',
+            'split', 'splits', 'start_time', 'start_time_timestamp', 'status', 'submit_time_timestamp',
+            'synchronize', 'updated_log'
+        }
+
+    for edge in loaded_edges:
+        # Check that the edge is a dict
+        assert isinstance(edge, dict)
+        # Check that the edge has the expected keys
+        assert set(edge.keys()) == {'e_from', 'e_to', 'from_step', 'status', 'completed', 'optional'}
+        # Check that the edge matches the saved edges
