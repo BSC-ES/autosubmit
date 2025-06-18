@@ -1,27 +1,46 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+import datetime
+import getpass
 import locale
+import os
+import random
+import re
+import select
+import socket
+import sys
+import threading
+import time
 from contextlib import suppress
 from pathlib import Path
+from threading import Thread
 from time import sleep
-import sys
-import socket
-import os
-from typing import List, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Union
+
+import Xlib.support.connect as xlib_connect
 import paramiko
-import datetime
-import select
-import re
-import random
+from paramiko.agent import Agent
+from paramiko.ssh_exception import (SSHException)
+
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_common import Type
 from autosubmit.platforms.platform import Platform
 from log.log import AutosubmitError, AutosubmitCritical, Log
-from paramiko.ssh_exception import (SSHException)
-import Xlib.support.connect as xlib_connect
-from threading import Thread
-import threading
-import getpass
-from paramiko.agent import Agent
-import time
 
 if TYPE_CHECKING:
     # Avoid circular imports
@@ -157,9 +176,9 @@ class ParamikoPlatform(Platform):
         except BaseException as e:
             self.connected = False
             raise AutosubmitCritical(str(e),7051)
-            #raise AutosubmitError("[{0}] connection failed for host: {1}".format(self.name, self.host), 6002, e.message)
+            # raise AutosubmitError("[{0}] connection failed for host: {1}".format(self.name, self.host), 6002, e.message)
 
-    def restore_connection(self, as_conf: 'AutosubmitConfig', log_recovery_process: bool = False) -> None:
+    def restore_connection(self, as_conf: Optional['AutosubmitConfig'], log_recovery_process: bool = False) -> None:
         """
         Restores the SSH connection to the platform.
 
@@ -993,10 +1012,10 @@ class ParamikoPlatform(Platform):
         poller = None
         self.transport.accept()
         while not session.exit_status_ready():
-            try:
+            with suppress(Exception):
                 if type(self.poller) is not list:
                     if sys.platform != "linux":
-                        poller = self.poller.kqueue()
+                        poller = self.poller.kqueue()  # type: ignore
                     else:
                         poller = self.poller.poll()
                 # accept subsequent x11 connections if any
@@ -1018,103 +1037,91 @@ class ParamikoPlatform(Platform):
                             channel.close()
                             counterpart.close()
                             del self.channels[fd]
-            except Exception as e:
-                pass
 
+    def exec_command(self, command: str, bufsize=-1, timeout=30, retries=3, x11=False) -> tuple[Union[Any, bool], Union[Any, bool], Union[Any, bool]]:
+        """Execute a command on the SSH server.
 
-    def exec_command(self, command, bufsize=-1, timeout=30, get_pty=False,retries=3, x11=False):
-        """
-        Execute a command on the SSH server.  A new `.Channel` is opened and
-        the requested command is execed.  The command's input and output
-        streams are returned as Python ``file``-like objects representing
-        stdin, stdout, and stderr.
+        A new ``.Channel`` is open and the requested command is executed.
+        The command's input and output streams are returned as Python
+        ``file``-like objects representing stdin, stdout, and stderr.
 
         :param x11:
         :param retries:
-        :param get_pty:
         :param command: the command to execute.
         :type command: str
         :param bufsize: interpreted the same way as by the built-in ``file()`` function in Python.
         :type bufsize: int
-        :param timeout: set command's channel timeout. See `Channel.settimeout`.settimeout.
+        :param timeout: set command's channel timeout. See ``Channel.settimeout``.
         :type timeout: int
         :return: the stdin, stdout, and stderr of the executing command
-
-        :raises SSHException: if the server fails to execute the command
         """
         while retries > 0:
             try:
                 if x11:
-                    display = os.getenv('DISPLAY')
-                    if display is None or not display:
-                        display = "localhost:0"
+                    display = os.getenv('DISPLAY') or 'localhost:0'
                     try:
                         self.local_x11_display = xlib_connect.get_display(display)
                     except Exception as e:
-                        Log.warning(f"X11 display not found: {e}")
+                        Log.warning(f"X11 display not found: {str(e)}")
                         self.local_x11_display = None
                     chan = self.transport.open_session()
-                    chan.request_x11(single_connection=False,handler=self.x11_handler)
-                else:
-                    chan = self.transport.open_session()
-                if x11:
+                    chan.request_x11(single_connection=False, handler=self.x11_handler)
+
                     if "timeout" in command:
                         timeout_command = command.split("timeout ")[1].split(" ")[0]
                         if timeout_command == 0:
                             timeout_command = "infinity"
                         command = f'{command} ; sleep {timeout_command} 2>/dev/null'
-                    #command = f'export display {command}'
                     Log.info(command)
                     try:
                         chan.exec_command(command)
-                    except BaseException as e:
+                    except Exception as e:
                         raise AutosubmitCritical(f"Failed to execute command: {e}")
                     chan_fileno = chan.fileno()
                     self.poller.register(chan_fileno, select.POLLIN)
                     self.x11_status_checker(chan, chan_fileno)
                 else:
+                    chan = self.transport.open_session()
                     chan.exec_command(command)
+
                 stdin = chan.makefile('wb', bufsize)
                 stdout = chan.makefile('rb', bufsize)
                 stderr = chan.makefile_stderr('rb', bufsize)
                 return stdin, stdout, stderr
-            except paramiko.SSHException as e:
+            except (paramiko.SSHException, ConnectionError) as e:
+                # FIXME: Huh, shouldn't it be the reverse here?
                 if str(e) in "SSH session not active":
                     self._ssh = None
                     self.restore_connection(None)
                 timeout = timeout + 60
                 retries = retries - 1
-        if retries <= 0:
-            return False , False, False
+
+        return False, False, False
 
     def send_command_non_blocking(self, command, ignore_log):
         thread = threading.Thread(target=self.send_command, args=(command, ignore_log))
         thread.start()
         return thread
 
-    def send_command(self, command, ignore_log=False, x11 = False):
-        """
-        Sends given command to HPC
+    def send_command(self, command: str, ignore_log=False, x11=False) -> bool:
+        """Sends a given command to an HPC platform.
 
-        :param x11:
-        :param ignore_log:
-        :param command: command to send
-        :type command: str
+        :param command: The command to send to the HPC.
+        :param ignore_log: Whether logging is enabled or not for this function.
+        :param x11: Whether X11 is enabled for the SSH session.
         :return: True if executed, False if failed
-        :rtype: bool
         """
-        lang = locale.getlocale()[1]
-        if lang is None:
-            lang = locale.getdefaultlocale()[1]
-            if lang is None:
-                lang = 'UTF-8'
+        lang = locale.getlocale()[1] or locale.getdefaultlocale()[1] or 'UTF-8'
         if "rsync" in command or "find" in command or "convertLink" in command:
             timeout = None  # infinite timeout on migrate command
         elif "rm" in command:
             timeout = 60
         else:
             timeout = 60 * 2
-        stderr_readlines = []
+        if not ignore_log:
+            Log.debug(f"send_command timeout used: {timeout} seconds (None = infinity)")
+
+        stderr_lines = []
         stdout_chunks = []
 
         try:
@@ -1127,10 +1134,9 @@ class ParamikoPlatform(Platform):
                 stdout_chunks.append(stdout.channel.recv(len(stdout.channel.in_buffer)))
 
             aux_stderr = []
-            i = 0
             x11_exit = False
 
-            while (not channel.closed or channel.recv_ready() or channel.recv_stderr_ready() ) and not x11_exit:
+            while (not channel.closed or channel.recv_ready() or channel.recv_stderr_ready()) and not x11_exit:
                 # stop if channel was closed prematurely, and there is no data in the buffers.
                 got_chunk = False
                 readq, _, _ = select.select([stdout.channel], [], [], 2)
@@ -1141,15 +1147,15 @@ class ParamikoPlatform(Platform):
                         got_chunk = True
                     if c.recv_stderr_ready():
                         # make sure to read stderr to prevent stall
-                        stderr_readlines.append(
-                            stderr.channel.recv_stderr(len(c.in_stderr_buffer)))
+                        stderr_lines.append(stderr.channel.recv_stderr(len(c.in_stderr_buffer)))
                         got_chunk = True
                 if x11:
-                    if len(stderr_readlines) > 0:
-                        aux_stderr.extend(stderr_readlines)
-                        for stderr_line in stderr_readlines:
+                    if len(stderr_lines) > 0:
+                        aux_stderr.extend(stderr_lines)
+                        for stderr_line in stderr_lines:
                             stderr_line = stderr_line.decode(lang)
-                            if "salloc" in stderr_line: # salloc is the command to allocate resources in slurm, for pjm it is different
+                            # ``salloc`` is the command to allocate resources in Slurm, for PJM it is different.
+                            if "salloc" in stderr_line:
                                 job_id = re.findall(r'\d+', stderr_line)
                                 if job_id:
                                     stdout_chunks.append(job_id[0].encode(lang))
@@ -1157,10 +1163,15 @@ class ParamikoPlatform(Platform):
                     else:
                         x11_exit = True
                     if not x11_exit:
-                        stderr_readlines = []
+                        stderr_lines = []
                     else:
-                        stderr_readlines = aux_stderr
-                if not got_chunk and stdout.channel.exit_status_ready() and not stderr.channel.recv_stderr_ready() and not stdout.channel.recv_ready():
+                        stderr_lines = aux_stderr
+                must_close_channels = (
+                        stdout.channel.exit_status_ready() and
+                        not stderr.channel.recv_stderr_ready() and
+                        not stdout.channel.recv_ready()
+                )
+                if not got_chunk and must_close_channels:
                     # indicate that we're not going to read from this channel anymore
                     stdout.channel.shutdown_read()
                     # close the channel
@@ -1171,52 +1182,49 @@ class ParamikoPlatform(Platform):
                 stdout.close()
                 stderr.close()
 
-
             self._ssh_output = ""
             self._ssh_output_err = ""
-            for s in stdout_chunks:
-                if s.decode(lang) != '':
-                    self._ssh_output += s.decode(lang)
-            for errorLineCase in stderr_readlines:
-                self._ssh_output_err += errorLineCase.decode(lang)
 
-                errorLine = errorLineCase.lower().decode(lang)
-                 # to be simplified in the future in a function and using in. The errors should be inside the class of the platform not here
-                if "not active" in errorLine:
-                    raise AutosubmitError(
-                        'SSH Session not active, will restart the platforms', 6005)
-                if errorLine.find("command not found") != -1:
+            for s in [s for s in stdout_chunks if s.decode(lang) != '']:
+                self._ssh_output += s.decode(lang)
+
+            for error_line_case in stderr_lines:
+                self._ssh_output_err += error_line_case.decode(lang)
+
+                error_line = error_line_case.lower().decode(lang)
+                # To be simplified in the future in a function and using in.
+                # The errors should be inside the class of the platform not here.
+                if "not active" in error_line:
+                    raise AutosubmitError('SSH Session not active, will restart the platforms', 6005)
+                if error_line.find("command not found") != -1:
                     raise AutosubmitError(
                         f"A platform command was not found. This may be a temporary issue. "
-                        f"Please verify that the correct scheduler is specified for this platform: '{self.name}.{self.type}'.",
+                        f"Please verify that the correct scheduler is specified for this platform: "
+                        f"'{self.name}.{self.type}'.",
                         7052,
                         self._ssh_output_err
                     )
-                elif errorLine.find("syntax error") != -1:
-                    raise AutosubmitCritical("Syntax error",7052,self._ssh_output_err)
-                elif errorLine.find("refused") != -1 or errorLine.find("slurm_persist_conn_open_without_init") != -1 or errorLine.find("slurmdbd") != -1 or errorLine.find("submission failed") != -1 or errorLine.find("git clone") != -1 or errorLine.find("sbatch: error: ") != -1 or errorLine.find("not submitted") != -1 or errorLine.find("invalid") != -1 or "[ERR.] PJM".lower() in errorLine:
-                    if "salloc: error" in errorLine or "salloc: unrecognized option" in errorLine or "[ERR.] PJM".lower() in errorLine or (self._submit_command_name == "sbatch" and (errorLine.find("policy") != -1 or errorLine.find("invalid") != -1) ) or (self._submit_command_name == "sbatch" and errorLine.find("argument") != -1) or (self._submit_command_name == "bsub" and errorLine.find("job not submitted") != -1) or self._submit_command_name == "ecaccess-job-submit" or self._submit_command_name == "qsub ":
-                        raise AutosubmitError(errorLine, 7014, "Bad Parameters.")
+                elif error_line.find("syntax error") != -1:
+                    raise AutosubmitCritical("Syntax error", 7052, self._ssh_output_err)
+                elif error_line.find("refused") != -1 or error_line.find("slurm_persist_conn_open_without_init") != -1 or error_line.find("slurmdbd") != -1 or error_line.find("submission failed") != -1 or error_line.find("git clone") != -1 or error_line.find("sbatch: error: ") != -1 or error_line.find("not submitted") != -1 or error_line.find("invalid") != -1 or "[ERR.] PJM".lower() in error_line:
+                    if "salloc: error" in error_line or "salloc: unrecognized option" in error_line or "[ERR.] PJM".lower() in error_line or (self._submit_command_name == "sbatch" and (error_line.find("policy") != -1 or error_line.find("invalid") != -1) ) or (self._submit_command_name == "sbatch" and error_line.find("argument") != -1) or (self._submit_command_name == "bsub" and error_line.find("job not submitted") != -1) or self._submit_command_name == "ecaccess-job-submit" or self._submit_command_name == "qsub ":
+                        raise AutosubmitError(error_line, 7014, "Bad Parameters.")
                     raise AutosubmitError(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6005)
 
-            if not ignore_log:
-                if len(stderr_readlines) > 0:
-                    Log.printlog(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6006)
-                else:
-                    pass
+            if not ignore_log and len(stderr_lines) > 0:
+                Log.printlog(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6006)
             return True
+        except AutosubmitCritical:
+            raise
+        except AutosubmitError:
+            raise
         except AttributeError as e:
             raise AutosubmitError(f'Session not active: {str(e)}', 6005)
-        except AutosubmitCritical as e:
-            raise
-        except AutosubmitError as e:
-            raise
         except IOError as e:
-            raise AutosubmitError(str(e),6016)
-        except BaseException as e:
-            if type(stderr_readlines) is str:
-                stderr_readlines = '\n'.join(stderr_readlines)
-            raise AutosubmitError(f'Command {command} in {self.host} warning: {stderr_readlines}', 6005, str(e))
+            raise AutosubmitError(str(e), 6016)
+        except Exception as e:
+            warning_message = '\n'.join(stderr_lines)
+            raise AutosubmitError(f'Command {command} in {self.host} warning: {warning_message}', 6005, str(e))
 
     def parse_job_output(self, output):
         """
