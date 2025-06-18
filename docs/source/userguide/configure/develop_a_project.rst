@@ -125,10 +125,10 @@ Autosubmit configuration
         # Time (seconds) before ending the run to retrieve the last logs.
         # Default:180
         LAST_LOGS_TIMEOUT: 180
-        # Number of retrials if a job fails. Can ve override at job level
+        # Number of retries if a job fails. Can ve override at job level
         # Default:0
         RETRIALS:0
-        ##  Allows to put a delay between retries, of retrials if a job fails. If not specified, it will be static
+        ##  Allows to put a delay between retries, of retries if a job fails. If not specified, it will be static
         # DELAY_RETRY_TIME:11
         # DELAY_RETRY_TIME:+11 # will wait 11,22,33,44...
         # DELAY_RETRY_TIME:*11 # will wait 11,110,1110,11110...
