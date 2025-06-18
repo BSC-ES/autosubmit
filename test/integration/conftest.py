@@ -46,7 +46,6 @@ from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import _create_ssh_client
-# noinspection PyProtectedMember
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from test.integration.test_utils.networking import get_free_port
