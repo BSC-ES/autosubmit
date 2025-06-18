@@ -50,7 +50,7 @@ _MONITOR_STATUS_TO_COLOR: dict[int, str] = {
     Status.HELD: 'salmon',
     Status.QUEUING: 'pink',
     Status.RUNNING: 'green',
-    Status.COMPLETED: 'black',
+    Status.COMPLETED: 'yellow',
     Status.FAILED: 'red',
     Status.DELAYED: 'lightcyan',
     Status.SUSPENDED: 'orange',
@@ -247,10 +247,15 @@ def _check_final_status(
         return None, None, None
 
     status_id = Status.KEY_TO_VALUE[child_edge_info['status']]
-    color = _color_status(status_id)
+    if child_edge_info['status'] == "COMPLETED":
+        # Avoid "yellow" arrows for completed jobs (old normal behaviour)
+        edge_color = "black"
+    else:
+        edge_color = _color_status(status_id)
     label = str(child_edge_info['from_step']) if child_edge_info['from_step'] > 0 else None
     optional = child_edge_info.get('optional', False)
-    return color, label, optional
+
+    return edge_color, label, optional
 
 
 def _delete_stats_files_but_two_newest(expid: str, _filter: Callable[[Path], bool]) -> None:
@@ -474,9 +479,9 @@ class Monitor:
                     if color:
                         # label = None doesn't disable label, instead it sets it to nothing and complain about invalid syntax
                         if label:
-                            exp.add_edge(pydotplus.Edge(node_job, node_child, style="dashed", color=color, label=label))
+                            exp.add_edge(pydotplus.Edge(node_job, node_child, style=style, color=color, label=label))
                         else:
-                            exp.add_edge(pydotplus.Edge(node_job, node_child, style="dashed", color=color))
+                            exp.add_edge(pydotplus.Edge(node_job, node_child, style=style, color=color))
                     else:
                         exp.add_edge(pydotplus.Edge(node_job, node_child))
                     skip = True

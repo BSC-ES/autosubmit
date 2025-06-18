@@ -1099,7 +1099,9 @@ class JobList(object):
                 (parents_by_section[self.graph.nodes[parent]['job'].section].add(self.graph.nodes[parent]['job']))
         for key, list_of_parents in parents_by_section.items():
             special_conditions = dict()
-            special_conditions["STATUS"] = filters_to_apply_by_section[key].pop("STATUS", "COMPLETED")
+            status = filters_to_apply_by_section[key].get("STATUS", "COMPLETED")
+            status = status if "?" != status[-1] else status[:-1]
+            special_conditions["STATUS"] = status
             special_conditions["FROM_STEP"] = (filters_to_apply_by_section[key].pop("FROM_STEP", 0))
             special_conditions["OPTIONAL"] = (filters_to_apply_by_section[key].pop("OPTIONAL", False))
 
