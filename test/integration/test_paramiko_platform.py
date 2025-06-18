@@ -18,22 +18,27 @@
 Note that tests will start and destroy an SSH server. For unit tests, see ``test_paramiko_platform.py``
 in the ``test/unit`` directory."""
 
+import socket
 from dataclasses import dataclass
 from getpass import getuser
 from pathlib import Path
 from typing import cast, Generator, Optional, Protocol, Union, TYPE_CHECKING
 
+
+import paramiko
 import pytest
 from paramiko import ChannelFile  # type: ignore[import]
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import AutosubmitCritical, AutosubmitError
+from autosubmit.log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitError
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
+    from _pytest._py.path import LocalPath
     from testcontainers.sftp import DockerContainer
     from test.integration.conftest import AutosubmitExperiment
     from autosubmit.platforms.psplatform import PsPlatform
@@ -70,7 +75,7 @@ def ssh_config() -> Generator[Path, None, None]:
 
 
 @pytest.fixture()
-def exp_platform_server(autosubmit_exp, ssh_server, request) -> ExperimentPlatformServer:
+def exp_platform_server(autosubmit_exp, ssh_server: 'DockerContainer', request) -> ExperimentPlatformServer:
     """Fixture that returns an Autosubmit experiment, a platform, and the (Docker) server used."""
     user = getuser()
     test_name = request.node.name
@@ -275,6 +280,35 @@ def test_send_command(cmd: str, error: Optional[Exception], x11_enabled: bool, m
         assert user in stdout
 
 
+@pytest.mark.parametrize(
+    'cmd,timeout',
+    [
+        ('rsync --version', None),
+        ('rm --help', 60),
+        ('whoami', 120)
+    ]
+)
+@pytest.mark.docker
+def test_send_command_timeout_error_exec_command(
+        cmd: str, timeout: Optional[int], exp_platform_server: 'AutosubmitExperiment', mocker):
+    """Test that the correct timeout is used, and that ``exec_command`` raises ``AutosubmitError``."""
+    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
+
+    # Capture platform log.
+    mocked_log = mocker.patch('autosubmit.platforms.paramiko_platform.Log')
+    # Simulate an error occurred, and retrying did not fix it.
+    mocker.patch.object(exp_platform_server.platform, 'exec_command', return_value=(False, False, False))
+
+    with pytest.raises(AutosubmitError) as cm:
+        exp_platform_server.platform.send_command(command=cmd, ignore_log=False, x11=False)
+
+    assert mocked_log.debug.called
+    assert f'send_command timeout used: {str(timeout)}' in mocked_log.debug.call_args[0][0]
+
+    assert 'Failed to send' in str(cm.value.message)
+    assert 6005 == cm.value.code
+
+
 @pytest.mark.docker
 def test_exec_command(exp_platform_server: 'ExperimentPlatformServer'):
     """This test opens an SSH connection (via sftp) and executes a command."""
@@ -375,6 +409,36 @@ def test_exec_command_ssh_session_not_active(x11: bool, retries: int, command: s
 
     # This will be true iff the ``ps_platform.restore_connection(None)`` ran without errors.
     assert isinstance(stdout, ChannelFile)
+    assert stdin is not False
+    assert stderr is not False
+    # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
+    assert user == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
+
+
+@pytest.mark.docker
+@pytest.mark.parametrize(
+    'error',
+    [
+        paramiko.ssh_exception.NoValidConnectionsError({'192.168.0.1': ValueError('failed')}),  # type: ignore
+        ConnectionError('Someone unplugged the networking cable.'),
+        socket.error('A random socket error occurred!')
+    ],
+    ids=[
+        'paramiko ssh exception',
+        'connection error',
+        'socket error'
+    ]
+)
+def test_exec_command_socket_error(error: Exception, exp_platform_server: 'ExperimentPlatformServer', mocker):
+    """Test that the command is retried and succeeds even when a socket error occurs."""
+    user = getuser() or "unknown"
+    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
+
+    exp_platform_server.platform.transport.close()
+
+    mocker.patch.object(exp_platform_server.platform.transport, 'open_session', side_effect=error)
+
+    stdin, stdout, stderr = exp_platform_server.platform.exec_command('whoami')
     assert stdin is not False
     assert stderr is not False
     # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
@@ -727,3 +791,32 @@ def test_deleted_failed_and_completed_names(jobs_to_delete: list, real_completed
     )
     for job in expected_result:
         assert job in platform.get_ssh_output()
+
+
+def test__load_ssh_config_missing_ssh_config(
+        exp_platform_server: 'ExperimentPlatformServer', tmp_path: 'LocalPath', mocker):
+    """Test that the user is warned when the expected SSH file cannot be located."""
+    mocked_log = mocker.patch('autosubmit.platforms.paramiko_platform.Log')
+
+    exp_platform_server.platform.config['AS_ENV_SSH_CONFIG_PATH'] = str(tmp_path / 'you-cannot-find-me')
+
+    as_conf = mocker.MagicMock()
+    as_conf.is_current_real_user_owner = False
+
+    # TODO: We must be able to test that we are not loading the right SSH, without a mock here.
+    mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', side_effect=ValueError)
+
+    with pytest.raises(AutosubmitError):
+        exp_platform_server.platform.connect(as_conf, reconnect=False, log_recovery_process=False)
+
+    assert mocked_log.warning.called
+
+
+@pytest.mark.docker
+def test_test_connection(exp_platform_server: 'ExperimentPlatformServer', ssh_server: 'DockerContainer'):
+    """Test that we can access files, send new files, move, delete."""
+    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
+
+    # TODO: This function is odd, if it reconnects, it will return ``"OK"``, but when it's all good
+    #       then it will return ``None``.
+    assert None is exp_platform_server.platform.test_connection(None)
