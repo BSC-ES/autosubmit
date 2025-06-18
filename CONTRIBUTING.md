@@ -88,14 +88,25 @@ $ sudo setfacl --modify user:$USER:rw /var/run/docker.sock
 # $ sudo setfacl --remove user:$USER /var/run/docker.sock
 ```
 
+For the Slurm tests (pytest marker `slurm`) you will need the Slurm container
+built and running locally. We run it as a service in the CI pipeline, see the
+file `.github/workflows/ci.yaml` for details -- there is a Docker service initialized
+for the `test-slurm` job.
+
 Then you can run all the tests, with
 
 ```bash
 $ pytest -m ""
 ```
 
-or just the tests that require Docker:
+or just the tests that require Docker,
 
 ```bash
 $ pytest -m 'docker'
+```
+
+or just the tests that require Slurm:
+
+```bash
+$ pytest -m 'slurm'
 ```
