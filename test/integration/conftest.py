@@ -107,7 +107,7 @@ def paramiko_platform() -> Iterator[ParamikoPlatform]:
 
 
 @pytest.fixture
-def ps_platform(tmp_path_factory: Path) -> PsPlatform:
+def ps_platform(tmp_path_factory: pytest.TempPathFactory) -> PsPlatform:
     platform_tmp_dir = tmp_path_factory.mktemp('ps_platform')
     config = {
         "LOCAL_ROOT_DIR": str(platform_tmp_dir),
