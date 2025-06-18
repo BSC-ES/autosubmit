@@ -149,7 +149,7 @@ def autosubmit_exp(
             create=True,
             *_,
             **kwargs
-    ):
+    ) -> AutosubmitExperiment:
         if experiment_data is None:
             experiment_data = {}
 
