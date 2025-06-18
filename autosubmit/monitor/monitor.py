@@ -24,7 +24,7 @@ from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from sys import platform
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Any, Callable, Optional, Tuple, Union, List, Dict
 
 import py3dotplus as pydotplus
 
@@ -32,6 +32,7 @@ from autosubmit.helpers.utils import NaturalSort, check_experiment_ownership
 from autosubmit.history.utils import create_path_if_not_exists_group_permission
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
+from autosubmit.job.job_list import JobList
 from autosubmit.monitor.diagram import create_stats_report
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from log.log import Log, AutosubmitCritical
@@ -49,7 +50,7 @@ _MONITOR_STATUS_TO_COLOR: dict[int, str] = {
     Status.HELD: 'salmon',
     Status.QUEUING: 'pink',
     Status.RUNNING: 'green',
-    Status.COMPLETED: 'yellow',
+    Status.COMPLETED: 'black',
     Status.FAILED: 'red',
     Status.DELAYED: 'lightcyan',
     Status.SUSPENDED: 'orange',
@@ -218,25 +219,38 @@ def _create_node(job, groups, hide_groups) -> Optional[pydotplus.Node]:
     return node
 
 
-def _check_final_status(job: Job, child: Job) -> tuple[Optional[str], Optional[int]]:
-    # TODO this won't work needs to obtain the edge_info from somewhere else (self.graph)
-    return None, None
-    # order of _MONITOR_STATUS_TO_COLOR
-    if not child.edge_info:
-        return None, None
+def _check_final_status(
+    job_edges_info: Optional[List[Dict[str, Any]]],
+    child: Job,
+) -> Tuple[Optional[str], Optional[int], Optional[bool]]:
+    """
+    Check the final status between a job and its child using edge information.
 
-    for status in _CHECK_STATUS_STATUS_LIST:
-        child_edge_info = child.edge_info.get(Status.VALUE_TO_KEY[status], {})
-        if job.name in child_edge_info:
-            color = _color_status(status)
-            label = child_edge_info.get(job.name)[1]
+    :param job_edges_info: List of edge information dictionaries.
+    :type job_edges_info: Optional[List[Dict[str, Any]]]
+    :param child: The child job.
+    :type child: Job
+    :return: Tuple of color and label, or (None, None) if not found.
+    :rtype: Tuple[Optional[str], Optional[int]], Optional[bool
+    """
+    if not job_edges_info:
+        return None, None, None
 
-            if label == 0:
-                label = None
+    # Find the edge info for the child
+    child_edge_info = None
+    for out_edge in job_edges_info:
+        if child.name == out_edge['e_to']:
+            child_edge_info = out_edge
+            break
 
-            return color, label
-    else:
-        return None, None
+    if not child_edge_info:
+        return None, None, None
+
+    status_id = Status.KEY_TO_VALUE[child_edge_info['status']]
+    color = _color_status(status_id)
+    label = str(child_edge_info['from_step']) if child_edge_info['from_step'] > 0 else None
+    optional = child_edge_info.get('optional', False)
+    return color, label, optional
 
 
 def _delete_stats_files_but_two_newest(expid: str, _filter: Callable[[Path], bool]) -> None:
@@ -295,7 +309,15 @@ def clean_stats(expid: str) -> None:
 class Monitor:
     """Class to handle monitoring of Jobs at HPC."""
 
-    def __init__(self):
+    def __init__(self, edge_info: Optional[dict[str, Any]] = None) -> None:
+        """
+        Initialize the Monitor class.
+        """
+        if not edge_info:
+            self.edge_info = {}
+        else:
+            self.edge_info = edge_info
+
         self.nodes_plotted = None
 
     def create_tree_list(
@@ -428,7 +450,11 @@ class Monitor:
         if job.has_children() != 0:
             for child in sorted(job.children, key=lambda k: NaturalSort(k.name)):
                 node_child, skip = _check_node_exists(exp, child, groups, hide_groups)
-                color, label = _check_final_status(job, child)
+                color, label, optional = _check_final_status(self.edge_info.get(job.name, None), child)
+                if optional:
+                    style = "dotted"
+                else:
+                    style = "solid"
                 if len(node_child) == 0 and not skip:
                     node_child = _create_node(child, groups, hide_groups)
                     if node_child:
@@ -436,9 +462,9 @@ class Monitor:
                         if color:
                             # label = None doesn't disable label, instead it sets it to nothing and complain about invalid syntax
                             if label:
-                                exp.add_edge(pydotplus.Edge(node_job, node_child, style="dashed", color=color, label=label))
+                                exp.add_edge(pydotplus.Edge(node_job, node_child, style=style, color=color, label=label))
                             else:
-                                exp.add_edge(pydotplus.Edge(node_job, node_child, style="dashed", color=color))
+                                exp.add_edge(pydotplus.Edge(node_job, node_child, style=style, color=color))
                         else:
                             exp.add_edge(pydotplus.Edge(node_job, node_child))
                     else:
