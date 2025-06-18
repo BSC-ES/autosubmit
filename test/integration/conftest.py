@@ -35,6 +35,7 @@ from testcontainers.core.waiting_utils import wait_for_logs
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import _create_ssh_client
+from autosubmit.platforms.psplatform import PsPlatform
 from test.integration.test_utils.networking import get_free_port
 
 if TYPE_CHECKING:
@@ -148,6 +149,13 @@ def git_server(tmp_path) -> Generator[tuple[DockerContainer, Path, str], None, N
         # repositories, using the volume bound onto ``/opt/git-server`` as base
         # for any subdirectory, the Git URL becoming ``git/{subdirectory-name}}``.
         yield container, git_repos_path, f'http://localhost:{http_port}/git'
+
+
+@pytest.fixture
+def ps_platform() -> PsPlatform:
+    platform = PsPlatform(expid='a000', name='ps', config={})
+    return platform
+
 
 
 @pytest.fixture()
