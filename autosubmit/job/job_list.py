@@ -333,7 +333,7 @@ class JobList(object):
             if not self.graph.has_edge(edge["e_from"], edge["e_to"]):
                 self.graph.add_edge(edge["e_from"], edge["e_to"], status=edge["status"],
                                     completed=edge["completed"],
-                                    from_step=edge["from_step"])
+                                    from_step=edge["from_step"], optional=edge["optional"])
                 # I would like to avoid this, and only rely in calls on the job_list,
                 # but not feasible changing all the related code
                 self.graph.nodes[edge["e_to"]]["job"].add_parent(
