@@ -15,6 +15,8 @@ permissions:
 
 jobs:
   test-unit:
+    env:
+      COVERAGE_PROCESS_START: .coveragerc
     # needs: lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -52,8 +54,8 @@ jobs:
 
       - name: Coverage report
         run: |
-          coverage xml
           coverage report
+          coverage xml
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
@@ -63,6 +65,8 @@ jobs:
           retention-days: 7
 
   test-integration:
+    env:
+      COVERAGE_PROCESS_START: .coveragerc
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -92,7 +96,7 @@ jobs:
           cache: 'pip' # caching pip dependencies
 
       - name: Install system dependencies
-        run: sudo apt-get install -y curl git graphviz rsync
+        run: sudo apt-get install -y curl git graphviz rsync xvfb
 
       - name: Install dependencies
         run: |
@@ -112,6 +116,9 @@ jobs:
       # CONTRIBUTING.md file for details how to set up your environment to run these.
       - name: Integration tests
         run: |
+          Xvfb :99 -screen 0 1024x768x24 -ac &
+          export DISPLAY=:99
+          
           pytest \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
@@ -121,8 +128,8 @@ jobs:
 
       - name: Coverage report
         run: |
-          coverage xml
           coverage report
+          coverage xml
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
@@ -167,8 +174,8 @@ jobs:
 
       - name: Coverage report
         run: |
-          coverage xml
           coverage report
+          coverage xml
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
@@ -220,8 +227,8 @@ jobs:
 
       - name: Coverage report
         run: |
-          coverage xml
           coverage report
+          coverage xml
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4

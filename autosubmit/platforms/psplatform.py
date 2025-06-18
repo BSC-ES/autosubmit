@@ -44,19 +44,19 @@ class PsPlatform(ParamikoPlatform):
         self.update_cmds()
 
     def get_checkAlljobs_cmd(self, jobs_id):
-        pass
+        pass  # pragma: no cover
 
     def parse_Alljobs_output(self, output, job_id):
-        pass
+        pass  # pragma: no cover
 
     def parse_queue_reason(self, output, job_id):
-        pass
+        pass  # pragma: no cover
 
     def create_a_new_copy(self):
         return PsPlatform(self.expid, self.name, self.config)
 
     def submit_Script(self, hold=False):
-        pass
+        pass  # pragma: no cover
 
     def update_cmds(self):
         """Updates commands for platforms."""

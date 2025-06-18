@@ -50,7 +50,7 @@ class JobListPersistence(object):
         :param persistence_path: str
         :param graph: DiGraph
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def load(self, persistence_path, persistence_file):
         """
@@ -59,7 +59,7 @@ class JobListPersistence(object):
         :param persistence_path: str
 
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def pkl_exists(self, persistence_path, persistence_file):
         """

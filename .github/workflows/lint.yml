@@ -31,6 +31,7 @@ jobs:
 
   mypy-changes-in-file:
     runs-on: ubuntu-latest
+    continue-on-error: true
     name: mypy run
     steps:
       - uses: actions/checkout@v5

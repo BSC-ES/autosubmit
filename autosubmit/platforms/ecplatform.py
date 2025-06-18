@@ -43,16 +43,16 @@ class EcPlatform(ParamikoPlatform):
     """
 
     def parse_Alljobs_output(self, output, job_id):
-        pass
+        pass  # pragma: no cover
 
     def parse_queue_reason(self, output, job_id):
-        pass
+        pass  # pragma: no cover
 
     def get_checkAlljobs_cmd(self, jobs_id):
-        pass
+        pass  # pragma: no cover
 
     def submit_Script(self, hold=False):
-        pass
+        pass  # pragma: no cover
 
     def __init__(self, expid, name, config, scheduler):
         ParamikoPlatform.__init__(self, expid, name, config)
@@ -243,7 +243,7 @@ class EcPlatform(ParamikoPlatform):
             raise AutosubmitError('Could not send file {0} to {1}'.format(os.path.join(self.tmp_path, filename),os.path.join(self.get_files_path(), filename)),6005,str(e))
         return True
 
-    def move_file(self, src, dest, must_exist = False):
+    def move_file(self, src, dest, must_exist=False):
         command = "ecaccess-file-move {0}:{1} {0}:{2}".format(self.host,os.path.join(self.remote_log_dir,src) , os.path.join(self.remote_log_dir,dest))
         try:
             retries = 0

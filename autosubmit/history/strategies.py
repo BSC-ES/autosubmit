@@ -40,14 +40,14 @@ class PlatformInformationHandler:
   
 
 class Strategy(metaclass=ABCMeta):
-  """ Strategy Interface """
+  """Strategy Interface"""
 
   def __init__(self, historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR):
     self.historiclog_dir_path = historiclog_dir_path
 
   @abstractmethod
   def apply_distribution(self, job_data_dc, job_data_dcs_in_wrapper, slurm_monitor):
-    pass
+    pass  # pragma: no cover
 
   def set_job_data_dc_as_processed(self, job_data_dc, original_ssh_output):
     job_data_dc.platform_output = original_ssh_output
