@@ -130,7 +130,7 @@ JOBS:
 """)),
 ], ids=[
     "HPC*_TEST_SCRIPT",
-    "HPC*_TEST_FILE"
+    "HPC*_TEST_FILE",
 ])
 def test_inspect(
         tmp_path,
@@ -144,9 +144,6 @@ def test_inspect(
     are correctly set in the job scripts.
     """
     yaml = YAML(typ='rt')
-    general_data['DEFAULT']['HPCARCH'] = 'TEST_PS'
-    general_data['PLATFORMS']['TEST_PS']['CUSTOM_DIR'] = 'test'
-    general_data['PLATFORMS']['TEST_PS']['CUSTOM_DIR_POINTS_TO_OTHER_DIR'] = '%TEST_REFERENCE%'
 
     if 'FILE' in additional_data:
         general_data['PROJECT']['PROJECT_TYPE'] = 'local'

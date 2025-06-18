@@ -2381,18 +2381,15 @@ class Autosubmit:
                                                inspect=inspect, only_wrappers=only_wrappers)
                 )
                 wrapper_errors.update(packager.wrappers_with_error)
-                # Jobs that are being retrieved in batch. Right now, only available for slurm platforms.
-
-                if not inspect and len(valid_packages_to_submit) > 0:
-                    job_list.save()
                 save_2 = False
+                # Jobs that are being retrieved in batch. Right now, only available for slurm platforms.
                 if platform.type.lower() in ["slurm", "pjm"] and not inspect and not only_wrappers:
                     # Process the script generated in submit_ready_jobs
                     save_2, valid_packages_to_submit = platform.process_batch_ready_jobs(valid_packages_to_submit,
                                                                                          failed_packages,
                                                                                          error_message="")
-                    if not inspect and len(valid_packages_to_submit) > 0:
-                        job_list.save()
+                if not inspect and len(valid_packages_to_submit) > 0:
+                    job_list.save()
                 # Save wrappers(jobs that has the same id) to be visualized and checked in other parts of the code
                 job_list.save_wrappers(valid_packages_to_submit, failed_packages, as_conf, packages_persistence,
                                        hold=hold, inspect=inspect)
