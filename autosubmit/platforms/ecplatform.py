@@ -243,7 +243,7 @@ class EcPlatform(ParamikoPlatform):
             raise AutosubmitError('Could not send file {0} to {1}'.format(os.path.join(self.tmp_path, filename),os.path.join(self.get_files_path(), filename)),6005,str(e))
         return True
 
-    def move_file(self, src, dest, must_exist = False):
+    def move_file(self, src, dest, must_exist=False):
         command = "ecaccess-file-move {0}:{1} {0}:{2}".format(self.host,os.path.join(self.remote_log_dir,src) , os.path.join(self.remote_log_dir,dest))
         try:
             retries = 0

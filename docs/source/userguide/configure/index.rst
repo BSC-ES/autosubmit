@@ -33,7 +33,7 @@ For more information on adding a new platform to the experiment configuration, s
 *autosubmit_<EXPID>.yml* contains:
     - Maximum number of jobs to be running at the same time at the HPC.
     - Time (seconds) between connections to the HPC queue scheduler to poll already submitted jobs status.
-    - Number of retrials if a job fails.
+    - Number of retries if a job fails.
 
 
 Once all file parameters have been tuned, an experiment can be created. Refer to the method page :meth:`autosubmit.autosubmit.Autosubmit.create` for syntax details.
@@ -105,12 +105,12 @@ For jobs running in HPC platforms, usually you have to provide information about
     * - ``QUEUE``
       - If given, Autosubmit will add jobs to the given queue instead of platform's default queue
     * - ``RETRIALS``
-      - Number of retrials if a job fails. Defaults to the value given on experiment's autosubmit_<EXPID>.yml
+      - Number of retries if a job fails. Defaults to the value given on experiment's autosubmit_<EXPID>.yml
     * - ``DELAY_RETRY_TIME``
       - Allows to put a delay between retries. Autosubmit will retry the job as soon as possible.
         Accepted formats are:
 
-        #. plain number (specify a constant delay between retrials),
+        #. plain number (specify a constant delay between retries),
 
         #. plus (+) sign followed by a number (the delay will steadily increase by the addition of these number of seconds)
 

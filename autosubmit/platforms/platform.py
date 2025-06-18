@@ -830,8 +830,7 @@ class Platform(object):
         return
 
     def write_jobid(self, jobid, complete_path):
-        """
-        Writes Job id in an out file.
+        """Writes Job id in an out file.
 
         :param jobid: job id
         :type jobid: str
@@ -868,15 +867,12 @@ class Platform(object):
         except Exception as ex:
             Log.error("Writing Job Id Failed : " + str(ex))
 
-    def generate_submit_script(self):
-        # type: () -> None
-        """ Opens Submit script file """
+    def generate_submit_script(self) -> None:
+        """Opens Submit script file."""
         raise NotImplementedError
 
     def submit_script(self, hold: bool = False) -> Union[list[str], str]:
-        """
-        Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once.
-        """
+        """Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once."""
         raise NotImplementedError
 
     def add_job_to_log_recover(self, job):
@@ -888,8 +884,7 @@ class Platform(object):
             job.updated_log = True
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
-        """
-        Establishes an SSH connection to the host.
+        """Establishes an SSH connection to the host.
 
         :param as_conf: The Autosubmit configuration object.
         :param reconnect: Indicates whether to attempt reconnection if the initial connection fails.
@@ -990,9 +985,8 @@ class Platform(object):
         os.waitpid(self.log_recovery_process.pid, os.WNOHANG)
         Log.result(f"Process {self.log_recovery_process.name} started with pid {self.log_recovery_process.pid}")
 
-    def spawn_log_retrieval_process(self, as_conf: 'AutosubmitConfig') -> None:
-        """
-        Spawns a process to recover the logs of the jobs that have been completed on this platform.
+    def spawn_log_retrieval_process(self, as_conf: Optional['AutosubmitConfig']) -> None:
+        """Spawns a process to recover the logs of the jobs that have been completed on this platform.
 
         :param as_conf: Configuration object for the platform.
         :type as_conf: AutosubmitConfig
