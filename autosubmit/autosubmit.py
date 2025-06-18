@@ -1002,7 +1002,7 @@ class Autosubmit:
         eadmin = False
         owner = False
         current_user_id = os.getuid()
-        admin_user = "eadmin" # to be improved in #944
+        admin_user = "eadmin"# to be improved in #944
         try:
             eadmin = current_user_id == pwd.getpwnam(admin_user).pw_uid
         except Exception:
@@ -1011,7 +1011,8 @@ class Autosubmit:
         try:
             current_owner = pwd.getpwuid(current_owner_id).pw_name
         except (TypeError,KeyError):
-            Log.warning(f"Current owner of experiment {expid} could not be retrieved. The owner is no longer in the system database.")
+            Log.warning(f"Current owner of experiment {expid} could not be retrieved. The owner is no longer in the "
+                        f"system database.")
         if current_owner_id == current_user_id:
             owner = True
         elif raise_error:
@@ -2284,7 +2285,7 @@ class Autosubmit:
                         if save:  # previous iteration
                             job_list.backup_save()
                         # This function name is totally misleading, yes it check the status of the wrappers, but also orders jobs the jobs that  are not wrapped by platform.
-                        jobs_to_check,job_changes_tracker = Autosubmit.check_wrappers(as_conf, job_list, platforms_to_test, expid)
+                        jobs_to_check, job_changes_tracker = Autosubmit.check_wrappers(as_conf, job_list, platforms_to_test, expid)
                         # Jobs to check are grouped by platform.
                         # platforms_to_test could be renamed to active_platforms or something like that.
                         for platform in platforms_to_test:
@@ -3678,7 +3679,7 @@ class Autosubmit:
         while True:
             try:
                 code, database_path = d.dselect(database_path, width=80, height=20,
-                                                title='\Zb\Z1Select path to database\Zn', colors='enable')
+                                                title='\\Zb\\Z1Select path to database\\Zn', colors='enable')
             except dialog.DialogError:
                 raise AutosubmitCritical(
                     "Graphical visualization failed, not enough screen size", 7060)
@@ -3696,7 +3697,7 @@ class Autosubmit:
         while True:
             try:
                 code, local_root_path = d.dselect(local_root_path, width=80, height=20,
-                                                  title='\Zb\Z1Select path to experiments repository\Zn',
+                                                  title='\\Zb\\Z1Select path to experiments repository\\Zn',
                                                   colors='enable')
             except dialog.DialogError:
                 raise AutosubmitCritical(
@@ -3723,7 +3724,7 @@ class Autosubmit:
                                      height=20,
                                      width=80,
                                      form_height=10,
-                                     title='\Zb\Z1Just a few more options:\Zn', colors='enable')
+                                     title='\\Zb\\Z1Just a few more options:\\Zn', colors='enable')
             except dialog.DialogError:
                 raise AutosubmitCritical(
                     "Graphical visualization failed, not enough screen size", 7060)
@@ -3759,7 +3760,7 @@ class Autosubmit:
                                      height=20,
                                      width=80,
                                      form_height=10,
-                                     title='\Zb\Z1Mail notifications configuration:\Zn', colors='enable')
+                                     title='\\Zb\\Z1Mail notifications configuration:\\Zn', colors='enable')
             except dialog.DialogError:
                 raise AutosubmitCritical(
                     "Graphical visualization failed, not enough screen size", 7060)
@@ -4576,7 +4577,7 @@ class Autosubmit:
                             continue
                         wrapper_jobs[wrapper_name] = as_conf.get_wrapper_jobs(wrapper_parameters)
 
-                    job_list.generate(as_conf,date_list, member_list, num_chunks, chunk_ini, parameters, date_format,
+                    job_list.generate(as_conf, date_list, member_list, num_chunks, chunk_ini, parameters, date_format,
                                       as_conf.get_retrials(),
                                       as_conf.get_default_job_type(),
                                       wrapper_jobs, run_only_members=run_only_members, force=force, create=True)

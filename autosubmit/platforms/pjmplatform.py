@@ -61,7 +61,7 @@ class PJMPlatform(ParamikoPlatform):
         self.job_status['RUNNING'] = ['RNO','RNE','RUN']
         self.job_status['QUEUING'] = ['ACC','QUE', 'RNA', 'RNP','HLD'] # TODO NOT SURE ABOUT HOLD HLD
         self.job_status['FAILED'] = ['ERR','CCL','RJT']
-        self._pathdir = "\$HOME/LOG_" + self.expid
+        self._pathdir = "\\$HOME/LOG_" + self.expid
         self._allow_arrays = False
         self._allow_wrappers = True # NOT SURE IF WE NEED WRAPPERS
         self.update_cmds()

@@ -71,7 +71,7 @@ class EcPlatform(ParamikoPlatform):
         self.job_status['RUNNING'] = ['EXEC']
         self.job_status['QUEUING'] = ['INIT', 'RETR', 'STDBY', 'WAIT']
         self.job_status['FAILED'] = ['STOP']
-        self._pathdir = "\$HOME/LOG_" + self.expid
+        self._pathdir = "\\$HOME/LOG_" + self.expid
         self._allow_arrays = False
         self._allow_wrappers = False # TODO
         self._allow_python_jobs = False

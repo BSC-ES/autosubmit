@@ -26,7 +26,7 @@ from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, Jo
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from log.log import AutosubmitCritical, AutosubmitError
 
-"""Tests for the Slurm platform."""
+"""Unit tests for the Slurm platform."""
 
 
 @pytest.fixture

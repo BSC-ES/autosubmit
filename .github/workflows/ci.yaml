@@ -7,6 +7,8 @@ on:
     branches:
       - main
       - master
+permissions:
+  contents: read
 
 jobs:
   # lint: # Turn on when linting issues are resolved
@@ -118,7 +120,7 @@ jobs:
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
             test/integration \
-            -m ''
+            -m 'not slurm'
 
       - name: Coverage report
         run: |
@@ -178,6 +180,81 @@ jobs:
           path: coverage.xml
           retention-days: 7
 
+  test-slurm:
+    runs-on: ubuntu-latest
+    services:
+      slurm:
+        image: autosubmit/slurm-openssh-container:25-05-0-1
+        ports:
+          - 2222:2222
+        options: --rm -it --cgroupns=host --privileged --volume /sys/fs/cgroup:/sys/fs/cgroup:rw --hostname slurmctld --name slurm-container
+
+    strategy:
+      matrix:
+        python-version: ["3.9"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Copy SSH access key
+        run: |
+          docker cp slurm-container:/root/.ssh/container_root_pubkey /tmp/container_root_pubkey
+          chmod 600 /tmp/container_root_pubkey
+
+      - name: Configure SSH host
+        run: |
+          sudo bash -c 'mkdir /home/runner/.ssh/'
+          sudo bash -c 'echo -e $"Host localDocker\n  HostName localhost\n  User root\nStrictHostKeyChecking no\n UserKnownHostsFile /dev/null\n  IdentityFile /tmp/container_root_pubkey\n  Port 2222\n   ForwardX11 yes" >> /home/runner/.ssh/config'
+
+      - name: Run sinfo over SSH on SLURM container
+        run: |
+          ssh localDocker -p 2222 -i /tmp/container_root_pubkey sinfo
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies
+        run: sudo apt-get install -y curl git graphviz rsync
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip packaging
+          pip install --upgrade -e .[all]
+
+      - name: Set up Git
+        run: |
+          # From: https://stackoverflow.com/questions/62960533/how-to-use-git-commands-during-a-github-action
+          # Set up dummy configuration for integration tests.
+          git --version
+          git config --global user.email "test@bsc.es"
+          git config --global user.name "GitHub Actions"
+
+      - name: Integration tests
+        run: |
+          pytest \
+            --cov=autosubmit --cov-config=.coveragerc \
+            --cov-report=xml:test/coverage.xml --cov-append \
+            test/integration \
+            -m 'slurm'
+
+      - name: Coverage report
+        run: |
+          coverage xml
+          coverage report
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage_slurm_py-${{ matrix.python-version }}
+          path: coverage.xml
+          retention-days: 7
+
   test-misc:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -206,7 +283,7 @@ jobs:
           cffconvert --validate -i CITATION.cff
 
   coverage:
-    needs: [test, test-integration, test-regression]
+    needs: [test, test-integration, test-regression, test-slurm]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
