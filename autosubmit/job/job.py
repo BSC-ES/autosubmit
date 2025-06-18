@@ -2829,7 +2829,7 @@ class WrapperJob(Job):
             # This will update the inner jobs to QUEUE or HELD (normal behaviour) or WAITING ( if they fail to be held)
             self._check_inner_jobs_queue(prev_status)
         elif self.status == Status.RUNNING:  # If wrapper is running
-            #Log.info("Wrapper {0} is {1}".format(self.name, Status().VALUE_TO_KEY[self.status]))
+            # Log.info("Wrapper {0} is {1}".format(self.name, Status().VALUE_TO_KEY[self.status]))
             # This will update the status from submitted or hold to running (if safety timer is high enough or queue is fast enough)
             if prev_status in [Status.SUBMITTED]:
                 for job in self.job_list:
@@ -2898,21 +2898,22 @@ class WrapperJob(Job):
         for job in not_completed_jobs:
             self._check_finished_job(job)
 
-    def _check_inner_jobs_queue(self, prev_status :str) -> None:
+    def _check_inner_jobs_queue(self, prev_status: str) -> None:
         """
-        Update previous status of a job and updating the job to a new status.
-        If the platform being used is slurm the function will get the status of all the jobs,
-        get the parsed queue reason and cancel and fail jobs that has a known reason.
+        Update previous status of a job and update the job to a new status.
+
+        If the platform being used is Slurm the function will get the status of all the jobs.
+
+        It will get the parsed queue reason and cancel and fail jobs that have a known reason.
+
         If job is held by admin or user the job will be held to be executed later.
+
         :param prev_status: previous status of a job
         :type prev_status: str
         """
-        reason = str()
         if self._platform.type == 'slurm':
-            self._platform.send_command(
-                self._platform.get_queue_status_cmd(self.id))
-            reason = self._platform.parse_queue_reason(
-                self._platform._ssh_output, self.id)
+            self._platform.send_command(self._platform.get_queue_status_cmd(self.id))
+            reason = self._platform.parse_queue_reason(self._platform._ssh_output, self.id)
             if self._queuing_reason_cancel(reason):
                 Log.printlog("Job {0} will be cancelled and set to FAILED as it was queuing due to {1}".format(
                     self.name, reason), 6009)
@@ -2938,8 +2939,7 @@ class WrapperJob(Job):
             elif reason == '(JobHeldAdmin)':
                 Log.debug(
                     "Job {0} Failed to be HELD, canceling... ", self.name)
-                self._platform.send_command(
-                    self._platform.cancel_cmd + " {0}".format(self.id))
+                self._platform.send_command(self._platform.cancel_cmd + " {0}".format(self.id))
                 self.status = Status.WAITING
             else:
                 Log.info("Job {0} is QUEUING {1}", self.name, reason)
