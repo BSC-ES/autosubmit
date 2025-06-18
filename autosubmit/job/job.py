@@ -1273,7 +1273,7 @@ class Job(object):
         remote_logs = tuple(remote_logs)
 
         # Retrieve remote logs
-        Log.debug(f"Retrieving log files {remote_logs} for job {self.name}")
+        Log.debug(f"Retrieving log files {remote_logs[0]} and .err")
         self.platform.get_logs_files(self.expid, remote_logs)
 
         # Update local logs
@@ -2576,7 +2576,6 @@ class Job(object):
         for i, log_file in enumerate(self.local_logs):
             for ext in compress_ext:
                 _aux_path = Path(self._tmp_path, f"LOG_{self.expid}").joinpath(log_file + ext)
-                Log.debug(f"Checking existence of log file: {_aux_path}")
                 if _aux_path.exists():
                     Log.debug(f"Found compressed log file: {_aux_path}")
                     _aux_local_logs[i] += ext
