@@ -67,17 +67,22 @@ class WrapperBuilder(object):
         return textwrap.dedent(self.header_directive) + self.build_imports()
 
     def build_imports(self):
-        pass
+        pass  # pragma: no cover
+
     def build_job_thread(self):
-        pass
+        pass  # pragma: no cover
+
     # hybrids
     def build_joblist_thread(self, **kwargs):
-        pass
+        pass  # pragma: no cover
+
     # horizontal and hybrids
     def build_nodes_list(self):
-        pass
+        pass  # pragma: no cover
+
     def build_machinefiles(self):
-        pass
+        pass  # pragma: no cover
+
     def get_machinefile_function(self):
         machinefile_function = ""
         if 'MACHINEFILES' in self.jobs_resources and self.jobs_resources['MACHINEFILES']:
@@ -90,22 +95,31 @@ class WrapperBuilder(object):
             else:
                 return self.build_machinefiles_standard()
         return machinefile_function
+
     def build_machinefiles_standard(self):
-        pass
+        pass  # pragma: no cover
+
     def build_machinefiles_components(self):
-        pass
+        pass  # pragma: no cover
+
     def build_machinefiles_components_alternate(self):
-        pass
+        pass  # pragma: no cover
+
     def build_sequential_threads_launcher(self, **kwargs):
-        pass
+        pass  # pragma: no cover
+
     def build_parallel_threads_launcher(self, **kwargs):
-        pass
+        pass  # pragma: no cover
+
     # all should override -> abstract!
     def build_main(self):
-        pass
+        pass  # pragma: no cover
+
     def _indent(self, text, amount, ch=' '):
         padding = amount * ch
         return ''.join(padding + line for line in text.splitlines(True))
+
+
 class PythonWrapperBuilder(WrapperBuilder):
     def get_random_alphanumeric_string(self,letters_count, digits_count):
         sample_str = ''.join((random.choice(string.ascii_letters) for i in range(letters_count)))
