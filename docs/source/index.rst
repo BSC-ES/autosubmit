@@ -224,7 +224,7 @@ of how to install Autosubmit with Conda.
                <i class="fa-solid fa-clock-rotate-left fs-4" style="color: #4E8490;"></i>
                Fault Tolerance
              </p>
-             <p>Automatic retrials and ability to re-run specific parts of
+             <p>Automatic retries and ability to re-run specific parts of
                 the experiment in case of failure.</p>
          </div>
          <div class="col" style="min-width: 20rem;">

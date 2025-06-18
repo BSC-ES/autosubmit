@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import os
 from getpass import getuser
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -26,7 +27,7 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitError, AutosubmitCritical
 # noinspection PyProtectedMember
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException
+from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException, _get_user_config_file
 from autosubmit.platforms.psplatform import PsPlatform
 
 
@@ -185,6 +186,65 @@ Host mn5-gpp
         ssh_content_user = ssh_content.replace("%change%", user)
         add_ssh_config_file(tmpdir, user, ssh_content_user)
     return tmpdir
+
+
+@pytest.mark.parametrize(
+    "user,env_ssh_config_defined",
+    [
+        (os.environ["USER"], True),
+        (os.environ["USER"], False),
+        ("dummy-one", True),
+        ("dummy-one", False),
+        ("not-exists", True),
+        ("not_exists", False)
+    ],
+    ids=[
+        "OWNER + AS_ENV_CONFIG_SSH_PATH(defined)",
+        "OWNER + AS_ENV_CONFIG_SSH_PATH(not defined)",
+        "SUDO USER(exists) + AS_ENV_CONFIG_SSH_PATH(defined)",
+        "SUDO USER(exists) + AS_ENV_CONFIG_SSH_PATH(not defined)",
+        "SUDO USER(not exists) + AS_ENV_CONFIG_SSH_PATH(defined)",
+        "SUDO USER(not exists) + AS_ENV_CONFIG_SSH_PATH(not defined)"
+    ]
+)
+def test__get_user_config_file(user: str, env_ssh_config_defined: bool, tmpdir, autosubmit_config, generate_all_files):
+    tmp_dir = str(tmpdir)
+    experiment_data = {
+        "ROOTDIR": tmp_dir,
+        "PROJDIR": tmp_dir,
+        "LOCAL_TMP_DIR": tmp_dir,
+        "LOCAL_ROOT_DIR": tmp_dir,
+        "AS_ENV_CURRENT_USER": user,
+    }
+    as_env_ssh_config_path = None
+    if env_ssh_config_defined:
+        experiment_data["AS_ENV_SSH_CONFIG_PATH"] = str(tmpdir.join(f".ssh/config_{user}"))
+        as_env_ssh_config_path = Path(experiment_data["AS_ENV_SSH_CONFIG_PATH"])
+
+    as_conf = autosubmit_config(expid='a000', experiment_data=experiment_data)
+
+    user_config_file = _get_user_config_file(
+        as_conf.is_current_real_user_owner,
+        as_env_ssh_config_path,
+        experiment_data.get('AS_ENV_CURRENT_USER', None)
+    )
+
+    if as_conf.is_current_real_user_owner:
+        # The user is the owner, the code immediately loads the user's config.
+        assert user_config_file == Path("~/.ssh/config").expanduser()
+    elif not as_env_ssh_config_path:
+        # The user is not the owner, but no env var was given, so we search in the home directory.
+        assert user_config_file == Path(f"~/.ssh/config_{user}").expanduser()
+    else:
+        # Otherwise, we now confirm that the file was loaded using the env var value path.
+        assert user_config_file == Path(tmpdir, f".ssh/config_{user}").expanduser()
+
+
+def test__get_user_config_file_invalid_settings():
+    """Test that an error is raised when the user is not the owner and no values
+    were provided to locate its SSH configuration file."""
+    with pytest.raises(ValueError):
+        _get_user_config_file(False, None, None)
 
 
 def test_submit_job(mocker, autosubmit_config, tmpdir):
