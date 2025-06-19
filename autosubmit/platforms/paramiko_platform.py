@@ -56,15 +56,12 @@ def threaded(fn):
 
     return wrapper
 
-# noinspection PyMethodParameters
+
 class ParamikoPlatform(Platform):
-    """
-    Class to manage the connections to the different platforms with the Paramiko library.
-    """
+    """Class to manage the connections to the different platforms with the Paramiko library."""
 
-    def __init__(self, expid, name, config, auth_password = None):
+    def __init__(self, expid: str, name: str, config :dict, auth_password=None):
         """
-
         :param config:
         :param expid:
         :param name:
@@ -93,7 +90,7 @@ class ParamikoPlatform(Platform):
         self._header = None
         self._wrapper = None
         self.remote_log_dir = ""
-        #self.get_job_energy_cmd = ""
+        # self.get_job_energy_cmd = ""
         display = os.getenv('DISPLAY')
         if display is None:
             display = "localhost:0"
@@ -102,6 +99,7 @@ class ParamikoPlatform(Platform):
         except Exception as e:
             Log.warning(f"X11 display not found: {e}")
             self.local_x11_display = None
+
     @property
     def header(self):
         """
@@ -146,11 +144,9 @@ class ParamikoPlatform(Platform):
         except Exception as e:
             Log.warning(f"X11 display not found: {e}")
             self.local_x11_display = None
-    def test_connection(self,as_conf):
-        """
-        Test if the connection is still alive, reconnect if not.
-        """
 
+    def test_connection(self,as_conf):
+        """Test if the connection is still alive, reconnect if not."""
         try:
             if not self.connected:
                 self.reset()
@@ -163,10 +159,10 @@ class ParamikoPlatform(Platform):
                     try:
                         transport = self._ssh.get_transport()
                         transport.send_ignore()
-                    except:
+                    except Exception:
                         message = "Timeout connection"
                 return message
-
+            return None
         except EOFError as e:
             self.connected = False
             raise AutosubmitError(f"[{self.name}] not alive. Host: {self.host}", 6002, str(e))
@@ -176,7 +172,6 @@ class ParamikoPlatform(Platform):
         except BaseException as e:
             self.connected = False
             raise AutosubmitCritical(str(e),7051)
-            # raise AutosubmitError("[{0}] connection failed for host: {1}".format(self.name, self.host), 6002, e.message)
 
     def restore_connection(self, as_conf: Optional['AutosubmitConfig'], log_recovery_process: bool = False) -> None:
         """
@@ -293,16 +288,19 @@ class ParamikoPlatform(Platform):
         else:
             Log.warning(f"SSH config file {self._user_config_file} not found")
 
-    def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
-        """
-        Establishes an SSH connection to the host.
+    def connect(
+            self,
+            as_conf: Optional['AutosubmitConfig'],
+            reconnect: bool = False,
+            log_recovery_process: bool = False
+    ) -> None:
+        """Establishes an SSH connection to the host.
 
         :param as_conf: The Autosubmit configuration object.
         :param reconnect: Indicates whether to attempt reconnection if the initial connection fails.
         :param log_recovery_process: Specifies if the call is made from the log retrieval process.
         :return: None
         """
-
         try:
             display = os.getenv('DISPLAY')
             if display is None:
@@ -318,7 +316,7 @@ class ParamikoPlatform(Platform):
             if as_conf:
                 self.map_user_config_file(as_conf)
             else:
-                with open(os.path.expanduser("~/.ssh/config"), "r") as fd:
+                with open(Path("~/.ssh/config").expanduser(), "r") as fd:
                     self._ssh_config.parse(fd)
 
             self._host_config = self._ssh_config.lookup(self.host)
@@ -340,7 +338,7 @@ class ParamikoPlatform(Platform):
                         try:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, sock=self._proxy, timeout=60 , banner_timeout=60)
-                        except Exception as e:
+                        except Exception:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, sock=self._proxy, timeout=60,
                                               banner_timeout=60, disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
@@ -348,7 +346,7 @@ class ParamikoPlatform(Platform):
                         try:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, timeout=60 , banner_timeout=60)
-                        except Exception as e:
+                        except Exception:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, timeout=60 , banner_timeout=60,disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
                 self.transport = self._ssh.get_transport()
@@ -365,7 +363,7 @@ class ParamikoPlatform(Platform):
                 self.transport.start_client()
                 try:
                     self.transport.auth_interactive(self.user, self.interactive_auth_handler)
-                except Exception as e:
+                except Exception:
                     Log.printlog("2FA authentication failed",7000)
                     raise
                 if self.transport.is_authenticated():
@@ -379,8 +377,6 @@ class ParamikoPlatform(Platform):
             self.connected = True
             if not log_recovery_process:
                 self.spawn_log_retrieval_process(as_conf)
-
-
         except SSHException:
             raise
         except IOError as e:
@@ -402,6 +398,7 @@ class ParamikoPlatform(Platform):
             else:
                 raise AutosubmitError(
                     "Couldn't establish a connection to the specified host, wrong configuration?", 6003, str(e))
+
     def check_completed_files(self, sections=None):
         if self.host == 'localhost':
             return None
@@ -420,7 +417,6 @@ class ParamikoPlatform(Platform):
             return None
 
     def remove_multiple_files(self, filenames):
-        #command = "rm"
         log_dir = os.path.join(self.tmp_path, f'LOG_{self.expid}')
         multiple_delete_previous_run = os.path.join(
             log_dir, "multiple_delete_previous_run.sh")
@@ -437,8 +433,6 @@ class ParamikoPlatform(Platform):
                                    "multiple_delete_previous_run.sh")
             if self.send_command(command, ignore_log=True):
                 return self._ssh_output
-            else:
-                return ""
         return ""
 
     def send_file(self, filename, check=True):
@@ -454,24 +448,22 @@ class ParamikoPlatform(Platform):
             self.delete_file(filename)
         try:
             local_path = os.path.join(os.path.join(self.tmp_path, filename))
-            remote_path = os.path.join(
-                self.get_files_path(), os.path.basename(filename))
+            remote_path = os.path.join(self.get_files_path(), os.path.basename(filename))
             self._ftpChannel.put(local_path, remote_path)
             self._ftpChannel.chmod(remote_path, os.stat(local_path).st_mode)
             return True
         except IOError as e:
             raise AutosubmitError(f'Can not send file {os.path.join(self.tmp_path, filename)} to '
                                   f'{os.path.join(self.get_files_path(), filename)}', 6004, str(e))
-        except BaseException as e:
-            raise AutosubmitError(
-                'Send file failed. Connection seems to no be active', 6004)
+        except BaseException:
+            raise AutosubmitError('Send file failed. Connection does not appear to be active', 6004)
 
 
     def get_list_of_files(self):
         return self._ftpChannel.get(self.get_files_path)
 
     # Gets .err and .out
-    def get_file(self, filename, must_exist=True, relative_path='', ignore_log=False, wrapper_failed=False):
+    def get_file(self, filename, must_exist=True, relative_path='', ignore_log=False, wrapper_failed=False) -> bool:
         """
         Copies a file from the current platform to experiment's tmp folder
 
@@ -486,7 +478,6 @@ class ParamikoPlatform(Platform):
         :return: True if file is copied successfully, false otherwise
         :rtype: bool
         """
-
         local_path = os.path.join(self.tmp_path, relative_path)
         if not os.path.exists(local_path):
             os.makedirs(local_path)
@@ -499,10 +490,9 @@ class ParamikoPlatform(Platform):
             self._ftpChannel.get(remote_path, file_path)
             return True
         except Exception as e:
-            try:
+            with suppress(Exception):
                 os.remove(file_path)
-            except Exception:
-                pass
+            # FIXME: Huh, probably a bug here?
             if str(e) in "Garbage":
                 if not ignore_log:
                     Log.printlog(f"File {filename} seems to no exists (skipping)", 5004)
@@ -515,7 +505,7 @@ class ParamikoPlatform(Platform):
                     Log.printlog(f"Log file couldn't be retrieved: {filename}", 5000)
                 return False
 
-    def delete_file(self, filename):
+    def delete_file(self, filename) -> bool:
         """
         Deletes a file from this platform
 
@@ -524,7 +514,6 @@ class ParamikoPlatform(Platform):
         :return: True if successful or file does not exist
         :rtype: bool
         """
-
         try:
             self._ftpChannel.remove(os.path.join(
                 self.get_files_path(), filename))
@@ -537,8 +526,9 @@ class ParamikoPlatform(Platform):
             if str(e).lower().find("garbage") != -1:
                 raise AutosubmitCritical(
                     "Wrong User or invalid .ssh/config. Or invalid user in the definition of PLATFORMS in YAML or public key not set ", 7051, str(e))
+            return False
 
-    def move_file(self, src, dest, must_exist=False):
+    def move_file(self, src: str, dest: str, must_exist=False) -> bool:
         """
         Moves a file on the platform (includes .err and .out)
         :param src: source name
@@ -547,7 +537,7 @@ class ParamikoPlatform(Platform):
         :param must_exist: ignore if file exist or not
         :type dest: str
         """
-        path_root=""
+        path_root = ""
         try:
             path_root = self.get_files_path()
             src = os.path.join(path_root, src)
@@ -557,7 +547,6 @@ class ParamikoPlatform(Platform):
             except IOError:
                 self._ftpChannel.rename(src,dest)
             return True
-
         except IOError as e:
             if str(e) in "Garbage":
                 raise AutosubmitError(f'File {os.path.join(path_root,src)} does not exists, something went '
@@ -576,7 +565,7 @@ class ParamikoPlatform(Platform):
                 Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
                 return False
 
-    def submit_job(self, job, script_name, hold=False, export="none"):
+    def submit_job(self, job, script_name, hold=False, export="none") -> Optional[int]:
         """
         Submit a job from a given job object.
 
@@ -624,7 +613,7 @@ class ParamikoPlatform(Platform):
         self.send_command(check_energy_cmd)
         return self.get_ssh_output()
 
-    def submit_Script(self, hold=False):
+    def submit_Script(self, hold=False) -> int:
         """
         Sends a Submit file Script, exec in platform and retrieve the Jobs_ID.
 
@@ -735,7 +724,7 @@ class ParamikoPlatform(Platform):
                 job_status = Status.RUNNING
                 if not is_wrapper:
                     if job.status != Status.RUNNING:
-                        job.start_time = datetime.datetime.now() # URi: start time
+                        job.start_time = datetime.datetime.now()  # URi: start time
                     if job.start_time is not None and str(job.wrapper_type).lower() == "none":
                         wallclock = job.wallclock
                         if job.wallclock == "00:00" or job.wallclock is None:
@@ -782,6 +771,7 @@ class ParamikoPlatform(Platform):
             if job not in ssh_output:
                 return False
         return True
+
     def parse_joblist(self, job_list: List[List['Job']]):
         """
         Convert a list of job_list to job_list_cmd
@@ -944,7 +934,6 @@ class ParamikoPlatform(Platform):
         """
         raise NotImplementedError
 
-
     def get_checkjob_cmd(self, job_id):
         """
         Returns command to check job status on remote platforms
@@ -985,12 +974,13 @@ class ParamikoPlatform(Platform):
         return NotImplementedError
 
     def x11_handler(self, channel, xxx_todo_changeme):
-        '''handler for incoming x11 connections
+        """handler for incoming x11 connections
         for each x11 incoming connection,
         - get a connection to the local display
         - maintain bidirectional map of remote x11 channel to local x11 channel
         - add the descriptors to the poller
-        - queue the channel (use transport.accept())'''
+        - queue the channel (use transport.accept())
+        """
         (src_addr, src_port) = xxx_todo_changeme
         x11_chanfd = channel.fileno()
         local_x11_socket = xlib_connect.get_socket(*self.local_x11_display[:4])
@@ -1038,7 +1028,9 @@ class ParamikoPlatform(Platform):
                             counterpart.close()
                             del self.channels[fd]
 
-    def exec_command(self, command: str, bufsize=-1, timeout=30, retries=3, x11=False) -> tuple[Union[Any, bool], Union[Any, bool], Union[Any, bool]]:
+    def exec_command(
+            self, command: str, bufsize=-1, timeout=30, retries=3, x11=False
+    ) -> tuple[Union[Any, bool], Union[Any, bool], Union[Any, bool]]:
         """Execute a command on the SSH server.
 
         A new ``.Channel`` is open and the requested command is executed.
@@ -1448,7 +1440,7 @@ class ParamikoPlatform(Platform):
         return header
 
     def closeConnection(self):
-        # Ensure to delete all references to the ssh connection, so that it frees all the file descriptors
+        """Ensure to delete all references to the ssh connection, so that it frees all the file descriptors."""
         with suppress(Exception):
             if self._ftpChannel:
                 self._ftpChannel.close()
@@ -1467,9 +1459,9 @@ class ParamikoPlatform(Platform):
                 self.transport.close()
                 self.transport.stop_thread()
 
-    def check_remote_permissions(self):
-        try:
-            path = os.path.join(self.scratch, self.project_dir, self.user, "permission_checker_azxbyc")
+    def check_remote_permissions(self) -> bool:
+        with suppress(Exception):
+            path = str(Path(self.scratch, self.project_dir, self.user, "permission_checker_azxbyc"))
             try:
                 self._ftpChannel.mkdir(path)
                 self._ftpChannel.rmdir(path)
@@ -1478,8 +1470,7 @@ class ParamikoPlatform(Platform):
                 self._ftpChannel.mkdir(path)
                 self._ftpChannel.rmdir(path)
             return True
-        except Exception as e:
-            return False
+        return False
     
     def check_remote_log_dir(self):
         """

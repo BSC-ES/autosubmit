@@ -20,6 +20,7 @@ from getpass import getuser
 from pathlib import Path
 from random import randrange
 from tempfile import TemporaryDirectory, gettempdir
+from typing import cast
 
 import paramiko
 import pytest
@@ -28,6 +29,7 @@ from testcontainers.sftp import DockerContainer
 
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.psplatform import PsPlatform
+from log.log import AutosubmitError
 
 """Integration tests for the paramiko platform.
 
@@ -35,8 +37,21 @@ Note that tests will start and destroy an SSH server. For unit tests, see ``para
 in the ``test/unit`` directory."""
 
 
+_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
+
+
 @pytest.fixture
-def paramiko_platform():
+def ssh_config():
+    # Paramiko platform relies on parsing the SSH config file, failing it if does not exist.
+    ssh_config = Path('~/.ssh/config').expanduser()
+    if not ssh_config.exists():
+        ssh_config.mkdir(parents=True)
+        ssh_config.touch()
+    yield ssh_config
+
+
+@pytest.fixture
+def paramiko_platform(ssh_config):
     local_root_dir = TemporaryDirectory()
     config = {
         "LOCAL_ROOT_DIR": local_root_dir.name,
@@ -54,7 +69,7 @@ def paramiko_platform():
 
 
 @pytest.fixture
-def ps_platform(tmpdir):
+def ps_platform(tmpdir, ssh_config):
     tmp_path = Path(tmpdir)
     tmpdir.owner = tmp_path.owner()
     config = {
@@ -116,8 +131,7 @@ def test_send_file(mocker, filename, ps_platform, check):
     ssh_port = randrange(2500, 3000)
 
     try:
-        image = 'lscr.io/linuxserver/openssh-server:latest'
-        with DockerContainer(image=image, remove=True, hostname='openssh-server') \
+        with DockerContainer(image=_DOCKER_IMAGE, remove=True, hostname='openssh-server') \
                 .with_env('TZ', 'Etc/UTC') \
                 .with_env('SUDO_ACCESS', 'false') \
                 .with_env('USER_NAME', user) \
@@ -141,3 +155,78 @@ def test_send_file(mocker, filename, ps_platform, check):
             assert check == (remote_dir / filename).exists()
     finally:
         os.system(f'chmod 700 -R {str(rootdir)}')
+
+
+@pytest.mark.parametrize(
+    'cmd,error',
+    [
+        ('whoami', None),
+        ('parangaricutirimicuaro', AutosubmitError)
+    ]
+)
+@pytest.mark.docker
+def test_send_command(ps_platform, cmd, error):
+    """This test opens an SSH connection (via sftp) and sends a command."""
+    platform, tmp_dir = ps_platform
+    platform = cast(ParamikoPlatform, platform)
+
+    user = getuser() or "unknown"
+
+    ssh_port = randrange(2500, 3000)
+
+    with DockerContainer(image=_DOCKER_IMAGE, remove=True, hostname='openssh-server') \
+            .with_env('TZ', 'Etc/UTC') \
+            .with_env('SUDO_ACCESS', 'false') \
+            .with_env('USER_NAME', user) \
+            .with_env('USER_PASSWORD', 'password') \
+            .with_env('PASSWORD_ACCESS', 'true') \
+            .with_bind_ports(2222, ssh_port) \
+            .with_volume_mapping('/tmp', '/tmp', mode='rw') as container:
+        wait_for_logs(container, 'sshd is listening on port 2222')
+        _ssh = paramiko.SSHClient()
+        _ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        _ssh.connect(hostname=platform.host, username=platform.user, password='password', port=ssh_port)
+        platform._ftpChannel = paramiko.SFTPClient.from_transport(_ssh.get_transport(), window_size=pow(4, 12),
+                                                                  max_packet_size=pow(4, 12))
+        platform._ftpChannel.get_channel().settimeout(120)
+        platform.connect(None, reconnect=False, log_recovery_process=False)
+
+        if error:
+            with pytest.raises(error):
+                platform.send_command(cmd, ignore_log=False, x11=False)
+        else:
+            assert platform.send_command(cmd, ignore_log=False, x11=False)
+
+
+@pytest.mark.docker
+def test_exec_command(ps_platform):
+    """This test opens an SSH connection (via sftp) and executes a command."""
+    platform, tmp_dir = ps_platform
+    platform = cast(ParamikoPlatform, platform)
+
+    user = getuser() or "unknown"
+
+    ssh_port = randrange(2500, 3000)
+
+    with DockerContainer(image=_DOCKER_IMAGE, remove=True, hostname='openssh-server') \
+            .with_env('TZ', 'Etc/UTC') \
+            .with_env('SUDO_ACCESS', 'false') \
+            .with_env('USER_NAME', user) \
+            .with_env('USER_PASSWORD', 'password') \
+            .with_env('PASSWORD_ACCESS', 'true') \
+            .with_bind_ports(2222, ssh_port) \
+            .with_volume_mapping('/tmp', '/tmp', mode='rw') as container:
+        wait_for_logs(container, 'sshd is listening on port 2222')
+        _ssh = paramiko.SSHClient()
+        _ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        _ssh.connect(hostname=platform.host, username=platform.user, password='password', port=ssh_port)
+        platform._ftpChannel = paramiko.SFTPClient.from_transport(_ssh.get_transport(), window_size=pow(4, 12),
+                                                                  max_packet_size=pow(4, 12))
+        platform._ftpChannel.get_channel().settimeout(120)
+        platform.connect(None, reconnect=False, log_recovery_process=False)
+
+        stdin, stdout, stderr = platform.exec_command('whoami')
+        assert stdin is not False
+        assert stderr is not False
+        # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
+        assert user == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
