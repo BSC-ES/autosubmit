@@ -32,8 +32,6 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistenceDb
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_packager import JobPackager
 from autosubmit.job.job_packages import JobPackageHorizontal, JobPackageHorizontalVertical, \
     JobPackageVerticalHorizontal, JobPackageSimple
@@ -2009,19 +2007,19 @@ class TestWrappers:
             if running == 'once':
                 name = 'expid_' + section
                 job = self._createDummyJob(name, wallclock, section)
-                self.job_list._job_list.append(job)
+                self.job_list.add_job(job)
             elif running == 'date':
                 for date in date_list:
                     name = 'expid_' + date + "_" + section
                     job = self._createDummyJob(name, wallclock, section, date)
-                    self.job_list._job_list.append(job)
+                    self.job_list.add_job(job)
             elif running == 'member':
                 for date in date_list:
                     for member in member_list:
                         name = 'expid_' + date + "_" + member + "_" + section
                         job = self._createDummyJob(
                             name, wallclock, section, date, member)
-                        self.job_list._job_list.append(job)
+                        self.job_list.add_job(job)
             elif running == 'chunk':
                 synchronize_type = section_dict['SYNCHRONIZE'] if 'SYNCHRONIZE' in section_dict else None
                 if synchronize_type == 'date':
@@ -2029,7 +2027,7 @@ class TestWrappers:
                         name = 'expid_' + str(chunk) + "_" + section
                         job = self._createDummyJob(
                             name, wallclock, section, None, None, chunk)
-                        self.job_list._job_list.append(job)
+                        self.job_list.add_job(job)
                 elif synchronize_type == 'member':
                     for date in date_list:
                         for chunk in chunk_list:
@@ -2037,7 +2035,7 @@ class TestWrappers:
                                    str(chunk) + "_" + section
                             job = self._createDummyJob(
                                 name, wallclock, section, date, None, chunk)
-                            self.job_list._job_list.append(job)
+                            self.job_list.add_job(job)
                 else:
                     for date in date_list:
                         for member in member_list:
@@ -2046,7 +2044,7 @@ class TestWrappers:
                                        "_" + str(chunk) + "_" + section
                                 job = self._createDummyJob(
                                     name, wallclock, section, date, member, chunk)
-                                self.job_list._job_list.append(job)
+                                self.job_list.add_job(job)
 
         self.job_list._date_list = date_list
         self.job_list._member_list = member_list
@@ -2152,8 +2150,7 @@ def setup(autosubmit_config, tmpdir):
     as_conf.experiment_data["WRAPPERS"]["WRAPPERS"]["JOBS_IN_WRAPPER"] = "SECTION1"
     as_conf.experiment_data["WRAPPERS"]["WRAPPERS"]["TYPE"] = "vertical"
     Path(tmpdir / experiment_id / "tmp").mkdir(parents=True, exist_ok=True)
-    job_list = JobList(experiment_id, as_conf, YAMLParserFactory(),
-                       JobListPersistencePkl())
+    job_list = JobList(experiment_id, as_conf, YAMLParserFactory())
 
     platform = SlurmPlatform(experiment_id, 'dummy-platform', as_conf.experiment_data)
 
@@ -2164,13 +2161,13 @@ def setup(autosubmit_config, tmpdir):
     job.wallclock = "00:20"
     job.section = "SECTION1"
     job.platform = platform
-    job_list._job_list.append(job)
+    job_list.graph.add_node(job.name, job=job)
     job = Job("job2", "2", Status.SUBMITTED, 0)
     job._init_runtime_parameters()
     job.wallclock = "00:20"
     job.section = "SECTION1"
     job.platform = platform
-    job_list._job_list.append(job)
+    job_list.graph.add_node(job.name, job=job)
     wrapper_jobs = copy.deepcopy(job_list.get_job_list())
     for job in wrapper_jobs:
         job.platform = platform

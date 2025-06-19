@@ -107,7 +107,8 @@ class CopyQueue(Queue):
         :param timeout: Timeout for blocking operations. Defaults to None.
         :type timeout: float
         """
-        super().put(job.__getstate__(), block, timeout)
+        super().put(job.__getstate__(log_process=True), block, timeout)
+
 
 
 class Platform(object):
@@ -344,7 +345,7 @@ class Platform(object):
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
 
-    def submit_ready_jobs(self, as_conf, job_list, platforms_to_test, packages_persistence, packages_to_submit,
+    def submit_ready_jobs(self, as_conf, job_list, platforms_to_test, packages_to_submit,
                           inspect=False, only_wrappers=False, hold=False):
 
         """
@@ -358,8 +359,6 @@ class Platform(object):
         :type job_list: JobList object  \n
         :param platforms_to_test: platforms used  \n
         :type platforms_to_test: set of Platform Objects, e.g. SgePlatform(), SlurmPlatform().  \n
-        :param packages_persistence: Handles database per experiment. \n
-        :type packages_persistence: JobPackagePersistence object \n
         :param inspect: True if coming from generate_scripts_andor_wrappers(). \n
         :type inspect: Boolean \n
         :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw. \n
@@ -372,7 +371,7 @@ class Platform(object):
         failed_packages = list()
         error_message = ""
         if not inspect:
-            job_list.save()
+            job_list.save_jobs()
         if not hold:
             Log.debug("\nJobs ready for {1}: {0}", len(
                 job_list.get_ready(self, hold=hold)), self.name)
@@ -386,15 +385,7 @@ class Platform(object):
             try:
                 # If called from inspect command or -cw
                 if only_wrappers or inspect:
-                    if hasattr(package, "name"):
-                        job_list.packages_dict[package.name] = package.jobs
-                        from ..job.job import WrapperJob
-                        wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.READY, 0,
-                                                 package.jobs,
-                                                 package._wallclock, package._num_processors,
-                                                 package.platform, as_conf, hold)
-                        job_list.job_package_map[package.jobs[0].id] = wrapper_job
-                        packages_persistence.save(package, inspect)
+                    package.status = Status.COMPLETED
                     for innerJob in package._jobs:
                         any_job_submitted = True
                         # Setting status to COMPLETED, so it does not get stuck in the loop that calls this function
@@ -402,44 +393,43 @@ class Platform(object):
                         innerJob.updated_log = False
 
                 # If called from RUN or inspect command
-                if not only_wrappers:
-                    try:
-                        package.submit(as_conf, job_list.parameters, inspect, hold=hold)
-                        save = True
-                        if not inspect:
-                            job_list.save()
-                        if package.x11 != "true":
-                            valid_packages_to_submit.append(package)
-                        # Log.debug("FD end-submit: {0}".format(log.fd_show.fd_table_status_str(open()))
-                    except (IOError, OSError):
-                        if package.jobs[0].id != 0:
-                            failed_packages.append(package.jobs[0].id)
-                        continue
-                    except AutosubmitError as e:
-                        if package.jobs[0].id != 0:
-                            failed_packages.append(package.jobs[0].id)
-                        self.connected = False
-                        if e.message.lower().find("bad parameters") != -1 or e.message.lower().find(
-                                "scheduler is not installed") != -1:
-                            error_msg = ""
-                            for package_tmp in valid_packages_to_submit:
-                                for job_tmp in package_tmp.jobs:
-                                    if job_tmp.section not in error_msg:
-                                        error_msg += job_tmp.section + "&"
-                            for job_tmp in package.jobs:
+                try:
+                    package.submit(as_conf, job_list.parameters, inspect or only_wrappers, hold=hold)
+                    save = True
+                    if not inspect:
+                        job_list.save_jobs()
+                    if package.x11 != "true":
+                        valid_packages_to_submit.append(package)
+                    # Log.debug("FD end-submit: {0}".format(log.fd_show.fd_table_status_str(open()))
+                except (IOError, OSError):
+                    if package.jobs[0].id != 0:
+                        failed_packages.append(package.jobs[0].id)
+                    continue
+                except AutosubmitError as e:
+                    if package.jobs[0].id != 0:
+                        failed_packages.append(package.jobs[0].id)
+                    self.connected = False
+                    if e.message.lower().find("bad parameters") != -1 or e.message.lower().find(
+                            "scheduler is not installed") != -1:
+                        error_msg = ""
+                        for package_tmp in valid_packages_to_submit:
+                            for job_tmp in package_tmp.jobs:
                                 if job_tmp.section not in error_msg:
                                     error_msg += job_tmp.section + "&"
-                            if e.message.lower().find("bad parameters") != -1:
-                                error_message += "\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {0}".format(
-                                    error_msg[:-1])
-                            else:
-                                error_message += "\ncheck that {1} platform has set the correct scheduler. Sections that could be affected: {0}".format(
-                                    error_msg[:-1], self.name)
-                    except AutosubmitCritical:
-                        raise
-                    except Exception as e:
-                        self.connected = False
-                        raise
+                        for job_tmp in package.jobs:
+                            if job_tmp.section not in error_msg:
+                                error_msg += job_tmp.section + "&"
+                        if e.message.lower().find("bad parameters") != -1:
+                            error_message += "\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {0}".format(
+                                error_msg[:-1])
+                        else:
+                            error_message += "\ncheck that {1} platform has set the correct scheduler. Sections that could be affected: {0}".format(
+                                error_msg[:-1], self.name)
+                except AutosubmitCritical:
+                    raise
+                except Exception as e:
+                    self.connected = False
+                    raise
 
             except AutosubmitCritical as e:
                 raise
@@ -662,8 +652,6 @@ class Platform(object):
 
         :param job: Get the checkpoint files
         :type job: Job
-        :param max_step: max step possible
-        :type max_step: int
         """
 
         if job.current_checkpoint_step < job.max_checkpoint_step:
@@ -916,6 +904,9 @@ class Platform(object):
         self.log_recovery_process = None
         self.processed_wrapper_logs = set()
 
+    def update_as_conf(self, as_conf: 'AutosubmitConfig') -> None:
+        self.config = as_conf.experiment_data
+
     def load_process_info(self, platform):
 
         platform.host = self.host
@@ -1072,7 +1063,7 @@ class Platform(object):
         while not self.recovery_queue.empty():
             try:
                 from autosubmit.job.job import Job
-                job = Job(loaded_data=self.recovery_queue.get(timeout=1))
+                job = Job(loaded_data=self.recovery_queue.get(timeout=1), log_process=True)
                 job.platform_name = self.name  # Change the original platform to this process platform.
                 job.platform = self
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
@@ -1096,13 +1087,14 @@ class Platform(object):
             try:
                 job.retrieve_logfiles(raise_error=True)
                 job._log_recovery_retries += 1
+                Log.result(
+                    f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
             except:
                 if job._log_recovery_retries < 5:
                     jobs_pending_to_process.add(job)
                 Log.warning(
                     f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry '{job.fail_count}'.")
-            Log.result(
-                f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
+
         if len(jobs_pending_to_process) > 0:
             self.restore_connection(as_conf, log_recovery_process=True)  # Restore the connection if there was an issue with one or more jobs.
 

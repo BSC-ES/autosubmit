@@ -17,33 +17,34 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import copy
 import datetime
+import math
 import os
 import re
 import traceback
 from contextlib import suppress
-from shutil import move
-from typing import List, Dict, Tuple, Any, Optional, Union
 from pathlib import Path
-
+from shutil import move
 from time import strftime, localtime, mktime
+from typing import List, Dict, Any, Union
+from typing import Optional, Tuple, Set
 
-import math
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
 
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
-
-from log.log import AutosubmitCritical, AutosubmitError, Log
-from autosubmit.job.job_utils import transitive_reduction
+from autosubmit.database.db_common import check_db_path, get_connection_url
+from autosubmit.database.db_manager import DbManager
 from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
-from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency, _get_submitter
-import autosubmit.database.db_structure as DbStructure
+from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from log.log import AutosubmitCritical, AutosubmitError
+from log.log import Log
+
+from autosubmit.database.db_manager_job_list import JobsDbManager
 
 
 class JobList(object):
@@ -52,16 +53,19 @@ class JobList(object):
 
     """
 
-    def __init__(self, expid, config, parser_factory, job_list_persistence):
-        self._persistence_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")
+    def __init__(self, expid, config, parser_factory, run_mode=False, disable_save=False):
+        if BasicConfig.DATABASE_BACKEND == 'sqlite':
+            self._persistence_path = Path(BasicConfig.LOCAL_ROOT_DIR, expid, "db")
+            self._persistence_file = Path("job_list.db")
+            self._persistence_full_path = Path(self._persistence_path, self._persistence_file)
+        else:
+            self._persistence_path = None
+            self._persistence_file = None
+            self._persistence_full_path = None
         self._update_file = "updated_list_" + expid + ".txt"
-        self._failed_file = "failed_job_list_" + expid + ".pkl"
-        self._persistence_file = "job_list_" + expid
-        self._job_list = list()
-        self._base_job_list = list()
-        self.jobs_edges = {}
+        self._failed_file = "failed_job_list_" + expid + ".txt"
         self._expid = expid
-        self._config = config
+        self._as_conf = config
         self._parser_factory = parser_factory
         self._stat_val = Status()
         self._parameters = []
@@ -69,10 +73,8 @@ class JobList(object):
         self._member_list = []
         self._chunk_list = []
         self._dic_jobs = dict()
-        self._persistence = job_list_persistence
         self.packages_dict = dict()
         self._ordered_jobs_by_date_member = dict()
-
         self.packages_id = dict()
         self.job_package_map = dict()
         self.sections_checked = set()
@@ -84,6 +86,91 @@ class JobList(object):
         self.depends_on_previous_split = dict()
         self.path_to_logs = Path(BasicConfig.LOCAL_ROOT_DIR,
                                  self.expid, BasicConfig.LOCAL_TMP_DIR, f'LOG_{self.expid}')
+        self.dbmanager = JobsDbManager(get_connection_url(self._persistence_full_path),
+                                       schema=None)  # TODO, from where I get the schema?
+        self.run_mode = run_mode
+        self._INACTIVE_STATUSES = [Status.DELAYED, Status.SUSPENDED, Status.WAITING]
+        self._ACTIVE_STATUSES = [Status.READY, Status.SUBMITTED, Status.QUEUING,
+                                 Status.HELD, Status.RUNNING]
+        self._IN_SCHEDULER = [Status.SUBMITTED, Status.QUEUING, Status.HELD, Status.RUNNING]
+        self._FINAL_STATUSES = [Status.COMPLETED, Status.FAILED, Status.SKIPPED]
+        self.total_size = 0
+        self.completed_size = 0
+        self.failed_size = 0
+        # -cw flag, inspect
+        self.disable_save = disable_save
+
+    @property
+    def graph_dict(self):
+        """
+        Converts the graph edges into a dictionary structure matching the ExperimentStructureTable.
+        :return: A list of dictionaries representing the edges.
+        """
+        edges_dict = []
+        for edge in self.graph.edges(data=True):  # Assuming graph.edges(data=True) provides (e_from, e_to, attributes)
+            e_from, e_to, attributes = edge
+            edges_dict.append({
+                "e_from": e_from,
+                "e_to": e_to,
+                "status": attributes.get("status", "COMPLETED"),
+                "from_step": attributes.get("from_step", 0),
+                "optional": attributes.get("optional", False),
+                "completed": attributes.get("completed", False),  # check if the edge completion status is fullfilled or not
+                # TODO this should be False once this is fixed: related to  https://github.com/BSC-ES/autosubmit/pull/2006 https://github.com/BSC-ES/autosubmit/issues/2373
+            })
+        return edges_dict
+
+    @graph_dict.setter
+    def graph_dict(self, value):
+        """
+        Prevent direct modification of the graph_dict.
+        """
+        raise AttributeError("graph_dict is a dynamic view and cannot be directly modified.")
+
+    @property
+    def graph_dict_by_job_name(self):
+        """
+        Converts the graph edges into a dictionary structure matching the ExperimentStructureTable.
+        :return: A list of dictionaries representing the edges.
+        """
+        edges_by_job_name = {}
+        for edge in self.graph.edges(data=True):
+            e_from, e_to, attributes = edge
+            if e_from not in edges_by_job_name:
+                edges_by_job_name[e_from] = []
+            edges_by_job_name[e_from].append({
+                "e_to": e_to,
+                "status": attributes.get("status", "COMPLETED"),
+                "from_step": attributes.get("from_step", 0),
+                "optional": attributes.get("optional", False),
+                "completed": attributes.get("completed", False),
+                # check if the edge completion status is fullfilled or not
+            })
+        return edges_by_job_name
+
+    @graph_dict_by_job_name.setter
+    def graph_dict_by_job_name(self, value):
+        """
+        Prevent direct modification of the graph_dict.
+        """
+        raise AttributeError("graph_dict is a dynamic view and cannot be directly modified.")
+
+    @property
+    def job_list(self) -> List[Job]:
+        """Dynamically return a list of all 'job' attributes from the graph nodes."""
+        try:
+            return [data['job'] for _, data in self.graph.nodes(data=True)]
+        except BaseException as e:
+            err_msg = ""
+            for node in self.graph.nodes:
+                if not isinstance(self.graph.nodes[node], dict) or 'job' not in self.graph.nodes[node]:
+                    err_msg += f"Node {node} does not have a 'job' attribute.\n"
+            raise AutosubmitCritical(f"Error retrieving job list: {err_msg}", 7013, str(e))
+
+    @job_list.setter
+    def job_list(self, value):
+        """Prevent direct modification of the job list."""
+        raise AttributeError("job_list is a dynamic view and cannot be directly modified.")
 
     @property
     def expid(self):
@@ -100,20 +187,19 @@ class JobList(object):
         return self._run_members
 
     @run_members.setter
-    def run_members(self, value):
+    def run_members(self, value):  # TODO
         if value is not None and len(str(value)) > 0:
             self._run_members = value
-            self._base_job_list = [job for job in self._job_list]
             found_member = False
             processed_job_list = []
             # We are assuming that the jobs are sorted in topological order (which is the default)
-            for job in self._job_list:
+            for job in self.job_list:
                 if ((job.member is None and not found_member) or job.member in self._run_members or
                         job.status not in [Status.WAITING, Status.READY]):
                     processed_job_list.append(job)
                 if job.member is not None and len(str(job.member)) > 0:
                     found_member = True
-            self._job_list = processed_job_list
+            self.job_list = processed_job_list
 
     def create_dictionary(self, date_list, member_list, num_chunks, chunk_ini,
                           date_format, default_retrials, wrapper_jobs, as_conf):
@@ -131,12 +217,11 @@ class JobList(object):
 
     def _delete_edgeless_jobs(self):
         # indices to delete
-        for job in self._job_list[:]:
+        for job in self.job_list:
             if job.dependencies is not None and job.dependencies not in ["{}", "[]"]:
                 if ((len(job.dependencies) > 0 and not job.has_parents() and not
                 job.has_children()) and str(job.delete_when_edgeless).casefold() ==
                         "true".casefold()):
-                    self._job_list.remove(job)
                     self.graph.remove_node(job.name)
 
     @staticmethod
@@ -147,162 +232,225 @@ class JobList(object):
                 return True
         return False
 
-    def generate(self, as_conf, date_list, member_list, num_chunks, chunk_ini, parameters,
-                 date_format, default_retrials, default_job_type, wrapper_jobs=dict(), new=True,
-                 run_only_members=[], show_log=True, monitor=False, force=False, create=False):
+    def generate(
+            self,
+            as_conf: AutosubmitConfig,
+            date_list: List[str],
+            member_list: List[str],
+            num_chunks: int,
+            chunk_ini: int,
+            parameters: Dict[str, Any],
+            date_format: str,
+            default_retrials: int,
+            default_job_type: str,
+            wrapper_jobs: Dict[str, Any] = {},
+            new: bool = True,
+            run_only_members: List[str] = [],
+            show_log: bool = True,
+            monitor: bool = False,
+            force: bool = False,
+            full_load: bool = False,
+    ) -> None:
         """
         Creates all jobs needed for the current workflow.
-        :param create:
-        :type create: bool
-        :param force:
-        :type force: bool
-        :param as_conf: AutosubmitConfig object
-        :type as_conf: AutosubmitConfig
-        :param date_list: list of dates
-        :type date_list: list
-        :param member_list: list of members
-        :type member_list: list
-        :param num_chunks: number of chunks
-        :type num_chunks: int
-        :param chunk_ini: initial chunk
-        :type chunk_ini: int
-        :param parameters: parameters
-        :type parameters: dict
-        :param date_format: date format ( D/M/Y )
-        :type date_format: str
-        :param default_retrials: default number of retrials
-        :type default_retrials: int
-        :param default_job_type: default job type
-        :type default_job_type: str
-        :param wrapper_jobs: wrapper jobs
-        :type wrapper_jobs: dict
-        :param new: new
-        :type new: bool
-        :param run_only_members: run only members
-        :type run_only_members: list
-        :param show_log: show log
-        :type show_log: bool
-        :param monitor: monitor
-        :type monitor: bool
         """
-        if create and self.check_split_set_to_auto(as_conf):
+        self._initialize_workflow_parameters(
+            as_conf, date_list, member_list, num_chunks, chunk_ini, parameters, date_format, default_retrials
+        )
+        if full_load and self.check_split_set_to_auto(as_conf):
             force = True
+
         if force:
-            Log.debug("Resetting the workflow graph to a zero state")
-            if os.path.exists(os.path.join(self._persistence_path, self._persistence_file + ".pkl")):
-                os.remove(os.path.join(self._persistence_path, self._persistence_file + ".pkl"))
-            if os.path.exists(os.path.join(self._persistence_path, self._persistence_file + "_backup.pkl")):
-                os.remove(os.path.join(self._persistence_path, self._persistence_file + "_backup.pkl"))
+            # TODO delete or clean tables not delete the file
+            self._reset_workflow_graph()
+        else:
+            self._load_graph(full_load)
+
+        if not self.run_mode:
+            self._create_and_add_jobs(show_log, default_job_type, date_list, member_list)
+
+        if new:
+            self._initialize_new_jobs()
+
+        if not self.run_mode:
+            self._save_workflow_state(wrapper_jobs, as_conf, full_load, new)
+
+    def _reset_workflow_graph(self) -> None:
+        Log.debug("Resetting the workflow graph to a zero state")
+        if check_db_path(self._persistence_full_path, must_exists=False):
+            os.remove(self._persistence_full_path)
+
+    def _initialize_workflow_parameters(
+            self,
+            as_conf: AutosubmitConfig,
+            date_list: List[str],
+            member_list: List[str],
+            num_chunks: int,
+            chunk_ini: int,
+            parameters: Dict[str, Any],
+            date_format: str,
+            default_retrials: int,
+    ) -> None:
         self._parameters = parameters
         self._date_list = date_list
         self._member_list = member_list
-        chunk_list = list(range(chunk_ini, num_chunks + 1))
-        self._chunk_list = chunk_list
-        self._dic_jobs = DicJobs(date_list, member_list, chunk_list, date_format,
-                                 default_retrials, as_conf)
+        self._chunk_list = list(range(chunk_ini, num_chunks + 1))
+        self._dic_jobs = DicJobs(date_list, member_list, self._chunk_list, date_format, default_retrials, as_conf)
 
-        try:
-            loaded_job_list = self.load(create)
-            Log.result("Load finished")
-        except BaseException as e:
-            Log.warning(f"Couldn't load the old job_list {e}")
-            loaded_job_list = None
+    def _recreate_graph(
+            self,
+            nodes: list[dict[str, any]],
+            edges: list[dict[str, any]],
+            full_load: bool
+    ) -> None:
+        """
+        Recreates the internal dependency graph from lists of nodes and edges.
 
-        if (not loaded_job_list and not create) or (loaded_job_list and
-                                                    len(loaded_job_list) == 0 and not create):
-            raise AutosubmitCritical(
-                "Autosubmit couldn't load the workflow graph. Please run autosubmit create first."
-                "If the pkl file exists and was generated with Autosubmit v4.1+, try again.",
-                7013)
-        elif loaded_job_list and len(loaded_job_list) == 0 and create:
-            new = True
-            Log.info(
-                "Removing previous pkl file due to empty graph, "
-                "likely due using an Autosubmit 4.0.XXX version")
-            with suppress(FileNotFoundError):
-                os.remove(os.path.join(self._persistence_path, self._persistence_file + ".pkl"))
-            with suppress(FileNotFoundError):
-                os.remove(os.path.join(self._persistence_path, self._persistence_file + "_backup.pkl"))
-        if loaded_job_list:
-            self._dic_jobs._job_list = loaded_job_list
+        :param nodes: List of node dictionaries, each representing a job node.
+        :type nodes: list[dict[str, any]]
+        :param edges: List of edge dictionaries, each representing a dependency edge.
+        :type edges: list[dict[str, any]]
+        :param full_load: Whether to load all jobs and edges.
+        :type full_load: bool
+        :return: None
+        """
 
-        self.graph = DiGraph()
+        if full_load:
+            self.graph.clear()
+            self.graph.clear_edges()
+        for node in [node for node in nodes if node.get("name", "") not in self.graph.nodes]:
+            self.graph.add_node(node["name"], job=Job(loaded_data=node))
+            job = self.graph.nodes[node["name"]]["job"]
+            if not node.get("platform_name", None):
+                node["platform_name"] = self._as_conf.jobs_data.get(job.section, {}).get("PLATFORM",
+                                                                                         self._as_conf.experiment_data.get(
+                                                                                             "DEFAULT", {}).get(
+                                                                                             "HPCARCH", "LOCAL"))
+            if not job.platform_name:
+                job.platform_name = node.get("platform_name",
+                                             self._as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL"))
 
-        # This generates the job object and also finds if dic_jobs has modified from previous 
-        # iteration in order to expand the workflow
+        for edge in (edge for edge in edges if edge.get("e_from", "") in self.graph.nodes and
+                                               edge.get("e_to", "") in self.graph.nodes):
+            if not self.graph.has_edge(edge["e_from"], edge["e_to"]):
+                self.graph.add_edge(edge["e_from"], edge["e_to"], status=edge["status"],
+                                    completed=edge["completed"],
+                                    from_step=edge["from_step"], optional=edge["optional"])
+                # I would like to avoid this, and only rely in calls on the job_list,
+                # but not feasible changing all the related code
+                self.graph.nodes[edge["e_to"]]["job"].add_parent(
+                    self.graph.nodes[edge["e_from"]]["job"])
+
+    def _load_graph(self, full_load: bool) -> Optional[List[Job]]:
+        """
+        Loads the job graph from the database, creating nodes and edges.
+        :param full_load: If True, loads all jobs and edges, otherwise loads only the necessary ones.
+        :return: None
+        """
+        nodes = self.load_jobs(full_load)
+        edges = self.load_edges(nodes, full_load)
+        self._recreate_graph(nodes, edges, full_load)
+
+        Log.result("Load finished")
+
+    def _create_and_add_jobs(
+            self, show_log: bool, default_job_type: str, date_list: List[str], member_list: List[str]) -> None:
         if show_log:
             Log.info("Creating jobs...")
         self._create_jobs(self._dic_jobs, 0, default_job_type)
-        # This dic_job is key to the dependencies management as they're ordered 
-        # by date[member[chunk]]
+
         if show_log:
             Log.info("Adding dependencies to the graph..")
-        self._add_dependencies(date_list, member_list, chunk_list, self._dic_jobs)
+        self._add_dependencies(date_list, member_list, self._chunk_list, self._dic_jobs)
 
         if show_log:
             Log.info("Adding dependencies to the job..")
         self.update_genealogy()
-        # Checking for member constraints
-        if len(run_only_members) > 0:
-            # Found
-            if show_log:
-                Log.info(f"Considering only members {str(run_only_members)}")
-            old_job_list = [job for job in self._job_list]
-            self._job_list = [
-                job for job in old_job_list if
-                job.member is None or job.member in run_only_members or job.status
-                not in [Status.WAITING, Status.READY]]
-            for job in self._job_list:
-                for jobp in job.parents:
-                    if jobp in self._job_list:
-                        job.parents.add(jobp)
-                for jobc in job.children:
-                    if jobc in self._job_list:
-                        job.children.add(jobc)
+
         if show_log:
             Log.info("Looking for edgeless jobs...")
-
-        # This if allows to have jobs with dependencies set to themselves even if there are no more than one chunk, member or split.
         if len(self.graph.edges) > 0:
             self._delete_edgeless_jobs()
-        if new:
-            for job in self._job_list:
-                job._fail_count = 0
-                if not job.has_parents():
-                    job.status = Status.READY
-                else:
-                    job.status = Status.WAITING
 
+    def _initialize_new_jobs(self) -> None:
+        for job in self.job_list:
+            job._fail_count = 0
+            job.status = Status.READY if not self.has_parents(job.name) else Status.WAITING
+            self.graph.nodes[job.name]["job"] = job
+
+    def has_parents(self, job_name: str) -> bool:
+        """
+        Check if a job has parents in the graph
+        :param job_name: name of the job to check
+        :return: True if the job has parents, False otherwise
+        """
+        return len(self.graph.pred[job_name]) > 0
+
+    def has_children(self, job_name: str) -> bool:
+        """
+        Check if a job has children in the graph
+        :param job_name: name of the job to check
+        :return: True if the job has children, False otherwise
+        """
+        return len(self.graph.succ[job_name]) > 0
+
+    def get_parents_edges(self, job_name: str) -> Dict:
+        """
+        Get the parents of a job in the graph
+        :param job_name: name of the job to check
+        :return: list of parents
+        """
+        names = list(self.graph.predecessors(job_name))
+        return {child_name: self.graph.edges[child_name, job_name] for child_name in names}
+
+    def get_children_edges(self, job_name: str) -> Dict:
+        """
+        Get the children of a job in the graph
+        :param job_name: name of the job to check
+        :return: list of children
+        """
+        names = list(self.graph.successors(job_name))
+        return {child_name: self.graph.edges[job_name, child_name] for child_name in names}
+
+    def _save_workflow_state(
+            self, wrapper_jobs: Dict[str, Any], as_conf: AutosubmitConfig, create: bool, new: bool
+    ) -> None:
+        self.save_jobs()
+        self.save_edges()
+        self._process_wrapper_jobs(wrapper_jobs)
+        for job in self.job_list:
+            self._assign_platforms(as_conf, job, create, new)
+
+    def _process_wrapper_jobs(self, wrapper_jobs: Dict[str, Any]) -> None:
         for wrapper_section in wrapper_jobs:
             try:
-                if (wrapper_jobs[wrapper_section] is not None and
-                        len(str(wrapper_jobs[wrapper_section])) > 0):
-                    self._ordered_jobs_by_date_member[wrapper_section] = (
-                        self._create_sorted_dict_jobs(wrapper_jobs[wrapper_section]))
+                if wrapper_jobs[wrapper_section]:
+                    self._ordered_jobs_by_date_member[wrapper_section] = self._create_sorted_dict_jobs(
+                        wrapper_jobs[wrapper_section]
+                    )
                 else:
                     self._ordered_jobs_by_date_member[wrapper_section] = {}
             except BaseException as e:
-                raise AutosubmitCritical(f"Some section jobs of the wrapper:{wrapper_section} are missing from your "
-                    "JOBS definition in YAML", 7014, str(e))
-        # divide job_list per platform name
-        job_list_per_platform = self.split_by_platform()
-        submitter = _get_submitter(as_conf)
-        submitter.load_platforms(as_conf)
+                raise AutosubmitCritical(
+                    f"Some section jobs of the wrapper:{wrapper_section} are missing from your JOBS definition in YAML",
+                    7014,
+                    str(e),
+                )
 
-        for platform in job_list_per_platform:
-            for job in job_list_per_platform[platform]:
-                if create or new:
-                    job.reset_logs(as_conf)
-                    # The platform mayn't exist. ( The Autosubmit config parser should check this )
-                    if job.platform_name and job.platform_name in submitter.platforms:
-                        job.platform = submitter.platforms[job.platform_name]
+    def _assign_platforms(self, as_conf: AutosubmitConfig, job: Job, create: bool, new: bool,
+                          submitter: Any = None) -> None:
+        if not submitter:
+            submitter = _get_submitter(as_conf)
+            submitter.load_platforms(as_conf)
+        if create or new:
+            job.reset_logs(as_conf)
+        if job.platform_name and job.platform_name in submitter.platforms:
+            job.platform = submitter.platforms[job.platform_name]
 
     def clear_generate(self):
         self.dependency_map = {}
         self.parameters = {}
         self._parameters = {}
-        self.graph.clear()
-        self.graph = None
 
     def split_by_platform(self):
         """
@@ -311,7 +459,7 @@ class JobList(object):
         :rtype: dict
         """
         job_list_per_platform = dict()
-        for job in self._job_list:
+        for job in self.job_list:
             if job.platform_name not in job_list_per_platform:
                 job_list_per_platform[job.platform_name] = []
             job_list_per_platform[job.platform_name].append(job)
@@ -376,10 +524,6 @@ class JobList(object):
             for job in (job for job in dic_jobs.get_jobs(job_section, sort_string=True)):
                 if job.name not in self.graph.nodes:
                     self.graph.add_node(job.name, job=job)
-                # Old versions of autosubmit needs re-adding the job to the graph
-                elif (job.name in self.graph.nodes and
-                      self.graph.nodes.get(job.name).get("job", None) is None):
-                    self.graph.nodes.get(job.name)["job"] = job
 
         for job_section in (section for section in jobs_data.keys()):
             # Changes when all jobs of a section are added
@@ -399,7 +543,6 @@ class JobList(object):
             for job in (job for job in dic_jobs.get_jobs(job_section, sort_string=True)):
                 self.actual_job_depends_on_special_chunk = False
                 if dependencies:
-                    job = self.graph.nodes.get(job.name)['job']
                     # Adds the dependencies to the job, and if not possible,
                     # adds the job to the problematic_dependencies
                     problematic_dependencies = self._manage_job_dependencies(dic_jobs, job,
@@ -439,32 +582,53 @@ class JobList(object):
                 self.graph.remove_edge(relation_to_delete[0], relation_to_delete[1])
 
     @staticmethod
+    def _parse_dependency_yaml_key(key: str) -> Tuple[str, Optional[int], Optional[str]]:
+        """
+        Parses a dependency key from the YAML configuration file.
+        The key can be in the format:
+        - section
+        - section-distance
+        - section+distance
+        - section*distance
+        - section?
+        - section-distance?
+        - section+distance?
+        - section*distance?
+        :param key: The dependency key to parse.
+        :return: A tuple containing the section name, distance (if any), and sign (if any).
+        :rtype: Tuple[str, Optional[int], Optional[str]]
+        """
+
+        distance = None
+        sign = None
+        section = key
+        if key[-1] == '?':
+            section = key[:-1]
+        if '-' in section:
+            sign = '-'
+        elif '+' in section:
+            sign = '+'
+        elif '*' in section:
+            sign = '*'
+
+        if sign:
+            section_split = section.split(sign)
+            section = section_split[0]
+            distance = int(section_split[1])
+        return section, distance, sign
+
+    @staticmethod
     def _manage_dependencies(dependencies_keys: dict, dic_jobs: DicJobs) -> dict[Any, Dependency]:
         parameters = dic_jobs.experiment_data["JOBS"]
         dependencies = dict()
         for key in list(dependencies_keys):
-            distance = None
+            # TODO: This("SPLITS") was always None pre-refactor, not sure if this is a bug or not
             splits = None
-            sign = None
-            if '-' not in key and '+' not in key and '*' not in key and '?' not in key:
-                section = key
-            else:
-                if '?' in key:
-                    sign = '?'
-                    section = key[:-1]
-                else:
-                    if '-' in key:
-                        sign = '-'
-                    elif '+' in key:
-                        sign = '+'
-                    elif '*' in key:
-                        sign = '*'
-                    key_split = key.split(sign)
-                    section = key_split[0]
-                    distance = int(key_split[1])
+            section, distance, sign = JobList._parse_dependency_yaml_key(key)
             if parameters.get(section, None):
                 dependency_running_type = str(parameters[section].get('RUNNING', 'once')).lower()
                 delay = int(parameters[section].get('DELAY', -1))
+                # TODO: Splits is always None? it is like this in the master_branch
                 dependency = Dependency(section, distance, dependency_running_type,
                                         sign, delay, splits, relationships=dependencies_keys[key])
                 dependencies[key] = dependency
@@ -626,8 +790,8 @@ class JobList(object):
             values_list = []  # splits, int list ( artificially generated later )
 
         relationship = relationships.get(level_to_check, {})
-        status = relationship.pop("STATUS", relationships.get("STATUS", None))
-        from_step = relationship.pop("FROM_STEP", relationships.get("FROM_STEP", None))
+        status = relationship.pop("STATUS", relationships.get("STATUS", "COMPLETED"))
+        from_step = relationship.pop("FROM_STEP", relationships.get("FROM_STEP", 0))
         for filter_range, filter_data in relationship.items():
             selected_filter = JobList._parse_filters_to_check(filter_range, values_list,
                                                               level_to_check)
@@ -903,20 +1067,6 @@ class JobList(object):
                 filters_to_apply = relationships
         return filters_to_apply
 
-    def _add_edges_map_info(self, job, special_status):
-        """
-        Special relations to be check in the update_list method
-        :param job: Current job
-        :param parent: parent jobs to check
-        :return:
-        """
-        if special_status not in self.jobs_edges:
-            self.jobs_edges[special_status] = set()
-        self.jobs_edges[special_status].add(job)
-        if "ALL" not in self.jobs_edges:
-            self.jobs_edges["ALL"] = set()
-        self.jobs_edges["ALL"].add(job)
-
     def add_special_conditions(self, job, special_conditions, filters_to_apply, parent):
         """
         Add special conditions to the job edge
@@ -926,28 +1076,19 @@ class JobList(object):
         :param parent: parent job
         :return:
         """
-        if special_conditions.get("STATUS", None):
-
-            if special_conditions.get("FROM_STEP", None):
-                job.max_checkpoint_step = int(special_conditions.get("FROM_STEP", 0)) \
-                    if int(special_conditions.get("FROM_STEP", 0)) > job.max_checkpoint_step \
-                    else job.max_checkpoint_step
-            self._add_edges_map_info(job, special_conditions["STATUS"])  # job_list map
-            job.add_edge_info(parent, special_conditions)  # this job
+        status = special_conditions.get("STATUS", "COMPLETED")
+        from_step = special_conditions.get("FROM_STEP", 0)
+        optional = special_conditions.get("OPTIONAL", False)
+        job.max_checkpoint_step = from_step if int(from_step) > job.max_checkpoint_step else job.max_checkpoint_step
+        self.graph.edges[parent.name, job.name].update(status=status, from_step=from_step, optional=optional)
+        pass
 
     def _apply_jobs_edge_info(self, job, dependencies):
-        # prune first
-        job.edge_info = {}
-        # get dependency that has special conditions set
         filters_to_apply_by_section = dict()
         for key, dependency in dependencies.items():
-            filters_to_apply = self._filter_current_job(job,
-                                                        copy.deepcopy(dependency.relationships))
+            filters_to_apply = self._filter_current_job(job, copy.deepcopy(dependency.relationships))
             if "STATUS" in filters_to_apply:
-                if "-" in key:
-                    key = key.split("-")[0]
-                elif "+" in key:
-                    key = key.split("+")[0]
+                key, _, _ = JobList._parse_dependency_yaml_key(key)
                 filters_to_apply_by_section[key] = filters_to_apply
         if not filters_to_apply_by_section:
             return
@@ -957,15 +1098,14 @@ class JobList(object):
             if self.graph.nodes[parent]['job'].section in filters_to_apply_by_section.keys():
                 if self.graph.nodes[parent]['job'].section not in parents_by_section:
                     parents_by_section[self.graph.nodes[parent]['job'].section] = set()
-                (parents_by_section[self.graph.nodes[parent]['job'].section].
-                 add(self.graph.nodes[parent]['job']))
+                (parents_by_section[self.graph.nodes[parent]['job'].section].add(self.graph.nodes[parent]['job']))
         for key, list_of_parents in parents_by_section.items():
             special_conditions = dict()
-            special_conditions["STATUS"] = filters_to_apply_by_section[key].pop("STATUS", None)
-            special_conditions["FROM_STEP"] = (filters_to_apply_by_section[key].
-                                               pop("FROM_STEP", None))
-            special_conditions["ANY_FINAL_STATUS_IS_VALID"] = (filters_to_apply_by_section[key].
-                                                               pop("ANY_FINAL_STATUS_IS_VALID", False))
+            status = filters_to_apply_by_section[key].get("STATUS", "COMPLETED")
+            status = status if "?" != status[-1] else status[:-1]
+            special_conditions["STATUS"] = status
+            special_conditions["FROM_STEP"] = (filters_to_apply_by_section[key].pop("FROM_STEP", 0))
+            special_conditions["OPTIONAL"] = (filters_to_apply_by_section[key].pop("OPTIONAL", False))
 
             for parent in list_of_parents:
                 self.add_special_conditions(job, special_conditions,
@@ -1057,17 +1197,17 @@ class JobList(object):
                 if job.section == parent.section:
                     if not self.actual_job_depends_on_previous_chunk:
                         if parent.section not in self.dependency_map[job.section]:
-                            graph.add_edge(parent.name, job.name)
+                            graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
                 else:
                     if self.actual_job_depends_on_special_chunk and not self.actual_job_depends_on_previous_chunk:
                         if parent.section not in self.dependency_map[job.section]:
                             if parent.running == job.running:
-                                graph.add_edge(parent.name, job.name)
+                                graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
                     elif not self.actual_job_depends_on_previous_chunk:
-                        graph.add_edge(parent.name, job.name)
+                        graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
                     elif not self.actual_job_depends_on_special_chunk and self.actual_job_depends_on_previous_chunk:
                         if job.running == "chunk" and job.chunk == 1 or job.running == "member" and parent.running == "member" or job.running == "chunk" and parent.running == "chunk":
-                            graph.add_edge(parent.name, job.name)
+                            graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
             else:
                 if job.section == parent.section:
                     if self.actual_job_depends_on_previous_chunk:
@@ -1090,15 +1230,15 @@ class JobList(object):
                                     skip = False
                         if not skip:
                             problematic_dependencies.add(parent.name)
-                            graph.add_edge(parent.name, job.name)
+                            graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
                 else:
                     if job.running == parent.running:
                         skip = False
                         problematic_dependencies.add(parent.name)
-                        graph.add_edge(parent.name, job.name)
+                        graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
                     if parent.running == "chunk":
                         if parent.chunk > (len(chunk_list) - max_distance):
-                            graph.add_edge(parent.name, job.name)
+                            graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
         JobList.handle_frequency_interval_dependencies(chunk, chunk_list, date, date_list, dic_jobs, job,
                                                        member,
                                                        member_list, dependency.section, natural_parents)
@@ -1111,7 +1251,8 @@ class JobList(object):
                     if found:
                         continue
                 problematic_dependencies.add(parent.name)
-                graph.add_edge(parent.name, job.name)
+                graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
+
         return problematic_dependencies
 
     def _calculate_filter_dependencies(self, filters_to_apply, dic_jobs, job, dependency, date,
@@ -1174,12 +1315,12 @@ class JobList(object):
                 if not job.splits or int(job.splits) > 0:
                     self.depends_on_previous_split[job.section] = int(parent.split)
             if self.actual_job_depends_on_previous_chunk and parent.section == job.section:
-                graph.add_edge(parent.name, job.name)
+                graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
                 edge_added = True
             else:
                 if parent.name not in self.depends_on_previous_special_section.get(
                         job.section, set()) or job.split > 0:
-                    graph.add_edge(parent.name, job.name)
+                    graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
                     edge_added = True
             if parent.section == job.section:
                 self.actual_job_depends_on_special_chunk = True
@@ -1206,15 +1347,15 @@ class JobList(object):
 
     def get_filters_to_apply(self, job, dependency):
         filters_to_apply = self._filter_current_job(job, copy.deepcopy(dependency.relationships))
-        filters_to_apply.pop("STATUS", None)
+        filters_to_apply.pop("STATUS", "COMPLETED")
         # Don't do perform special filter if only "FROM_STEP" is applied
         if "FROM_STEP" in filters_to_apply:
             if (filters_to_apply.get("CHUNKS_TO", "none") == "none" and filters_to_apply.
                     get("MEMBERS_TO", "none") == "none" and filters_to_apply.get("DATES_TO", "none")
                     == "none" and filters_to_apply.get("SPLITS_TO", "none") == "none"):
                 filters_to_apply = {}
-        filters_to_apply.pop("FROM_STEP", None)
-        filters_to_apply.pop("ANY_FINAL_STATUS_IS_VALID", None)
+        filters_to_apply.pop("FROM_STEP", 0)
+        filters_to_apply.pop("OPTIONAL", False)
 
         # If the selected filter is "natural" for all filters_to, trigger the natural dependency
         # calculation
@@ -1432,7 +1573,6 @@ class JobList(object):
 
         return problematic_dependencies
 
-
     @staticmethod
     def _calculate_dependency_metadata(chunk, chunk_list, member, member_list, date,
                                        date_list, dependency):
@@ -1569,7 +1709,7 @@ class JobList(object):
 
             for section in wrapper_jobs:
                 # RUNNING = once, as default. This value comes from jobs_.yml
-                sections_running_type_map[section] = str(self._config.experiment_data["JOBS"].
+                sections_running_type_map[section] = str(self._as_conf.experiment_data["JOBS"].
                                                          get(section, {}).get("RUNNING", 'once'))
 
             # Select only relevant jobs, those belonging to the sections defined in the wrapper
@@ -1578,7 +1718,7 @@ class JobList(object):
         for section in sections_running_type_map:
             sections_to_filter += section
 
-        filtered_jobs_list = [job for job in self._job_list if
+        filtered_jobs_list = [job for job in self.job_list if
                               job.section in sections_running_type_map]
 
         filtered_jobs_fake_date_member, fake_original_job_map = self._create_fake_dates_members(
@@ -1715,7 +1855,7 @@ class JobList(object):
         return str_date
 
     def __len__(self):
-        return self._job_list.__len__()
+        return self.job_list.__len__()
 
     def get_date_list(self):
         """
@@ -1751,7 +1891,7 @@ class JobList(object):
         :return: job list
         :rtype: list
         """
-        return self._job_list
+        return self.job_list
 
     def get_date_format(self):
         date_format = ''
@@ -1787,8 +1927,8 @@ class JobList(object):
         :rtype: list
         """
 
-        completed_jobs = [job for job in self._job_list if (platform is None or
-                                                            job.platform.name == platform.name) and job.status == Status.COMPLETED]
+        completed_jobs = [job for job in self.job_list if (platform is None or
+                                                           job.platform.name == platform.name) and job.status == Status.COMPLETED]
         if wrapper:
             return [job for job in completed_jobs if job.packed is False]
         return completed_jobs
@@ -1803,7 +1943,7 @@ class JobList(object):
         :rtype: List[Job]
         """
 
-        completed_failed_jobs = [job for job in self._job_list if
+        completed_failed_jobs = [job for job in self.job_list if
                                  (platform is None or job.platform.name == platform.name) and
                                  (job.status == Status.COMPLETED or job.status == Status.FAILED) and
                                  job.updated_log is False]
@@ -1820,7 +1960,7 @@ class JobList(object):
         :return: completed jobs
         :rtype: list
         """
-        uncompleted_jobs = [job for job in self._job_list if
+        uncompleted_jobs = [job for job in self.job_list if
                             (platform is None or job.platform.name == platform.name) and
                             job.status != Status.COMPLETED]
 
@@ -1841,12 +1981,12 @@ class JobList(object):
         """
         submitted = list()
         if hold:
-            submitted = [job for job in self._job_list if (platform is None or
-                                                           job.platform.name == platform.name) and job.status == Status.SUBMITTED
+            submitted = [job for job in self.job_list if (platform is None or
+                                                          job.platform.name == platform.name) and job.status == Status.SUBMITTED
                          and job.hold == hold]
         else:
-            submitted = [job for job in self._job_list if (platform is None or
-                                                           job.platform.name == platform.name) and job.status == Status.SUBMITTED]
+            submitted = [job for job in self.job_list if (platform is None or
+                                                          job.platform.name == platform.name) and job.status == Status.SUBMITTED]
         if wrapper:
             return [job for job in submitted if job.packed is False]
         return submitted
@@ -1861,8 +2001,8 @@ class JobList(object):
         :return: running jobs
         :rtype: list
         """
-        running = [job for job in self._job_list if (platform is None or
-                                                     job.platform.name == platform.name) and job.status == Status.RUNNING]
+        running = [job for job in self.job_list if (platform is None or
+                                                    job.platform.name == platform.name) and job.status == Status.RUNNING]
         if wrapper:
             return [job for job in running if job.packed is False]
         return running
@@ -1877,8 +2017,8 @@ class JobList(object):
         :return: queuedjobs
         :rtype: list
         """
-        queuing = [job for job in self._job_list if (platform is None or
-                                                     job.platform.name == platform.name) and job.status == Status.QUEUING]
+        queuing = [job for job in self.job_list if (platform is None or
+                                                    job.platform.name == platform.name) and job.status == Status.QUEUING]
         if wrapper:
             return [job for job in queuing if job.packed is False]
         return queuing
@@ -1893,8 +2033,8 @@ class JobList(object):
         :return: failed jobs
         :rtype: list
         """
-        failed = [job for job in self._job_list if (platform is None or
-                                                    job.platform.name == platform.name) and job.status == Status.FAILED]
+        failed = [job for job in self.job_list if (platform is None or
+                                                   job.platform.name == platform.name) and job.status == Status.FAILED]
         if wrapper:
             return [job for job in failed if job.packed is False]
         return failed
@@ -1909,10 +2049,10 @@ class JobList(object):
         :return: all jobs
         :rtype: list
         """
-        unsubmitted = [job for job in self._job_list if (platform is None or
-                                                         job.platform.name == platform.name) and (
-                                   job.status != Status.SUBMITTED and
-                                   job.status != Status.QUEUING and job.status != Status.RUNNING)]
+        unsubmitted = [job for job in self.job_list if (platform is None or
+                                                        job.platform.name == platform.name) and (
+                               job.status != Status.SUBMITTED and
+                               job.status != Status.QUEUING and job.status != Status.RUNNING)]
 
         if wrapper:
             return [job for job in unsubmitted if job.packed is False]
@@ -1929,7 +2069,7 @@ class JobList(object):
         :return: all jobs
         :rtype: list
         """
-        all_jobs = [job for job in self._job_list]
+        all_jobs = [job for job in self.job_list]
 
         if wrapper:
             return [job for job in all_jobs if job.packed is False]
@@ -2011,10 +2151,10 @@ class JobList(object):
         jobs_date = []
         # First Filter {select job by name}
         if select_jobs_by_name != "":
-            jobs_by_name = [job for job in self._job_list if
+            jobs_by_name = [job for job in self.job_list if
                             re.search("(^|[^0-9a-z_])" + job.name.lower() + "([^a-z0-9_]|$)",
                                       select_jobs_by_name.lower()) is not None]
-            jobs_by_name_no_expid = [job for job in self._job_list if
+            jobs_by_name_no_expid = [job for job in self.job_list if
                                      re.search("(^|[^0-9a-z_])" + job.name.lower()[5:] +
                                                "([^a-z0-9_]|$)", select_jobs_by_name.lower()) is not None]
             ultimate_jobs_list.extend(jobs_by_name)
@@ -2022,7 +2162,7 @@ class JobList(object):
 
         # Second Filter { select all }
         if select_all_jobs_by_section != "":
-            all_jobs_by_section = [job for job in self._job_list if
+            all_jobs_by_section = [job for job in self.job_list if
                                    re.search("(^|[^0-9a-z_])" + job.section.upper() +
                                              "([^a-z0-9_]|$)", select_all_jobs_by_section.upper()) is not None]
             ultimate_jobs_list.extend(all_jobs_by_section)
@@ -2050,7 +2190,7 @@ class JobList(object):
                         section_members = section_list[3].strip('mM:[]')
 
                 if section_name != "":
-                    jobs_filtered = [job for job in self._job_list if
+                    jobs_filtered = [job for job in self.job_list if
                                      re.search("(^|[^0-9a-z_])" + job.section.upper() +
                                                "([^a-z0-9_]|$)", section_name.upper()) is not None]
                 if section_dates != "":
@@ -2064,9 +2204,9 @@ class JobList(object):
                                                                re.search(
                                                                    "(^|[^0-9a-z_])" + str(job.chunk) + "([^a-z0-9_]|$)",
                                                                    section_chunks) is not None) and (
-                                              section_members == "" or
-                                              re.search("(^|[^0-9a-z_])" + str(job.member) + "([^a-z0-9_]|$)",
-                                                        section_members.lower()) is not None)]
+                                          section_members == "" or
+                                          re.search("(^|[^0-9a-z_])" + str(job.member) + "([^a-z0-9_]|$)",
+                                                    section_members.lower()) is not None)]
                 ultimate_jobs_list.extend(jobs_final)
         # Duplicates out
         ultimate_jobs_list = list(set(ultimate_jobs_list))
@@ -2084,7 +2224,7 @@ class JobList(object):
         :return: ready jobs
         :rtype: list
         """
-        ready = [job for job in self._job_list if
+        ready = [job for job in self.job_list if
                  (platform is None or platform == "" or job.platform.name == platform.name) and
                  job.status == Status.READY and job.hold is hold]
 
@@ -2101,8 +2241,8 @@ class JobList(object):
         :return: prepared jobs
         :rtype: list
         """
-        prepared = [job for job in self._job_list if (platform is None or
-                                                      job.platform.name == platform.name) and job.status == Status.PREPARED]
+        prepared = [job for job in self.job_list if (platform is None or
+                                                     job.platform.name == platform.name) and job.status == Status.PREPARED]
         return prepared
 
     def get_delayed(self, platform=None):
@@ -2114,8 +2254,8 @@ class JobList(object):
         :return: delayed jobs
         :rtype: list
         """
-        delayed = [job for job in self._job_list if (platform is None or
-                                                     job.platform.name == platform.name) and job.status == Status.DELAYED]
+        delayed = [job for job in self.job_list if (platform is None or
+                                                    job.platform.name == platform.name) and job.status == Status.DELAYED]
         return delayed
 
     def get_waiting(self, platform=None, wrapper=False):
@@ -2128,8 +2268,8 @@ class JobList(object):
         :return: waiting jobs
         :rtype: list
         """
-        waiting_jobs = [job for job in self._job_list if (platform is None or
-                                                          job.platform.name == platform.name) and job.status == Status.WAITING]
+        waiting_jobs = [job for job in self.job_list if (platform is None or
+                                                         job.platform.name == platform.name) and job.status == Status.WAITING]
         if wrapper:
             return [job for job in waiting_jobs if job.packed is False]
         return waiting_jobs
@@ -2143,7 +2283,7 @@ class JobList(object):
         :rtype: list
 
         """
-        waiting_jobs = [job for job in self._job_list if (
+        waiting_jobs = [job for job in self.job_list if (
                 job.platform.type == platform_type and job.status == Status.WAITING)]
         return waiting_jobs
 
@@ -2156,8 +2296,8 @@ class JobList(object):
         :return: jobs in platforms
         :rtype: list
         """
-        return [job for job in self._job_list if (platform is None or
-                                                  job.platform.name == platform.name) and job.status == Status.HELD]
+        return [job for job in self.job_list if (platform is None or
+                                                 job.platform.name == platform.name) and job.status == Status.HELD]
 
     def get_unknown(self, platform=None, wrapper=False):
         """
@@ -2169,8 +2309,8 @@ class JobList(object):
         :return: unknown state jobs
         :rtype: list
         """
-        submitted = [job for job in self._job_list if (platform is None or
-                                                       job.platform.name == platform.name) and job.status == Status.UNKNOWN]
+        submitted = [job for job in self.job_list if (platform is None or
+                                                      job.platform.name == platform.name) and job.status == Status.UNKNOWN]
         if wrapper:
             return [job for job in submitted if job.packed is False]
         return submitted
@@ -2191,6 +2331,49 @@ class JobList(object):
         if wrapper:
             return [job for job in in_queue if job.packed is False]
         return in_queue
+
+    def continue_run(self, submitter):
+        """
+        Loads the next possible jobs and edges from the database and checks if there are active jobs in the workflow.
+        Checks if there are active jobs in the workflow.
+        If there are active jobs, it returns True, otherwise it returns False.
+        """
+
+        self._load_graph(full_load=False)
+        for job in self.job_list:
+            if not job.platform:
+                self._assign_platforms(self._as_conf, job, create=False, new=False, submitter=submitter)
+            # if job.status not in (self._IN_SCHEDULER + self._FINAL_STATUSES):
+            if not job.updated:
+                self.update_parents_edge_completeness(job, ready_job=False if job.status in [Status.WAITING, Status.SUSPENDED] else True)
+                job.update_parameters(self._as_conf, set_attributes=True, reset_logs=False if job.status in (
+                        self._IN_SCHEDULER + self._FINAL_STATUSES) else True)
+
+        self.unload_completed_jobs()
+        Log.debug(f"Jobs loaded: {len(self.job_list)}")
+        Log.debug(f"Edges loaded: {len(self.graph_dict)}")
+        if len(self.get_active()) > 0:
+            return True
+        else:
+            return False
+
+    def unload_completed_jobs(self):
+        """
+        Unloads completed jobs and edges from the memory
+        This method removes jobs that are in the completed state and logs are recovered.
+        """
+        jobs_to_unload = [
+            job for job in self.job_list
+            if job.updated_log and (
+                    (job.status == Status.FAILED and job.fail_count >= job.retrials) or
+                    (job.status in self._FINAL_STATUSES)
+            )
+        ]
+        for job in (job for job in jobs_to_unload):
+            for parent in job.parents:
+                if self.graph.has_edge(parent.name, job.name):
+                    self.graph.remove_edge(parent.name, job.name)
+                self.graph.remove_node(job.name)
 
     def get_active(self, platform=None, wrapper=False):
         """
@@ -2226,7 +2409,7 @@ class JobList(object):
         :return: found job
         :rtype: job
         """
-        for job in self._job_list:
+        for job in self.job_list:
             if job.name == name:
                 return job
         return None
@@ -2253,7 +2436,7 @@ class JobList(object):
             banned_jobs = []
 
         jobs = []
-        for job in self._job_list:
+        for job in self.job_list:
             if job.section.upper() in section_list and job.name not in banned_jobs:
                 if get_only_non_completed:
                     if job.status != Status.COMPLETED:
@@ -2282,7 +2465,7 @@ class JobList(object):
         :return: jobs sorted by name
         :rtype: list
         """
-        return sorted(self._job_list, key=lambda k: k.name)
+        return sorted(self.job_list, key=lambda k: k.name)
 
     def sort_by_id(self):
         """
@@ -2291,7 +2474,7 @@ class JobList(object):
         :return: jobs sorted by ID
         :rtype: list
         """
-        return sorted(self._job_list, key=lambda k: k.id)
+        return sorted(self.job_list, key=lambda k: k.id)
 
     def sort_by_type(self):
         """
@@ -2300,7 +2483,7 @@ class JobList(object):
         :return: job sorted by type
         :rtype: list
         """
-        return sorted(self._job_list, key=lambda k: k.type)
+        return sorted(self.job_list, key=lambda k: k.type)
 
     def sort_by_status(self):
         """
@@ -2309,79 +2492,36 @@ class JobList(object):
         :return: job sorted by status
         :rtype: list
         """
-        return sorted(self._job_list, key=lambda k: k.status)
+        return sorted(self.job_list, key=lambda k: k.status)
 
-    def load(self, create=False, backup=False):
-        """
-        Recreates a stored job list from the persistence
-
-        :return: loaded job list object
-        :rtype: JobList
-        """
-        try:
-            if not backup:
-                Log.info("Loading JobList")
-                return self._persistence.load(self._persistence_path, self._persistence_file)
-            else:
-                return self._persistence.load(self._persistence_path,
-                                              self._persistence_file + "_backup")
-        except ValueError as e:
-            if not create:
-                raise AutosubmitCritical(
-                    f'JobList could not be loaded due pkl being saved with a different version '
-                    f'of Autosubmit or Python version. {e}')
-            else:
-                Log.warning(
-                    f'Job list will be created from scratch due pkl being saved with a different '
-                    f'version of Autosubmit or Python version. {e}')
-        except PermissionError as e:
-            if not create:
-                raise AutosubmitCritical(f'JobList could not be loaded due to permission error.{e}')
-            else:
-                Log.warning(f'Job list will be created from scratch due to permission error. {e}')
-        except BaseException as e:
-            if not backup:
-                Log.debug("Autosubmit will use a backup to recover the job_list")
-                return self.load(create, True)
-            else:
-                if not create:
-                    raise AutosubmitCritical(f"JobList could not be loaded due: "
-                                             f"{e}\nAutosubmit won't do anything")
-                else:
-                    Log.warning(f'Joblist will be created from scratch due: {e}')
-
-    def save(self):
+    def save_jobs(self):
         """
         Persists the job list
         """
-
-        try:
-            job_list = None
-            if self.run_members is not None and len(str(self.run_members)) > 0:
-                job_names = [job.name for job in self._job_list]
-                job_list = [job for job in self._job_list]
-                for job in self._base_job_list:
-                    if job.name not in job_names:
-                        job_list.append(job)
+        if not self.disable_save:
             self.update_status_log()
+            self.dbmanager.save_jobs(self.job_list)
 
-            try:
-                self._persistence.save(self._persistence_path, self._persistence_file,
-                                       self._job_list if self.run_members is None or
-                                                         job_list is None else job_list, self.graph)
-            except BaseException as e:
-                raise AutosubmitError(str(e), 6040, "Failure while saving the job_list")
-        except AutosubmitError as e:
-            raise
-        except BaseException as e:
-            raise AutosubmitError(str(e), 6040, "Unknown failure while saving the job_list")
+    def load_jobs(self, full_load):
+        """
+        Loads the job list
+        """
+        nodes = self.dbmanager.load_jobs(full_load)
+        self.total_size, self.completed_size, self.failed_size = self.dbmanager.get_job_list_size()
+        return nodes
 
-    def backup_save(self):
+    def save_edges(self):
         """
-        Persists the job list
+        Persists the job edges
         """
-        self._persistence.save(self._persistence_path,
-                               self._persistence_file + "_backup", self._job_list)
+        if not self.disable_save:
+            self.dbmanager.save_edges(self.graph_dict)
+
+    def load_edges(self, job_list, full_load=False):
+        """
+        Loads the job edges
+        """
+        return self.dbmanager.load_edges(job_list, full_load)
 
     def update_status_log(self):
 
@@ -2480,24 +2620,19 @@ class JobList(object):
         """
         Check if all parents of a job have the correct status for checkpointing.
 
-        :returns: jobs_to_check - Jobs that fulfill the special conditions.
+        :returns: List of jobs that fulfill the special conditions for checkpointing.
+        :rtype: List[Job]
         """
-        jobs_to_check = []
-        jobs_to_skip = []
-        for target_status, sorted_job_list in self.jobs_edges.items():
-            if target_status == "ALL":
-                continue
-            for job in sorted_job_list:
-                if job.status != Status.WAITING:
-                    continue
-                if target_status in ["RUNNING", "FAILED"]:
-                    self._check_checkpoint(job)
-                non_completed_parents_current, completed_parents = (
-                    self._count_parents_status(job, target_status))
-                if ((len(non_completed_parents_current) + len(completed_parents)) ==
-                        len(job.parents)):
-                    if job not in jobs_to_skip:
-                        jobs_to_check.append(job)
+        jobs_to_check: List[Job] = []
+        for current_job in [current_job for current_job in self.job_list if current_job.status == Status.WAITING]:
+            self._check_checkpoint(current_job)
+            parents_edge_info = self.get_parents_edges(current_job.name)
+            parents_nodes = {parent_name: self.graph.nodes[parent_name]["job"] for parent_name in
+                             parents_edge_info.keys()}
+            non_completed, completed = self._count_parents_status(current_job, parents_edge_info, parents_nodes)
+            if len(non_completed) == 0 and len(completed) > 0:
+                # If all parents are completed, we can run the job
+                jobs_to_check.append(current_job)
         return jobs_to_check
 
     @staticmethod
@@ -2511,29 +2646,82 @@ class JobList(object):
         if job.platform and job.platform.connected:
             job.get_checkpoint_files()
 
-    @staticmethod
-    def _count_parents_status(job: Job, target_status: str) -> Tuple[List[Job], List[Job]]:
+    def _count_parents_status(
+            self,
+            job: Job,
+            parents_edge_info: dict,
+            parents_nodes: dict
+    ) -> Tuple[List[Job], List[Job]]:
         """
-        Count the number of completed and non-completed parents.
+        Count the number of completed and non-completed parent jobs for a given job.
 
-        :param job: The job to check.
-        :param target_status: The target status to compare against.
-        :return: A tuple containing two lists:
-            - non_completed_parents_current: Non-completed parents.
-            - completed_parents: Completed parents.
+        :param job: The job whose parent statuses are to be checked.
+        :type job: Job
+        :param parents_edge_info: Dictionary or list containing information about the edges from parent jobs.
+        :type parents_edge_info: dict
+        :param parents_nodes: Dictionary mapping parent job names to Job objects.
+        :type parents_nodes: dict
+        :returns: A tuple containing two lists:
+            - non_completed_parents: List of parent jobs that are not completed.
+            - completed_parents: List of parent jobs that are completed.
+        :rtype: Tuple[List[Job], List[Job]]
         """
-        non_completed_parents_current = []
-        completed_parents = [parent for parent in job.parents if parent.status == Status.COMPLETED]
-        for parent in job.edge_info[target_status].values():
-            if (target_status in ["RUNNING", "FAILED"] and parent[1] and int(parent[1]) >=
-                    job.current_checkpoint_step):
-                continue
-            current_status = Status.VALUE_TO_KEY[parent[0].status]
-            if (Status.LOGICAL_ORDER.index(current_status) >=
-                    Status.LOGICAL_ORDER.index(target_status)):
-                if parent[0] not in completed_parents:
-                    non_completed_parents_current.append(parent[0])
-        return non_completed_parents_current, completed_parents
+        non_completed = []
+        completed = []
+        for parent_name, edge_info in parents_edge_info.items():
+            parent = parents_nodes[parent_name]
+            p_status = parent.status
+            edge_status = Status.KEY_TO_VALUE[edge_info["status"].upper()]
+            optional = edge_info.get("OPTIONAL", False)
+            from_step = edge_info.get("FROM_STEP", 0)
+
+            # SUSPENDED
+            if p_status == Status.SUSPENDED:
+                non_completed.append(parent)
+            # COMPLETED or SKIPPED
+            elif p_status in [Status.COMPLETED, Status.SKIPPED]:
+                if edge_status in [Status.COMPLETED, Status.SKIPPED]:
+                    completed.append(parent)
+                elif edge_status == Status.FAILED and optional or (job.current_checkpoint_step >= from_step > 0):
+                    completed.append(parent)
+                else:
+                    non_completed.append(parent)
+            # FAILED
+            elif p_status == Status.FAILED:
+                if edge_status == Status.FAILED:
+                    completed.append(parent)
+                elif edge_status in [Status.COMPLETED, Status.SKIPPED]:
+                    if optional or (job.current_checkpoint_step >= from_step > 0):
+                        completed.append(parent)
+                    else:
+                        non_completed.append(parent)
+                else:
+                    non_completed.append(parent)
+            # RUNNING
+            elif p_status == Status.RUNNING:
+                if edge_status == Status.RUNNING:
+                    if job.current_checkpoint_step >= from_step > 0:
+                        completed.append(parent)
+                    elif from_step == 0:
+                        completed.append(parent)
+                    else:
+                        non_completed.append(parent)
+                else:
+                    non_completed.append(parent)
+            # Other statuses
+            else:
+                if p_status == edge_status:
+                    completed.append(parent)
+                elif Status.VALUE_TO_KEY[p_status] in Status.LOGICAL_ORDER_SUCCESS_WORKFLOW:
+                    idx_parent = Status.LOGICAL_ORDER.index(Status.VALUE_TO_KEY[p_status])
+                    idx_edge = Status.LOGICAL_ORDER.index(Status.VALUE_TO_KEY[edge_status])
+                    if idx_parent >= idx_edge:
+                        completed.append(parent)
+                    else:
+                        non_completed.append(parent)
+                else:
+                    non_completed.append(parent)
+        return non_completed, completed
 
     def update_log_status(self, job, as_conf, new_run=False):
         """
@@ -2555,8 +2743,7 @@ class JobList(object):
             job.updated_log = True
             # TODO in pickle -> db/yaml migration(I): 
             #  Do the save of the job here then clean attributes from mem ( or even the full job )
-            job.clean_attributes()
-            # TODO in pickle -> db/yaml migration(II): 
+            # TODO in pickle -> db/yaml migration(II):
             #  And remove these two lines
             # we only want the last one
             job.local_logs = (log_recovered.name, log_recovered.name[:-4] + ".err")
@@ -2591,97 +2778,170 @@ class JobList(object):
                     return log_recovered
         return None
 
-    def update_list(self, as_conf: AutosubmitConfig, store_change: bool = True,
-                    fromSetStatus: bool = False, submitter: object = None,
-                    first_time: bool = False) -> bool:
+    def update_list(
+            self,
+            as_conf: AutosubmitConfig,
+            store_change: bool = True,
+            fromSetStatus: bool = False,
+            submitter: object = None,
+            first_time: bool = False
+    ) -> bool:
         """
-        Updates job list, resetting failed jobs and changing to READY
-        all WAITING jobs with all parents COMPLETED
+        Update the job list, resetting failed jobs and changing to READY all WAITING jobs with all parents in their target status.
 
-        :param first_time:
-        :param submitter:
-        :param fromSetStatus:
-        :param store_change:
-        :param as_conf: autosubmit config object
+        :param as_conf: Autosubmit configuration object.
         :type as_conf: AutosubmitConfig
-        :return: True if job status were modified, False otherwise
+        :param store_change: Whether to store changes after update.
+        :type store_change: bool, optional
+        :param fromSetStatus: If called from set status.
+        :type fromSetStatus: bool, optional
+        :param submitter: Submitter object (unused).
+        :type submitter: object, optional
+        :param first_time: If this is the first run.
+        :type first_time: bool, optional
+        :return: True if any job status was updated, False otherwise.
         :rtype: bool
         """
-        # load updated file list
         save = False
         if self.update_from_file(store_change):
             save = store_change
         Log.debug('Updating FAILED jobs')
         if not first_time:
-            for job in self.get_failed():
-                if as_conf.jobs_data[job.section].get("RETRIALS", None) is None:
-                    retrials = int(as_conf.get_retrials())
-                else:
-                    retrials = int(job.retrials)
-                if job.fail_count < retrials:
-                    job.inc_fail_count()
-                    tmp = [
-                        parent for parent in job.parents if parent.status == Status.COMPLETED]
-                    if len(tmp) == len(job.parents):
-                        aux_job_delay = 0
-                        if job.delay_retrials:
-                            if ("+" == str(job.delay_retrials)[0] or "*" ==
-                                    str(job.delay_retrials)[0]):
-                                aux_job_delay = int(job.delay_retrials[1:])
-                            else:
-                                aux_job_delay = int(job.delay_retrials)
-
-                        if (as_conf.jobs_data[job.section].get("DELAY_RETRY_TIME", None) or
-                                aux_job_delay <= 0):
-                            delay_retry_time = str(as_conf.get_delay_retry_time())
-                        else:
-                            delay_retry_time = job.retry_delay
-                        if "+" in delay_retry_time:
-                            retry_delay = (job.fail_count * int(delay_retry_time[:-1]) +
-                                           int(delay_retry_time[:-1]))
-                        elif "*" in delay_retry_time:
-                            retry_delay = int(delay_retry_time[1:])
-                            for retrial_amount in range(0, job.fail_count):
-                                retry_delay += retry_delay * 10
-                        else:
-                            retry_delay = int(delay_retry_time)
-                        if retry_delay > 0:
-                            job.status = Status.DELAYED
-                            job.delay_end = (datetime.datetime.now() +
-                                             datetime.timedelta(seconds=retry_delay))
-                            Log.debug(f"Resetting job: {job.name} status to: DELAYED for retrial...")
-                        else:
-                            job.status = Status.READY
-                            Log.debug(f"Resetting job: {job.name} status to: READY for retrial...")
-                        job.id = None
-                        save = True
-
-                    else:
-                        job.status = Status.WAITING
-                        save = True
-                        Log.debug(f"Resetting job: {job.name} status to: "
-                                  f"WAITING for parents completion...")
-                else:
-                    job.status = Status.FAILED
-                    save = True
+            save |= self._update_failed_jobs(as_conf)
         else:
-            for job in [job for job in self._job_list if job.status in
-                                                         [Status.WAITING, Status.READY, Status.DELAYED,
-                                                          Status.PREPARED]]:
-                job.fail_count = 0
-        # Check checkpoint jobs, the status can be Any
+            self._reset_jobs_on_first_run()
+        save |= self._handle_special_checkpoint_jobs()
+        # save |= self._sync_completed_jobs(as_conf) # TODO This code was existing before but not sure what is doing?
+        if not fromSetStatus:
+            save |= self._update_waiting_and_delayed_jobs(as_conf)
+            save |= self._update_held_jobs(as_conf)
+            save |= self._skip_jobs(as_conf)
+        for job in self.get_ready():
+            self.update_parents_edge_completeness(job, ready_job=True)
+            job.set_ready_date()
+        self.update_two_step_jobs()
+        Log.debug('Update finished')
+        return save
+
+    def update_parents_edge_completeness(self, job: Job, ready_job: bool) -> None:
+        """
+        Update the 'completed' status of all edges from each parent to the given job.
+
+        :param job: The job whose parent edges will be updated.
+        :type job: Job
+        :param ready_job: The status to set for the edge's 'completed' field.
+        :type ready_job: bool
+        """
+        for parent in job.parents:
+            self.update_edge_completed(
+                e_from=parent.name,
+                e_to=job.name,
+                completed=ready_job
+            )
+
+    def update_edge_completed(self, e_from: str, e_to: str, completed: bool) -> None:
+        """
+        Update the 'completed' status of the edge between two jobs in the graph.
+
+        :param e_from: Name of the parent job.
+        :type e_from: str
+        :param e_to: Name of the child job.
+        :type e_to: str
+        :param completed: The status to set for the edge's 'completed' field.
+        :type completed: bool
+        """
+        if e_from in self.graph_dict and e_to in self.graph_dict[e_from]:
+            self.graph_dict[e_from][e_to]["completed"] = completed
+            Log.debug(f"Edge from {e_from} to {e_to} set to COMPLETED.")
+
+    def _update_failed_jobs(self, as_conf: AutosubmitConfig) -> bool:
+        """
+        Update failed jobs, retrying them if possible or marking as FAILED.
+
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: AutosubmitConfig
+        :return: True if any job status was updated, False otherwise.
+        :rtype: bool
+        """
+        save = False
+        for job in self.get_failed():
+            if as_conf.jobs_data[job.section].get("RETRIALS", None) is None:
+                retrials = int(as_conf.get_retrials())
+            else:
+                retrials = int(job.retrials)
+            if job.fail_count < retrials:
+                job.inc_fail_count()
+                tmp = [parent for parent in job.parents if parent.status == Status.COMPLETED]
+                if len(tmp) == len(job.parents):
+                    aux_job_delay = 0
+                    if job.delay_retrials:
+                        if ("+" == str(job.delay_retrials)[0] or "*" == str(job.delay_retrials)[0]):
+                            aux_job_delay = int(job.delay_retrials[1:])
+                        else:
+                            aux_job_delay = int(job.delay_retrials)
+                    if (as_conf.jobs_data[job.section].get("DELAY_RETRY_TIME", None) or aux_job_delay <= 0):
+                        delay_retry_time = str(as_conf.get_delay_retry_time())
+                    else:
+                        delay_retry_time = job.retry_delay
+                    if "+" in delay_retry_time:
+                        retry_delay = (job.fail_count * int(delay_retry_time[:-1]) + int(delay_retry_time[:-1]))
+                    elif "*" in delay_retry_time:
+                        retry_delay = int(delay_retry_time[1:])
+                        for retrial_amount in range(0, job.fail_count):
+                            retry_delay += retry_delay * 10
+                    else:
+                        retry_delay = int(delay_retry_time)
+                    if retry_delay > 0:
+                        job.status = Status.DELAYED
+                        job.delay_end = (datetime.datetime.now() + datetime.timedelta(seconds=retry_delay))
+                        Log.debug(f"Resetting job: {job.name} status to: DELAYED for retrial...")
+                    else:
+                        job.status = Status.READY
+                        Log.debug(f"Resetting job: {job.name} status to: READY for retrial...")
+                    job.id = None
+                    save = True
+                else:
+                    job.status = Status.WAITING
+                    save = True
+                    Log.debug(f"Resetting job: {job.name} status to: WAITING for parents completion...")
+            else:
+                job.status = Status.FAILED
+                save = True
+        return save
+
+    def _reset_jobs_on_first_run(self) -> None:
+        """
+        Reset fail count for jobs in WAITING, READY, DELAYED, or PREPARED status.
+        """
+        for job in [job for job in self.job_list if job.status in
+                                                    [Status.WAITING, Status.READY, Status.DELAYED, Status.PREPARED]]:
+            job.fail_count = 0
+
+    def _handle_special_checkpoint_jobs(self) -> bool:
+        """
+        Set jobs that fulfill special checkpoint conditions to READY.
+
+        :return: True if any job status was updated, False otherwise.
+        :rtype: bool
+        """
+        save = False
         for job in self.check_special_status():
             job.status = Status.READY
-            # Run start time in format (YYYYMMDDHH:MM:SS) from current time
             job.id = None
             job.wrapper_type = None
             save = True
-            Log.debug(f"Special condition fulfilled for job {job.name}")
-        # if waiting jobs has all parents completed change its State to READY
+            Log.debug(f"JOB: {job.name} was set to READY all parents are in the desired status.")
+        return save
+
+    def _sync_completed_jobs(self) -> bool:
+        """
+        Synchronize jobs with parents' completion status. If
+
+        :return: True if any job status was updated, False otherwise.
+        :rtype: bool
+        """
+        save = False
         for job in self.get_completed():
-            # Log name has this format:
-            # a02o_20000101_fc0_2_SIM.20240212115021.err
-            # $jobname.$(YYYYMMDDHHMMSS).err or .out
             if job.synchronize is not None and len(str(job.synchronize)) > 0:
                 tmp = [parent for parent in job.parents if parent.status == Status.COMPLETED]
                 if len(tmp) != len(job.parents):
@@ -2690,208 +2950,258 @@ class JobList(object):
                             parent.status == Status.SKIPPED or parent.status == Status.FAILED]
                     if len(tmp2) == len(job.parents):
                         for parent in job.parents:
-                            if () and parent.status != Status.COMPLETED:
+                            if parent.status != Status.COMPLETED:
                                 job.status = Status.WAITING
                                 save = True
-                                Log.debug(f"Resetting sync job: {job.name} status to: WAITING "
-                                          "for parents completion...")
+                                Log.debug(
+                                    f"Resetting sync job: {job.name} status to: WAITING for parents completion...")
                                 break
                     else:
                         job.status = Status.WAITING
                         save = True
-                        Log.debug(f"Resetting sync job: {job.name} status to: WAITING "
-                                  "for parents completion...")
-        Log.debug('Updating WAITING jobs')
-        if not fromSetStatus:
-            all_parents_completed = []
-            for job in self.get_delayed():
-                if datetime.datetime.now() >= job.delay_end:
-                    job.status = Status.READY
-            for job in self.get_waiting():
-                tmp = [parent for parent in job.parents if
-                       parent.status == Status.COMPLETED or parent.status == Status.SKIPPED]
-                tmp2 = [parent for parent in job.parents if
-                        parent.status == Status.COMPLETED or parent.status == Status.SKIPPED
-                        or parent.status == Status.FAILED]
-                tmp3 = [parent for parent in job.parents if
-                        parent.status == Status.SKIPPED or parent.status == Status.FAILED]
-                failed_ones = [parent for parent in job.parents if parent.status == Status.FAILED]
-                if job.parents is None or len(tmp) == len(job.parents):
-                    job.status = Status.READY
-                    job.hold = False
-                    Log.debug(f"Setting job: {job.name} status to: READY (all parents completed)...")
-                    if as_conf.get_remote_dependencies() == "true":
-                        all_parents_completed.append(job.name)
-                if job.status != Status.READY:
-                    if len(tmp3) != len(job.parents):
-                        if len(tmp2) == len(job.parents):
-                            strong_dependencies_failure = False
-                            weak_dependencies_failure = False
-                            for parent in failed_ones:
-                                if (parent.name in job.edge_info and job.edge_info[parent.name].
-                                        get('optional', False)):
-                                    weak_dependencies_failure = True
-                                elif parent.section in job.dependencies:
-                                    if parent.status not in [Status.COMPLETED, Status.SKIPPED]:
-                                        strong_dependencies_failure = True
-                                    break
-                            if not strong_dependencies_failure and weak_dependencies_failure:
+                        Log.debug(f"Resetting sync job: {job.name} status to: WAITING for parents completion...")
+        return save
+
+    def _update_waiting_and_delayed_jobs(self, as_conf: AutosubmitConfig) -> bool:
+        """
+        Update jobs in WAITING or DELAYED status based on parent completion and delay timers.
+
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: AutosubmitConfig
+        :return: True if any job status was updated, False otherwise.
+        :rtype: bool
+        """
+        save = False
+        all_parents_completed = []
+        for job in self.get_delayed():
+            if datetime.datetime.now() >= job.delay_end:
+                job.status = Status.READY
+        for job in self.get_waiting():
+            tmp = [parent for parent in job.parents if
+                   parent.status == Status.COMPLETED or parent.status == Status.SKIPPED]
+            tmp2 = [parent for parent in job.parents if
+                    parent.status == Status.COMPLETED or parent.status == Status.SKIPPED
+                    or parent.status == Status.FAILED]
+            tmp3 = [parent for parent in job.parents if
+                    parent.status == Status.SKIPPED or parent.status == Status.FAILED]
+            failed_ones = [parent for parent in job.parents if parent.status == Status.FAILED]
+            if job.parents is None or len(tmp) == len(job.parents):
+                job.status = Status.READY
+                job.hold = False
+                Log.debug(f"Setting job: {job.name} status to: READY (all parents completed)...")
+                if as_conf.get_remote_dependencies() == "true":
+                    all_parents_completed.append(job.name)
+            if job.status != Status.READY:
+                if len(tmp3) != len(job.parents):
+                    if len(tmp2) == len(job.parents):
+                        strong_dependencies_failure = False
+                        weak_dependencies_failure = False
+                        for parent in failed_ones:
+                            if (parent.name in job.edge_info and job.edge_info[parent.name].get('optional', False)):
+                                weak_dependencies_failure = True
+                            elif parent.section in job.dependencies:
+                                if parent.status not in [Status.COMPLETED, Status.SKIPPED]:
+                                    strong_dependencies_failure = True
+                                break
+                        if not strong_dependencies_failure and weak_dependencies_failure:
+                            job.status = Status.READY
+                            job.hold = False
+                            Log.debug(
+                                f"Setting job: {job.name} status to: READY (conditional jobs are completed/failed)...")
+                            break
+                        if as_conf.get_remote_dependencies() == "true":
+                            all_parents_completed.append(job.name)
+                else:
+                    if len(tmp3) == 1 and len(job.parents) == 1:
+                        for parent in job.parents:
+                            if (parent.name in job.edge_info and job.edge_info[parent.name].get('optional', False)):
                                 job.status = Status.READY
                                 job.hold = False
-                                Log.debug(f"Setting job: {job.name} status to: READY "
-                                          "(conditional jobs are completed/failed)...")
+                                Log.debug(
+                                    f"Setting job: {job.name} status to: READY (conditional jobs are completed/failed)...")
                                 break
-                            if as_conf.get_remote_dependencies() == "true":
-                                all_parents_completed.append(job.name)
-                    else:
-                        if len(tmp3) == 1 and len(job.parents) == 1:
-                            for parent in job.parents:
-                                if (parent.name in job.edge_info and job.edge_info[parent.name].
-                                        get('optional', False)):
-                                    job.status = Status.READY
-                                    job.hold = False
-                                    Log.debug(f"Setting job: {job.name} status to: READY"
-                                              " (conditional jobs are completed/failed)...")
-                                    break
-            if as_conf.get_remote_dependencies() == "true":
-                for job in self.get_prepared():
-                    tmp = [
-                        parent for parent in job.parents if parent.status == Status.COMPLETED]
-                    tmp2 = [parent for parent in job.parents if
-                            parent.status == Status.COMPLETED or parent.status == Status.SKIPPED
-                            or parent.status == Status.FAILED]
-                    tmp3 = [parent for parent in job.parents if
-                            parent.status == Status.SKIPPED or parent.status == Status.FAILED]
-                    if len(tmp2) == len(job.parents) and len(tmp3) != len(job.parents):
-                        job.status = Status.READY
-                        # Run start time in format (YYYYMMDDHH:MM:SS) from current time
-                        job.hold = False
-                        save = True
-                        Log.debug("A job in prepared status has all parent completed, job:"
-                                  f"{job.name} status set to: READY ...")
-                Log.debug('Updating WAITING jobs eligible for be prepared')
-                # Setup job name should be a variable
-                for job in self.get_waiting_remote_dependencies('slurm'):
-                    if job.name not in all_parents_completed:
-                        tmp = [parent for parent in job.parents if (
-                                (parent.status == Status.SKIPPED or parent.status == Status.COMPLETED
-                                 or parent.status == Status.QUEUING or parent.status == Status.RUNNING)
-                                and "setup" not in parent.name.lower())]
-                        if len(tmp) == len(job.parents):
-                            job.status = Status.PREPARED
-                            job.hold = True
-                            Log.debug(
-                                f"Setting job: {job.name} status to: Prepared for be held ("
-                                "all parents queuing, running or completed)...")
-
-                Log.debug('Updating Held jobs')
-                if self.job_package_map:
-                    held_jobs = [job for job in self.get_held_jobs() if (
-                            job.id not in list(self.job_package_map.keys()))]
-                    held_jobs += [wrapper_job for wrapper_job in list(self.job_package_map.values())
-                                  if wrapper_job.status == Status.HELD]
-                else:
-                    held_jobs = self.get_held_jobs()
-
-                for job in held_jobs:
-                    # Wrappers and inner jobs
-                    if self.job_package_map and job.id in list(self.job_package_map.keys()):
-                        hold_wrapper = False
-                        for inner_job in job.job_list:
-                            valid_parents = [parent
-                                             for parent in inner_job.parents if parent not in job.job_list]
-                            tmp = [parent
-                                   for parent in valid_parents if parent.status == Status.COMPLETED]
-                            if len(tmp) < len(valid_parents):
-                                hold_wrapper = True
-                        job.hold = hold_wrapper
-                        if not job.hold:
-                            for inner_job in job.job_list:
-                                inner_job.hold = False
-                            Log.debug(
-                                f"Setting job: {job.name} status to: Queuing (all parents completed)...")
-                    else:  # Non-wrapped jobs
-                        tmp = [
-                            parent for parent in job.parents if parent.status == Status.COMPLETED]
-                        if len(tmp) == len(job.parents):
-                            job.hold = False
-                            Log.debug(f"Setting job: {job.name} status to: Queuing (all parents completed)...")
-                        else:
-                            job.hold = True
-            jobs_to_skip = self.get_skippable_jobs(
-                as_conf.get_wrapper_jobs())  # Get A Dict with all jobs that are listed as skippable
-
-            for section in jobs_to_skip:
-                for job in jobs_to_skip[section]:
-                    # Check only jobs to be pending of canceled if not started
-                    if job.status == Status.READY or job.status == Status.QUEUING:
-                        jobdate = date2str(job.date, job.date_format)
-                        if job.running == 'chunk':
-                            for related_job in jobs_to_skip[section]:
-                                if (job.chunk < related_job.chunk and job.member ==
-                                        related_job.member and jobdate == date2str(
-                                            related_job.date, related_job.date_format)):
-                                    try:
-                                        if job.status == Status.QUEUING:
-                                            job.platform.send_command(job.platform.cancel_cmd +
-                                                                      " " + str(job.id), ignore_log=True)
-                                    except Exception as e:
-                                        pass  # jobid finished already
-                                    job.status = Status.SKIPPED
-                                    save = True
-                        elif job.running == 'member':
-                            members = as_conf.get_member_list()
-                            for related_job in jobs_to_skip[section]:
-                                if (members.index(job.member) < members.index(related_job.member)
-                                        and job.chunk == related_job.chunk and jobdate ==
-                                        date2str(related_job.date, related_job.date_format)):
-                                    try:
-                                        if job.status == Status.QUEUING:
-                                            job.platform.send_command(job.platform.cancel_cmd +
-                                                                      " " + str(job.id), ignore_log=True)
-                                    except Exception as e:
-                                        pass  # job_id finished already
-                                    job.status = Status.SKIPPED
-                                    save = True
-            # save = True
-        # Needed so the main process can know if the job was downloaded
-        for job in self.get_ready():
-            job.set_ready_date()
-        self.update_two_step_jobs()
-        Log.debug('Update finished')
+        if as_conf.get_remote_dependencies() == "true":
+            for job in self.get_prepared():
+                tmp = [parent for parent in job.parents if
+                       parent.status == Status.COMPLETED or parent.status == Status.SKIPPED
+                       or parent.status == Status.FAILED]
+                tmp2 = [parent for parent in job.parents if
+                        parent.status == Status.SKIPPED or parent.status == Status.FAILED]
+                if len(tmp) == len(job.parents) and len(tmp2) != len(job.parents):
+                    job.status = Status.READY
+                    job.hold = False
+                    save = True
+                    Log.debug("A job in prepared status has all parent completed, job:"
+                              f"{job.name} status set to: READY ...")
         return save
+
+    def _update_held_jobs(self, as_conf: AutosubmitConfig) -> bool:
+        """
+        Update jobs in HELD status, releasing them if all parents are completed.
+
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: AutosubmitConfig
+        :return: True if any job status was updated, False otherwise.
+        :rtype: bool
+        """
+        save = False
+        Log.debug('Updating Held jobs')
+        if self.job_package_map:
+            held_jobs = [job for job in self.get_held_jobs() if (
+                    job.id not in list(self.job_package_map.keys()))]
+            held_jobs += [wrapper_job for wrapper_job in list(self.job_package_map.values())
+                          if wrapper_job.status == Status.HELD]
+        else:
+            held_jobs = self.get_held_jobs()
+        for job in held_jobs:
+            if self.job_package_map and job.id in list(self.job_package_map.keys()):
+                hold_wrapper = False
+                for inner_job in job.job_list:
+                    valid_parents = [parent for parent in inner_job.parents if parent not in job.job_list]
+                    tmp = [parent for parent in valid_parents if parent.status == Status.COMPLETED]
+                    if len(tmp) < len(valid_parents):
+                        hold_wrapper = True
+                job.hold = hold_wrapper
+                if not job.hold:
+                    for inner_job in job.job_list:
+                        inner_job.hold = False
+                    Log.debug(f"Setting job: {job.name} status to: Queuing (all parents completed)...")
+            else:
+                tmp = [parent for parent in job.parents if parent.status == Status.COMPLETED]
+                if len(tmp) == len(job.parents):
+                    job.hold = False
+                    Log.debug(f"Setting job: {job.name} status to: Queuing (all parents completed)...")
+                else:
+                    job.hold = True
+        return save
+
+    def _skip_jobs(self, as_conf: AutosubmitConfig) -> bool:
+        """
+        Skip jobs that are skippable and meet the skipping criteria.
+
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: AutosubmitConfig
+        :return: True if any job was skipped, False otherwise.
+        :rtype: bool
+        """
+        save = False
+        jobs_to_skip = self.get_skippable_jobs(as_conf.get_wrapper_jobs())
+        for section in jobs_to_skip:
+            for job in jobs_to_skip[section]:
+                if job.status == Status.READY or job.status == Status.QUEUING:
+                    jobdate = date2str(job.date, job.date_format)
+                    if job.running == 'chunk':
+                        for related_job in jobs_to_skip[section]:
+                            if (job.chunk < related_job.chunk and job.member == related_job.member and
+                                    jobdate == date2str(related_job.date, related_job.date_format)):
+                                try:
+                                    if job.status == Status.QUEUING:
+                                        job.platform.send_command(job.platform.cancel_cmd +
+                                                                  " " + str(job.id), ignore_log=True)
+                                except Exception:
+                                    pass
+                                job.status = Status.SKIPPED
+                                save = True
+                    elif job.running == 'member':
+                        members = as_conf.get_member_list()
+                        for related_job in jobs_to_skip[section]:
+                            if (members.index(job.member) < members.index(related_job.member)
+                                    and job.chunk == related_job.chunk and jobdate ==
+                                    date2str(related_job.date, related_job.date_format)):
+                                try:
+                                    if job.status == Status.QUEUING:
+                                        job.platform.send_command(job.platform.cancel_cmd +
+                                                                  " " + str(job.id), ignore_log=True)
+                                except Exception:
+                                    pass
+                                job.status = Status.SKIPPED
+                                save = True
+        return save
+
+    def fill_parents_children(self):  # TODO maybe remove this to revise at the end of the merge
+        """
+        Fill the job._parents and job._children attributes
+        """
+        for u in self.graph:
+            self.graph.nodes[u]["job"].parents = set()
+            self.graph.nodes[u]["job"].children = set()
+        for u in self.graph:
+            self.graph.nodes[u]["job"].add_children([self.graph.nodes[v]["job"] for v in self.graph[u]])
 
     def update_genealogy(self):
         """
         When we have created the job list, every type of job is created.
         Update genealogy remove jobs that have no templates
         """
-        Log.info("Transitive reduction...")
-        # This also adds the jobs edges to the job itself (job._parents and job._children)
-        self.graph = transitive_reduction(self.graph)
-        # update job list view as transitive_Reduction also fills
-        # job._parents and job._children if recreate is set
-        self._job_list = [job["job"] for job in self.graph.nodes().values()]
-        try:
-            DbStructure.save_structure(self.graph, self.expid, Path(self._config.experiment_data["STRUCTURES_DIR"]))
-        except Exception as exp:
-            Log.warning(str(exp))
+        self.fill_parents_children()
+        self.dbmanager.save_edges(self.graph_dict)
 
-    def save_wrappers(self, packages_to_save, failed_packages, as_conf, packages_persistence,
-                      hold=False, inspect=False):
-        for package in packages_to_save:
-            if package.jobs[0].id not in failed_packages:
-                if hasattr(package, "name"):
-                    self.packages_dict[package.name] = package.jobs
-                    from ..job.job import WrapperJob
-                    wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.SUBMITTED, 0,
-                                             package.jobs, package._wallclock, package._num_processors,
-                                             package.platform, as_conf, hold)
-                    self.job_package_map[package.jobs[0].id] = wrapper_job
-                    if isinstance(package, JobPackageThread):
-                        # Saving only when it is a real multi job package
-                        # Need to store the wallclock for the is_overwallclock function
-                        packages_persistence.save(package, inspect)
+    def save_wrappers(
+            self,
+            packages_to_save: List[Any],
+            failed_packages: Set[int],
+            as_conf: Any,
+            hold: bool = False,
+            preview: bool = False
+    ) -> None:
+        """
+        Save wrapper jobs for job packages that are not in the failed set.
+
+        :param packages_to_save: List of job package objects to process.
+        :type packages_to_save: List[Any]
+        :param failed_packages: Set of job IDs that failed and should be skipped.
+        :type failed_packages: Set[int]
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: Any
+        :param hold: Whether to hold the job submission.
+        :type hold: bool
+        :param preview: Whether to run in preview mode.
+        :type preview: bool
+        :return: None
+        :rtype: None
+        """
+        packages_to_save_gen = (
+            package for package in packages_to_save
+            if isinstance(package, JobPackageThread)
+            and package.jobs[0].id not in failed_packages
+            and hasattr(package, "name")
+        )
+        initial_status = Status.SUBMITTED if not preview else Status.COMPLETED
+        for package in packages_to_save_gen:
+            self.packages_dict[package.name] = package.jobs
+            # TODO: For another day, tried to change this, results in a circular import
+            from ..job.job import WrapperJob
+            wrapper_job = WrapperJob(
+                package.name,
+                package.jobs[0].id,
+                initial_status,
+                0,
+                package.jobs,
+                package._wallclock,
+                package._num_processors,
+                package.platform,
+                as_conf,
+                hold
+            )
+            self.job_package_map[package.jobs[0].id] = wrapper_job
+            self.dbmanager.save_wrappers(wrapper_job, as_conf, preview=preview)
+
+    def _wrapper_job_dict(self, wrapper_job: 'WrapperJob') -> Dict[str, Any]:
+        """
+        Returns a dict representation of the attributes to save for a wrapper job.
+        """
+        return {
+            "name": wrapper_job.name,
+            "id": wrapper_job.id,
+            "status": wrapper_job.status,
+            "fail_count": wrapper_job.fail_count,
+            "wallclock": wrapper_job.wallclock,
+            "num_processors": wrapper_job.num_processors,
+            "platform": wrapper_job.platform.name if wrapper_job.platform else None,
+            "hold": wrapper_job.hold,
+            "job_list": [job.name for job in wrapper_job.job_list],
+            "section": wrapper_job.section
+        }
 
     def check_scripts(self, as_conf):
         """
@@ -2905,12 +3215,12 @@ class JobList(object):
         out = True
         # Implementing checking scripts feedback to the users in a minimum of 4 messages
         count = stage = 0
-        for job in (job for job in self._job_list):
+        for job in (job for job in self.job_list):
             job.update_check_variables(as_conf)
             count += 1
-            if (count >= len(self._job_list) / 4 * (stage + 1)) or count == len(self._job_list):
+            if (count >= len(self.job_list) / 4 * (stage + 1)) or count == len(self.job_list):
                 stage += 1
-                Log.info(f"{count} of {len(self._job_list)} checked")
+                Log.info(f"{count} of {len(self.job_list)} checked")
 
             show_logs = str(job.check_warnings).lower()
             if str(job.check).lower() in ['on_submission', 'false']:
@@ -2942,8 +3252,7 @@ class JobList(object):
 
         for parent in job.parents:
             parent.children.remove(job)
-
-        self._job_list.remove(job)
+        self.graph.remove_node(job.name)
 
     def rerun(self, job_list_unparsed, as_conf, monitor=False):
         """
@@ -3010,25 +3319,26 @@ class JobList(object):
         jobs_parser = self._parser_factory.create_parser()
         jobs_parser.optionxform = str
         jobs_parser.load(
-            os.path.join(self._config.LOCAL_ROOT_DIR, self._expid,
+            os.path.join(self._as_conf.LOCAL_ROOT_DIR, self._expid,
                          'conf', "jobs_" + self._expid + ".yaml"))
         return jobs_parser
 
-    def remove_rerun_only_jobs(self, notransitive=False):
+    def remove_rerun_only_jobs(self, notransitive=False):  # TODO
         """
         Removes all jobs to be run only in reruns
         """
         flag = False
-        for job in self._job_list[:]:
+        for job in self.job_list:
             if job.rerun_only == "true":
                 self._remove_job(job)
                 flag = True
-
         if flag:
             self.update_genealogy()
+
         del self._dic_jobs
 
-    def print_with_status(self, status_change: Optional[dict[Any, Any]] = None, nocolor=False, existing_list=None) -> str:
+    def print_with_status(self, status_change: Optional[dict[Any, Any]] = None, nocolor=False,
+                          existing_list=None) -> str:
         """
         Returns the string representation of the dependency tree of the Job List
 
@@ -3046,7 +3356,7 @@ class JobList(object):
         all_jobs = self.get_all() if existing_list is None else existing_list
         # Header
         result = (bcolors.BOLD if nocolor is False else '') + \
-            "## String representation of Job List [" + str(len(all_jobs)) + "] "
+                 "## String representation of Job List [" + str(len(all_jobs)) + "] "
         if status_change is not None and len(str(status_change)) > 0:
             result += ("with " + (bcolors.OKGREEN if nocolor is False else '') +
                        str(len(list(status_change.keys()))) + " Change(s) ##" +
@@ -3414,7 +3724,7 @@ class JobList(object):
 
         current_status = values[3] if (len(values) > 3 and len(
             values[3]) != 14) else status_from_job
-        # TOTAL_STATS last line has more than 3 items, status is different from pkl,
+        # TOTAL_STATS last line has more than 3 items, status is different from db,
         # and status is not "NA"
         if len(values) > 3 and current_status != status_from_job and current_status != "NA":
             current_status = "SUSPICIOUS"
@@ -3428,3 +3738,9 @@ class JobList(object):
             return datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
         else:
             return None
+
+    def update_as_conf(self, as_conf: 'AutosubmitConfig') -> None:
+        self._as_conf = as_conf
+
+    def add_job(self, job: Job):
+        self.graph.add_node(job.name, job=job)
