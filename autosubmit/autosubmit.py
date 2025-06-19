@@ -1790,23 +1790,20 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def generate_scripts_andor_wrappers(as_conf, job_list, jobs_filtered, only_wrappers=False):
+    def generate_scripts_andor_wrappers(as_conf, job_list, only_wrappers=False):
         """
         :param as_conf: Class that handles basic configuration parameters of Autosubmit. \n
         :type as_conf: AutosubmitConfig() Object \n
         :param job_list: Representation of the jobs of the experiment, keeps the list of jobs inside. \n
         :type job_list: JobList() Object \n
-        :param jobs_filtered: list of jobs that are relevant to the process. \n
-        :type jobs_filtered: List() of Job Objects \n
         :param only_wrappers: True when coming from Autosubmit.create(). False when coming from Autosubmit.inspect(), \n
         :type only_wrappers: Boolean \n
         :return: Nothing\n
         :rtype: \n
         """
+        # We don't want to store inspect/-cw related jobs and edges stuff
+        job_list.disable_save = True
         Log.warning("Generating the auxiliary job_list used for the -CW flag.")
-        job_list._job_list = jobs_filtered
-        job_list._persistence_file = job_list._persistence_file + "_cw_flag"
-        parameters = as_conf.load_parameters()
         date_list = as_conf.get_date_list()
         if len(date_list) != len(set(date_list)):
             raise AutosubmitCritical(
@@ -1814,7 +1811,6 @@ class Autosubmit:
         num_chunks = as_conf.get_num_chunks()
         chunk_ini = as_conf.get_chunk_ini()
         member_list = as_conf.get_member_list()
-        run_only_members = as_conf.get_member_list(run_only=True)
         date_format = ''
         if as_conf.get_chunk_size_unit() == 'hour':
             date_format = 'H'
@@ -1844,6 +1840,7 @@ class Autosubmit:
         # Loading parameters again
         Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
         # Related to TWO_STEP_START new variable defined in expdef
+        # TODO: For another day, this was a workaround in AS 3 to fake dependencies for crossdate, this should not be longer neccesary
         unparsed_two_step_start = as_conf.get_parse_two_step_start()
         if unparsed_two_step_start != "":
             job_list.parse_jobs_by_filter(unparsed_two_step_start)
@@ -1852,12 +1849,13 @@ class Autosubmit:
         for job in job_list.get_active():
             if job.status != Status.WAITING:
                 job.status = Status.READY
-        while job_list.get_active():
+        while job_list.continue_run(submitter):
             Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, True,
                                          only_wrappers, hold=False)
             job_list.update_list(as_conf, False)
         for job in job_list.get_job_list():
             job.status = Status.WAITING
+        job_list.disable_save = False
 
     @staticmethod
     def manage_wrapper_job(as_conf, job_list, platform, wrapper_id, save=False):
@@ -2671,7 +2669,7 @@ class Autosubmit:
                         job_list.save_jobs()
                 # Save wrappers(jobs that has the same id) to be visualized and checked in other parts of the code
                 job_list.save_wrappers(valid_packages_to_submit, failed_packages, as_conf,
-                                       hold=hold, inspect=inspect)
+                                       hold=hold, preview=(inspect or only_wrappers))
                 if error_message != "":
                     raise AutosubmitCritical(f"Submission Failed due wrong configuration:{error_message}",7014)
 
@@ -4718,10 +4716,8 @@ class Autosubmit:
                             groups_dict = job_grouping.group_jobs()
                         # WRAPPERS
                         if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrappers:
-                            job_list_wr = Autosubmit.load_job_list(
-                                expid, as_conf, notransitive=notransitive, monitor=True, new=False)
                             Autosubmit.generate_scripts_andor_wrappers(
-                                as_conf, job_list_wr, job_list_wr.get_job_list(), True)
+                                as_conf, job_list, True)
                             packages = None
                             packages = packages_persistence.load(True)
                         else:

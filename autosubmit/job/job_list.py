@@ -53,7 +53,7 @@ class JobList(object):
 
     """
 
-    def __init__(self, expid, config, parser_factory, run_mode=False):
+    def __init__(self, expid, config, parser_factory, run_mode=False, disable_save=False):
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
             self._persistence_path = Path(BasicConfig.LOCAL_ROOT_DIR, expid, "db")
             self._persistence_file = Path("job_list.db")
@@ -97,6 +97,8 @@ class JobList(object):
         self.total_size = 0
         self.completed_size = 0
         self.failed_size = 0
+        # -cw flag, inspect
+        self.disable_save = disable_save
 
     @property
     def graph_dict(self):
@@ -2442,8 +2444,9 @@ class JobList(object):
         """
         Persists the job list
         """
-        self.update_status_log()
-        self.dbmanager.save_jobs(self.job_list)
+        if not self.disable_save:
+            self.update_status_log()
+            self.dbmanager.save_jobs(self.job_list)
 
     def load_jobs(self, full_load):
         """
@@ -2457,7 +2460,8 @@ class JobList(object):
         """
         Persists the job edges
         """
-        self.dbmanager.save_edges(self.graph_dict)
+        if not self.disable_save:
+            self.dbmanager.save_edges(self.graph_dict)
 
     def load_edges(self, job_list, full_load=False):
         """
@@ -3078,22 +3082,54 @@ class JobList(object):
         self.fill_parents_children()
         self.dbmanager.save_edges(self.graph_dict)
 
-    def save_wrappers(self, packages_to_save, failed_packages, as_conf,
-                      hold=False, inspect=False):
-        for package in packages_to_save:
-            if package.jobs[0].id not in failed_packages:
-                if hasattr(package, "name"):
-                    self.packages_dict[package.name] = package.jobs
-                    from ..job.job import WrapperJob
-                    wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.SUBMITTED, 0,
-                                             package.jobs, package._wallclock, package._num_processors,
-                                             package.platform, as_conf, hold)
-                    self.job_package_map[package.jobs[0].id] = wrapper_job
-                    if isinstance(package, JobPackageThread):
-                        # Saving only when it is a real multi job package
-                        # Need to store the wallclock for the is_overwallclock function
-                        # TODO save wrappers
-                        pass
+    def save_wrappers(
+            self,
+            packages_to_save: List[Any],
+            failed_packages: Set[int],
+            as_conf: Any,
+            hold: bool = False,
+            preview: bool = False
+    ) -> None:
+        """
+        Save wrapper jobs for job packages that are not in the failed set.
+
+        :param packages_to_save: List of job package objects to process.
+        :type packages_to_save: List[Any]
+        :param failed_packages: Set of job IDs that failed and should be skipped.
+        :type failed_packages: Set[int]
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: Any
+        :param hold: Whether to hold the job submission.
+        :type hold: bool
+        :param preview: Whether to run in preview mode.
+        :type preview: bool
+        :return: None
+        :rtype: None
+        """
+        packages_to_save_gen = (
+            package for package in packages_to_save
+            if isinstance(package, JobPackageThread)
+            and package.jobs[0].id not in failed_packages
+            and hasattr(package, "name")
+        )
+        for package in packages_to_save_gen:
+            self.packages_dict[package.name] = package.jobs
+            # TODO: For another day, tried to change this, results in a circular import
+            from ..job.job import WrapperJob
+            wrapper_job = WrapperJob(
+                package.name,
+                package.jobs[0].id,
+                Status.SUBMITTED,
+                0,
+                package.jobs,
+                package._wallclock,
+                package._num_processors,
+                package.platform,
+                as_conf,
+                hold
+            )
+            self.job_package_map[package.jobs[0].id] = wrapper_job
+            self.dbmanager.save_wrappers(wrapper_job, as_conf, preview=preview)
 
     def check_scripts(self, as_conf):
         """
