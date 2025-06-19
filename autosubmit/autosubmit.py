@@ -4721,7 +4721,8 @@ class Autosubmit:
                             job_list_wr = Autosubmit.load_job_list(
                                 expid, as_conf, notransitive=notransitive, monitor=True, new=False)
                             Autosubmit.generate_scripts_andor_wrappers(
-                                as_conf, job_list_wr, job_list_wr.get_job_list(), packages_persistence, True)
+                                as_conf, job_list_wr, job_list_wr.get_job_list(), True)
+                            packages = None
                             packages = packages_persistence.load(True)
                         else:
                             packages = None

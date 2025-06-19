@@ -85,6 +85,14 @@ class JobsDbManager(DbManager):
         job_list = self.select_all_with_columns(JobsTable.name)
         return [dict(job) for job in job_list]
 
+    def select_jobs_by_section(self, section: str) -> List[dict[str, Any]]:
+        """
+        Return the jobs from the database that belong to a specific section.
+        """
+        self.create_table(JobsTable.name)
+        job_list = self.select_where_with_columns(JobsTable.name, {'section': section})
+        return [dict(job) for job in job_list]
+
     def select_active_jobs(self) -> List[Union[str, Any]]:
         """
         Return the active jobs from the database (without edges).
@@ -103,7 +111,8 @@ class JobsDbManager(DbManager):
         # make the select need the same structure as similar functions TODO discuss it or revise later
         job_list_tmp = [dict(job) for job in job_list]
         for job in job_list_tmp:
-            child_rows = [dict(child) for child in self.select_where_with_columns(ExperimentStructureTable.name, {'e_from': job['name']})]
+            child_rows = [dict(child) for child in
+                          self.select_where_with_columns(ExperimentStructureTable.name, {'e_from': job['name']})]
             for row in child_rows:
                 children_names.add(row['e_to'])  # e_to
 
@@ -188,8 +197,7 @@ class JobsDbManager(DbManager):
             matches = self.select_where_with_columns(jobs_table.name, {'package_name': package_name})
             for match in matches:
                 # check if the job is already in the job_list
-                if not any(match['name'] == job.get("name") for job in job_list_tmp):
-                    # add the match to the job_list
+                if not any(match['name'] == job.get("name", None) for job in job_list_tmp):
                     job_list.append(matches[0])
 
         # return a hashable tuple to avoid duplicates
@@ -235,8 +243,32 @@ class JobsDbManager(DbManager):
 
 
 
-    # Load possible (temporally) all possible inner_jobs from the databases.
-    # Method to load while building the wrappers.
+    def load_wrappers(self, preview: bool = False) -> Tuple[List[WrapperJob], List[dict[str, Any]]]:
+        """
+        Load the wrapper jobs and their associated information from the database.
 
-    # def load_wrappers(self):
-    # def delete_wrappers(self):
+        :param preview: If True, use preview tables; otherwise, use production tables.
+        :type preview: bool
+        :return: Tuple containing a list of WrapperJob objects and a list of dictionaries with package info.
+        :rtype: Tuple[List[WrapperJob], List[dict[str, Any]]]
+        """
+        if preview:
+            innerjobs_table = PreviewWrapperJobsTable
+            wrapper_info_table = PreviewWrapperInfoTable
+            self.drop_table(innerjobs_table.name)
+            self.drop_table(wrapper_info_table.name)
+        else:
+            innerjobs_table = WrapperJobsTable
+            wrapper_info_table = WrapperInfoTable
+
+        self.create_table(innerjobs_table.name)
+        self.create_table(wrapper_info_table.name)
+
+        # Load wrapper jobs
+        wrapper_jobs_data = self.select_all_with_columns(innerjobs_table.name)
+        wrapper_jobs = [WrapperJob(**data) for data in wrapper_jobs_data]
+
+        # Load wrapper info
+        wrapper_info_data = self.select_all_with_columns(wrapper_info_table.name)
+
+        return wrapper_jobs, wrapper_info_data

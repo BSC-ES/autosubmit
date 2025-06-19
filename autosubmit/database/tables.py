@@ -212,6 +212,7 @@ def create_wrapper_tables(name, metadata_obj_):
         Column("script_name", Text),
         Column("type", Text),
         Column("status", Text),  # TODO Add Custom status column?
+        Column("sections", Text)
     )
     if name == "preview_wrappers":
         table_package_info.append_column(Column("id", Text, nullable=True))
