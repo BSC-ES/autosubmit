@@ -255,6 +255,52 @@ jobs:
           path: coverage.xml
           retention-days: 7
 
+  # NOTE: The docs are already built on ReadTheDocs. We perform another quick build,Add commentMore actions
+  #       without checking or deploying the produced HTML, just to i) verify that
+  #       we can build it and ii) collect the coverage of the examples executed.
+  test-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        python-version: [ "3.9" ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies
+        run: sudo apt-get install -y curl graphviz rsync
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip packaging setuptools twine
+          pip install --upgrade -e .[all]
+
+      # Run regression tests
+      - name: Build docs
+        run: |
+          cd docs && make xml_coverage
+
+      - name: Coverage report
+        run: |
+          cd docs
+          coverage xml
+          coverage report
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage_docs-${{ matrix.python-version }}
+          path: docs/coverage.xml
+          retention-days: 7
+
   test-misc:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -283,7 +329,7 @@ jobs:
           cffconvert --validate -i CITATION.cff
 
   coverage:
-    needs: [test, test-integration, test-regression, test-slurm]
+    needs: [test, test-integration, test-regression, test-slurm, test-docs]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

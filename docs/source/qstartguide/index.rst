@@ -92,7 +92,9 @@ The output of the command will show the <EXPID> of the experiment and generate t
 
 Then, execute ``autosubmit create <EXPID> -np`` and Autosubmit will generate the workflow graph.
 
-.. runcmdquiet:: autosubmit create a000 -o png --hide
+.. runcmd:: autosubmit create a000 -o png --hide
+    :silent-output: 1
+    :prompt:
 
 Run and monitoring
 ==================
@@ -105,9 +107,11 @@ Run and monitoring
 
 While the experiment is running, it can be visualized via ``autosubmit monitor <EXPID>``.
 
-.. runcmdquiet:: find /home/docs/autosubmit/a000/plot/ -maxdepth 1 -daystart -mtime 0 -iname "*a000_*.png" -true -exec mv -- {} ./qstartguide/dummy.pdf \;
+.. runcmd:: find /home/docs/autosubmit/a000/plot/ -iname "*a000_*.png" -true -exec mv -- {} ./qstartguide/dummy.png \;
+    :silent-output: 1
+    :prompt:
 
-.. figure:: dummy.pdf
+.. figure:: dummy.png
    :name: dummy_workflow
    :width: 100%
    :align: center

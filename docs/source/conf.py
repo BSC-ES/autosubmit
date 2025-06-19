@@ -36,8 +36,8 @@ extensions = [
     'sphinx_rtd_theme',
     'sphinx_reredirects',
     'sphinx.ext.graphviz',
+    'sphinx.ext.coverage',
     'autosubmit_variables',
-    'runcmdquiet',
     'runcmd'
 ]
 
