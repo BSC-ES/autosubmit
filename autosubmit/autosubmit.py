@@ -1846,13 +1846,14 @@ class Autosubmit:
             job_list.parse_jobs_by_filter(unparsed_two_step_start)
         job_list.create_dictionary(date_list, member_list, num_chunks, chunk_ini, date_format, as_conf.get_retrials(),
                                    wrapper_jobs, as_conf)
-        for job in job_list.get_active():
-            if job.status != Status.WAITING:
-                job.status = Status.READY
-        while job_list.continue_run(submitter):
+        for job in job_list.get_job_list():
+            if job.status != Status.WAITING and job.status != Status.READY:
+                job.status = Status.WAITING
+        while job_list.get_active():
             Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, True,
                                          only_wrappers, hold=False)
             job_list.update_list(as_conf, False)
+
         for job in job_list.get_job_list():
             job.status = Status.WAITING
         job_list.disable_save = False
@@ -4718,11 +4719,9 @@ class Autosubmit:
                         if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrappers:
                             Autosubmit.generate_scripts_andor_wrappers(
                                 as_conf, job_list, True)
-                            packages = None
-                            packages = packages_persistence.load(True)
-                        else:
-                            packages = None
 
+                        #packages = job_list.dbmanager.load_wrappers(preview=check_wrappers)
+                        packages = None
                         Log.info("\nPlotting the jobs list...")
                         monitor_exp = Monitor()
                         # if output is set, use output

@@ -385,15 +385,7 @@ class Platform(object):
             try:
                 # If called from inspect command or -cw
                 if only_wrappers or inspect:
-                    if hasattr(package, "name"):
-                        job_list.packages_dict[package.name] = package.jobs
-                        from ..job.job import WrapperJob
-                        wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.READY, 0,
-                                                 package.jobs,
-                                                 package._wallclock, package._num_processors,
-                                                 package.platform, as_conf, hold)
-                        job_list.job_package_map[package.jobs[0].id] = wrapper_job
-                        # TODO save wrapper
+                    package.status = Status.COMPLETED
                     for innerJob in package._jobs:
                         any_job_submitted = True
                         # Setting status to COMPLETED, so it does not get stuck in the loop that calls this function
@@ -401,44 +393,43 @@ class Platform(object):
                         innerJob.updated_log = False
 
                 # If called from RUN or inspect command
-                if not only_wrappers:
-                    try:
-                        package.submit(as_conf, job_list.parameters, inspect, hold=hold)
-                        save = True
-                        if not inspect:
-                            job_list.save_jobs()
-                        if package.x11 != "true":
-                            valid_packages_to_submit.append(package)
-                        # Log.debug("FD end-submit: {0}".format(log.fd_show.fd_table_status_str(open()))
-                    except (IOError, OSError):
-                        if package.jobs[0].id != 0:
-                            failed_packages.append(package.jobs[0].id)
-                        continue
-                    except AutosubmitError as e:
-                        if package.jobs[0].id != 0:
-                            failed_packages.append(package.jobs[0].id)
-                        self.connected = False
-                        if e.message.lower().find("bad parameters") != -1 or e.message.lower().find(
-                                "scheduler is not installed") != -1:
-                            error_msg = ""
-                            for package_tmp in valid_packages_to_submit:
-                                for job_tmp in package_tmp.jobs:
-                                    if job_tmp.section not in error_msg:
-                                        error_msg += job_tmp.section + "&"
-                            for job_tmp in package.jobs:
+                try:
+                    package.submit(as_conf, job_list.parameters, inspect or only_wrappers, hold=hold)
+                    save = True
+                    if not inspect:
+                        job_list.save_jobs()
+                    if package.x11 != "true":
+                        valid_packages_to_submit.append(package)
+                    # Log.debug("FD end-submit: {0}".format(log.fd_show.fd_table_status_str(open()))
+                except (IOError, OSError):
+                    if package.jobs[0].id != 0:
+                        failed_packages.append(package.jobs[0].id)
+                    continue
+                except AutosubmitError as e:
+                    if package.jobs[0].id != 0:
+                        failed_packages.append(package.jobs[0].id)
+                    self.connected = False
+                    if e.message.lower().find("bad parameters") != -1 or e.message.lower().find(
+                            "scheduler is not installed") != -1:
+                        error_msg = ""
+                        for package_tmp in valid_packages_to_submit:
+                            for job_tmp in package_tmp.jobs:
                                 if job_tmp.section not in error_msg:
                                     error_msg += job_tmp.section + "&"
-                            if e.message.lower().find("bad parameters") != -1:
-                                error_message += "\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {0}".format(
-                                    error_msg[:-1])
-                            else:
-                                error_message += "\ncheck that {1} platform has set the correct scheduler. Sections that could be affected: {0}".format(
-                                    error_msg[:-1], self.name)
-                    except AutosubmitCritical:
-                        raise
-                    except Exception as e:
-                        self.connected = False
-                        raise
+                        for job_tmp in package.jobs:
+                            if job_tmp.section not in error_msg:
+                                error_msg += job_tmp.section + "&"
+                        if e.message.lower().find("bad parameters") != -1:
+                            error_message += "\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {0}".format(
+                                error_msg[:-1])
+                        else:
+                            error_message += "\ncheck that {1} platform has set the correct scheduler. Sections that could be affected: {0}".format(
+                                error_msg[:-1], self.name)
+                except AutosubmitCritical:
+                    raise
+                except Exception as e:
+                    self.connected = False
+                    raise
 
             except AutosubmitCritical as e:
                 raise

@@ -3112,6 +3112,7 @@ class JobList(object):
             and package.jobs[0].id not in failed_packages
             and hasattr(package, "name")
         )
+        initial_status = Status.SUBMITTED if not preview else Status.COMPLETED
         for package in packages_to_save_gen:
             self.packages_dict[package.name] = package.jobs
             # TODO: For another day, tried to change this, results in a circular import
@@ -3119,7 +3120,7 @@ class JobList(object):
             wrapper_job = WrapperJob(
                 package.name,
                 package.jobs[0].id,
-                Status.SUBMITTED,
+                initial_status,
                 0,
                 package.jobs,
                 package._wallclock,
@@ -3130,6 +3131,23 @@ class JobList(object):
             )
             self.job_package_map[package.jobs[0].id] = wrapper_job
             self.dbmanager.save_wrappers(wrapper_job, as_conf, preview=preview)
+
+    def _wrapper_job_dict(self, wrapper_job: 'WrapperJob') -> Dict[str, Any]:
+        """
+        Returns a dict representation of the attributes to save for a wrapper job.
+        """
+        return {
+            "name": wrapper_job.name,
+            "id": wrapper_job.id,
+            "status": wrapper_job.status,
+            "fail_count": wrapper_job.fail_count,
+            "wallclock": wrapper_job.wallclock,
+            "num_processors": wrapper_job.num_processors,
+            "platform": wrapper_job.platform.name if wrapper_job.platform else None,
+            "hold": wrapper_job.hold,
+            "job_list": [job.name for job in wrapper_job.job_list],
+            "section": wrapper_job.section
+        }
 
     def check_scripts(self, as_conf):
         """
