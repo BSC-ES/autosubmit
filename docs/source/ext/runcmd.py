@@ -125,7 +125,7 @@ class RunCmdDirective(code.CodeBlock):
         "replace": directives.unchanged,
         "prompt": directives.flag,
         "dedent-output": int,
-        "working-directory": directives.unchanged
+        "working-directory": directives.unchanged,
     }
 
     def run(self):
@@ -159,15 +159,14 @@ class RunCmdDirective(code.CodeBlock):
         # prompt = "prompt" in self.options
         # We patched this so that the prompt is displayed by default, similar
         # to how ``{code-block} console`` works.
-        prompt = True
         dedent_output = self.options.get("dedent-output", 0)
 
         # Dedent the output if required
         if dedent_output > 0:
-            output = "\n\nOutput:\n".join([x[dedent_output:] for x in output.split("\n")])
+            output = ""
 
         # Add the prompt to our output if required
-        if prompt:
+        if 'prompt' not in self.options:
             output = f"$ {command}\n\nOutput:\n{output}"
 
         # Do our "replace" syntax on the command output

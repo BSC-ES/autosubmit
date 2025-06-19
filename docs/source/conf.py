@@ -36,8 +36,8 @@ extensions = [
     'sphinx_rtd_theme',
     'sphinx_reredirects',
     'sphinx.ext.graphviz',
+    'sphinx.ext.coverage',
     'autosubmit_variables',
-    'runcmdquiet',
     'runcmd'
 ]
 
@@ -332,6 +332,8 @@ texinfo_documents = [
      author, 'autosubmit', 'One line description of project.',
      'Miscellaneous'),
 ]
+
+suppress_warnings = ['misc.highlighting_failure', 'ref.doc']
 
 # Documents to append as an appendix to all manuals.
 # texinfo_appendices = []

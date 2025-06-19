@@ -66,6 +66,11 @@ watch: clean
 			--watch='source' \
 			$(SPHINXOPTS) $(O)
 
+xml_coverage:
+	coverage run $$(which $(SPHINXBUILD)) -b xml $(ALLSPHINXOPTS) $(BUILDDIR)/xml
+	@echo
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html. Coverage in $(BUILDDIR)/htmlcov."
+
 html:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
