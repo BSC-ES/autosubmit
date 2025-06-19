@@ -138,11 +138,12 @@ JobDataTable = Table(
     UniqueConstraint("counter", "job_name", name="unique_counter_and_job_name"),
 )
 
-JobStatusEnum = Enum(
-    "WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING",
-    "SKIPPED", "FAILED", "UNKNOWN", "COMPLETED", "SUSPENDED",
-    name="job_status_enum"
-)
+# TODO this doesn't work in POSTGRESQL
+# JobStatusEnum = Enum(
+#     "WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING",
+#     "SKIPPED", "FAILED", "UNKNOWN", "COMPLETED", "SUSPENDED",
+#     name="job_status_enum"
+# )
 
 """All these tables will go inside the $expid/db/job_list.db."""
 # Jobs table
@@ -154,7 +155,7 @@ JobsTable = Table(
     Column("id", Integer),
     Column("script_name", String),
     Column("priority", Integer),
-    Column("status", JobStatusEnum, nullable=False),
+    Column("status", String, nullable=False), # Should be job_status_enum
     Column("frequency", String),  # TODO move to Section table ?
     Column("synchronize", Boolean),  # TODO move to Section table ?
     Column("section", String, ForeignKey("sections.name")),  # TODO Foreign key?

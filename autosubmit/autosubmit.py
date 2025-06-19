@@ -2868,7 +2868,7 @@ class Autosubmit:
                 "Jobs can't be grouped, perhaps you're using an invalid format. Take a look into readthedocs", 7011,
                 str(e))
 
-        monitor_exp = Monitor()
+        monitor_exp = Monitor(edge_info=job_list.graph_dict_by_job_name)
         try:
             if txt_only or txt_logfiles or file_format == "txt":
                 monitor_exp.generate_output_txt(expid, jobs, os.path.join(
@@ -2965,7 +2965,7 @@ class Autosubmit:
             if len(jobs) > 0:
                 try:
                     Log.info("Plotting stats...")
-                    monitor_exp = Monitor()
+                    monitor_exp = Monitor(edge_info=job_list.graph_dict_by_job_name)
                     # noinspection PyTypeChecker
                     report_created = monitor_exp.generate_output_stats(expid, jobs, file_format, hide, section_summary,
                                                                        jobs_summary, period_ini, period_fi,
@@ -3179,7 +3179,7 @@ class Autosubmit:
             if not noplot:
                 from .monitor.monitor import Monitor
                 Log.info("\nPlotting the jobs list...")
-                monitor_exp = Monitor()
+                monitor_exp = Monitor(edge_info=job_list.graph_dict_by_job_name)
                 monitor_exp.generate_output(expid,
                                             job_list.get_job_list(),
                                             os.path.join(
@@ -4624,12 +4624,6 @@ class Autosubmit:
                         raise AutosubmitCritical(f"The plot folder doesn't exists. Make sure that the 'plot'"
                                                  f" folder exists in the following path: {exp_path}", code=6013)
 
-                    persistence_file = 'job_list.db'
-                    persistence_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid / "db"
-
-                    update_job = not check_db_path(persistence_path / persistence_file, must_exists = False)
-                    Autosubmit._create_project_associated_conf(
-                        as_conf, False, update_job)
 
                     # Load parameters
                     Log.info("Loading parameters...")
@@ -4723,7 +4717,7 @@ class Autosubmit:
                         #packages = job_list.dbmanager.load_wrappers(preview=check_wrappers)
                         packages = None
                         Log.info("\nPlotting the jobs list...")
-                        monitor_exp = Monitor()
+                        monitor_exp = Monitor(edge_info=job_list.graph_dict_by_job_name)
                         # if output is set, use output
                         monitor_exp.generate_output(expid, job_list.get_job_list(),
                                                     os.path.join(
@@ -5511,7 +5505,7 @@ class Autosubmit:
                                                    expanded_status=status)
                         groups_dict = job_grouping.group_jobs()
                     Log.info("\nPlotting joblist...")
-                    monitor_exp = Monitor()
+                    monitor_exp = Monitor(edge_info=job_list.graph_dict_by_job_name)
                     monitor_exp.generate_output(expid,
                                                 job_list.get_job_list(),
                                                 os.path.join(

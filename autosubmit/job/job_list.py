@@ -114,7 +114,7 @@ class JobList(object):
                 "e_to": e_to,
                 "status": attributes.get("status", "COMPLETED"),
                 "from_step": attributes.get("from_step", 0),
-                "optional": attributes.get("optional", True),
+                "optional": attributes.get("optional", False),
                 "completed": attributes.get("completed", False),  # check if the edge completion status is fullfilled or not
                 # TODO this should be False once this is fixed: related to  https://github.com/BSC-ES/autosubmit/pull/2006 https://github.com/BSC-ES/autosubmit/issues/2373
             })
@@ -128,9 +128,44 @@ class JobList(object):
         raise AttributeError("graph_dict is a dynamic view and cannot be directly modified.")
 
     @property
+    def graph_dict_by_job_name(self):
+        """
+        Converts the graph edges into a dictionary structure matching the ExperimentStructureTable.
+        :return: A list of dictionaries representing the edges.
+        """
+        edges_by_job_name = {}
+        for edge in self.graph.edges(data=True):
+            e_from, e_to, attributes = edge
+            if e_from not in edges_by_job_name:
+                edges_by_job_name[e_from] = []
+            edges_by_job_name[e_from].append({
+                "e_to": e_to,
+                "status": attributes.get("status", "COMPLETED"),
+                "from_step": attributes.get("from_step", 0),
+                "optional": attributes.get("optional", False),
+                "completed": attributes.get("completed", False),
+                # check if the edge completion status is fullfilled or not
+            })
+        return edges_by_job_name
+
+    @graph_dict_by_job_name.setter
+    def graph_dict_by_job_name(self, value):
+        """
+        Prevent direct modification of the graph_dict.
+        """
+        raise AttributeError("graph_dict is a dynamic view and cannot be directly modified.")
+
+    @property
     def job_list(self) -> List[Job]:
         """Dynamically return a list of all 'job' attributes from the graph nodes."""
-        return [data['job'] for _, data in self.graph.nodes(data=True)]
+        try:
+            return [data['job'] for _, data in self.graph.nodes(data=True)]
+        except BaseException as e:
+            err_msg = ""
+            for node in self.graph.nodes:
+                if not isinstance(self.graph.nodes[node], dict) or 'job' not in self.graph.nodes[node]:
+                    err_msg += f"Node {node} does not have a 'job' attribute.\n"
+            raise AutosubmitCritical(f"Error retrieving job list: {err_msg}", 7013, str(e))
 
     @job_list.setter
     def job_list(self, value):
@@ -300,7 +335,7 @@ class JobList(object):
             if not self.graph.has_edge(edge["e_from"], edge["e_to"]):
                 self.graph.add_edge(edge["e_from"], edge["e_to"], status=edge["status"],
                                     completed=edge["completed"],
-                                    from_step=edge["from_step"])
+                                    from_step=edge["from_step"], optional=edge["optional"])
                 # I would like to avoid this, and only rely in calls on the job_list,
                 # but not feasible changing all the related code
                 self.graph.nodes[edge["e_to"]]["job"].add_parent(
@@ -547,32 +582,53 @@ class JobList(object):
                 self.graph.remove_edge(relation_to_delete[0], relation_to_delete[1])
 
     @staticmethod
+    def _parse_dependency_yaml_key(key: str) -> Tuple[str, Optional[int], Optional[str]]:
+        """
+        Parses a dependency key from the YAML configuration file.
+        The key can be in the format:
+        - section
+        - section-distance
+        - section+distance
+        - section*distance
+        - section?
+        - section-distance?
+        - section+distance?
+        - section*distance?
+        :param key: The dependency key to parse.
+        :return: A tuple containing the section name, distance (if any), and sign (if any).
+        :rtype: Tuple[str, Optional[int], Optional[str]]
+        """
+
+        distance = None
+        sign = None
+        section = key
+        if key[-1] == '?':
+            section = key[:-1]
+        if '-' in section:
+            sign = '-'
+        elif '+' in section:
+            sign = '+'
+        elif '*' in section:
+            sign = '*'
+
+        if sign:
+            section_split = section.split(sign)
+            section = section_split[0]
+            distance = int(section_split[1])
+        return section, distance, sign
+
+    @staticmethod
     def _manage_dependencies(dependencies_keys: dict, dic_jobs: DicJobs) -> dict[Any, Dependency]:
         parameters = dic_jobs.experiment_data["JOBS"]
         dependencies = dict()
         for key in list(dependencies_keys):
-            distance = None
+            # TODO: This("SPLITS") was always None pre-refactor, not sure if this is a bug or not
             splits = None
-            sign = None
-            if '-' not in key and '+' not in key and '*' not in key and '?' not in key:
-                section = key
-            else:
-                if '?' in key:
-                    sign = '?'
-                    section = key[:-1]
-                else:
-                    if '-' in key:
-                        sign = '-'
-                    elif '+' in key:
-                        sign = '+'
-                    elif '*' in key:
-                        sign = '*'
-                    key_split = key.split(sign)
-                    section = key_split[0]
-                    distance = int(key_split[1])
+            section, distance, sign = JobList._parse_dependency_yaml_key(key)
             if parameters.get(section, None):
                 dependency_running_type = str(parameters[section].get('RUNNING', 'once')).lower()
                 delay = int(parameters[section].get('DELAY', -1))
+                # TODO: Splits is always None? it is like this in the master_branch
                 dependency = Dependency(section, distance, dependency_running_type,
                                         sign, delay, splits, relationships=dependencies_keys[key])
                 dependencies[key] = dependency
@@ -1022,18 +1078,17 @@ class JobList(object):
         """
         status = special_conditions.get("STATUS", "COMPLETED")
         from_step = special_conditions.get("FROM_STEP", 0)
+        optional = special_conditions.get("OPTIONAL", False)
         job.max_checkpoint_step = from_step if int(from_step) > job.max_checkpoint_step else job.max_checkpoint_step
-        self.graph.edges[parent.name, job.name].update(status=status, from_step=from_step)
+        self.graph.edges[parent.name, job.name].update(status=status, from_step=from_step, optional=optional)
+        pass
 
     def _apply_jobs_edge_info(self, job, dependencies):
         filters_to_apply_by_section = dict()
         for key, dependency in dependencies.items():
             filters_to_apply = self._filter_current_job(job, copy.deepcopy(dependency.relationships))
             if "STATUS" in filters_to_apply:
-                if "-" in key:
-                    key = key.split("-")[0]
-                elif "+" in key:
-                    key = key.split("+")[0]
+                key, _, _ = JobList._parse_dependency_yaml_key(key)
                 filters_to_apply_by_section[key] = filters_to_apply
         if not filters_to_apply_by_section:
             return
@@ -1043,15 +1098,14 @@ class JobList(object):
             if self.graph.nodes[parent]['job'].section in filters_to_apply_by_section.keys():
                 if self.graph.nodes[parent]['job'].section not in parents_by_section:
                     parents_by_section[self.graph.nodes[parent]['job'].section] = set()
-                (parents_by_section[self.graph.nodes[parent]['job'].section].
-                 add(self.graph.nodes[parent]['job']))
+                (parents_by_section[self.graph.nodes[parent]['job'].section].add(self.graph.nodes[parent]['job']))
         for key, list_of_parents in parents_by_section.items():
             special_conditions = dict()
-            special_conditions["STATUS"] = filters_to_apply_by_section[key].pop("STATUS", "COMPLETED")
-            special_conditions["FROM_STEP"] = (filters_to_apply_by_section[key].
-                                               pop("FROM_STEP", 0))
-            special_conditions["OPTIONAL"] = (filters_to_apply_by_section[key].
-                                                               pop("OPTIONAL", False))
+            status = filters_to_apply_by_section[key].get("STATUS", "COMPLETED")
+            status = status if "?" != status[-1] else status[:-1]
+            special_conditions["STATUS"] = status
+            special_conditions["FROM_STEP"] = (filters_to_apply_by_section[key].pop("FROM_STEP", 0))
+            special_conditions["OPTIONAL"] = (filters_to_apply_by_section[key].pop("OPTIONAL", False))
 
             for parent in list_of_parents:
                 self.add_special_conditions(job, special_conditions,
