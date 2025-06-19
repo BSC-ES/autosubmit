@@ -155,7 +155,7 @@ JobsTable = Table(
     Column("id", Integer),
     Column("script_name", String),
     Column("priority", Integer),
-    Column("status", String, nullable=False), # Should be job_status_enum
+    Column("status", String, nullable=False),  # Should be job_status_enum
     Column("frequency", String),  # TODO move to Section table ?
     Column("synchronize", Boolean),  # TODO move to Section table ?
     Column("section", String, ForeignKey("sections.name")),  # TODO Foreign key?
@@ -209,16 +209,36 @@ def create_wrapper_tables(name, metadata_obj_):
     table_package_info = Table(
         f"{name}_info",
         metadata_obj_,
-        Column("package_name", Text, primary_key=True),
+        Column("name", String, nullable=False, primary_key=True),
+        Column("id", Integer),
+        Column("script_name", String),
+        Column("status", String, nullable=False),  # Should be job_status_enum
+        Column("local_logs_out", String),  # TODO: We should recover the log from the remote at some point
+        Column("local_logs_err", String),  # TODO: We should recover the log from the remote at some point
+        Column("remote_logs_out", String),  # TODO: We should recover the log from the remote at some point
+        Column("remote_logs_err", String),  # TODO: We should recover the log from the remote at some point
+        Column("updated_log", Boolean),  # TODO: We should recover the log from the remote at some point
+
+        Column("platform_name", String),
         Column("script_name", Text),
         Column("type", Text),
-        Column("status", Text),  # TODO Add Custom status column?
-        Column("sections", Text)
+        Column("status", Text),
+        Column("sections", Text),
+        Column("method", Text),
+
+
     )
-    if name == "preview_wrappers":
-        table_package_info.append_column(Column("id", Text, nullable=True))
-    else:
-        table_package_info.append_column(Column("id", Text, nullable=False))
+    wrapper_job = WrapperJob(
+        0,
+        package.jobs,
+        package._wallclock,
+        package._num_processors,
+        package.platform,
+        as_conf,
+        hold
+    )
+
+    table_package_info.append_column(Column("id", Text, nullable=False))
     table_jobs_inside_wrapper = Table(
         f"{name}_jobs",
         metadata_obj_,
