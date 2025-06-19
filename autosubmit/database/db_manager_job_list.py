@@ -26,9 +26,10 @@ from autosubmit.database import session
 from autosubmit.database.db_common import check_db_path, get_connection_url
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmit.database.db_manager import DbManager
-from autosubmit.database.tables import ExperimentStructureTable
+from autosubmit.database.tables import ExperimentStructureTable, PreviewWrapperJobsTable, WrapperJobsTable, \
+    PreviewWrapperInfoTable, WrapperInfoTable
 from autosubmit.database.tables import JobsTable
-from autosubmit.job.job import Job
+from autosubmit.job.job import Job, WrapperJob
 from log.log import Log
 
 
@@ -151,3 +152,91 @@ class JobsDbManager(DbManager):
         self.create_table(ExperimentStructureTable.name)
         self.delete_all(ExperimentStructureTable.name)
         self.save_edges(graph)
+
+    # Once wrappers are built, they are saved in the database.
+    def select_inner_jobs(self, job_list: List[Union[str, Any]], preview: bool = False) -> List[Union[str, Any]]:
+        """
+        Select inner jobs from the database based on the provided loaded job list.
+        This function retrieves jobs that form part of the same package.
+        param job_list: List of jobs to find inner jobs for.
+        param preview: If True, use the preview tables; otherwise, use the main tables.
+        return: List of inner jobs that are children of the provided job list.
+        :rtype: List[dict[str, Any]]
+        """
+
+        jobs_table = JobsTable
+        if preview:
+            innerjobs_table = PreviewWrapperJobsTable
+        else:
+            innerjobs_table = WrapperJobsTable
+        self.create_table(innerjobs_table.name)
+        self.create_table(jobs_table.name)
+
+        packages_names = set()
+        job_list_tmp = [dict(job) for job in job_list]
+
+        # find package_name
+        for job in job_list_tmp:
+            where_query = {'job_name': job['name']}
+            row = self.select_where_with_columns(innerjobs_table.name, where_query)
+            # from row, obtain the package_name
+            if row:
+                packages_names.add(row['package_name'])
+
+        # load all inner jobs that match the package_name
+        for package_name in packages_names:
+            matches = self.select_where_with_columns(jobs_table.name, {'package_name': package_name})
+            for match in matches:
+                # check if the job is already in the job_list
+                if not any(match['name'] == job.get("name") for job in job_list_tmp):
+                    # add the match to the job_list
+                    job_list.append(matches[0])
+
+        # return a hashable tuple to avoid duplicates
+        return job_list
+
+    # WRAPPERS
+    # At this point, we already built the wrappers, so we can save them in the database.
+    def save_wrappers(
+            self,
+            packages_info: Dict[str, dict],
+            package_inner_jobs: List[dict],
+            preview: bool = False
+    ) -> None:
+        """
+        Save the wrapper jobs and their associated information to the database.
+
+        :param packages_info: Dictionary mapping package names to their info dictionaries.
+        :type packages_info: Dict[str, dict]
+        :param package_inner_jobs: List of dictionaries, each representing an inner job for a package.
+        :type package_inner_jobs: List[dict]
+        :param preview: If True, use preview tables; otherwise, use production tables.
+        :type preview: bool
+        :return: None
+        :rtype: None
+        """
+        if preview:
+            innerjobs_table = PreviewWrapperJobsTable
+            wrapper_info_table = PreviewWrapperInfoTable
+        else:
+            innerjobs_table = WrapperJobsTable
+            wrapper_info_table = WrapperInfoTable
+
+        self.create_table(innerjobs_table.name)
+        self.create_table(wrapper_info_table.name)
+
+        pkeys = ['package_name', 'job_name']
+        for p in package_inner_jobs:
+            self.upsert_many(innerjobs_table.name, p, pkeys)
+
+        pkeys = ['package_name']
+        for package_name, info in packages_info.items():
+            self.upsert_many(wrapper_info_table.name, {'package_name': package_name, **info}, pkeys)
+
+
+
+    # Load possible (temporally) all possible inner_jobs from the databases.
+    # Method to load while building the wrappers.
+
+    # def load_wrappers(self):
+    # def delete_wrappers(self):
