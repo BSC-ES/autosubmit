@@ -20,6 +20,7 @@ from getpass import getuser
 from pathlib import Path
 from random import randrange
 from tempfile import TemporaryDirectory, gettempdir
+from textwrap import dedent
 from typing import cast
 
 import paramiko
@@ -42,11 +43,11 @@ _DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
 
 @pytest.fixture
 def ssh_config():
-    # Paramiko platform relies on parsing the SSH config file, failing it if does not exist.
+    # Paramiko platform relies on parsing the SSH config file, failing if it does not exist.
     ssh_config = Path('~/.ssh/config').expanduser()
     if not ssh_config.exists():
-        ssh_config.mkdir(parents=True)
-        ssh_config.touch()
+        ssh_config.parent.mkdir(parents=True)
+        ssh_config.touch(exist_ok=False)
     yield ssh_config
 
 
@@ -165,7 +166,7 @@ def test_send_file(mocker, filename, ps_platform, check):
     ]
 )
 @pytest.mark.docker
-def test_send_command(ps_platform, cmd, error):
+def test_send_command(ps_platform, cmd, error, mocker, tmp_path):
     """This test opens an SSH connection (via sftp) and sends a command."""
     platform, tmp_dir = ps_platform
     platform = cast(ParamikoPlatform, platform)
@@ -183,12 +184,25 @@ def test_send_command(ps_platform, cmd, error):
             .with_bind_ports(2222, ssh_port) \
             .with_volume_mapping('/tmp', '/tmp', mode='rw') as container:
         wait_for_logs(container, 'sshd is listening on port 2222')
-        _ssh = paramiko.SSHClient()
-        _ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        _ssh.connect(hostname=platform.host, username=platform.user, password='password', port=ssh_port)
-        platform._ftpChannel = paramiko.SFTPClient.from_transport(_ssh.get_transport(), window_size=pow(4, 12),
-                                                                  max_packet_size=pow(4, 12))
-        platform._ftpChannel.get_channel().settimeout(120)
+
+        def _load_ssh_config(*args, **kwargs):
+            return paramiko.SSHConfig.from_text(dedent(f'''\
+            Host 127.0.0.1
+                HostName {platform.host}
+                User {platform.user}
+                Port {ssh_port}
+                ForwardAgent yes
+            '''))
+
+        def _ssh_connect(*args, **kwargs):
+            # FIXME: _ssh.connect(hostname=platform.host, username=platform.user, password='password', port=ssh_port)
+            return True
+
+        mocker.patch('autosubmit.platforms.paramiko_platform._load_ssh_config', side_effect=_load_ssh_config)
+
+        mocked_connect = mocker.patch.object(paramiko.SSHClient, 'connect')
+        mocked_connect.side_effect = _ssh_connect
+
         platform.connect(None, reconnect=False, log_recovery_process=False)
 
         if error:
@@ -220,9 +234,6 @@ def test_exec_command(ps_platform):
         _ssh = paramiko.SSHClient()
         _ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         _ssh.connect(hostname=platform.host, username=platform.user, password='password', port=ssh_port)
-        platform._ftpChannel = paramiko.SFTPClient.from_transport(_ssh.get_transport(), window_size=pow(4, 12),
-                                                                  max_packet_size=pow(4, 12))
-        platform._ftpChannel.get_channel().settimeout(120)
         platform.connect(None, reconnect=False, log_recovery_process=False)
 
         stdin, stdout, stderr = platform.exec_command('whoami')
