@@ -30,7 +30,9 @@ Or download, unpack and:
     pip install .
 
 .. hint::
-    To check if Autosubmit is installed, run ``autosubmit -v.`` This command will print Autosubmit's current version
+    To check if Autosubmit is installed, run ``autosubmit -v`` This command will print Autosubmit's current version
+
+.. runcmd:: autosubmit -v
 
 .. hint::
     To read Autosubmit's readme file, run ``autosubmit readme``
@@ -75,11 +77,11 @@ For a very quick test, you can follow the next instructions to configure and run
 
     # Quick-start
 
-    # Get expid
-    autosubmit expid -H "local" -d "Test exp in local."
+    # Get <EXPID>
+    autosubmit a000 -H "local" -d "Test exp in local."
 
     # Create with
-    # Since it was a new install, the expid will be a000
+    # Since it was a new install, the <EXPID> will be a000
     autosubmit create a000
 
     # In case you want to use a remote platform
@@ -117,7 +119,7 @@ If you don't have conda installed yet, we recommend following `Installing Minico
 
     # Download git
     apt install git -y -q
-    
+
     # Download autosubmit
     git clone https://github.com/BSC-ES/autosubmit.git -b v4.0.0b
     cd autosubmit
@@ -145,11 +147,11 @@ For a very quick test, you can follow the next instructions to configure and run
     autosubmit install
 
     # Quick-start
-    # Get expid
-    autosubmit expid -H "local" -d "Test exp in local."
+    # Get <EXPID>
+    autosubmit <EXPID> -H "local" -d "Test exp in local."
 
     # Create with
-    # Since it was a new install, the expid will be a000
+    # Since it was a new install, the <EXPID> will be a000
     autosubmit create a000
 
     # In case you want to use a remote platform
@@ -268,7 +270,7 @@ Mandatory parameters of /etc/autosubmit
     [local]
     path = <experiment_path>
 
-    # Global logs, logs without expid associated.
+    # Global logs, logs without <EXPID> associated.
     [globallogs]
     path = /home/dbeltran/autosubmit/logs
 
@@ -301,10 +303,10 @@ These parameters provide extra functionalities to Autosubmit.
 .. code-block:: ini
 
     [conf]
-    # Allows using a different jobs.yml default template on `autosubmit expid ``
-    jobs = <path_jobs>/jobs.yml
-    # Allows using a different platforms.yml default template on `autosubmit expid `
-    platforms = <path_platforms>platforms.yml> path to any jobs.yml
+    # Allows using a different jobs_<EXPID>.yml default template on `autosubmit expid ``
+    jobs = <path_jobs>/jobs_<EXPID>.yml
+    # Allows using a different platforms_<EXPID>.yml default template on `autosubmit expid `
+    platforms = <path_platforms>platforms_<EXPID>.yml> path to any jobs.yml
 
     # Autosubmit API includes extra information for some Autosubmit functions. It is optional to have access to it to use Autosubmit.
     [autosubmitapi]
@@ -357,5 +359,3 @@ As the last step, ensure to install the Autosubmit database. To do so, execute  
     autosubmit install
 
 This command will generate a blank database in the specified configuration path.
-
-
