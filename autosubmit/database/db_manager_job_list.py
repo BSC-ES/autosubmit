@@ -20,10 +20,12 @@ from pathlib import Path
 from typing import Any, Optional, List, Dict, TYPE_CHECKING, Union, Tuple
 
 from sqlalchemy import Engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import relationship
 
 from autosubmit.database import session
 from autosubmit.database.db_common import check_db_path, get_connection_url
+from autosubmit.job.job_list import JobList
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmit.database.db_manager import DbManager
 from autosubmit.database.tables import ExperimentStructureTable, PreviewWrapperJobsTable, WrapperJobsTable, \
@@ -203,25 +205,33 @@ class JobsDbManager(DbManager):
         # return a hashable tuple to avoid duplicates
         return job_list
 
+    def select_job_by_name(self, job_name: str) -> dict[str, Any]:
+        """
+        Select a job by its name from the database.
+        :param job_name: Name of the job to select.
+        :type job_name: str
+        :return: List of dictionaries containing the job information.
+        """
+
+        self.create_table(JobsTable.name)
+        job = self.select_where_with_columns(JobsTable.name, {'name': job_name})
+        if job:
+            return job[0]
+
     # WRAPPERS
     # At this point, we already built the wrappers, so we can save them in the database.
     def save_wrappers(
             self,
-            packages_info: Dict[str, dict],
-            package_inner_jobs: List[dict],
+            wrappers: Tuple[List[Dict[str, Any]], List[Dict[str, Any]]],
             preview: bool = False
     ) -> None:
         """
         Save the wrapper jobs and their associated information to the database.
 
-        :param packages_info: Dictionary mapping package names to their info dictionaries.
-        :type packages_info: Dict[str, dict]
-        :param package_inner_jobs: List of dictionaries, each representing an inner job for a package.
-        :type package_inner_jobs: List[dict]
+        :param wrappers: List of dictionaries containing wrapper job data and package info.
+        :type wrappers: Tuple[Dict[str, Any], List[Dict[str, Any]]]
         :param preview: If True, use preview tables; otherwise, use production tables.
         :type preview: bool
-        :return: None
-        :rtype: None
         """
         if preview:
             innerjobs_table = PreviewWrapperJobsTable
@@ -229,46 +239,58 @@ class JobsDbManager(DbManager):
         else:
             innerjobs_table = WrapperJobsTable
             wrapper_info_table = WrapperInfoTable
-
         self.create_table(innerjobs_table.name)
         self.create_table(wrapper_info_table.name)
+        for wrapper_info, inner_jobs in wrappers:
+            self.upsert_many(wrapper_info_table.name, wrapper_info, ['name'])
+            try:
+                self.insert_many(innerjobs_table.name, inner_jobs)
+            except IntegrityError as e:
+                Log.warning(f"Unique constraint failed when inserting inner jobs: {e}")
 
-        pkeys = ['package_name', 'job_name']
-        for p in package_inner_jobs:
-            self.upsert_many(innerjobs_table.name, p, pkeys)
-
-        pkeys = ['package_name']
-        for package_name, info in packages_info.items():
-            self.upsert_many(wrapper_info_table.name, {'package_name': package_name, **info}, pkeys)
-
-
-
-    def load_wrappers(self, preview: bool = False) -> Tuple[List[WrapperJob], List[dict[str, Any]]]:
+    def load_wrappers(self, preview: bool = False, job_list: JobList = None) -> Tuple[
+        List[dict[str, Any]], List[dict[str, Any]]]:
         """
         Load the wrapper jobs and their associated information from the database.
 
         :param preview: If True, use preview tables; otherwise, use production tables.
         :type preview: bool
-        :return: Tuple containing a list of WrapperJob objects and a list of dictionaries with package info.
-        :rtype: Tuple[List[WrapperJob], List[dict[str, Any]]]
+        job_list: Optional list of jobs to filter the loaded wrappers.
+        :param job_list: Optional list of jobs to filter the loaded wrappers.
+        :return: Tuple containing a list of dictionaries with wrapper job info and inner jobs.
+        :rtype: Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]
+
         """
+        if preview or job_list:
+            full_load = True
+        else:
+            full_load = False
+
         if preview:
             innerjobs_table = PreviewWrapperJobsTable
             wrapper_info_table = PreviewWrapperInfoTable
-            self.drop_table(innerjobs_table.name)
-            self.drop_table(wrapper_info_table.name)
         else:
             innerjobs_table = WrapperJobsTable
             wrapper_info_table = WrapperInfoTable
 
         self.create_table(innerjobs_table.name)
         self.create_table(wrapper_info_table.name)
+        if full_load:
+            # Load wrapper jobs
+            wrappers_inner_jobs = self.select_all_with_columns(innerjobs_table.name)
+            wrappers_info = self.select_all_with_columns(wrapper_info_table.name)
+        else:
+            # Load only active wrapper jobs
+            job_names = [job.name for job in job_list] if job_list else []
+            wrappers_inner_jobs = self.select_where_with_columns(innerjobs_table.name, {'job_name': job_names})
+            packages_names = list(set([job['package_name'] for job in wrappers_inner_jobs]))
+            wrappers_info = self.select_where_with_columns(wrapper_info_table.name, {'name': packages_names})
 
-        # Load wrapper jobs
-        wrapper_jobs_data = self.select_all_with_columns(innerjobs_table.name)
-        wrapper_jobs = [WrapperJob(**data) for data in wrapper_jobs_data]
+        # map package_name with job_name and add job_list [ ]
+        for wrapper_info in wrappers_info:
+            wrapper_info['job_list'] = []
+            for inner_job in wrappers_inner_jobs:
+                if inner_job['package_name'] == wrapper_info['name']:
+                    wrapper_info['job_list'].append(inner_job)
 
-        # Load wrapper info
-        wrapper_info_data = self.select_all_with_columns(wrapper_info_table.name)
-
-        return wrapper_jobs, wrapper_info_data
+        return wrappers_info, wrappers_inner_jobs

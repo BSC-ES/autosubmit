@@ -218,32 +218,19 @@ def create_wrapper_tables(name, metadata_obj_):
         Column("remote_logs_out", String),  # TODO: We should recover the log from the remote at some point
         Column("remote_logs_err", String),  # TODO: We should recover the log from the remote at some point
         Column("updated_log", Boolean),  # TODO: We should recover the log from the remote at some point
-
         Column("platform_name", String),
-        Column("script_name", Text),
+        Column("wallclock", String),
+        Column("num_processors", Integer),
         Column("type", Text),
-        Column("status", Text),
         Column("sections", Text),
         Column("method", Text),
-
-
-    )
-    wrapper_job = WrapperJob(
-        0,
-        package.jobs,
-        package._wallclock,
-        package._num_processors,
-        package.platform,
-        as_conf,
-        hold
     )
 
-    table_package_info.append_column(Column("id", Text, nullable=False))
     table_jobs_inside_wrapper = Table(
         f"{name}_jobs",
         metadata_obj_,
-        Column("package_name", String, ForeignKey(f"{name}.package_name"), nullable=False, primary_key=True),
-        Column("job_name", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True),
+        Column("package_name", String, ForeignKey(f"{name}_info.name"), nullable=False, primary_key=True),
+        Column("job_name", String, ForeignKey("jobs.name"), nullable=False, primary_key=True),
     )
     return table_package_info, table_jobs_inside_wrapper
 
