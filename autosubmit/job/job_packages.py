@@ -248,8 +248,10 @@ class JobPackageSimple(JobPackageBase):
         for job in self.jobs:
             self.platform.send_file(self._job_scripts[job.name])
             for f in job.additional_files:
-                real_name = f"{Path(f).stem}_{job.section}"
+                real_name = job.construct_real_additional_file_name(f)
                 self.platform.send_file(real_name)
+
+
 
     def _do_submission(self, job_scripts: Dict[str, str] = "", hold: bool = False) -> None:
         """

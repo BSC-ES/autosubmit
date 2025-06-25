@@ -2484,10 +2484,23 @@ class Job(object):
         :type lang: str
         :return: None
         """
-        filename = Path(additional_file).stem
-        full_path = Path(self._tmp_path) / f"{filename}_{self.section}"
+        tmp_path = Path(self._tmp_path)
+        full_path = tmp_path.joinpath(self.construct_real_additional_file_name(additional_file))
         with full_path.open('wb') as f:
             f.write(content.encode(lang))
+
+    def construct_real_additional_file_name(self, file_name: str) -> str:
+        """
+        Constructs the real name of the file to be sent to the platform.
+
+        :param file_name: The name of the file to be sent.
+        :type file_name: str
+        :return: The full path of the file to be sent.
+        :rtype: str
+        """
+        real_name = str(f"{Path(file_name).stem}_{self.name}")
+        real_name = real_name.replace(f"{self.expid}_", "")
+        return real_name
 
 
     def create_wrapped_script(self, as_conf, wrapper_tag='wrapped'):
