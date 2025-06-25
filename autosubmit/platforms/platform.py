@@ -760,7 +760,10 @@ class Platform(object):
             os.remove(stat_local_path)
         if self.check_file_exists(filename):
             if self.get_file(filename, True):
-                Log.debug(f'{job.name}_STAT_{str(count)} file have been transferred')
+                if count == -1:
+                    Log.debug(f'{job.name}_STAT_{str(job.fail_count)} file have been transferred')
+                else:
+                    Log.debug(f'{job.name}_STAT_{str(count)} file have been transferred')
                 return True
         Log.warning(f'{job.name}_STAT_{str(count)} file not found')
         return False
