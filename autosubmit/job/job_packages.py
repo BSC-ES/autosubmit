@@ -24,6 +24,8 @@ import random
 import time
 from datetime import timedelta
 
+from pathlib import Path
+
 from autosubmit.job.job_common import Status
 from log.log import Log, AutosubmitCritical
 
@@ -242,14 +244,14 @@ class JobPackageSimple(JobPackageBase):
             self._job_scripts[job.name] = job.create_script(configuration)
 
     def _send_files(self):
+        # TODO: pytests when the slurm container is avaliable
         for job in self.jobs:
             self.platform.send_file(self._job_scripts[job.name])
-            # TODO Ugly fix quick fix until figure another option, this is to avoid to delete the Additional file in local before sending it due sharing the same directory
-            if self.platform.type.upper() != "LOCAL":
-                for file_n in range(len(job.additional_files)):
-                    filename = os.path.basename(os.path.splitext(job.additional_files[file_n])[0])
-                    full_path = os.path.join(self._tmp_path,filename ) + "_" + job.name[5:]
-                    self.platform.send_file(os.path.join(self._tmp_path, full_path))
+            for f in job.additional_files:
+                real_name = job.construct_real_additional_file_name(f)
+                self.platform.send_file(real_name)
+
+
 
     def _do_submission(self, job_scripts: Dict[str, str] = "", hold: bool = False) -> None:
         """

@@ -209,6 +209,7 @@ class Platform(object):
             platform_total_jobs = self.config.get("PLATFORMS", {}).get('TOTAL_JOBS', config_total_jobs)
             log_queue_size = int(platform_total_jobs) * 2
         self.log_queue_size = log_queue_size
+        self.remote_log_dir = None
 
     @classmethod
     def update_workers(cls, event_worker):
@@ -665,7 +666,10 @@ class Platform(object):
         :param max_step: max step possible
         :type max_step: int
         """
-
+        if not job.current_checkpoint_step:
+            job.current_checkpoint_step = 0
+        if not job.max_checkpoint_step:
+            job.max_checkpoint_step = 0
         if job.current_checkpoint_step < job.max_checkpoint_step:
             remote_checkpoint_path = f'{self.get_files_path()}/CHECKPOINT_'
             self.get_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}', False, ignore_log=True)
@@ -756,7 +760,10 @@ class Platform(object):
             os.remove(stat_local_path)
         if self.check_file_exists(filename):
             if self.get_file(filename, True):
-                Log.debug(f'{job.name}_STAT_{str(count)} file have been transferred')
+                if count == -1:
+                    Log.debug(f'{job.name}_STAT_{str(job.fail_count)} file have been transferred')
+                else:
+                    Log.debug(f'{job.name}_STAT_{str(count)} file have been transferred')
                 return True
         Log.warning(f'{job.name}_STAT_{str(count)} file not found')
         return False
@@ -770,11 +777,10 @@ class Platform(object):
         :rtype: str
         """
         if self.type == "local":
-            path = os.path.join(
-                self.root_dir, self.config.get("LOCAL_TMP_DIR"), 'LOG_{0}'.format(self.expid))
+            path = Path(self.root_dir) / self.config.get("LOCAL_TMP_DIR") / f'LOG_{self.expid}'
         else:
-            path = os.path.join(self.root_dir, 'LOG_{0}'.format(self.expid))
-        return path
+            path = Path(self.remote_log_dir)
+        return str(path)
 
     def submit_job(self, job, script_name, hold=False, export="none"):
         """
