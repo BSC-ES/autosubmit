@@ -25,7 +25,6 @@ from sqlalchemy.orm import relationship
 
 from autosubmit.database import session
 from autosubmit.database.db_common import check_db_path, get_connection_url
-from autosubmit.job.job_list import JobList
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmit.database.db_manager import DbManager
 from autosubmit.database.tables import ExperimentStructureTable, PreviewWrapperJobsTable, WrapperJobsTable, \
@@ -33,6 +32,9 @@ from autosubmit.database.tables import ExperimentStructureTable, PreviewWrapperJ
 from autosubmit.database.tables import JobsTable
 from autosubmit.job.job import Job, WrapperJob
 from log.log import Log
+
+if TYPE_CHECKING:
+    from autosubmit.job.job_list import JobList
 
 
 class JobsDbManager(DbManager):
@@ -248,7 +250,7 @@ class JobsDbManager(DbManager):
             except IntegrityError as e:
                 Log.warning(f"Unique constraint failed when inserting inner jobs: {e}")
 
-    def load_wrappers(self, preview: bool = False, job_list: JobList = None) -> Tuple[
+    def load_wrappers(self, preview: bool = False, job_list: Any = None) -> Tuple[
         List[dict[str, Any]], List[dict[str, Any]]]:
         """
         Load the wrapper jobs and their associated information from the database.
@@ -286,11 +288,5 @@ class JobsDbManager(DbManager):
             packages_names = list(set([job['package_name'] for job in wrappers_inner_jobs]))
             wrappers_info = self.select_where_with_columns(wrapper_info_table.name, {'name': packages_names})
 
-        # map package_name with job_name and add job_list [ ]
-        for wrapper_info in wrappers_info:
-            wrapper_info['job_list'] = []
-            for inner_job in wrappers_inner_jobs:
-                if inner_job['package_name'] == wrapper_info['name']:
-                    wrapper_info['job_list'].append(inner_job)
 
         return wrappers_info, wrappers_inner_jobs

@@ -4713,9 +4713,8 @@ class Autosubmit:
                         if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrappers:
                             Autosubmit.generate_scripts_andor_wrappers(
                                 as_conf, job_list, True)
-
-                        #packages = job_list.dbmanager.load_wrappers(preview=check_wrappers)
-                        packages = None
+                        job_list.load_wrappers(preview=check_wrappers)
+                        packages = list(job_list.job_package_map.values())
                         Log.info("\nPlotting the jobs list...")
                         monitor_exp = Monitor(edge_info=job_list.graph_dict_by_job_name)
                         # if output is set, use output

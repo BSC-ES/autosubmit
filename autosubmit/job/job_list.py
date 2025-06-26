@@ -32,7 +32,7 @@ from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
 
 from autosubmit.database.db_common import check_db_path, get_connection_url
-from autosubmit.database.db_manager import DbManager
+from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status, bcolors
@@ -41,10 +41,8 @@ from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency, _get_submitter
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
-from log.log import AutosubmitCritical, AutosubmitError
+from log.log import AutosubmitCritical
 from log.log import Log
-
-from autosubmit.database.db_manager_job_list import JobsDbManager
 
 
 class JobList(object):
@@ -3191,45 +3189,58 @@ class JobList(object):
             wrappers.append(self._wrapper_job_dict(wrapper_job))
         self.dbmanager.save_wrappers(wrappers, preview=preview)
 
-    def load_wrappers(self) -> None:
+    def load_wrappers(self, preview: bool = False) -> None:
         """
-        Load wrapper jobs from the database and populate the job package map.
+        Load wrapper jobs and their inner jobs from the database, and populate the job package map.
 
+        :param preview: If True, load wrappers in preview mode.
+        :type preview: bool
         :return: None
         :rtype: None
         """
-        un_mapped_wrapper_info, un_mapped_inner_jobs = self.dbmanager.load_wrappers()
+        # Retrieve wrapper and inner job info from the database
+        un_mapped_wrapper_info, un_mapped_inner_jobs = self.dbmanager.load_wrappers(preview)
 
-        # change the list to dict determined by package name
-        wrappers = {wrapper_info["name"]: wrapper_info for wrapper_info in un_mapped_wrapper_info}
+        # Build a dictionary of wrapper info indexed by wrapper name
+        wrappers_info: Dict[str, dict] = {
+            dict(wrapper)['name']: dict(wrapper) for wrapper in un_mapped_wrapper_info
+        }
 
-        # add job_list to the right job_package_map
-        for package_name, job_name in un_mapped_inner_jobs:
-            if package_name in wrappers:
-                if not wrappers[package_name].get("job_list", None):
-                    wrappers[package_name]["job_list"] = []
-                # if it is loaded obtain it
-                job = self.get_job_by_name(job_name)
-                if not job:
-                    # load it
-                    job = self.dbmanager.load_job_by_name(job_name)
-                    wrappers[package_name]["job_list"].append(self.get_job_by_name(job_name))
+        # Group inner jobs by package name
+        inner_jobs_by_package: Dict[str, list] = {}
+        for package_name_tuple, job_name_tuple in un_mapped_inner_jobs:
+            package_name = package_name_tuple[1]
+            job_name = job_name_tuple[1]
+            inner_jobs_by_package.setdefault(package_name, []).append(job_name)
 
-            for wrapper_info in wrappers.values():
-                from ..job.job import WrapperJob
-                wrapper_job = WrapperJob(
-                    wrapper_info["name"],
-                    wrapper_info["id"],
-                    wrapper_info["status"],
-                    wrapper_info["wallclock"],
-                    wrapper_info["job_list"],
-                    wrapper_info["num_processors"],
-                    wrapper_info.get("script_name", None),
-                    wrapper_info.get("platform_name", None),
-                    self.expid,
-                    hold=False
-                )
-                self.job_package_map[wrapper_job.id] = wrapper_job
+        # Attach job objects to each wrapper's job list and update packages_dict
+        for package_name, job_names in inner_jobs_by_package.items():
+            if package_name in wrappers_info:
+                wrappers_info[package_name]["job_list"] = []
+                for job_name in job_names:
+                    job = self.get_job_by_name(job_name)
+                    if not job:
+                        job = self.dbmanager.load_job_by_name(job_name)
+                    wrappers_info[package_name]["job_list"].append(job)
+                self.packages_dict[package_name] = wrappers_info[package_name]["job_list"]
+
+        # Create WrapperJob objects and populate job_package_map
+        from ..job.job import WrapperJob
+        for wrapper_info in wrappers_info.values():
+            wrapper_job = WrapperJob(
+                wrapper_info["name"],
+                wrapper_info["id"],
+                wrapper_info["status"],
+                wrapper_info["wallclock"],
+                wrapper_info["job_list"],
+                wrapper_info["num_processors"],
+                wrapper_info.get("script_name", None),
+                wrapper_info.get("platform_name", None),
+                self.expid,
+                hold=False
+            )
+            self.job_package_map[wrapper_job.id] = wrapper_job
+
 
     def _wrapper_job_dict(self, wrapper_job: 'WrapperJob') -> Tuple[Dict[str, Any], List[str]]:
         """

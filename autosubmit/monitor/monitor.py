@@ -423,24 +423,22 @@ class Monitor:
 
         graph.add_subgraph(exp)
 
-        jobs_packages_dict = dict()
-        if packages is not None and len(str(packages)) > 0:
-            for (exp_id, package_name, job_name, wallclock) in packages:
-                jobs_packages_dict[job_name] = package_name
-
         packages_subgraphs_dict = dict()
 
         # Wrapper visualization
         for node in exp.get_nodes():
             name = node.obj_dict['name']
-            if name in jobs_packages_dict:
-                package = jobs_packages_dict[name]
-                if package not in packages_subgraphs_dict:
-                    packages_subgraphs_dict[package] = pydotplus.graphviz.Cluster(
-                        graph_name=package)
-                    packages_subgraphs_dict[package].obj_dict['attributes']['color'] = 'black'
-                    packages_subgraphs_dict[package].obj_dict['attributes']['style'] = 'dashed'
-                packages_subgraphs_dict[package].add_node(node)
+            for wrapper_job in packages:
+                for job in wrapper_job.job_list:
+                    if name == job.name:
+                        package = wrapper_job.name
+                        if package not in packages_subgraphs_dict:
+                            packages_subgraphs_dict[package] = pydotplus.graphviz.Cluster(
+                                graph_name=package)
+                            packages_subgraphs_dict[package].obj_dict['attributes']['color'] = 'black'
+                            packages_subgraphs_dict[package].obj_dict['attributes']['style'] = 'dashed'
+                        packages_subgraphs_dict[package].add_node(node)
+                        break
 
         for package, cluster in packages_subgraphs_dict.items():
             graph.add_subgraph(cluster)
