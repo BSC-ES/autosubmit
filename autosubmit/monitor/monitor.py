@@ -329,7 +329,7 @@ class Monitor:
             self,
             expid: str,
             joblist: list[Job],
-            packages: list[Tuple[str, str, str, str]],  # (exp_id, package_name, job_name, wallclock)
+            packages: list[Job],  # (wrapper_job)
             groups: dict[str, Union[list[Job], dict]],
             hide_groups=False
     ) -> pydotplus.Dot:

@@ -3815,3 +3815,28 @@ class JobList(object):
 
     def add_job(self, job: Job):
         self.graph.add_node(job.name, job=job)
+
+
+    def check_wrapper_stored_status(self) -> Any:
+        """
+        Check if the wrapper job has been submitted and the inner jobs are in the queue after a load.
+        :return: Updated JobList object.
+        :rtype: JobList
+        """
+        # if packages_dict attr is in job_list
+        wrapper_status = Status.SUBMITTED
+        for package_name, jobs in self.packages_dict.items():
+            from ..job.job import WrapperJob
+            # Ordered by higher priority status
+            if all(job.status == Status.COMPLETED for job in jobs):
+                wrapper_status = Status.COMPLETED
+            elif any(job.status == Status.RUNNING for job in jobs):
+                wrapper_status = Status.RUNNING
+            elif any(job.status == Status.FAILED for job in jobs): # No more inner jobs running but inner job in failed
+                wrapper_status = Status.FAILED
+            elif any(job.status == Status.QUEUING for job in jobs):
+                wrapper_status = Status.QUEUING
+            elif any(job.status == Status.HELD for job in jobs):
+                wrapper_status = Status.HELD
+            elif any(job.status == Status.SUBMITTED for job in jobs):
+                wrapper_status = Status.SUBMITTED

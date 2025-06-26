@@ -1958,44 +1958,7 @@ class Autosubmit:
                             jobs_to_check[platform.name] = [[job, job_prev_status]]
         return jobs_to_check,job_changes_tracker
 
-    @staticmethod
-    def check_wrapper_stored_status(as_conf: Any, job_list: Any, wrapper_wallclock: str) -> Any:
-        """
-        Check if the wrapper job has been submitted and the inner jobs are in the queue after a load.
 
-        :param as_conf: A BasicConfig object.
-        :type as_conf: BasicConfig
-        :param job_list: A JobList object.
-        :type job_list: JobList
-        :param wrapper_wallclock: The wallclock of the wrapper.
-        :type wrapper_wallclock: str
-        :return: Updated JobList object.
-        :rtype: JobList
-        """
-        # if packages_dict attr is in job_list
-        if hasattr(job_list, "packages_dict"):
-            wrapper_status = Status.SUBMITTED
-            for package_name, jobs in job_list.packages_dict.items():
-                from .job.job import WrapperJob
-                # Ordered by higher priority status
-                if all(job.status == Status.COMPLETED for job in jobs):
-                    wrapper_status = Status.COMPLETED
-                elif any(job.status == Status.RUNNING for job in jobs):
-                    wrapper_status = Status.RUNNING
-                elif any(job.status == Status.FAILED for job in jobs): # No more inner jobs running but inner job in failed
-                    wrapper_status = Status.FAILED
-                elif any(job.status == Status.QUEUING for job in jobs):
-                    wrapper_status = Status.QUEUING
-                elif any(job.status == Status.HELD for job in jobs):
-                    wrapper_status = Status.HELD
-                elif any(job.status == Status.SUBMITTED for job in jobs):
-                    wrapper_status = Status.SUBMITTED
-
-                wrapper_job = WrapperJob(package_name, jobs[0].id, wrapper_status, 0, jobs,
-                                         wrapper_wallclock,
-                                         None, jobs[0].platform, as_conf, jobs[0].hold)
-                job_list.job_package_map[jobs[0].id] = wrapper_job
-        return job_list
 
     @staticmethod
     def get_historical_database(expid, job_list, as_conf):
@@ -2171,23 +2134,9 @@ class Autosubmit:
 
         # Check if the user wants to continue using wrappers and loads the appropriate info.
         if as_conf.experiment_data.get("WRAPPERS",None) is not None:
-            os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR,
-                                  expid, "db", "job_packages_" + expid + ".db"), 0o644)
-
             Log.debug("Processing job packages")
-            try:
-                # fallback value, only affects to is_overclock
-                wrapper_wallclock = as_conf.experiment_data.get("CONFIG", {}).get("WRAPPERS_WALLCLOCK", "48:00")
-                for (exp_id, package_name, job_name, wrapper_wallclock) in packages:
-                    if package_name not in job_list.packages_dict:
-                        job_list.packages_dict[package_name] = []
-                    job_list.packages_dict[package_name].append(job_list.get_job_by_name(job_name))
-                # This function, checks the stored STATUS of jobs inside wrappers. Since "wrapper status" is a memory variable.
-                job_list = Autosubmit.check_wrapper_stored_status(as_conf, job_list, wrapper_wallclock)
-            except Exception as e:
-                raise AutosubmitCritical(
-                    "Autosubmit failed while processing job packages. This might be due to a change in your experiment configuration files after 'autosubmit create' was performed.",
-                    7014, str(e))
+            job_list.load_wrappers()
+            job_list.check_wrapper_stored_status()
         if recover:
             Log.info("Recovering wrappers... Done")
 
