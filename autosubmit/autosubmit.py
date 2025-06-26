@@ -1653,7 +1653,7 @@ class Autosubmit:
             # TODO wrappers
             if BasicConfig.DATABASE_BACKEND == 'sqlite':
                 os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid,
-                                      "db", "job_packages_" + expid + ".db"), 0o644)
+                                      "db", "job_list.db"), 0o644)
 
             # TODO reset wrapper
             job_list = Autosubmit.load_job_list(
@@ -1769,14 +1769,16 @@ class Autosubmit:
                 for job in jobs:
                     file_paths += f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}/tmp/{job.name}.cmd\n"
                     job.status = Status.WAITING
+
+
                 Autosubmit.generate_scripts_andor_wrappers(
-                    as_conf, job_list, jobs, False)
+                    as_conf, job_list, False)
             if len(jobs_cw) > 0:
                 for job in jobs_cw:
                     file_paths += f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}/tmp/{job.name}.cmd\n"
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
-                    as_conf, job_list, jobs_cw, False)
+                    as_conf, job_list, False)
 
             Log.info("No more scripts to generate, you can proceed to check them manually")
             Log.result(file_paths)
