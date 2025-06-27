@@ -24,6 +24,7 @@ the filter the jobs. Not using any value for `-fp` still returns all jobs.
 - Update portalocker requirement from <=3.1.1 to <=3.2.0 #2423
 - Fixed a `ZeroDivisionError` when using RO-Crate or `stats`, and also an issue
   where the message said `None` could not be iterable. #2389
+- Additional files are now generated upon using the `autosubmit inspect` command #2323'
 
 ### 4.1.14: Bug fixes, enhancements, and new features
 
