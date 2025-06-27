@@ -16,14 +16,12 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import math
-import os
 from typing import Dict, Optional, TYPE_CHECKING
 
 from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates
 from networkx.classes import DiGraph
 
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from log.log import Log, AutosubmitCritical
@@ -230,26 +228,6 @@ def get_split_size(as_conf, section) -> int:
     return int(job_data.get("SPLITSIZE", 1))
 
 
-def transitive_reduction(graph) -> DiGraph:
-    """
-
-    Returns transitive reduction of a directed graph
-
-    The transitive reduction of G = (V,E) is a graph G- = (V,E-) such that
-    for all v,w in V there is an edge (v,w) in E- if and only if (v,w) is
-    in E and there is no path from v to w in G with length greater than 1.
-
-    :param graph: A directed acyclic graph (DAG)
-    :type graph: NetworkX DiGraph
-    :return: The transitive reduction of G
-    """
-    for u in graph:
-        graph.nodes[u]["job"].parents = set()
-        graph.nodes[u]["job"].children = set()
-    for u in graph:
-        graph.nodes[u]["job"].add_children([graph.nodes[v]["job"] for v in graph[u]])
-    return graph
-
 def get_job_package_code(expid: str, job_name: str) -> int:
     """
     Finds the package code and retrieves it. None if no package.
@@ -264,6 +242,7 @@ def get_job_package_code(expid: str, job_name: str) -> int:
     try:
         basic_conf = BasicConfig()
         basic_conf.read()
+        # wrapper load
         packages_wrapper = JobPackagePersistence(expid).load(wrapper=True)
         packages_wrapper_plus = JobPackagePersistence(expid).load(wrapper=False)
         if packages_wrapper or packages_wrapper_plus:
@@ -510,4 +489,4 @@ def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status=Opti
         Log.info(f"Changing status of job {job.name} to {target_status}")
         job.status = Status.KEY_TO_VALUE[target_status]
 
-    job_list.save()
+    job_list.save_jobs()
