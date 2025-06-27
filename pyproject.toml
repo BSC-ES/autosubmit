@@ -79,7 +79,7 @@ tests = [
     "pytest>=8.2,<8.5",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.12.0",
+    "ruff==0.12.1",
     "pytest-xdist",
     "testcontainers"
 ]
