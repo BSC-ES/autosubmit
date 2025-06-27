@@ -4,6 +4,7 @@
   via its entrypoint #2359
 - Adding a Slurm Container to the CI/CD and creating tests to increase the
   coverage of the Platforms #977
+- Execute scripts to generate the documentation and standardize expid on documentation #1160
 
 ### 4.1.15: Unreleased
 
