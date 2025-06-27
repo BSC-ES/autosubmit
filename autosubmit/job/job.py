@@ -2455,6 +2455,10 @@ class Job(object):
         :return: Content with placeholders substituted.
         :rtype: str
         """
+        # TODO quick fix for 4.1.15 release, to see why it is needed
+        if as_conf.dynamic_variables:
+            parameters = as_conf.substitute_dynamic_variables(parameters, max_deep=25, in_the_end=True)
+
         placeholders = re.findall(r'%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', content, flags=re.IGNORECASE)
         for placeholder in placeholders:
             if placeholder in as_conf.default_parameters.values():
