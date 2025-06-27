@@ -201,18 +201,18 @@ class JobList(object):
             self.job_list = processed_job_list
 
     def create_dictionary(self, date_list, member_list, num_chunks, chunk_ini,
-                          date_format, default_retrials, wrapper_jobs, as_conf):
+                          date_format, default_retrials, wrapper_section, as_conf):
         chunk_list = list(range(chunk_ini, num_chunks + 1))
-
+        ordered_jobs_by_date_member = dict()
         dic_jobs = DicJobs(date_list, member_list, chunk_list,
                            date_format, default_retrials, as_conf)
         self._dic_jobs = dic_jobs
-        for wrapper_section in wrapper_jobs:
-            if str(wrapper_jobs[wrapper_section]).lower() != 'none':
-                self._ordered_jobs_by_date_member[wrapper_section] = self._create_sorted_dict_jobs(
-                    wrapper_jobs[wrapper_section])
-            else:
-                self._ordered_jobs_by_date_member[wrapper_section] = {}
+        if str(wrapper_section).lower() != 'none':
+            ordered_jobs_by_date_member[wrapper_section] = self._create_sorted_dict_jobs(wrapper_section)
+        else:
+            ordered_jobs_by_date_member[wrapper_section] = {}
+
+        return ordered_jobs_by_date_member
 
     def _delete_edgeless_jobs(self):
         # indices to delete
@@ -416,25 +416,24 @@ class JobList(object):
     ) -> None:
         self.save_jobs()
         self.save_edges()
-        self._process_wrapper_jobs(wrapper_jobs)
         for job in self.job_list:
             self._assign_platforms(as_conf, job, create, new)
 
-    def _process_wrapper_jobs(self, wrapper_jobs: Dict[str, Any]) -> None:
-        for wrapper_section in wrapper_jobs:
-            try:
-                if wrapper_jobs[wrapper_section]:
-                    self._ordered_jobs_by_date_member[wrapper_section] = self._create_sorted_dict_jobs(
-                        wrapper_jobs[wrapper_section]
-                    )
-                else:
-                    self._ordered_jobs_by_date_member[wrapper_section] = {}
-            except BaseException as e:
-                raise AutosubmitCritical(
-                    f"Some section jobs of the wrapper:{wrapper_section} are missing from your JOBS definition in YAML",
-                    7014,
-                    str(e),
+    def process_wrapper_jobs(self, wrapper_section: str, inner_sections: list[str]) -> None:
+        try:
+            if inner_sections:
+                self._ordered_jobs_by_date_member[wrapper_section] = self._create_sorted_dict_jobs(
+                    inner_sections
                 )
+            else:
+                # TODO: clean on remove wrapper from mem
+                self._ordered_jobs_by_date_member[wrapper_section] = {}
+        except BaseException as e:
+            raise AutosubmitCritical(
+                f"Some section jobs of the wrapper:{wrapper_section} are missing from your JOBS definition in YAML",
+                7014,
+                str(e),
+            )
 
     def _assign_platforms(self, as_conf: AutosubmitConfig, job: Job, create: bool, new: bool,
                           submitter: Any = None) -> None:
@@ -1667,9 +1666,9 @@ class JobList(object):
             dic_jobs.read_section(section, priority, default_job_type)
             priority += 1
 
-    def _create_sorted_dict_jobs(self, wrapper_jobs):
+    def _create_sorted_dict_jobs(self, inner_sections):
         """
-        Creates a sorting of the jobs whose job.section is in wrapper_jobs, according to the
+        Creates a sorting of the jobs whose job.section is in inner_sections, according to the
         following filters in order of importance:
         date, member, RUNNING, and chunk number; where RUNNING is defined in jobs_.yml
         for each section.
@@ -1677,9 +1676,9 @@ class JobList(object):
         If the job does not have a chunk number, the total number of chunks configured for
         the experiment is used.
 
-        :param wrapper_jobs: User defined job types in autosubmit_,conf [wrapper] section to
+        :param inner_sections: User defined job types in autosubmit_,conf [wrapper] section to
         be wrapped.
-        :type wrapper_jobs: String \n
+        :type inner_sections: String \n
         :return: Sorted Dictionary of List that represents the jobs included in the wrapping
         process.
         :rtype: Dictionary Key: date, Value: (Dictionary Key: Member, Value: List of jobs that
@@ -1698,15 +1697,15 @@ class JobList(object):
         num_chunks = len(self._chunk_list)
 
         sections_running_type_map = dict()
-        if wrapper_jobs is not None and len(str(wrapper_jobs)) > 0:
-            if type(wrapper_jobs) is not list:
-                if "&" in wrapper_jobs:
+        if inner_sections is not None and len(str(inner_sections)) > 0:
+            if type(inner_sections) is not list:
+                if "&" in inner_sections:
                     char = "&"
                 else:
                     char = " "
-                wrapper_jobs = wrapper_jobs.split(char)
+                wrapper_jobs = inner_sections.split(char)
 
-            for section in wrapper_jobs:
+            for section in inner_sections:
                 # RUNNING = once, as default. This value comes from jobs_.yml
                 sections_running_type_map[section] = str(self._as_conf.experiment_data["JOBS"].
                                                          get(section, {}).get("RUNNING", 'once'))
@@ -1904,7 +1903,7 @@ class JobList(object):
     def copy_ordered_jobs_by_date_member(self):
         pass
 
-    def get_ordered_jobs_by_date_member(self, section):
+    def get_ordered_jobs_by_date_member(self, wrapper_name):
         """
         Get the dictionary of jobs ordered according to wrapper's
         expression divided by date and member
@@ -1912,8 +1911,9 @@ class JobList(object):
         :return: jobs ordered divided by date and member
         :rtype: dict
         """
+
         if len(self._ordered_jobs_by_date_member) > 0:
-            return self._ordered_jobs_by_date_member[section]
+            return self._ordered_jobs_by_date_member[wrapper_name]
 
     def get_completed(self, platform=None, wrapper=False):
         """
@@ -3163,8 +3163,8 @@ class JobList(object):
         packages_to_save_gen = (
             package for package in packages_to_save
             if isinstance(package, JobPackageThread)
-               and package.jobs[0].id not in failed_packages
-               and hasattr(package, "name")
+            and package.jobs[0].id not in failed_packages
+            and hasattr(package, "name")
         )
         wrappers = []
         initial_status = Status.SUBMITTED if not preview else Status.COMPLETED
@@ -3189,17 +3189,20 @@ class JobList(object):
             wrappers.append(self._wrapper_job_dict(wrapper_job))
         self.dbmanager.save_wrappers(wrappers, preview=preview)
 
-    def load_wrappers(self, preview: bool = False) -> None:
+    def load_wrappers(self, preview: bool = False, job_list: Any = None) -> None:
         """
         Load wrapper jobs and their inner jobs from the database, and populate the job package map.
 
         :param preview: If True, load wrappers in preview mode.
         :type preview: bool
+        :param job_list: Optional list of jobs to filter the loaded wrappers.
+        :type job_list: Any
+
         :return: None
         :rtype: None
         """
         # Retrieve wrapper and inner job info from the database
-        un_mapped_wrapper_info, un_mapped_inner_jobs = self.dbmanager.load_wrappers(preview)
+        un_mapped_wrapper_info, un_mapped_inner_jobs = self.dbmanager.load_wrappers(preview, job_list)
 
         # Build a dictionary of wrapper info indexed by wrapper name
         wrappers_info: Dict[str, dict] = {

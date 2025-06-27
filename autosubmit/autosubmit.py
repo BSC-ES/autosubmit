@@ -1650,10 +1650,6 @@ class Autosubmit:
             safetysleeptime = as_conf.get_safetysleeptime()
             Log.debug("The Experiment name is: {0}", expid)
             Log.debug("Sleep: {0}", safetysleeptime)
-            # TODO wrappers
-            if BasicConfig.DATABASE_BACKEND == 'sqlite':
-                os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid,
-                                      "db", "job_list.db"), 0o644)
 
             # TODO reset wrapper
             job_list = Autosubmit.load_job_list(
@@ -1846,8 +1842,7 @@ class Autosubmit:
         unparsed_two_step_start = as_conf.get_parse_two_step_start()
         if unparsed_two_step_start != "":
             job_list.parse_jobs_by_filter(unparsed_two_step_start)
-        job_list.create_dictionary(date_list, member_list, num_chunks, chunk_ini, date_format, as_conf.get_retrials(),
-                                   wrapper_jobs, as_conf)
+
         for job in job_list.get_job_list():
             if job.status != Status.WAITING and job.status != Status.READY:
                 job.status = Status.WAITING
@@ -2135,7 +2130,7 @@ class Autosubmit:
         # Check if the user wants to continue using wrappers and loads the appropriate info.
         if as_conf.experiment_data.get("WRAPPERS",None) is not None:
             Log.debug("Processing job packages")
-            job_list.load_wrappers()
+            job_list.load_wrappers(job_list=job_list)
             job_list.check_wrapper_stored_status()
         if recover:
             Log.info("Recovering wrappers... Done")
