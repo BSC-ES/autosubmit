@@ -2907,12 +2907,9 @@ class WrapperJob(Job):
         :param prev_status: previous status of a job
         :type prev_status: str
         """
-        reason = str()
         if self._platform.type == 'slurm':
-            self._platform.send_command(
-                self._platform.get_queue_status_cmd(self.id))
-            reason = self._platform.parse_queue_reason(
-                self._platform._ssh_output, self.id)
+            self._platform.send_command(self._platform.get_queue_status_cmd(self.id))
+            reason = self._platform.parse_queue_reason(self._platform._ssh_output, self.id)
             if self._queuing_reason_cancel(reason):
                 Log.printlog("Job {0} will be cancelled and set to FAILED as it was queuing due to {1}".format(
                     self.name, reason), 6009)
@@ -2938,8 +2935,7 @@ class WrapperJob(Job):
             elif reason == '(JobHeldAdmin)':
                 Log.debug(
                     "Job {0} Failed to be HELD, canceling... ", self.name)
-                self._platform.send_command(
-                    self._platform.cancel_cmd + " {0}".format(self.id))
+                self._platform.send_command(self._platform.cancel_cmd + " {0}".format(self.id))
                 self.status = Status.WAITING
             else:
                 Log.info("Job {0} is QUEUING {1}", self.name, reason)

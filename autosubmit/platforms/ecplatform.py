@@ -231,8 +231,6 @@ class EcPlatform(ParamikoPlatform):
             raise AutosubmitError(f'Could not execute command {command} on {self.host}', 7500, str(err_message))
         return True
 
-
-
     def send_file(self, filename, check=True):
         self.check_remote_log_dir()
         self.delete_file(filename)
