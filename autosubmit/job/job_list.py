@@ -3189,7 +3189,7 @@ class JobList(object):
             wrappers.append(self._wrapper_job_dict(wrapper_job))
         self.dbmanager.save_wrappers(wrappers, preview=preview)
 
-    def load_wrappers(self, preview: bool = False, job_list: Any = None) -> None:
+    def load_wrappers(self, preview: bool = False) -> None:
         """
         Load wrapper jobs and their inner jobs from the database, and populate the job package map.
 
@@ -3202,7 +3202,12 @@ class JobList(object):
         :rtype: None
         """
         # Retrieve wrapper and inner job info from the database
-        un_mapped_wrapper_info, un_mapped_inner_jobs = self.dbmanager.load_wrappers(preview, job_list)
+        job_list = None
+        if not preview:
+            job_list = self.job_list
+
+
+        un_mapped_wrapper_info, un_mapped_inner_jobs = self.dbmanager.load_wrappers(preview, self.job_list)
 
         # Build a dictionary of wrapper info indexed by wrapper name
         wrappers_info: Dict[str, dict] = {

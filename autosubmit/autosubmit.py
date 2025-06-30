@@ -2130,7 +2130,7 @@ class Autosubmit:
         # Check if the user wants to continue using wrappers and loads the appropriate info.
         if as_conf.experiment_data.get("WRAPPERS",None) is not None:
             Log.debug("Processing job packages")
-            job_list.load_wrappers(job_list=job_list)
+            job_list.load_wrappers()
             job_list.check_wrapper_stored_status()
         if recover:
             Log.info("Recovering wrappers... Done")
@@ -2785,12 +2785,9 @@ class Autosubmit:
                 job_list_wr = Autosubmit.load_job_list(
                     expid, as_conf, notransitive=notransitive, monitor=True, new=False)
                 Autosubmit.generate_scripts_andor_wrappers(as_conf, job_list_wr, job_list_wr.get_job_list(), True)
-
-                # load wrapper
-            else:
-                # load wrapper
-                pass
-                packages = JobPackagePersistence(expid).load()
+            packages = job_list.load_wrappers()
+            if not packages and check_wrapper:
+                packages = job_list.load_wrappers(check_wrapper)
         except BaseException as e:
             if profile:
                 profiler.stop()
