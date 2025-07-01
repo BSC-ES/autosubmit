@@ -71,6 +71,11 @@ def test_log_not_format():
     msg = "Test {foo, bar}"
     _send_messages(msg)
 
+def is_xz_file(filepath: str):
+    with open(filepath, 'rb') as f:
+        magic = f.read(6)
+    return magic == bytes.fromhex("FD 37 7A 58 5A 00")
+
 def test_logfile_compression(tmpdir):
     with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
         tmp_file.write(b"Some content to compress.\n")
@@ -82,8 +87,7 @@ def test_logfile_compression(tmpdir):
         assert not tmp_file_path.exists()
 
         compressed_path = tmp_file_path.with_suffix(tmp_file_path.suffix + ".xz")
-        assert compressed_path.exists()
-        assert compressed_path.stat().st_size > 0
+        assert is_xz_file(compressed_path)
 
     finally:
         compressed_path = tmp_file_path.with_suffix(tmp_file_path.suffix + ".xz")
