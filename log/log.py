@@ -280,7 +280,7 @@ class Log:
     @staticmethod
     def compress_logfile(file_path):
         """
-        Replaces original logfile with a compressed version of it using 'xz -9 -T4 -e'
+        Creates compressed version of logfile using 'xz -9 -T4 -e -k'
         """
 
         if not os.path.isfile(file_path):
@@ -288,7 +288,7 @@ class Log:
     
         try:
             subprocess.run(
-                ["xz", "-9", "-T4", "-e", file_path],
+                ["xz", "-9", "-T4", "-e", "-k", file_path],
                 check=True
             )
         except subprocess.CalledProcessError as e:
