@@ -231,7 +231,7 @@ class JobGrouping(object):
                             group_name = date2str(date, self.date_format)
                     else:
                         groups.append(group_name)
-            elif job.member is None :
+            elif not job.member:
                 synchronized = True
                 if self.group_by == 'date':
                     groups.append(date2str(job.date, self.date_format))
@@ -243,16 +243,15 @@ class JobGrouping(object):
                         groups.append(group_name)
         return synchronized
 
-
     def _automatic_grouping(self, groups_map):
-        all_jobs = copy.deepcopy(self.jobs)
+        # A deep copy of the job_list, deletes all the property methods ( I don't know why ) In any case it is not neccesary to do so
         split_groups, split_groups_status = self._create_splits_groups()
-
+        # Apparently, the splits_groups depletes the self.jobs, so we need to restore it
+        self.jobs = self.job_list.job_list
         blacklist = list()
         jobs_group_dict = dict()
         self.group_status_dict = dict()
         self.group_by = 'chunk'
-        self.jobs = all_jobs
 
         self._create_groups(jobs_group_dict, blacklist)
 
@@ -270,7 +269,7 @@ class JobGrouping(object):
                 if group in job.name and status == job.status:
                     jobs_group_dict[job.name] = [group]
                     self.jobs.pop(i)
-    
+
         return jobs_group_dict
 
     def _create_splits_groups(self):

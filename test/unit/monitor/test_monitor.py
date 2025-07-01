@@ -370,8 +370,7 @@ def test_generate_output(
     exp = autosubmit_exp(_EXPID, experiment_data={})
     exp_path = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR) / _EXPID
 
-    job_list_persistence = exp.autosubmit._get_job_list_persistence(_EXPID, exp.as_conf)
-    job_list = JobList(_EXPID, exp.as_conf, YAMLParserFactory(), job_list_persistence)
+    job_list = JobList(_EXPID, exp.as_conf, YAMLParserFactory())
     date_list = exp.as_conf.get_date_list()
     # TODO: we can probably simplify our code, so that ``date_format`` is calculated more easily...
     date_format = ''
@@ -396,7 +395,7 @@ def test_generate_output(
         wrapper_jobs,
         run_only_members=exp.as_conf.get_member_list(run_only=True),
         force=True,
-        create=True)
+        full_load=True)
 
     monitor = Monitor()
     if error_raised:
@@ -467,7 +466,10 @@ def test_generate_output_unexpected_error(error_msg: str, mocker):
 
     assert mocked_log.printlog.call_count > 0
     logged_message = mocked_log.printlog.call_args_list[-1].args[0]
-    assert 'Specified output does not have an available viewer installed' in logged_message
+    if "graphviz" in error_msg.lower():
+        assert 'Graphviz is not installed. Autosubmit needs this system package to plot the workflow.' in logged_message
+    else:
+        assert error_msg in logged_message
 
 
 @pytest.mark.parametrize(
