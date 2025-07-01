@@ -39,7 +39,7 @@ def test_create_platform_slurm(autosubmit_exp):
             'SIM': {
                 'PLATFORM': _PLATFORM_NAME,
                 'RUNNING': 'once',
-                'SCRIPT': 'echo "This is job ${SLURM_JOB_ID} EOM"'
+                'SCRIPT': 'echo "This is job ${SLURM_JOB_ID} EOM"',
             }
         },
         'PLATFORMS': {
@@ -52,7 +52,7 @@ def test_create_platform_slurm(autosubmit_exp):
                 'SCRATCH_DIR': '/tmp/scratch/',
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
-                'USER': 'root'
+                'USER': 'root',
             }
         }
     })
@@ -68,7 +68,7 @@ def test_create_platform_slurm(autosubmit_exp):
             'SIM': {
                 'PLATFORM': _PLATFORM_NAME,
                 'RUNNING': 'once',
-                'SCRIPT': 'echo "This is job ${SLURM_JOB_ID} EOM"'
+                'SCRIPT': 'echo "This is job ${SLURM_JOB_ID} EOM"',
             },
         },
         'PLATFORMS': {
@@ -81,7 +81,7 @@ def test_create_platform_slurm(autosubmit_exp):
                 'SCRATCH_DIR': '/tmp/scratch/',
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
-                'USER': 'root'
+                'USER': 'root',
             },
         },
     },
@@ -90,13 +90,13 @@ def test_create_platform_slurm(autosubmit_exp):
             'SIM': {
                 'PLATFORM': _PLATFORM_NAME,
                 'RUNNING': 'chunk',
-                'SCRIPT': 'sleep 1'
+                'SCRIPT': 'echo "0"',
             },
             'SIM_2': {
                 'PLATFORM': _PLATFORM_NAME,
                 'RUNNING': 'chunk',
-                'SCRIPT': 'sleep 1',
-                'DEPENDENCIES': 'SIM'
+                'SCRIPT': 'echo "0"',
+                'DEPENDENCIES': 'SIM',
             },
         },
         'PLATFORMS': {
@@ -109,7 +109,7 @@ def test_create_platform_slurm(autosubmit_exp):
                 'SCRATCH_DIR': '/tmp/scratch/',
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
-                'USER': 'root'
+                'USER': 'root',
             },
         },
     },
@@ -132,31 +132,34 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
         'JOBS': {
             'SIM': {
                 'DEPENDENCIES': {
-                    'SIM - 1': {}
+                    'SIM-1': {}
                 },
-                'SCRIPT': 'sleep 1',
-                'WALLCLOCK': '00:10',
+                'SCRIPT': 'echo "0"',
+                'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
+                'PLATFORM': _PLATFORM_NAME,
             },
             'POST': {
                 'DEPENDENCIES': {
-                    'SIM'
+                    'SIM',
                 },
-                'SCRIPT': 'sleep 1',
-                'WALLCLOCK': '00:05',
+                'SCRIPT': 'echo "0"',
+                'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
+                'PLATFORM': _PLATFORM_NAME,
             },
             'TA': {
                 'DEPENDENCIES': {
                     'SIM',
                     'POST',
                 },
-                'SCRIPT': 'sleep 1',
-                'WALLCLOCK': '00:05',
+                'SCRIPT': 'echo "0"',
+                'WALLCLOCK': '00:03',
                 'RUNNING': 'once',
                 'CHECK': 'on_submission',
+                'PLATFORM': _PLATFORM_NAME,
             },
         },
         'PLATFORMS': {
@@ -169,127 +172,31 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
                 'SCRATCH_DIR': '/tmp/scratch/',
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
-                'USER': 'root'
+                'USER': 'root',
+                'MAX_PROCESSORS': 10,
+                'PROCESSORS_PER_NODE': 10,
             },
         },
         'WRAPPERS': {
             'WRAPPER': {
                 'TYPE': 'vertical',
                 'JOBS_IN_WRAPPER': 'SIM',
-                'RETRIALS': 0
+                'RETRIALS': 0,
             }
         },
     },
-    # {
-    #     'JOBS': {
-    #         'SIMV': {
-    #             'DEPENDENCIES': {
-    #                 'SIMV - 1': {}
-    #             },
-    #             'SCRIPT': 'sleep 1',
-    #             'WALLCLOCK': '00:10',
-    #             'RUNNING': 'chunk',
-    #             'CHECK': 'on_submission',
-    #             'RETRIALS': 1,
-    #         },
-    #     },
-    #     'PLATFORMS': {
-    #         _PLATFORM_NAME: {
-    #             'ADD_PROJECT_TO_HOST': False,
-    #             'HOST': 'localDocker',
-    #             'MAX_WALLCLOCK': '00:03',
-    #             'PROJECT': 'group',
-    #             'QUEUE': 'gp_debug',
-    #             'SCRATCH_DIR': '/tmp/scratch/',
-    #             'TEMP_DIR': '',
-    #             'TYPE': 'slurm',
-    #             'USER': 'root'
-    #         },
-    #     },
-    #     'WRAPPERS': {
-    #         'WRAPPERV': {
-    #             'TYPE': 'vertical',
-    #             'JOBS_IN_WRAPPER': 'SIMV',
-    #             'RETRIALS': 0
-    #         },
-    #     },
-    # },
-    # {
-    #     'JOBS': {
-    #         'SIMHV': {
-    #             'DEPENDENCIES': {
-    #                 'SIMHV - 1': {}
-    #             },
-    #             'SCRIPT': 'sleep 1',
-    #             'WALLCLOCK': '00:10',
-    #             'RUNNING': 'chunk',
-    #             'CHECK': 'on_submission',
-    #             'RETRIALS': 1,
-    #         },
-    #     },
-    #     'PLATFORMS': {
-    #         _PLATFORM_NAME: {
-    #             'ADD_PROJECT_TO_HOST': False,
-    #             'HOST': 'localDocker',
-    #             'MAX_WALLCLOCK': '00:03',
-    #             'PROJECT': 'group',
-    #             'QUEUE': 'gp_debug',
-    #             'SCRATCH_DIR': '/tmp/scratch/',
-    #             'TEMP_DIR': '',
-    #             'TYPE': 'slurm',
-    #             'USER': 'root'
-    #         },
-    #     },
-    #     'WRAPPERS': {
-    #         'WRAPPERHV': {
-    #             'TYPE': 'horizontal-vertical',
-    #             'JOBS_IN_WRAPPER': 'SIMHV',
-    #             'RETRIALS': 0
-    #         },
-    #     },
-    # },
-    # {
-    #     'JOBS': {
-    #         'SIMVH': {
-    #             'DEPENDENCIES': {
-    #                 'SIMVH - 1': {},
-    #             },
-    #             'SCRIPT': 'sleep 1',
-    #             'WALLCLOCK': '00:10',
-    #             'RUNNING': 'chunk',
-    #             'CHECK': 'on_submission',
-    #             'RETRIALS': 1,
-    #         },
-    #     },
-    #     'PLATFORMS': {
-    #         _PLATFORM_NAME: {
-    #             'ADD_PROJECT_TO_HOST': False,
-    #             'HOST': 'localDocker',
-    #             'MAX_WALLCLOCK': '00:03',
-    #             'PROJECT': 'group',
-    #             'QUEUE': 'gp_debug',
-    #             'SCRATCH_DIR': '/tmp/scratch/',
-    #             'TEMP_DIR': '',
-    #             'TYPE': 'slurm',
-    #             'USER': 'root'
-    #         },
-    #     },
-    #     'WRAPPERS': {
-    #         'WRAPPERVH': {
-    #             'TYPE': 'vertical-horizontal',
-    #             'JOBS_IN_WRAPPER': 'SIMVH',
-    #             'RETRIALS': 0
-    #         },
-    #     },
-    # },
     {
         'JOBS': {
-            'SIMH': {
-                'SCRIPT': 'sleep 1',
-                'WALLCLOCK': "00:10",
+            'SIMV': {
+                'DEPENDENCIES': {
+                    'SIMV-1': {}
+                },
+                'SCRIPT': 'echo "0"',
+                'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
                 'RETRIALS': 1,
+                'PLATFORM': _PLATFORM_NAME,
             },
         },
         'PLATFORMS': {
@@ -302,28 +209,154 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
                 'SCRATCH_DIR': '/tmp/scratch/',
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
-                'USER': 'root'
+                'USER': 'root',
+                'MAX_PROCESSORS': 10,
+                'PROCESSORS_PER_NODE': 10,
+            },
+        },
+        'WRAPPERS': {
+            'WRAPPERV': {
+                'TYPE': 'vertical',
+                'JOBS_IN_WRAPPER': 'SIMV',
+                'RETRIALS': 0,
+            },
+        },
+    },
+    {
+        'JOBS': {
+            'SIMH': {
+                'DEPENDENCIES': {
+                    'SIMH-1': {}
+                },
+                'SCRIPT': 'echo "0"',
+                'WALLCLOCK': '00:03',
+                'RUNNING': 'chunk',
+                'CHECK': 'on_submission',
+                'RETRIALS': 1,
+                'PLATFORM': _PLATFORM_NAME,
+            },
+        },
+        'PLATFORMS': {
+            _PLATFORM_NAME: {
+                'ADD_PROJECT_TO_HOST': False,
+                'HOST': 'localDocker',
+                'MAX_WALLCLOCK': '00:03',
+                'PROJECT': 'group',
+                'QUEUE': 'gp_debug',
+                'SCRATCH_DIR': '/tmp/scratch/',
+                'TEMP_DIR': '',
+                'TYPE': 'slurm',
+                'USER': 'root',
+                'MAX_PROCESSORS': 10,
+                'PROCESSORS_PER_NODE': 10,
             },
         },
         'WRAPPERS': {
             'WRAPPERH': {
                 'TYPE': 'horizontal',
                 'JOBS_IN_WRAPPER': 'SIMH',
-                'RETRIALS': 0
+                'RETRIALS': 0,
+            },
+        },
+    },
+    {
+        'JOBS': {
+            'SIMHV': {
+                'DEPENDENCIES': {
+                    'SIMHV-1': {}
+                },
+                'SCRIPT': 'echo "0"',
+                'WALLCLOCK': '00:03',
+                'RUNNING': 'chunk',
+                'CHECK': 'on_submission',
+                'RETRIALS': 1,
+                'PLATFORM': _PLATFORM_NAME,
+            },
+        },
+        'PLATFORMS': {
+            _PLATFORM_NAME: {
+                'ADD_PROJECT_TO_HOST': False,
+                'HOST': 'localDocker',
+                'MAX_WALLCLOCK': '00:03',
+                'PROJECT': 'group',
+                'QUEUE': 'gp_debug',
+                'SCRATCH_DIR': '/tmp/scratch/',
+                'TEMP_DIR': '',
+                'TYPE': 'slurm',
+                'USER': 'root',
+                'MAX_PROCESSORS': 10,
+                'PROCESSORS_PER_NODE': 10,
+            },
+        },
+        'WRAPPERS': {
+            'WRAPPERHV': {
+                'TYPE': 'horizontal-vertical',
+                'JOBS_IN_WRAPPER': 'SIMHV',
+                'RETRIALS': 0,
+            },
+        },
+    },
+    {
+        'JOBS': {
+            'SIMVH': {
+                'DEPENDENCIES': {
+                    'SIMVH-1': {},
+                },
+                'SCRIPT': 'echo "0"',
+                'WALLCLOCK': '00:03',
+                'RUNNING': 'chunk',
+                'CHECK': 'on_submission',
+                'RETRIALS': 1,
+                'PLATFORM': _PLATFORM_NAME,
+            },
+        },
+        'PLATFORMS': {
+            _PLATFORM_NAME: {
+                'ADD_PROJECT_TO_HOST': False,
+                'HOST': 'localDocker',
+                'MAX_WALLCLOCK': '00:03',
+                'PROJECT': 'group',
+                'QUEUE': 'gp_debug',
+                'SCRATCH_DIR': '/tmp/scratch/',
+                'TEMP_DIR': '',
+                'TYPE': 'slurm',
+                'USER': 'root',
+                'MAX_PROCESSORS': 10,
+                'PROCESSORS_PER_NODE': 10,
+            },
+        },
+        'WRAPPERS': {
+            'WRAPPERVH': {
+                'TYPE': 'vertical-horizontal',
+                'JOBS_IN_WRAPPER': 'SIMVH',
+                'RETRIALS': 0,
             },
         },
     },
 ], ids=[
     'Vertical Wrapper Workflow',
-    # 'Wrapper Vertical',
-    # 'Wrapper Horizontal-vertical',
-    # 'Wrapper Vertical-horizontal',
+    'Wrapper Vertical',
     'Wrapper Horizontal',
+    'Wrapper Horizontal-vertical',
+    'Wrapper Vertical-horizontal',
 ])
 def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, experiment_data):
     """Runs a simple Bash script using Slurm."""
-    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
+
+    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, wrapper=True)
     _create_slurm_platform(exp.as_conf)
+
+    exp.as_conf.experiment_data = {
+        'EXPERIMENT': {
+            'DATELIST': '20000101',
+            'MEMBERS': 'fc0 fc1',
+            'CHUNKSIZEUNIT': 'day',
+            'CHUNKSIZE': 1,
+            'NUMCHUNKS': '2',
+            'CHUNKINI': '',
+            'CALENDAR': 'standard',
+        }
+    }
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
     assert 0 == exp.autosubmit.run_experiment(_EXPID)
