@@ -30,7 +30,7 @@ import py3dotplus as pydotplus
 
 from autosubmit.helpers.utils import NaturalSort, check_experiment_ownership
 from autosubmit.history.utils import create_path_if_not_exists_group_permission
-from autosubmit.job.job import Job
+from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.monitor.diagram import create_stats_report
@@ -329,7 +329,7 @@ class Monitor:
             self,
             expid: str,
             joblist: list[Job],
-            packages: list[Job],  # (wrapper_job)
+            packages: list[WrapperJob],  # (wrapper_job)
             groups: dict[str, Union[list[Job], dict]],
             hide_groups=False
     ) -> pydotplus.Dot:
@@ -424,21 +424,22 @@ class Monitor:
         graph.add_subgraph(exp)
 
         packages_subgraphs_dict = dict()
-
-        # Wrapper visualization
-        for node in exp.get_nodes():
-            name = node.obj_dict['name']
-            for wrapper_job in packages:
-                for job in wrapper_job.job_list:
-                    if name == job.name:
-                        package = wrapper_job.name
-                        if package not in packages_subgraphs_dict:
-                            packages_subgraphs_dict[package] = pydotplus.graphviz.Cluster(
-                                graph_name=package)
-                            packages_subgraphs_dict[package].obj_dict['attributes']['color'] = 'black'
-                            packages_subgraphs_dict[package].obj_dict['attributes']['style'] = 'dashed'
-                        packages_subgraphs_dict[package].add_node(node)
-                        break
+        if packages:
+            Log.debug('Creating wrapper jobs graph...')
+            # Wrapper visualization
+            for node in exp.get_nodes():
+                name = node.obj_dict['name']
+                for wrapper_job in packages:
+                    for job in wrapper_job.job_list:
+                        if name == job.name:
+                            package = wrapper_job.name
+                            if package not in packages_subgraphs_dict:
+                                packages_subgraphs_dict[package] = pydotplus.graphviz.Cluster(
+                                    graph_name=package)
+                                packages_subgraphs_dict[package].obj_dict['attributes']['color'] = 'black'
+                                packages_subgraphs_dict[package].obj_dict['attributes']['style'] = 'dashed'
+                            packages_subgraphs_dict[package].add_node(node)
+                            break
 
         for package, cluster in packages_subgraphs_dict.items():
             graph.add_subgraph(cluster)
@@ -515,10 +516,9 @@ class Monitor:
             output_date = time.strftime("%Y%m%d_%H%M", now)
             plot_file_name = f'{expid}_{output_date}.{output_format}'
             output_file = Path(BasicConfig.LOCAL_ROOT_DIR, expid, "plot", plot_file_name)
-
             graph = self.create_tree_list(expid, joblist, packages, groups, hide_groups)
 
-            Log.debug(f"Saving workflow plot at '{output_file}'")
+            Log.info(f"Saving workflow plot at '{output_file}'")
             if output_format == "png":
                 # noinspection PyUnresolvedReferences
                 graph.write_png(str(output_file))
@@ -557,6 +557,7 @@ class Monitor:
                 Log.printlog(message, 7014)
             else:
                 Log.printlog(str(e), 7014)
+        Log.result('Plotting finished')
 
 
     def generate_output_txt(self, expid: str, joblist: list[Job], path: str, classictxt=False,

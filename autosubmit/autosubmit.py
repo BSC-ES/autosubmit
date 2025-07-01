@@ -1655,6 +1655,7 @@ class Autosubmit:
             job_list = Autosubmit.load_job_list(
                 expid, as_conf, notransitive=notransitive)
             job_list.packages_dict = {}
+            job_list.packages_id = {}
 
             Log.debug("Length of the jobs list: {0}", len(job_list))
 
@@ -2070,6 +2071,7 @@ class Autosubmit:
 
         # Loads the communication lib, always paramiko.
         # Paramiko is the only way to communicate with the remote machines. Previously we had also Saga.
+        # TODO: move all submitter instances to job_list.submitter
         if not submitter:
             submitter = Autosubmit._get_submitter(as_conf)
             submitter.load_platforms(as_conf)
@@ -2080,7 +2082,7 @@ class Autosubmit:
             Log.info("Recovering job_list")
         try:
             job_list = Autosubmit.load_job_list(
-                expid, as_conf, notransitive=notransitive, new=False, full_load=False)
+                expid, as_conf, notransitive=notransitive, new=False, full_load=False, submitter=submitter)
         except IOError as e:
             raise AutosubmitError(
                 "Job_list not found", 6016, str(e))
@@ -2099,7 +2101,6 @@ class Autosubmit:
         Autosubmit._load_parameters(
             as_conf, job_list, submitter.platforms)
         Log.debug("Checking experiment templates...")
-        platforms_to_test = set()
         hpcarch = as_conf.get_platform()
         # Load only platforms used by the experiment, by looking at JOBS.$JOB.PLATFORM. So Autosubmit only establishes connections to the machines that are used.
         # Also, it ignores platforms used by "COMPLETED/FAILED" jobs as they are no need any more. ( in case of recovery or run a workflow that were already running )
@@ -2108,13 +2109,11 @@ class Autosubmit:
                 job.platform_name = hpcarch
             # noinspection PyTypeChecker
             try:
-                 job.platform = submitter.platforms[job.platform_name.upper()]
+                job.platform = submitter.platforms[job.platform_name.upper()]
             except Exception as e:
                 raise AutosubmitCritical(f"hpcarch={job.platform_name} not found in the platforms configuration file",
                     7014)
             # noinspection PyTypeChecker
-            if job.status not in (Status.COMPLETED, Status.SUSPENDED):
-                platforms_to_test.add(job.platform)
         # This function, looks at %JOBS.$JOB.FILE% ( mandatory ) and %JOBS.$JOB.CHECK% ( default True ).
         # Checks the contents of the .sh/.py/r files and looks for AS placeholders.
         try:
@@ -2163,10 +2162,11 @@ class Autosubmit:
             exp_history = Autosubmit.get_historical_database(expid, job_list,as_conf)
             # establish the connection to all platforms
             # Restore is a misleading, it is actually a "connect" function when the recover flag is not set.
-            Autosubmit.restore_platforms(platforms_to_test,as_conf=as_conf)
-            return job_list, submitter , exp_history, host , as_conf, platforms_to_test, False
+            Autosubmit.restore_platforms(job_list.submitter.platforms_object, as_conf=as_conf)
+            # TODO remove platforms_to_test everywhere and just access to job_list.submitter.platforms_object
+            return job_list, submitter , exp_history, host , as_conf, job_list.submitter.platforms_object, False
         else:
-            return job_list, submitter, None, None, as_conf, platforms_to_test, True
+            return job_list, submitter, None, None, as_conf, job_list.submitter.platforms_object, True
 
     @staticmethod
     def get_iteration_info(as_conf, job_list):
@@ -2265,7 +2265,7 @@ class Autosubmit:
                 max_recovery_retrials = as_conf.experiment_data.get("CONFIG",{}).get("RECOVERY_RETRIALS",3650)  # (72h - 122h )
                 recovery_retrials = 0
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
-                while job_list.continue_run(submitter):
+                while job_list.continue_run():
                     try:
                         if Autosubmit.exit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
@@ -2784,10 +2784,10 @@ class Autosubmit:
                 # Load another job_list to go through that goes through the jobs, but we want to monitor the other one
                 job_list_wr = Autosubmit.load_job_list(
                     expid, as_conf, notransitive=notransitive, monitor=True, new=False)
-                Autosubmit.generate_scripts_andor_wrappers(as_conf, job_list_wr, job_list_wr.get_job_list(), True)
-            packages = job_list.load_wrappers()
-            if not packages and check_wrapper:
-                packages = job_list.load_wrappers(check_wrapper)
+                Autosubmit.generate_scripts_andor_wrappers(as_conf, job_list, True)
+            job_list.load_wrappers()
+            if not job_list.packages_dict and check_wrapper:
+                job_list.load_wrappers(check_wrapper)
         except BaseException as e:
             if profile:
                 profiler.stop()
@@ -2832,7 +2832,7 @@ class Autosubmit:
                                                 exp_path, "/tmp/LOG_", expid),
                                             output_format=file_format if file_format is not None and len(
                                                 str(file_format)) > 0 else output_type,
-                                            packages=packages,
+                                            packages=list(job_list.job_package_map.values()),
                                             show=not hide,
                                             groups=groups_dict,
                                             hide_groups=hide_groups,
@@ -3128,7 +3128,7 @@ class Autosubmit:
                                             os.path.join(
                                                 exp_path, "/tmp/LOG_", expid),
                                             output_format=output_type,
-                                            packages=packages,
+                                            packages=list(job_list.job_package_map.values()),
                                             show=not hide,
                                             groups=groups_dict,
                                             job_list_object=job_list)
@@ -4665,7 +4665,7 @@ class Autosubmit:
                                                     os.path.join(
                                                         exp_path, "/tmp/LOG_", expid),
                                                     output if output is not None else output_type,
-                                                    packages,
+                                                    list(job_list.job_package_map.values()),
                                                     not hide,
                                                     groups=groups_dict,
                                                     job_list_object=job_list)
@@ -5453,7 +5453,7 @@ class Autosubmit:
                                                 os.path.join(
                                                     exp_path, "/tmp/LOG_", expid),
                                                 output_format=output_type,
-                                                packages=packages,
+                                                packages=list(job_list.job_package_map.values()),
                                                 show=not hide,
                                                 groups=groups_dict,
                                                 job_list_object=job_list)
@@ -5769,9 +5769,9 @@ class Autosubmit:
 
     # TODO: To be moved to utils
     @staticmethod
-    def load_job_list(expid, as_conf, notransitive=False, monitor=False, new=True, full_load=True) -> JobList:
+    def load_job_list(expid, as_conf, notransitive=False, monitor=False, new=True, full_load=True, submitter=None) -> JobList:
         rerun = as_conf.get_rerun()
-        job_list = JobList(expid, as_conf, YAMLParserFactory(), run_mode=True)
+        job_list = JobList(expid, as_conf, YAMLParserFactory(), run_mode=True, submitter=submitter)
         run_only_members = as_conf.get_member_list(run_only=True)
         date_list = as_conf.get_date_list()
         date_format = ''

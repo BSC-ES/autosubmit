@@ -71,6 +71,17 @@ class JobsDbManager(DbManager):
         # return modificable list of dicts so it is easier to save later
         return [dict(job) for job in job_list]
 
+    def load_job_by_name(self, job_name: str) -> dict[str, Any]:
+        """
+        Load a job by its name from the database.
+        :param job_name: Name of the job to load.
+        :type job_name: str
+        :return: Dictionary containing the job information.
+        """
+        self.create_table(JobsTable.name)
+        job = self.select_job_by_name(job_name)
+        return dict(job)
+
     def get_job_list_size(self) -> Tuple[int, int, int]:
         """
         Return the number of jobs in the database.

@@ -51,7 +51,7 @@ class JobList(object):
 
     """
 
-    def __init__(self, expid, config, parser_factory, run_mode=False, disable_save=False):
+    def __init__(self, expid, config, parser_factory, run_mode=False, disable_save=False, submitter=None):
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
             self._persistence_path = Path(BasicConfig.LOCAL_ROOT_DIR, expid, "db")
             self._persistence_file = Path("job_list.db")
@@ -97,6 +97,7 @@ class JobList(object):
         self.failed_size = 0
         # -cw flag, inspect
         self.disable_save = disable_save
+        self.submitter = submitter
 
     @property
     def graph_dict(self):
@@ -318,27 +319,64 @@ class JobList(object):
             self.graph.clear()
             self.graph.clear_edges()
         for node in [node for node in nodes if node.get("name", "") not in self.graph.nodes]:
-            self.graph.add_node(node["name"], job=Job(loaded_data=node))
-            job = self.graph.nodes[node["name"]]["job"]
-            if not node.get("platform_name", None):
-                node["platform_name"] = self._as_conf.jobs_data.get(job.section, {}).get("PLATFORM",
-                                                                                         self._as_conf.experiment_data.get(
-                                                                                             "DEFAULT", {}).get(
-                                                                                             "HPCARCH", "LOCAL"))
-            if not job.platform_name:
-                job.platform_name = node.get("platform_name",
-                                             self._as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL"))
+            self._add_job_node_with_platform(node)
 
-        for edge in (edge for edge in edges if edge.get("e_from", "") in self.graph.nodes and
-                                               edge.get("e_to", "") in self.graph.nodes):
-            if not self.graph.has_edge(edge["e_from"], edge["e_to"]):
-                self.graph.add_edge(edge["e_from"], edge["e_to"], status=edge["status"],
-                                    completed=edge["completed"],
-                                    from_step=edge["from_step"], optional=edge["optional"])
-                # I would like to avoid this, and only rely in calls on the job_list,
-                # but not feasible changing all the related code
-                self.graph.nodes[edge["e_to"]]["job"].add_parent(
-                    self.graph.nodes[edge["e_from"]]["job"])
+        for edge in (edge for edge in edges if edge.get("e_from", "") in self.graph.nodes and edge.get("e_to", "") in self.graph.nodes):
+            self._add_edge_and_parent(edge)
+
+    def _add_edge_and_parent(
+            self,
+            edge: dict[str, Any]
+    ) -> None:
+        """
+        Add an edge to the graph and update the parent relationship for the job nodes.
+
+        :param edge: Dictionary containing edge data with keys 'e_from', 'e_to', 'status', 'completed',
+                        'from_step', and 'optional'.
+        :type edge: dict[str, Any]
+        :return: None
+        :rtype: None
+        """
+        if not self.graph.has_edge(edge["e_from"], edge["e_to"]):
+            self.graph.add_edge(
+                edge["e_from"],
+                edge["e_to"],
+                status=edge["status"],
+                completed=edge["completed"],
+                from_step=edge["from_step"],
+                optional=edge["optional"]
+            )
+            # Update the parent job
+            self.graph.nodes[edge["e_to"]]["job"].add_parent(self.graph.nodes[edge["e_from"]]["job"])
+
+    def _add_job_node_with_platform(
+            self,
+            node: Dict[str, Any],
+            connect_to_platform: bool = True,
+    ) -> None:
+        """
+        Add a job node to the graph and ensure the platform name is set.
+
+        :param node: Dictionary containing job node data.
+        :type node: Dict[str, Any]
+
+        """
+        self.graph.add_node(node["name"], job=Job(loaded_data=node))
+        job = self.graph.nodes[node["name"]]["job"]
+        if not node.get("platform_name", None):
+            node["platform_name"] = self._as_conf.jobs_data.get(
+                job.section, {}
+            ).get(
+                "PLATFORM",
+                self._as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
+            )
+        if not job.platform_name:
+            job.platform_name = node.get(
+                "platform_name",
+                self._as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
+            )
+        if connect_to_platform:
+            self._assign_platforms(self._as_conf, job, create=False, new=False)
 
     def _load_graph(self, full_load: bool) -> Optional[List[Job]]:
         """
@@ -435,15 +473,11 @@ class JobList(object):
                 str(e),
             )
 
-    def _assign_platforms(self, as_conf: AutosubmitConfig, job: Job, create: bool, new: bool,
-                          submitter: Any = None) -> None:
-        if not submitter:
-            submitter = _get_submitter(as_conf)
-            submitter.load_platforms(as_conf)
+    def _assign_platforms(self, as_conf: AutosubmitConfig, job: Job, create: bool, new: bool) -> None:
         if create or new:
             job.reset_logs(as_conf)
-        if job.platform_name and job.platform_name in submitter.platforms:
-            job.platform = submitter.platforms[job.platform_name]
+        if self.submitter and job.platform_name and job.platform_name in self.submitter.platforms:
+            job.platform = self.submitter.platforms[job.platform_name]
 
     def clear_generate(self):
         self.dependency_map = {}
@@ -2331,7 +2365,7 @@ class JobList(object):
             return [job for job in in_queue if job.packed is False]
         return in_queue
 
-    def continue_run(self, submitter):
+    def continue_run(self):
         """
         Loads the next possible jobs and edges from the database and checks if there are active jobs in the workflow.
         Checks if there are active jobs in the workflow.
@@ -2341,7 +2375,7 @@ class JobList(object):
         self._load_graph(full_load=False)
         for job in self.job_list:
             if not job.platform:
-                self._assign_platforms(self._as_conf, job, create=False, new=False, submitter=submitter)
+                self._assign_platforms(self._as_conf, job, create=False, new=False)
             # if job.status not in (self._IN_SCHEDULER + self._FINAL_STATUSES):
             if not job.updated:
                 self.update_parents_edge_completeness(job, ready_job=False if job.status in [Status.WAITING,
@@ -2509,6 +2543,26 @@ class JobList(object):
         nodes = self.dbmanager.load_jobs(full_load)
         self.total_size, self.completed_size, self.failed_size = self.dbmanager.get_job_list_size()
         return nodes
+
+    def load_job_by_name(self, job_name: str) -> Optional[Job]:
+        """
+        Loads a job by its name from the database.
+
+        :param job_name: Name of the job to load.
+        :type job_name: str
+        :return: The loaded job object or None if not found.
+        :rtype: Job or None
+        """
+        node = self.dbmanager.load_job_by_name(job_name)
+        if node:
+            edges = self.dbmanager.load_edges([node], full_load=False)
+            self._add_job_node_with_platform(node)
+            for edge in (edge for edge in edges if
+                         edge.get("e_from", "") in self.graph.nodes and edge.get("e_to", "") in self.graph.nodes):
+                self._add_edge_and_parent(edge)
+        # get node from the graph
+        return self.graph.nodes.get(job_name, None)['job']
+
 
     def save_edges(self):
         """
@@ -2976,58 +3030,24 @@ class JobList(object):
         for job in self.get_delayed():
             if datetime.datetime.now() >= job.delay_end:
                 job.status = Status.READY
+
+        # At this point, we already computed jobs with STATUS != COMPLETED.
+
         for job in self.get_waiting():
             tmp = [parent for parent in job.parents if
                    parent.status == Status.COMPLETED or parent.status == Status.SKIPPED]
-            tmp2 = [parent for parent in job.parents if
-                    parent.status == Status.COMPLETED or parent.status == Status.SKIPPED
-                    or parent.status == Status.FAILED]
-            tmp3 = [parent for parent in job.parents if
-                    parent.status == Status.SKIPPED or parent.status == Status.FAILED]
-            failed_ones = [parent for parent in job.parents if parent.status == Status.FAILED]
             if job.parents is None or len(tmp) == len(job.parents):
                 job.status = Status.READY
                 job.hold = False
                 Log.debug(f"Setting job: {job.name} status to: READY (all parents completed)...")
                 if as_conf.get_remote_dependencies() == "true":
                     all_parents_completed.append(job.name)
-            if job.status != Status.READY:
-                if len(tmp3) != len(job.parents):
-                    if len(tmp2) == len(job.parents):
-                        strong_dependencies_failure = False
-                        weak_dependencies_failure = False
-                        for parent in failed_ones:
-                            if (parent.name in job.edge_info and job.edge_info[parent.name].get('optional', False)):
-                                weak_dependencies_failure = True
-                            elif parent.section in job.dependencies:
-                                if parent.status not in [Status.COMPLETED, Status.SKIPPED]:
-                                    strong_dependencies_failure = True
-                                break
-                        if not strong_dependencies_failure and weak_dependencies_failure:
-                            job.status = Status.READY
-                            job.hold = False
-                            Log.debug(
-                                f"Setting job: {job.name} status to: READY (conditional jobs are completed/failed)...")
-                            break
-                        if as_conf.get_remote_dependencies() == "true":
-                            all_parents_completed.append(job.name)
-                else:
-                    if len(tmp3) == 1 and len(job.parents) == 1:
-                        for parent in job.parents:
-                            if (parent.name in job.edge_info and job.edge_info[parent.name].get('optional', False)):
-                                job.status = Status.READY
-                                job.hold = False
-                                Log.debug(
-                                    f"Setting job: {job.name} status to: READY (conditional jobs are completed/failed)...")
-                                break
+
         if as_conf.get_remote_dependencies() == "true":
             for job in self.get_prepared():
                 tmp = [parent for parent in job.parents if
-                       parent.status == Status.COMPLETED or parent.status == Status.SKIPPED
-                       or parent.status == Status.FAILED]
-                tmp2 = [parent for parent in job.parents if
-                        parent.status == Status.SKIPPED or parent.status == Status.FAILED]
-                if len(tmp) == len(job.parents) and len(tmp2) != len(job.parents):
+                       parent.status == Status.COMPLETED or parent.status == Status.SKIPPED]
+                if job.parents is None or len(tmp) == len(job.parents):
                     job.status = Status.READY
                     job.hold = False
                     save = True
@@ -3163,8 +3183,8 @@ class JobList(object):
         packages_to_save_gen = (
             package for package in packages_to_save
             if isinstance(package, JobPackageThread)
-            and package.jobs[0].id not in failed_packages
-            and hasattr(package, "name")
+               and package.jobs[0].id not in failed_packages
+               and hasattr(package, "name")
         )
         wrappers = []
         initial_status = Status.SUBMITTED if not preview else Status.COMPLETED
@@ -3206,7 +3226,6 @@ class JobList(object):
         if not preview:
             job_list = self.job_list
 
-
         un_mapped_wrapper_info, un_mapped_inner_jobs = self.dbmanager.load_wrappers(preview, self.job_list)
 
         # Build a dictionary of wrapper info indexed by wrapper name
@@ -3224,11 +3243,12 @@ class JobList(object):
         # Attach job objects to each wrapper's job list and update packages_dict
         for package_name, job_names in inner_jobs_by_package.items():
             if package_name in wrappers_info:
-                wrappers_info[package_name]["job_list"] = []
+                if not wrappers_info[package_name].get("job_list", None):
+                    wrappers_info[package_name]["job_list"] = []
                 for job_name in job_names:
                     job = self.get_job_by_name(job_name)
                     if not job:
-                        job = self.dbmanager.load_job_by_name(job_name)
+                        job = self.load_job_by_name(job_name)
                     wrappers_info[package_name]["job_list"].append(job)
                 self.packages_dict[package_name] = wrappers_info[package_name]["job_list"]
 
@@ -3248,7 +3268,6 @@ class JobList(object):
                 hold=False
             )
             self.job_package_map[wrapper_job.id] = wrapper_job
-
 
     def _wrapper_job_dict(self, wrapper_job: 'WrapperJob') -> Tuple[Dict[str, Any], List[str]]:
         """
@@ -3824,7 +3843,6 @@ class JobList(object):
     def add_job(self, job: Job):
         self.graph.add_node(job.name, job=job)
 
-
     def check_wrapper_stored_status(self) -> Any:
         """
         Check if the wrapper job has been submitted and the inner jobs are in the queue after a load.
@@ -3840,7 +3858,7 @@ class JobList(object):
                 wrapper_status = Status.COMPLETED
             elif any(job.status == Status.RUNNING for job in jobs):
                 wrapper_status = Status.RUNNING
-            elif any(job.status == Status.FAILED for job in jobs): # No more inner jobs running but inner job in failed
+            elif any(job.status == Status.FAILED for job in jobs):  # No more inner jobs running but inner job in failed
                 wrapper_status = Status.FAILED
             elif any(job.status == Status.QUEUING for job in jobs):
                 wrapper_status = Status.QUEUING

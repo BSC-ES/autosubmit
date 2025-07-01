@@ -537,7 +537,6 @@ class JobPackager(object):
         section_jobs_to_submit = dict()
 
         for job in [job for job in jobs_ready]:
-            job.update_parameters(self._as_config, set_attributes=True)
             for event in job.platform.worker_events:  # keep alive log retrieval workers.
                 if not event.is_set():
                     event.set()
