@@ -11,6 +11,10 @@ permissions:
 jobs:
   build-docker-images:
     name: Build Docker images
+    # NOTE: The Docker loging command apparently stopped working at some point
+    #       probably due to some security changes in either/both GitHub and
+    #       Dependabot. To solve this, we do not build docker images here.
+    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

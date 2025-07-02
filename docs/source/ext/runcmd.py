@@ -124,8 +124,9 @@ class RunCmdDirective(code.CodeBlock):
         "syntax": directives.unchanged,
         "replace": directives.unchanged,
         "prompt": directives.flag,
+        "silent-output": int,
         "dedent-output": int,
-        "working-directory": directives.unchanged
+        "working-directory": directives.unchanged,
     }
 
     def run(self):
@@ -137,7 +138,7 @@ class RunCmdDirective(code.CodeBlock):
         # allow the directive to receive a working directory, so that we
         # change to that working directory before running the desired command.
         # The working directory is omitted from the final output.
-        working_directory = self.options.get('working-directory', 'source/')
+        working_directory = self.options.get('working-directory', '')
         if working_directory == '':
             # subprocess default value, so that we can disable it if needed.
             working_directory = None
@@ -153,22 +154,26 @@ class RunCmdDirective(code.CodeBlock):
         output = cache.get(command, working_directory)
 
         # Grab our custom commands
-        syntax = self.options.get("syntax", "bash")
+        syntax = self.options.get("syntax", "console")
         replace = self.options.get("replace", '')
         reader = csv.reader([replace], delimiter=",", escapechar="\\")
         # prompt = "prompt" in self.options
         # We patched this so that the prompt is displayed by default, similar
         # to how ``{code-block} console`` works.
-        prompt = True
+        silent_output = self.options.get("silent-output", 0)
         dedent_output = self.options.get("dedent-output", 0)
 
         # Dedent the output if required
         if dedent_output > 0:
             output = "\n".join([x[dedent_output:] for x in output.split("\n")])
 
+        # silence the output if required
+        if silent_output > 0:
+            output = ""
+
         # Add the prompt to our output if required
-        if prompt:
-            output = "$ {}\n{}".format(command, output)
+        if 'prompt' not in self.options:
+            output = f"$ {command}\n\nOutput:\n{output}"
 
         # Do our "replace" syntax on the command output
         for items in reader:
@@ -182,7 +187,8 @@ class RunCmdDirective(code.CodeBlock):
                     output = re.sub(p, r, output)
 
         # Note: Sphinx's CodeBlock directive expects an array of command-line
-        #       output lines: https://github.com/sphinx-doc/sphinx/blob/c51a88da8b7b40e8d8cbdb1fce85ca2346b2b59a/sphinx/directives/code.py#L114
+        #       output lines:
+        #       https://github.com/sphinx-doc/sphinx/blob/c51a88da8b7b40e8d8cbdb1fce85ca2346b2b59a/sphinx/directives/code.py#L114
         #       But the runcmd original code was simply wrapping a string
         #       containing \n in the text as a one-element array, e.g.
         #       ["cwltool --debug ...\ncwltool Version..."].

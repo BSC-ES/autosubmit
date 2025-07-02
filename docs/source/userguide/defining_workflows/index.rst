@@ -53,6 +53,17 @@ To set at what level a job has to run you have to use the RUNNING attribute. It 
 member and chunk corresponding to running once, once per startdate, once per member or once per chunk respectively.
 
 .. code-block:: yaml
+
+    EXPERIMENT:
+      DATELIST: 19900101 20000101
+      MEMBERS: Member1 Member2
+      CHUNKSIZEUNIT: month
+      CHUNKSIZE: '4'
+      NUMCHUNKS: '2'
+      CHUNKINI: ''
+      CALENDAR: standard
+
+.. code-block:: yaml
     
     JOBS:
       once:
