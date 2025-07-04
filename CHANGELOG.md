@@ -25,14 +25,15 @@ the filter the jobs. Not using any value for `-fp` still returns all jobs.
 - Log levels in the command line now accept `ERROR` #2412
 - Fix setstatus command to work in all cases #2381
 - Fix PS platform to work with the local machine #2374
+- Fixed a `ZeroDivisionError` when using RO-Crate or `stats`, and also an issue
+  where the message said `None` could not be iterable. #2389
 
 **Enhancements:**
 
 - EDITO Autosubmit-Demo container updated to install API in different environment #2398
 - Update portalocker requirement from <=3.1.1 to <=3.2.0 #2423
-- Fixed a `ZeroDivisionError` when using RO-Crate or `stats`, and also an issue
-  where the message said `None` could not be iterable. #2389
-- Additional files are now generated upon using the `autosubmit inspect` command #2323'
+- Additional files are now generated upon using the `autosubmit inspect` command #2323
+- Operational runs now require no pending commits, ensuring a cleaner workflow. [#2220](https://github.com/BSC-ES/autosubmit/issues/2220), [PR](https://github.com/BSC-ES/autosubmit/pull/2293)
 
 ### 4.1.14: Bug fixes, enhancements, and new features
 
@@ -53,7 +54,6 @@ the filter the jobs. Not using any value for `-fp` still returns all jobs.
 
 **New features:**
 - Added support for `%^%` variables to improve template customization. [PR](https://github.com/BSC-ES/autosubmit/pull/2288), [Docs](https://autosubmit.readthedocs.io/en/latest/userguide/templates.html#sustitute-placeholders-after-all-files-have-been-loaded)
-- Operational runs now require no pending commits, ensuring a cleaner workflow. [#2220](https://github.com/BSC-ES/autosubmit/issues/2220), [PR](https://github.com/BSC-ES/autosubmit/pull/2293)
 
 ### 4.1.13: Dependencies bug fixes, regression tests
 
