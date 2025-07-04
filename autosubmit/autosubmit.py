@@ -2282,10 +2282,6 @@ class Autosubmit:
                             raise AutosubmitError("Config files seems to not be accessible", 6040, str(e))
                         total_jobs, safetysleeptime, default_retrials, check_wrapper_jobs_sleeptime = Autosubmit.get_iteration_info(as_conf,job_list)
 
-                        save = False
-                        # End Check Current jobs
-                        if save:  # previous iteration
-                            job_list.backup_save()
                         # This function name is totally misleading, yes it check the status of the wrappers, but also orders jobs the jobs that  are not wrapped by platform.
                         jobs_to_check, job_changes_tracker = Autosubmit.check_wrappers(as_conf, job_list, platforms_to_test, expid)
                         # Jobs to check are grouped by platform.
@@ -2336,7 +2332,6 @@ class Autosubmit:
                             except Exception as e:
                                 Log.warning(
                                     "Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
-                        job_changes_tracker = {}
                         if Autosubmit.exit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             job_list.save()
@@ -5555,15 +5550,15 @@ class Autosubmit:
         :return: submitter
         :rtype: Submitter
         """
-        try:
-            communications_library = as_conf.get_communications_library()
-        except Exception as e:
-            communications_library = 'paramiko'
-        if communications_library == 'paramiko':
-            return ParamikoSubmitter()
-        else:
+        # try:
+        as_conf.get_communications_library()
+        # except Exception as e:
+        #     communications_library = 'paramiko'
+        # if communications_library == 'paramiko':
+        #     return ParamikoSubmitter()
+        # else:
             # only paramiko is available right now.
-            return ParamikoSubmitter()
+        return ParamikoSubmitter()
 
     @staticmethod
     def _get_job_list_persistence(expid, as_conf):
