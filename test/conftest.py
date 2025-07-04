@@ -263,10 +263,7 @@ def autosubmit_exp(
         #       needed, especially if the disk has the valid value?
         config.experiment_data['DEFAULT']['EXPID'] = expid
 
-        if wrapper:
-            autosubmit.create(expid, noplot=True, hide=False, force=True, check_wrappers=True)
-        else:
-            autosubmit.create(expid, noplot=True, hide=False, force=True)
+        autosubmit.create(expid, noplot=True, hide=False, force=True, check_wrappers=wrapper)
 
         return AutosubmitExperiment(
             expid=expid,
