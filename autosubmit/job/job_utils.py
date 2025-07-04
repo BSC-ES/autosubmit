@@ -47,15 +47,15 @@ def _get_submitter(as_conf) -> ParamikoSubmitter:
     :return: submitter
     :rtype: Submitter
     """
-    try:
-        communications_library = as_conf.get_communications_library()
-    except Exception as e:
-        communications_library = 'paramiko'
-    if communications_library == 'paramiko':
-        return ParamikoSubmitter()
-    else:
+    # try:
+    communications_library = as_conf.get_communications_library()
+    # except Exception as e:
+    #     communications_library = 'paramiko'
+    # if communications_library == 'paramiko':
+    #     return ParamikoSubmitter()
+    # else:
         # only paramiko is available right now.
-        return ParamikoSubmitter()
+    return ParamikoSubmitter()
 
 
 def is_leap_year(year) -> bool:
