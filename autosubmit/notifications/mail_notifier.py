@@ -89,21 +89,6 @@ def _attach_file(file_path: Path, message: MIMEMultipart) -> None:
             message='An error has occurred while attaching log files to a warning email about remote_platforms',
             trace=str(e))
 
-def _collect_logfiles(message):
-    run_log_files = [f for f in self.config.expid_aslog_dir(
-        exp_id).glob('*_run.log') if Path(f).is_file()]
-    if run_log_files:
-        latest_run_log: Path = max(run_log_files)
-        temp_dir = TemporaryDirectory()
-        try:
-            compressed_run_log = _compress_file(temp_dir, latest_run_log)
-            _attach_file(compressed_run_log, message)
-        except AutosubmitError as e:
-            Log.printlog(code=e.code, message=e.message)
-        finally:
-            if temp_dir:
-                temp_dir.cleanup()
-
 def _generate_message_text(
         exp_id: str,
         job_name: str,
@@ -160,6 +145,21 @@ class MailNotifier:
     def __init__(self, basic_config):
         self.config = basic_config
 
+    def _collect_logfiles(message):
+        run_log_files = [f for f in self.config.expid_aslog_dir(
+            exp_id).glob('*_run.log') if Path(f).is_file()]
+        if run_log_files:
+            latest_run_log: Path = max(run_log_files)
+            temp_dir = TemporaryDirectory()
+            try:
+                compressed_run_log = _compress_file(temp_dir, latest_run_log)
+                _attach_file(compressed_run_log, message)
+            except AutosubmitError as e:
+                Log.printlog(code=e.code, message=e.message)
+            finally:
+                if temp_dir:
+                    temp_dir.cleanup()
+
     def notify_experiment_status(
             self,
             exp_id: str,
@@ -186,7 +186,7 @@ class MailNotifier:
         message['Subject'] = '[Autosubmit] Warning: a remote platform is malfunctioning'
         message['Date'] = email.utils.formatdate(localtime=True)
         message.attach(MIMEText(message_text))
-        _collect_logfiles(message)
+        self._collect_logfiles(message)
 
         for mail in mail_to:
             message['To'] = email.utils.formataddr((mail, mail))
@@ -216,7 +216,7 @@ class MailNotifier:
         
         if status == "FAILED":
             message.attach(MIMEText(message_text))
-            _collect_logfiles(message)
+            self._collect_logfiles(message)
 
         for mail in mail_to:  # expects a list
             message['To'] = email.utils.formataddr((mail, mail))
