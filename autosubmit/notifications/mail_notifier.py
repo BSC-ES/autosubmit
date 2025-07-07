@@ -35,8 +35,8 @@ if TYPE_CHECKING:
 
 
 def _compress_file(
-        temporary_directory: TemporaryDirectory,
-        file_path: Path) -> Path:
+        temporary_directory: str,
+        file_path: list[Path]) -> Path:
     """Compress a file.
 
     The file is created inside the given temporary directory.
@@ -46,15 +46,16 @@ def _compress_file(
     :param temporary_directory: The temporary directory.
     :type temporary_directory: TemporaryDirectory
     :param file_path: The path of the file to be compressed.
-    :type file_path: Path
+    :type file_path: list[Path]
     :return: The Path object of the compressed file.
-    :rtype: str
+    :rtype: Path
     :raises AutosubmitError: The file cannot be compressed.
     """
     try:
-        zip_file_name = Path(temporary_directory.name, f'{file_path.name}.zip')
+        zip_file_name = Path(temporary_directory, 'log.zip')
         with zipfile.ZipFile(zip_file_name, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            zip_file.write(file_path, Path(file_path).name)
+            for file in file_path:
+                zip_file.write(file, Path(file).name)
             return Path(zip_file.filename)
     except ValueError as e:
         raise AutosubmitError(
@@ -154,20 +155,30 @@ class MailNotifier:
     def __init__(self, basic_config):
         self.config = basic_config
 
-    def _collect_logfiles(self, message, exp_id):
-        run_log_files = [f for f in self.config.expid_aslog_dir(
-            exp_id).glob('*_run.log') if Path(f).is_file()]
-        if run_log_files:
-            latest_run_log: Path = max(run_log_files)
-            temp_dir = TemporaryDirectory()
-            try:
-                compressed_run_log = _compress_file(temp_dir, latest_run_log)
-                _attach_file(compressed_run_log, message)
-            except AutosubmitError as e:
-                Log.printlog(code=e.code, message=e.message)
-            finally:
-                if temp_dir:
-                    temp_dir.cleanup()
+    def _collect_logfiles(self, message: 'MIMEMultipart', exp_id: str):
+        """Generate a compressed file with all the logs from the LOG_<EXPID> folder"""
+        run_log_files_err = [f for f in self.config.expid_log_dir(exp_id).glob('*.err') if Path(f).is_file()]
+        run_log_files_out = [f for f in self.config.expid_log_dir(exp_id).glob('*.out') if Path(f).is_file()]
+        run_log_files_log = [f for f in self.config.expid_log_dir(exp_id).glob('*.log') if Path(f).is_file()]
+        latest_run_log_err = Path()
+        latest_run_log_out = Path()
+        latest_run_log_log = Path()
+        if run_log_files_err:
+            latest_run_log_err: Path = max(run_log_files_err)
+        if run_log_files_out:
+            latest_run_log_out: Path = max(run_log_files_out)
+        if run_log_files_log:
+            latest_run_log_log: Path = max(run_log_files_log)
+            with TemporaryDirectory() as temp_dir:
+                try:
+                    compressed_run_log = _compress_file(temp_dir, [latest_run_log_err, latest_run_log_out, latest_run_log_log])
+                    if self.config.ATTACHMENT:
+                        _attach_file(compressed_run_log, message)
+                except AutosubmitError as e:
+                    Log.printlog(code=e.code, message=e.message)
+        else:
+            raise AutosubmitError(message=f'No Log files for the experiment {exp_id} where found to send via email')
+
 
     def notify_experiment_status(
             self,
@@ -226,8 +237,6 @@ class MailNotifier:
                 Log.printlog(
                     f'Trace:{str(e)}\nAn error has occurred while sending a mail '
                     f'for the job {job_name}', 6011)
-
-        self._send_message(mail_to, self.config.MAIL_FROM, message)
 
     def _send_message(self, mail_to: list[str], mail_from: str, message) -> None:
         formatted_addresses = [
