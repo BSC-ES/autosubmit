@@ -218,6 +218,19 @@ class MailNotifier:
         if status == "FAILED":
             message.attach(MIMEText(message_text))
             self._collect_logfiles(message, exp_id)
+            run_log_files = [f for f in self.config.expid_aslog_dir(
+                exp_id).glob('*_run.log') if Path(f).is_file()]
+            if run_log_files:
+                latest_run_log: Path = max(run_log_files)
+                temp_dir = TemporaryDirectory()
+                try:
+                    compressed_run_log = _compress_file(temp_dir, latest_run_log)
+                    _attach_file(compressed_run_log, message)
+                except AutosubmitError as e:
+                    Log.printlog(code=e.code, message=e.message)
+                finally:
+                    if temp_dir:
+                        temp_dir.cleanup()
 
         for mail in mail_to:  # expects a list
             message['To'] = email.utils.formataddr((mail, mail))
