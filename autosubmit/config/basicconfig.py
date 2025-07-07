@@ -54,6 +54,7 @@ class BasicConfig:
     CUSTOM_PLATFORMS_PATH = ''
     DEFAULT_JOBS_CONF = ''
     SMTP_SERVER = ''
+    ATTACHMENT = ''
     MAIL_FROM = ''
     ALLOWED_HOSTS: str | dict = ''
     DENIED_HOSTS: str | dict = ''
@@ -67,7 +68,7 @@ class BasicConfig:
     #       used right now as it already existed, but it should be moved to a proper place later.
     #       Validation of expids must also be centralised, as this is not the only place where it is done.
     @staticmethod
-    def expid_dir(exp_id):
+    def expid_dir(exp_id) -> Path:
         """Return the experiment directory.
 
         Fails if the experiment ID is not valid. The expid must be a string,
@@ -83,7 +84,7 @@ class BasicConfig:
         return Path(BasicConfig.LOCAL_ROOT_DIR, exp_id)
 
     @staticmethod
-    def expid_tmp_dir(exp_id):
+    def expid_tmp_dir(exp_id) -> Path:
         return BasicConfig.expid_dir(exp_id).joinpath(BasicConfig.LOCAL_TMP_DIR)
 
     @staticmethod
@@ -91,11 +92,11 @@ class BasicConfig:
         return BasicConfig.expid_tmp_dir(exp_id).joinpath('autosubmit.lock')
 
     @staticmethod
-    def expid_log_dir(exp_id):
+    def expid_log_dir(exp_id) -> Path:
         return BasicConfig.expid_tmp_dir(exp_id).joinpath(f'LOG_{exp_id}')
 
     @staticmethod
-    def expid_aslog_dir(exp_id):
+    def expid_aslog_dir(exp_id) -> Path:
         return BasicConfig.expid_tmp_dir(exp_id).joinpath(BasicConfig.LOCAL_ASLOG_DIR)
 
     @staticmethod
@@ -144,6 +145,8 @@ class BasicConfig:
             BasicConfig.DEFAULT_JOBS_CONF = parser.get('conf', 'jobs')
         if parser.has_option('mail', 'smtp_server'):
             BasicConfig.SMTP_SERVER = parser.get('mail', 'smtp_server')
+        if parser.has_option('mail', 'attachment'):
+            BasicConfig.ATTACHMENT = parser.get('mail', 'attachment')
         if parser.has_option('mail', 'mail_from'):
             BasicConfig.MAIL_FROM = parser.get('mail', 'mail_from')
         if parser.has_option('hosts', 'authorized'):
