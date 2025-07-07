@@ -88,7 +88,6 @@ def _attach_file(file_path: Path, message: MIMEMultipart) -> None:
             message='An error has occurred while attaching log files to a warning email about remote_platforms',
             trace=str(e))
 
-
 def _generate_message_text(
         exp_id: str,
         job_name: str,
@@ -155,6 +154,21 @@ class MailNotifier:
     def __init__(self, basic_config):
         self.config = basic_config
 
+    def _collect_logfiles(self, message, exp_id):
+        run_log_files = [f for f in self.config.expid_aslog_dir(
+            exp_id).glob('*_run.log') if Path(f).is_file()]
+        if run_log_files:
+            latest_run_log: Path = max(run_log_files)
+            temp_dir = TemporaryDirectory()
+            try:
+                compressed_run_log = _compress_file(temp_dir, latest_run_log)
+                _attach_file(compressed_run_log, message)
+            except AutosubmitError as e:
+                Log.printlog(code=e.code, message=e.message)
+            finally:
+                if temp_dir:
+                    temp_dir.cleanup()
+
     def notify_experiment_status(
             self,
             exp_id: str,
@@ -180,20 +194,7 @@ class MailNotifier:
         message['Subject'] = '[Autosubmit] Warning: a remote platform is malfunctioning'
         message['Date'] = email.utils.formatdate(localtime=True)
         message.attach(MIMEText(message_text))
-
-        run_log_files = [f for f in self.config.expid_aslog_dir(
-            exp_id).glob('*_run.log') if Path(f).is_file()]
-        if run_log_files:
-            latest_run_log: Path = max(run_log_files)
-            temp_dir = TemporaryDirectory()
-            try:
-                compressed_run_log = _compress_file(temp_dir, latest_run_log)
-                _attach_file(compressed_run_log, message)
-            except AutosubmitError as e:
-                Log.printlog(code=e.code, message=e.message)
-            finally:
-                if temp_dir:
-                    temp_dir.cleanup()
+        self._collect_logfiles(message, exp_id)
 
         self._send_message(mail_to, self.config.MAIL_FROM, message)
 
@@ -208,11 +209,23 @@ class MailNotifier:
         _check_mail_address(mail_to)
         message_text = _generate_message_text(
             exp_id, job_name, prev_status, status)
-        message = MIMEText(message_text)
+        message = MIMEMultipart()
         message['From'] = email.utils.formataddr(
             ('Autosubmit', self.config.MAIL_FROM))
         message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {status}'
         message['Date'] = email.utils.formatdate(localtime=True)
+        if status == "FAILED":
+            message.attach(MIMEText(message_text))
+            self._collect_logfiles(message, exp_id)
+
+        for mail in mail_to:  # expects a list
+            message['To'] = email.utils.formataddr((mail, mail))
+            try:
+                self._send_mail(self.config.MAIL_FROM, mail, message)
+            except BaseException as e:
+                Log.printlog(
+                    f'Trace:{str(e)}\nAn error has occurred while sending a mail '
+                    f'for the job {job_name}', 6011)
 
         self._send_message(mail_to, self.config.MAIL_FROM, message)
 
