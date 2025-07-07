@@ -166,10 +166,7 @@ def test_clean_git_project(
     mocked_autosubmit_config = mocker.patch('autosubmit.autosubmit.AutosubmitConfig.set_git_project_commit')
     mocked_autosubmit_config.return_value = True
 
-    mocked_autosubmit_git = mocker.patch('autosubmit.autosubmit.AutosubmitGit')
-    mocked_autosubmit_git_obj = mocker.MagicMock()
-    mocked_autosubmit_git.return_value = mocked_autosubmit_git_obj
-    mocked_autosubmit_git_obj.clean_git.return_value = clean_git_return
+    mocker.patch('autosubmit.autosubmit.clean_git', return_value=clean_git_return)
 
     git_project = Path(tmp_path / 'tmp_git_project')
     git_project.mkdir()
