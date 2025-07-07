@@ -17,15 +17,18 @@
 
 import logging
 from contextlib import nullcontext as does_not_raise
+from email.mime.text import MIMEText
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from autosubmit.config.basicconfig import BasicConfig
 
 from autosubmit.log.log import (
     AutosubmitError, AutosubmitCritical, LogFormatter, Log, StatusFilter, StatusFailedFilter
 )
 from autosubmit.log.utils import compress_xz, find_uncompressed_files, is_xz_file
+from autosubmit.notifications.mail_notifier import MailNotifier
 
 if TYPE_CHECKING:
     from pytest_mock import MockFixture
@@ -407,3 +410,43 @@ def test_compress_xz(tmp_path: Path):
     # Cover nonexistent path
     with pytest.raises(FileNotFoundError):
         find_uncompressed_files(str(tmp_path.joinpath("nonexistent_path")))
+
+
+@pytest.mark.parametrize(
+    "make_files",
+    [
+        True, False,
+    ],
+    ids=[
+        "With Files: No errors",
+        "No Files: error",
+    ]
+)
+def test__collect_logfiles(make_files: bool, mocker):
+    mock_config = mocker.Mock()
+    mock_config.MAIL_FROM = "test@example.com"
+    mock_config.SMTP_SERVER = "smtp.example.com"
+    mock_config.expid_log_dir.side_effect = lambda exp_id: BasicConfig.expid_log_dir(exp_id)
+
+    mail_notifier = MailNotifier(mock_config)
+
+    job_name = 'Job1'
+    expid = 'a123'
+
+    path_to_attach = mock_config.expid_log_dir(expid)
+    path_to_attach.mkdir(parents=True, exist_ok=True)
+    if make_files:
+        path_to_attach.joinpath('test_run.err').touch(mode=0o666, exist_ok=True)
+        path_to_attach.joinpath('test_run.out').touch(mode=0o666, exist_ok=True)
+
+    message = MIMEText("Generated message")
+    message['From'] = mail_notifier.config.MAIL_FROM
+    message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to Test'
+
+    if make_files:
+        mail_notifier._collect_logfiles(message, exp_id=expid)
+    else:
+        with pytest.raises(AutosubmitError) as ae:
+            mail_notifier._collect_logfiles(message, exp_id=expid)
+
+        assert 'No Log files for the experiment' in str(ae.value.message)
