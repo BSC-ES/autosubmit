@@ -89,7 +89,38 @@ $ sudo setfacl --modify user:$USER:rw /var/run/docker.sock
 ```
 
 For the Slurm tests (pytest marker `slurm`) you will need the Slurm container
-built and running locally. We run it as a service in the CI pipeline, see the
+built and running locally. Below is the step-by-step on how to run locally
+
+```bash
+$ docker pull autosubmit/slurm-openssh-container:25-05-0-1
+```
+
+```bash
+$ docker run --rm -it --cgroupns=host --privileged --volume /sys/fs/cgroup:/sys/fs/cgroup:rw --hostname slurmctld --name slurm-container -p 2222:2222 autosubmit/slurm-openssh-container:25-05-0-1
+```
+
+```bash
+$ docker cp slurm-container:/root/.ssh/container_root_pubkey $HOME/.ssh/container_root_pubkey || echo "Failed to docker cp SSH key"
+```
+
+```bash
+$ chmod 600 $HOME/.ssh/container_root_pubkey
+```
+
+```bash
+$ cat <<- EOF >> $HOME/.ssh/config
+Host localDocker
+    HostName localhost
+    User root
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    IdentityFile $HOME/.ssh/container_root_pubkey
+    Port 2222
+    ForwardX11 yes
+EOF
+```
+
+We run it as a service in the CI pipeline, in case of doubt, see the
 file `.github/workflows/ci.yaml` for details -- there is a Docker service initialized
 for the `test-slurm` job.
 
