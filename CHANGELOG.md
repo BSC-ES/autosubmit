@@ -5,7 +5,7 @@
 - Adding a Slurm Container to the CI/CD and creating tests to increase the
   coverage of the Platforms #977
 - Execute scripts to generate the documentation and standardize expid on documentation #1160
-- Added new users of the Autosubmit tool #2445
+- Added new Autosubmit users GANANA, ESiWACE HPCW, and TerraDT #2445
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 
