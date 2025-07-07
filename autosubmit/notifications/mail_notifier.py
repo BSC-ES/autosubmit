@@ -18,7 +18,6 @@
 import email.utils
 import re
 import smtplib
-import zipfile
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -49,11 +48,9 @@ def _compress_file(
     :raises AutosubmitError: The file cannot be compressed.
     """
     try:
-        zip_file_name = Path(temporary_directory, 'log.zip')
-        with zipfile.ZipFile(zip_file_name, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            for file in file_path:
-                zip_file.write(file, Path(file).name)
-            return Path(zip_file.filename)
+        log_dir = Path(temporary_directory)
+        file, _, _ = [file for f in [log_dir.glob(e) for e in ('*.gz', '*.xz')] for file in f]
+        return Path(temporary_directory, file.name) if file is not None else Path()
     except ValueError as e:
         raise AutosubmitError(
             code=6011,
@@ -85,6 +82,7 @@ def _attach_file(file_path: Path, message: MIMEMultipart) -> None:
             code=6011,
             message='An error has occurred while attaching log files to a warning email about remote_platforms',
             trace=str(e))
+
 
 def _generate_message_text(
         exp_id: str,
@@ -155,21 +153,13 @@ class MailNotifier:
     def _collect_logfiles(self, message: 'MIMEMultipart', exp_id: str):
         """Generate a compressed file with all the logs from the LOG_<EXPID> folder"""
         logs_exist = False
-        run_log_files_err = [f for f in self.config.expid_log_dir(exp_id).glob('*.err') if Path(f).is_file()]
-        run_log_files_out = [f for f in self.config.expid_log_dir(exp_id).glob('*.out') if Path(f).is_file()]
-        run_log_files_log = [f for f in self.config.expid_log_dir(exp_id).glob('*.log') if Path(f).is_file()]
+        run_log_compressed_files = [f for f in [self.config.expid_log_dir(exp_id).glob(e) for e in ('*.gz', '*.xz')] for f in f]
 
         try:
             if self.config.ATTACHMENT:
-                if len(run_log_files_err) > 0:
+                if len(run_log_compressed_files) > 0:
                     logs_exist = True
-                    _attach_file(max(run_log_files_err), message)
-                if len(run_log_files_out) > 0:
-                    logs_exist = True
-                    _attach_file(max(run_log_files_out), message)
-                if len(run_log_files_log) > 0:
-                    logs_exist = True
-                    _attach_file(max(run_log_files_log), message)
+                    _attach_file(max(run_log_compressed_files), message)
             else:
                 return
         except AutosubmitError as e:

@@ -436,9 +436,8 @@ def test__collect_logfiles(make_files: bool, mocker):
     path_to_attach = mock_config.expid_log_dir(expid)
     path_to_attach.mkdir(parents=True, exist_ok=True)
     if make_files:
-        path_to_attach.joinpath('test_run.err').touch(mode=0o666, exist_ok=True)
-        path_to_attach.joinpath('test_run.out').touch(mode=0o666, exist_ok=True)
-        path_to_attach.joinpath('test_run.log').touch(mode=0o666, exist_ok=True)
+        path_to_attach.joinpath('test_run.gz').touch(mode=0o666, exist_ok=True)
+        path_to_attach.joinpath('test_run.xz').touch(mode=0o666, exist_ok=True)
 
     message = MIMEText("Generated message")
     message['From'] = mail_notifier.config.MAIL_FROM
