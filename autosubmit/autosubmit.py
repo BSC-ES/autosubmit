@@ -2069,7 +2069,7 @@ class Autosubmit:
             exp_history = Autosubmit.get_historical_database(expid, job_list, as_conf)
             # establish the connection to all platforms
             # Restore is misleading, it is actually a "connect" function when the recover flag is not set.
-            Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf)
+            restore_platforms(platforms_to_test, as_conf=as_conf)
             return job_list, submitter, exp_history, host, as_conf, list(platforms_to_test), False
 
         return job_list, submitter, None, None, as_conf, list(platforms_to_test), True
@@ -2358,7 +2358,7 @@ class Autosubmit:
                                 else:
                                     mail_notify = False
                                 times = times + 1
-                                Autosubmit.restore_platforms(platforms_to_test, mail_notify=mail_notify,
+                                restore_platforms(platforms_to_test, mail_notify=mail_notify,
                                                              as_conf=as_conf, expid=expid)
                                 reconnected = True
                             except AutosubmitCritical as e:
@@ -3575,6 +3575,7 @@ class Autosubmit:
                     if smtp_hostname is not None or mail_from is not None:
                         parser.add_section('mail')
                         parser.set('mail', 'smtp_server', smtp_hostname)
+                        parser.set('mail', 'attachment', 'False')
                         parser.set('mail', 'mail_from', mail_from)
                     parser.add_section("globallogs")
                     parser.set("globallogs", "path", str(global_logs_path))
@@ -5363,7 +5364,7 @@ class Autosubmit:
                 definitive_platforms = list()
                 for platform in platforms_to_test:
                     try:
-                        Autosubmit.restore_platforms([platform], as_conf=as_conf)
+                        restore_platforms([platform], as_conf=as_conf)
                         definitive_platforms.append(platform.name)
                     except Exception:
                         pass
