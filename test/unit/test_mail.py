@@ -66,22 +66,22 @@ def mail_notifier(mock_basic_config):
 
 
 @pytest.mark.parametrize(
-    "number_of_files, sendmail_error, attach_error",
+    "number_of_files, sendmail_error, attach_error, file_name",
     [
         # No errors, no log files compressed.
-        (0, None, None),
+        (0, None, None, 'test_file_run.gz'),
 
         # No errors, one log file compressed.
-        (1, None, None),
+        (1, None, None, 'test_file_run.xz'),
 
         # No errors, three log files, one file compressed.
-        (3, None, None),
+        (3, None, None, 'test_file_run.gz'),
 
         # STMP error.
-        (1, Exception("SMTP server error"), None),
+        (1, Exception("SMTP server error"), None, 'test_file_run.xz'),
 
         # Attach error.
-        (1, None, ValueError('Attach error'))
+        (1, None, ValueError('Attach error'), 'test_file_run.gz')
     ],
     ids=[
         "No files. No errors",
@@ -100,7 +100,8 @@ def test_compress_file(
         tmp_path,
         number_of_files: int,
         sendmail_error: Optional[Exception],
-        attach_error: Optional[Exception]
+        attach_error: Optional[Exception],
+        file_name: str
 ):
     expid = 'a000'
     ae_info = None
@@ -117,21 +118,9 @@ def test_compress_file(
     mock_printlog = mocker.patch.object(Log, 'printlog')
 
     for _ in range(number_of_files):
-        test_file = path_to_attach / "test_file_run.err"
+        test_file = path_to_attach / file_name
         with open(test_file, 'w') as f:
             f.write("file data 1")
-            f.flush()
-
-    for _ in range(number_of_files):
-        test_file = path_to_attach / "test_file_run.out"
-        with open(test_file, 'w') as f:
-            f.write("file data 2")
-            f.flush()
-
-    for _ in range(number_of_files):
-        test_file = path_to_attach / "test_file_run.log"
-        with open(test_file, 'w') as f:
-            f.write("file data 3")
             f.flush()
 
     mocker.patch.object(
@@ -166,9 +155,9 @@ def test_compress_file(
             message_arg = mock_smtp.method_calls[0].args[2]
 
             if number_of_files > 0:
-                assert '.log' in message_arg
+                assert '.gz' in message_arg or '.xz' in message_arg
             else:
-                assert '.log' not in message_arg
+                assert '.gz' not in message_arg or '.xz' not in message_arg
         else:
             assert 'No Log files for the experiment' in ae_info.value.error_message
 
@@ -208,9 +197,8 @@ def test_notify_status_change(
 
     path_to_attach = mock_basic_config.expid_log_dir(expid)
     path_to_attach.mkdir(parents=True, exist_ok=True)
-    path_to_attach.joinpath('test_run.err').touch(mode=0o666, exist_ok=True)
-    path_to_attach.joinpath('test_run.out').touch(mode=0o666, exist_ok=True)
-    path_to_attach.joinpath('test_run.log').touch(mode=0o666, exist_ok=True)
+    path_to_attach.joinpath('test_run.gz').touch(mode=0o666, exist_ok=True)
+    path_to_attach.joinpath('test_run.xz').touch(mode=0o666, exist_ok=True)
 
     if sendmail_error:
         mock_smtp.side_effect = sendmail_error
