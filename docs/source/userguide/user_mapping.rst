@@ -56,9 +56,12 @@ Defaults to: None
 
 * (OPTIONAL) ssh_config file that contains the ssh config for each platform
 
-(Personal user action): The user must set the environment variable "AS_ENV_SSH_CONFIG_PATH" to point to a file that contains the personal ~/.ssh/config file.
+(Personal user action): The user must set the environment variable "AS_ENV_SSH_CONFIG_PATH" to point to a file that contains the personal $HOME/.ssh/config file.
 
-Defaults to: "~/.ssh/config" or "~/.ssh/config_${SUDO_USER}" if the env variable: "AS_ENV_SSH_CONFIG_PATH" is set.
+Defaults to: "$HOME/.ssh/config" or "$HOME/.ssh/config_${SUDO_USER}" if the env variable: "AS_ENV_SSH_CONFIG_PATH" is set.
+
+.. warning::
+    It must be used ``$HOME`` instead of ``~/`` since it wouldn't be red as expected with our configurations
 
 
 How to activate it with examples
@@ -87,7 +90,7 @@ How to activate it with examples
 
 .. code-block:: bash
 
-    export AS_ENV_PLATFORMS_PATH="~/platforms/platform_${SUDO_USER}.yml"
+    export AS_ENV_PLATFORMS_PATH="$HOME/platforms/platform_${SUDO_USER}.yml"
 
 Tip: Add it to the shared account .bashrc file.
 
@@ -95,7 +98,7 @@ Tip: Add it to the shared account .bashrc file.
 
 .. code-block:: bash
 
-    export AS_ENV_SSH_CONFIG_PATH="~/ssh/config_${SUDO_USER}.yml"
+    export AS_ENV_SSH_CONFIG_PATH="$HOME/ssh/config_${SUDO_USER}.yml"
 
 Tip: Add it to the shared account .bashrc file.
 
