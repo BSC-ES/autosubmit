@@ -5550,14 +5550,7 @@ class Autosubmit:
         :return: submitter
         :rtype: Submitter
         """
-        # try:
         as_conf.get_communications_library()
-        # except Exception as e:
-        #     communications_library = 'paramiko'
-        # if communications_library == 'paramiko':
-        #     return ParamikoSubmitter()
-        # else:
-            # only paramiko is available right now.
         return ParamikoSubmitter()
 
     @staticmethod

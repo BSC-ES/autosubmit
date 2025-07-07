@@ -47,14 +47,7 @@ def _get_submitter(as_conf) -> ParamikoSubmitter:
     :return: submitter
     :rtype: Submitter
     """
-    # try:
     as_conf.get_communications_library()
-    # except Exception as e:
-    #     communications_library = 'paramiko'
-    # if communications_library == 'paramiko':
-    #     return ParamikoSubmitter()
-    # else:
-        # only paramiko is available right now.
     return ParamikoSubmitter()
 
 
@@ -426,18 +419,11 @@ class SubJobManager(object):
 
                         if positive > 1:
                             for i in range(0, len(filtered)):
-                                # if filtered[i].transit >= 0:
-                                #     temp_index = i
                                 if i > 0:
                                     # Only consider after the first job
                                     filtered[i].queue = max(filtered[i].queue -
                                                             filtered[i - 1].total, 0)
                                     fixes_applied[filtered[i].name] = filtered[i - 1].total
-                                # else:
-                                #     filtered[i].queue = max(filtered[i].queue -
-                                #                             filtered[temp_index].total, 0)
-                                #     fixes_applied[filtered[i].name] = filtered[temp_index].total
-                                # it is starting of level
 
                     for sub in filtered:
                         self.subjobindex[sub.name].queue = sub.queue
