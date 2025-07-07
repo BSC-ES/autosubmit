@@ -145,7 +145,7 @@ class MailNotifier:
     def __init__(self, basic_config):
         self.config = basic_config
 
-    def _collect_logfiles(message):
+    def _collect_logfiles(self, message):
         run_log_files = [f for f in self.config.expid_aslog_dir(
             exp_id).glob('*_run.log') if Path(f).is_file()]
         if run_log_files:
