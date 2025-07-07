@@ -145,7 +145,7 @@ class MailNotifier:
     def __init__(self, basic_config):
         self.config = basic_config
 
-    def _collect_logfiles(self, message):
+    def _collect_logfiles(self, message, exp_id):
         run_log_files = [f for f in self.config.expid_aslog_dir(
             exp_id).glob('*_run.log') if Path(f).is_file()]
         if run_log_files:
@@ -186,7 +186,7 @@ class MailNotifier:
         message['Subject'] = '[Autosubmit] Warning: a remote platform is malfunctioning'
         message['Date'] = email.utils.formatdate(localtime=True)
         message.attach(MIMEText(message_text))
-        self._collect_logfiles(message)
+        self._collect_logfiles(message, exp_id)
 
         for mail in mail_to:
             message['To'] = email.utils.formataddr((mail, mail))
@@ -216,7 +216,7 @@ class MailNotifier:
         
         if status == "FAILED":
             message.attach(MIMEText(message_text))
-            self._collect_logfiles(message)
+            self._collect_logfiles(message, exp_id)
 
         for mail in mail_to:  # expects a list
             message['To'] = email.utils.formataddr((mail, mail))
