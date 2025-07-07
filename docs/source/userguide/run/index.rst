@@ -23,12 +23,6 @@ Options:
 
 Example:
 
-.. code-block:: bash
-
-    # Add your key to ssh agent ( if encrypted )
-    ssh-add ~/.ssh/id_rsa
-    autosubmit run <EXPID>
-
 .. important:: If the autosubmit version is set on ``autosubmit_<EXPID>.yml`` it must match the actual autosubmit version
 .. hint:: It is recommended to launch it in background and with ``nohup`` (continue running although the user who launched the process logs out).
 
@@ -48,6 +42,17 @@ Example:
 More info on password-less ssh can be found at: http://www.linuxproblem.org/art_9.html
 
 .. caution:: After launching Autosubmit, one must be aware of login expiry limit and policy (if applicable for any HPC) and renew the login access accordingly (by using token/key etc) before expiry.
+
+When running operational experiments (i.e. an experiment whose EXPID starts with ``'o'``, e.g. ``o001``),
+and that have a Git project, Autosubmit checks if there is any code that was not committed
+or not pushed to the remote Git repository.
+
+If there are local changes not committed and pushed, Autosubmit will fail to run
+the experiment, print an error message, and exit with an exit code different than zero.
+
+This can be disabled by setting the property ``CONFIG.GIT_OPERATIONAL_CHECK_ENABLED``
+to ``False`` (it is ``True`` by default). Note, however, that this is discouraged as
+it would affect the traceability of operational experiments.
 
 How to run an experiment that was created with another version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

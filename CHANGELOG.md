@@ -1,5 +1,11 @@
 ### 4.1.16: Unreleased
 
+**Bug fixes:**
+
+- Fixed issue with the verification of dirty Git local repositories in operational experiments #2446
+
+**Enhancements:**
+
 - autosubmit/autosubmit container now includes the `$USER` environment variable
   via its entrypoint #2359
 - Adding a Slurm Container to the CI/CD and creating tests to increase the

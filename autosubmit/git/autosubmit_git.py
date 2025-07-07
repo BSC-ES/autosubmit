@@ -1,38 +1,33 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
-from os import path
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import locale
 import os
-import psutil
 import re
 import shutil
 import subprocess
 from pathlib import Path
-from ruamel.yaml import YAML
 from shutil import rmtree
 from time import time
-from typing import List, Union
+from typing import List, Optional, Union
 
-# from autosubmit import Autosubmit
-from autosubmit.helpers.processes import process_id
 from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+
 from log.log import Log, AutosubmitCritical
 
 Log.get_logger("Autosubmit")
@@ -45,57 +40,122 @@ _GIT_URL_PATTERN = re.compile(
     )''', re.VERBOSE)
 """Regular expression to match Git URL."""
 
+_GIT_UNCOMMITTED_CMD = ('git', 'status', '--porcelain')
+"""Command to check if there are changes not committed go local Git repository."""
+
+_GIT_UNPUSHED_CMD = ('git', 'log', '--branches', '--not', '--remotes')
+"""Command to check if there are changes not pushed to Git remotes."""
+
+
+def _get_uncommitted_code(git_repo: Path) -> Optional[str]:
+    """Return any uncommitted changes in the given Git repository or submodules.
+
+    If there are no uncommitted changes, return None.
+
+    :param git_repo: Path to the Git repository.
+    :return: A string containing the list of code not committed (directly git command output).
+    Returns``None`` if there are no uncommitted changes.
+    """
+    encoding = locale.getlocale()[1]
+
+    git_output = subprocess.check_output(_GIT_UNCOMMITTED_CMD, cwd=git_repo, encoding=encoding)
+    for line in git_output.splitlines():
+        tokens = line.strip().split(' ')
+        if tokens[0] != '':
+            return git_output
+
+    return None
+
+
+def _get_code_not_pushed(git_repo: Path) -> Optional[str]:
+    """Return any code not pushed to remotes in the given Git repository or submodules.
+
+    If there are no code not pushed changes, return None.
+
+    :param git_repo: Path to the Git repository.
+    :return: A string containing the list of code not pushed (directly git command output).
+    Returns``None`` if there are no pushed not changes.
+    """
+    encoding = locale.getlocale()[1]
+
+    git_output = subprocess.check_output(_GIT_UNPUSHED_CMD, cwd=git_repo, encoding=encoding)
+    for line in git_output.splitlines():
+        if line.strip():
+            return git_output
+
+    return None
+
+
+def check_unpushed_changes(expid: str, as_conf: AutosubmitConfig) -> None:
+    """Check if the Git repository is dirty for an operational experiment.
+
+    Raises an AutosubmitCritical error if the experiment is operational,
+    the platform is Git, and there are unpushed changes in the local Git
+    repository, or in any of its Git submodules.
+
+    :param expid: The experiment ID.
+    :param as_conf: Autosubmit configuration object.
+    """
+    project_type = as_conf.get_project_type()
+    if expid[0] == 'o' and project_type == 'git':
+        proj_dir = Path(as_conf.get_project_dir())
+
+        if uncommitted_code := _get_uncommitted_code(proj_dir):
+            message = ("You must commit and push your code to the remote Git repository in an "
+                       f"operational experiment before running it.\n\n{uncommitted_code}")
+            raise AutosubmitCritical(message, 7075)
+
+        if not_pushed := _get_code_not_pushed(proj_dir):
+            message = ("You must push your code to the remote Git repository in an "
+                       f"operational experiment before running it.\n\n{not_pushed}")
+            raise AutosubmitCritical(message, 7075)
+
+
+def clean_git(as_conf: AutosubmitConfig) -> bool:
+    """Clean the cloned Git repository inside the project directory of the experiment.
+
+    Skipped if the project directory location is not a valid directory.
+
+    Skipped if the project directory is not a valid Git repository.
+
+    Skipped if there are changes in the Git repository that were not committed or
+    not pushed.
+
+    :param as_conf: experiment configuration
+    :return: ``True`` if the Git project directory was successfully deleted, ``False`` otherwise.
+    """
+    dirname_path = Path(as_conf.get_project_dir())
+    Log.debug("Checking git directory status...")
+
+    if not dirname_path.is_dir():
+        Log.debug("Not a directory... SKIPPING!")
+        return False
+
+    if not Path(dirname_path, '.git').is_dir():
+        Log.debug("Not a git repository... SKIPPING!")
+        return False
+
+    if _get_uncommitted_code(dirname_path):
+        Log.info("Changes not committed detected... SKIPPING!")
+        raise AutosubmitCritical("Commit needed!", 7013)
+
+    if _get_code_not_pushed(dirname_path):
+        Log.info("Changes not pushed detected... SKIPPING!")
+        raise AutosubmitCritical("Synchronization needed!", 7064)
+
+    if not as_conf.set_git_project_commit(as_conf):
+        Log.info("Failed to set Git project commit... SKIPPING!")
+        return False
+
+    proj_dir = Path(BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, BasicConfig.LOCAL_PROJ_DIR)
+    Log.debug(f"Removing project directory {str(proj_dir)}")
+    rmtree(proj_dir)
+
+    return True
+
+
 class AutosubmitGit:
-    """
-    Class to handle experiment git repository
-
-    :param expid: experiment identifier
-    :type expid: str
-    """
-
-    def __init__(self, expid):
-        self._expid = expid
-
-    @staticmethod
-    def clean_git(as_conf):
-        """
-        Function to clean space on BasicConfig.LOCAL_ROOT_DIR/git directory.
-
-        :param as_conf: experiment configuration
-        :type as_conf: autosubmitconfigparser.config.AutosubmitConfig
-        """
-        proj_dir = os.path.join(
-            BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, BasicConfig.LOCAL_PROJ_DIR)
-        dirname_path = as_conf.get_project_dir()
-        Log.debug("Checking git directory status...")
-        if path.isdir(dirname_path):
-            if path.isdir(os.path.join(dirname_path, '.git')):
-                try:
-                    output = subprocess.check_output("cd {0}; git diff-index HEAD --".format(dirname_path),
-                                                     shell=True)
-                except subprocess.CalledProcessError as e:
-                    raise AutosubmitCritical(
-                        "Failed to retrieve git info ...", 7064, str(e))
-                if output:
-                    Log.info("Changes not committed detected... SKIPPING!")
-                    raise AutosubmitCritical("Commit needed!", 7013)
-                else:
-                    output = subprocess.check_output("cd {0}; git log --branches --not --remotes".format(dirname_path),
-                                                     shell=True)
-                    if output:
-                        Log.info("Changes not pushed detected... SKIPPING!")
-                        raise AutosubmitCritical(
-                            "Synchronization needed!", 7064)
-                    else:
-                        if not as_conf.set_git_project_commit(as_conf):
-                            return False
-                        Log.debug("Removing directory")
-                        rmtree(proj_dir)
-            else:
-                Log.debug("Not a git repository... SKIPPING!")
-        else:
-            Log.debug("Not a directory... SKIPPING!")
-        return True
+    """Class to handle experiment git repository."""
 
     @staticmethod
     def clone_repository(as_conf, force, hpcarch):
@@ -259,9 +319,11 @@ class AutosubmitGit:
             if os.path.exists(project_backup_path):
                 Log.info("Restoring proj folder...")
                 shutil.move(project_backup_path, project_path)
-            raise AutosubmitCritical(f'Can not clone {git_project_branch+" "+git_project_origin} into {project_path}', 7065)
+            raise AutosubmitCritical(
+                f'Can not clone {git_project_branch + " " + git_project_origin} into {project_path}', 7065)
         if submodule_failure:
-            Log.info("Some Submodule failures have been detected. Backup {0} will not be removed.".format(project_backup_path))
+            Log.info("Some Submodule failures have been detected. Backup {0} will not be removed.".format(
+                project_backup_path))
             return False
 
         if os.path.exists(project_backup_path):
@@ -275,45 +337,3 @@ class AutosubmitGit:
         git_repo = git_repo.lower().strip()
 
         return _GIT_URL_PATTERN.match(git_repo) is not None
-
-    @staticmethod
-    def check_unpushed_changes(expid: str) -> None:
-        """
-        Raises an AutosubmitCritical error if the experiment is operational, the platform is Git, and there are unpushed changes.
-
-        Args: expid (str): The experiment ID.
-
-        Returns: None
-        """
-        if expid[0] == 'o':
-            origin = Path(BasicConfig.expid_dir(expid).joinpath("conf/expdef_{}.yml".format(expid)))
-            with open(origin, 'r') as f:
-                yaml = YAML(typ='rt')
-                data = yaml.load(f)
-                project = data["PROJECT"]["PROJECT_TYPE"]
-
-            version_controls = ["git", 
-                                "git submodule"]
-            arguments = [["status", "--porcelain"],
-                        ["foreach", "'git status --porcelain'"]]
-            for version_control, args in zip(version_controls, arguments):
-                if project == version_control:
-                    output = subprocess.check_output([version_control, args]).decode(locale.getlocale()[1])
-                    if any(status.startswith(code) for code in ["M", "A", "D", "?"] for status in output.splitlines()):
-                        # M: Modified, A: Added, D: Deleted, ?: Untracked
-                        raise AutosubmitCritical("Push local changes to remote repository before running", 7075)
-
-    @staticmethod
-    def check_directory_in_use(expid: str) -> bool:
-        """
-        Checks for open files and unfinished git-credential requests in a directory
-        """
-        if process_id(expid) is not None:
-            return True
-        for proc in psutil.process_iter(['name', 'cmdline']):
-            name = proc.info.get('name', '')
-            cmdline = proc.info.get('cmdline', [])
-            if '_run.log' in name or any('run' in arg for arg in cmdline): 
-                return True
-        return False 
-
