@@ -139,7 +139,7 @@ def autosubmit_exp(
     def _create_autosubmit_exp(
             expid: Optional[str] = None,
             experiment_data: Optional[Dict] = None,
-            wrapper = False,
+            wrapper=False,
             *_,
             **kwargs
     ):
