@@ -28,11 +28,11 @@ How to cite Autosubmit:
 AUTOSUBMIT IS MAINTAINED ON THE FOLLOWING MACHINES
 ==================================================
 
-- bscesautosubmit{01/02}.bsc.es (Autosubmit 3, BSC machine)
-- bsceshub02.bsc.es (Autosubmit 3 and Autosubmit 4, BSC machine)
-- Cirrus (Autosubmit 3 and Autosubmit 4, BSC machine)
-- climate-dt (Autosubmit 4, CSC machine)
-- EDITO-infra (Autosubmit 4, MOI and VLIZ infrastructure)
+- bscesautosubmit{01/02}.bsc.es -- Autosubmit 3, BSC virtual machine
+- bsceshub{02/03/04}.bsc.es -- Autosubmit 3 and Autosubmit 4, BSC virtual machine
+- climate-dt -- Autosubmit 4, CSC virtual machine
+- EDITO-infra -- Autosubmit 4, MOi and VLIZ cloud infrastructure (Docker, Kubernetes)
+- AEMET -- Autosubmit 3 and Autosubmit 4, AEMET virtual machine
 
 HOW TO DEPLOY/SETUP AUTOSUBMIT FRAMEWORK
 ========================================
@@ -47,23 +47,24 @@ HOW TO DEPLOY/SETUP AUTOSUBMIT FRAMEWORK
    * MacOS* Not directly by Autosubmit team, but by users
 
   on the following HPC platforms:
-   * Ithaca (IC3 machine)
-   * Stargate (IC3 machine)
+   * Cirrus (AEMET machine)
    * MareNostrum (BSC machine)
    * MareNostrum3 (BSC machine)
    * MareNostrum4 (BSC machine)
    * MareNostrum5 (BSC machine)
-   * HECToR (EPCC machine)
-   * Lindgren (PDC machine)
+   * Lumi (CSC machine)
+   * Levante (DKRZ machine)
+   * ATOS (ECMWF machine)
    * C2A (ECMWF machine)
    * CCA (ECMWF machine)
-   * ATOS (ECMWF machine)
    * ARCHER (EPCC machine)
-   * Levante (DKRZ machine)
-   * Lumi (CSC machine)
+   * HECToR (EPCC machine)
+   * Ithaca (IC3 machine)
+   * Stargate (IC3 machine)
    * Juwels (Jülich machine)
-   * Fugaku (RIKEN machine)
    * MeluXina (LXP machine)
+   * Lindgren (PDC machine)
+   * Fugaku (RIKEN machine)
 
 - Pre-requisites: These packages (bash, python2, sqlite3, git-scm > 1.8.2, subversion, pip >= 24.0, dialog*) must be available at local
   machine. These packages (argparse, dateutil, pyparsing, numpy, pydotplus, matplotlib, paramiko,
