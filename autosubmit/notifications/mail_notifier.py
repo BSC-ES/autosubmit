@@ -162,7 +162,8 @@ class MailNotifier:
             temp_dir = TemporaryDirectory()
             try:
                 compressed_run_log = _compress_file(temp_dir, latest_run_log)
-                _attach_file(compressed_run_log, message)
+                if self.config.ATTACHMENT:
+                    _attach_file(compressed_run_log, message)
             except AutosubmitError as e:
                 Log.printlog(code=e.code, message=e.message)
             finally:
@@ -226,8 +227,6 @@ class MailNotifier:
                 Log.printlog(
                     f'Trace:{str(e)}\nAn error has occurred while sending a mail '
                     f'for the job {job_name}', 6011)
-
-        self._send_message(mail_to, self.config.MAIL_FROM, message)
 
     def _send_message(self, mail_to: list[str], mail_from: str, message) -> None:
         formatted_addresses = [

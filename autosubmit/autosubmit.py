@@ -3643,6 +3643,7 @@ class Autosubmit:
                     if smtp_hostname is not None or mail_from is not None:
                         parser.add_section('mail')
                         parser.set('mail', 'smtp_server', smtp_hostname)
+                        parser.set('mail', 'attachment', 'False')
                         parser.set('mail', 'mail_from', mail_from)
                     parser.add_section("globallogs")
                     parser.set("globallogs", "path", str(global_logs_path))
@@ -3868,6 +3869,7 @@ class Autosubmit:
                     parser.set('conf', 'platforms', platforms_conf_path)
             parser.add_section('mail')
             parser.set('mail', 'smtp_server', smtp_hostname)
+            parser.set('mail', 'attachment', 'False')
             parser.set('mail', 'mail_from', mail_from)
             parser.write(config_file)
             config_file.close()
