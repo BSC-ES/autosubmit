@@ -208,7 +208,7 @@ class MailNotifier:
             raise ValueError('mail_to must be a list of emails!')
         message_text = _generate_message_text(
             exp_id, job_name, prev_status, status)
-        message = MIMEText(message_text)
+        message = MIMEMultipart()
         message['From'] = email.utils.formataddr(
             ('Autosubmit', self.config.MAIL_FROM))
         message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {status}'
