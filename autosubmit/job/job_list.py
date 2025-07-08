@@ -189,10 +189,12 @@ class JobList(object):
             force = True
         if force:
             Log.debug("Resetting the workflow graph to a zero state")
-            if Path(self._persistence_path +"/"+ self._persistence_file + ".pkl").exists():
-                Path(self._persistence_path +"/"+ self._persistence_file + ".pkl").rmdir()
-            if Path(self._persistence_path +"/"+ self._persistence_file + "_backup.pkl").exists():
-                Path(self._persistence_path +"/"+ self._persistence_file + "_backup.pkl").rmdir()
+            persistence_pkl_path = Path(self._persistence_path, self._persistence_file + ".pkl")
+            if persistence_pkl_path.exists():
+                persistence_pkl_path.unlink()
+            persistence_pkl_path = Path(self._persistence_path, self._persistence_file + "_backup.pkl")
+            if persistence_pkl_path.exists():
+                persistence_pkl_path.unlink()
         self._parameters = parameters
         self._date_list = date_list
         self._member_list = member_list
@@ -228,7 +230,7 @@ class JobList(object):
 
         self.graph = DiGraph()
 
-        # This generates the job object and also finds if dic_jobs has modified from previous 
+        # This generates the job object and also finds if dic_jobs has modified from previous
         # iteration in order to expand the workflow
         if show_log:
             Log.info("Creating jobs...")

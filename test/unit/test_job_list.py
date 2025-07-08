@@ -158,6 +158,10 @@ def test_load(mocker, as_conf, empty_job_list):
     job_list = empty_job_list()
     job_list.changes = mocker.Mock(return_value=['random_section', 'random_section'])
     as_conf.detailed_deep_diff = mocker.Mock(return_value={})
+
+    Path(as_conf.basic_config.LOCAL_ROOT_DIR / _EXPID / 'pkl' / f'job_list_{_EXPID}.pkl').touch()
+    Path(as_conf.basic_config.LOCAL_ROOT_DIR / _EXPID / 'pkl' / f'job_list_{_EXPID}_backup.pkl').touch()
+
     # act
     job_list.generate(
         as_conf=as_conf,
@@ -172,6 +176,7 @@ def test_load(mocker, as_conf, empty_job_list):
         wrapper_jobs={},
         new=True,
         create=True,
+        force=True,
     )
     job_list.save()
     # Test load
