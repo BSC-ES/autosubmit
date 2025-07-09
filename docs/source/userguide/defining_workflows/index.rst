@@ -270,7 +270,7 @@ The ``STATUS`` keyword can be used to select the status of the dependency that y
     * - ``SUSPENDED``
       - The task is suspended.
 
-The status are ordered, so if you select "RUNNING" status, the task will be run if the parent is in any of the following statuses: "RUNNING", "QUEUING", "HELD", "SUBMITTED", "READY", "PREPARED", "DELAYED", "WAITING".
+The status are ordered, so if you select ``RUNNING`` status, the task will be run if the parent is in any of the following statuses: ``RUNNING``, ``QUEUING``, ``HELD``, ``SUBMITTED``, ``READY``, ``PREPARED``, ``DELAYED``, ``WAITING``.
 
 .. code-block:: yaml
 
@@ -539,13 +539,49 @@ Each part will depend on the 1st part of the asim job.
 The 2nd part of the post job will depend on the 2nd part of the asim job.
 The 3rd part of the post job will depend on the 3rd part of the asim job.
 
+.. figure:: fig/splits_job.png
+   :name: splits_job
+   :width: 100%
+   :align: center
+   :alt: splits_job
+
+Example 1: 1-to-1 dependency
+
+.. code-block:: yaml
+
+  EXPERIMENT:
+    DATELIST: 19600101
+    MEMBERS: "00"
+    CHUNKSIZEUNIT: day
+    CHUNKSIZE: '1'
+    NUMCHUNKS: '2'
+    CALENDAR: standard
+
+  JOBS:
+    TEST:
+      FILE: TEST.sh
+      RUNNING: chunk
+      SPLITS: 1
+      WALLCLOCK: 00:30
+    TEST2:
+      FILE: TEST2.sh
+      DEPENDENCIES:
+        TEST:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: '[1:auto]*\1'
+      RUNNING: chunk
+      SPLITS: 1
+      WALLCLOCK: 00:30
+
+
 .. figure:: fig/splits_1_to_1.png
    :name: split_1_to_1
    :width: 100%
    :align: center
    :alt: 1-to-1
 
-Example2: N-to-1 dependency
+Example 2: N-to-1 dependency
 
 .. code-block:: yaml
 
@@ -570,17 +606,9 @@ Example2: N-to-1 dependency
    :align: center
    :alt: N_to_1
 
-Example3: 1-to-N dependency
+Example 3: 1-to-N dependency
 
 .. code-block:: yaml
-
-  EXPERIMENT:
-    DATELIST: 19600101
-    MEMBERS: "00"
-    CHUNKSIZEUNIT: day
-    CHUNKSIZE: '1'
-    NUMCHUNKS: '2'
-    CALENDAR: standard
 
   JOBS:
     TEST:
@@ -833,8 +861,8 @@ In this workflow you can see an illustrated example of weak dependencies.
 
 Weak dependencies, work like this way:
 
-* X job only has one parent. X job parent can have "COMPLETED or FAILED" as status for current job to run.
-* X job has more than one parent. One of the X job parent must have "COMPLETED" as status while the rest can be  "FAILED or COMPLETED".
+* X job only has one parent. X job parent can have ``COMPLETED`` or ``FAILED`` as status for current job to run.
+* X job has more than one parent. One of the X job parent must have ``COMPLETED`` as status while the rest can be  ``FAILED`` or ``COMPLETED``.
 
 .. code-block:: yaml
 
@@ -993,14 +1021,6 @@ To generate the following jobs:
 One can use now the following configuration:
 
 .. code-block:: yaml
-
-    EXPERIMENT:
-      DATELIST: 19600101
-      MEMBERS: "00"
-      CHUNKSIZEUNIT: day
-      CHUNKSIZE: '1'
-      NUMCHUNKS: '2'
-      CALENDAR: standard
 
     JOBS:
       SIM:
