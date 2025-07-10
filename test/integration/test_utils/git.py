@@ -62,8 +62,12 @@ def create_git_repository(path: Path, bare=False, branch='master') -> None:
 
 
 def git_clone_repository(url: str, path: Path) -> None:
+    """Clone a Git repository into the given path."""
     if not path or not path.is_absolute() or path.exists():
         raise ValueError(f'You must provide a valid, absolute, non-existent path for your Git repository: {path}')
+
+    if not url:
+        raise ValueError(f'You must provide a valid URL to be cloned: {url}')
 
     commands = [
         f'git clone {url} {str(path)}'
@@ -85,6 +89,28 @@ def git_commit_all_in_dir(path: Path, push=False, remote='origin', branch='maste
     commands = [
         'git add .',
         'git commit -am "Initial commit"'
+    ]
+
+    if push:
+        commands.append(f'git push {remote} {branch}')
+
+    command = ';'.join(commands)
+    check_output(command, cwd=str(path), shell=True)
+
+
+def git_add_submodule(url: str, path: Path, name: str, push=False, remote='origin', branch='master') -> None:
+    """Adds a submodule to a Git repository."""
+    if not path or not path.is_dir():
+        raise ValueError(f'You must provide a valid path for your Git repository: {path}')
+
+    if not url:
+        raise ValueError(f'You must provide a valid URL to be cloned: {url}')
+
+    commands = [
+        'git submodule init',
+        f'git -c protocol.file.allow=always submodule add {url} {name}',
+        'git add .',
+        'git commit -am "Add submodule"'
     ]
 
     if push:

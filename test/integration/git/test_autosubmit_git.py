@@ -25,6 +25,7 @@ from typing import Callable, ContextManager
 import pytest
 
 from autosubmit.git.autosubmit_git import check_unpushed_changes
+from integration.test_utils.git import git_clone_repository, git_add_submodule
 from log.log import AutosubmitCritical
 from test.integration.test_utils.git import create_git_repository, git_commit_all_in_dir
 
@@ -113,3 +114,65 @@ def test_git_local_dirty(
 
     with expected:
         check_unpushed_changes(expid, as_conf)
+
+
+@pytest.mark.parametrize(
+    "dirty,expid,expected",
+    [
+        (True, 'o001', pytest.raises(AutosubmitCritical)),
+        # (False, 'o001', does_not_raise()),
+        # (True, 'o001', does_not_raise()),
+        # (True, 'a001', does_not_raise()),
+        # (True, 'a001', does_not_raise()),
+        # (True, 't001', does_not_raise()),
+        # (True, 'e001', does_not_raise()),
+        # (False, 'e001', does_not_raise()),
+    ]
+)
+def test_git_submodules_dirty(
+        dirty: bool,
+        expid: str,
+        expected: ContextManager,
+        tmp_path: Path,
+        autosubmit_exp: Callable
+) -> None:
+    """Tests that Autosubmit detects dirty local Git submodules, especially with operational experiments."""
+    git_repo = tmp_path / 'git_repository'
+    git_submodule = tmp_path / 'git_submodule'
+
+    create_git_repository(git_repo, bare=True)
+    create_git_repository(git_submodule, bare=True)
+
+    temp_clone = tmp_path / 'git_clone'
+
+    git_clone_repository(f'file://{git_repo}', temp_clone)
+
+    submodule_name = 'submodule'
+
+    git_add_submodule(f'file://{str(git_submodule)}', temp_clone, name=submodule_name, push=True)
+
+
+    experiment_data = _get_experiment_data(tmp_path)
+    experiment_data['PROJECT']['PROJECT_TYPE'] = 'git'
+    experiment_data['GIT']['PROJECT_ORIGIN'] = f'file://{str(git_repo)}'
+    experiment_data['GIT']['PROJECT_SUBMODULES'] = submodule_name
+    experiment_data['LOCAL'] = {
+        'PROJECT_PATH': str(git_repo)
+    }
+
+    as_exp = autosubmit_exp(expid, experiment_data)
+    as_conf = as_exp.as_conf
+    proj_dir = Path(as_conf.get_project_dir())
+
+    with open(proj_dir / submodule_name / 'a_file.yaml', 'w') as f:
+        f.write('initial content')
+    git_commit_all_in_dir(proj_dir, push=True)
+
+    if dirty:
+        # Make the Git repository have changes/dirty
+        with open(proj_dir / submodule_name / 'a_file.yaml', 'w') as f:
+            f.write('modified content')
+
+    with expected:
+        check_unpushed_changes(expid, as_conf)
+
