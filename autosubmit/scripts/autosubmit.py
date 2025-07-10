@@ -105,6 +105,7 @@ def main():
             return_value = Autosubmit.run_command(args)
         delete_lock_file()
     except BaseException as e:
+        raise
         delete_lock_file()
         command = "<no command provided>"
         expid = "<no expid provided>"
