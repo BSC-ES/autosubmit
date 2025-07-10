@@ -17,7 +17,6 @@
 
 """Integration tests for ``autosubmit_git``."""
 
-import subprocess
 from contextlib import nullcontext as does_not_raise
 from getpass import getuser
 from pathlib import Path
@@ -27,6 +26,7 @@ import pytest
 
 from autosubmit.git.autosubmit_git import check_unpushed_changes
 from log.log import AutosubmitCritical
+from test.integration.test_utils.git import create_git_repository, git_commit_all_in_dir
 
 _EXPID = 'a000'
 
@@ -57,8 +57,8 @@ def _get_experiment_data(tmp_path) -> dict:
         'GIT': {
             'PROJECT_BRANCH': 'master',
             'PROJECT_COMMIT': '',
-            'PROJECT_SUBMODULES': 'false',
-            'FETCH_SINGLE_BRANCH': 'true'
+            'PROJECT_SUBMODULES': False,
+            'FETCH_SINGLE_BRANCH': True
         }
     }
 
@@ -86,11 +86,8 @@ def test_git_local_dirty(
 ) -> None:
     """Tests that Autosubmit detects dirty local Git repositories, especially with operational experiments."""
     git_repo = tmp_path / 'git_repository'
-    git_repo.mkdir()
-    with open(git_repo / 'a_file.yaml', 'w') as f:
-        f.write('initial content')
 
-    subprocess.check_output('git init .; git add .; git commit -m "Initial commit"', cwd=str(git_repo), shell=True)
+    create_git_repository(git_repo, bare=True)
 
     experiment_data = _get_experiment_data(tmp_path)
     experiment_data['PROJECT']['PROJECT_TYPE'] = project_type
@@ -101,10 +98,16 @@ def test_git_local_dirty(
 
     as_exp = autosubmit_exp(expid, experiment_data)
     as_conf = as_exp.as_conf
+    proj_dir = Path(as_conf.get_project_dir())
+
+    with open(proj_dir / 'a_file.yaml', 'w') as f:
+        f.write('initial content')
+
+    if project_type == 'git':
+        git_commit_all_in_dir(proj_dir, push=True)
 
     if dirty:
         # Make the Git repository have changes/dirty
-        proj_dir = Path(as_conf.get_project_dir())
         with open(proj_dir / 'a_file.yaml', 'w') as f:
             f.write('modified content')
 

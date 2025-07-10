@@ -15,7 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-# Fixtures available to multiple test files must be created in this file.
+"""Fixtures available to multiple test files must be created in this file."""
+
 import os
 import pwd
 from dataclasses import dataclass
@@ -101,6 +102,7 @@ def _initialize_autosubmitrc(folder: Path) -> Path:
 
 class AutosubmitExperimentFixture(Protocol):
     """Type for ``autosubmit_exp`` fixture."""
+
     def __call__(
             self,
             expid: Optional[str] = None,
