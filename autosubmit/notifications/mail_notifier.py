@@ -217,7 +217,7 @@ class MailNotifier:
 
         self._send_message(mail_to, self.config.MAIL_FROM, message)
 
-    def _send_message(self, mail_to: str, mail_from: str, message) -> None:
+    def _send_message(self, mail_to: list[str], mail_from: str, message) -> None:
         formatted_addresses = [
                 email.utils.formataddr(
                     (mail, mail)) for mail in mail_to]
