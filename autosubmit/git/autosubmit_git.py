@@ -1,38 +1,36 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
-from os import path
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import locale
 import os
-import psutil
 import re
 import shutil
 import subprocess
+from os import path
 from pathlib import Path
-from ruamel.yaml import YAML
 from shutil import rmtree
 from time import time
 from typing import List, Union
 
-# from autosubmit import Autosubmit
-from autosubmit.helpers.processes import process_id
+import psutil
 from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+
+from autosubmit.helpers.processes import process_id
 from log.log import Log, AutosubmitCritical
 
 Log.get_logger("Autosubmit")
@@ -44,6 +42,79 @@ _GIT_URL_PATTERN = re.compile(
     (file://.+$)                                                    # e.g. file:///path/to/repo.git/
     )''', re.VERBOSE)
 """Regular expression to match Git URL."""
+
+_GIT_UNCOMMITTED_CMD = 'git status --porcelain'.split(' ')
+"""Command to check if there are changes not committed go local Git repository."""
+
+_SUBMODULE_UNCOMMITTED_CMD = f'git submodule foreach "\'{_GIT_UNCOMMITTED_CMD}\''.split(' ')
+"""Command to check if there are changes not committed to local Git submodules."""
+
+_GIT_UNPUSHED_CMD = 'git log --branches --not --remotes'.split(' ')
+"""Command to check if there are changes not pushed to Git remotes."""
+
+_SUBMODULE_UNPUSHED_CMD = f'git submodule foreach "\'{_GIT_UNPUSHED_CMD}\''.split(' ')
+"""Command to check if there are changes not pushed to Git submodules."""
+
+
+def _has_uncommitted_code(git_repo: Path) -> bool:
+    """Check if there are uncommitted changes in the given Git repository or submodules."""
+    encoding = locale.getlocale()[1]
+
+    git_output = subprocess.check_output(_GIT_UNCOMMITTED_CMD, cwd=git_repo, encoding=encoding)
+    for line in git_output.splitlines():
+        tokens = line.strip().split(' ')
+        if tokens[0] != '':
+            return True
+
+    submodules_output = subprocess.check_output(_SUBMODULE_UNCOMMITTED_CMD, cwd=git_repo, encoding=encoding)
+    for line in submodules_output.splitlines():
+        tokens = line.strip().split(' ')
+        if tokens[0] != '':
+            return True
+
+    return False
+
+
+def _has_code_not_pushed(git_repo: Path) -> bool:
+    """Check if there is any code not pushed to remotes in the given Git repository or submodules."""
+    encoding = locale.getlocale()[1]
+
+    git_output = subprocess.check_output(_GIT_UNPUSHED_CMD, cwd=git_repo, encoding=encoding)
+    for line in git_output.splitlines():
+        if line.strip():
+            return True
+
+    submodules_output = subprocess.check_output(_SUBMODULE_UNPUSHED_CMD, cwd=git_repo, encoding=encoding)
+    for line in submodules_output.splitlines():
+        tokens = line.strip().split(' ')
+        if tokens[0] != '':
+            return True
+
+    return False
+
+
+def check_unpushed_changes(expid: str, as_conf: AutosubmitConfig) -> None:
+    """Check if the Git repository is dirty for an operational experiment.
+
+    Raises an AutosubmitCritical error if the experiment is operational,
+    the platform is Git, and there are unpushed changes in the local Git
+    repository, or in any of its Git submodules.
+
+    :param expid: The experiment ID.
+    :param as_conf: Autosubmit configuration object.
+    """
+    project_type = as_conf.get_project_type()
+    if expid[0] == 'o' and project_type == 'git':
+        proj_dir = Path(as_conf.get_project_dir())
+
+        if _has_uncommitted_code(proj_dir):
+            raise AutosubmitCritical("You have local uncommitted code in an operational experiment", 7075)
+
+        if _has_code_not_pushed(proj_dir):
+            raise AutosubmitCritical("You must push your code to the remote Git repository in an "
+                                     "operational experiment", 7075)
+
+
 
 class AutosubmitGit:
     """
@@ -277,33 +348,6 @@ class AutosubmitGit:
         return _GIT_URL_PATTERN.match(git_repo) is not None
 
     @staticmethod
-    def check_unpushed_changes(expid: str) -> None:
-        """
-        Raises an AutosubmitCritical error if the experiment is operational, the platform is Git, and there are unpushed changes.
-
-        Args: expid (str): The experiment ID.
-
-        Returns: None
-        """
-        if expid[0] == 'o':
-            origin = Path(BasicConfig.expid_dir(expid).joinpath("conf/expdef_{}.yml".format(expid)))
-            with open(origin, 'r') as f:
-                yaml = YAML(typ='rt')
-                data = yaml.load(f)
-                project = data["PROJECT"]["PROJECT_TYPE"]
-
-            version_controls = ["git", 
-                                "git submodule"]
-            arguments = [["status", "--porcelain"],
-                        ["foreach", "'git status --porcelain'"]]
-            for version_control, args in zip(version_controls, arguments):
-                if project == version_control:
-                    output = subprocess.check_output([version_control, args]).decode(locale.getlocale()[1])
-                    if any(status.startswith(code) for code in ["M", "A", "D", "?"] for status in output.splitlines()):
-                        # M: Modified, A: Added, D: Deleted, ?: Untracked
-                        raise AutosubmitCritical("Push local changes to remote repository before running", 7075)
-
-    @staticmethod
     def check_directory_in_use(expid: str) -> bool:
         """
         Checks for open files and unfinished git-credential requests in a directory
@@ -313,7 +357,7 @@ class AutosubmitGit:
         for proc in psutil.process_iter(['name', 'cmdline']):
             name = proc.info.get('name', '')
             cmdline = proc.info.get('cmdline', [])
-            if '_run.log' in name or any('run' in arg for arg in cmdline): 
+            if '_run.log' in name or any('run' in arg for arg in cmdline):
                 return True
-        return False 
+        return False
 

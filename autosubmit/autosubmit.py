@@ -60,7 +60,7 @@ from autosubmit.database.db_structure import get_structure
 from autosubmit.experiment.detail_updater import ExperimentDetails
 from autosubmit.experiment.experiment_common import copy_experiment
 from autosubmit.experiment.experiment_common import new_experiment
-from autosubmit.git.autosubmit_git import AutosubmitGit
+from autosubmit.git.autosubmit_git import AutosubmitGit, check_unpushed_changes
 from autosubmit.helpers.processes import process_id
 from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path
 from autosubmit.helpers.utils import strtobool
@@ -721,7 +721,6 @@ class Autosubmit:
             Autosubmit._init_logs(args, args.logconsole, args.logfile, expid)
 
         if args.command == 'run':
-            AutosubmitGit.check_unpushed_changes(expid)
             return Autosubmit.run_experiment(args.expid, args.notransitive,args.start_time,args.start_after, args.run_only_members, args.profile)
         elif args.command == 'expid':
             return Autosubmit.expid(args.description,args.HPC,args.copy, args.dummy,args.minimal_configuration,args.git_repo,args.git_branch,args.git_as_conf,args.operational,args.testcase,args.evaluation,args.use_local_minimal) != ''
@@ -2240,6 +2239,10 @@ class Autosubmit:
                     raise
                 except Exception as e:
                     raise AutosubmitCritical("Error in run initialization", 7014, str(e))  # Changing default to 7014
+
+                Log.debug('Checking for dirty local Git repository')
+                check_unpushed_changes(expid, as_conf)
+
                 Log.debug("Running main running loop")
                 did_run = False
                 #########################
