@@ -141,3 +141,12 @@ or just the tests that require Slurm:
 ```bash
 $ pytest -m 'slurm'
 ```
+
+## Random ports
+
+Some tests require random ports. This table below can be useful for troubleshooting
+if we ever start running out of ports.
+
+- The integration test `test_paramiko_platform.py` uses the range `2500` to `3000`
+- The integration test `test_mail.py` uses the range `3500` to `4000`
+- The integration test `test_autosubmit_git.py` uses the range `4000` to `4500`

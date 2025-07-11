@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+"""Helper functions for working with Git in integration tests."""
+
 from pathlib import Path
 from subprocess import check_output
 from tempfile import TemporaryDirectory
@@ -37,10 +39,10 @@ def create_git_repository(path: Path, bare=False, branch='master') -> None:
 
     git_init_args = []
     if bare:
-        git_init_args.append('--bare')
+        git_init_args.append('--bare --shared=true')
 
     commands = [
-        f'git init . {" ".join(git_init_args)}'
+        f'git -c init.defaultBranch=master init . {" ".join(git_init_args)}'
     ]
 
     command = ' '.join(commands)

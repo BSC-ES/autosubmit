@@ -20,6 +20,7 @@
 from contextlib import nullcontext as does_not_raise
 from getpass import getuser
 from pathlib import Path
+from random import randrange
 from typing import Callable, ContextManager
 
 import pytest
@@ -28,6 +29,7 @@ from autosubmit.git.autosubmit_git import check_unpushed_changes
 from integration.test_utils.git import git_clone_repository, git_add_submodule
 from log.log import AutosubmitCritical
 from test.integration.test_utils.git import create_git_repository, git_commit_all_in_dir
+from testcontainers.sftp import DockerContainer, wait_for_logs
 
 _EXPID = 'a000'
 
@@ -140,39 +142,51 @@ def test_git_submodules_dirty(
     git_repo = tmp_path / 'git_repository'
     git_submodule = tmp_path / 'git_submodule'
 
+    # Create main repository and submodule repository.
     create_git_repository(git_repo, bare=True)
     create_git_repository(git_submodule, bare=True)
 
+    # Add submodule repository as a submodule in the main repository.
     temp_clone = tmp_path / 'git_clone'
-
     git_clone_repository(f'file://{git_repo}', temp_clone)
-
     submodule_name = 'submodule'
-
     git_add_submodule(f'file://{str(git_submodule)}', temp_clone, name=submodule_name, push=True)
 
+    # Start a container to server it -- otherwise, we would have to use
+    # `git -c protocol.file.allow=always submodule ...`, and we cannot
+    # change how Autosubmit uses it in `autosubmit create` (due to bad
+    # code design choices).
 
-    experiment_data = _get_experiment_data(tmp_path)
-    experiment_data['PROJECT']['PROJECT_TYPE'] = 'git'
-    experiment_data['GIT']['PROJECT_ORIGIN'] = f'file://{str(git_repo)}'
-    experiment_data['GIT']['PROJECT_SUBMODULES'] = submodule_name
-    experiment_data['LOCAL'] = {
-        'PROJECT_PATH': str(git_repo)
-    }
+    http_port = randrange(4000, 4500)
 
-    as_exp = autosubmit_exp(expid, experiment_data)
-    as_conf = as_exp.as_conf
-    proj_dir = Path(as_conf.get_project_dir())
+    image = 'githttpd/githttpd:latest'
+    with DockerContainer(image=image, remove=True) \
+            .with_env('PASSWORD_ACCESS', 'true') \
+            .with_bind_ports(80, http_port) \
+            .with_volume_mapping(str(git_repo), '/opt/git-server', mode='rw') as container:
+        wait_for_logs(container, "Command line: 'httpd -D FOREGROUND'")
 
-    with open(proj_dir / submodule_name / 'a_file.yaml', 'w') as f:
-        f.write('initial content')
-    git_commit_all_in_dir(proj_dir, push=True)
+        experiment_data = _get_experiment_data(tmp_path)
+        experiment_data['PROJECT']['PROJECT_TYPE'] = 'git'
+        experiment_data['GIT']['PROJECT_ORIGIN'] = f'http://localhost:{http_port}/git'
+        experiment_data['GIT']['PROJECT_SUBMODULES'] = submodule_name
+        experiment_data['LOCAL'] = {
+            'PROJECT_PATH': str(git_repo)
+        }
 
-    if dirty:
-        # Make the Git repository have changes/dirty
+        as_exp = autosubmit_exp(expid, experiment_data)
+        as_conf = as_exp.as_conf
+        proj_dir = Path(as_conf.get_project_dir())
+
         with open(proj_dir / submodule_name / 'a_file.yaml', 'w') as f:
-            f.write('modified content')
+            f.write('initial content')
+        git_commit_all_in_dir(proj_dir, push=True)
 
-    with expected:
-        check_unpushed_changes(expid, as_conf)
+        if dirty:
+            # Make the Git repository have changes/dirty
+            with open(proj_dir / submodule_name / 'a_file.yaml', 'w') as f:
+                f.write('modified content')
+
+        with expected:
+            check_unpushed_changes(expid, as_conf)
 
