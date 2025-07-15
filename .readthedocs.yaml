@@ -12,6 +12,7 @@ build:
     python: "3.9"
   apt_packages:
     - graphviz
+    - sqlite3
   jobs:
     post_install:
       # ruamel.yaml.clib appears to cause the build to fail when

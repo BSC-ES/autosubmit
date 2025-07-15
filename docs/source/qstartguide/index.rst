@@ -66,6 +66,10 @@ Create a new experiment
 
 .. runcmd:: autosubmit expid -dm -H "local" -d "Tutorial"
 
+.. runcmd:: autosubmit expid -dm -H "local" -d "Tutorial2"
+    :silent-output: 1
+    :prompt:
+
 - *-dm: Generates a dummy experiment.*
 - *-H: Sets the principal experiment platform.*
 - *-d: Sets a short description for the experiment.*
