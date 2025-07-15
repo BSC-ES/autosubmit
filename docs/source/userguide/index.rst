@@ -6,6 +6,8 @@ User Guide
    /userguide/create/index
    /userguide/configure/index
    /userguide/defining_workflows/index
+   /userguide/defining_workflows_job/index
+   /userguide/defining_workflows_example/index
    /userguide/wrappers/index
    /userguide/run/index
    /userguide/modifying_workflow/index

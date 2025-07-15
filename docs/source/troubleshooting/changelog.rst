@@ -472,6 +472,14 @@ Basic
 New format
 ==========
 
+.. runcmd:: mv -v ./troubleshooting/code/job_new_format.yml /home/docs/autosubmit/a000/conf/jobs_a000.yml
+    :silent-output: 1
+    :prompt:
+
+.. runcmd:: mv -v ./troubleshooting/code/exp_new_format.yml /home/docs/autosubmit/a000/conf/expdef_a000.yml
+    :silent-output: 1
+    :prompt:
+
 .. code-block:: yaml
 
   JOBS:
@@ -523,6 +531,16 @@ New format
                 chunks_to: "natural"
         RUNNING: chunk
 
+
+.. runcmd:: autosubmit create a000 --hide -o png
+    :silent-output: 1
+    :prompt:
+
+.. runcmd:: find /home/docs/autosubmit/a000/plot/ -type f -iname "a000_*.png" -exec mv -- {} ./troubleshooting/fig/new_dependencies_0.png \;
+    :silent-output: 1
+    :prompt:
+
+
 .. figure:: fig/new_dependencies_0.png
    :name: new_dependencies_0
    :align: center
@@ -534,6 +552,13 @@ Example 1: New format with specific dependencies
 
 In the following example, we want to launch the next member SIM after the last SIM chunk of the previous member is finished.
 
+.. runcmd:: mv -v ./troubleshooting/code/job_new_format_dependencies.yml /home/docs/autosubmit/a001/conf/jobs_a001.yml
+    :silent-output: 1
+    :prompt:
+
+.. runcmd:: cp /home/docs/autosubmit/a000/conf/expdef_a000.yml /home/docs/autosubmit/a001/conf/expdef_a001.yml
+    :silent-output: 1
+    :prompt:
 
 .. code-block:: yaml
 
@@ -560,23 +585,36 @@ In the following example, we want to launch the next member SIM after the last S
                     MEMBERS_FROM:
                       FC2:
                         CHUNKS_FROM:
-                         1:
-                          dates_to: "all"
-                          members_to: "FC1"
-                          chunks_to: "4"
+                          1:
+                            dates_to: "all"
+                            members_to: "FC1"
+                            chunks_to: "4"
             RUNNING: chunk
         POST:
             FILE: post.sh
             DEPENDENCIES:
                 SIM:
+                    dates_to: "natural"
+                    members_to: "natural"
+                    chunks_to: "natural"
             RUNNING: chunk
         TEST:
             FILE: test.sh
             DEPENDENCIES:
                 POST:
                   members_to: "FC2"
-                  chunks_to: 4
+                  chunks_to: "4"
             RUNNING: once
+
+
+
+.. runcmd:: autosubmit create a001 --hide -o png
+    :silent-output: 1
+    :prompt:
+
+.. runcmd:: find /home/docs/autosubmit/a001/plot/ -type f -iname "a001_*.png" -exec mv -- {} ./troubleshooting/fig/new_dependencies_1.png \;
+    :silent-output: 1
+    :prompt:
 
 .. figure:: fig/new_dependencies_1.png
    :name: new_dependencies_1
@@ -586,90 +624,109 @@ In the following example, we want to launch the next member SIM after the last S
 Example 2: Crossdate wrappers using the the new dependencies
 ------------------------------------------------------------
 
+.. runcmd:: mv -v ./troubleshooting/code/job_monarch-da.yml /home/docs/autosubmit/a001/conf/jobs_a001.yml
+    :silent-output: 1
+    :prompt:
+
+.. runcmd:: mv -v ./troubleshooting/code/exp_monarch-da.yml /home/docs/autosubmit/a001/conf/expdef_a001.yml
+    :silent-output: 1
+    :prompt:
+
 .. code-block:: yaml
 
-    experiment:
+    EXPERIMENT:
       DATELIST: 20120101 20120201
-      MEMBERS: "000 001"
+      MEMBERS: 000 001
       CHUNKSIZEUNIT: day
       CHUNKSIZE: '1'
       NUMCHUNKS: '3'
-    wrappers:
-        wrapper_simda:
-            TYPE: "horizontal-vertical"
-            JOBS_IN_WRAPPER: "SIM DA"
+      CALENDAR: standard
 
     JOBS:
       LOCAL_SETUP:
-        FILE: templates/local_setup.sh
-        PLATFORM: marenostrum_archive
+        SCRIPT: echo "0"
         RUNNING: once
         NOTIFY_ON: COMPLETED
       LOCAL_SEND_SOURCE:
-        FILE: templates/01_local_send_source.sh
-        PLATFORM: marenostrum_archive
+        SCRIPT: echo "0"
         DEPENDENCIES: LOCAL_SETUP
         RUNNING: once
+        WALLCLOCK: 00:01
         NOTIFY_ON: FAILED
       LOCAL_SEND_STATIC:
-        FILE: templates/01b_local_send_static.sh
-        PLATFORM: marenostrum_archive
+        SCRIPT: echo "0"
         DEPENDENCIES: LOCAL_SETUP
         RUNNING: once
+        WALLCLOCK: 00:01
         NOTIFY_ON: FAILED
       REMOTE_COMPILE:
-        FILE: templates/02_compile.sh
+        SCRIPT: echo "0"
         DEPENDENCIES: LOCAL_SEND_SOURCE
         RUNNING: once
         PROCESSORS: '4'
-        WALLCLOCK: 00:50
-        NOTIFY_ON: COMPLETED
+        WALLCLOCK: 00:01
+        NOTIFY_ON: FAILED
       SIM:
-        FILE: templates/05b_sim.sh
+        SCRIPT: echo "0"
         DEPENDENCIES:
-          LOCAL_SEND_STATIC:
-          REMOTE_COMPILE:
-          SIM-1:
-          DA-1:
-        RUNNING: chunk
-        PROCESSORS: '68'
-        WALLCLOCK: 00:12
+          LOCAL_SEND_STATIC: {}
+          REMOTE_COMPILE: {}
+          SIM-1: {}
+          DA-1: {}
+        RUNNING: chunck
+        PROCESSORS: '4'
+        WALLCLOCK: 00:01
         NOTIFY_ON: FAILED
       LOCAL_SEND_INITIAL_DA:
-        FILE: templates/00b_local_send_initial_DA.sh
-        PLATFORM: marenostrum_archive
+        SCRIPT: echo "0"
         DEPENDENCIES: LOCAL_SETUP LOCAL_SEND_INITIAL_DA-1
         RUNNING: chunk
+        WALLCLOCK: 00:01
         SYNCHRONIZE: member
         DELAY: '0'
       COMPILE_DA:
-        FILE: templates/02b_compile_da.sh
+        SCRIPT: echo "0"
         DEPENDENCIES: LOCAL_SEND_SOURCE
         RUNNING: once
-        WALLCLOCK: 00:20
+        WALLCLOCK: 00:01
         NOTIFY_ON: FAILED
       DA:
         FILE: templates/05c_da.sh
         DEPENDENCIES:
           SIM:
           LOCAL_SEND_INITIAL_DA:
-            CHUNKS_TO: "all"
-            DATES_TO: "all"
-            MEMBERS_TO: "all"
+            CHUNKS_TO: 'all'
+            DATES_TO: 'all'
+            MEMBERS_TO: 'all'
           COMPILE_DA:
           DA:
             DATES_FROM:
-              "20120201":
+              '20120201':
                 CHUNKS_FROM:
                   1:
-                    DATES_TO: "20120101"
-                    CHUNKS_TO: "1"
+                    DATES_TO: '20120101'
+                    CHUNKS_TO: '1'
         RUNNING: chunk
         SYNCHRONIZE: member
         DELAY: '0'
-        WALLCLOCK: 00:12
-        PROCESSORS: '256'
+        WALLCLOCK: 00:01
+        PROCESSORS: '4'
         NOTIFY_ON: FAILED
+
+    WRAPPERS:
+      WRAPPER_SIMDA:
+        TYPE: "horizontal-vertical"
+        JOBS_IN_WRAPPER: "SIM&DA"
+        RETRIALS: 0
+
+
+.. runcmd:: autosubmit monitor a001 -cw --hide -o png
+    :silent-output: 1
+    :prompt:
+
+.. runcmd:: find /home/docs/autosubmit/a001/plot/ -type f -iname "a001_*.png" -exec mv -- {} ./troubleshooting/fig/monarch-da.png \;
+    :silent-output: 1
+    :prompt:
 
 .. figure:: fig/monarch-da.png
    :name: crossdate-example

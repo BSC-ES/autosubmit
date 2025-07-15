@@ -66,13 +66,17 @@ Create a new experiment
 
 .. runcmd:: autosubmit expid -dm -H "local" -d "Tutorial"
 
+- *-dm: Generates a dummy experiment.*
+- *-H: Sets the principal experiment platform.*
+- *-d: Sets a short description for the experiment.*
+
 .. runcmd:: autosubmit expid -dm -H "local" -d "Tutorial2"
     :silent-output: 1
     :prompt:
 
-- *-dm: Generates a dummy experiment.*
-- *-H: Sets the principal experiment platform.*
-- *-d: Sets a short description for the experiment.*
+.. runcmd:: autosubmit expid -dm -H "local" -d "Tutorial3"
+    :silent-output: 1
+    :prompt:
 
 The output of the command will show the <EXPID> of the experiment and generate the following directory structure:
 
