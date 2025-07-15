@@ -29,7 +29,6 @@ from typing import Any, Callable, Optional, Tuple, Union
 import py3dotplus as pydotplus
 
 from autosubmit.helpers.utils import NaturalSort, check_experiment_ownership
-from autosubmit.history.utils import create_path_if_not_exists_group_permission
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.monitor.diagram import create_stats_report
@@ -39,6 +38,12 @@ from log.log import Log, AutosubmitCritical
 _GENERAL_STATS_OPTION_MAX_LENGTH = 1000
 """Maximum length used in the stats plot."""
 
+_DEFAULT_MKDIR_GROUP_PERMISSION = 0o744
+"""Default mkdir mode constant.
+
+This permission mode was previously defined in (now removed)
+``autosubmit.history.utils.create_path_if_not_exists_group_permission``
+"""
 
 _MONITOR_STATUS_TO_COLOR: dict[int, str] = {
     Status.UNKNOWN: 'white',
@@ -625,7 +630,7 @@ class Monitor:
         output_complete_path_stats = os.path.join(BasicConfig.DEFAULT_OUTPUT_DIR, output_filename)
         is_default_path = True
         if is_owner or is_eadmin:
-            create_path_if_not_exists_group_permission(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "stats"))
+            Path(BasicConfig.LOCAL_ROOT_DIR, expid, "stats").mkdir(mode=_DEFAULT_MKDIR_GROUP_PERMISSION, parents=True, exist_ok=True)
             output_complete_path_stats = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "stats", output_filename)
             is_default_path = False
         else:
@@ -638,7 +643,8 @@ class Monitor:
                 is_default_path = False
         if is_default_path:
             Log.info("You don't have enough permissions to the experiment's ({}) folder. The output file will be created in the default location: {}".format(expid, BasicConfig.DEFAULT_OUTPUT_DIR))
-            create_path_if_not_exists_group_permission(BasicConfig.DEFAULT_OUTPUT_DIR)
+
+            Path(BasicConfig.DEFAULT_OUTPUT_DIR).mkdir(mode=_DEFAULT_MKDIR_GROUP_PERMISSION, parents=True, exist_ok=True)
 
         report_created = create_stats_report(
             expid, joblist, str(output_complete_path_stats), section_summary, jobs_summary,

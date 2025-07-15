@@ -1,23 +1,22 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
-
-# This file is part of Autosubmit.
-
-# Autosubmit is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-
-# Autosubmit is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-
-# You should have received a copy of the GNU General Public License
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS 
+# 
+# This file is part of Autosubmit. 
+# 
+# Autosubmit is free software: you can redistribute it and/or modify 
+# it under the terms of the GNU General Public License as published by 
+# the Free Software Foundation, either version 3 of the License, or 
+# (at your option) any later version. 
+# 
+# Autosubmit is distributed in the hope that it will be useful, 
+# but WITHOUT ANY WARRANTY; without even the implied warranty of 
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+# GNU General Public License for more details. 
+# 
+# You should have received a copy of the GNU General Public License 
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import email.utils
+import re
 import smtplib
 import zipfile
 from email.mime.application import MIMEApplication
@@ -26,10 +25,11 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from autosubmitconfigparser.config.basicconfig import BasicConfig
-from log.log import Log, AutosubmitError
+
+from log.log import AutosubmitError, Log
 
 if TYPE_CHECKING:
     from autosubmit.platforms.platform import Platform
@@ -142,6 +142,16 @@ def _generate_message_experiment_status(
         remember that you can disable these messages on Autosubmit config file.\n''')
 
 
+def _check_mail_address(mail_to: list[str]) -> None:
+    if not isinstance(mail_to, list):
+        raise ValueError(
+            'Recipients of mail notifications must be a list of emails!')
+    elif not mail_to:
+        raise ValueError('Empty recipient list')
+    elif any([not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', mail) for mail in mail_to]):
+        raise ValueError('Invalid email in recipient list')
+
+
 class MailNotifier:
     def __init__(self, basic_config):
         self.config = basic_config
@@ -149,7 +159,7 @@ class MailNotifier:
     def notify_experiment_status(
             self,
             exp_id: str,
-            mail_to: List[str],
+            mail_to: list[str],
             platform: "Platform") -> None:
         """Send email notifications.
 
@@ -159,12 +169,11 @@ class MailNotifier:
         :param exp_id: The experiment id.
         :type exp_id: str
         :param mail_to: The email address.
-        :type mail_to: List[str]
+        :type mail_to: list[str]
         :param platform: The platform.
         :type platform: Platform
         """
-        if not isinstance(mail_to, list):
-            raise ValueError('mail_to must be a list of emails!')
+        _check_mail_address(mail_to)
         message_text = _generate_message_experiment_status(exp_id, platform)
         message = MIMEMultipart()
         message['From'] = email.utils.formataddr(
@@ -187,14 +196,7 @@ class MailNotifier:
                 if temp_dir:
                     temp_dir.cleanup()
 
-        for mail in mail_to:
-            message['To'] = email.utils.formataddr((mail, mail))
-            try:
-                self._send_mail(self.config.MAIL_FROM, mail, message)
-            except BaseException as e:
-                Log.printlog(
-                    f'Trace:{str(e)}\nAn error has occurred while sending a mail for '
-                    f'warn about remote_platform', 6011)
+        self._send_message(mail_to, self.config.MAIL_FROM, message)
 
     def notify_status_change(
             self,
@@ -202,9 +204,9 @@ class MailNotifier:
             job_name: str,
             prev_status: str,
             status: str,
-            mail_to: List[str]) -> None:
-        if not isinstance(mail_to, list):
-            raise ValueError('mail_to must be a list of emails!')
+            mail_to: list[str]) -> None:
+
+        _check_mail_address(mail_to)
         message_text = _generate_message_text(
             exp_id, job_name, prev_status, status)
         message = MIMEText(message_text)
@@ -212,14 +214,23 @@ class MailNotifier:
             ('Autosubmit', self.config.MAIL_FROM))
         message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {status}'
         message['Date'] = email.utils.formatdate(localtime=True)
-        for mail in mail_to:  # expects a list
-            message['To'] = email.utils.formataddr((mail, mail))
-            try:
-                self._send_mail(self.config.MAIL_FROM, mail, message)
-            except BaseException as e:
-                Log.printlog(
-                    f'Trace:{str(e)}\nAn error has occurred while sending a mail '
-                    f'for the job {job_name}', 6011)
+
+        self._send_message(mail_to, self.config.MAIL_FROM, message)
+
+    def _send_message(self, mail_to: list[str], mail_from: str, message) -> None:
+        formatted_addresses = [
+                email.utils.formataddr(
+                    (mail, mail)) for mail in mail_to]
+        message["To"] = ", ".join(formatted_addresses)
+        try:
+            self._send_mail(
+                    mail_from,
+                    formatted_addresses,
+                    message)
+        except Exception as e:
+            Log.printlog(
+                    f'Trace:{str(e)}\nAn error has occurred while sending a warning mail '
+                    f'about remote_platform', 6011)
 
     def _send_mail(self, mail_from, mail_to, message):
         server = smtplib.SMTP(self.config.SMTP_SERVER, timeout=60)

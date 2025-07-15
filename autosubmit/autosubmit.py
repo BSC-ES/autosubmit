@@ -1435,7 +1435,7 @@ class Autosubmit:
             exp_folder.mkdir(mode=dir_mode)
             required_dirs = ["conf", "pkl", "tmp", "tmp/ASLOGS", f"tmp/LOG_{exp_id}", "plot", "status"]
             for required_dir in required_dirs:
-                Path(exp_folder / required_dir).mkdir(mode=dir_mode)
+                Path(exp_folder / required_dir).mkdir(parents=True, mode=dir_mode)
             Log.info(f"Experiment folder: {exp_folder}")
         except OSError as e:
             try:
@@ -3505,7 +3505,7 @@ class Autosubmit:
                     Log.error("Not a valid path. You must include '~/' at the beginning.")
             database_path = Path(database_path).expanduser().resolve()
             # if not os.path.exists(database_path):
-            HUtils.create_path_if_not_exists(database_path)
+            Path(database_path).mkdir(parents=True, exist_ok=True)
             # Log.error("Database path does not exist.")
             # return False
             while database_filename is None:
@@ -3519,7 +3519,7 @@ class Autosubmit:
             local_root_path = Path(local_root_path).expanduser().resolve()
 
             # if not os.path.exists(local_root_path):
-            HUtils.create_path_if_not_exists(local_root_path)
+            Path(local_root_path).mkdir(parents=True, exist_ok=True)
             # Log.error("Local Root path does not exist.")
             # return False
             # else:
@@ -3576,11 +3576,11 @@ class Autosubmit:
                     # parser.set("hosts", "whitelist", " localhost # Add your machine names")
                     parser.write(config_file)
                     Log.result(f"Configuration file written successfully: \n\t{rc_path}")
-                    HUtils.create_path_if_not_exists(local_root_path)
-                    HUtils.create_path_if_not_exists(global_logs_path)
-                    HUtils.create_path_if_not_exists(structures_path)
-                    HUtils.create_path_if_not_exists(historicdb_path)
-                    HUtils.create_path_if_not_exists(historiclog_path)
+                    Path(local_root_path).mkdir(parents=True, exist_ok=True)
+                    Path(global_logs_path).mkdir(parents=True, exist_ok=True)
+                    Path(structures_path).mkdir(parents=True, exist_ok=True)
+                    Path(historicdb_path).mkdir(parents=True, exist_ok=True)
+                    Path(historiclog_path).mkdir(parents=True, exist_ok=True)
                     Log.result(f"Directories configured successfully: \n\t{str(database_path)} \n\t{str(local_root_path)}"
                                f" \n\t{str(global_logs_path)} \n\t{str(structures_path)} \n\t{str(historicdb_path)}"
                                f" \n\t{str(historiclog_path)}")
