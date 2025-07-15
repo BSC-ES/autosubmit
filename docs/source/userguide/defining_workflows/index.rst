@@ -20,6 +20,13 @@ first one.
 It is important to remember when defining workflows that DEPENDENCIES on autosubmit always refer to jobs that should
 be finished before launching the job that has the DEPENDENCIES attribute.
 
+.. runcmd:: mv -v ./userguide/defining_workflows/code/simple_job.yml /home/docs/autosubmit/a000/conf/jobs_a000.yml
+    :silent-output: 1
+    :prompt:
+
+.. runcmd:: autosubmit monitor a000 --hide -o png
+    :silent-output: 1
+    :prompt:
 
 .. code-block:: yaml
 
@@ -31,6 +38,10 @@ be finished before launching the job that has the DEPENDENCIES attribute.
       FILE: two.sh
       DEPENDENCIES: One
 
+
+.. runcmd:: find /home/docs/autosubmit/a000/plot/ -type f -iname "a000_*.png" -exec mv -- {} ./userguide/defining_workflows/fig/simple.png \;
+    :silent-output: 1
+    :prompt:
 
 The resulting workflow can be seen in Figure :numref:`simple`
 
@@ -52,6 +63,14 @@ divide member execution on different chunks.
 To set at what level a job has to run you have to use the RUNNING attribute. It has four possible values: once, date,
 member and chunk corresponding to running once, once per startdate, once per member or once per chunk respectively.
 
+.. runcmd:: mv ./userguide/defining_workflows/code/job_startdate.yml /home/docs/autosubmit/a000/conf/jobs_a000.yml
+    :silent-output: 1
+    :prompt:
+
+.. runcmd:: mv ./userguide/defining_workflows/code/exp_startdate.yml /home/docs/autosubmit/a000/conf/expdef_a000.yml
+    :silent-output: 1
+    :prompt:
+
 .. code-block:: yaml
 
     EXPERIMENT:
@@ -62,7 +81,7 @@ member and chunk corresponding to running once, once per startdate, once per mem
       NUMCHUNKS: '2'
       CHUNKINI: ''
       CALENDAR: standard
-    
+
     JOBS:
       ONCE:
           FILE: Once.sh
@@ -82,6 +101,14 @@ member and chunk corresponding to running once, once per startdate, once per mem
           DEPENDENCIES: member
           RUNNING: chunk
 
+
+.. runcmd:: autosubmit create a000 --hide -o png
+    :silent-output: 1
+    :prompt:
+
+.. runcmd:: find /home/docs/autosubmit/a000/plot/ -type f -iname "a000_*.png" -exec mv -- {} ./userguide/defining_workflows/fig/running.png \;
+    :silent-output: 1
+    :prompt:
 
 The resulting workflow can be seen in Figure :numref:`running` for a experiment with 2 startdates, 2 members and 2 chunks.
 
@@ -106,6 +133,14 @@ Dependencies with previous jobs
 Autosubmit can manage dependencies between jobs that are part of different chunks, members or startdates. The next
 example will show how to make a simulation job wait for the previous chunk of the simulation. To do that, we add
 sim-1 on the DEPENDENCIES attribute. As you can see, you can add as much dependencies as you like separated by spaces
+
+.. runcmd:: mv ./userguide/defining_workflows/code/job_dependecy_previous.yml /home/docs/autosubmit/a001/conf/jobs_a001.yml
+    :silent-output: 1
+    :prompt:
+
+.. runcmd:: mv ./userguide/defining_workflows/code/exp_dependecy_previous.yml /home/docs/autosubmit/a001/conf/expdef_a001.yml
+    :silent-output: 1
+    :prompt:
 
 .. code-block:: yaml
 
@@ -161,6 +196,14 @@ on the next example.
 In the other case, a job depending on a lower running level job, the higher level job will wait for ALL the lower level
 jobs to be finished. That is the case of the postprocess combine dependency on the next example.
 
+.. runcmd:: mv -vf ./userguide/defining_workflows/code/job_dependencies_running.yml /home/docs/autosubmit/a001/conf/jobs_a001.yml
+    :silent-output: 1
+    :prompt:
+
+.. runcmd:: autosubmit monitor a001 --hide -o png
+    :silent-output: 1
+    :prompt:
+
 .. code-block:: yaml
 
     JOBS:
@@ -183,6 +226,10 @@ jobs to be finished. That is the case of the postprocess combine dependency on t
         DEPENDENCIES: postprocess
         RUNNING: member
 
+
+.. runcmd:: find /home/docs/autosubmit/a001/plot/ -type f -iname "a001_*.png" -exec mv -vf -- {} ./userguide/defining_workflows/fig/dependencies_running.png \;
+    :silent-output: 1
+    :prompt:
 
 The resulting workflow can be seen in Figure :numref:`dependencies`
 

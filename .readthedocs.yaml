@@ -12,6 +12,7 @@ build:
     python: "3.9"
   apt_packages:
     - graphviz
+    - sqlite3
   jobs:
     post_install:
       - autosubmit --version
