@@ -1847,6 +1847,7 @@ class Autosubmit:
         for job in job_list.get_job_list():
             if job.status != Status.WAITING and job.status != Status.READY:
                 job.status = Status.WAITING
+            job.update_parameters(as_conf, set_attributes=True, reset_logs=False)
         while job_list.get_active():
             Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, True,
                                          only_wrappers, hold=False)
