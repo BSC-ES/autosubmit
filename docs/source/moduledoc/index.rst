@@ -6,7 +6,6 @@ API Reference
    :titlesonly:
 
    autosubmit
-   config
    database
    git
    job

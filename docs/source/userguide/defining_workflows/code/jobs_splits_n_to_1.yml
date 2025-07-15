@@ -1,0 +1,15 @@
+JOBS:
+  TEST_DEPENDENCY:
+    SCRIPT: 'sleep 0'
+    RUNNING: once
+    SPLITS: '4'
+
+  TEST_DEPENDENCY2:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES:
+      TEST_DEPENDENCY:
+        SPLITS_FROM:
+          "[1:2]":
+            SPLITS_TO: "[1:4]*\\2"
+    RUNNING: once
+    SPLITS: '2'
