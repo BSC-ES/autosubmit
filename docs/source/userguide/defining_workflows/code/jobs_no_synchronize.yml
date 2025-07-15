@@ -1,0 +1,14 @@
+JOBS:
+  INI:
+    SCRIPT: 'sleep 0'
+    RUNNING: member
+
+  SIM:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: INI SIM-1
+    RUNNING: chunk
+
+  ASIM:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: SIM
+    RUNNING: chunk

@@ -1,0 +1,48 @@
+JOBS:
+    JOB_1:
+        SCRIPT: 'sleep 0'
+        RUNNING: chunk
+    JOB_2:
+        SCRIPT: 'sleep 0'
+        DEPENDENCIES:
+            JOB_1:
+                dates_to: "natural"
+                members_to: "natural"
+                chunks_to: "natural"
+        RUNNING: chunk
+    JOB_3:
+        SCRIPT: 'sleep 0'
+        DEPENDENCIES:
+            JOB_2:
+                dates_to: "natural"
+                members_to: "natural"
+                chunks_to: "natural"
+        RUNNING: chunk
+    SIM:
+        SCRIPT: 'sleep 0'
+        DEPENDENCIES:
+            JOB_3:
+                dates_to: "natural"
+                members_to: "natural"
+                chunks_to: "natural"
+            SIM-1:
+                dates_to: "natural"
+                members_to: "natural"
+                chunks_to: "natural"
+        RUNNING: chunk
+    POST:
+        SCRIPT: 'sleep 0'
+        DEPENDENCIES:
+            SIM:
+                dates_to: "natural"
+                members_to: "natural"
+                chunks_to: "natural"
+        RUNNING: chunk
+    TEST:
+        SCRIPT: 'sleep 0'
+        DEPENDENCIES:
+            POST:
+                dates_to: "natural"
+                members_to: "natural"
+                chunks_to: "natural"
+        RUNNING: chunk
