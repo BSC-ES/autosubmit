@@ -7,6 +7,7 @@ import sys
 
 from pathlib import Path
 
+from docutils import nodes
 from docutils.parsers.rst import directives
 from sphinx.directives import code
 
@@ -55,8 +56,6 @@ class CMDCache(Singleton):
         h = hash(cmd)
         if h in self.exclude_cache_cmd:
             return run_command(cmd, working_directory)
-        elif h in self.cache:
-            return self.cache[h]
         else:
             result = run_command(cmd, working_directory)
             self.cache[h] = result
@@ -169,7 +168,7 @@ class RunCmdDirective(code.CodeBlock):
 
         # silence the output if required
         if silent_output > 0:
-            output = ""
+            return [nodes.Text('')]
 
         # Add the prompt to our output if required
         if 'prompt' not in self.options:

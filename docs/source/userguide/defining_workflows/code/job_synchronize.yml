@@ -1,0 +1,15 @@
+JOBS:
+  INI:
+    FILE: ini.sh
+    RUNNING: member
+
+  SIM:
+    FILE: sim.sh
+    DEPENDENCIES: INI SIM-1
+    RUNNING: chunk
+
+  ASIM:
+    FILE: asim.sh
+    DEPENDENCIES: SIM
+    RUNNING: chunk
+    SYNCHRONIZE: member

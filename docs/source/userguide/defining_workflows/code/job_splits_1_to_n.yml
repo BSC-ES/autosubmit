@@ -1,0 +1,15 @@
+JOBS:
+  TEST:
+    FILE: TEST.sh
+    RUNNING: once
+    SPLITS: '2'
+
+  TEST2:
+    FILE: TEST2.sh
+    DEPENDENCIES:
+      TEST:
+        SPLITS_FROM:
+          "[1:4]":
+            SPLITS_TO: "[1:2]*\\2"
+    RUNNING: once
+    SPLITS: '4'
