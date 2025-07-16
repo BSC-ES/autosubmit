@@ -33,6 +33,7 @@ from networkx import DiGraph
 
 from autosubmit.database.db_common import check_db_path, get_connection_url
 from autosubmit.database.db_manager_job_list import JobsDbManager
+from autosubmit.database.tables import SectionsStructureTable
 from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status, bcolors
@@ -259,21 +260,33 @@ class JobList(object):
         )
         if full_load and self.check_split_set_to_auto(as_conf):
             force = True
-
+        changes = False
         if force:
             # TODO delete or clean tables not delete the file
             self._reset_workflow_graph()
+            changes = True
         else:
-            self._load_graph(full_load, from_generate=True)
+            changes = self._load_graph(full_load)
 
-        if not self.run_mode:
+        if changes or not self.run_mode:
             self._create_and_add_jobs(show_log, default_job_type, date_list, member_list)
 
         if new:
             self._initialize_new_jobs()
 
-        if not self.run_mode:
+        if changes or not self.run_mode:
             self._save_workflow_state(wrapper_jobs, as_conf, full_load, new)
+
+        if self.run_mode:
+            self.graph.clear()
+            self.graph.clear_edges()
+            changes = self._load_graph(full_load)
+            if changes:
+                raise AutosubmitCritical(
+                    "The workflow graph has changed since the last run. "
+                    "Please recreate the workflow with the new changes.",
+                    7015
+                )
 
     def _reset_workflow_graph(self) -> None:
         Log.debug("Resetting the workflow graph to a zero state")
@@ -379,23 +392,83 @@ class JobList(object):
         if connect_to_platform:
             self._assign_platforms(self._as_conf, job, create=False, new=False)
 
-    def _load_graph(self, full_load: bool, from_generate: bool) -> Optional[List[Job]]:
+    def _load_graph(self, full_load: bool) -> bool:
         """
         Loads the job graph from the database, creating nodes and edges.
         :param full_load: If True, loads all jobs and edges, otherwise loads only the necessary ones.
-        :return: None
+        :return: True if there are differences in sections, False otherwise.
         """
         Log.info("Loading graph from database...")
-        if from_generate:
-            self.remove_unused_nodes(nodes, full_load)
+        Log.info("Check (graph relevant) last persistent sections yaml data vs current sections yaml data")
+        differences = self.compute_section_differences(self._as_conf.experiment_data.get("EXPERIMENT", {}), self._as_conf.jobs_data)
+        if not differences:
+            Log.info("No differences found in sections, loading graph from database...")
         else:
-            nodes = self.load_jobs(full_load, from_generate=from_generate)
-            edges = self.load_edges(nodes, full_load, from_generate=from_generate)
-        job_sections = self._as_conf.jobs_data
+            Log.info("Differences found in sections, updating graph...")
+            self.remove_outdated_information_from_database()
 
+        if differences:
+            full_load = True
+        Log.info("Loading jobs and edges from database...")
+        nodes = self.load_jobs(full_load)
+        edges = self.load_edges(nodes, full_load)
         self._recreate_graph(nodes, edges, full_load)
+        return False if not differences else True
 
-        Log.result("Load finished")
+    def remove_outdated_information_from_database(self) -> None:
+        """
+        Removes outdated information from the database based on the differences found in sections.
+
+        """
+        sections = self.build_sections_data_to_store()
+        Log.info("Removing outdated information from database based on section differences...")
+        self.dbmanager.save_sections_data(sections)
+        Log.info("All edges will be recreated")  # Not sure how to do this in a more efficient way
+        self.dbmanager.clear_edges()
+        section_names = [section["name"] for section in sections]
+        self.dbmanager.clear_unused_nodes(sections)
+
+
+    def compute_section_differences(self, experiment_section: Dict[str, Any], sections: Dict[str, Any]) -> Dict[
+        str, str]:
+        """
+        Compute the differences between the current sections and the persistent sections in the database.
+
+        :param experiment_section: Dictionary containing experiment-level configuration.
+        :type experiment_section: Dict[str, Any]
+        :param sections: Dictionary of section names to their configuration data.
+        :type sections: Dict[str, Any]
+        :return: A dictionary mapping section names to the type of change: 'removed', 'modified', or 'added'.
+        :rtype: Dict[str, str]
+        """
+        persistent_sections_data = self.load_sections()
+        if not persistent_sections_data:
+            return {}
+
+        current_sections_data = self.build_sections_data_to_store()
+
+        persistent_sections = {section["name"]: section for section in persistent_sections_data}
+        current_sections = {section["name"]: section for section in current_sections_data}
+
+        differences: Dict[str, str] = {}
+        for section_name, section in persistent_sections.items():
+            if section_name not in current_sections:
+                differences[section_name] = "removed"
+            elif section != current_sections[section_name]:
+                differences[section_name] = "modified"
+
+        for section_name in current_sections:
+            if section_name not in persistent_sections:
+                differences[section_name] = "added"
+        return differences
+
+    def load_sections(self) -> List[Dict[str, Any]]:
+        """
+        Loads the sections from the database.
+        :return: List of sections.
+        """
+        Log.debug("Loading sections from database...")
+        return [ dict(section) for section in self.dbmanager.select_all_with_columns(SectionsStructureTable.name)]
 
     def _create_and_add_jobs(
             self, show_log: bool, default_job_type: str, date_list: List[str], member_list: List[str]) -> None:
@@ -461,8 +534,40 @@ class JobList(object):
     ) -> None:
         self.save_jobs()
         self.save_edges()
+        self.save_sections()
         for job in self.job_list:
             self._assign_platforms(as_conf, job, create, new)
+
+    def build_sections_data_to_store(self) -> List[Dict[str, Any]]:
+        """
+        Build a list of dictionaries representing section data for database storage.
+
+        :return: List of dictionaries, each representing a section's data.
+        :rtype: List[Dict[str, Any]]
+        """
+        experiment_section = self._as_conf.experiment_data.get("EXPERIMENT", {})
+        sections = self._as_conf.jobs_data
+        datelist = str(experiment_section.get("DATELIST", ""))
+        members = str(experiment_section.get("MEMBERS", ""))
+        numchunks = int(experiment_section.get("NUMCHUNKS", ""))
+        data_to_store: List[Dict[str, Any]] = []
+        for section_name, section_data in sections.items():
+            data_to_store.append({
+                "name": section_name,
+                "splits": int(section_data.get("SPLITS", -1)),
+                "dependencies": str(section_data.get("DEPENDENCIES", None)),
+                "datelist": datelist,
+                "members": members,
+                "numchunks": numchunks,
+            })
+        return data_to_store
+
+    def save_sections(self):
+        """
+        Saves the sections of the job list to the database.
+        """
+        Log.info("Saving sections...")
+        self.dbmanager.save_sections_data(self.build_sections_data_to_store())
 
     def process_wrapper_jobs(self, wrapper_section: str, inner_sections: list[str]) -> None:
         try:
@@ -2578,7 +2683,7 @@ class JobList(object):
         if not self.disable_save:
             self.dbmanager.save_edges(self.graph_dict)
 
-    def load_edges(self, job_list, full_load=False):
+    def load_edges(self, job_list, full_load=False) -> Dict[str, Any]:
         """
         Loads the job edges
         """

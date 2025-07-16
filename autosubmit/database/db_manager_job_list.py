@@ -28,7 +28,7 @@ from autosubmit.database.db_common import check_db_path, get_connection_url
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmit.database.db_manager import DbManager
 from autosubmit.database.tables import ExperimentStructureTable, PreviewWrapperJobsTable, WrapperJobsTable, \
-    PreviewWrapperInfoTable, WrapperInfoTable
+    PreviewWrapperInfoTable, WrapperInfoTable, SectionsStructureTable
 from autosubmit.database.tables import JobsTable
 from autosubmit.job.job import Job, WrapperJob
 from log.log import Log
@@ -310,9 +310,74 @@ class JobsDbManager(DbManager):
         self.drop_table(PreviewWrapperInfoTable.name)
         self.drop_table(WrapperInfoTable.name)
 
-    @staticmethod
-    def save_sections_data(section_data: Dict[str, Any], experiment_data: Dict[str, Any]) -> None:
-        """Save the section data to the database."""
-        db_manager.create_table(SectionsDataTable.name)
-        store =
-        db_manager.upsert_many(SectionsDataTable.name, section_data, ['e_from', 'e_to'])
+    def save_sections_data(self, sections_data: List[Dict[str, Any]]) -> None:
+        """
+        Save the section data to the database.
+
+        :param sections_data: List of dictionaries containing section information.
+        :type sections_data: List[Dict[str, Any]]
+        :return: None
+        :rtype: None
+        """
+        self.drop_table(SectionsStructureTable.name)
+        self.create_table(SectionsStructureTable.name)
+        self.upsert_many(SectionsStructureTable.name, sections_data, ['name'])
+
+    def load_sections_data(self) -> List[Dict[str, Any]]:
+        """Load the section data to the database."""
+        self.create_table(SectionsStructureTable.name)
+        section_data = self.select_all(SectionsStructureTable.name)
+        return section_data
+
+    def clear_unused_nodes(self, section_names: List[str]) -> None:
+        """
+        Delete all jobs from the jobs table whose section matches any name in the provided list.
+
+        :param section_names: List of section names to match for deletion.
+        :type section_names: List[str]
+        :return: None
+        :rtype: None
+        """
+        self.create_table(JobsTable.name)
+        if section_names:
+            self.delete_where(JobsTable.name, {"section": section_names})
+        # TODO delete if chunk_number is > than the section specified
+        # TODO delete if date is not in the section specified
+        # TODO delete if member is not in the section specified
+        # TODO delete if split is not in the section specified
+
+    def remove_section(self, section_name: str) -> None:
+        """
+        Remove a section from the database by name.
+
+        :param section_name: Name of the section to remove.
+        :type section_name: str
+        """
+        self.create_table(SectionsStructureTable.name)
+        self.delete_where(SectionsStructureTable.name, {'name': section_name})
+
+    def update_section(self, section_data: Dict[str, Any]) -> None:
+        """
+        Update a section in the database.
+
+        :param section_data: Dictionary containing section data to update.
+        :type section_data: Dict[str, Any]
+        """
+        self.create_table(SectionsStructureTable.name)
+        self.upsert_many(SectionsStructureTable.name, [section_data], ['name'])
+
+    def add_section(self, section_data: Dict[str, Any]) -> None:
+        """
+        Add a new section to the database.
+
+        :param section_data: Dictionary containing section data to add.
+        :type section_data: Dict[str, Any]
+        """
+        self.create_table(SectionsStructureTable.name)
+        self.insert_many(SectionsStructureTable.name, [section_data])
+
+    def clear_edges(self) -> None:
+        """Clear all edges from the database."""
+        self.create_table(ExperimentStructureTable.name)
+        self.delete_all(ExperimentStructureTable.name)
+        self.create_table(ExperimentStructureTable.name)

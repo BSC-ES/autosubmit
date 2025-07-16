@@ -197,15 +197,12 @@ SectionsStructureTable = Table(
     "sections",
     metadata_obj,
     Column("name", String, nullable=False, primary_key=True),
-    Column("splits", Integer, default=None),
-    Column("datelist", str, default=None),
-    Column("members", str, default=None),
-    Column("numchunks", Integer, default=None),
-    # total chunks to detect changes?
-    # total dates to detect changes?
-    # total members to detect changes?
+    Column("splits", Integer),
+    Column("dependencies", String),
+    Column("datelist", String),
+    Column("members", String),
+    Column("numchunks", Integer),
 )
-
 
 def create_wrapper_tables(name, metadata_obj_):
     """Create a wrapper table for the given name."""
