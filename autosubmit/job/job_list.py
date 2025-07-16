@@ -264,7 +264,7 @@ class JobList(object):
             # TODO delete or clean tables not delete the file
             self._reset_workflow_graph()
         else:
-            self._load_graph(full_load)
+            self._load_graph(full_load, from_generate=True)
 
         if not self.run_mode:
             self._create_and_add_jobs(show_log, default_job_type, date_list, member_list)
@@ -277,8 +277,9 @@ class JobList(object):
 
     def _reset_workflow_graph(self) -> None:
         Log.debug("Resetting the workflow graph to a zero state")
-        if check_db_path(self._persistence_full_path, must_exists=False):
-            os.remove(self._persistence_full_path)
+        self.dbmanager.reset_workflow()
+
+
 
     def _initialize_workflow_parameters(
             self,
@@ -378,14 +379,20 @@ class JobList(object):
         if connect_to_platform:
             self._assign_platforms(self._as_conf, job, create=False, new=False)
 
-    def _load_graph(self, full_load: bool) -> Optional[List[Job]]:
+    def _load_graph(self, full_load: bool, from_generate: bool) -> Optional[List[Job]]:
         """
         Loads the job graph from the database, creating nodes and edges.
         :param full_load: If True, loads all jobs and edges, otherwise loads only the necessary ones.
         :return: None
         """
-        nodes = self.load_jobs(full_load)
-        edges = self.load_edges(nodes, full_load)
+        Log.info("Loading graph from database...")
+        if from_generate:
+            self.remove_unused_nodes(nodes, full_load)
+        else:
+            nodes = self.load_jobs(full_load, from_generate=from_generate)
+            edges = self.load_edges(nodes, full_load, from_generate=from_generate)
+        job_sections = self._as_conf.jobs_data
+
         self._recreate_graph(nodes, edges, full_load)
 
         Log.result("Load finished")

@@ -1215,11 +1215,13 @@ class Autosubmit:
         except BaseException as e:
             error_message += f"Cannot delete directory: {e}\n"
 
-
+        # TODO, call to the dbmanager and delete the tables related to the experiment for Postgres
         if is_sqlite:
             Log.info("Removing Structure db...")
             try:
                 os.remove(structure_db_path)
+            except IOError as e:
+                Log.warning(f"Structure database {structure_db_path} does not exist. Skipping deletion.")
             except BaseException as e:
                 error_message += f"Cannot delete structure: {e}\n"
 
@@ -1231,6 +1233,8 @@ class Autosubmit:
                     os.remove(db_path)
                 if sql_path.exists():
                     os.remove(sql_path)
+            except IOError as e:
+                Log.warning(f"Job data database {job_data_db_path} does not exist. Skipping deletion.")
             except BaseException as e:
                 error_message += f"Cannot delete job_data: {e}\n"
 
@@ -1653,7 +1657,7 @@ class Autosubmit:
 
             # TODO reset wrapper
             job_list = Autosubmit.load_job_list(
-                expid, as_conf, notransitive=notransitive)
+                expid, as_conf, notransitive=notransitive, full_load=False)
             job_list.packages_dict = {}
             job_list.packages_id = {}
 
@@ -3445,7 +3449,6 @@ class Autosubmit:
                 hpc = as_conf.get_platform()
                 description = get_experiment_description(experiment_id)
                 Log.result("Describing {0}", experiment_id)
-
                 Log.result("Owner: {0}", user)
                 Log.result("Location: {0}", exp_path)
                 Log.result("Created: {0}", created)

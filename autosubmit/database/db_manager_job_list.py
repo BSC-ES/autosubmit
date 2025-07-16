@@ -299,5 +299,20 @@ class JobsDbManager(DbManager):
             packages_names = list(set([job['package_name'] for job in wrappers_inner_jobs]))
             wrappers_info = self.select_where_with_columns(wrapper_info_table.name, {'name': packages_names})
 
-
         return wrappers_info, wrappers_inner_jobs
+
+    def reset_workflow(self) -> None:
+        """Reset the workflow by dropping all tables related to jobs and wrappers."""
+        self.drop_table(JobsTable.name)
+        self.drop_table(ExperimentStructureTable.name)
+        self.drop_table(PreviewWrapperJobsTable.name)
+        self.drop_table(WrapperJobsTable.name)
+        self.drop_table(PreviewWrapperInfoTable.name)
+        self.drop_table(WrapperInfoTable.name)
+
+    @staticmethod
+    def save_sections_data(section_data: Dict[str, Any], experiment_data: Dict[str, Any]) -> None:
+        """Save the section data to the database."""
+        db_manager.create_table(SectionsDataTable.name)
+        store =
+        db_manager.upsert_many(SectionsDataTable.name, section_data, ['e_from', 'e_to'])

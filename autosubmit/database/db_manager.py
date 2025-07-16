@@ -208,3 +208,13 @@ class DbManager:
         with self.engine.connect() as conn:
             row = conn.execute(query).scalar()
         return cast(int, row) if row is not None else 0
+
+    def reset_table(self, table_name: str) -> None:
+        """
+        Drop and recreate a table in the database.
+
+        :param table_name: Name of the table to reset.
+        :type table_name: str
+        """
+        self.drop_table(table_name)
+        self.create_table(table_name)

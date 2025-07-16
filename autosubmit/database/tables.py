@@ -197,7 +197,10 @@ SectionsStructureTable = Table(
     "sections",
     metadata_obj,
     Column("name", String, nullable=False, primary_key=True),
-    Column("splits", Integer, default=-1),
+    Column("splits", Integer, default=None),
+    Column("datelist", str, default=None),
+    Column("members", str, default=None),
+    Column("numchunks", Integer, default=None),
     # total chunks to detect changes?
     # total dates to detect changes?
     # total members to detect changes?
