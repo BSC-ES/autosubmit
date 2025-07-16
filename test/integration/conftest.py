@@ -17,12 +17,19 @@
 
 """Fixtures for integration tests."""
 
+import os
+from getpass import getuser
+from pwd import getpwnam
 from pathlib import Path
+from random import randrange
 from tempfile import TemporaryDirectory
+from tempfile import gettempdir
 from typing import Callable, Iterator, TYPE_CHECKING
 
 import paramiko
 import pytest
+from testcontainers.core.waiting_utils import wait_for_logs
+from testcontainers.sftp import DockerContainer
 
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 # noinspection PyProtectedMember
@@ -32,6 +39,10 @@ from autosubmit.platforms.psplatform import PsPlatform
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
     from py._path.local import LocalPath  # type: ignore
+
+
+_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
+_DOCKER_PASSWORD = 'password'
 
 
 @pytest.fixture
@@ -123,3 +134,28 @@ def ps_platform(tmp_path: Path) -> PsPlatform:
     Path(platform.root_dir).mkdir(parents=True, exist_ok=True)
     return platform
 
+
+@pytest.fixture()
+def ssh_server(mocker, tmp_path, make_ssh_client, request):
+    ssh_port = randrange(2000, 4000)
+
+    user = getuser() or "unknown"
+    user_pw = getpwnam(user)
+    uid = user_pw.pw_uid
+    gid = user_pw.pw_gid
+
+    with DockerContainer(image=_DOCKER_IMAGE, remove=True, hostname='openssh-server') \
+            .with_env('TZ', 'Etc/UTC') \
+            .with_env('SUDO_ACCESS', 'false') \
+            .with_env('USER_NAME', user) \
+            .with_env('PUID', str(uid)) \
+            .with_env('PGID', str(gid)) \
+            .with_env('PASSWORD_ACCESS', 'true') \
+            .with_bind_ports(2222, ssh_port) \
+            .with_volume_mapping(str(tmp_path), '/app', mode='rw') as container:
+        wait_for_logs(container, 'sshd is listening on port 2222')
+
+        ssh_client = make_ssh_client(ssh_port, _DOCKER_PASSWORD)
+        mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
+
+        yield container

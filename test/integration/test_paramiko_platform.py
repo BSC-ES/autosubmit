@@ -24,7 +24,6 @@ import os
 from getpass import getuser
 from pathlib import Path
 from random import randrange
-from tempfile import gettempdir
 from typing import Optional
 
 import pytest
@@ -33,9 +32,6 @@ from testcontainers.sftp import DockerContainer
 
 from autosubmit.platforms.psplatform import PsPlatform
 from log.log import AutosubmitError
-
-_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
-_DOCKER_PASSWORD = 'password'
 
 
 @pytest.fixture(scope='module', autouse=True)
@@ -55,66 +51,35 @@ def ssh_config() -> None:
 
 @pytest.mark.docker
 @pytest.mark.parametrize(
-    'filename,check',
+    'filename',
     [
-        ('test1', True),
-        ('sub/test2', True)
+        'test1',
+        'sub/test2'
     ],
     ids=['filename', 'filename_long_path']
 )
-def test_send_file(filename: str, check: bool, mocker, tmp_path, ps_platform: PsPlatform, make_ssh_client):
+def test_send_file(
+        filename: str,
+        mocker,
+        tmp_path,
+        ps_platform: PsPlatform,
+        ssh_server: DockerContainer):
     """This test opens an SSH connection (via sftp) and sends a file to the remote location.
 
     It launches a Docker Image using testcontainers library.
     """
     remote_dir = Path(ps_platform.root_dir) / f'LOG_{ps_platform.expid}'
-    remote_dir.mkdir(parents=True, exist_ok=True)
-    Path(ps_platform.tmp_path).mkdir(parents=True, exist_ok=True)
-    # generate file
     if "/" in filename:
-        filename_dir = Path(filename).parent
-        (Path(ps_platform.tmp_path) / filename_dir).mkdir(parents=True, exist_ok=True)
         filename = Path(filename).name
-    with open(Path(ps_platform.tmp_path) / filename, 'w') as f:
-        f.write('test')
 
-    # NOTE: because the test will run inside a container, with a different UID and GID,
-    #       sftp would not be able to write to the folder in the temporary directory
-    #       created by another user uid/gid (inside the container the user will be nobody).
-    from_env = os.environ.get("PYTEST_DEBUG_TEMPROOT")
-    temproot = Path(from_env or gettempdir()).resolve()
-    user = getuser() or "unknown"
-    rootdir = temproot / f"pytest-of-{user}"
+    ps_platform.connect(None, reconnect=False, log_recovery_process=False)
 
-    # To write in the /tmp (sticky bit, different uid/gid), reset it later (default pytest is 700)
-    os.system(f'chmod 777 -R {str(rootdir)}')
+    ps_platform.get_send_file_cmd = mocker.Mock()
+    ps_platform.get_send_file_cmd.return_value = 'ls'
+    ps_platform.send_command = mocker.Mock()
 
-    ssh_port = randrange(2500, 3000)
-
-    try:
-        with DockerContainer(image=_DOCKER_IMAGE, remove=True, hostname='openssh-server') \
-                .with_env('TZ', 'Etc/UTC') \
-                .with_env('SUDO_ACCESS', 'false') \
-                .with_env('USER_NAME', user) \
-                .with_env('USER_PASSWORD', _DOCKER_PASSWORD) \
-                .with_env('PASSWORD_ACCESS', 'true') \
-                .with_bind_ports(2222, ssh_port) \
-                .with_volume_mapping(str(temproot), '/tmp', mode='rw') as container:
-            wait_for_logs(container, 'sshd is listening on port 2222')
-
-            ssh_client = make_ssh_client(ssh_port, _DOCKER_PASSWORD)
-            mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
-
-            ps_platform.connect(None, reconnect=False, log_recovery_process=False)
-
-            ps_platform.get_send_file_cmd = mocker.Mock()
-            ps_platform.get_send_file_cmd.return_value = 'ls'
-            ps_platform.send_command = mocker.Mock()
-
-            ps_platform.send_file(filename)
-            assert check == (remote_dir / filename).exists()
-    finally:
-        os.system(f'chmod 700 -R {str(rootdir)}')
+    ps_platform.send_file(filename)
+    assert (remote_dir / filename).exists()
 
 
 @pytest.mark.parametrize(
@@ -419,3 +384,48 @@ def test_fs_operations(ps_platform: PsPlatform, mocker, make_ssh_client, tmp_pat
         # Here, the variable names are misleading, as we moved the existing file over the non-existing one.
         assert not ps_platform.delete_file(str(remote_file))
         assert ps_platform.delete_file(str(file_not_found))
+
+
+def test__load_ssh_config_missing_ssh_config(ps_platform, tmp_path, mocker):
+    """Test that the user is warned when the expected SSH file cannot be located."""
+    mocked_log = mocker.patch('autosubmit.platforms.paramiko_platform.Log')
+
+    ps_platform.config['AS_ENV_SSH_CONFIG_PATH'] = str(tmp_path / 'you-cannot-find-me')
+
+    as_conf = mocker.MagicMock()
+    as_conf.is_current_real_user_owner = False
+
+    # TODO: We must be able to test that we are not loading the right SSH, without a mock here.
+    mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', side_effect=ValueError)
+
+    with pytest.raises(AutosubmitError):
+        ps_platform.connect(as_conf, reconnect=False, log_recovery_process=False)
+
+    assert mocked_log.warning.called
+
+
+@pytest.mark.docker
+def test_test_connection(ps_platform: PsPlatform, mocker, make_ssh_client, tmp_path):
+    """Test that we can access files, send new files, move, delete."""
+    user = getuser() or "unknown"
+
+    ssh_port = randrange(2000, 4000)
+
+    with DockerContainer(image=_DOCKER_IMAGE, remove=True, hostname='openssh-server') \
+            .with_env('TZ', 'Etc/UTC') \
+            .with_env('SUDO_ACCESS', 'false') \
+            .with_env('USER_NAME', user) \
+            .with_env('USER_PASSWORD', _DOCKER_PASSWORD) \
+            .with_env('PASSWORD_ACCESS', 'true') \
+            .with_bind_ports(2222, ssh_port) \
+            .with_volume_mapping(str(tmp_path), '/app', mode='rw') as container:
+        wait_for_logs(container, 'sshd is listening on port 2222')
+
+        ssh_client = make_ssh_client(ssh_port, _DOCKER_PASSWORD)
+        mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
+
+        ps_platform.connect(None, reconnect=False, log_recovery_process=False)
+
+        # TODO: This function is odd, if it reconnects, it will return ``"OK"``, but when it's all good
+        #       then it will return ``None``.
+        assert None == ps_platform.test_connection(None)

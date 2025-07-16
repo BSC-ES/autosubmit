@@ -80,18 +80,20 @@ def _load_ssh_config(ssh_config_path: Path) -> paramiko.SSHConfig:
     """
     ssh_config = paramiko.SSHConfig()
 
+    Log.info(f"Using {ssh_config_path} as SSH configuration file")
+
     if ssh_config_path.exists():
         with open(Path(ssh_config_path).expanduser(), "r") as ssh_config_file:
             ssh_config.parse(ssh_config_file)
     else:
-        Log.warning(f"SSH config file {ssh_config_path} not found")
+        Log.warning(f"The SSH configuration file {ssh_config_path} does not exist!")
 
     return ssh_config
 
 
 def _get_user_config_file(
         is_current_real_user_owner: bool,
-        as_env_ssh_config_path: Optional[Path],
+        as_env_ssh_config_path: Optional[str],
         as_env_current_user: Optional[str]
 ) -> Path:
     """Retrieve the user SSH configuration file.
@@ -101,8 +103,11 @@ def _get_user_config_file(
     Maps the shared account user ssh config file to the current user config file.
     Defaults to ~/.ssh/config if the mapped file does not exist.
     Defaults to ~/.ssh/config_%AS_ENV_CURRENT_USER% if %AS_ENV_SSH_CONFIG_PATH% is not defined.
-    param as_conf: Autosubmit configuration
-    return: None
+
+    :param is_current_real_user_owner: Whether the user is the owner of the experiment.
+    :param as_env_ssh_config_path: Path to the SSH configuration file to load.
+    :param as_env_current_user: The name to use loading an SSH configuration.
+    :return: None
     """
     if not is_current_real_user_owner:
         if not as_env_ssh_config_path and not as_env_current_user:
@@ -110,7 +115,7 @@ def _get_user_config_file(
                              '`AS_ENV_CURRENT_USER` must be specified!')
 
         if as_env_ssh_config_path:
-            return as_env_ssh_config_path.expanduser()
+            return Path(as_env_ssh_config_path).expanduser()
 
         return Path(f'~/.ssh/config_{as_env_current_user}').expanduser()
 
@@ -339,8 +344,6 @@ class ParamikoPlatform(Platform):
                 Log.warning(f"X11 display not found: {e}")
                 self.local_x11_display = None
 
-            self._ssh = _create_ssh_client()
-
             is_current_real_user_owner = True if not as_conf else as_conf.is_current_real_user_owner
 
             ssh_config_path: Path = _get_user_config_file(
@@ -348,11 +351,10 @@ class ParamikoPlatform(Platform):
                 self.config.get('AS_ENV_SSH_CONFIG_PATH', None),
                 self.config.get('AS_ENV_CURRENT_USER')
             )
-            Log.info(f"Using {ssh_config_path} as SSH configuration file")
-            if not ssh_config_path.exists():
-                Log.debug(f"The SSH configuration file {ssh_config_path} does not exist!")
 
             self._ssh_config = _load_ssh_config(ssh_config_path)
+
+            self._ssh = _create_ssh_client()
 
             self._host_config = self._ssh_config.lookup(self.host)
             if "," in self._host_config['hostname']:
@@ -433,10 +435,11 @@ class ParamikoPlatform(Platform):
                 raise AutosubmitError("File can't be located due an slow or timeout connection", 6016, str(e))
         except Exception as e:
             self.connected = False
+            hostname = self._host_config.get('hostname', '') if self._host_config else ''
             if "Authentication failed." in str(e):
                 raise AutosubmitCritical(f"Authentication Failed, please check the definition of PLATFORMS in YAML of "
-                                         f"{self._host_config['hostname']}", 7050, str(e))
-            if not reconnect and "," in self._host_config['hostname']:
+                                         f"{hostname}", 7050, str(e))
+            if not reconnect and "," in hostname:
                 self.restore_connection(as_conf)
             else:
                 raise AutosubmitError(
