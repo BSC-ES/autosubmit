@@ -29,7 +29,7 @@ from typing import List, Dict, Any, Union
 from typing import Optional, Tuple, Set
 
 from bscearth.utils.date import date2str, parse_date
-from networkx import DiGraph
+from networkx import DiGraph, difference
 
 from autosubmit.database.db_common import check_db_path, get_connection_url
 from autosubmit.database.db_manager_job_list import JobsDbManager
@@ -292,8 +292,6 @@ class JobList(object):
         Log.debug("Resetting the workflow graph to a zero state")
         self.dbmanager.reset_workflow()
 
-
-
     def _initialize_workflow_parameters(
             self,
             as_conf: AutosubmitConfig,
@@ -335,7 +333,8 @@ class JobList(object):
         for node in [node for node in nodes if node.get("name", "") not in self.graph.nodes]:
             self._add_job_node_with_platform(node)
 
-        for edge in (edge for edge in edges if edge.get("e_from", "") in self.graph.nodes and edge.get("e_to", "") in self.graph.nodes):
+        for edge in (edge for edge in edges if
+                     edge.get("e_from", "") in self.graph.nodes and edge.get("e_to", "") in self.graph.nodes):
             self._add_edge_and_parent(edge)
 
     def _add_edge_and_parent(
@@ -400,12 +399,12 @@ class JobList(object):
         """
         Log.info("Loading graph from database...")
         Log.info("Check (graph relevant) last persistent sections yaml data vs current sections yaml data")
-        differences = self.compute_section_differences(self._as_conf.experiment_data.get("EXPERIMENT", {}), self._as_conf.jobs_data)
+        differences = self.compute_section_differences()
         if not differences:
             Log.info("No differences found in sections, loading graph from database...")
         else:
             Log.info("Differences found in sections, updating graph...")
-            self.remove_outdated_information_from_database()
+            self.remove_outdated_information_from_database(differences)
 
         if differences:
             full_load = True
@@ -413,31 +412,30 @@ class JobList(object):
         nodes = self.load_jobs(full_load)
         edges = self.load_edges(nodes, full_load)
         self._recreate_graph(nodes, edges, full_load)
+        Log.info("Graph loaded successfully.")
+        if differences:
+            Log.info(
+                "Differences found in sections, the whole graph will be updated accordingly. This may take a while.")
         return False if not differences else True
 
-    def remove_outdated_information_from_database(self) -> None:
+    def remove_outdated_information_from_database(self, differences: Dict[str, Any]) -> None:
         """
         Removes outdated information from the database based on the differences found in sections.
-
+        :param differences: Dictionary containing the differences in sections.
+        :type differences: Dict[str, Any]
         """
         sections = self.build_sections_data_to_store()
         Log.info("Removing outdated information from database based on section differences...")
         self.dbmanager.save_sections_data(sections)
         Log.info("All edges will be recreated")  # Not sure how to do this in a more efficient way
         self.dbmanager.clear_edges()
-        section_names = [section["name"] for section in sections]
-        self.dbmanager.clear_unused_nodes(sections)
+        self.dbmanager.clear_unused_nodes(differences)
 
-
-    def compute_section_differences(self, experiment_section: Dict[str, Any], sections: Dict[str, Any]) -> Dict[
+    def compute_section_differences(self) -> Dict[
         str, str]:
         """
         Compute the differences between the current sections and the persistent sections in the database.
 
-        :param experiment_section: Dictionary containing experiment-level configuration.
-        :type experiment_section: Dict[str, Any]
-        :param sections: Dictionary of section names to their configuration data.
-        :type sections: Dict[str, Any]
         :return: A dictionary mapping section names to the type of change: 'removed', 'modified', or 'added'.
         :rtype: Dict[str, str]
         """
@@ -450,16 +448,41 @@ class JobList(object):
         persistent_sections = {section["name"]: section for section in persistent_sections_data}
         current_sections = {section["name"]: section for section in current_sections_data}
 
-        differences: Dict[str, str] = {}
+        differences: Dict[str, dict] = {}
         for section_name, section in persistent_sections.items():
+            differences[section_name] = {}
             if section_name not in current_sections:
-                differences[section_name] = "removed"
-            elif section != current_sections[section_name]:
-                differences[section_name] = "modified"
+                differences[section_name]["status"] = "removed"
+
+            elif section != current_sections.get(section_name, None):
+                differences[section_name]["status"] = "modified"
+                if section["datelist"] != current_sections[section_name]["datelist"]:
+                    differences[section_name]["datelist"] = current_sections[section_name]["datelist"]
+                if section["members"] != current_sections[section_name]["members"]:
+                    differences[section_name]["members"] = current_sections[section_name]["members"]
+                if section["numchunks"] != current_sections[section_name]["numchunks"]:
+                    differences[section_name]["numchunks"] = current_sections[section_name]["numchunks"]
+                if section["splits"] != current_sections[section_name]["splits"]:
+                    differences[section_name]["splits"] = current_sections[section_name]["splits"]
+                if section["dependencies"] != current_sections[section_name]["dependencies"]:
+                    differences[section_name]["dependencies"] = current_sections[section_name]["dependencies"]
+
+            if not differences[section_name]:
+                del differences[section_name]
 
         for section_name in current_sections:
+            differences[section_name] = {}
             if section_name not in persistent_sections:
-                differences[section_name] = "added"
+                differences[section_name]["status"] = "added"
+                differences[section_name]["datelist"] = current_sections[section_name]["datelist"]
+                differences[section_name]["members"] = current_sections[section_name]["members"]
+                differences[section_name]["numchunks"] = current_sections[section_name]["numchunks"]
+                differences[section_name]["splits"] = current_sections[section_name]["splits"]
+                differences[section_name]["dependencies"] = current_sections[section_name]["dependencies"]
+
+            if not differences[section_name]:
+                del differences[section_name]
+
         return differences
 
     def load_sections(self) -> List[Dict[str, Any]]:
@@ -468,7 +491,7 @@ class JobList(object):
         :return: List of sections.
         """
         Log.debug("Loading sections from database...")
-        return [ dict(section) for section in self.dbmanager.select_all_with_columns(SectionsStructureTable.name)]
+        return [dict(section) for section in self.dbmanager.select_all_with_columns(SectionsStructureTable.name)]
 
     def _create_and_add_jobs(
             self, show_log: bool, default_job_type: str, date_list: List[str], member_list: List[str]) -> None:
@@ -547,19 +570,25 @@ class JobList(object):
         """
         experiment_section = self._as_conf.experiment_data.get("EXPERIMENT", {})
         sections = self._as_conf.jobs_data
-        datelist = str(experiment_section.get("DATELIST", ""))
-        members = str(experiment_section.get("MEMBERS", ""))
-        numchunks = int(experiment_section.get("NUMCHUNKS", ""))
+        datelist_ref = str(experiment_section.get("DATELIST", ""))
+        members_ref = str(experiment_section.get("MEMBERS", ""))
+        numchunks_ref = int(experiment_section.get("NUMCHUNKS", ""))
         data_to_store: List[Dict[str, Any]] = []
         for section_name, section_data in sections.items():
+            splits = None if not section_data.get("SPLITS", None) else int(section_data.get("SPLITS", 0))
+            dependencies = None if not section_data.get("DEPENDENCIES", None) else str(section_data.get("DEPENDENCIES", {}))
+            datelist = datelist_ref if section_data.get("RUNNING", "once") != "once" else None
+            members = members_ref if section_data.get("RUNNING", "once") not in ["once", "date"] else None
+            numchunks = numchunks_ref if section_data.get("RUNNING", "once") not in ["once", "date", "member"] else None
             data_to_store.append({
                 "name": section_name,
-                "splits": int(section_data.get("SPLITS", -1)),
-                "dependencies": str(section_data.get("DEPENDENCIES", None)),
+                "splits": splits,
+                "dependencies": dependencies,
                 "datelist": datelist,
                 "members": members,
                 "numchunks": numchunks,
             })
+
         return data_to_store
 
     def save_sections(self):
@@ -2674,7 +2703,6 @@ class JobList(object):
                 self._add_edge_and_parent(edge)
         # get node from the graph
         return self.graph.nodes.get(job_name, None)['job']
-
 
     def save_edges(self):
         """

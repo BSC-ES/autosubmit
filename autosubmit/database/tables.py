@@ -197,11 +197,11 @@ SectionsStructureTable = Table(
     "sections",
     metadata_obj,
     Column("name", String, nullable=False, primary_key=True),
-    Column("splits", Integer),
-    Column("dependencies", String),
-    Column("datelist", String),
-    Column("members", String),
-    Column("numchunks", Integer),
+    Column("splits", Integer, nullable=True),
+    Column("dependencies", String, nullable=True),
+    Column("datelist", String, nullable=True),
+    Column("members", String, nullable=True),
+    Column("numchunks", Integer, nullable=True),
 )
 
 def create_wrapper_tables(name, metadata_obj_):

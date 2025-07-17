@@ -19,6 +19,7 @@
 from pathlib import Path
 from typing import Any, Optional, List, Dict, TYPE_CHECKING, Union, Tuple
 
+from docutils.nodes import section
 from sqlalchemy import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import relationship
@@ -32,6 +33,7 @@ from autosubmit.database.tables import ExperimentStructureTable, PreviewWrapperJ
 from autosubmit.database.tables import JobsTable
 from autosubmit.job.job import Job, WrapperJob
 from log.log import Log
+from sqlalchemy import and_
 
 if TYPE_CHECKING:
     from autosubmit.job.job_list import JobList
@@ -329,22 +331,81 @@ class JobsDbManager(DbManager):
         section_data = self.select_all(SectionsStructureTable.name)
         return section_data
 
-    def clear_unused_nodes(self, section_names: List[str]) -> None:
+    def clear_unused_nodes(self, differences: Dict[str, Any]) -> None:
         """
         Delete all jobs from the jobs table whose section matches any name in the provided list.
 
-        :param section_names: List of section names to match for deletion.
-        :type section_names: List[str]
-        :return: None
-        :rtype: None
+        :param differences: List of section names to match for deletion.
+        :type differences: Dict[str, Any]
+
         """
         self.create_table(JobsTable.name)
-        if section_names:
-            self.delete_where(JobsTable.name, {"section": section_names})
-        # TODO delete if chunk_number is > than the section specified
-        # TODO delete if date is not in the section specified
-        # TODO delete if member is not in the section specified
-        # TODO delete if split is not in the section specified
+        # Delete jobs which section doesn't match any of the sections provided
+        deleted_sections = []
+        for section_name, section_data in differences.items():
+            if section_data.get('status', None) == 'removed':
+                deleted_sections.append(section_name)
+        if deleted_sections:
+            self.delete_where(JobsTable.name, {'section': deleted_sections})
+
+        for section_name, section_data in differences.items():
+            if section_data.get('status', None) == 'modified':
+                # delete if chunk_number is > than the section specified
+
+                condition = and_(
+                    JobsTable.section == section_name,
+                    JobsTable.numchunks > section_data.get('chunk_number', 0),
+                )
+                self.delete_where(JobsTable.name, condition)
+
+                # delete if split_number is > than the section specified
+                condition = and_(
+                    JobsTable.section == section_name,
+                    JobsTable.split > section_data.get('splits', -1),
+                )
+                self.delete_where(JobsTable.name, condition)
+
+                # delete if date is not in the section specified
+                if 'date' in section_data:
+                    condition = and_(
+                        JobsTable.section == section_name,
+                        ~JobsTable.datelist.in_(section_data['datelist'].split(" ")),
+                    )
+                    self.delete_where(JobsTable.name, condition)
+                # delete if member is not in the section specified
+                if 'member' in section_data:
+                    condition = and_(
+                        JobsTable.section == section_name,
+                        ~JobsTable.members.in_(section_data['members'].split(" ")),
+                    )
+                    self.delete_where(JobsTable.name, condition)
+
+                # Update node status to 'Waiting' if it was not in the active statuses
+                condition = and_(
+                    JobsTable.section == section_name,
+                    ~JobsTable.status.in_(self._ACTIVE_STATUSES)
+                )
+
+                #self.update_where(JobsTable.name, {'status': 'WAITING'}, condition)
+
+
+
+    def delete_rows_with_number_greater_than(
+            self,
+            column: "Column",
+            x: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Delete rows from the JobsTable where the specified column's value is greater than x.
+        :param column: SQLAlchemy Column object to compare.
+        :type column: Column
+        :param x: Value to compare against.
+        :type x: int
+        :return: List of rows as dictionaries.
+        :rtype: List[Dict[str, Any]]
+        """
+
+        self.delete_where(JobsTable.name, {column.name: column > x})
 
     def remove_section(self, section_name: str) -> None:
         """
