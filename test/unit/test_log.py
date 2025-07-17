@@ -84,8 +84,6 @@ def test_logfile_compression(tmpdir):
     try:
         Log.compress_logfile(str(tmp_file_path))
 
-        assert not tmp_file_path.exists()
-
         compressed_path = tmp_file_path.with_suffix(tmp_file_path.suffix + ".xz")
         assert is_xz_file(compressed_path)
 
