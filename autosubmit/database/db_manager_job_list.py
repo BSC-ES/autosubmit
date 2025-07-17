@@ -340,7 +340,7 @@ class JobsDbManager(DbManager):
 
         """
         self.create_table(JobsTable.name)
-        # Delete jobs which section doesn't match any of the sections provided
+        # Delete jobs which section has been removed in the recent yaml file.
         deleted_sections = []
         for section_name, section_data in differences.items():
             if section_data.get('status', None) == 'removed':

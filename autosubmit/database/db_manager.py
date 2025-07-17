@@ -148,14 +148,30 @@ class DbManager:
             conn.commit()
         return cast(int, result.rowcount)
 
-    def delete_where(self, table_name: str, where: dict[str, Any]) -> int:
+    def delete_where(self, table_name: str, where: Dict[str, Any]) -> int:
+        """
+        Delete rows from a table where the specified conditions are met.
+        Supports both equality and 'IN' queries for list values.
+
+        :param table_name: Name of the table to delete from.
+        :type table_name: str
+        :param where: Dictionary of column names and values (single value or list for IN).
+        :type where: Dict[str, Any]
+        :return: Number of rows deleted.
+        :rtype: int
+        :raises ValueError: If 'where' is empty.
+        """
         if not where:
-            raise ValueError(f'You must specify a where when deleting from table " {table_name}"')
+            raise ValueError(f'You must specify a where when deleting from table "{table_name}"')
 
         table = get_table_from_name(schema=self.schema, table_name=table_name)
         query = delete(table)
         for key, value in where.items():
-            query = query.where(getattr(table.c, key) == value)  # type: ignore
+            column = getattr(table.c, key)
+            if isinstance(value, list):
+                query = query.where(column.in_(value))
+            else:
+                query = query.where(column == value)
 
         with self.engine.connect() as conn:
             result = conn.execute(query)
