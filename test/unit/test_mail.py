@@ -168,19 +168,23 @@ def test_compress_file(
 
 
 @pytest.mark.parametrize(
-    "sendmail_error, expected_log_message",
+    "new_status, sendmail_error, expected_log_message",
     [
         # Normal case: No errors, should not log anything
         # No logs are expected, everything works fine
-        (None, None),
+        (Status.VALUE_TO_KEY[Status.FAILED], None, None),
 
         # Log connection error: Simulate an error while sending email
-        (Exception("SMTP server error"),
-         'Trace:SMTP server error\nAn error has occurred while sending a warning mail about remote_platform')
+        (Status.VALUE_TO_KEY[Status.FAILED], Exception("SMTP server error"),
+         'Trace:SMTP server error\nAn error has occurred while sending a mail for the job Job1'),
+
+        # Job is now failing
+        (Status.VALUE_TO_KEY[Status.COMPLETED], None, None)
     ],
     ids=[
         "Normal case: No errors",
-        "Log connection error (SMTP server error)"
+        "Log connection error (SMTP server error)",
+        "No notification needed"
     ]
 )
 def test_notify_status_change(
@@ -188,12 +192,13 @@ def test_notify_status_change(
         mock_smtp,
         mocker,
         mail_notifier,
+        new_status,
         sendmail_error: Optional[Exception],
         expected_log_message):
     exp_id = 'a123'
     job_name = 'Job1'
     prev_status = Status.VALUE_TO_KEY[Status.RUNNING]
-    status = Status.VALUE_TO_KEY[Status.COMPLETED]
+    status = new_status 
     mail_to = ['recipient@example.com']
 
     mock_smtp = mocker.patch(
