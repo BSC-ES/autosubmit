@@ -1,0 +1,15 @@
+JOBS:
+  ONCE:
+    FILE: once.sh
+  DATE:
+    FILE: date.sh
+    DEPENDENCIES: once
+    RUNNING: date
+  MEMBER:
+    FILE: member.sh
+    DEPENDENCIES: date
+    RUNNING: member
+  CHUNCK:
+    FILE: chunk.sh
+    DEPENDENCIES: member
+    RUNNING: chunk
