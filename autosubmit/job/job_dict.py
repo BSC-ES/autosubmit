@@ -84,9 +84,9 @@ class DicJobs: # To rename to JobBuilder or something like that
         splits = parameters[section].get("SPLITS", -1)
         running = str(parameters[section].get('RUNNING', "once")).lower()
 
-        if splits == "auto" and running != "chunk":
+        if isinstance(splits, list)  and running != "chunk":
             raise AutosubmitCritical("SPLITS=auto is only allowed for running=chunk")
-        elif splits != "auto":
+        elif not isinstance(splits, list):
             splits = int(splits)
         frequency = int(parameters[section].get("FREQUENCY", 1))
         if running == 'once':
