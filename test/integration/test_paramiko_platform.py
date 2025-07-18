@@ -35,52 +35,6 @@ Note that tests will start and destroy an SSH server. For unit tests, see ``para
 in the ``test/unit`` directory."""
 
 
-@pytest.fixture
-def paramiko_platform():
-    local_root_dir = TemporaryDirectory()
-    config = {
-        "LOCAL_ROOT_DIR": local_root_dir.name,
-        "LOCAL_TMP_DIR": 'tmp'
-    }
-    platform = ParamikoPlatform(expid='a000', name='local', config=config)
-    platform.job_status = {
-        'COMPLETED': [],
-        'RUNNING': [],
-        'QUEUING': [],
-        'FAILED': []
-    }
-    yield platform
-    local_root_dir.cleanup()
-
-
-@pytest.fixture
-def ps_platform(tmpdir):
-    tmp_path = Path(tmpdir)
-    tmpdir.owner = tmp_path.owner()
-    config = {
-        "LOCAL_ROOT_DIR": str(tmpdir),
-        "LOCAL_TMP_DIR": 'tmp',
-        "PLATFORMS": {
-            "pytest-ps": {
-                "type": "ps",
-                "host": "127.0.0.1",
-                "user": tmpdir.owner,
-                "project": "whatever",
-                "scratch_dir": f"{Path(tmpdir).name}",
-                "MAX_WALLCLOCK": "48:00",
-                "DISABLE_RECOVERY_THREADS": True
-            }
-        }
-    }
-    platform = PsPlatform(expid='a000', name='local-ps', config=config)
-    platform.host = '127.0.0.1'
-    platform.user = tmpdir.owner
-    platform.root_dir = Path(tmpdir) / "remote"
-    platform.root_dir.mkdir(parents=True, exist_ok=True)
-    platform.remote_log_dir = platform.root_dir / 'LOG_a000'
-    yield platform, tmpdir
-
-
 @pytest.mark.docker
 @pytest.mark.parametrize('filename, check', [
     ('test1', True),
@@ -91,16 +45,15 @@ def test_send_file(mocker, filename, ps_platform, check):
 
     It launches a Docker Image using testcontainers library.
     """
-    platform, tmp_dir = ps_platform
-    remote_dir = Path(platform.root_dir) / f'LOG_{platform.expid}'
+    remote_dir = Path(ps_platform.root_dir) / f'LOG_{ps_platform.expid}'
     remote_dir.mkdir(parents=True, exist_ok=True)
-    Path(platform.tmp_path).mkdir(parents=True, exist_ok=True)
+    Path(ps_platform.tmp_path).mkdir(parents=True, exist_ok=True)
     # generate file
     if "/" in filename:
         filename_dir = Path(filename).parent
-        (Path(platform.tmp_path) / filename_dir).mkdir(parents=True, exist_ok=True)
+        (Path(ps_platform.tmp_path) / filename_dir).mkdir(parents=True, exist_ok=True)
         filename = Path(filename).name
-    with open(Path(platform.tmp_path) / filename, 'w') as f:
+    with open(Path(ps_platform.tmp_path) / filename, 'w') as f:
         f.write('test')
 
     # NOTE: because the test will run inside a container, with a different UID and GID,
@@ -129,16 +82,16 @@ def test_send_file(mocker, filename, ps_platform, check):
             wait_for_logs(container, 'sshd is listening on port 2222')
             _ssh = paramiko.SSHClient()
             _ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            _ssh.connect(hostname=platform.host, username=platform.user, password='password', port=ssh_port)
-            platform._ftpChannel = paramiko.SFTPClient.from_transport(_ssh.get_transport(), window_size=pow(4, 12),
+            _ssh.connect(hostname=ps_platform.host, username=ps_platform.user, password='password', port=ssh_port)
+            ps_platform._ftpChannel = paramiko.SFTPClient.from_transport(_ssh.get_transport(), window_size=pow(4, 12),
                                                                       max_packet_size=pow(4, 12))
-            platform._ftpChannel.get_channel().settimeout(120)
-            platform.connected = True
-            platform.get_send_file_cmd = mocker.Mock()
-            platform.get_send_file_cmd.return_value = 'ls'
-            platform.send_command = mocker.Mock()
+            ps_platform._ftpChannel.get_channel().settimeout(120)
+            ps_platform.connected = True
+            ps_platform.get_send_file_cmd = mocker.Mock()
+            ps_platform.get_send_file_cmd.return_value = 'ls'
+            ps_platform.send_command = mocker.Mock()
 
-            platform.send_file(filename)
+            ps_platform.send_file(filename)
             assert check == (remote_dir / filename).exists()
     finally:
         os.system(f'chmod 700 -R {str(rootdir)}')
