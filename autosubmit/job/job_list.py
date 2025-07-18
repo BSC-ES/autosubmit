@@ -491,7 +491,7 @@ class JobList(object):
         :return: List of sections.
         """
         Log.debug("Loading sections from database...")
-        return [dict(section) for section in self.dbmanager.select_all_with_columns(SectionsStructureTable.name)]
+        return self.dbmanager.load_sections_data()
 
     def _create_and_add_jobs(
             self, show_log: bool, default_job_type: str, date_list: List[str], member_list: List[str]) -> None:
@@ -575,7 +575,7 @@ class JobList(object):
         numchunks_ref = int(experiment_section.get("NUMCHUNKS", ""))
         data_to_store: List[Dict[str, Any]] = []
         for section_name, section_data in sections.items():
-            splits = None if not section_data.get("SPLITS", None) else int(section_data.get("SPLITS", 0))
+            splits = None if not section_data.get("SPLITS", None) else str(section_data.get("SPLITS", 0))
             dependencies = None if not section_data.get("DEPENDENCIES", None) else str(section_data.get("DEPENDENCIES", {}))
             datelist = datelist_ref if section_data.get("RUNNING", "once") != "once" else None
             members = members_ref if section_data.get("RUNNING", "once") not in ["once", "date"] else None
@@ -1485,7 +1485,7 @@ class JobList(object):
                     continue
 
             if parent.section == job.section:
-                if not job.splits or int(job.splits) > 0:
+                if not job.split or int(job.split) > 0:
                     self.depends_on_previous_split[job.section] = int(parent.split)
             if self.actual_job_depends_on_previous_chunk and parent.section == job.section:
                 graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")

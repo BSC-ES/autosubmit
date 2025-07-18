@@ -1983,6 +1983,8 @@ class Job(object):
                 self.retrials = wrapper_data.get("RETRIALS", self.retrials)
         if not self.splits:
             self.splits = as_conf.jobs_data.get(self.section, {}).get("SPLITS", None)
+        if isinstance(self.splits, dict):
+            self.splits = self.splits[date2str(self.date, "%Y%m%d")][self.chunk-1]
         self.delete_when_edgeless = as_conf.jobs_data.get(self.section, {}).get("DELETE_WHEN_EDGELESS", True)
         self.dependencies = str(as_conf.jobs_data.get(self.section, {}).get("DEPENDENCIES", ""))
         self.running = as_conf.jobs_data.get(self.section, {}).get("RUNNING", "once")

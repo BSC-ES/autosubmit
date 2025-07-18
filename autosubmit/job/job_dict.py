@@ -84,9 +84,9 @@ class DicJobs: # To rename to JobBuilder or something like that
         splits = parameters[section].get("SPLITS", -1)
         running = str(parameters[section].get('RUNNING', "once")).lower()
 
-        if isinstance(splits, list)  and running != "chunk":
+        if isinstance(splits, dict) and running != "chunk":
             raise AutosubmitCritical("SPLITS=auto is only allowed for running=chunk")
-        elif not isinstance(splits, list):
+        elif not isinstance(splits, dict):
             splits = int(splits)
         frequency = int(parameters[section].get("FREQUENCY", 1))
         if running == 'once':
@@ -200,10 +200,6 @@ class DicJobs: # To rename to JobBuilder or something like that
                 self._dic[section][date][member] = dict()
                 count = 0
                 for chunk in (chunk for chunk in self._chunk_list):
-                    if splits == "auto":
-                        real_splits = calendar_chunk_section(self.experiment_data, section, date, chunk)
-                    else:
-                        real_splits = splits
                     count += 1
                     if delay == -1 or delay < chunk:
                         if count % frequency == 0 or count == len(self._chunk_list):
@@ -215,12 +211,17 @@ class DicJobs: # To rename to JobBuilder or something like that
                                     self._dic[section][date][member][chunk] = tmp_dic[chunk][date]
                             else:
                                 self._dic[section][date][member][chunk] = []
-                                self._create_jobs_split(real_splits, section, date, member, chunk, priority,
+                                self._create_jobs_split(splits, section, date, member, chunk, priority,
                                                         default_job_type,
                                                         self._dic[section][date][member][chunk])
 
     def _create_jobs_split(self, splits, section, date, member, chunk, priority, default_job_type, section_data):
-        splits_list = [-1] if splits <= 0 else range(1, splits + 1)
+        if isinstance(splits, dict):
+            date_str = date2str(date, self._date_format)
+            splits_list = [-1] if splits[date_str][chunk-1] <= 0 else range(1, splits[date_str][chunk-1] + 1)
+        else:
+            splits_list = [-1] if splits <= 0 else range(1, splits + 1)
+
         for split in splits_list:
             self.build_job(section, priority, date, member, chunk, default_job_type, section_data, splits, split)
 
