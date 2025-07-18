@@ -15,24 +15,27 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-# Fixtures available to multiple test files must be created in this file.
+"""Fixtures available to multiple test files must be created in this file."""
+
 import os
 import pwd
 from dataclasses import dataclass
 from datetime import datetime
 from fileinput import FileInput
 from pathlib import Path
+from random import randrange
 from random import seed, randint, choice
 from re import sub
 from textwrap import dedent
 from time import time
-from typing import TYPE_CHECKING, Any, Dict, Protocol, Optional, Type, List
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional, Protocol, Tuple, Type
 
 import pytest
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from pytest_mock import MockerFixture
 from ruamel.yaml import YAML
+from testcontainers.sftp import DockerContainer, wait_for_logs
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
@@ -101,6 +104,7 @@ def _initialize_autosubmitrc(folder: Path) -> Path:
 
 class AutosubmitExperimentFixture(Protocol):
     """Type for ``autosubmit_exp`` fixture."""
+
     def __call__(
             self,
             expid: Optional[str] = None,
@@ -139,7 +143,7 @@ def autosubmit_exp(
     def _create_autosubmit_exp(
             expid: Optional[str] = None,
             experiment_data: Optional[Dict] = None,
-            wrapper = False,
+            wrapper=False,
             *_,
             **kwargs
     ):
@@ -591,3 +595,30 @@ def create_jobs(
         return jobs
 
     return _create_jobs(mocker, request.param[0], request.param[1])
+
+
+@pytest.fixture(scope="function")
+def git_server(tmp_path) -> Generator[Tuple[DockerContainer, Path, str], None, None]:
+
+    # Start a container to server it -- otherwise, we would have to use
+    # `git -c protocol.file.allow=always submodule ...`, and we cannot
+    # change how Autosubmit uses it in `autosubmit create` (due to bad
+    # code design choices).
+
+    git_repos_path = tmp_path / 'git_repos'
+    git_repos_path.mkdir(exist_ok=True, parents=True)
+
+    http_port = randrange(4000, 4500)
+
+    image = 'githttpd/githttpd:latest'
+    with DockerContainer(image=image, remove=True) \
+            .with_bind_ports(80, http_port) \
+            .with_volume_mapping(str(git_repos_path), '/opt/git-server', mode='rw') as container:
+        wait_for_logs(container, "Command line: 'httpd -D FOREGROUND'")
+
+        # The docker image ``githttpd/githttpd`` creates an HTTP server for Git
+        # repositories, using the volume bound onto ``/opt/git-server`` as base
+        # for any subdirectory, the Git URL becoming ``git/{subdirectory-name}}``.
+        yield container, git_repos_path, f'http://localhost:{http_port}/git'
+
+
