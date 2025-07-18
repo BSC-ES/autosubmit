@@ -37,6 +37,19 @@ def threaded(fn):
 
     return wrapper
 
+
+def _create_ssh_client() -> paramiko.SSHClient:
+    """Create a Paramiko SSH Client.
+    Sets up all the attributes required by Autosubmit in the :class:`paramiko.SSHClient`.
+    This code is in a separated function for composition and to make it easier
+    to write tests that mock the SSH client (as having this function makes it
+    a lot easier).
+    """
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    return ssh
+
+
 # noinspection PyMethodParameters
 class ParamikoPlatform(Platform):
     """
@@ -295,8 +308,7 @@ class ParamikoPlatform(Platform):
             except Exception as e:
                 Log.warning(f"X11 display not found: {e}")
                 self.local_x11_display = None
-            self._ssh = paramiko.SSHClient()
-            self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            self._ssh = _create_ssh_client()
             self._ssh_config = paramiko.SSHConfig()
             if as_conf:
                 self.map_user_config_file(as_conf)
