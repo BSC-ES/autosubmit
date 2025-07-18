@@ -18,7 +18,6 @@
 import os
 from getpass import getuser
 from pathlib import Path
-from random import randrange
 from tempfile import TemporaryDirectory, gettempdir
 
 import paramiko
@@ -28,6 +27,7 @@ from testcontainers.sftp import DockerContainer
 
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.psplatform import PsPlatform
+from test.integration.test_utils.networking import get_free_port
 
 """Integration tests for the paramiko platform.
 
@@ -114,7 +114,7 @@ def test_send_file(mocker, filename, ps_platform, check):
     # To write in the /tmp (sticky bit, different uid/gid), reset it later (default pytest is 700)
     os.system(f'chmod 777 -R {str(rootdir)}')
 
-    ssh_port = randrange(2500, 3000)
+    ssh_port = get_free_port()
 
     try:
         image = 'lscr.io/linuxserver/openssh-server:latest'
