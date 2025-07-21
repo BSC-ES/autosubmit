@@ -171,8 +171,8 @@ class LocalPlatform(ParamikoPlatform):
         """
         Sends a file to a specified location using a command.
 
-        :param filenames: The name of the file to send.
-        :type filenames: str
+        :param filename: The name of the file to send.
+        :type filename: str
         :param check: Unused in this platform.
         :type check: bool
         :return: True if the file was sent successfully.

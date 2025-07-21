@@ -36,8 +36,8 @@ class JobGrouping(object):
         if not expanded_status:
             expanded_status = []
 
-        self.group_by = group_by
         self.jobs = jobs
+        self.group_by = group_by
         self.job_list = job_list
         self.date_format = job_list.get_date_format()
         self.expand_list = expand_list
@@ -133,7 +133,7 @@ class JobGrouping(object):
                         date = out[0][count]
                         member_chunks = out[0][count + 1]
                         member_count = 0
-                        for element_member in member_chunks:
+                        for _ in member_chunks:
                             if member_count % 2 == 0:
                                 member = member_chunks[member_count]
                                 chunks = list()
@@ -175,7 +175,9 @@ class JobGrouping(object):
             elif Status.UNKNOWN in statuses:
                 return Status.UNKNOWN
 
-    def _create_groups(self, jobs_group_dict, blacklist=list()):
+    def _create_groups(self, jobs_group_dict, blacklist=None):
+        if blacklist is None:
+            blacklist = []
         for i in reversed(range(len(self.jobs))):
             job = self.jobs[i]
 
@@ -231,7 +233,7 @@ class JobGrouping(object):
                             group_name = date2str(date, self.date_format)
                     else:
                         groups.append(group_name)
-            elif job.member is None :
+            elif job.member is None:
                 synchronized = True
                 if self.group_by == 'date':
                     groups.append(date2str(job.date, self.date_format))
@@ -242,7 +244,6 @@ class JobGrouping(object):
                             group_name += '_' + str(job.chunk)
                         groups.append(group_name)
         return synchronized
-
 
     def _automatic_grouping(self, groups_map):
         all_jobs = copy.deepcopy(self.jobs)
@@ -328,7 +329,7 @@ class JobGrouping(object):
                     if new_group not in checked_groups:
                         checked_groups.append(new_group)
                         possible_groups = [existing_group for existing_group in list(self.group_status_dict.keys()) if
-                                              new_group+'_' in existing_group]
+                                           new_group + '_' in existing_group]
 
                         if len(possible_groups) == num_groups:
                             if self._check_valid_group(possible_groups, new_group, groups_map):
