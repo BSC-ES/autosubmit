@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     # Avoid circular imports
     from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.job.job import Job
+    from autosubmit.platforms.headers import PlatformHeader
 
 
 def threaded(fn):
@@ -108,12 +109,11 @@ class ParamikoPlatform(Platform):
         self._init_local_x11_display()
 
     @property
-    def header(self):
+    def header(self) -> 'PlatformHeader':
         """
         Header to add to job for scheduler configuration
 
         :return: header
-        :rtype: object
         """
         return self._header
 
@@ -531,8 +531,8 @@ class ParamikoPlatform(Platform):
         return False
 
     def move_file(self, src, dest, must_exist=False):
-        """
-        Moves a file on the platform (includes .err and .out)
+        """Moves a file on the platform (includes .err and .out).
+
         :param src: source name
         :type src: str
         :param dest: destination name
@@ -554,18 +554,18 @@ class ParamikoPlatform(Platform):
                 raise AutosubmitError(f'File {os.path.join(path_root, src)} does not exists, something went '
                                       f'wrong with the platform', 6004, str(e))
             if must_exist:
-                raise AutosubmitError(f"File {os.path.join(path_root, src)} does not exists", 6004, str(e))
-            else:
-                Log.debug(f"File {path_root} doesn't exists ")
-                return False
+                raise AutosubmitError(f"File {os.path.join(path_root,src)} does not exists", 6004, str(e))
+
+            Log.debug(f"File {path_root} doesn't exists ")
         except Exception as e:
             if str(e) in "Garbage":
                 raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exists', 6004, str(e))
             if must_exist:
                 raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exists", 6004, str(e))
-            else:
-                Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
-                return False
+
+            Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
+
+        return False
 
     def submit_job(self, job, script_name, hold=False, export="none"):
         """
@@ -666,9 +666,10 @@ class ParamikoPlatform(Platform):
                     Log.debug(f"Error cancelling job {job.id}: {str(e)}")
         return job_status
 
-    def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
-        """
-        Checks job running status
+    def check_job(
+            self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False
+    ) -> Optional[int]:
+        """Checks job running status, returning the latest status if ``submit_hold_check``, ``None`` otherwise.
 
         :param is_wrapper:
         :param submit_hold_check:
@@ -680,8 +681,7 @@ class ParamikoPlatform(Platform):
         :param default_status: status to assign if it can be retrieved from the platform
         :type default_status: autosubmit.job.job_common.Status
         :return: current job status
-        :rtype: autosubmit.job.job_common.Status
-
+        :rtype: The job status or ``None`` if ``submit_hold_check`` is ``False``.
         """
         for event in job.platform.worker_events:  # keep alive log retrieval workers.
             if not event.is_set():
@@ -689,8 +689,7 @@ class ParamikoPlatform(Platform):
         job_id = job.id
         job_status = Status.UNKNOWN
         if type(job_id) is not int and type(job_id) is not str:
-            Log.error(
-                'check_job() The job id ({0}) is not an integer neither a string.', job_id)
+            Log.error(f'check_job() The job id ({job_id}) is not an integer neither a string.')
             job.new_status = job_status
         sleep_time = 5
         sleep(2)
@@ -759,10 +758,14 @@ class ParamikoPlatform(Platform):
             # backup for start time in case that the stat file is not found
             job.start_time_timestamp = int(time.time())
 
+        # FIXME: It's strange that this argument is passed to this function, but used only here,
+        #        to decide whether the job status is returned or not. It sounds safe to always
+        #        return the status, simplifying code, tests, docs, maintenance in general...
         if submit_hold_check:
             return job_status
-        else:
-            job.new_status = job_status
+
+        job.new_status = job_status
+        return None
 
     def _check_jobid_in_queue(self, ssh_output, job_list_cmd):
         """
@@ -1374,7 +1377,7 @@ class ParamikoPlatform(Platform):
 
         :param job: The job.
         :param parameters: Parameters dictionary.
-        :return: Job header.
+        :return: Header to use for the job.
         """
         if not job.packed or str(job.wrapper_type).lower() != "vertical":
             out_filename = f"{job.name}.cmd.out.{job.fail_count}"

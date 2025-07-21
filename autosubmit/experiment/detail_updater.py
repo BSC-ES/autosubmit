@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # Copyright 2015-2025 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
@@ -17,22 +15,21 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from abc import ABC, abstractmethod
 import datetime
 import pwd
-from pathlib import Path
 import sqlite3
+from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, Dict, Union
 
 from sqlalchemy import Table
-from autosubmit.database.db_common import get_connection_url, get_experiment_id
-from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.yamlparser import YAMLParserFactory
 
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.database.db_common import get_connection_url, get_experiment_id
 from autosubmit.database.session import create_engine
 from autosubmit.database.tables import get_table_from_name
-
 
 LOCAL_TZ = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
 

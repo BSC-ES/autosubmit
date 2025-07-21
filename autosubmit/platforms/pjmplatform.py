@@ -205,7 +205,7 @@ class PJMPlatform(ParamikoPlatform):
             self.send_file(self.get_submit_script(), False)
             cmd = os.path.join(self.get_files_path(),
                                os.path.basename(self._submit_script_path))
-            # remove file after submisison
+            # remove file after submission
             cmd = f"{cmd} ; rm {cmd}"
             try:
                 self.send_command(cmd)
