@@ -128,9 +128,6 @@ class DicJobs:
         :param frequency: if greater than 1, only creates one job each frequency members. Always creates one job
                           for the last
         :type frequency: int
-        :type excluded_members: list
-        :param excluded_members: if member index is listed there, the job won't run for this member.
-
         """
         self._dic[section] = dict()
         for date in self._date_list:
