@@ -68,7 +68,7 @@ _CHECK_STATUS_STATUS_LIST = [
     Status.DELAYED, Status.UNKNOWN, Status.SUSPENDED, Status.SKIPPED,
     Status.WAITING, Status.READY, Status.SUBMITTED
 ]
-"""A list of statuses used by ``check_final_status`` function to return a lis of colors and labels.
+"""A list of statuses used by ``check_final_status`` function to return a list of colors and labels.
 
 Note, some statuses are not used, like ``Status.COMPLETED`` and ``Status.PREPARED``.
 """

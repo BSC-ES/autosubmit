@@ -55,6 +55,9 @@ def current_tmpdir(tmpdir_factory):
 
 @pytest.fixture
 def prepare_test(current_tmpdir):
+    """Prepares test data, creating the platform configuration and a few
+    basic files for tests.
+    """
     # touch as_misc
     platforms_path = Path(f"{current_tmpdir.strpath}/platforms_t000.yml")
     jobs_path = Path(f"{current_tmpdir.strpath}/jobs_t000.yml")

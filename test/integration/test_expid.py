@@ -26,10 +26,10 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
-from autosubmit.config.basicconfig import BasicConfig
 
 from autosubmit.autosubmit import Autosubmit
-from autosubmit.experiment.experiment_common import new_experiment, copy_experiment
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.experiment.experiment_common import check_ownership, copy_experiment, new_experiment
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 
 _EXPID = 't000'
@@ -508,17 +508,15 @@ def test_delete_experiment_not_owner(mocker, tmp_path, autosubmit_exp, autosubmi
     mocker.patch('autosubmit.autosubmit.Autosubmit._user_yes_no_query', return_value=True)
     mocker.patch('pwd.getpwuid', side_effect=TypeError)
     mocker.patch("autosubmit.autosubmit.process_id", return_value=None)
-    _, _, current_owner = autosubmit._check_ownership(_EXPID)
+    _, _, current_owner = check_ownership(_EXPID)
     assert current_owner is None
     # test not owner not eadmin
     _user = getuser()
-    mocker.patch("autosubmit.autosubmit.Autosubmit._check_ownership",
-                 return_value=(False, False, _user))
+    mocker.patch("autosubmit.autosubmit.check_ownership", return_value=(False, False, _user))
     with pytest.raises(AutosubmitCritical):
         autosubmit.delete(expid=f'{_EXPID}', force=True)
     # test eadmin
-    mocker.patch("autosubmit.autosubmit.Autosubmit._check_ownership",
-                 return_value=(False, True, _user))
+    mocker.patch("autosubmit.autosubmit.check_ownership", return_value=(False, True, _user))
     with pytest.raises(AutosubmitCritical):
         autosubmit.delete(expid=f'{_EXPID}', force=False)
     # test eadmin force

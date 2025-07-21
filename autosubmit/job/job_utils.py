@@ -153,11 +153,13 @@ def calendar_split_size_isvalid(date_str, split_size, split_unit,
 def calendar_chunk_section(exp_data, section, date, chunk) -> int:
     """
     Calendar for chunks
+    :param exp_data:
     :param section:
-    :param parameters:
+    :param date:
+    :param chunk:
     :return: int
     """
-    #next_auto_date = date
+    # next_auto_date = date
     splits = 0
     jobs_data = exp_data.get('JOBS', {})
     split_unit = str(exp_data.get("EXPERIMENT", {}).get('SPLITSIZEUNIT', jobs_data.get(section,{}).get("SPLITSIZEUNIT", None))).lower()
