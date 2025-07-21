@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # Copyright 2015-2025 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
@@ -19,13 +17,13 @@
 
 import datetime
 import pwd
-from pathlib import Path
 import sqlite3
-from autosubmit.database.db_common import get_experiment_id
-from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.yamlparser import YAMLParserFactory
+from pathlib import Path
 
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.database.db_common import get_experiment_id
 
 LOCAL_TZ = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
 

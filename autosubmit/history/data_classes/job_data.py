@@ -16,11 +16,10 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import collections
 import autosubmit.history.utils as HUtils
 import autosubmit.history.database_managers.database_models as Models
 from datetime import datetime, timedelta
-from json import dumps, loads
+from json import loads
 
 
 class JobData(object):
