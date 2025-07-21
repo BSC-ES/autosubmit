@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from log.log import Log
+from autosubmit.log.log import Log
 
 
 def test_add_autosubmit_dict(autosubmit_config, mocker):

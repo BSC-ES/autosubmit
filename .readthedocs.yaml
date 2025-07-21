@@ -14,12 +14,7 @@ build:
     - graphviz
   jobs:
     post_install:
-      # ruamel.yaml.clib appears to cause the build to fail when
-      # using new API in ruamel.yaml
-      # refs:
-      # - https://earth.bsc.es/gitlab/es/autosubmit/-/merge_requests/340/
-      # - https://yaml.readthedocs.io/en/latest/api.html
-      - pip uninstall ruamel.yaml.clib -y
+      - autosubmit --version
       - autosubmit configure
       - autosubmit install
 

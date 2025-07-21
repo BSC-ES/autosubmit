@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-
-# Copyright 2015 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -17,10 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Script for handling experiment monitoring"""
+"""Script for handling experiment monitoring."""
+
 import argparse
 import traceback
 from contextlib import suppress
+# noinspection PyProtectedMember
 from os import _exit  # type: ignore
 from pathlib import Path
 from typing import Optional, Union
@@ -29,7 +29,7 @@ from portalocker.exceptions import BaseLockException
 
 from autosubmit.autosubmit import Autosubmit  # noqa: E402
 from autosubmit.config.configcommon import AutosubmitConfig  # noqa: E402
-from log.log import Log, AutosubmitCritical, AutosubmitError  # noqa: E402
+from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError  # noqa: E402
 
 
 def delete_lock_file(base_path: str = Log.file_path, lock_file: str = 'autosubmit.lock') -> None:

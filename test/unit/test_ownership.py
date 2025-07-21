@@ -18,7 +18,7 @@
 import pytest
 
 from autosubmit.autosubmit import Autosubmit
-from log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 
 
 @pytest.fixture

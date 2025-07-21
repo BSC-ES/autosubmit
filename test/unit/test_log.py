@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from log.log import AutosubmitError, AutosubmitCritical, Log
+from autosubmit.log.log import AutosubmitError, AutosubmitCritical, Log
 
 """Tests for the log module."""
 

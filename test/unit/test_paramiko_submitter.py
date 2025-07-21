@@ -17,8 +17,8 @@
 
 import pytest
 
+from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
-from log.log import AutosubmitCritical
 
 
 @pytest.mark.parametrize("config", [

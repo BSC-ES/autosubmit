@@ -1,34 +1,35 @@
-#!/usr/bin/env python3
-
-# Copyright 2017-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import collections
+import operator
+from contextlib import suppress
+from math import ceil
+from operator import attrgetter
+from typing import List
+
+from bscearth.utils.date import sum_str_hours
 
 from autosubmit.job.job import Job
-from log.log import Log, AutosubmitCritical
 from autosubmit.job.job_common import Status, Type
-from bscearth.utils.date import sum_str_hours
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal, \
     JobPackageSimpleWrapped, JobPackageHorizontalVertical, JobPackageVerticalHorizontal, JobPackageBase
-from operator import attrgetter
-from math import ceil
-import operator
-from typing import List
-from contextlib import suppress
+from autosubmit.log.log import Log, AutosubmitCritical
+
 
 class JobPackager(object):
     """

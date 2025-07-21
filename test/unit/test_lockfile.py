@@ -18,8 +18,8 @@
 import pytest
 from portalocker.exceptions import BaseLockException
 
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.scripts.autosubmit import delete_lock_file, exit_from_error
-from log.log import AutosubmitCritical, AutosubmitError
 
 
 def test_delete_lockfile(tmp_path):

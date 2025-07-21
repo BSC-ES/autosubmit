@@ -1,4 +1,4 @@
-# Copyright 2015-2023 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -6,11 +6,14 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """RO-Crate is a human and machine-readable format, widely used in the
 workflow community with a wide variety of tools and use cases, built
@@ -32,13 +35,13 @@ from rocrate.model.contextentity import ContextEntity
 from rocrate.rocrate import ROCrate, File
 from rocrate.utils import iso_now
 
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.database.db_common import get_autosubmit_version
 from autosubmit.database.db_common import get_experiment_descrip
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
-from log.log import Log, AutosubmitCritical
+from autosubmit.log.log import Log, AutosubmitCritical
 
 """List of profiles used in our RO-Crate implementation, plus the one used
 as graph context."""

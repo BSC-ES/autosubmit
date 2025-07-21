@@ -1,19 +1,17 @@
-#!/usr/bin/env python3
-
-# Copyright 2017-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -24,10 +22,8 @@ import random
 import time
 from datetime import timedelta
 
-from pathlib import Path
-
 from autosubmit.job.job_common import Status
-from log.log import Log, AutosubmitCritical
+from autosubmit.log.log import Log, AutosubmitCritical
 
 Log.get_logger("Autosubmit")
 from autosubmit.job.job import Job
@@ -40,6 +36,8 @@ import datetime
 import re
 import locale
 lock = Lock()
+
+
 def threaded(fn):
     def wrapper(*args, **kwargs):
         thread = Thread(target=fn, args=args, kwargs=kwargs)
@@ -47,6 +45,8 @@ def threaded(fn):
         thread.start()
         return thread
     return wrapper
+
+
 def jobs_in_wrapper_str(as_conf, current_wrapper):
     jobs_in_wrapper = as_conf.experiment_data["WRAPPERS"].get(current_wrapper, {}).get("JOBS_IN_WRAPPER", "")
     if "," in jobs_in_wrapper:
@@ -57,6 +57,8 @@ def jobs_in_wrapper_str(as_conf, current_wrapper):
         jobs_in_wrapper = jobs_in_wrapper.split(" ")
     jobs_in_wrapper = [job.strip(" ,") for job in jobs_in_wrapper]
     return "_".join(jobs_in_wrapper)
+
+
 class JobPackageBase(object):
     """
     Class to manage the package of jobs to be submitted by autosubmit
