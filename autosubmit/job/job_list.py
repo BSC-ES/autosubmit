@@ -412,7 +412,9 @@ class JobList(object):
         nodes = self.load_jobs(full_load)
         edges = self.load_edges(nodes, full_load)
         self._recreate_graph(nodes, edges, full_load)
-        Log.info("Graph loaded successfully.")
+        if not self.job_list:
+            Log.warning("No jobs found in the graph. If this is the first time you create this experiment, is normal.")
+            return False
         if differences:
             Log.info(
                 "Differences found in sections, the whole graph will be updated accordingly. This may take a while.")
@@ -491,7 +493,7 @@ class JobList(object):
         :return: List of sections.
         """
         Log.debug("Loading sections from database...")
-        return self.dbmanager.load_sections_data()
+        return [dict(raw_row) for raw_row in self.dbmanager.load_sections_data()]
 
     def _create_and_add_jobs(
             self, show_log: bool, default_job_type: str, date_list: List[str], member_list: List[str]) -> None:
@@ -1841,120 +1843,64 @@ class JobList(object):
             dic_jobs.read_section(section, priority, default_job_type)
             priority += 1
 
-    def _create_sorted_dict_jobs(self, inner_sections):
+    def _create_sorted_dict_jobs(self, inner_sections: Any) -> Dict[str, Dict[str, List[Any]]]:
         """
-        Creates a sorting of the jobs whose job.section is in inner_sections, according to the
-        following filters in order of importance:
-        date, member, RUNNING, and chunk number; where RUNNING is defined in jobs_.yml
-        for each section.
+        Sort jobs by date, member, and chunk for the specified sections.
 
-        If the job does not have a chunk number, the total number of chunks configured for
-        the experiment is used.
-
-        :param inner_sections: User defined job types in autosubmit_,conf [wrapper] section to
-        be wrapped.
-        :type inner_sections: String \n
-        :return: Sorted Dictionary of List that represents the jobs included in the wrapping
-        process.
-        :rtype: Dictionary Key: date, Value: (Dictionary Key: Member, Value: List of jobs that
-        belong to the date, member, and are ordered by chunk number if it is a chunk job otherwise
-        num_chunks from JOB TYPE (section)
+        :param inner_sections: Sections to include in the sorting.
+        :type inner_sections: list or str
+        :return: Dictionary of jobs sorted by date and member.
+        :rtype: Dict[str, Dict[str, List[Any]]]
         """
+        # Prepare the sections list
+        if inner_sections is None or not str(inner_sections).strip():
+            return {}
 
-        # Dictionary Key: date, Value: (Dictionary Key: Member, Value: List)
-        job = None
+        if not isinstance(inner_sections, list):
+            char = "&" if "&" in str(inner_sections) else " "
+            inner_sections = [s.strip() for s in str(inner_sections).split(char) if s.strip()]
 
-        dict_jobs = dict()
-        for date in self._date_list:
-            dict_jobs[date] = dict()
-            for member in self._member_list:
-                dict_jobs[date][member] = list()
+        # Map section to its RUNNING type
+        sections_running_type_map = {
+            section: str(self._as_conf.experiment_data["JOBS"].get(section, {}).get("RUNNING", "once"))
+            for section in inner_sections
+        }
+
+        # Filter jobs by section
+        filtered_jobs = [job for job in self.job_list if job.section in sections_running_type_map]
+
+        # Create fake jobs for sorting
+        filtered_jobs_fake, fake_original_map = self._create_fake_dates_members(filtered_jobs)
         num_chunks = len(self._chunk_list)
 
-        sections_running_type_map = dict()
-        if inner_sections is not None and len(str(inner_sections)) > 0:
-            if type(inner_sections) is not list:
-                if "&" in inner_sections:
-                    char = "&"
-                else:
-                    char = " "
-                wrapper_jobs = inner_sections.split(char)
-
-            for section in inner_sections:
-                # RUNNING = once, as default. This value comes from jobs_.yml
-                sections_running_type_map[section] = str(self._as_conf.experiment_data["JOBS"].
-                                                         get(section, {}).get("RUNNING", 'once'))
-
-            # Select only relevant jobs, those belonging to the sections defined in the wrapper
-
-        sections_to_filter = ""
-        for section in sections_running_type_map:
-            sections_to_filter += section
-
-        filtered_jobs_list = [job for job in self.job_list if
-                              job.section in sections_running_type_map]
-
-        filtered_jobs_fake_date_member, fake_original_job_map = self._create_fake_dates_members(
-            filtered_jobs_list)
+        # Build the sorted dictionary
+        dict_jobs: Dict[str, Dict[str, List[Any]]] = {
+            date: {member: [] for member in self._member_list} for date in self._date_list
+        }
 
         for date in self._date_list:
             str_date = self._get_date(date)
             for member in self._member_list:
-                # Filter list of fake jobs according to date and member,
-                # result not sorted at this point
-                sorted_jobs_list = [job for job in filtered_jobs_fake_date_member if
-                                    job.name.split("_")[1] == str_date and
-                                    job.name.split("_")[2] == member]
-
-                # There can be no jobs for this member when select chunk/member is enabled
-                if not sorted_jobs_list or len(sorted_jobs_list) == 0:
+                jobs = [
+                    job for job in filtered_jobs_fake
+                    if job.name.split("_")[1] == str_date and job.name.split("_")[2] == member
+                ]
+                if not jobs:
                     continue
 
-                previous_job = sorted_jobs_list[0]
+                # Sort jobs by chunk or num_chunks
+                jobs_sorted = sorted(
+                    jobs,
+                    key=lambda k: (
+                        k.name.split('_')[1],
+                        k.name.split('_')[2],
+                        int(k.name.split('_')[3]) if len(k.name.split('_')) == 5 else num_chunks + 1
+                    )
+                )
 
-                # get RUNNING for this section
-                section_running_type = sections_running_type_map[previous_job.section]
-                jobs_to_sort = [previous_job]
-                previous_section_running_type = None
-                # Index starts at 1 because 0 has been taken in a previous step
-                for index in range(1, len(sorted_jobs_list) + 1):
-                    # If not last item
-                    if index < len(sorted_jobs_list):
-                        job = sorted_jobs_list[index]
-                        # Test if section has changed. e.g. from INI to SIM
-                        if previous_job.section != job.section:
-                            previous_section_running_type = section_running_type
-                            section_running_type = sections_running_type_map[job.section]
-                    # Test if RUNNING is different between sections, or if we have reached
-                    # the last item in sorted_jobs_list
-                    if ((previous_section_running_type is not None and
-                         previous_section_running_type != section_running_type) or
-                            index == len(sorted_jobs_list)):
-
-                        # Sorting by date, member, chunk number if it is a chunk job otherwise
-                        # num_chunks from JOB TYPE (section)
-                        # Important to note that the only differentiating factor would be chunk
-                        # OR num_chunks
-                        jobs_to_sort = sorted(jobs_to_sort, key=lambda k: (
-                            k.name.split('_')[1], (k.name.split('_')[2]), (int(k.name.split('_')[3])
-                                                                           if len(
-                                k.name.split('_')) == 5 else num_chunks + 1)))
-
-                        # Bringing back original job if identified
-                        for idx in range(0, len(jobs_to_sort)):
-                            # Test if it is a fake job
-                            if jobs_to_sort[idx] in fake_original_job_map:
-                                fake_job = jobs_to_sort[idx]
-                                # Get original
-                                jobs_to_sort[idx] = fake_original_job_map[fake_job]
-                        # Add to result, and reset jobs_to_sort
-                        # By adding to the result at this step, only those with the same
-                        # RUNNING have been added.
-                        dict_jobs[date][member] += jobs_to_sort
-                        jobs_to_sort = []
-                    if len(sorted_jobs_list) > 1:
-                        jobs_to_sort.append(job)
-                        previous_job = job
+                # Replace fake jobs with originals
+                jobs_sorted = [fake_original_map.get(job, job) for job in jobs_sorted]
+                dict_jobs[date][member].extend(jobs_sorted)
 
         return dict_jobs
 

@@ -325,10 +325,10 @@ class JobsDbManager(DbManager):
         self.create_table(SectionsStructureTable.name)
         self.upsert_many(SectionsStructureTable.name, sections_data, ['name'])
 
-    def load_sections_data(self) -> List[Dict[str, Any]]:
+    def load_sections_data(self) -> list[tuple[str, Any]]:
         """Load the section data to the database."""
         self.create_table(SectionsStructureTable.name)
-        section_data = self.select_all(SectionsStructureTable.name)
+        section_data = self.select_all_with_columns(SectionsStructureTable.name)
         return section_data
 
     def clear_unused_nodes(self, differences: Dict[str, Any]) -> None:

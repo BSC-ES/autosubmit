@@ -723,7 +723,7 @@ class JobPackager(object):
         for job in section_list:
             if wrapper_limits["max"] > 0:
                 if not job.packed_during_building:
-                    job_vertical_packager = JobPackagerVerticalMixed(dict_jobs, job, [job], job.wallclock, wrapper_limits["max"], wrapper_limits, self._platform.max_wallclock,wrapper_info=wrapper_info)
+                    job_vertical_packager = JobPackagerVerticalMixed(dict_jobs, job, [job], "00:00", wrapper_limits["max"], wrapper_limits, self._platform.max_wallclock,wrapper_info=wrapper_info)
                     jobs_list = job_vertical_packager.build_vertical_package(job, wrapper_info)
                     packages.append(JobPackageVertical(jobs_list, configuration=self._as_config,wrapper_section=self.current_wrapper_section,wrapper_info=wrapper_info))
             else:

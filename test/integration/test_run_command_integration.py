@@ -24,6 +24,8 @@ from typing import Any
 
 import pytest
 
+from log.log import Log
+
 _EXPID = 't000'
 """The experiment ID used throughout the test."""
 
@@ -31,6 +33,8 @@ _EXPID = 't000'
 # TODO expand the tests to test Slurm, PSPlatform, Ecplatform whenever possible
 
 # --- Fixtures.
+Log.set_console_level("DEBUG")
+
 
 @pytest.fixture
 def as_exp(autosubmit_exp):

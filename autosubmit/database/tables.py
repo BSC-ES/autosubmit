@@ -160,6 +160,7 @@ JobsTable = Table(
     Column("synchronize", Boolean),  # TODO move to Section table ?
     Column("section", String, ForeignKey("sections.name")),  # TODO Foreign key?
     Column("chunk", Integer),
+    Column("member", Text),
     Column("splits", Integer),  # TODO move to Section table?
     Column("split", Integer),
     Column("date", String),

@@ -65,6 +65,7 @@ PERSISTENT_ATTRIBUTES = (
     "synchronize",
     "section",
     "chunk",
+    "member",
     "splits",
     "split",
     "date",

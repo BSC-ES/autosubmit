@@ -181,7 +181,7 @@ def test_db_job_list_jobs(tmp_path: Path, db_engine: str, options: dict, request
         assert isinstance(job, dict)
         # Check that the job has the expected keys
         assert set(job.keys()) == {
-            'chunk', 'current_checkpoint_step', 'date', 'date_split', 'finish_time_timestamp', 'frequency',
+            'chunk', 'member', 'current_checkpoint_step', 'date', 'date_split', 'finish_time_timestamp', 'frequency',
             'id', 'local_logs_err', 'local_logs_out', 'max_checkpoint_step', 'name', 'packed', 'platform_name',
             'priority', 'ready_date', 'remote_logs_err', 'remote_logs_out', 'script_name', 'section',
             'split', 'splits', 'start_time', 'start_time_timestamp', 'status', 'submit_time_timestamp',
@@ -263,7 +263,7 @@ def test_db_job_list_jobs_and_edges_together(
         assert isinstance(job, dict)
         # Check that the job has the expected keys
         assert set(job.keys()) == {
-            'chunk', 'current_checkpoint_step', 'date', 'date_split', 'finish_time_timestamp', 'frequency',
+            'chunk', 'member', 'current_checkpoint_step', 'date', 'date_split', 'finish_time_timestamp', 'frequency',
             'id', 'local_logs_err', 'local_logs_out', 'max_checkpoint_step', 'name', 'packed', 'platform_name',
             'priority', 'ready_date', 'remote_logs_err', 'remote_logs_out', 'script_name', 'section',
             'split', 'splits', 'start_time', 'start_time_timestamp', 'status', 'submit_time_timestamp',
