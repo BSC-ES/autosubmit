@@ -28,8 +28,7 @@ from textwrap import dedent
 from typing import TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
-
-from log.log import AutosubmitError, Log
+from autosubmit.log.log import AutosubmitError, Log
 
 if TYPE_CHECKING:
     from autosubmit.platforms.platform import Platform

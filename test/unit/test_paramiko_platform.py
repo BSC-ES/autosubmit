@@ -23,9 +23,9 @@ import pytest
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
+from autosubmit.log.log import AutosubmitError
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.psplatform import PsPlatform
-from log.log import AutosubmitError
 
 
 @pytest.fixture

@@ -24,7 +24,7 @@ from typing import Callable
 import pytest
 
 import autosubmit.helpers.autosubmit_helper as helper
-from log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 
 
 @pytest.mark.parametrize('time', [

@@ -1,35 +1,34 @@
-#!/usr/bin/python
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-# You should have received a copy of the GNU General Public License
-# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import traceback
 from time import time, sleep
 
 import autosubmit.history.database_managers.database_models as Models
 import autosubmit.history.utils as HUtils
 from autosubmit.config.basicconfig import BasicConfig
-from log.log import Log
-from .data_classes.experiment_run import ExperimentRun
-from .data_classes.job_data import JobData
-from .database_managers.database_manager import DEFAULT_JOBDATA_DIR, DEFAULT_HISTORICAL_LOGS_DIR
-from .database_managers.experiment_history_db_manager import create_experiment_history_db_manager, ExperimentHistoryDatabaseManager
-from .internal_logging import Logging
-from .platform_monitor.slurm_monitor import SlurmMonitor
-from .strategies import PlatformInformationHandler, SingleAssociationStrategy, StraightWrapperAssociationStrategy, \
+from autosubmit.history.data_classes.experiment_run import ExperimentRun
+from autosubmit.history.data_classes.job_data import JobData
+from autosubmit.history.database_managers.database_manager import DEFAULT_JOBDATA_DIR, DEFAULT_HISTORICAL_LOGS_DIR
+from autosubmit.history.database_managers.experiment_history_db_manager import create_experiment_history_db_manager, \
+    ExperimentHistoryDatabaseManager
+from autosubmit.history.internal_logging import Logging
+from autosubmit.history.platform_monitor.slurm_monitor import SlurmMonitor
+from autosubmit.history.strategies import PlatformInformationHandler, SingleAssociationStrategy, \
+    StraightWrapperAssociationStrategy, \
     TwoDimWrapperDistributionStrategy, GeneralizedWrapperDistributionStrategy
+from autosubmit.log.log import Log
 
 SECONDS_WAIT_PLATFORM = 60
 

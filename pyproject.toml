@@ -104,6 +104,8 @@ all = [
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["autosubmit*"]
+namespaces = true
 
 [tool.setuptools]
 package-data = { "autosubmit" = [

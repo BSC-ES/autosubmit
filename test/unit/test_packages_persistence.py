@@ -18,7 +18,7 @@
 import pytest
 
 from autosubmit.job.job_package_persistence import JobPackagePersistence
-from log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 
 
 def test_load(mocker):

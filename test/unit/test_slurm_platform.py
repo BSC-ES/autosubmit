@@ -23,8 +23,8 @@ import pytest
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from log.log import AutosubmitCritical, AutosubmitError
 
 """Unit tests for the Slurm platform."""
 

@@ -1,27 +1,46 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+import datetime
+import getpass
 import locale
+import os
+import random
+import re
+import select
+import socket
+import sys
+import threading
+import time
 from contextlib import suppress
 from pathlib import Path
+from threading import Thread
 from time import sleep
-import sys
-import socket
-import os
 from typing import List, TYPE_CHECKING, Union
+
+import Xlib.support.connect as xlib_connect
 import paramiko
-import datetime
-import select
-import re
-import random
+from paramiko.agent import Agent
+from paramiko.ssh_exception import (SSHException)
+
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_common import Type
+from autosubmit.log.log import AutosubmitError, AutosubmitCritical, Log
 from autosubmit.platforms.platform import Platform
-from log.log import AutosubmitError, AutosubmitCritical, Log
-from paramiko.ssh_exception import (SSHException)
-import Xlib.support.connect as xlib_connect
-from threading import Thread
-import threading
-import getpass
-from paramiko.agent import Agent
-import time
 
 if TYPE_CHECKING:
     # Avoid circular imports

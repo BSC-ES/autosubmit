@@ -1,4 +1,4 @@
-# Copyright 2017-2020 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -16,17 +16,16 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import math
-import os
 from typing import Dict, Optional, TYPE_CHECKING
 
 from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates
 from networkx.classes import DiGraph
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_package_persistence import JobPackagePersistence
+from autosubmit.log.log import Log, AutosubmitCritical
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
-from autosubmit.config.basicconfig import BasicConfig
-from log.log import Log, AutosubmitCritical
 
 if TYPE_CHECKING:
     from autosubmit.job.job_list import JobList

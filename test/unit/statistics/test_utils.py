@@ -24,7 +24,7 @@ from autosubmit.job.job import Job
 from autosubmit.statistics.utils import (
     filter_by_section, filter_by_time_period, timedelta2hours, parse_number_processors
 )
-from log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 
 DEFAULT_NUMBER_PROCESSORS = 1
 

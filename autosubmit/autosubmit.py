@@ -80,7 +80,7 @@ from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.submitter import Submitter
-from log.log import Log, AutosubmitError, AutosubmitCritical
+from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 
 dialog = None
 
@@ -2310,7 +2310,6 @@ class Autosubmit:
                         job_list.update_list(as_conf, submitter=submitter)
                         job_list.save()
                         # Submit jobs that are ready to run
-                        #Log.debug(f"FD submit: {fd_show.fd_table_status_str()}")
                         if len(job_list.get_ready()) > 0:
                             Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence, hold=False)
                             job_list.update_list(as_conf, submitter=submitter)
@@ -2344,13 +2343,9 @@ class Autosubmit:
                             job_list.save()
                             as_conf.save()
                         time.sleep(safetysleeptime)
-                        #Log.debug(f"FD endsubmit: {fd_show.fd_table_status_str()}")
-
-
                     except AutosubmitError as e:  # If an error is detected, restore all connections and job_list
                         Log.error("Trace: {0}", e.trace)
                         Log.error("{1} [eCode={0}]", e.code, e.message)
-                        # Log.debug("FD recovery: {0}".format(log.fd_show.fd_table_status_str()))
                         # No need to wait until the remote platform reconnection
                         recovery = False
                         as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())

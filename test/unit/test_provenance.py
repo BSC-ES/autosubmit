@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 from autosubmit.autosubmit import Autosubmit
-from log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ def test_provenance_rocrate_success(mock_paths, mocker):
     Test the provenance function when rocrate=True and the process is successful.
     """
     mock_rocrate = mocker.patch('autosubmit.autosubmit.Autosubmit.rocrate')
-    mock_log_info = mocker.patch('log.log.Log.info')
+    mock_log_info = mocker.patch('autosubmit.log.log.Log.info')
 
     expid = "expid123"
     exp_folder = os.path.join(str(mock_paths), expid)

@@ -38,7 +38,7 @@ from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
-from log.log import Log, AutosubmitCritical, AutosubmitError
+from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError
 
 
 class AutosubmitConfig(object):

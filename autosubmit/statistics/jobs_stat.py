@@ -20,7 +20,7 @@ from math import ceil
 from typing import Optional
 
 from autosubmit.statistics.utils import timedelta2hours
-from log.log import Log
+from autosubmit.log.log import Log
 
 
 def _estimate_requested_nodes(nodes, processors, tasks, processors_per_node) -> int:

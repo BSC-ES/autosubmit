@@ -15,19 +15,16 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import builtins
 import inspect
 import os
 import pwd
 import re
-import sys
 import tempfile
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from textwrap import dedent
 from time import time
-from typing import Any
 
 import pytest
 from bscearth.utils.date import date2str
@@ -35,18 +32,18 @@ from mock import Mock, MagicMock
 from mock.mock import patch
 
 from autosubmit.autosubmit import Autosubmit
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.configcommon import BasicConfig, YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.job.job_utils import get_job_package_code, SubJob, SubJobManager
+from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.config.configcommon import BasicConfig, YAMLParserFactory
-from log.log import AutosubmitCritical
 
 """Tests for the Autosubmit ``Job`` class."""
 

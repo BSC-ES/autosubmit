@@ -15,8 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/
 
-from collections import OrderedDict
-
 import copy
 import datetime
 import json
@@ -25,13 +23,17 @@ import os
 import re
 import textwrap
 import time
-from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, Log, subs_dates
+from collections import OrderedDict
 from functools import reduce
 from pathlib import Path
 from threading import Thread
 from time import sleep
 from typing import List, Optional, Tuple, TYPE_CHECKING
 
+from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, Log, subs_dates
+
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job import job_utils
@@ -40,11 +42,9 @@ from autosubmit.job.job_common import StatisticsSnippetR, StatisticsSnippetEmpty
 from autosubmit.job.job_common import Status, Type, increase_wallclock_by_chunk
 from autosubmit.job.job_utils import get_job_package_code, get_split_size_unit, get_split_size
 from autosubmit.job.metrics_processor import UserMetricProcessor
+from autosubmit.log.log import Log, AutosubmitCritical
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
-from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
-from log.log import Log, AutosubmitCritical
 
 if TYPE_CHECKING:
     from autosubmit.platforms.platform import Platform

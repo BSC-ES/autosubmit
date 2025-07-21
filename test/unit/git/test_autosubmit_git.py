@@ -20,7 +20,7 @@
 import pytest
 
 from autosubmit.git.autosubmit_git import AutosubmitGit
-from log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 
 _EXPID = 'a000'
 

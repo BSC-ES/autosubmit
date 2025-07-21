@@ -1,36 +1,35 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""
-Module containing functions to manage autosubmit's database.
-"""
+"""Module containing functions to manage autosubmit's database."""
+
+import multiprocessing
 import os
 import sqlite3
-import multiprocessing
-from log.log import Log, AutosubmitCritical
+
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.log.log import Log, AutosubmitCritical
 
 Log.get_logger("Autosubmit")
 
 
 CURRENT_DATABASE_VERSION = 1
 TIMEOUT = 10
+
 
 def create_db(qry):
     """
@@ -596,6 +595,7 @@ def _update_database(version, cursor):
     Log.info("Update completed")
     return True
 
+
 def _get_experiment_id(name: str) -> int:
     """
     Gets the experiment id from the database
@@ -622,6 +622,7 @@ def _get_experiment_id(name: str) -> int:
             'The experiment "{0}" does not exist'.format(name), 7005
         )
     return row[0]
+
 
 class DbException(Exception):
     """

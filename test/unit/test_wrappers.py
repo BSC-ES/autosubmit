@@ -15,33 +15,31 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from collections import OrderedDict
-
 import copy
 import inspect
-import mock
-import pytest
 import shutil
 import tempfile
-from mock import MagicMock
+from collections import OrderedDict
 from pathlib import Path
 from random import randrange
 
-import log.log
+import mock
+import pytest
+from mock import MagicMock
+
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistenceDb
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_packager import JobPackager
 from autosubmit.job.job_packages import JobPackageHorizontal, JobPackageHorizontalVertical, \
     JobPackageVerticalHorizontal, JobPackageSimple
 from autosubmit.job.job_packages import JobPackageVertical
 from autosubmit.job.job_utils import Dependency
+from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from autosubmit.config.yamlparser import YAMLParserFactory
-from log.log import AutosubmitCritical
 
 """Tests for wrappers."""
 
@@ -1988,12 +1986,12 @@ class TestWrappers:
 
             self.job_packager.wrapper_policy["WRAPPER_V"] = "mixed"
             packages_to_submit = []
-            with pytest.raises(log.log.AutosubmitCritical):
+            with pytest.raises(AutosubmitCritical):
                 self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit,
                                                                         max_jobs_to_submit, wrapper_limits)
             self.job_packager.wrapper_policy["WRAPPER_V"] = "strict"
             packages_to_submit = []
-            with pytest.raises(log.log.AutosubmitCritical):
+            with pytest.raises(AutosubmitCritical):
                 self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit,
                                                                         max_jobs_to_submit, wrapper_limits)
 

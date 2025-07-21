@@ -1,8 +1,25 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import logging
 import os
 import sys
-from time import sleep
 from datetime import datetime
+from time import sleep
 from typing import Union
 
 
@@ -15,7 +32,7 @@ class AutosubmitError(Exception):
         trace (str): extra information about the error
     """
 
-    def __init__(self, message="Unhandled Error", code=6000, trace: Union[None, str]=None):
+    def __init__(self, message="Unhandled Error", code=6000, trace: Union[None, str] = None):
         self.code = code
         self.message = message
         self.trace = trace
@@ -40,7 +57,7 @@ class AutosubmitError(Exception):
 class AutosubmitCritical(Exception):
     """Exception raised for Autosubmit critical errors .
     Attributes:
-        errorcode -- Classified code
+        code -- Classified code
         message -- explanation of the error
     """
 
@@ -54,7 +71,6 @@ class AutosubmitCritical(Exception):
 
 
 class LogFormatter:
-
     """
     Class to format log output.
 
@@ -64,7 +80,6 @@ class LogFormatter:
     __module__ = __name__
     yellow = "\x1b[33;20m"
     RESULT = '\x1b[32m'
-    ERROR = '\x1b[31m'
     CRITICAL = '\x1b[1m \x1b[31m'
     DEFAULT = '\x1b[0m\x1b[39m'
     ERROR = '\033[38;5;214m'
@@ -118,9 +133,11 @@ class StatusFilter(logging.Filter):
     def filter(self, rec):
         return rec.levelno == Log.STATUS
 
+
 class StatusFailedFilter(logging.Filter):
     def filter(self, rec):
         return rec.levelno == Log.STATUS_FAILED
+
 
 class Log:
     """
@@ -128,7 +145,7 @@ class Log:
     configured. Levels can be set for each output independently. These levels are (from lower to higher priority):
     """
 
-    date = ('{0:%Y%m%d_%H%M%S}_').format(datetime.now())
+    date = '{0:%Y%m%d_%H%M%S}_'.format(datetime.now())
 
     def __init__(self):
         pass
@@ -155,7 +172,8 @@ class Log:
     console_handler.setLevel(INFO)
     console_handler.setFormatter(LogFormatter(False))
     log.addHandler(console_handler)
-    def init_variables(self,file_path=""):
+
+    def init_variables(self, file_path=""):
         self.file_path = file_path
 
     @staticmethod
@@ -184,6 +202,8 @@ class Log:
 
         :param file_path: file to store the log
         :type file_path: str
+        :param type: file type
+        :param level: log level
         """
         levels = {}
         levels["STATUS_FAILED"] = 500
@@ -196,7 +216,7 @@ class Log:
         levels["CRITICAL"] = 7000
         levels["NO_LOG"] = levels["CRITICAL"] + 1000
 
-        level = levels.get(str(level).upper(),"DEBUG")
+        level = levels.get(str(level).upper(), "DEBUG")
 
         max_retries = 3
         retries = 1
@@ -241,20 +261,22 @@ class Log:
                     status_file_handler.addFilter(custom_filter)
                     Log.log.addHandler(status_file_handler)
                 os.chmod(file_path, 509)
-            except Exception: # retry again
+            except Exception:  # retry again
                 sleep(timeout * retries)
 
     @staticmethod
-    def reset_status_file(file_path,type='status', level=WARNING):
+    def reset_status_file(file_path, type='status', level=WARNING):
         """
         Configure the file to store the log. If another file was specified earlier, new messages will only go to the
         new file.
 
         :param file_path: file to store the log
         :type file_path: str
+        :param type: file type
+        :param level: log level
         """
         try:
-            #test = Log.log.handlers
+            # test = Log.log.handlers
             if type == 'status':
                 while len(Log.log.handlers) > 3:
                     Log.log.handlers.pop()
@@ -273,6 +295,7 @@ class Log:
                 Log.log.addHandler(status_file_handler)
         except Exception:  # retry again
             pass
+
     @staticmethod
     def set_console_level(level):
         """
@@ -298,7 +321,7 @@ class Log:
         if args:
             msg = msg.format(*args)
         return msg
-        
+
     @staticmethod
     def debug(msg, *args):
         """

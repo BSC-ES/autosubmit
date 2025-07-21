@@ -20,7 +20,7 @@ from typing import Optional
 import pytest
 
 from autosubmit.autosubmit import Autosubmit
-from log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 
 
 @pytest.mark.parametrize(

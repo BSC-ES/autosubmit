@@ -26,7 +26,7 @@ import pytest
 from testcontainers.sftp import DockerContainer
 
 from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
-from log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 from test.integration.test_utils.git import (
     create_git_repository, git_commit_all_in_dir, git_clone_repository, git_add_submodule
 )
