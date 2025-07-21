@@ -817,3 +817,20 @@ def test_retrieve_times(job_list, jobs_as_dict, tmp_path, make_exception, second
                                                     job_times=None, seconds=seconds, job_data_collection=None)
             assert retrieve_data.name == job.name
             assert retrieve_data.status == Status.VALUE_TO_KEY[job.status]
+
+
+def test_get_in_queue_grouped_id_same_job_id(job_list, mocker):
+    """Test that in a list of Jobs where they all have the same ID, they
+    are returned grouped correctly.
+
+    TODO: maybe we should understand what triggers that (wrappers, recover a wrapper?).
+    """
+    platform = mocker.MagicMock()
+    platform.name = 'dummy_platform'
+    platform.serial_platform = platform
+
+    for job in job_list._job_list:
+        job.platform = platform
+
+    jobs_by_id = job_list.get_in_queue_grouped_id(platform)
+    assert all([isinstance(job, list) for job in jobs_by_id.values()])
