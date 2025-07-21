@@ -2262,10 +2262,9 @@ class JobList(object):
                     jobs.append(job)
         return jobs
 
-    def get_in_queue_grouped_id(self, platform):
-        # type: (object) -> Dict[int, List[Job]]
-        jobs = self.get_in_queue(platform)
-        jobs_by_id = dict()
+    def get_in_queue_grouped_id(self, platform) -> dict[str, list[Job]]:
+        jobs: list[Job] = self.get_in_queue(platform)
+        jobs_by_id: dict[str, list[Job]] = dict()
         for job in jobs:
             if job.id not in jobs_by_id:
                 jobs_by_id[job.id] = list()
