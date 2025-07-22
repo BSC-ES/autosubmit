@@ -39,6 +39,7 @@ from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
 
+from autosubmit.performance.factory_performance import PerformanceFactory
 
 def _init_logs_log_process(as_conf, platform_name):
     Log.set_console_level(as_conf.experiment_data.get("LOG_RECOVERY_CONSOLE_LEVEL", "DEBUG"))
@@ -228,6 +229,7 @@ class Platform(object):
             log_queue_size = int(platform_total_jobs) * 2
         self.log_queue_size = log_queue_size
         self.remote_log_dir = None
+        self._performance_factory = PerformanceFactory()
 
     @classmethod
     def update_workers(cls, event_worker):
@@ -1076,6 +1078,19 @@ class Platform(object):
                 process_log = True
                 break
         return process_log
+    
+    def _compute_performance_metrics(self, job: 'Job', as_conf: 'AutosubmitConfig') -> None:
+        """
+        Computes performance metrics for the job.
+
+        :param job: The job object for which to compute performance metrics.
+        :type job: Job
+        :param as_conf: The Autosubmit configuration object containing experiment data.
+        :type as_conf: AutosubmitConfig
+        """
+
+        manager_performance = self._performance_factory.create_performance(job, as_conf)
+        manager_performance.compute_and_check_performance_metrics(job)
 
     def recover_job_log(self, identifier: str, jobs_pending_to_process: Set[Any], as_conf: 'AutosubmitConfig') -> Set[Any]:
         """
@@ -1099,6 +1114,7 @@ class Platform(object):
                 job.platform_name = self.name  # Change the original platform to this process platform.
                 job.platform = self
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
+                self._compute_performance_metrics(job, as_conf)
                 try:
                     job.retrieve_logfiles(raise_error=True)
                 except Exception:
