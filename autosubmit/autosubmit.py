@@ -1866,9 +1866,9 @@ class Autosubmit:
     def check_wrappers(
         as_conf: AutosubmitConfig,
         job_list: JobList,
-        platforms_to_test: Set[Platform],
+        platforms_to_test: set[Platform],
         expid: str,
-    ) -> Tuple[Dict[str, List[List[Job]]], Dict[str, Tuple[Status, Status]]]:
+    ) -> tuple[dict[str, list[list[Job]]], dict[str, tuple[Status, Status]]]:
         """
         Check wrappers and inner jobs status also order the non-wrapped jobs to be submitted by active platforms
         :param as_conf: a AutosubmitConfig object
@@ -1877,8 +1877,8 @@ class Autosubmit:
         :param expid: a string with the experiment id
         :return: non-wrapped jobs to check and a dictionary with the changes in the jobs status
         """
-        jobs_to_check: Dict[str, List[List[Job]]] = dict()
-        job_changes_tracker: Dict[str, Tuple[Status, Status]] = dict()
+        jobs_to_check: dict[str, list[list[Job]]] = dict()
+        job_changes_tracker: dict[str, tuple[Status, Status]] = dict()
         for platform in platforms_to_test:
             queuing_jobs = job_list.get_in_queue_grouped_id(platform)
             Log.debug(f'Checking jobs for platform={platform.name}')
