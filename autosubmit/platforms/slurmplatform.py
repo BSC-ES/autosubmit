@@ -215,6 +215,10 @@ class SlurmPlatform(ParamikoPlatform):
                             can_continue = True
                             while can_continue and retries > 0:
                                 cmd = package.jobs[0].platform.get_queue_status_cmd(current_package_id)
+                                from autosubmit.autosubmit import Autosubmit
+                                if Autosubmit.loop_counter > 0:
+                                    Log.info('FAILING!!!')
+                                    raise AutosubmitError()
                                 package.jobs[0].platform.send_command(cmd)
                                 queue_status = package.jobs[0].platform._ssh_output
                                 reason = package.jobs[0].platform.parse_queue_reason(queue_status, current_package_id)
@@ -266,7 +270,7 @@ class SlurmPlatform(ParamikoPlatform):
             raise
         except Exception as e:
             raise AutosubmitError(f"{self.name} submission failed", 6015, str(e)) from e
-        return save,valid_packages_to_submit
+        return save, valid_packages_to_submit
 
     def generate_submit_script(self) -> None:
         """

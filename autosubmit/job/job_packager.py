@@ -43,8 +43,10 @@ class JobPackager(object):
     :type jobs_list: JobList object.
     """
 
-
     def __init__(self, as_config, platform, jobs_list, hold=False):
+        self.waiting_jobs = None
+        self.queuing_jobs_len = None
+        self.running_jobs_len = None
         self.current_wrapper_section = "WRAPPERS"
         self._as_config = as_config
         self._platform = platform
@@ -64,11 +66,10 @@ class JobPackager(object):
         self.special_variables = dict()
         self.wrappers_with_error = {}
 
-
-        #todo add default values
-        #Wrapper building starts here
-        for wrapper_section,wrapper_data in self._as_config.experiment_data.get("WRAPPERS",{}).items():
-            if isinstance(wrapper_data,collections.abc.Mapping ):
+        # TODO: add default values
+        # Wrapper building starts here
+        for wrapper_section, wrapper_data in self._as_config.experiment_data.get("WRAPPERS", {}).items():
+            if isinstance(wrapper_data,collections.abc.Mapping):
                 self.wrapper_type[wrapper_section] = self._as_config.get_wrapper_type(wrapper_data)
                 self.wrapper_policy[wrapper_section] = self._as_config.get_wrapper_policy(wrapper_data)
                 if self._as_config.get_wrapper_method(wrapper_data) is None:
@@ -475,7 +476,7 @@ class JobPackager(object):
         if len(jobs_ready) == 0:
             # If there are no jobs ready, result is tuple of empty
             return jobs_ready,False
-        #check if there are jobs listed on calculate_job_limits
+        # check if there are jobs listed on calculate_job_limits
         self.calculate_job_limits(self._platform)
         if not (self._max_wait_jobs_to_submit > 0 and self._max_jobs_to_submit > 0):
             # If there is no more space in platform, result is tuple of empty
@@ -522,16 +523,14 @@ class JobPackager(object):
         self._max_jobs_to_submit = self._max_jobs_to_submit if self._max_jobs_to_submit > 0 else 0
         self.max_jobs = min(self._max_wait_jobs_to_submit,self._max_jobs_to_submit)
 
-    def build_packages(self):
-        # type: () -> List[JobPackageBase]
-        """
-        Returns the list of the built packages to be submitted
+    def build_packages(self) -> list[JobPackageBase]:
+        """Returns the list of the built packages to be submitted.
 
         :return: List of packages depending on type of package, JobPackageVertical Object for 'vertical'.
         :rtype: List() of JobPackageVertical
         """
-        packages_to_submit = list()
-        jobs_ready,ready = self.check_if_packages_are_ready_to_build()
+        packages_to_submit: list[JobPackageBase] = list()
+        jobs_ready, ready = self.check_if_packages_are_ready_to_build()
         if not ready:
             return []
         max_jobs_to_submit = min(self._max_wait_jobs_to_submit, self._max_jobs_to_submit)
@@ -628,7 +627,6 @@ class JobPackager(object):
             max_jobs_to_submit = max_jobs_to_submit - 1
             if job.section in section_jobs_to_submit:
                 section_jobs_to_submit[job.section] = section_jobs_to_submit[job.section] - 1
-
 
         for package in packages_to_submit:
             self.max_jobs = self.max_jobs - 1

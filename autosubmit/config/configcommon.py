@@ -2625,6 +2625,8 @@ class AutosubmitConfig(object):
         """
         # Disabled, forced to "false" not working anymore in newer slurm versions.
         # return str(self.get_section(['CONFIG', 'PRESUBMISSION'], "false")).lower()
+        # FIXME: deprecate and/or remove PRESUBMISSION as it's not working on Slurm now?
+        #        https://github.com/BSC-ES/autosubmit/issues/2548
         return "false"
 
     def get_wrapper_type(self, wrapper=None) -> Optional[str]:

@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import collections.abc
 import copy
 import datetime
 import math
@@ -25,7 +26,8 @@ from contextlib import suppress
 from pathlib import Path
 from shutil import move
 from time import strftime, localtime, mktime
-from typing import List, Dict, Tuple, Any, Optional, Union
+from itertools import chain
+from typing import Any, Optional, Union, TYPE_CHECKING
 
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
@@ -33,25 +35,28 @@ from networkx import DiGraph
 import autosubmit.database.db_structure as DbStructure
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
+from autosubmit.job.job_list_persistence import get_job_list_persistence
 from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packages import JobPackageThread
-from autosubmit.job.job_utils import Dependency, _get_submitter
-from autosubmit.job.job_utils import transitive_reduction
+from autosubmit.job.job_utils import Dependency, _get_submitter, transitive_reduction
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+
+if TYPE_CHECKING:
+    from autosubmit.job.job_list_persistence import JobListPersistence
+    from autosubmit.platforms.platform import Platform
 
 
 class JobList(object):
-    """
-    Class to manage the list of jobs to be run by autosubmit
+    """Class to manage the list of jobs to be run by autosubmit."""
 
-    """
-
-    def __init__(self, expid, config, parser_factory, job_list_persistence):
-        self._persistence_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")
+    def __init__(self, expid, config, parser_factory, job_list_persistence: 'JobListPersistence'):
+        self.dependency_map = None
+        self._persistence_path: str = str(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl"))
         self._update_file = "updated_list_" + expid + ".txt"
         self._failed_file = "failed_job_list_" + expid + ".pkl"
         self._persistence_file = "job_list_" + expid
@@ -66,7 +71,7 @@ class JobList(object):
         self._date_list = []
         self._member_list = []
         self._chunk_list = []
-        self._dic_jobs = dict()
+        self._dic_jobs: Optional[DicJobs] = None
         self._persistence = job_list_persistence
         self.packages_dict = dict()
         self._ordered_jobs_by_date_member = dict()
@@ -84,12 +89,10 @@ class JobList(object):
                                  self.expid, BasicConfig.LOCAL_TMP_DIR, f'LOG_{self.expid}')
 
     @property
-    def expid(self):
-        """
-        Returns the experiment identifier
+    def expid(self) -> str:
+        """Returns the experiment identifier.
 
         :return: experiment's identifier
-        :rtype: str
         """
         return self._expid
 
@@ -98,7 +101,7 @@ class JobList(object):
         return self._run_members
 
     @run_members.setter
-    def run_members(self, value):
+    def run_members(self, value) -> None:
         if value is not None and len(str(value)) > 0:
             self._run_members = value
             self._base_job_list = [job for job in self._job_list]
@@ -147,7 +150,7 @@ class JobList(object):
 
     def generate(self, as_conf, date_list, member_list, num_chunks, chunk_ini, parameters,
                  date_format, default_retrials, default_job_type, wrapper_jobs=dict(), new=True,
-                 run_only_members=[], show_log=True, monitor=False, force=False, create=False):
+                 run_only_members=[], show_log=True, force=False, create=False):
         """
         Creates all jobs needed for the current workflow.
         :param create:
@@ -180,8 +183,6 @@ class JobList(object):
         :type run_only_members: list
         :param show_log: show log
         :type show_log: bool
-        :param monitor: monitor
-        :type monitor: bool
         """
         if create and self.check_split_set_to_auto(as_conf):
             force = True
@@ -282,8 +283,8 @@ class JobList(object):
                 else:
                     self._ordered_jobs_by_date_member[wrapper_section] = {}
             except BaseException as e:
-                raise AutosubmitCritical(f"Some section jobs of the wrapper:{wrapper_section} are missing from your "
-                    "JOBS definition in YAML", 7014, str(e))
+                raise AutosubmitCritical(f"Some section jobs of the wrapper:{wrapper_section} are "
+                                         f"missing from your JOBS definition in YAML", 7014, str(e))
         # divide job_list per platform name
         job_list_per_platform = self.split_by_platform()
         submitter = _get_submitter(as_conf)
@@ -328,11 +329,8 @@ class JobList(object):
             for job in jobs_gen:
                 self._apply_jobs_edge_info(job, dependencies)
 
-    def _deep_map_dependencies(self, section, jobs_data, option, dependency_list=set(),
-                               strip_keys=True):
-        """
-        Recursive function to map dependencies of dependencies
-        """
+    def _deep_map_dependencies(self, section, jobs_data, option, dependency_list=set(), strip_keys=True):
+        """Recursive function to map dependencies of dependencies."""
         if section in dependency_list:
             return dependency_list
         dependency_list.add(section)
@@ -353,8 +351,7 @@ class JobList(object):
             dependency_list.add(dependency)
         return dependency_list
 
-    def _add_dependencies(self, date_list, member_list, chunk_list, dic_jobs,
-                          option="DEPENDENCIES"):
+    def _add_dependencies(self, date_list, member_list, chunk_list, dic_jobs, option="DEPENDENCIES"):
         jobs_data = dic_jobs.experiment_data.get("JOBS", {})
         problematic_jobs = {}
         # map dependencies
@@ -473,8 +470,7 @@ class JobList(object):
         return dependencies
 
     @staticmethod
-    def _parse_filters_to_check(list_of_values_to_check, value_list=[],
-                                level_to_check="DATES_FROM"):
+    def _parse_filters_to_check(list_of_values_to_check, value_list=[], level_to_check="DATES_FROM"):
         final_values = []
         list_of_values_to_check = str(list_of_values_to_check).upper()
         if list_of_values_to_check is None:
@@ -495,8 +491,7 @@ class JobList(object):
         return final_values
 
     @staticmethod
-    def _parse_filter_to_check(value_to_check, value_list=[], level_to_check="DATES_FROM",
-                               splits=None) -> list:
+    def _parse_filter_to_check(value_to_check, value_list=[], level_to_check="DATES_FROM", splits=None) -> list:
         """
         Parse the filter to check and return the value to check.
         Selection process:
@@ -652,7 +647,7 @@ class JobList(object):
             filters = [{}]
         return filters
 
-    def _check_dates(self, relationships: Dict, current_job: Job) -> {}:
+    def _check_dates(self, relationships: dict, current_job: Job) -> {}:
         """
         Check if the current_job_value is included in the filter_from and retrieve filter_to value
         :param relationships: Remaining filters to apply.
@@ -688,7 +683,7 @@ class JobList(object):
         # {DATES_TO: "20020201", MEMBERS_TO: "fc2", CHUNKS_TO: "ALL", SPLITS_TO: "2"}
         return filters_to_apply
 
-    def _check_members(self, relationships: Dict, current_job: Job) -> Dict:
+    def _check_members(self, relationships: dict, current_job: Job) -> dict:
         """
         Check if the current_job_value is included in the filter_from and retrieve filter_to value
         :param relationships: Remaining filters to apply.
@@ -711,7 +706,7 @@ class JobList(object):
         filters_to_apply = self._unify_to_filters(filters_to_apply)
         return filters_to_apply
 
-    def _check_chunks(self, relationships: Dict, current_job: Job) -> {}:
+    def _check_chunks(self, relationships: dict, current_job: Job) -> {}:
         """
         Check if the current_job_value is included in the filter_from and retrieve filter_to value
         :param relationships: Remaining filters to apply.
@@ -730,21 +725,20 @@ class JobList(object):
         filters_to_apply = self._unify_to_filters(filters_to_apply)
         return filters_to_apply
 
-    def _check_splits(self, relationships, current_job):
-        """
-        Check if the current_job_value is included in the filter_from and retrieve filter_to value
+    def _check_splits(self, relationships, current_job) -> dict:
+        """Check if the current_job_value is included in the filter_from and retrieve filter_to value.
+
         :param relationships: Remaining filters to apply.
         :param current_job: Current job to check.
         :return: filters_to_apply
         """
-
         filters_to_apply = self._check_relationship(relationships, "SPLITS_FROM",
                                                     current_job.split)
         # No more FROM sections to check, unify _to FILTERS and return
         filters_to_apply = self._unify_to_filters(filters_to_apply, current_job.splits)
         return filters_to_apply
 
-    def _unify_to_filter(self, unified_filter, filter_to, filter_type, splits=None) -> {}:
+    def _unify_to_filter(self, unified_filter, filter_to, filter_type, splits=None) -> dict:
         """
         Unify filter_to filters into a single dictionary
         :param unified_filter: Single dictionary with all filters_to
@@ -852,13 +846,13 @@ class JobList(object):
 
         return unified_filter
 
-    def _filter_current_job(self, current_job, relationships):
-        '''
-        This function will filter the current job based on the relationships given
+    def _filter_current_job(self, current_job, relationships) -> dict:
+        """This function will filter the current job based on the relationships given.
+
         :param current_job: Current job to filter
         :param relationships: Relationships to apply
-        :return: dict() with the filters to apply, or empty dict() if no filters to apply
-        '''
+        :return: A dictionary with the filters to apply, or empty dict() if no filters to apply.
+        """
 
         # This function will look if the given relationship is set for the given job DATEs,MEMBER,
         # CHUNK,SPLIT ( _from filters )
@@ -971,7 +965,9 @@ class JobList(object):
                 self.add_special_conditions(job, special_conditions,
                                             filters_to_apply_by_section[key], parent)
 
-    def find_current_section(self, job_section, section, dic_jobs, distance, visited_section=[]):
+    def find_current_section(self, job_section, section, dic_jobs, distance, visited_section=None):
+        if visited_section is None:
+            visited_section = []
         sections = dic_jobs.as_conf.jobs_data[section].get("DEPENDENCIES", {}).keys()
         if len(sections) == 0:
             return distance
@@ -1432,7 +1428,6 @@ class JobList(object):
 
         return problematic_dependencies
 
-
     @staticmethod
     def _calculate_dependency_metadata(chunk, chunk_list, member, member_list, date,
                                        date_list, dependency):
@@ -1776,90 +1771,84 @@ class JobList(object):
         if len(self._ordered_jobs_by_date_member) > 0:
             return self._ordered_jobs_by_date_member[section]
 
-    def get_completed(self, platform=None, wrapper=False):
-        """
-        Returns a list of completed jobs
+    def get_completed(self, platform=None, wrapper=False) -> list[Job]:
+        """Returns a list of completed jobs.
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: completed jobs
-        :rtype: list
         """
 
-        completed_jobs = [job for job in self._job_list if (platform is None or
-                                                            job.platform.name == platform.name) and job.status == Status.COMPLETED]
+        completed_jobs = [
+            job
+            for job in self._job_list
+            if (platform is None or job.platform.name == platform.name) and job.status == Status.COMPLETED
+        ]
         if wrapper:
             return [job for job in completed_jobs if job.packed is False]
         return completed_jobs
 
-    def get_completed_failed_without_logs(self, platform: Any = None) -> List[Any]:
-        """
-        Returns a list of completed or failed jobs without updated logs.
+    def get_completed_failed_without_logs(self, platform: Optional['Platform'] = None) -> list[Job]:
+        """Returns a list of completed or failed jobs without updated logs.
 
         :param platform: Job platform, defaults to None.
-        :type platform: Platform
         :return: List of completed and failed jobs without updated logs.
-        :rtype: List[Job]
         """
-
-        completed_failed_jobs = [job for job in self._job_list if
-                                 (platform is None or job.platform.name == platform.name) and
-                                 (job.status == Status.COMPLETED or job.status == Status.FAILED) and
-                                 job.updated_log is False]
-
+        completed_failed_jobs = [
+            job
+            for job in self._job_list
+            if (platform is None or job.platform.name == platform.name) and
+               (job.status == Status.COMPLETED or job.status == Status.FAILED) and job.updated_log is False
+        ]
         return completed_failed_jobs
 
-    def get_uncompleted(self, platform=None, wrapper=False):
+    def get_uncompleted(self, platform: Optional['Platform'] = None, wrapper=False) -> list[Job]:
         """
         Returns a list of completed jobs
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: completed jobs
-        :rtype: list
         """
-        uncompleted_jobs = [job for job in self._job_list if
-                            (platform is None or job.platform.name == platform.name) and
-                            job.status != Status.COMPLETED]
-
+        uncompleted_jobs = [
+            job
+            for job in self._job_list
+            if (platform is None or job.platform.name == platform.name) and job.status != Status.COMPLETED
+        ]
         if wrapper:
             return [job for job in uncompleted_jobs if job.packed is False]
         return uncompleted_jobs
 
-    def get_submitted(self, platform=None, hold=False, wrapper=False):
-        """
-        Returns a list of submitted jobs
+    def get_submitted(self, platform: Optional['Platform'] = None, hold=False, wrapper=False) -> list[Job]:
+        """Returns a list of submitted jobs.
 
         :param wrapper:
         :param hold:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: submitted jobs
-        :rtype: list
         """
-        submitted = list()
         if hold:
-            submitted = [job for job in self._job_list if (platform is None or
-                                                           job.platform.name == platform.name) and job.status == Status.SUBMITTED
-                         and job.hold == hold]
+            submitted = [
+                job
+                for job in self._job_list
+                if (platform is None or job.platform.name == platform.name) and job.status == Status.SUBMITTED and job.hold == hold
+            ]
         else:
-            submitted = [job for job in self._job_list if (platform is None or
-                                                           job.platform.name == platform.name) and job.status == Status.SUBMITTED]
+            submitted = [
+                job
+                for job in self._job_list
+                if (platform is None or job.platform.name == platform.name) and job.status == Status.SUBMITTED
+            ]
         if wrapper:
             return [job for job in submitted if job.packed is False]
         return submitted
 
-    def get_running(self, platform=None, wrapper=False):
-        """
-        Returns a list of jobs running
+    def get_running(self, platform: Optional['Platform'] = None, wrapper=False) -> list[Job]:
+        """Returns a list of jobs running.
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: running jobs
-        :rtype: list
         """
         running = [job for job in self._job_list if (platform is None or
                                                      job.platform.name == platform.name) and job.status == Status.RUNNING]
@@ -1867,15 +1856,12 @@ class JobList(object):
             return [job for job in running if job.packed is False]
         return running
 
-    def get_queuing(self, platform=None, wrapper=False):
-        """
-        Returns a list of jobs queuing
+    def get_queuing(self, platform: Optional['Platform'] = None, wrapper=False) -> list[Job]:
+        """Returns a list of jobs queuing.
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
-        :return: queuedjobs
-        :rtype: list
+        :return: queued jobs
         """
         queuing = [job for job in self._job_list if (platform is None or
                                                      job.platform.name == platform.name) and job.status == Status.QUEUING]
@@ -1883,51 +1869,45 @@ class JobList(object):
             return [job for job in queuing if job.packed is False]
         return queuing
 
-    def get_failed(self, platform=None, wrapper=False):
-        """
-        Returns a list of failed jobs
+    def get_failed(self, platform: Optional['Platform'] = None, wrapper=False) -> list[Job]:
+        """Returns a list of failed jobs.
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: failed jobs
-        :rtype: list
         """
-        failed = [job for job in self._job_list if (platform is None or
-                                                    job.platform.name == platform.name) and job.status == Status.FAILED]
+        failed = [
+            job
+            for job in self._job_list
+            if (platform is None or job.platform.name == platform.name) and job.status == Status.FAILED
+        ]
         if wrapper:
             return [job for job in failed if job.packed is False]
         return failed
 
-    def get_unsubmitted(self, platform=None, wrapper=False):
-        """
-        Returns a list of unsubmitted jobs
+    def get_unsubmitted(self, platform: Optional['Platform'] = None, wrapper=False) -> list[Job]:
+        """Returns a list of unsubmitted jobs.
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: all jobs
-        :rtype: list
         """
-        unsubmitted = [job for job in self._job_list if (platform is None or
-                                                         job.platform.name == platform.name) and (
-                                   job.status != Status.SUBMITTED and
-                                   job.status != Status.QUEUING and job.status != Status.RUNNING)]
-
+        unsubmitted = [
+            job
+            for job in self._job_list
+            if (platform is None or job.platform.name == platform.name) and (job.status != Status.SUBMITTED and job.status != Status.QUEUING and job.status != Status.RUNNING)
+        ]
         if wrapper:
             return [job for job in unsubmitted if job.packed is False]
         else:
             return unsubmitted
 
-    def get_all(self, platform=None, wrapper=False):
-        """
-        Returns a list of all jobs
+    def get_all(self, platform: Optional['Platform'] = None, wrapper=False) -> list[Job]:
+        """Returns a list of all jobs.
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: all jobs
-        :rtype: list
         """
         all_jobs = [job for job in self._job_list]
 
@@ -1954,10 +1934,7 @@ class JobList(object):
                                          7014)
 
     def parse_jobs_by_filter(self, unparsed_jobs, two_step_start=True):
-        jobs_to_run_first = list()
         select_jobs_by_name = ""  # job_name
-        select_all_jobs_by_section = ""  # all
-        filter_jobs_by_section = ""  # Select, chunk / member
         if "&" in unparsed_jobs:  # If there are explicit jobs add them
             jobs_to_check = unparsed_jobs.split("&")
             select_jobs_by_name = jobs_to_check[0]
@@ -2073,63 +2050,61 @@ class JobList(object):
         Log.debug(f"List of jobs filtered by TWO_STEP_START parameter:\n{[job.name for job in ultimate_jobs_list]}")
         return ultimate_jobs_list
 
-    def get_ready(self, platform=None, hold=False, wrapper=False):
-        """
-        Returns a list of ready jobs
+    def get_ready(self, platform: Optional['Platform'] = None, hold=False, wrapper=False) -> list[Job]:
+        """Returns a list of ready jobs.
 
         :param wrapper:
         :param hold:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: ready jobs
-        :rtype: list
         """
-        ready = [job for job in self._job_list if
-                 (platform is None or platform == "" or job.platform.name == platform.name) and
-                 job.status == Status.READY and job.hold is hold]
-
+        ready = [
+            job
+            for job in self._job_list
+            if (platform is None or platform == "" or job.platform.name == platform.name) and job.status == Status.READY and job.hold is hold
+        ]
         if wrapper:
             return [job for job in ready if job.packed is False]
         return ready
 
-    def get_prepared(self, platform=None):
-        """
-        Returns a list of prepared jobs
+    def get_prepared(self, platform: Optional['Platform'] = None) -> list[Job]:
+        """Returns a list of prepared jobs.
 
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: prepared jobs
-        :rtype: list
         """
-        prepared = [job for job in self._job_list if (platform is None or
-                                                      job.platform.name == platform.name) and job.status == Status.PREPARED]
+        prepared = [
+            job
+            for job in self._job_list
+            if (platform is None or job.platform.name == platform.name) and job.status == Status.PREPARED
+        ]
         return prepared
 
-    def get_delayed(self, platform=None):
-        """
-        Returns a list of delayed jobs
+    def get_delayed(self, platform: Optional['Platform'] = None) -> list[Job]:
+        """Returns a list of delayed jobs.
 
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: delayed jobs
-        :rtype: list
         """
-        delayed = [job for job in self._job_list if (platform is None or
-                                                     job.platform.name == platform.name) and job.status == Status.DELAYED]
+        delayed = [
+            job
+            for job in self._job_list
+            if (platform is None or job.platform.name == platform.name) and job.status == Status.DELAYED
+        ]
         return delayed
 
-    def get_waiting(self, platform=None, wrapper=False):
-        """
-        Returns a list of jobs waiting
+    def get_waiting(self, platform: Optional['Platform'] = None, wrapper=False) -> list[Job]:
+        """Returns a list of jobs waiting.
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: waiting jobs
-        :rtype: list
         """
-        waiting_jobs = [job for job in self._job_list if (platform is None or
-                                                          job.platform.name == platform.name) and job.status == Status.WAITING]
+        waiting_jobs = [
+            job
+            for job in self._job_list
+            if (platform is None or job.platform.name == platform.name) and job.status == Status.WAITING
+        ]
         if wrapper:
             return [job for job in waiting_jobs if job.packed is False]
         return waiting_jobs
@@ -2147,67 +2122,61 @@ class JobList(object):
                 job.platform.type == platform_type and job.status == Status.WAITING)]
         return waiting_jobs
 
-    def get_held_jobs(self, platform=None):
-        """
-        Returns a list of jobs in the platforms (Held)
+    def get_held_jobs(self, platform: Optional['Platform'] = None) -> list[Job]:
+        """Returns a list of jobs in the platforms (Held).
 
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: jobs in platforms
-        :rtype: list
         """
-        return [job for job in self._job_list if (platform is None or
-                                                  job.platform.name == platform.name) and job.status == Status.HELD]
+        return [
+            job
+            for job in self._job_list
+            if (platform is None or job.platform.name == platform.name) and job.status == Status.HELD
+        ]
 
-    def get_unknown(self, platform=None, wrapper=False):
-        """
-        Returns a list of jobs on unknown state
+    def get_unknown(self, platform: Optional['Platform'] = None, wrapper=False) -> list[Job]:
+        """Returns a list of jobs on unknown state.
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: unknown state jobs
-        :rtype: list
         """
-        submitted = [job for job in self._job_list if (platform is None or
-                                                       job.platform.name == platform.name) and job.status == Status.UNKNOWN]
+        submitted = [
+            job
+            for job in self._job_list
+            if (platform is None or job.platform.name == platform.name) and job.status == Status.UNKNOWN
+        ]
         if wrapper:
             return [job for job in submitted if job.packed is False]
         return submitted
 
-    def get_in_queue(self, platform=None, wrapper=False):
-        """
-        Returns a list of jobs in the platforms (Submitted, Running, Queuing, Unknown,Held)
+    def get_in_queue(self, platform: Optional['Platform'] = None, wrapper=False) -> list[Job]:
+        """Returns a list of jobs in the platforms (Submitted, Running, Queuing, Unknown,Held).
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: jobs in platforms
-        :rtype: list
         """
-
-        in_queue = self.get_submitted(platform) + self.get_running(platform) + self.get_queuing(
-            platform) + self.get_unknown(platform) + self.get_held_jobs(platform)
+        in_queue = list(chain(self.get_submitted(platform), self.get_running(platform),
+                              self.get_queuing(platform), self.get_unknown(platform), self.get_held_jobs(platform)))
         if wrapper:
             return [job for job in in_queue if job.packed is False]
         return in_queue
 
-    def get_active(self, platform=None, wrapper=False):
-        """
-        Returns a list of active jobs (In platforms queue + Ready)
+    def get_active(self, platform: Optional['Platform'] = None, wrapper=False) -> list[Job]:
+        """Returns a list of active jobs (In platforms queue + Ready).
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: active jobs
-        :rtype: list
         """
-
-        active = (self.get_in_queue(platform) + self.get_ready(
-            platform=platform, hold=True) + self.get_ready(platform=platform, hold=False) +
-                  self.get_delayed(platform=platform))
-        tmp = [job for job in active if job.hold and not (job.status ==
-                                                          Status.SUBMITTED or job.status == Status.READY or job.status == Status.DELAYED)]
+        active = list(chain(self.get_in_queue(platform), self.get_ready(platform=platform, hold=True),
+                            self.get_ready(platform=platform, hold=False), self.get_delayed(platform=platform)))
+        tmp = [
+            job
+            for job in active
+            if job.hold and not (job.status == Status.SUBMITTED or job.status == Status.READY or job.status == Status.DELAYED)
+        ]
         if len(tmp) == len(active):  # IF only held jobs left without dependencies satisfied
             if len(tmp) != 0 and len(active) != 0:
                 raise AutosubmitCritical(
@@ -2262,7 +2231,7 @@ class JobList(object):
                     jobs.append(job)
         return jobs
 
-    def get_in_queue_grouped_id(self, platform) -> dict[str, list[Job]]:
+    def get_in_queue_grouped_id(self, platform: Optional['Platform']) -> dict[str, list[Job]]:
         jobs: list[Job] = self.get_in_queue(platform)
         jobs_by_id: dict[str, list[Job]] = dict()
         for job in jobs:
@@ -2349,11 +2318,8 @@ class JobList(object):
                 else:
                     Log.warning(f'Joblist will be created from scratch due: {e}')
 
-    def save(self):
-        """
-        Persists the job list
-        """
-
+    def save(self) -> None:
+        """Persists the job list."""
         try:
             job_list = None
             if self.run_members is not None and len(str(self.run_members)) > 0:
@@ -2362,25 +2328,26 @@ class JobList(object):
                 for job in self._base_job_list:
                     if job.name not in job_names:
                         job_list.append(job)
+
             self.update_status_log()
 
             try:
-                self._persistence.save(self._persistence_path, self._persistence_file,
-                                       self._job_list if self.run_members is None or
-                                                         job_list is None else job_list, self.graph)
-            except BaseException as e:
+                list_of_jobs = job_list
+                if self.run_members is None or job_list is None:
+                    list_of_jobs = self._job_list
+                self._persistence.save(self._persistence_path, self._persistence_file, list_of_jobs)
+            except Exception as e:
                 raise AutosubmitError(str(e), 6040, "Failure while saving the job_list")
         except AutosubmitError as e:
             raise
-        except BaseException as e:
+        except Exception as e:
             raise AutosubmitError(str(e), 6040, "Unknown failure while saving the job_list")
 
     def backup_save(self):
         """
         Persists the job list
         """
-        self._persistence.save(self._persistence_path,
-                               self._persistence_file + "_backup", self._job_list)
+        self._persistence.save(self._persistence_path, self._persistence_file + "_backup", self._job_list)
 
     def update_status_log(self):
 
@@ -2475,7 +2442,7 @@ class JobList(object):
         """ Check if a checkpoint step exists for this edge"""
         return job.get_checkpoint_files(parent.name)
 
-    def check_special_status(self) -> List[Job]:
+    def check_special_status(self) -> list[Job]:
         """
         Check if all parents of a job have the correct status for checkpointing.
 
@@ -2511,7 +2478,7 @@ class JobList(object):
             job.get_checkpoint_files()
 
     @staticmethod
-    def _count_parents_status(job: Job, target_status: str) -> Tuple[List[Job], List[Job]]:
+    def _count_parents_status(job: Job, target_status: str) -> tuple[list[Job], list[Job]]:
         """
         Count the number of completed and non-completed parents.
 
@@ -2566,7 +2533,7 @@ class JobList(object):
             job.platform.add_job_to_log_recover(job)
         return log_recovered
 
-    def check_if_log_is_recovered(self, job: Job) -> Path:
+    def check_if_log_is_recovered(self, job: Job) -> Optional[Path]:
         """
         Check if the log is recovered.
 
@@ -2591,14 +2558,12 @@ class JobList(object):
         return None
 
     def update_list(self, as_conf: AutosubmitConfig, store_change: bool = True,
-                    fromSetStatus: bool = False, submitter: object = None,
-                    first_time: bool = False) -> bool:
+                    fromSetStatus: bool = False, first_time: bool = False) -> bool:
         """
         Updates job list, resetting failed jobs and changing to READY
         all WAITING jobs with all parents COMPLETED
 
         :param first_time:
-        :param submitter:
         :param fromSetStatus:
         :param store_change:
         :param as_conf: autosubmit config object
@@ -2664,9 +2629,11 @@ class JobList(object):
                     job.status = Status.FAILED
                     save = True
         else:
-            for job in [job for job in self._job_list if job.status in
-                                                         [Status.WAITING, Status.READY, Status.DELAYED,
-                                                          Status.PREPARED]]:
+            for job in [
+                job
+                for job in self._job_list
+                if job.status in [Status.WAITING, Status.READY, Status.DELAYED, Status.PREPARED]
+            ]:
                 job.fail_count = 0
         # Check checkpoint jobs, the status can be Any
         for job in self.check_special_status():
@@ -2754,8 +2721,6 @@ class JobList(object):
                                     break
             if as_conf.get_remote_dependencies() == "true":
                 for job in self.get_prepared():
-                    tmp = [
-                        parent for parent in job.parents if parent.status == Status.COMPLETED]
                     tmp2 = [parent for parent in job.parents if
                             parent.status == Status.COMPLETED or parent.status == Status.SKIPPED
                             or parent.status == Status.FAILED]
@@ -2904,7 +2869,7 @@ class JobList(object):
         out = True
         # Implementing checking scripts feedback to the users in a minimum of 4 messages
         count = stage = 0
-        for job in (job for job in self._job_list):
+        for job in self._job_list:
             job.update_check_variables(as_conf)
             count += 1
             if (count >= len(self._job_list) / 4 * (stage + 1)) or count == len(self._job_list):
@@ -2945,15 +2910,14 @@ class JobList(object):
         self._job_list.remove(job)
 
     def rerun(self, job_list_unparsed, as_conf, monitor=False):
-        """
-        Updates job list to rerun the jobs specified by a job list
+        """Updates job list to rerun the jobs specified by a job list.
+
         :param job_list_unparsed: list of jobs to rerun
         :type job_list_unparsed: str
         :param as_conf: experiment configuration
         :type as_conf: AutosubmitConfig
         :param monitor: if True, the job list will be monitored
         :type monitor: bool
-
         """
         self.parse_jobs_by_filter(job_list_unparsed, two_step_start=False)
         member_list = set()
@@ -2979,7 +2943,6 @@ class JobList(object):
         self._chunk_list = list(chunk_list)
         self._date_list = list(date_list)
         Log.info("Adding dependencies...")
-        dependencies = dict()
 
         for job_section in job_sections:
             Log.debug(f"Reading rerun dependencies for {job_section} jobs")
@@ -3013,7 +2976,7 @@ class JobList(object):
                          'conf', "jobs_" + self._expid + ".yaml"))
         return jobs_parser
 
-    def remove_rerun_only_jobs(self, notransitive=False):
+    def remove_rerun_only_jobs(self):
         """
         Removes all jobs to be run only in reruns
         """
@@ -3092,7 +3055,7 @@ class JobList(object):
             return f'Job List object'
         return "\n".join(results)
 
-    def _recursion_print(self, job, level, visited=[], statusChange=None, nocolor=False):
+    def _recursion_print(self, job, level, visited=None, statusChange=None, nocolor=False):
         """
         Returns the list of children in a recursive way
         Traverses the dependency tree
@@ -3108,6 +3071,8 @@ class JobList(object):
         :return: parent + list of children
         :rtype: String
         """
+        if visited is None:
+            visited = []
         result = ""
         if job.name not in visited:
             visited.append(job.name)
@@ -3367,8 +3332,7 @@ class JobList(object):
         submit_time = now
         start_time = now
         finish_time = now
-        current_status = status_from_job
-        path = os.path.join(tmp_path, name + '_TOTAL_STATS')
+        path: str = str(os.path.join(tmp_path, name + '_TOTAL_STATS'))
         # print("Looking in " + path)
         if os.path.exists(path):
             request = 'tail -1 ' + path
@@ -3409,7 +3373,6 @@ class JobList(object):
                 start_time = now
                 finish_time = now
                 # NA if reading fails
-                current_status = "NA"
 
         current_status = values[3] if (len(values) > 3 and len(
             values[3]) != 14) else status_from_job
@@ -3427,3 +3390,48 @@ class JobList(object):
             return datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
         else:
             return None
+
+
+def load_job_list(
+        expid: str,
+        as_conf: AutosubmitConfig,
+        monitor=False,
+        new=True
+) -> JobList:
+    date_list = as_conf.get_date_list()
+    date_format = ''
+    if as_conf.get_chunk_size_unit() == 'hour':
+        date_format = 'H'
+    for date in date_list:
+        if date.hour > 1:
+            date_format = 'H'
+        if date.minute > 1:
+            date_format = 'M'
+
+    wrapper_jobs = dict()
+    wrappers = as_conf.experiment_data.get("WRAPPERS", {})
+    for wrapper_section, wrapper_data in wrappers.items():
+        if isinstance(wrapper_data, collections.abc.Mapping):
+            wrapper_jobs[wrapper_section] = wrapper_data.get("JOBS_IN_WRAPPER", "")
+
+    run_only_members = as_conf.get_member_list(run_only=True)
+
+    job_list = JobList(expid, as_conf, YAMLParserFactory(), get_job_list_persistence(expid, as_conf))
+    job_list.generate(
+        as_conf, date_list, as_conf.get_member_list(), as_conf.get_num_chunks(), as_conf.get_chunk_ini(),
+        as_conf.experiment_data, date_format, as_conf.get_retrials(), as_conf.get_default_job_type(),
+        wrapper_jobs, new=new, run_only_members=run_only_members
+    )
+
+    # TODO: If we load a job list with submitted statuses, should we reset then here? Or alert the user
+    #       and quit? Otherwise, if it doesn't have a package dict, then i will never set/check the
+    #       package/wrapper status.
+
+    rerun = as_conf.get_rerun()
+    if str(rerun).lower() == "true":
+        rerun_jobs = as_conf.get_rerun_jobs()
+        job_list.rerun(rerun_jobs, as_conf, monitor=monitor)
+    else:
+        job_list.remove_rerun_only_jobs()
+
+    return job_list

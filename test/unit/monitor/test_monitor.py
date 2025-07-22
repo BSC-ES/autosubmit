@@ -31,7 +31,7 @@ from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_grouping import JobGrouping
-from autosubmit.job.job_list import JobList
+from autosubmit.job.job_list import JobList, get_job_list_persistence
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.monitor.monitor import (
     _check_final_status, _check_node_exists, _color_status, _create_node, _display_file,
@@ -370,7 +370,7 @@ def test_generate_output(
     exp = autosubmit_exp(_EXPID, experiment_data={})
     exp_path = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR) / _EXPID
 
-    job_list_persistence = exp.autosubmit._get_job_list_persistence(_EXPID, exp.as_conf)
+    job_list_persistence = get_job_list_persistence(_EXPID, exp.as_conf)
     job_list = JobList(_EXPID, exp.as_conf, YAMLParserFactory(), job_list_persistence)
     date_list = exp.as_conf.get_date_list()
     # TODO: we can probably simplify our code, so that ``date_format`` is calculated more easily...
