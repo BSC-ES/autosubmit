@@ -2904,7 +2904,7 @@ class JobList(object):
         out = True
         # Implementing checking scripts feedback to the users in a minimum of 4 messages
         count = stage = 0
-        for job in (job for job in self._job_list):
+        for job in self._job_list:
             job.update_check_variables(as_conf)
             count += 1
             if (count >= len(self._job_list) / 4 * (stage + 1)) or count == len(self._job_list):

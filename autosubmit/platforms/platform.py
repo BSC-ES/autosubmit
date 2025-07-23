@@ -34,6 +34,7 @@ import setproctitle
 
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
+from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
 if TYPE_CHECKING:
@@ -363,8 +364,8 @@ class Platform(object):
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
 
-    def submit_ready_jobs(self, as_conf, job_list, platforms_to_test, packages_persistence, packages_to_submit,
-                          inspect=False, only_wrappers=False, hold=False):
+    def submit_ready_jobs(self, as_conf, job_list, platforms_to_test, packages_persistence: JobPackagePersistence,
+                          packages_to_submit, inspect=False, only_wrappers=False, hold=False):
 
         """
         Gets READY jobs and send them to the platforms if there is available space on the queues
