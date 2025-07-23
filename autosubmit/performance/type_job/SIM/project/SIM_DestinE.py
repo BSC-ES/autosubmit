@@ -34,9 +34,10 @@ class SIMDestinEPerformance(SIMPerformance):
         """
         Compute the performance metrics for a SIM DestinE job and check if it is under a threshold.
 
-        Args:
-            job: Job instance containing the necessary attributes.
-        Returns:
-            list: List of PerformanceMetricInfo instances containing the performance metrics.
+        :param job: Job instance containing the necessary attributes.
+        :type job: Job
+
+        :return: A list of PerformanceMetricInfo instances containing metric details.
+        :rtype: list[PerformanceMetricInfo]
         """
         return super().compute_and_check_performance_metrics(job)

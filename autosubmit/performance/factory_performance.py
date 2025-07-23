@@ -28,11 +28,14 @@ class PerformanceFactory:
         """
         Factory method to create a performance metric calculator for a job.
 
-        Args:
-            job: Job instance containing the necessary attributes.
+        :param job: Job instance containing the necessary attributes.
+        :type job: Job
 
-        Returns:
-            BasePerformance: An instance of a class derived from BasePerformance.
+        :param config: Autosubmit configuration containing performance settings.
+        :type config: AutosubmitConfig
+
+        :return: An instance of a class derived from BasePerformance.
+        :rtype: BasePerformance
         """
 
         performance_config = config.experiment_data.get('PERFORMANCE', {})
@@ -57,11 +60,14 @@ class PerformanceFactory:
         """
         Create a performance calculator based on the job type.
 
-        Args:
-            job_type: The type of the job (e.g., 'SIM_DESTINE').
+        :param job_type: Type of the job, e.g., "SIM_DESTINE" or "SIM_DEFAULT".
+        :type job_type: str
 
-        Returns:
-            BasePerformance: An instance of a class derived from BasePerformance.
+        :param config: Autosubmit configuration containing performance settings.
+        :type config: AutosubmitConfig
+
+        :return: An instance of a class derived from BasePerformance specific to the job type.
+        :rtype: BasePerformance
         """
         if job_type == "SIM_DESTINE":
             from autosubmit.performance.type_job.SIM.project.SIM_DestinE import SIMDestinEPerformance

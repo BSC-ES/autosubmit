@@ -1079,7 +1079,7 @@ class Platform(object):
                 break
         return process_log
     
-    def _compute_performance_metrics(self, job: 'Job', as_conf: 'AutosubmitConfig') -> None:
+    def _compute_performance_metrics(self, job: 'Job', as_conf: 'AutosubmitConfig'):
         """
         Computes performance metrics for the job.
 
@@ -1090,7 +1090,11 @@ class Platform(object):
         """
 
         manager_performance = self._performance_factory.create_performance(job, as_conf)
-        manager_performance.compute_and_check_performance_metrics(job)
+        try:
+            manager_performance.compute_and_check_performance_metrics(job)
+        except Exception as e:
+            Log.error(f"Failed to compute performance metrics for job '{job.name}': {e}")
+            Log.debug(traceback.format_exc())
 
     def recover_job_log(self, identifier: str, jobs_pending_to_process: Set[Any], as_conf: 'AutosubmitConfig') -> Set[Any]:
         """
