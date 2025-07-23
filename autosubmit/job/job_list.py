@@ -25,7 +25,7 @@ from contextlib import suppress
 from pathlib import Path
 from shutil import move
 from time import strftime, localtime, mktime
-from typing import List, Dict, Tuple, Any, Optional, Union
+from typing import List, Dict, Tuple, Any, Optional, Union, TYPE_CHECKING
 
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
@@ -42,6 +42,8 @@ from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency, _get_submitter
 from autosubmit.job.job_utils import transitive_reduction
 from log.log import AutosubmitCritical, AutosubmitError, Log
+if TYPE_CHECKING:
+    from autosubmit.job.job_list_persistence import JobListPersistence
 
 
 class JobList(object):
@@ -50,7 +52,7 @@ class JobList(object):
 
     """
 
-    def __init__(self, expid, config, parser_factory, job_list_persistence):
+    def __init__(self, expid, config, parser_factory, job_list_persistence: 'JobListPersistence'):
         self._persistence_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")
         self._update_file = "updated_list_" + expid + ".txt"
         self._failed_file = "failed_job_list_" + expid + ".pkl"
