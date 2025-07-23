@@ -34,7 +34,7 @@ class JobListPersistence(object):
 
     """
 
-    def save(self, persistence_path, persistence_file, job_list , graph):
+    def save(self, persistence_path, persistence_file, job_list, graph):
         """
         Persists a job list
         :param job_list: JobList
@@ -117,7 +117,6 @@ class JobListPersistencePkl(JobListPersistence):
         Log.debug(f'JobList saved in {path[:-4]}')
 
 
-
 class JobListPersistenceDb(JobListPersistence):
     """
     Class to manage the database persistence of the job lists
@@ -175,7 +174,7 @@ class JobListPersistenceDb(JobListPersistence):
                       job.priority, job.section, job.date,
                       job.member, job.chunk, job.split,
                       job.local_logs[0], job.local_logs[1],
-                      job.remote_logs[0], job.remote_logs[1],job.wrapper_type) for job in job_list]
+                      job.remote_logs[0], job.remote_logs[1], job.wrapper_type) for job in job_list]
         self.db_manager.insertMany(self.JOB_LIST_TABLE, jobs_data)
 
     def _reset_table(self):
