@@ -71,11 +71,11 @@ class SIMPerformance(BasePerformance):
         """
         Calculate the simulated time in years based on start and finish timestamps, chunk size, and unit.
 
-        Args:
-            job: Job instance containing the necessary attributes.
+        :param job: Job instance containing the necessary attributes.
+        :type job: Job
 
-        Returns:
-            float: Simulated time in years.
+        :return: Simulated time in years.
+        :rtype: float
         """
 
         start_timestamp = job.start_time_timestamp
@@ -108,10 +108,11 @@ class SIMPerformance(BasePerformance):
         Compute the SYPD from a job and check if it is above the threshold.
         Moreover, send an email notification if the SYPD is under the threshold.
 
-        Args:
-            job: Job instance containing the necessary attributes.
-        Returns:
-            bool: True if the SYPD is above the threshold, False otherwise.
+        :param job: Job instance containing the necessary attributes.
+        :type job: Job
+
+        :return: PerformanceMetricInfo instance containing the SYPD metric details.
+        :rtype: PerformanceMetricInfo
         """
 
         sypd = self.compute_sypd_from_job(job)
@@ -132,10 +133,11 @@ class SIMPerformance(BasePerformance):
         """
         Compute the performance metrics for a job and check if it is under a threshold.
 
-        Args:
-            job: Job instance containing the necessary attributes.
-        Returns:
-            list: List of PerformanceMetricInfo instances containing the performance metrics.
+        :param job: Job instance containing the necessary attributes.
+        :type job: Job
+
+        :return: A list of PerformanceMetricInfo instances containing metric details.
+        :rtype: list[PerformanceMetricInfo]
         """
         message_parts = ["🚨 Performance Alert\n===================\n"]
 

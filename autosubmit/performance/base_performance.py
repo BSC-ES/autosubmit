@@ -51,14 +51,22 @@ class BasePerformance(ABC):
         """
         Initialize the BasePerformance class.
 
-        Args:
-            mail_notifier: An instance of MailNotifier for sending notifications.
+        :param autosubmit_config: Autosubmit configuration containing performance settings.
+        :type autosubmit_config: Optional[AutosubmitConfig]
         """
         self._autosubmit_config = autosubmit_config
 
     @abstractmethod
     def compute_and_check_performance_metrics(self, job: 'Job') -> list[PerformanceMetricInfo]:
-        """Compute performance metrics for a job"""
+        """
+        Compute performance metrics for a job.
+
+        :param job: Job instance containing the necessary attributes.
+        :type job: Job
+
+        :return: A list of PerformanceMetricInfo instances containing metric details.
+        :rtype: list[PerformanceMetricInfo]
+        """
         pass
 
     # Build mail message for the metrics
@@ -67,12 +75,14 @@ class BasePerformance(ABC):
         """
         Generate a message template for the performance metric.
 
-        Args:
-            metric_info: An instance of PerformanceMetricInfo containing metric details.
-            job: Job instance containing the necessary attributes.
+        :param metric_info: PerformanceMetricInfo instance containing metric details.
+        :type metric_info: PerformanceMetricInfo
 
-        Returns:
-            str: A formatted message string.
+        :param job: Job instance containing the necessary attributes.
+        :type job: Job
+
+        :return: A formatted message string.
+        :rtype: str
         """
         return f"""
         🧪 Experiment ID: {job.expid}
@@ -91,8 +101,8 @@ class BasePerformance(ABC):
         """
         Set the MailNotifier instance for the Performance class.
 
-        Args:
-            mail_notifier: An instance of MailNotifier.
+        :param mail_notifier: An instance of MailNotifier to handle email notifications.
+        :type mail_notifier: MailNotifier
         """
         
         self._mail_notifier = mail_notifier
@@ -103,8 +113,8 @@ class BasePerformance(ABC):
         """
         Set the Autosubmit configuration for the Performance class.
 
-        Args:
-            autosubmit_config: An instance of AutosubmitConfig.
+        :param autosubmit_config: An instance of AutosubmitConfig containing performance settings.
+        :type autosubmit_config: AutosubmitConfig
         """
         self._autosubmit_config = autosubmit_config
 
@@ -114,8 +124,8 @@ class BasePerformance(ABC):
         """
         Get the email recipients for performance notifications from the Autosubmit configuration.
 
-        Returns:
-            list: List of email addresses to notify.
+        :return: A list of email addresses to notify.
+        :rtype: list[str]
         """
         try:
             if not self._autosubmit_config:
