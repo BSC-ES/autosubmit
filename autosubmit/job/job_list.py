@@ -1,41 +1,38 @@
-#!/usr/bin/env python3
-
-# Copyright 2017-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import copy
 import datetime
+import math
 import os
 import re
 import traceback
 from contextlib import suppress
-from shutil import move
-from typing import List, Dict, Tuple, Any, Optional, Union
 from pathlib import Path
-
+from shutil import move
 from time import strftime, localtime, mktime
-
-import math
-from bscearth.utils.date import date2str, parse_date
-from networkx import DiGraph
+from typing import List, Dict, Tuple, Any, Optional, Union, TYPE_CHECKING
 
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from bscearth.utils.date import date2str, parse_date
+from networkx import DiGraph
 
-from log.log import AutosubmitCritical, AutosubmitError, Log
-from autosubmit.job.job_utils import transitive_reduction
+import autosubmit.database.db_structure as DbStructure
 from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status, bcolors
@@ -43,7 +40,10 @@ from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency, _get_submitter
-import autosubmit.database.db_structure as DbStructure
+from autosubmit.job.job_utils import transitive_reduction
+from log.log import AutosubmitCritical, AutosubmitError, Log
+if TYPE_CHECKING:
+    from autosubmit.job.job_list_persistence import JobListPersistence
 
 
 class JobList(object):
@@ -52,7 +52,7 @@ class JobList(object):
 
     """
 
-    def __init__(self, expid, config, parser_factory, job_list_persistence):
+    def __init__(self, expid, config, parser_factory, job_list_persistence: 'JobListPersistence'):
         self._persistence_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")
         self._update_file = "updated_list_" + expid + ".txt"
         self._failed_file = "failed_job_list_" + expid + ".pkl"
@@ -2264,10 +2264,9 @@ class JobList(object):
                     jobs.append(job)
         return jobs
 
-    def get_in_queue_grouped_id(self, platform):
-        # type: (object) -> Dict[int, List[Job]]
-        jobs = self.get_in_queue(platform)
-        jobs_by_id = dict()
+    def get_in_queue_grouped_id(self, platform) -> dict[str, list[Job]]:
+        jobs: list[Job] = self.get_in_queue(platform)
+        jobs_by_id: dict[str, list[Job]] = dict()
         for job in jobs:
             if job.id not in jobs_by_id:
                 jobs_by_id[job.id] = list()
@@ -2907,7 +2906,7 @@ class JobList(object):
         out = True
         # Implementing checking scripts feedback to the users in a minimum of 4 messages
         count = stage = 0
-        for job in (job for job in self._job_list):
+        for job in self._job_list:
             job.update_check_variables(as_conf)
             count += 1
             if (count >= len(self._job_list) / 4 * (stage + 1)) or count == len(self._job_list):

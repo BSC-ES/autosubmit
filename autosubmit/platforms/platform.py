@@ -1,22 +1,41 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import atexit
-import multiprocessing
-import queue  # only for the exception
-from contextlib import suppress
-from os import _exit
-import setproctitle
 import locale
+import multiprocessing
 import os
+import queue  # only for the exception
+import time
 import traceback
-
-from pathlib import Path
-
-from autosubmit.job.job_common import Status
-from typing import List, Union, Set, Any, TYPE_CHECKING
-from autosubmit.helpers.parameters import autosubmit_parameter
-from log.log import AutosubmitCritical, AutosubmitError, Log
+from contextlib import suppress
 from multiprocessing import Event
 from multiprocessing.queues import Queue
-import time
+# noinspection PyProtectedMember
+from os import _exit  # type: ignore
+from pathlib import Path
+from typing import List, Union, Set, Any, TYPE_CHECKING
+
+import setproctitle
+
+from autosubmit.helpers.parameters import autosubmit_parameter
+from autosubmit.job.job_common import Status
+from autosubmit.job.job_package_persistence import JobPackagePersistence
+from log.log import AutosubmitCritical, AutosubmitError, Log
 
 if TYPE_CHECKING:
     from autosubmitconfigparser.config.configcommon import AutosubmitConfig
@@ -345,8 +364,8 @@ class Platform(object):
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
 
-    def submit_ready_jobs(self, as_conf, job_list, platforms_to_test, packages_persistence, packages_to_submit,
-                          inspect=False, only_wrappers=False, hold=False):
+    def submit_ready_jobs(self, as_conf, job_list, platforms_to_test, packages_persistence: JobPackagePersistence,
+                          packages_to_submit, inspect=False, only_wrappers=False, hold=False):
 
         """
         Gets READY jobs and send them to the platforms if there is available space on the queues
