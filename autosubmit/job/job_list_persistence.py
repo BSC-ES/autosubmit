@@ -1,30 +1,32 @@
-#!/usr/bin/env python3
-import gc
-# Copyright 2017-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import gc
 import os
 import pickle
-from sys import setrecursionlimit, getrecursionlimit
 import shutil
-from autosubmit.database.db_manager import create_db_manager
-from log.log import AutosubmitCritical, Log
 from contextlib import suppress
-from autosubmitconfigparser.config.basicconfig import BasicConfig
 from pathlib import Path
+from sys import setrecursionlimit, getrecursionlimit
+
+from autosubmitconfigparser.config.basicconfig import BasicConfig
+
+from autosubmit.database.db_manager import create_db_manager
+from log.log import Log
 
 
 class JobListPersistence(object):
@@ -33,7 +35,7 @@ class JobListPersistence(object):
 
     """
 
-    def save(self, persistence_path, persistence_file, job_list , graph):
+    def save(self, persistence_path, persistence_file, job_list, graph):
         """
         Persists a job list
         :param job_list: JobList
@@ -116,7 +118,6 @@ class JobListPersistencePkl(JobListPersistence):
         Log.debug(f'JobList saved in {path[:-4]}')
 
 
-
 class JobListPersistenceDb(JobListPersistence):
     """
     Class to manage the database persistence of the job lists
@@ -174,7 +175,7 @@ class JobListPersistenceDb(JobListPersistence):
                       job.priority, job.section, job.date,
                       job.member, job.chunk, job.split,
                       job.local_logs[0], job.local_logs[1],
-                      job.remote_logs[0], job.remote_logs[1],job.wrapper_type) for job in job_list]
+                      job.remote_logs[0], job.remote_logs[1], job.wrapper_type) for job in job_list]
         self.db_manager.insertMany(self.JOB_LIST_TABLE, jobs_data)
 
     def _reset_table(self):
