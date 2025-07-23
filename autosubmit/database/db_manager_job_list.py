@@ -61,12 +61,12 @@ class JobsDbManager(DbManager):
         pkeys = ['name']
         self.upsert_many(JobsTable.name, persistent_data, pkeys)
 
-    def load_jobs(self, full_load) -> List[dict[str, Any]]:
+    def load_jobs(self, full_load, load_failed_jobs: bool = False) -> List[dict[str, Any]]:
         self.create_table(JobsTable.name)
         if full_load:
             job_list = self.select_all_jobs()
         else:
-            job_list = self.select_active_jobs()
+            job_list = self.select_active_jobs(include_failed=load_failed_jobs)
             job_list.extend(self.select_children_jobs(job_list))
             job_list = set(job_list)  # remove duplicates
 
@@ -110,14 +110,14 @@ class JobsDbManager(DbManager):
         job_list = self.select_where_with_columns(JobsTable.name, {'section': section})
         return [dict(job) for job in job_list]
 
-    def select_active_jobs(self) -> List[Union[str, Any]]:
+    def select_active_jobs(self, include_failed: bool = False) -> List[Union[str, Any]]:
         """
         Return the active jobs from the database (without edges).
         """
         self.create_table(JobsTable.name)
 
         job_list = []
-        for status in self._ACTIVE_STATUSES:
+        for status in self._ACTIVE_STATUSES + (['FAILED'] if include_failed else []):
             job_list.extend(self.select_where_with_columns(JobsTable.name, {"status": status}))
 
         return job_list

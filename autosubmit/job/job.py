@@ -30,7 +30,7 @@ from functools import reduce
 from pathlib import Path
 from threading import Thread
 from time import sleep
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import List, Optional, Tuple, TYPE_CHECKING, Any, Dict
 
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
@@ -192,10 +192,10 @@ class Job(object):
 
 
     def __setstate__(self, state, log_process=False):
-        # TODO REMOVE DEBUG STUFF
-        debug = []
         for slot, value in state.items():
-            if slot in ['local_logs_out', 'remote_logs_err', 'remote_logs_out', 'local_logs_err', 'status', 'date']:
+            if log_process and slot in self.__slots__:
+                setattr(self, slot, value)
+            elif slot in ['local_logs_out', 'remote_logs_err', 'remote_logs_out', 'local_logs_err', 'status', 'date']:
                 continue
             elif slot in self.__slots__:
                 setattr(self, slot, value)
@@ -203,19 +203,12 @@ class Job(object):
                 slot = self.internal_slot_name(slot)
                 if slot in self.__slots__:
                     setattr(self, slot, value)
-                else:
-                    debug.append(f"Slot {slot} not found in Job class. Value: {value}")
 
         if not log_process:
             self.local_logs = (state.get('local_logs_out', ''), state.get('local_logs_err', ''))
             self.remote_logs = (state.get('remote_logs_out', ''), state.get('remote_logs_err', ''))
             self.status = Status.KEY_TO_VALUE[state['status']]
             self.date = datetime.datetime.fromisoformat(state['date']) if state.get('date', None) else None
-
-        if debug:
-            from pprint import pprint
-            pprint(debug)
-            raise
 
     def internal_slot_name(self, slot) -> str:
         """
@@ -2164,7 +2157,24 @@ class Job(object):
                 parameters['CHUNK_LAST'] = 'FALSE'
         return parameters
 
-    def update_job_parameters(self, as_conf, parameters, set_attributes):
+    def update_job_parameters(
+            self,
+            as_conf: Any,
+            parameters: Dict[str, Any],
+            set_attributes: bool
+    ) -> Dict[str, Any]:
+        """
+        Update job parameters and optionally set job attributes.
+
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: Any
+        :param parameters: Dictionary of parameters to update.
+        :type parameters: Dict[str, Any]
+        :param set_attributes: Whether to set job attributes from parameters.
+        :type set_attributes: bool
+        :return: Updated parameters dictionary.
+        :rtype: Dict[str, Any]
+        """
         if set_attributes:
             if self.splits == "auto":
                 self.splits = parameters.get("CURRENT_SPLITS", None)
@@ -2179,6 +2189,7 @@ class Job(object):
             if self.checkpoint:  # To activate placeholder sustitution per <empty> in the template
                 parameters["AS_CHECKPOINT"] = self.checkpoint
             self.wchunkinc = as_conf.get_wchunkinc(self.section)
+            self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT", {}).get("WORKFLOW_COMMIT", "")
 
         parameters['JOBNAME'] = self.name
         parameters['FAIL_COUNT'] = str(self.fail_count)
@@ -2203,6 +2214,7 @@ class Job(object):
         parameters['EXPORT'] = self.export
         parameters['PROJECT_TYPE'] = as_conf.get_project_type()
         parameters['X11'] = self.x11
+        parameters['WORKFLOW_COMMIT'] = self.workflow_commit
         return parameters
 
     def update_job_variables_final_values(self, parameters):

@@ -2087,7 +2087,14 @@ class Autosubmit:
             Log.info("Recovering job_list")
         try:
             job_list = Autosubmit.load_job_list(
-                expid, as_conf, notransitive=notransitive, new=False, full_load=False, submitter=submitter)
+                expid, as_conf, notransitive=notransitive, new=False, full_load=False, submitter=submitter, check_failed_jobs=True)
+            # New runs, reset failed status to waiting
+            if not recover:
+                for job in job_list.job_list:
+                    if job.status == Status.FAILED:
+                        Log.warning(f"Job {job.name} has failed in the previous run, resetting its status to WAITING")
+                        job.fail_count = 0
+                        job.status = Status.WAITING
         except IOError as e:
             raise AutosubmitError(
                 "Job_list not found", 6016, str(e))
@@ -5773,7 +5780,7 @@ class Autosubmit:
 
     # TODO: To be moved to utils
     @staticmethod
-    def load_job_list(expid, as_conf, notransitive=False, monitor=False, new=True, full_load=True, submitter=None) -> JobList:
+    def load_job_list(expid, as_conf, notransitive=False, monitor=False, new=True, full_load=True, submitter=None, check_failed_jobs=False) -> JobList:
         rerun = as_conf.get_rerun()
         job_list = JobList(expid, as_conf, YAMLParserFactory(), run_mode=True, submitter=submitter)
         run_only_members = as_conf.get_member_list(run_only=True)
@@ -5795,7 +5802,7 @@ class Autosubmit:
                           as_conf.get_chunk_ini(),
                           as_conf.experiment_data, date_format, as_conf.get_retrials(),
                           as_conf.get_default_job_type(), wrapper_jobs,
-                          new=new, run_only_members=run_only_members, monitor=monitor, full_load=full_load)
+                          new=new, run_only_members=run_only_members, monitor=monitor, full_load=full_load, check_failed_jobs=check_failed_jobs)
 
         if str(rerun).lower() == "true":
             rerun_jobs = as_conf.get_rerun_jobs()

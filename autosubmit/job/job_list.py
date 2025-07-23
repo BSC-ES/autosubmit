@@ -225,13 +225,6 @@ class JobList(object):
                         "true".casefold()):
                     self.graph.remove_node(job.name)
 
-    @staticmethod
-    def check_split_set_to_auto(as_conf):
-        # If this is true, the workflow needs to be recreated on create
-        for job_name, values in as_conf.experiment_data.get("JOBS", {}).items():
-            if values.get("SPLITS", None) == "auto":
-                return True
-        return False
 
     def generate(
             self,
@@ -251,6 +244,7 @@ class JobList(object):
             monitor: bool = False,
             force: bool = False,
             full_load: bool = False,
+            check_failed_jobs: bool = False,
     ) -> None:
         """
         Creates all jobs needed for the current workflow.
@@ -258,21 +252,19 @@ class JobList(object):
         self._initialize_workflow_parameters(
             as_conf, date_list, member_list, num_chunks, chunk_ini, parameters, date_format, default_retrials
         )
-        if full_load and self.check_split_set_to_auto(as_conf):
-            force = True
-        changes = False
+
         if force:
             # TODO delete or clean tables not delete the file
             self._reset_workflow_graph()
             changes = True
         else:
-            changes = self._load_graph(full_load)
+            changes = self._load_graph(full_load, load_failed_jobs=check_failed_jobs)
 
         if changes or not self.run_mode:
             self._create_and_add_jobs(show_log, default_job_type, date_list, member_list)
 
-        if new:
-            self._initialize_new_jobs()
+        if changes or new:
+            self._initialize_new_jobs(changes)
 
         if changes or not self.run_mode:
             self._save_workflow_state(wrapper_jobs, as_conf, full_load, new)
@@ -280,7 +272,7 @@ class JobList(object):
         if self.run_mode:
             self.graph.clear()
             self.graph.clear_edges()
-            changes = self._load_graph(full_load)
+            changes = self._load_graph(full_load, load_failed_jobs=check_failed_jobs)
             if changes:
                 raise AutosubmitCritical(
                     "The workflow graph has changed since the last run. "
@@ -391,10 +383,11 @@ class JobList(object):
         if connect_to_platform:
             self._assign_platforms(self._as_conf, job, create=False, new=False)
 
-    def _load_graph(self, full_load: bool) -> bool:
+    def _load_graph(self, full_load: bool, load_failed_jobs: bool = False) -> bool:
         """
         Loads the job graph from the database, creating nodes and edges.
         :param full_load: If True, loads all jobs and edges, otherwise loads only the necessary ones.
+        :param load_failed_jobs: If True, loads failed jobs from the database.
         :return: True if there are differences in sections, False otherwise.
         """
         Log.info("Loading graph from database...")
@@ -409,12 +402,9 @@ class JobList(object):
         if differences:
             full_load = True
         Log.info("Loading jobs and edges from database...")
-        nodes = self.load_jobs(full_load)
+        nodes = self.load_jobs(full_load, load_failed_jobs)
         edges = self.load_edges(nodes, full_load)
         self._recreate_graph(nodes, edges, full_load)
-        if not self.job_list:
-            Log.warning("No jobs found in the graph. If this is the first time you create this experiment, is normal.")
-            return False
         if differences:
             Log.info(
                 "Differences found in sections, the whole graph will be updated accordingly. This may take a while.")
@@ -514,10 +504,11 @@ class JobList(object):
         if len(self.graph.edges) > 0:
             self._delete_edgeless_jobs()
 
-    def _initialize_new_jobs(self) -> None:
+    def _initialize_new_jobs(self, changes: bool) -> None:
         for job in self.job_list:
-            job._fail_count = 0
-            job.status = Status.READY if not self.has_parents(job.name) else Status.WAITING
+            if changes:
+                job._fail_count = 0
+            job.status = Status.READY if not self.has_parents(job.name) else job.status
             self.graph.nodes[job.name]["job"] = job
 
     def has_parents(self, job_name: str) -> bool:
@@ -2473,10 +2464,8 @@ class JobList(object):
         self.unload_completed_jobs()
         Log.debug(f"Jobs loaded: {len(self.job_list)}")
         Log.debug(f"Edges loaded: {len(self.graph_dict)}")
-        if len(self.get_active()) > 0:
-            return True
-        else:
-            return False
+        return len(self.get_active()) > 0
+
 
     def unload_completed_jobs(self):
         """
@@ -2623,11 +2612,11 @@ class JobList(object):
             self.update_status_log()
             self.dbmanager.save_jobs(self.job_list)
 
-    def load_jobs(self, full_load):
+    def load_jobs(self, full_load, load_failed_jobs: bool = False) -> List[Job]:
         """
         Loads the job list
         """
-        nodes = self.dbmanager.load_jobs(full_load)
+        nodes = self.dbmanager.load_jobs(full_load, load_failed_jobs)
         self.total_size, self.completed_size, self.failed_size = self.dbmanager.get_job_list_size()
         return nodes
 
