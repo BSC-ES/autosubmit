@@ -13,7 +13,7 @@
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.  
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
 class Utils:
@@ -22,29 +22,33 @@ class Utils:
     """
 
     @staticmethod
-    def get_SYPD(start_timestamp: int, finish_timestamp: int, chunk_size: str, chunk_size_unit: str) -> float:
+    def get_SYPD(
+        start_timestamp: int,
+        finish_timestamp: int,
+        chunk_size: str,
+        chunk_size_unit: str,
+    ) -> float:
         """
         Calculate the simulated time in years based on start and finish timestamps, chunk size, and unit.
-        
+
         Args:
             start_timestamp: Start timestamp in Unix format.
             finish_timestamp: Finish timestamp in Unix format.
             chunk_size: Size of the chunk (e.g., '12').
             chunk_size_unit: Unit of the chunk size (e.g., 'month').
-        
+
         Returns:
             float: Simulated time in years.
         """
         duration_seconds = finish_timestamp - start_timestamp
-        if chunk_size_unit == 'year':
+        if chunk_size_unit == "year":
             return duration_seconds / (365 * 24 * 3600) * float(chunk_size)
-        elif chunk_size_unit == 'month':
+        elif chunk_size_unit == "month":
             return duration_seconds / (30 * 24 * 3600) * float(chunk_size)
-        elif chunk_size_unit == 'day':
+        elif chunk_size_unit == "day":
             return duration_seconds / (24 * 3600) * float(chunk_size)
-        else:
-            raise ValueError(f"Unsupported chunk size unit: {chunk_size_unit}")
-        
+        raise ValueError(f"Unsupported chunk size unit: {chunk_size_unit}")
+
     @staticmethod
     def get_under_performance(value: float, threshold: float) -> float:
         """

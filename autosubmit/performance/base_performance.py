@@ -13,16 +13,17 @@
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.  
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Optional, NamedTuple
-from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from autosubmit.notifications.mail_notifier import MailNotifier
 
 if TYPE_CHECKING:
     from autosubmit.job.job import Job
+
 
 class PerformanceMetricInfo(NamedTuple):
     """
@@ -35,17 +36,20 @@ class PerformanceMetricInfo(NamedTuple):
         threshold (float): The threshold value for the metric.
         under_performance (Optional[float]): The percentage of underperformance, if applicable.
     """
+
     metric: str
     under_threshold: bool
     value: float
     threshold: float
     under_performance: Optional[float] = None
-       
+
 
 class BasePerformance(ABC):
     """Base class for performance metrics calculation"""
 
-    _mail_notifier = MailNotifier(BasicConfig()) # Default MailNotifier with BasicConfig 
+    _mail_notifier = MailNotifier(
+        BasicConfig()
+    )  # Default MailNotifier with BasicConfig
 
     def __init__(self, autosubmit_config: Optional[AutosubmitConfig] = None):
         """
@@ -57,7 +61,9 @@ class BasePerformance(ABC):
         self._autosubmit_config = autosubmit_config
 
     @abstractmethod
-    def compute_and_check_performance_metrics(self, job: 'Job') -> list[PerformanceMetricInfo]:
+    def compute_and_check_performance_metrics(
+        self, job: "Job"
+    ) -> list[PerformanceMetricInfo]:
         """
         Compute performance metrics for a job.
 
@@ -71,7 +77,8 @@ class BasePerformance(ABC):
 
     # Build mail message for the metrics
 
-    def _template_metric_message(self, metric_info: PerformanceMetricInfo, job: 'Job') -> str:
+    @staticmethod
+    def _template_metric_message(metric_info: PerformanceMetricInfo, job: "Job") -> str:
         """
         Generate a message template for the performance metric.
 
@@ -94,8 +101,8 @@ class BasePerformance(ABC):
 
         🔍 Performance is {metric_info.under_performance:.1f}% below expected threshold.
         """
-    
-    # Mail notifier setter 
+
+    # Mail notifier setter
 
     def set_mail_notifier(self, mail_notifier: MailNotifier):
         """
@@ -104,10 +111,10 @@ class BasePerformance(ABC):
         :param mail_notifier: An instance of MailNotifier to handle email notifications.
         :type mail_notifier: MailNotifier
         """
-        
+
         self._mail_notifier = mail_notifier
 
-    # Autosubmit configuration setter 
+    # Autosubmit configuration setter
 
     def set_autosubmit_config(self, autosubmit_config: AutosubmitConfig):
         """
@@ -130,18 +137,19 @@ class BasePerformance(ABC):
         try:
             if not self._autosubmit_config:
                 raise ValueError("Autosubmit configuration is not set.")
-                
-            performance_config = self._autosubmit_config.experiment_data.get('PERFORMANCE', {})     
-                
-            notify_to = performance_config.get('NOTIFY_TO', [])
+
+            performance_config = self._autosubmit_config.experiment_data.get(
+                "PERFORMANCE", {}
+            )
+
+            notify_to = performance_config.get("NOTIFY_TO", [])
 
             if not notify_to:
-                raise ValueError("No email recipients configured for performance notifications.")
-            
+                raise ValueError(
+                    "No email recipients configured for performance notifications."
+                )
+
             return notify_to
 
         except Exception as e:
-            raise ValueError(f"Error retrieving email recipients: {e}") 
-
-
-    
+            raise ValueError(f"Error retrieving email recipients: {e}") from e

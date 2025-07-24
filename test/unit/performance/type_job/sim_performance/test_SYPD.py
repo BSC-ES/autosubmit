@@ -13,14 +13,14 @@
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>. 
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import pytest 
-
-from autosubmit.job.job import Job
-from autosubmit.performance.type_job.SIM.SIM_performance import SIMPerformance
 from test.unit.performance.support_job import JobTestPerformance
 from test.unit.performance.utils import Utils
+import pytest
+from autosubmit.job.job import Job
+from autosubmit.performance.type_job.SIM.SIM_performance import SIMPerformance
+
 
 class TestSIMPerformanceSYPDNaive:
     """
@@ -28,17 +28,19 @@ class TestSIMPerformanceSYPDNaive:
     using a naive Job instance.
     """
 
-    def test_computation_SYPD(self, sim_performance: SIMPerformance, utils: Utils, naive_job: Job): 
+    def test_computation_SYPD(
+        self, sim_performance: SIMPerformance, utils: Utils, naive_job: Job
+    ):
         """
         Test to verify the computation of SYPD (Seconds per Year per Day) for a Job.
         """
         expected_sypd = utils.get_SYPD(
             start_timestamp=naive_job.start_time_timestamp,
             finish_timestamp=naive_job.finish_time_timestamp,
-            chunk_size=naive_job.parameters['EXPERIMENT']['CHUNKSIZE'],
-            chunk_size_unit=naive_job.parameters['EXPERIMENT']['CHUNKSIZEUNIT']
+            chunk_size=naive_job.parameters["EXPERIMENT"]["CHUNKSIZE"],
+            chunk_size_unit=naive_job.parameters["EXPERIMENT"]["CHUNKSIZEUNIT"],
         )
-        sypd = sim_performance.compute_sypd_from_job(naive_job) 
+        sypd = sim_performance.compute_sypd_from_job(naive_job)
 
         assert sypd == expected_sypd, f"Expected SYPD: {expected_sypd}, but got: {sypd}"
 
@@ -49,7 +51,10 @@ class TestSIMPerformanceSYPDNaive:
         naive_job.start_time_timestamp = None
         with pytest.raises(ValueError) as exc_info:
             sim_performance.compute_sypd_from_job(naive_job)
-        assert str(exc_info.value) == "Job must have start_time_timestamp, finish_time_timestamp, parameters ['EXPERIMENT']['CHUNKSIZE'] and parameters ['EXPERIMENT']['CHUNKSIZEUNIT'] set."
+        assert (
+            str(exc_info.value)
+            == "Job must have start_time_timestamp, finish_time_timestamp, parameters ['EXPERIMENT']['CHUNKSIZE'] and parameters ['EXPERIMENT']['CHUNKSIZEUNIT'] set."
+        )
 
     def test_no_finish_timestamp(self, sim_performance: SIMPerformance, naive_job: Job):
         """
@@ -59,79 +64,118 @@ class TestSIMPerformanceSYPDNaive:
         naive_job.finish_time_timestamp = None
         with pytest.raises(ValueError) as exc_info:
             sim_performance.compute_sypd_from_job(naive_job)
-        assert str(exc_info.value) == "Job must have start_time_timestamp, finish_time_timestamp, parameters ['EXPERIMENT']['CHUNKSIZE'] and parameters ['EXPERIMENT']['CHUNKSIZEUNIT'] set."
+        assert (
+            str(exc_info.value)
+            == "Job must have start_time_timestamp, finish_time_timestamp, parameters ['EXPERIMENT']['CHUNKSIZE'] and parameters ['EXPERIMENT']['CHUNKSIZEUNIT'] set."
+        )
 
     def test_no_chunk_size(self, sim_performance: SIMPerformance, naive_job: Job):
         """
         Test to verify that an error is raised when chunk_size is not set.
         """
-        naive_job.parameters['EXPERIMENT']['CHUNKSIZE'] = None
+        naive_job.parameters["EXPERIMENT"]["CHUNKSIZE"] = None
         with pytest.raises(ValueError) as exc_info:
             sim_performance.compute_sypd_from_job(naive_job)
-        assert str(exc_info.value) == "Job must have start_time_timestamp, finish_time_timestamp, parameters ['EXPERIMENT']['CHUNKSIZE'] and parameters ['EXPERIMENT']['CHUNKSIZEUNIT'] set."
+        assert (
+            str(exc_info.value)
+            == "Job must have start_time_timestamp, finish_time_timestamp, parameters ['EXPERIMENT']['CHUNKSIZE'] and parameters ['EXPERIMENT']['CHUNKSIZEUNIT'] set."
+        )
 
     def test_no_chunk_size_unit(self, sim_performance: SIMPerformance, naive_job: Job):
         """
         Test to verify that an error is raised when chunk_size_unit is not set.
         """
-        naive_job.parameters['EXPERIMENT']['CHUNKSIZEUNIT'] = None
+        naive_job.parameters["EXPERIMENT"]["CHUNKSIZEUNIT"] = None
         with pytest.raises(ValueError) as exc_info:
             sim_performance.compute_sypd_from_job(naive_job)
-        assert str(exc_info.value) == "Job must have start_time_timestamp, finish_time_timestamp, parameters ['EXPERIMENT']['CHUNKSIZE'] and parameters ['EXPERIMENT']['CHUNKSIZEUNIT'] set."
+        assert (
+            str(exc_info.value)
+            == "Job must have start_time_timestamp, finish_time_timestamp, parameters ['EXPERIMENT']['CHUNKSIZE'] and parameters ['EXPERIMENT']['CHUNKSIZEUNIT'] set."
+        )
 
-    def test_invalid_start_timestamp_type(self, sim_performance: SIMPerformance, naive_job: Job):
+    def test_invalid_start_timestamp_type(
+        self, sim_performance: SIMPerformance, naive_job: Job
+    ):
         """
         Test to verify that an error is raised when start_timestamp is not an integer.
         """
         naive_job.start_time_timestamp = "invalid_timestamp"
         with pytest.raises(TypeError) as exc_info:
             sim_performance.compute_sypd_from_job(naive_job)
-        assert str(exc_info.value) == "start_timestamp must be an integer representing Unix timestamp."
+        assert (
+            str(exc_info.value)
+            == "start_timestamp must be an integer representing Unix timestamp."
+        )
 
-    def test_invalid_finish_timestamp_type(self, sim_performance: SIMPerformance, naive_job: Job):
+    def test_invalid_finish_timestamp_type(
+        self, sim_performance: SIMPerformance, naive_job: Job
+    ):
         """
         Test to verify that an error is raised when finish_timestamp is not an integer.
         """
         naive_job.finish_time_timestamp = "invalid_timestamp"
         with pytest.raises(TypeError) as exc_info:
             sim_performance.compute_sypd_from_job(naive_job)
-        assert str(exc_info.value) == "finish_timestamp must be an integer representing Unix timestamp."
+        assert (
+            str(exc_info.value)
+            == "finish_timestamp must be an integer representing Unix timestamp."
+        )
 
-    def test_invalid_chunk_size_type(self, sim_performance: SIMPerformance, naive_job: Job):
+    def test_invalid_chunk_size_type(
+        self, sim_performance: SIMPerformance, naive_job: Job
+    ):
         """
         Test to verify that an error is raised when chunk_size is not a string.
         """
-        naive_job.parameters['EXPERIMENT']['CHUNKSIZE'] = 12
+        naive_job.parameters["EXPERIMENT"]["CHUNKSIZE"] = 12
         with pytest.raises(TypeError) as exc_info:
             sim_performance.compute_sypd_from_job(naive_job)
-        assert str(exc_info.value) == "chunk_size must be a string representing the size of the chunk (e.g., '12')."
+        assert (
+            str(exc_info.value)
+            == "chunk_size must be a string representing the size of the chunk (e.g., '12')."
+        )
 
-    def test_invalid_chunk_size_unit_type(self, sim_performance: SIMPerformance, naive_job: Job):
+    def test_invalid_chunk_size_unit_type(
+        self, sim_performance: SIMPerformance, naive_job: Job
+    ):
         """
         Test to verify that an error is raised when chunk_size_unit is not a string.
         """
-        naive_job.parameters['EXPERIMENT']['CHUNKSIZEUNIT'] = 12
+        naive_job.parameters["EXPERIMENT"]["CHUNKSIZEUNIT"] = 12
         with pytest.raises(TypeError) as exc_info:
             sim_performance.compute_sypd_from_job(naive_job)
-        assert str(exc_info.value) == "chunk_size_unit must be a string representing the unit of the chunk size (e.g., 'month')."
+        assert (
+            str(exc_info.value)
+            == "chunk_size_unit must be a string representing the unit of the chunk size (e.g., 'month')."
+        )
 
-    def test_invalid_chunk_size_value(self, sim_performance: SIMPerformance, naive_job: Job):
+    def test_invalid_chunk_size_value(
+        self, sim_performance: SIMPerformance, naive_job: Job
+    ):
         """
         Test to verify that an error is raised when chunk_size is not a numeric string.
         """
-        naive_job.parameters['EXPERIMENT']['CHUNKSIZE'] = "invalid_chunk_size"
+        naive_job.parameters["EXPERIMENT"]["CHUNKSIZE"] = "invalid_chunk_size"
         with pytest.raises(ValueError) as exc_info:
             sim_performance.compute_sypd_from_job(naive_job)
-        assert str(exc_info.value) == "chunk_size must be a positive numeric string (e.g., '12')."
+        assert (
+            str(exc_info.value)
+            == "chunk_size must be a positive numeric string (e.g., '12')."
+        )
 
-    def test_negative_chunk_size_unit_value(self, sim_performance: SIMPerformance, naive_job: Job):
+    def test_negative_chunk_size_unit_value(
+        self, sim_performance: SIMPerformance, naive_job: Job
+    ):
         """
         Test to verify that an error is raised when chunk_size is a negative numeric string.
         """
-        naive_job.parameters['EXPERIMENT']['CHUNKSIZE'] = "-12"
+        naive_job.parameters["EXPERIMENT"]["CHUNKSIZE"] = "-12"
         with pytest.raises(ValueError) as exc_info:
             sim_performance.compute_sypd_from_job(naive_job)
-        assert str(exc_info.value) == "chunk_size must be a positive numeric string (e.g., '12')."
+        assert (
+            str(exc_info.value)
+            == "chunk_size must be a positive numeric string (e.g., '12')."
+        )
 
 
 class TestPerformanceSYPDCheckThreshold:
@@ -151,27 +195,35 @@ class TestPerformanceSYPDCheckThreshold:
             status="COMPLETED",
             section="SIM",
             chunk_size="12",
-            chunk_size_unit="hour"
+            chunk_size_unit="hour",
         )
 
         test_job.set_start_timestamp("2025-07-17 14:30:25")
         test_job.set_finish_timestamp("2025-07-17 14:35:25")
-        
+
         return job_factory.create_job(test_job)
 
-    def test_sypd_threshold_above(self, sim_performance: SIMPerformance, job_above_threshold: Job):
+    def test_sypd_threshold_above(
+        self, sim_performance: SIMPerformance, job_above_threshold: Job
+    ):
         """
         Test to verify that the SYPD threshold is above the defined limit.
         """
-        sypd_metric_info = sim_performance.compute_and_check_SYPD_threshold(job_above_threshold)
+        sypd_metric_info = sim_performance.compute_and_check_SYPD_threshold(
+            job_above_threshold
+        )
         sypd = sypd_metric_info.value
         metric = sypd_metric_info.metric
         threshold_sypd = sypd_metric_info.threshold
         under_threshold = sypd_metric_info.under_threshold
         under_performance = sypd_metric_info.under_performance
         assert metric == "SYPD", "Metric name should be 'SYPD'."
-        assert under_threshold is False, f"SYPD should be above threshold. SYPD: {sypd} is lower than threshold: {threshold_sypd}."
-        assert under_performance is None, "Under performance should not be calculated when SYPD is above threshold."
+        assert (
+            under_threshold is False
+        ), f"SYPD should be above threshold. SYPD: {sypd} is lower than threshold: {threshold_sypd}."
+        assert (
+            under_performance is None
+        ), "Under performance should not be calculated when SYPD is above threshold."
 
     @pytest.fixture
     def job_below_threshold(self, job_factory):
@@ -183,29 +235,37 @@ class TestPerformanceSYPDCheckThreshold:
             status="COMPLETED",
             section="SIM",
             chunk_size="1",
-            chunk_size_unit="month"
+            chunk_size_unit="month",
         )
 
         test_job.set_start_timestamp("2025-07-17 14:30:25")
         test_job.set_finish_timestamp("2025-07-17 15:30:25")
-        
+
         return job_factory.create_job(test_job)
-    
-    def test_sypd_threshold_below(self, sim_performance: SIMPerformance, job_below_threshold: Job):
+
+    def test_sypd_threshold_below(
+        self, sim_performance: SIMPerformance, job_below_threshold: Job
+    ):
         """
         Test to verify that the SYPD threshold is below the defined limit.
         """
-        sypd_metric_info = sim_performance.compute_and_check_SYPD_threshold(job_below_threshold)
+        sypd_metric_info = sim_performance.compute_and_check_SYPD_threshold(
+            job_below_threshold
+        )
         sypd = sypd_metric_info.value
         threshold_sypd = sypd_metric_info.threshold
         under_threshold = sypd_metric_info.under_threshold
         under_performance = sypd_metric_info.under_performance
 
-        assert under_threshold is True, f"SYPD should be below threshold. SYPD: {sypd} is greater than threshold: {threshold_sypd}."
-        assert under_performance is not None, "Under performance should be calculated when SYPD is below threshold."
+        assert (
+            under_threshold is True
+        ), f"SYPD should be below threshold. SYPD: {sypd} is greater than threshold: {threshold_sypd}."
+        assert (
+            under_performance is not None
+        ), "Under performance should be calculated when SYPD is below threshold."
 
 
-class TestPerformanceSYPDExtremeCases: 
+class TestPerformanceSYPDExtremeCases:
     """
     Test class for the SYPD (Seconds per Year per Day) computation
     using extreme Job instances.
@@ -221,21 +281,26 @@ class TestPerformanceSYPDExtremeCases:
             status="COMPLETED",
             section="SIM",
             chunk_size="1",
-            chunk_size_unit="day"
+            chunk_size_unit="day",
         )
 
         test_job.set_start_timestamp("2025-07-17 14:30:25")
         test_job.set_finish_timestamp("2025-07-17 14:30:25")
 
         return job_factory.create_job(test_job)
-    
-    def test_sypd_zero_duration(self, sim_performance: SIMPerformance, job_with_zero_duration: Job):
+
+    def test_sypd_zero_duration(
+        self, sim_performance: SIMPerformance, job_with_zero_duration: Job
+    ):
         """
         Test to verify that SYPD is computed correctly for a Job with zero duration.
         """
         with pytest.raises(ValueError) as exc_info:
             sim_performance.compute_sypd_from_job(job_with_zero_duration)
-        assert str(exc_info.value) == "Finish timestamp must be greater than start timestamp."
+        assert (
+            str(exc_info.value)
+            == "Finish timestamp must be greater than start timestamp."
+        )
 
     @pytest.fixture
     def job_with_negative_duration(self, job_factory):
@@ -247,7 +312,7 @@ class TestPerformanceSYPDExtremeCases:
             status="COMPLETED",
             section="SIM",
             chunk_size="1",
-            chunk_size_unit="day"
+            chunk_size_unit="day",
         )
 
         test_job.set_start_timestamp("2025-07-17 14:30:25")
@@ -255,13 +320,18 @@ class TestPerformanceSYPDExtremeCases:
 
         return job_factory.create_job(test_job)
 
-    def test_sypd_negative_duration(self, sim_performance: SIMPerformance, job_with_negative_duration: Job):
+    def test_sypd_negative_duration(
+        self, sim_performance: SIMPerformance, job_with_negative_duration: Job
+    ):
         """
         Test to verify that SYPD raises an error for a Job with negative duration.
         """
         with pytest.raises(ValueError) as exc_info:
             sim_performance.compute_sypd_from_job(job_with_negative_duration)
-        assert str(exc_info.value) == "Finish timestamp must be greater than start timestamp."
+        assert (
+            str(exc_info.value)
+            == "Finish timestamp must be greater than start timestamp."
+        )
 
     @pytest.fixture
     def job_with_invalid_chunk_size(self, job_factory):
@@ -273,7 +343,7 @@ class TestPerformanceSYPDExtremeCases:
             status="COMPLETED",
             section="SIM",
             chunk_size="invalid_chunk_size",
-            chunk_size_unit="day"
+            chunk_size_unit="day",
         )
 
         test_job.set_start_timestamp("2025-07-17 14:30:25")
@@ -281,13 +351,18 @@ class TestPerformanceSYPDExtremeCases:
 
         return job_factory.create_job(test_job)
 
-    def test_sypd_invalid_chunk_size(self, sim_performance: SIMPerformance, job_with_invalid_chunk_size: Job):
+    def test_sypd_invalid_chunk_size(
+        self, sim_performance: SIMPerformance, job_with_invalid_chunk_size: Job
+    ):
         """
         Test to verify that SYPD raises an error for a Job with an invalid chunk size.
         """
         with pytest.raises(ValueError) as exc_info:
             sim_performance.compute_sypd_from_job(job_with_invalid_chunk_size)
-        assert str(exc_info.value) == "chunk_size must be a positive numeric string (e.g., '12')."
+        assert (
+            str(exc_info.value)
+            == "chunk_size must be a positive numeric string (e.g., '12')."
+        )
 
     @pytest.fixture
     def job_with_invalid_chunk_size_unit(self, job_factory):
@@ -299,7 +374,7 @@ class TestPerformanceSYPDExtremeCases:
             status="COMPLETED",
             section="SIM",
             chunk_size="12",
-            chunk_size_unit="invalid_unit"
+            chunk_size_unit="invalid_unit",
         )
 
         test_job.set_start_timestamp("2025-07-17 14:30:25")
@@ -307,14 +382,12 @@ class TestPerformanceSYPDExtremeCases:
 
         return job_factory.create_job(test_job)
 
-    def test_sypd_invalid_chunk_size_unit(self, sim_performance: SIMPerformance, job_with_invalid_chunk_size_unit: Job):
+    def test_sypd_invalid_chunk_size_unit(
+        self, sim_performance: SIMPerformance, job_with_invalid_chunk_size_unit: Job
+    ):
         """
         Test to verify that SYPD raises an error for a Job with an invalid chunk size unit.
         """
         with pytest.raises(ValueError) as exc_info:
             sim_performance.compute_sypd_from_job(job_with_invalid_chunk_size_unit)
         assert str(exc_info.value) == "Unsupported chunk size unit: invalid_unit"
-
-    
-
-
