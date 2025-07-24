@@ -126,7 +126,6 @@ def init_jobs(setup_job_list: Tuple[Any, Any, Dict[str, Any]]) -> Tuple[Job, Job
     return job_list, job_a, job_b, job_c
 
 
-
 @pytest.mark.parametrize(
     'job_a_edge_info,job_b_edge_info',
     [
@@ -183,9 +182,9 @@ def init_jobs(setup_job_list: Tuple[Any, Any, Dict[str, Any]]) -> Tuple[Job, Job
     ]
 )
 def test_handle_special_checkpoint_jobs_matching_parent_status_with_target(
-    job_a_edge_info: Dict[str, Any],
-    job_b_edge_info: Dict[str, Any],
-    init_jobs: Tuple[JobList, Any, Any, Any]
+        job_a_edge_info: Dict[str, Any],
+        job_b_edge_info: Dict[str, Any],
+        init_jobs: Tuple[JobList, Any, Any, Any]
 ) -> None:
     """
     Test special checkpoint job handling for various parent job status combinations.
