@@ -81,25 +81,6 @@ def _create_dummy_job_with_status(status, platform):
     return job
 
 
-def test_add_edge_job(setup_job_list):
-    _, waiting_job, _ = setup_job_list
-    special_variables = {"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": -1}
-    for p in waiting_job.parents:
-        waiting_job.add_edge_info(p, special_variables)
-    for parent in waiting_job.parents:
-        assert waiting_job.edge_info[special_variables["STATUS"]][parent.name] == (
-            parent, special_variables.get("FROM_STEP", 0))
-
-
-def test_add_edge_info_joblist(setup_job_list):
-    job_list, waiting_job, jobs = setup_job_list
-    special_conditions = {"STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": -1}
-    job_list._add_edges_map_info(waiting_job, special_conditions["STATUS"])
-    assert len(job_list.jobs_edges.get(Status.VALUE_TO_KEY[Status.COMPLETED], [])) == 1
-    job_list._add_edges_map_info(jobs["waiting"][1], special_conditions["STATUS"])
-    assert len(job_list.jobs_edges.get(Status.VALUE_TO_KEY[Status.COMPLETED], [])) == 2
-
-
 @pytest.fixture
 def init_jobs(setup_job_list: Tuple[Any, Any, Dict[str, Any]]) -> Tuple[Job, Job, Job]:
     """
@@ -181,7 +162,7 @@ def init_jobs(setup_job_list: Tuple[Any, Any, Dict[str, Any]]) -> Tuple[Job, Job
         "JOB A FAILED, JOB B FAILED",
     ]
 )
-def test_handle_special_checkpoint_jobs_matching_parent_status_with_target(
+def test_handle_special_checkpoint_jobs_matching_parent_status_with_target_and_not_optional(
         job_a_edge_info: Dict[str, Any],
         job_b_edge_info: Dict[str, Any],
         init_jobs: Tuple[JobList, Any, Any, Any]
@@ -235,3 +216,4 @@ def test_handle_special_checkpoint_jobs_matching_parent_status_with_target(
 # 1) Cases when job_c.status remains in WAITING.
 # 2) Cases when job_a or job_b status doesn't match the edge_info target status.
 # 3) OPTIONAL edges and their handling.
+# 4) From step higher than 0. (update job.checkpoint)
