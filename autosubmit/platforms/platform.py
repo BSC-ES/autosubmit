@@ -1089,8 +1089,8 @@ class Platform(object):
         :type as_conf: AutosubmitConfig
         """
 
-        manager_performance = self._performance_factory.create_performance(job, as_conf)
         try:
+            manager_performance = self._performance_factory.create_performance(job, as_conf)
             manager_performance.compute_and_check_performance_metrics(job)
         except Exception as e:
             Log.error(f"Failed to compute performance metrics for job '{job.name}': {e}")
