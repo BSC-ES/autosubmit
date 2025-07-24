@@ -269,7 +269,7 @@ def last_name_used(test=False, operational=False, evaluation=False):
     if BasicConfig.DATABASE_BACKEND == 'postgres':
         fn = _last_name_used_sqlalchemy
 
-    queue = multiprocessing.Queue(TIMEOUT)
+    queue = multiprocessing.Queue(1)
     proc = multiprocessing.Process(target=fn_wrapper, args=(fn, queue, test, operational, evaluation))
     proc.start()
 
