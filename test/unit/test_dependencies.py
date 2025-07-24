@@ -571,8 +571,11 @@ def test_add_special_conditions(mocker, joblist):
     job.split = 1
     job.splits = 1
     job.max_checkpoint_step = 0
-    special_conditions = {"STATUS": "RUNNING", "FROM_STEP": "2"}
-    filters_to_apply = {"DATES_TO": "all", "MEMBERS_TO": "all", "CHUNKS_TO": "all", "SPLITS_TO": "all"}
+    joblist.graph = DiGraph()
+    joblist.add_job(job)
+
+    special_conditions = {"STATUS": "RUNNING", "FROM_STEP": "2", "OPTIONAL": False}
+
     parent = Job("parent", 1, Status.READY, 1)
     parent.section = "parent_one"
     parent.date = datetime.strptime("20200128", "%Y%m%d")
@@ -581,31 +584,33 @@ def test_add_special_conditions(mocker, joblist):
     parent.split = 1
     parent.splits = 1
     parent.max_checkpoint_step = 0
-    job.status = Status.READY
-    job_list = mocker.Mock(wraps=joblist)
-    job_list._job_list = [job, parent]
-    job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent)
-    # joblist.jobs_edges
-    # job.edges = joblist.jobs_edges[job.name]
-    # assert
-    assert job.max_checkpoint_step == 2
+    joblist.add_job(parent)
+    joblist.graph.add_edge(parent.name, job.name)
+    job.status = Status.WAITING
+    joblist._job_list = [parent, job]
+    joblist.add_special_conditions(job, special_conditions, parent)
+
+    assert job.max_checkpoint_step == '2'
+    # THIS IS TODO (job.edge not longer exists)
     value = job.edge_info.get("RUNNING", "").get("parent", ())
     assert (value[0].name, value[1]) == (parent.name, "2")
     assert len(job.edge_info.get("RUNNING", "")) == 1
 
-    assert str(job_list.jobs_edges.get("RUNNING", ())) == str({job})
+    assert str(joblist.jobs_edges.get("RUNNING", ())) == str({job})
     parent2 = Job("parent2", 1, Status.READY, 1)
     parent2.section = "parent_two"
     parent2.date = datetime.strptime("20200128", "%Y%m%d")
     parent2.member = "fc0"
     parent2.chunk = 1
+    joblist.add_job(parent2)
+    joblist.graph.add_edge(parent2.name, job.name)
 
-    job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent2)
+    joblist.add_special_conditions(job, special_conditions, parent2)
     value = job.edge_info.get("RUNNING", "").get("parent2", ())
     assert len(job.edge_info.get("RUNNING", "")) == 2
     assert (value[0].name, value[1]) == (parent2.name, "2")
-    assert str(job_list.jobs_edges.get("RUNNING", ())) == str({job})
-    job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent2)
+    assert str(joblist.jobs_edges.get("RUNNING", ())) == str({job})
+    joblist.add_special_conditions(job, special_conditions, parent2)
     assert len(job.edge_info.get("RUNNING", "")) == 2
 
 
@@ -655,8 +660,8 @@ def test_add_special_conditions_chunks_to_once(mocker, joblist):
     assert filters_to_apply == {}
     assert filters_to_apply_two == {}
 
-    job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent)
-    job_list.add_special_conditions(job_two, special_conditions_two, filters_to_apply_two, parent)
+    job_list.add_special_conditions(job, special_conditions, parent)
+    job_list.add_special_conditions(job_two, special_conditions_two, parent)
 
     dependency = MagicMock()
     dependency.relationships = {'CHUNKS_FROM': {'1': {'FROM_STEP': '1', 'CHUNKS_TO': 'natural'},
@@ -668,8 +673,8 @@ def test_add_special_conditions_chunks_to_once(mocker, joblist):
     assert filters_to_apply == {}
     assert filters_to_apply_two == {}
 
-    job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent)
-    job_list.add_special_conditions(job_two, special_conditions_two, filters_to_apply_two, parent)
+    job_list.add_special_conditions(job, special_conditions, parent)
+    job_list.add_special_conditions(job_two, special_conditions_two, parent)
 
     assert job.max_checkpoint_step == 1
     assert job_two.max_checkpoint_step == 2

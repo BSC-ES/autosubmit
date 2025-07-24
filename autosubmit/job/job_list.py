@@ -1233,21 +1233,27 @@ class JobList(object):
                 filters_to_apply = relationships
         return filters_to_apply
 
-    def add_special_conditions(self, job, special_conditions, filters_to_apply, parent):
+    def add_special_conditions(
+            self,
+            job: Job,
+            special_conditions: Dict[str, Any],
+            parent: Job
+    ) -> None:
         """
-        Add special conditions to the job edge
-        :param job: Job
-        :param special_conditions: dict
-        :param filters_to_apply: dict
-        :param parent: parent job
-        :return:
+        Add special conditions to the edge between a parent job and a child job in the workflow graph.
+
+        :param job: The child job to which special conditions are applied.
+        :type job: Job
+        :param special_conditions: Dictionary containing special condition parameters (e.g., STATUS, FROM_STEP, OPTIONAL).
+        :type special_conditions: Dict[str, Any]
+        :param parent: The parent job from which the edge originates.
+        :type parent: Job
         """
         status = special_conditions.get("STATUS", "COMPLETED")
         from_step = special_conditions.get("FROM_STEP", 0)
         optional = special_conditions.get("OPTIONAL", False)
         job.max_checkpoint_step = from_step if int(from_step) > job.max_checkpoint_step else job.max_checkpoint_step
         self.graph.edges[parent.name, job.name].update(status=status, from_step=from_step, optional=optional)
-        pass
 
     def _apply_jobs_edge_info(self, job, dependencies):
         filters_to_apply_by_section = dict()
@@ -1274,8 +1280,7 @@ class JobList(object):
             special_conditions["OPTIONAL"] = (filters_to_apply_by_section[key].pop("OPTIONAL", False))
 
             for parent in list_of_parents:
-                self.add_special_conditions(job, special_conditions,
-                                            filters_to_apply_by_section[key], parent)
+                self.add_special_conditions(job, special_conditions, parent)
 
     def find_current_section(self, job_section, section, dic_jobs, distance, visited_section=[]):
         sections = dic_jobs.as_conf.jobs_data[section].get("DEPENDENCIES", {}).keys()
