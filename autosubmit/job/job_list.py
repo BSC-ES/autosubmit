@@ -2940,7 +2940,7 @@ class JobList(object):
         else:
             self._reset_jobs_on_first_run()
         save |= self._handle_special_checkpoint_jobs()
-        # save |= self._sync_completed_jobs(as_conf) # TODO This code was existing before but not sure what is doing?
+        save |= self._sync_completed_jobs() # TODO This code was existing before but not sure what is doing?
         if not fromSetStatus:
             save |= self._update_waiting_and_delayed_jobs(as_conf)
             save |= self._update_held_jobs(as_conf)

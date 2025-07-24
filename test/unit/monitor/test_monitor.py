@@ -37,6 +37,8 @@ from autosubmit.monitor.monitor import (
     _display_file_xdg, clean_plot, clean_stats, Monitor
 )
 from log.log import AutosubmitCritical
+import pytest
+from typing import Any, Dict, Tuple, List, Optional
 
 _EXPID = 't000'
 
@@ -162,8 +164,6 @@ def test_create_node(job_name: str, groups: dict[str, Any], hide_groups: bool, e
     else:
         assert node.get_name() == expected_group
 
-import pytest
-from typing import Any, Dict, Tuple, List, Optional
 
 _COLORS = [
     ('UNKNOWN', 'white'),
