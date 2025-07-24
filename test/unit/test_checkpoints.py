@@ -231,3 +231,8 @@ def test_handle_special_checkpoint_jobs_matching_parent_status_with_target(
     job_b.status = Status.KEY_TO_VALUE[job_b_edge_info["STATUS"]]
     job_list._handle_special_checkpoint_jobs()
     assert job_c.status == Status.READY
+
+# TODO: missing scenarios
+# 1) Cases when job_c.status remains in WAITING.
+# 2) Cases when job_a or job_b status doesn't match the edge_info target status.
+# 3) OPTIONAL edges and their handling.
