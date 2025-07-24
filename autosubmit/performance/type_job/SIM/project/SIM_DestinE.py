@@ -13,7 +13,7 @@
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.  
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from typing import TYPE_CHECKING
 from autosubmit.performance.base_performance import PerformanceMetricInfo
@@ -22,6 +22,7 @@ from autosubmit.performance.type_job.SIM.SIM_performance import SIMPerformance
 if TYPE_CHECKING:
     from autosubmit.job.job import Job
 
+
 class SIMDestinEPerformance(SIMPerformance):
     """
     Class to compute performance metrics for SIM DestinE jobs.
@@ -29,8 +30,10 @@ class SIMDestinEPerformance(SIMPerformance):
     """
 
     SYPD_THRESHOLD: float = 2  # Threshold for SYPD to consider a job as "fast"
-    
-    def compute_and_check_performance_metrics(self, job: 'Job') -> list[PerformanceMetricInfo]:
+
+    def compute_and_check_performance_metrics(
+        self, job: "Job"
+    ) -> list[PerformanceMetricInfo]:
         """
         Compute the performance metrics for a SIM DestinE job and check if it is under a threshold.
 
