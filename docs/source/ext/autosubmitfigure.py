@@ -78,12 +78,12 @@ class AutosubmitFigureDirective(code.CodeBlock):
         caption = self.options.get('caption')
 
         if self.options.get('name'):
-            path_from = f"{self.env.srcdir}/{self.options.get('path')}/code/job_{self.options.get('name')}.yml"
+            path_from = f"{self.env.srcdir}/../{self.options.get('path')}/code/job_{self.options.get('name')}.yml"
             if Path(path_from).is_file():
                 path_to = f"/home/docs/autosubmit/a000/conf/jobs_a000.yml"
                 shutil.move(path_from, path_to)
 
-            path_from = f"{self.env.srcdir}/{self.options.get('path')}/code/exp_{self.options.get('name')}.yml"
+            path_from = f"{self.env.srcdir}/../{self.options.get('path')}/code/exp_{self.options.get('name')}.yml"
             if Path(path_from).is_file():
                 path_to = f"/home/docs/autosubmit/a000/conf/expdef_a000.yml"
                 shutil.move(path_from, path_to)
