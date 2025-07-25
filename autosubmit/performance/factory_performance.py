@@ -25,9 +25,7 @@ if TYPE_CHECKING:
 
 class PerformanceFactory:
 
-    def create_performance(
-        self, job: "Job", config: AutosubmitConfig
-    ) -> BasePerformance:
+    def create_performance(self, job: "Job", config: AutosubmitConfig) -> BasePerformance:
         """
         Factory method to create a performance metric calculator for a job.
 
@@ -64,9 +62,7 @@ class PerformanceFactory:
         return self._create_performance_by_type(f"{job.section}_{project}", config)
 
     @staticmethod
-    def _create_performance_by_type(
-        job_type: str, config: AutosubmitConfig
-    ) -> BasePerformance:
+    def _create_performance_by_type(job_type: str, config: AutosubmitConfig) -> BasePerformance:
         """
         Create a performance calculator based on the job type.
 

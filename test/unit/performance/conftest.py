@@ -100,7 +100,7 @@ def mock_smtp(mocker):
 
 
 @pytest.fixture
-def mock_mail_notifier(mock_basic_config):
+def mock_mail_notifier(mock_basic_config) -> MailNotifier:
     """
     Fixture to create a MailNotifier instance with mocked BasicConfig.
     """

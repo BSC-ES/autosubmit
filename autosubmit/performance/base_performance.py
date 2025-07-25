@@ -47,9 +47,7 @@ class PerformanceMetricInfo(NamedTuple):
 class BasePerformance(ABC):
     """Base class for performance metrics calculation"""
 
-    _mail_notifier = MailNotifier(
-        BasicConfig()
-    )  # Default MailNotifier with BasicConfig
+    _mail_notifier = MailNotifier(BasicConfig())  # Default MailNotifier with BasicConfig
 
     def __init__(self, autosubmit_config: Optional[AutosubmitConfig] = None):
         """
@@ -61,9 +59,7 @@ class BasePerformance(ABC):
         self._autosubmit_config = autosubmit_config
 
     @abstractmethod
-    def compute_and_check_performance_metrics(
-        self, job: "Job"
-    ) -> list[PerformanceMetricInfo]:
+    def compute_and_check_performance_metrics(self, job: "Job") -> list[PerformanceMetricInfo]:
         """
         Compute performance metrics for a job.
 

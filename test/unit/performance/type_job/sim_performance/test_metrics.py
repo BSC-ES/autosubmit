@@ -26,14 +26,7 @@ class TestPerformanceMetricsNaive:
     Test class for performance metrics calculations, check threshold and send mail.
     """
 
-    def test_check_and_compute_performance_metrics(
-        self,
-        mocker,
-        naive_job: Job,
-        sim_performance_with_mail_notifier: SIMPerformance,
-        mock_smtp,
-        utils: Utils,
-    ):
+    def test_check_and_compute_performance_metrics(self, mocker, naive_job: Job, sim_performance_with_mail_notifier: SIMPerformance, mock_smtp, utils: Utils):
         """
         Test the performance metrics calculations for a naive job.
         Check if the metrics are under the threshold and if the mail is sent.
