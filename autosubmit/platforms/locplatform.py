@@ -26,11 +26,11 @@ from time import sleep
 from autosubmit.platforms.headers.local_header import LocalHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.wrappers.wrapper_factory import LocalWrapperFactory
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 from log.log import Log, AutosubmitError
 
 if TYPE_CHECKING:
-    from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+    from autosubmit.config.configcommon import AutosubmitConfig
 
 class LocalPlatform(ParamikoPlatform):
     """

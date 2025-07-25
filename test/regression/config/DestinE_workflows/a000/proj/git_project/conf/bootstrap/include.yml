@@ -1,0 +1,40 @@
+# This file is the entry point for this workflow configuration.
+# You must point the as_conf directory to the directory of this
+# file, and define the other files to be loaded here via
+# CUSTOM_CONFIG.{PRE|POST}.
+
+DEFAULT:
+  CUSTOM_CONFIG:
+    PRE:
+      # Basic configuration: platforms, jobs and defaults
+      - "%PROJDIR%/conf/platforms.yml"
+      - "%PROJDIR%/conf/jobs_%RUN.WORKFLOW%.yml" 
+      - "%PROJDIR%/conf/defaults_%RUN.WORKFLOW%.yml"
+      # Model configuration
+      - "%PROJDIR%/conf/simulation/%MODEL.SIMULATION%.yml"
+      - "%PROJDIR%/conf/model/%MODEL.NAME%/%MODEL.NAME%.yml"
+      - "%PROJDIR%/conf/model/%MODEL.NAME%/%MODEL.GRID_ATM%-%RUN.PROCESSOR_UNIT%.yml"
+      - "%PROJDIR%/conf/model/%MODEL.NAME%/ICMCL-%CONFIGURATION.ICMCL%.yml"
+      - "%PROJDIR%/conf/model/%MODEL.NAME%/%MODEL.GRID_OCE%.yml"
+      # Additional jobs
+      - "%PROJDIR%/conf/additional_jobs/transfer-%CONFIGURATION.ADDITIONAL_JOBS.TRANSFER%.yml"
+      - "%PROJDIR%/conf/additional_jobs/backup-%CONFIGURATION.ADDITIONAL_JOBS.BACKUP%.yml"
+      - "%PROJDIR%/conf/additional_jobs/memory_checker-%CONFIGURATION.ADDITIONAL_JOBS.MEMORY_CHECKER%.yml" 
+      - "%PROJDIR%/conf/additional_jobs/dqc-%CONFIGURATION.ADDITIONAL_JOBS.DQC%.yml" 
+      - "%PROJDIR%/conf/additional_jobs/wipe-%CONFIGURATION.ADDITIONAL_JOBS.WIPE%.yml" 
+      - "%PROJDIR%/conf/additional_jobs/aqua-%CONFIGURATION.ADDITIONAL_JOBS.AQUA%.yml" 
+      - "%PROJDIR%/conf/additional_jobs/clean-%CONFIGURATION.ADDITIONAL_JOBS.CLEAN%.yml" 
+      - "%PROJDIR%/conf/additional_jobs/scaling-%CONFIGURATION.ADDITIONAL_JOBS.SCALING%.yml"
+      - "%PROJDIR%/conf/additional_jobs/aqua-%CONFIGURATION.ADDITIONAL_JOBS.AQUA%.yml"
+      # Applications 
+      - "%PROJDIR%/conf/applications/%APP.NAMES%" # this only works if we run a single app!
+      - "%PROJDIR%/conf/applications/container_versions.yml"
+      - "%PROJDIR%/conf/applications/%APP.NAMES%"
+      # Data configuration
+      - "%PROJDIR%/conf/data_gov/%RUN.TYPE%.yml" 
+      # Mother request
+      - "%PROJDIR%/conf/mother_request.yml" 
+
+    POST:
+      - "~/platforms.yml"
+

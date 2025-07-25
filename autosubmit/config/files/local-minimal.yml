@@ -1,0 +1,15 @@
+
+CONFIG:
+  AUTOSUBMIT_VERSION: 4.0.0b
+  TOTALJOBS: 20
+  MAXWAITINGJOBS: 20
+DEFAULT:
+  EXPID: ""
+  HPCARCH: ""
+  #hint: use %PROJDIR% to point to the project folder (where the project is cloned)
+  CUSTOM_CONFIG: ""
+project:
+  PROJECT_TYPE: "local"
+  PROJECT_DESTINATION: "local_project"
+local:
+  PROJECT_PATH: 'TO_FILL'

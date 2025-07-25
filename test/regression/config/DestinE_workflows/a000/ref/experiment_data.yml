@@ -1,0 +1,3833 @@
+APP:
+  NAMES:
+  - ENERGY_ONSHORE
+  OUTPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+AQUA:
+  '1':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: tp
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: tp
+  '10':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: tclw
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: tclw
+  '11':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: e
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: e
+  '12':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: sf
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: sf
+  '13':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: slhf
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: slhf
+  '14':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: sshf
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: sshf
+  '15':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: ssr
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: ssr
+  '16':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: str
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: str
+  '17':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: strd
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: strd
+  '18':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: ssrd
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: ssrd
+  '19':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: tsr
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: tsr
+  '2':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      MODEL: IFS-NEMO
+      PARAM: 2t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+  '20':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: ttr
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: ttr
+  '21':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: tisr
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: tisr
+  '22':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVELIST:
+      - 1
+      - 5
+      - 10
+      - 20
+      - 30
+      - 50
+      - 70
+      - 100
+      - 150
+      - 200
+      - 250
+      - 300
+      - 400
+      - 500
+      - 600
+      - 700
+      - 850
+      - 925
+      - 1000
+      LEVTYPE: pl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: q
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: q
+  '23':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVELIST:
+      - 1
+      - 5
+      - 10
+      - 20
+      - 30
+      - 50
+      - 70
+      - 100
+      - 150
+      - 200
+      - 250
+      - 300
+      - 400
+      - 500
+      - 600
+      - 700
+      - 850
+      - 925
+      - 1000
+      LEVTYPE: pl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: t
+  '24':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVELIST:
+      - 1
+      - 5
+      - 10
+      - 20
+      - 30
+      - 50
+      - 70
+      - 100
+      - 150
+      - 200
+      - 250
+      - 300
+      - 400
+      - 500
+      - 600
+      - 700
+      - 850
+      - 925
+      - 1000
+      LEVTYPE: pl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: u
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: u
+  '25':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVELIST:
+      - 1
+      - 5
+      - 10
+      - 20
+      - 30
+      - 50
+      - 70
+      - 100
+      - 150
+      - 200
+      - 250
+      - 300
+      - 400
+      - 500
+      - 600
+      - 700
+      - 850
+      - 925
+      - 1000
+      LEVTYPE: pl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: v
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: v
+  '26':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: o2d
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: avg_tos
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '0000'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 1440
+      VARIABLE: avg_tos
+  '27':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: o2d
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: avg_siconc
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '0000'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 1440
+      VARIABLE: avg_siconc
+  '28':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: o2d
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: avg_sos
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '0000'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 1440
+      VARIABLE: avg_sos
+  '29':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVELIST:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
+      - 19
+      - 20
+      - 21
+      - 22
+      - 23
+      - 24
+      - 25
+      - 26
+      - 27
+      - 28
+      - 29
+      - 30
+      - 31
+      - 32
+      - 33
+      - 34
+      - 35
+      - 36
+      - 37
+      - 38
+      - 39
+      - 40
+      - 41
+      - 42
+      - 43
+      - 44
+      - 45
+      - 46
+      - 47
+      - 48
+      - 49
+      - 50
+      - 51
+      - 52
+      - 53
+      - 54
+      - 55
+      - 56
+      - 57
+      - 58
+      - 59
+      - 60
+      - 61
+      - 62
+      - 63
+      - 64
+      - 65
+      - 66
+      - 67
+      - 68
+      - 69
+      - 70
+      - 71
+      - 72
+      - 73
+      - 74
+      - 75
+      LEVTYPE: o3d
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: avg_thetao
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '0000'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 1440
+      VARIABLE: avg_thetao
+  '3':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: skt
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: skt
+  '30':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVELIST:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
+      - 19
+      - 20
+      - 21
+      - 22
+      - 23
+      - 24
+      - 25
+      - 26
+      - 27
+      - 28
+      - 29
+      - 30
+      - 31
+      - 32
+      - 33
+      - 34
+      - 35
+      - 36
+      - 37
+      - 38
+      - 39
+      - 40
+      - 41
+      - 42
+      - 43
+      - 44
+      - 45
+      - 46
+      - 47
+      - 48
+      - 49
+      - 50
+      - 51
+      - 52
+      - 53
+      - 54
+      - 55
+      - 56
+      - 57
+      - 58
+      - 59
+      - 60
+      - 61
+      - 62
+      - 63
+      - 64
+      - 65
+      - 66
+      - 67
+      - 68
+      - 69
+      - 70
+      - 71
+      - 72
+      - 73
+      - 74
+      - 75
+      LEVTYPE: o3d
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: avg_so
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '0000'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 1440
+      VARIABLE: avg_so
+  '4':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: tcc
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: tcc
+  '5':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: lcc
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: lcc
+  '6':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: mcc
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: mcc
+  '7':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: hcc
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: hcc
+  '8':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: sd
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: sd
+  '9':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: tciw
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: monthly
+      TIME_STEP: 60
+      VARIABLE: tciw
+  CATALOG_NAME: mn5-phase2
+  CONTAINER_VERSION: 0.11.3
+  ECCODES_PATH: /gpfs/scratch/bsc32/bsc032655/opt/eccodes-2.32.6/definitions
+  GRID_OCE: eORCA1
+  SOURCE_HL: hourly-hpz5-hl
+  SOURCE_O2D: daily-hpz5-o2d
+  SOURCE_O3D: daily-hpz5-o3d
+  SOURCE_PL: hourly-hpz5-atm3d
+  SOURCE_SFC: hourly-hpz5-atm2d
+  SOURCE_SOL: hourly-hpz5-sol
+  VARS_HL: ''
+  VARS_O2D: "['avg_tos', 'avg_sithick', 'avg_siconc', 'avg_sos', 'avg_hc700m']"
+  VARS_O3D: " ['avg_thetao', 'avg_so']"
+  VARS_PL: "['q', 't', 'u', 'v']"
+  VARS_SFC: "['mtpr', '2t', 'skt', 'msl', 'tcc', 'lcc', 'hcc', 'mcc', 'sd', 'tciw',\
+    \ 'tclw', 'mer', 'msr', 'mslhf', 'msshf', 'msnswrf', 'msnlwrf', 'msdwlwrf', 'msdwswrf',\
+    \ 'mtnswrf', 'mtnlwrf', 'mtdwswrf', 'mntss', 'metss', 'msror']"
+  VARS_SOL: ''
+  WORKERS_HL: 0
+  WORKERS_O2D: 12
+  WORKERS_O3D: 3
+  WORKERS_PL: 6
+  WORKERS_SFC: 16
+  WORKERS_SOL: 0
+CONFIG:
+  AUTOSUBMIT_VERSION: 4.1.10
+  MAXWAITINGJOBS: 20
+  TOTALJOBS: 20
+CONFIGURATION:
+  ADDITIONAL_JOBS:
+    AQUA: 'True'
+    BACKUP: 'False'
+    DQC: 'True'
+    MEMORY_CHECKER: 'False'
+    TRANSFER: 'False'
+  DATA_PORTFOLIO: production
+  DQC_PROFILE: lowres
+  DQC_PROFILE_PATH: '%HPCROOTDIR%/profiles/ifs-nemo'
+  DQC_PROFILE_ROOT: '%HPCROOTDIR%/profiles'
+  IFS:
+    EXPVER: hz9m
+    GTYPE: tco
+    IO_NODES: 1
+    LABEL: LWDA
+    LEVELS: 137
+    RESOL: 79
+  INPUTS: experiment/scenario-20y-2020-debug-configuration-2y-coupled-spinup
+  RAPS_EXPERIMENT: hist
+  RAPS_USER_FLAGS: --keepxml
+DEFAULT:
+  CUSTOM_CONFIG: /appl/AS/AUTOSUBMIT_DATA/a1sr/proj/git_project/conf/bootstrap/
+  EXPID: a1sr
+  HPCARCH: MARENOSTRUM5
+ENERGY_OFFSHORE:
+  '1':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 10u
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 10u
+  '10':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: '%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%'
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: o2d
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: avg_siue
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '0000'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: avg_siue
+  '11':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: '%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%'
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: o2d
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: avg_sivn
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '0000'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: avg_sivn
+  '12':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: '%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%'
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: o2d
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: avg_tos
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '0000'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: avg_tos
+  '13':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: '%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%'
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: o2d
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: avg_sos
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '0000'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: avg_sos
+  '14':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: '%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%'
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: o2d
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: avg_zos
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '0000'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: avg_zos
+  '15':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: '%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%'
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVELIST: '1000'
+      LEVTYPE: pl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: t
+  '16':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: '%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%'
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVELIST: '1000'
+      LEVTYPE: pl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: q
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: q
+  '17':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: '%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%'
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVELIST: '1000'
+      LEVTYPE: pl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: clwc
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: clwc
+  '18':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: '%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%'
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVELIST: '1000'
+      LEVTYPE: pl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: z
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: z
+  '2':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 10v
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 10v
+  '3':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 2t
+  '4':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2d
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 2d
+  '5':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: tprate
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: tprate
+  '6':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: '%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%'
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVELIST: '100'
+      LEVTYPE: hl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 100u
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 100u
+  '7':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: '%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%'
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVELIST: '100'
+      LEVTYPE: hl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 100v
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 100v
+  '8':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: '%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%'
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: o2d
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: avg_sithick
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '0000'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: avg_sithick
+  '9':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70/-12/48/31
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: '%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%'
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: o2d
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: avg_siconc
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '0000'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: avg_siconc
+ENERGY_ONSHORE:
+  '1':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA:
+      - 72.1
+      - -25.1
+      - 26.9
+      - 45.1
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVELIST: 100
+      LEVTYPE: hl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 100v
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 100v
+  '2':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA:
+      - 72.1
+      - -25.1
+      - 26.9
+      - 45.1
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVELIST: 100
+      LEVTYPE: hl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 100u
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 100u
+  '3':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA:
+      - 72.1
+      - -25.1
+      - 26.9
+      - 45.1
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVELIST: 100
+      LEVTYPE: hl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 100v
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: 100v
+  '4':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA:
+      - 72.1
+      - -25.1
+      - 26.9
+      - 45.1
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVELIST: 100
+      LEVTYPE: hl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 100u
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: 100u
+  '5':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA:
+      - 72.1
+      - -25.1
+      - 26.9
+      - 45.1
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: min
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: 2t
+  '6':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA:
+      - 72.1
+      - -25.1
+      - 26.9
+      - 45.1
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: max
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: 2t
+  '7':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA:
+      - 72.1
+      - -25.1
+      - 26.9
+      - 45.1
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: 2t
+EXPERIMENT:
+  CALENDAR: standard
+  CHUNKSIZE: 1
+  CHUNKSIZEUNIT: day
+  DATELIST: 20200101
+  MEMBERS: fc0
+  NUMCHUNKS: 2
+GIT:
+  FETCH_SINGLE_BRANCH: true
+  PROJECT_BRANCH: main
+  PROJECT_COMMIT: ''
+  PROJECT_ORIGIN: https://earth.bsc.es/gitlab/digital-twins/de_340-2/workflow
+  PROJECT_SUBMODULES: gsv_interface one-pass bias_adjustment energy_onshore dvc-cache-de340
+    data-portfolio catalog
+HYDROMET:
+  '1':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 60.0/5.0/45.0/20.0
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: tp
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: annually
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: iams
+      STAT_FREQ: annually
+      TIME_STEP: 60
+      VARIABLE: tp
+  '2':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 60.0/5.0/45.0/20.0
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: tp
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: tp
+JOBS:
+  APP_ENERGY_ONSHORE:
+    ADDITIONAL_FILES: []
+    CHECK: on_submission
+    DEPENDENCIES:
+      APP_ENERGY_ONSHORE:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+      OPA_ENERGY_ONSHORE_1:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: all
+      OPA_ENERGY_ONSHORE_2:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: all
+      OPA_ENERGY_ONSHORE_3:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: all
+      OPA_ENERGY_ONSHORE_4:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: all
+      OPA_ENERGY_ONSHORE_5:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: all
+      OPA_ENERGY_ONSHORE_6:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: all
+      OPA_ENERGY_ONSHORE_7:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: all
+    FILE: templates/application.sh
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: MARENOSTRUM5
+    PROCESSORS: 1
+    RUNNING: chunk
+    SPLITS: '1'
+    TASKS: 1
+    THREADS: 1
+    WALLCLOCK: 00:10
+  AQUA_ANALYSIS:
+    ADDITIONAL_FILES: []
+    CHECK: on_submission
+    DEPENDENCIES:
+      LRA_GENERATOR: {}
+    EXCLUSIVE: 'True'
+    FILE: templates/aqua/aqua_analysis.sh
+    FREQUENCY: 1
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: MARENOSTRUM5
+    PROCESSORS: '%CURRENT_PROCESSORS_PER_NODE%'
+    RUNNING: chunk
+    TASKS: 0
+    THREADS: 1
+    WALLCLOCK: 02:00
+  DN:
+    ADDITIONAL_FILES:
+    - conf/mother_request.yml
+    CHECK: on_submission
+    DELAY_RETRY_TIME: 11
+    DEPENDENCIES:
+      APP_ENERGY_ONSHORE-1:
+        SPLITS_TO: '1'
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+      DN-1: {}
+      REMOTE_SETUP:
+        STATUS: COMPLETED
+        ANY_FINAL_STATUS_IS_VALID: False
+    FILE: templates/dn.sh
+    PLATFORM: MARENOSTRUM5-login
+    RETRIALS: 3
+    RUNNING: chunk
+    SPLITS: '1'
+    TOTALJOBS: 1
+    WALLCLOCK: 02:00
+  DQC_BASIC:
+    ADDITIONAL_FILES: []
+    CHECK: on_submission
+    CHECK_PHYSICAL_PLAUSIBILITY: 'True'
+    CHECK_SPATIAL_COMPLETENESS: 'True'
+    CHECK_SPATIAL_CONSISTENCY: 'True'
+    CHECK_STANDARD_COMPLIANCE: 'False'
+    DEPENDENCIES:
+      SIM: {}
+    FILE: templates/dqc.sh
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: MARENOSTRUM5
+    PROCESSORS: 1
+    RUNNING: chunk
+    TASKS: 1
+    THREADS: 16
+    WALLCLOCK: 00:05
+  DQC_FULL:
+    ADDITIONAL_FILES: []
+    CHECK: on_submission
+    CHECK_PHYSICAL_PLAUSIBILITY: 'True'
+    CHECK_SPATIAL_COMPLETENESS: 'True'
+    CHECK_SPATIAL_CONSISTENCY: 'True'
+    CHECK_STANDARD_COMPLIANCE: 'True'
+    DEPENDENCIES:
+      DQC_BASIC: {}
+    FILE: templates/dqc.sh
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: MARENOSTRUM5
+    PROCESSORS: 1
+    RUNNING: chunk
+    TASKS: 1
+    THREADS: 16
+    WALLCLOCK: 00:05
+  INI:
+    ADDITIONAL_FILES: []
+    CHECK: on_submission
+    DEPENDENCIES:
+      REMOTE_SETUP: {}
+    FILE: templates/ini.sh
+    PLATFORM: MARENOSTRUM5-login
+    RUNNING: member
+    WALLCLOCK: 00:30
+  LOCAL_SETUP:
+    ADDITIONAL_FILES: []
+    CHECK: on_submission
+    DEPENDENCIES: {}
+    FILE: templates/local_setup.sh
+    PLATFORM: LOCAL
+    RUNNING: once
+  LRA_GENERATOR:
+    ADDITIONAL_FILES:
+    - templates/aqua/only_lra.yaml
+    CHECK: on_submission
+    DEPENDENCIES:
+      SIM: {}
+    EXCLUSIVE: 'True'
+    FILE: templates/aqua/lra_generator.sh
+    FREQUENCY: 3
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: MARENOSTRUM5
+    PROCESSORS: '%CURRENT_PROCESSORS_PER_NODE%'
+    RUNNING: chunk
+    TASKS: 0
+    THREADS: 1
+    WALLCLOCK: 02:00
+  OPA_ENERGY_ONSHORE_1:
+    ADDITIONAL_FILES: []
+    CHECK: on_submission
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:1]*\1'
+      OPA_ENERGY_ONSHORE_1:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+    FILE: templates/opa.sh
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: MARENOSTRUM5
+    PROCESSORS: 1
+    RUNNING: chunk
+    SPLITS: '1'
+    TASKS: 1
+    THREADS: 1
+  OPA_ENERGY_ONSHORE_2:
+    ADDITIONAL_FILES: []
+    CHECK: on_submission
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:1]*\1'
+      OPA_ENERGY_ONSHORE_2:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+    FILE: templates/opa.sh
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: MARENOSTRUM5
+    PROCESSORS: 1
+    RUNNING: chunk
+    SPLITS: '1'
+    TASKS: 1
+    THREADS: 1
+  OPA_ENERGY_ONSHORE_3:
+    ADDITIONAL_FILES: []
+    CHECK: on_submission
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:1]*\1'
+      OPA_ENERGY_ONSHORE_3:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+    FILE: templates/opa.sh
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: MARENOSTRUM5
+    PROCESSORS: 1
+    RUNNING: chunk
+    SPLITS: '1'
+    TASKS: 1
+    THREADS: 1
+  OPA_ENERGY_ONSHORE_4:
+    ADDITIONAL_FILES: []
+    CHECK: on_submission
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:1]*\1'
+      OPA_ENERGY_ONSHORE_4:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+    FILE: templates/opa.sh
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: MARENOSTRUM5
+    PROCESSORS: 1
+    RUNNING: chunk
+    SPLITS: '1'
+    TASKS: 1
+    THREADS: 1
+  OPA_ENERGY_ONSHORE_5:
+    ADDITIONAL_FILES: []
+    CHECK: on_submission
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:1]*\1'
+      OPA_ENERGY_ONSHORE_5:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+    FILE: templates/opa.sh
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: MARENOSTRUM5
+    PROCESSORS: 1
+    RUNNING: chunk
+    SPLITS: '1'
+    TASKS: 1
+    THREADS: 1
+  OPA_ENERGY_ONSHORE_6:
+    ADDITIONAL_FILES: []
+    CHECK: on_submission
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:1]*\1'
+      OPA_ENERGY_ONSHORE_6:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+    FILE: templates/opa.sh
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: MARENOSTRUM5
+    PROCESSORS: 1
+    RUNNING: chunk
+    SPLITS: '1'
+    TASKS: 1
+    THREADS: 1
+  OPA_ENERGY_ONSHORE_7:
+    ADDITIONAL_FILES: []
+    CHECK: on_submission
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:1]*\1'
+      OPA_ENERGY_ONSHORE_7:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+    FILE: templates/opa.sh
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: MARENOSTRUM5
+    PROCESSORS: 1
+    RUNNING: chunk
+    SPLITS: '1'
+    TASKS: 1
+    THREADS: 1
+  REMOTE_SETUP:
+    ADDITIONAL_FILES:
+    - templates/fdb/confignative.yaml
+    - templates/fdb/configlatlon.yaml
+    - templates/fdb/config.yaml
+    - templates/aqua/config_catalog.yaml
+    CHECK: on_submission
+    DEPENDENCIES:
+      SYNCHRONIZE: {}
+    FILE: templates/remote_setup.sh
+    PLATFORM: MARENOSTRUM5-login
+    RUNNING: once
+    WALLCLOCK: 02:00
+  SIM:
+    ADDITIONAL_FILES: []
+    CHECK: on_submission
+    DEPENDENCIES:
+      DQC_BASIC-10: {}
+      INI: {}
+      SIM-1: {}
+    FILE: templates/sim_ifs-nemo.sh
+    NODES: 4
+    PLATFORM: MARENOSTRUM5
+    RUNNING: chunk
+    WALLCLOCK: 00:30
+  SYNCHRONIZE:
+    ADDITIONAL_FILES: []
+    CHECK: on_submission
+    DEPENDENCIES:
+      LOCAL_SETUP: {}
+    FILE: templates/synchronize.sh
+    PLATFORM: LOCAL
+    RUNNING: once
+MHM:
+  '1':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: 2t
+  '2':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: tprate
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: tprate
+MODEL:
+  GRID_ATM: tco79l137
+  GRID_OCE: eORCA1_Z75
+  NAME: ifs-nemo
+  SIMULATION: test-ifs-nemo
+  VERSION: DE_CY48R1.0_climateDT_20240523
+OBSALL:
+  '1':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 2t
+  '10':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVELIST:
+      - 1000
+      - 925
+      - 850
+      - 700
+      - 600
+      - 500
+      - 400
+      - 300
+      - 250
+      - 200
+      - 150
+      - 100
+      - 70
+      - 50
+      - 30
+      - 20
+      - 10
+      - 5
+      - 1
+      LEVTYPE: pl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: q
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: q
+  '11':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVELIST:
+      - 1000
+      - 925
+      - 850
+      - 700
+      - 600
+      - 500
+      - 400
+      - 300
+      - 250
+      - 200
+      - 150
+      - 100
+      - 70
+      - 50
+      - 30
+      - 20
+      - 10
+      - 5
+      - 1
+      LEVTYPE: pl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: clwc
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: clwc
+  '12':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVTYPE: o2d
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: avg_siconc
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '0000'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 0
+      VARIABLE: avg_siconc
+  '2':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVELIST:
+      - 850
+      LEVTYPE: pl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/1200
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 720
+      VARIABLE: t
+  '3':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/1200
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 720
+      VARIABLE: 2t
+  '4':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2d
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 2d
+  '5':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 10u
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 10u
+  '6':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 10v
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 10v
+  '7':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: sp
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: sp
+  '8':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: skt
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: skt
+  '9':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVELIST:
+      - 1000
+      - 925
+      - 850
+      - 700
+      - 600
+      - 500
+      - 400
+      - 300
+      - 250
+      - 200
+      - 150
+      - 100
+      - 70
+      - 50
+      - 30
+      - 20
+      - 10
+      - 5
+      - 1
+      LEVTYPE: pl
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: t
+PLATFORMS:
+  JUWELS:
+    ADD_PROJECT_TO_HOST: false
+    CUSTOM_DIRECTIVES: '#SBATCH -p standard -N 1 --ntasks-per-node=24 --cpus-per-task=2'
+    HOST: juwels-cluster
+    MAX_WALLCLOCK: 48:00
+    PARTITION: devel
+    PROCESSORS_PER_NODE: 24
+    PROJECT: hhb19
+    QUEUE: ''
+    SCRATCH_DIR: /p/scratch
+    SCRATCH_PROJECT_DIR: chhb19
+    TEMP_DIR: ''
+    TYPE: slurm
+    USER: <USER>
+  JUWELS-LOGIN:
+    ADD_PROJECT_TO_HOST: false
+    HOST: juwels-cluster
+    PROJECT: hhb19
+    SCRATCH_DIR: /p/scratch
+    SCRATCH_PROJECT_DIR: chhb19
+    TEMP_DIR: ''
+    TYPE: ps
+    USER: <USER>
+  LEVANTE:
+    ADD_PROJECT_TO_HOST: false
+    BUDGET: <to-be-overloaded-by-user>
+    EXECUTABLE: /usr/bin/bash -l
+    HOST: levante.dkrz.de
+    MAX_WALLCLOCK: 00:29
+    PARTITION: interactive
+    PROCESSORS_PER_NODE: 128
+    PROJECT: bb1153
+    QUEUE: ''
+    SCRATCH_DIR: /work
+    TEMP_DIR: ''
+    TYPE: slurm
+    USER: b382351
+  LEVANTE-LOGIN:
+    ADD_PROJECT_TO_HOST: false
+    EXECUTABLE: /usr/bin/bash -l
+    HOST: levante.dkrz.de
+    PARTITION: interactive
+    PROJECT: bb1153
+    SCRATCH_DIR: /work
+    TEMP_DIR: ''
+    TYPE: slurm
+    USER: b382351
+  LUMI:
+    ADD_PROJECT_TO_HOST: false
+    APP_PARTITION: small
+    BUDGET: project_465000454
+    CONTAINER_DIR: /projappl/project_465000454//containers
+    CUSTOM_DIRECTIVES: "['#SBATCH --export=ALL', '#SBATCH --hint=nomultithread']"
+    DATABRIDGE_FDB_HOME: /appl/local/climatedt/databridge
+    EXCLUSIVE: 'True'
+    EXECUTABLE: /bin/bash --login
+    FDB_DIR: /scratch/project_465000454/experiments
+    FDB_PROD: /appl/local/climatedt
+    HOST: lumi-cluster
+    HPCARCH_SHORT: lumi
+    HPC_PROJECT_DIR: /projappl/project_465000454/
+    MAX_PROCESSORS: 99999
+    MAX_WALLCLOCK: 00:30
+    MEMORY: 224G
+    NODES: 2
+    PARTITION: debug
+    PROCESSORS_PER_NODE: 128
+    PROJECT: project_465000454
+    PROJECT_SCRATCH: /scratch/project_465000454
+    SCRATCH_DIR: /scratch
+    TASKS: 16
+    TEMP_DIR: ''
+    THREADS: 8
+    TYPE: slurm
+    USER: dbeltran
+  LUMI-LOGIN:
+    ADD_PROJECT_TO_HOST: false
+    CONTAINER_DIR: /projappl/project_465000454//containers
+    DATABRIDGE_FDB_HOME: /appl/local/climatedt/databridge
+    FDB_DIR: /scratch/project_465000454/experiments
+    FDB_PROD: /appl/local/climatedt
+    HOST: lumi-cluster
+    HPCARCH_SHORT: lumi
+    HPC_PROJECT_DIR: /projappl/project_465000454/
+    MAX_WAITING_JOBS: 1
+    PROJECT: project_465000454
+    PROJECT_SCRATCH: /scratch/project_465000454
+    SCRATCH_DIR: /scratch
+    TEMP_DIR: ''
+    TOTAL_JOBS: 1
+    TYPE: ps
+    USER: dbeltran
+  LUMI-TRANSFER:
+    ADD_PROJECT_TO_HOST: false
+    BUDGET: project_465000454
+    CONTAINER_DIR: /scratch/project_465000454/containers
+    CUSTOM_DIRECTIVES: "['#SBATCH --export=ALL']"
+    DATABRIDGE_FDB_HOME: /appl/local/climatedt/databridge
+    EXCLUSIVE: 'True'
+    EXECUTABLE: /bin/bash --login
+    FDB_DIR: /scratch/project_465000454/experiments
+    FDB_PROD: /appl/local/climatedt
+    HOST: lumi-cluster
+    HPC_PROJECT_DIR: /projappl/project_465000454/
+    MAX_PROCESSORS: 1024
+    MAX_WALLCLOCK: 05:00
+    PARTITION: small
+    PROCESSORS_PER_NODE: 128
+    PROJECT: project_465000454
+    PROJECT_SCRATCH: /scratch/project_465000454
+    SCRATCH_DIR: /scratch
+    TEMP_DIR: ''
+    TOTALJOBS: 1
+    TYPE: slurm
+    USER: <to-be-overloaded-in-user-conf>
+  MARENOSTRUM0:
+    HOST: marenostrum0
+    MAX_PROCESSORS: '2400'
+    MAX_WALLCLOCK: 48:00
+    PROCESSORS_PER_NODE: '48'
+    PROJECT: bsc32
+    QUEUE: debug
+    SCRATCH_DIR: /gpfs/scratch
+    SERIAL_QUEUE: debug
+    TYPE: slurm
+    USER: bsc32070
+  MARENOSTRUM4:
+    ADD_PROJECT_TO_HOST: 'False'
+    HOST: bsc
+    MAX_PROCESSORS: '2400'
+    MAX_WALLCLOCK: 48:00
+    PROCESSORS_PER_NODE: '48'
+    PROJECT: bsc32
+    QUEUE: debug
+    SCRATCH_DIR: /gpfs/scratch
+    SERIAL_QUEUE: debug
+    TYPE: slurm
+    USER: bsc32070
+  MARENOSTRUM4-LOGIN:
+    USER: bsc32070
+  MARENOSTRUM5:
+    ADD_PROJECT_TO_HOST: false
+    APP_PARTITION: gp_bsces
+    CONTAINER_DIR: /gpfs/projects/ehpc01/containers
+    CUSTOM_DIRECTIVES: "['#SBATCH --export=ALL', '#SBATCH --hint=nomultithread']"
+    EXCLUSIVE: 'True'
+    FDB_DIR: /gpfs/scratch/ehpc01/experiments
+    FDB_PROD: /gpfs/projects/ehpc01/dte/fdb
+    HOST: mn5-cluster1
+    HPCARCH_SHORT: MN5
+    HPC_PROJECT_DIR: /gpfs/projects/ehpc01
+    MAX_WALLCLOCK: 00:30
+    NODES: 2
+    PROCESSORS_PER_NODE: 112
+    PROJECT: ehpc01
+    PROJECT_SCRATCH: /gpfs/scratch/ehpc01
+    QUEUE: gp_debug
+    SCRATCH_DIR: /gpfs/scratch
+    TASKS: 14
+    TEMP_DIR: ''
+    THREADS: 8
+    TYPE: slurm
+    USER: <to-be-overloaded-in-user-conf>
+  MARENOSTRUM5-LOGIN:
+    ADD_PROJECT_TO_HOST: false
+    CONTAINER_DIR: /gpfs/projects/ehpc01/containers
+    FDB_DIR: /gpfs/scratch/ehpc01/experiments
+    FDB_PROD: /gpfs/projects/ehpc01/dte/fdb
+    HOST: mn5-cluster1
+    HPCARCH_SHORT: MN5
+    HPC_PROJECT_DIR: /gpfs/projects/ehpc01
+    MAX_WALLCLOCK: 2:00
+    PROCESSORS: 4
+    PROJECT: ehpc01
+    PROJECT_SCRATCH: /gpfs/scratch/ehpc01
+    QUEUE: gp_interactive
+    SCRATCH_DIR: /gpfs/scratch
+    TYPE: ps
+    USER: <to-be-overloaded-in-user-conf>
+  MARENOSTRUM_ARCHIVE:
+    ADD_PROJECT_TO_HOST: 'False'
+    HOST: dt01.bsc.es
+    PROJECT: bsc32
+    SCRATCH_DIR: /gpfs/scratch
+    TEST_SUITE: 'False'
+    TYPE: ps
+    USER: bsc32070
+  TRANSFER_NODE:
+    ADD_PROJECT_TO_HOST: 'false'
+    HOST: dt01.bsc.es
+    PROJECT: bsc32
+    SCRATCH_DIR: /gpfs/scratch
+    TYPE: ps
+    USER: bsc32070
+PROJDIR: /appl/AS/AUTOSUBMIT_DATA/a1sr/proj/project_files
+PROJECT:
+  PROJECT_DESTINATION: git_project
+  PROJECT_TYPE: git
+REQUEST:
+  ACTIVITY: CMIP6
+  CLASS: d1
+  EXPERIMENT: hist
+  EXPVER: a1sr
+  FDB_HOME: '%CURRENT_FDB_DIR%/a1sr/fdb'
+  GENERATION: 1
+  MODEL: IFS-NEMO
+  REALIZATION: 1
+  RESOLUTION: standard
+ROOTDIR: /appl/AS/AUTOSUBMIT_DATA/a1sr
+RUN:
+  APP_NAMES:
+  - ENERGY_ONSHORE
+  ENVIRONMENT: intel
+  OPA_NAMES:
+  - energy_onshore_1
+  - energy_onshore_2
+  - energy_onshore_3
+  - energy_onshore_4
+  - energy_onshore_5
+  - energy_onshore_6
+  - energy_onshore_7
+  PROCESSOR_UNIT: cpu
+  TYPE: test
+  WORKFLOW: end-to-end
+STORAGE: {}
+URBAN:
+  '1':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA:
+      - 72.1
+      - -25.1
+      - 26.9
+      - 45.1
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: min
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: 2t
+  '2':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA:
+      - 72.1
+      - -25.1
+      - 26.9
+      - 45.1
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: max
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: 2t
+  '3':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA:
+      - 72.1
+      - -25.1
+      - 26.9
+      - 45.1
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: monthly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: 2t
+  '4':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA:
+      - 72.1
+      - -25.1
+      - 26.9
+      - 45.1
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: weekly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 2t
+  '5':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA:
+      - 72.1
+      - -25.1
+      - 26.9
+      - 45.1
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 10u
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: weekly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 10u
+  '6':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA:
+      - 72.1
+      - -25.1
+      - 26.9
+      - 45.1
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 10v
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: weekly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 10v
+  '7':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA:
+      - 72.1
+      - -25.1
+      - 26.9
+      - 45.1
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2d
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: weekly
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 2d
+WILDFIRES_FWI:
+  '1':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 10u
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '1200'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: daily_noon
+      TIME_STEP: 60
+      VARIABLE: 10u
+  '2':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 10v
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '1200'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: daily_noon
+      TIME_STEP: 60
+      VARIABLE: 10v
+  '3':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2d
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '1200'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: daily_noon
+      TIME_STEP: 60
+      VARIABLE: 2d
+  '4':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: tp
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily_noon
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: sum
+      STAT_FREQ: daily_noon
+      TIME_STEP: 60
+      VARIABLE: tp
+  '5':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 1.0/1.0
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: '1200'
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: raw
+      STAT_FREQ: daily_noon
+      TIME_STEP: 60
+      VARIABLE: 2t
+WILDFIRES_SPITFIRE:
+  '1':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70.7/19/59.7/31.9
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: 2t
+  '2':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70.7/19/59.7/31.9
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 10u
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: 10u
+  '3':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70.7/19/59.7/31.9
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 10v
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: 10v
+  '4':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70.7/19/59.7/31.9
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: max
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: 2t
+  '5':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 70.7/19/59.7/31.9
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: tp
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: sum
+      STAT_FREQ: daily
+      TIME_STEP: 60
+      VARIABLE: tp
+WILDFIRES_WISE:
+  '1':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 71/19/59.5/32
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2t
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 2t
+  '2':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 71/19/59.5/32
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 2d
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 2d
+  '3':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 71/19/59.5/32
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 10v
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 10v
+  '4':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 71/19/59.5/32
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: 10u
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: 10u
+  '5':
+    GSVREQUEST:
+      ACTIVITY: CMIP6
+      AREA: 71/19/59.5/32
+      CLASS: d1
+      DATASET: climate-dt
+      DATE: split_day
+      EXPERIMENT: hist
+      EXPVER: '%APP.READ_EXPID%'
+      GENERATION: '1'
+      GRID: 0.1/0.1
+      LEVTYPE: sfc
+      METHOD: nn
+      MODEL: IFS-NEMO
+      PARAM: tp
+      REALIZATION: '1'
+      RESOLUTION: standard
+      STREAM: clte
+      TIME: 0000/to/2300/by/0100
+      TYPE: fc
+    OPAREQUEST:
+      BIAS_ADJUSTMENT: none
+      CHECKPOINT: true
+      CHECKPOINT_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      OUTPUT_FREQ: daily
+      SAVE: true
+      SAVE_FILEPATH: '%CURRENT_PROJECT_SCRATCH%/tmp/a1sr/'
+      STAT: mean
+      STAT_FREQ: hourly
+      TIME_STEP: 60
+      VARIABLE: tp
+AS_ENV_PLATFORMS_PATH: "test"
+AS_ENV_SSH_CONFIG_PATH: "test2"
+AS_ENV_CURRENT_USER: "dummy"

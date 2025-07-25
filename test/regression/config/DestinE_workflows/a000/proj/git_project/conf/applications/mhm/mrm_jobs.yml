@@ -1,0 +1,9 @@
+PLATFORMS:    
+  LUMI:
+    TYPE: slurm
+    PARTITION: "standard-g"
+    WALLCLOCK: "00:10"
+    TASKS: 8
+    THREADS: 2
+    PROCESSORS: 2
+    CUSTOM_DIRECTIVES: "['#SBATCH --mem-per-cpu=10G']"

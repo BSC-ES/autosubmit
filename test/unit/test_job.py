@@ -44,8 +44,8 @@ from autosubmit.job.job_utils import get_job_package_code, SubJob, SubJobManager
 from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
-from autosubmitconfigparser.config.configcommon import BasicConfig, YAMLParserFactory
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.configcommon import BasicConfig, YAMLParserFactory
 from log.log import AutosubmitCritical
 
 """Tests for the Autosubmit ``Job`` class."""
@@ -155,7 +155,7 @@ class TestJob:
 
         assert initial_fail_count + 1 == incremented_fail_count
 
-    @patch('autosubmitconfigparser.config.basicconfig.BasicConfig')
+    @patch('autosubmit.config.basicconfig.BasicConfig')
     def test_header_tailer(self, mocked_global_basic_config: Mock):
         """Test if header and tailer are being properly substituted onto the final .cmd file without
         a bunch of mocks
@@ -535,7 +535,7 @@ CONFIG:
             checked = job.check_script(config, parameters)
             assert checked
 
-    @patch('autosubmitconfigparser.config.basicconfig.BasicConfig')
+    @patch('autosubmit.config.basicconfig.BasicConfig')
     def test_header_tailer(self, mocked_global_basic_config: Mock):
         """Test if header and tailer are being properly substituted onto the final .cmd file without
         a bunch of mocks
@@ -1737,7 +1737,7 @@ def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines
         experiment_data['PLATFORMS']['dummy_platform']['APP_CUSTOM_DIRECTIVES'] = custom_directives
         experiment_data['JOBS']['RANDOM-SECTION']['CUSTOM_DIRECTIVES'] = "%CURRENT_APP_CUSTOM_DIRECTIVES%"
     job, as_conf, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data, "slurm")
-    mocker.patch('autosubmitconfigparser.config.configcommon.AutosubmitConfig.reload')
+    mocker.patch('autosubmit.config.configcommon.AutosubmitConfig.reload')
     template_content, _ = job.update_content(as_conf, parameters)
     for directive in result_by_lines:
         pattern = r'^\s*' + re.escape(directive) + r'\s*$'  # Match Start line, match directive, match end line

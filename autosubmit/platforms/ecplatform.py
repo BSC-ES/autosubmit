@@ -29,7 +29,7 @@ from time import sleep
 import locale
 
 if TYPE_CHECKING:
-    from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+    from autosubmit.config.configcommon import AutosubmitConfig
 
 
 class EcPlatform(ParamikoPlatform):

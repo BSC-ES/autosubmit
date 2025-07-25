@@ -1,0 +1,180 @@
+JOBS:
+  APP:
+    CHECK: on_submission
+    DEPENDENCIES: OPA
+    FILE: templates/application.sh
+    FOR:
+      DEPENDENCIES:
+      - APP_ENERGY_ONSHORE:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: previous
+        OPA_ENERGY_ONSHORE_1:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: all
+        OPA_ENERGY_ONSHORE_2:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: all
+        OPA_ENERGY_ONSHORE_3:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: all
+        OPA_ENERGY_ONSHORE_4:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: all
+        OPA_ENERGY_ONSHORE_5:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: all
+        OPA_ENERGY_ONSHORE_6:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: all
+        OPA_ENERGY_ONSHORE_7:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: all
+      NAME: '%RUN.APP_NAMES%'
+      SPLITS: '[1]'
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: '%DEFAULT.HPCARCH%'
+    PROCESSORS: 1
+    RUNNING: chunk
+    TASKS: 1
+    THREADS: 1
+    WALLCLOCK: 00:10
+  DN:
+    CHECK: on_submission
+    DEPENDENCIES:
+      APP_ENERGY_ONSHORE-1:
+        SPLITS_TO: '1'
+      DN:
+        SPLITS_FROM:
+          all:
+            SPLITS_TO: previous
+      REMOTE_SETUP:
+        STATUS: COMPLETED
+    FILE: templates/dn.sh,conf/mother_request.yml
+    PLATFORM: '%DEFAULT.HPCARCH%-login'
+    RUNNING: chunk
+    SPLITS: 1
+    TOTALJOBS: 1
+    WALLCLOCK: 02:00
+  INI:
+    CHECK: on_submission
+    DEPENDENCIES: REMOTE_SETUP
+    FILE: templates/ini.sh
+    PLATFORM: '%DEFAULT.HPCARCH%-login'
+    RUNNING: member
+    WALLCLOCK: 00:30
+  LOCAL_SETUP:
+    CHECK: on_submission
+    FILE: templates/local_setup.sh
+    PLATFORM: LOCAL
+    RUNNING: once
+  OPA:
+    CHECK: on_submission
+    DEPENDENCIES: null
+    FILE: templates/opa.sh
+    FOR:
+      DEPENDENCIES:
+      - DN:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+        OPA_ENERGY_ONSHORE_1:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: previous
+      - DN:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+        OPA_ENERGY_ONSHORE_2:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: previous
+      - DN:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+        OPA_ENERGY_ONSHORE_3:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: previous
+      - DN:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+        OPA_ENERGY_ONSHORE_4:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: previous
+      - DN:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+        OPA_ENERGY_ONSHORE_5:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: previous
+      - DN:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+        OPA_ENERGY_ONSHORE_6:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: previous
+      - DN:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+        OPA_ENERGY_ONSHORE_7:
+          SPLITS_FROM:
+            all:
+              SPLITS_TO: previous
+      NAME: '%RUN.OPA_NAMES%'
+      SPLITS: '[1, 1, 1, 1, 1, 1, 1]'
+    NODES: 1
+    PARTITION: '%CURRENT_APP_PARTITION%'
+    PLATFORM: '%DEFAULT.HPCARCH%'
+    PROCESSORS: 1
+    RUNNING: chunk
+    TASKS: 1
+    THREADS: 1
+  REMOTE_SETUP:
+    CHECK: on_submission
+    DEPENDENCIES: SYNCHRONIZE
+    FILE: templates/remote_setup.sh,templates/fdb/confignative.yaml,templates/fdb/configlatlon.yaml,templates/fdb/config.yaml
+    PLATFORM: '%DEFAULT.HPCARCH%-login'
+    RUNNING: once
+    WALLCLOCK: 02:00
+  SIM:
+    CHECK: on_submission
+    DEPENDENCIES: INI SIM-1 DQC_BASIC-10
+    FILE: templates/sim_%MODEL.NAME%.sh
+    PLATFORM: '%DEFAULT.HPCARCH%'
+    WALLCLOCK: 00:30
+    running: chunk
+  SYNCHRONIZE:
+    CHECK: on_submission
+    DEPENDENCIES: LOCAL_SETUP
+    FILE: templates/synchronize.sh
+    PLATFORM: LOCAL
+    RUNNING: once
+RUN:
+  APP_NAMES:
+  - ENERGY_ONSHORE
+  OPA_NAMES:
+  - energy_onshore_1
+  - energy_onshore_2
+  - energy_onshore_3
+  - energy_onshore_4
+  - energy_onshore_5
+  - energy_onshore_6
+  - energy_onshore_7

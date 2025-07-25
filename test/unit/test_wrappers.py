@@ -40,7 +40,7 @@ from autosubmit.job.job_packages import JobPackageHorizontal, JobPackageHorizont
 from autosubmit.job.job_packages import JobPackageVertical
 from autosubmit.job.job_utils import Dependency
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from autosubmit.config.yamlparser import YAMLParserFactory
 from log.log import AutosubmitCritical
 
 """Tests for wrappers."""

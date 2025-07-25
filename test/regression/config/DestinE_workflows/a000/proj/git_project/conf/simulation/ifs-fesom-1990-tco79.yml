@@ -1,0 +1,30 @@
+## In this file we define the configuration used in the HISTORICAL run (1990-2020)
+
+experiment:
+    DATELIST: 19900101
+    MEMBERS: fc0
+    CHUNKSIZEUNIT: month
+    CHUNKSIZE: 1
+    NUMCHUNKS: 5
+    CALENDAR: standard
+
+PLATFORMS:
+   LUMI:
+        PARTITION: "dev-g"
+        MAX_WALLCLOCK: "24:00"
+
+JOBS:
+   SIM:
+       WALLCLOCK: "03:00"
+       #RETRIALS: 2
+
+       #CONFIGURATION:
+       #        IFS:
+       #                MULTIO_PLANS: "historical"
+       #        NEMO:
+       #                MULTIO_PLANS: "historical"
+
+CONFIGURATION:
+    IFS:
+      EXPVER: awi0
+    RAPS_EXPERIMENT: "hist"

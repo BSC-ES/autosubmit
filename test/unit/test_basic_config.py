@@ -19,7 +19,7 @@ import os
 from mock import Mock
 from mock import patch
 
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 
 """TODO: This class has a static private (__named) method which is impossible to be tested.
 
@@ -41,7 +41,7 @@ def test_update_config_set_the_right_db_path():
 
 def test_read_makes_the_right_method_calls():
     # arrange
-    with patch('autosubmitconfigparser.config.basicconfig.BasicConfig._update_config', Mock()):
+    with patch('autosubmit.config.basicconfig.BasicConfig._update_config', Mock()):
         # act
         BasicConfig.read()
         # assert

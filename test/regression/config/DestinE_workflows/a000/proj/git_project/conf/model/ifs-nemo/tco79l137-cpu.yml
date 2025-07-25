@@ -1,0 +1,33 @@
+CONFIGURATION:
+  RAPS_USER_FLAGS: "--keepxml"
+  DQC_PROFILE: lowres
+  DATA_PORTFOLIO: production
+  IFS:
+    GTYPE: tco
+    RESOL: 79
+    LEVELS: 137
+    EXPVER: hz9m
+    LABEL: LWDA
+    IO_NODES: 1
+
+
+PLATFORMS: 
+
+  LUMI:
+    NODES: 2
+    TASKS: 16
+    THREADS: 8
+    PROCESSORS_PER_NODE: 128
+
+  MARENOSTRUM5:
+    TYPE: slurm
+    QUEUE: "gp_debug"
+    MAX_WALLCLOCK: "00:30"
+    NODES: 2
+    TASKS: 14
+    THREADS: 8
+    PROCESSORS_PER_NODE: 112
+
+REQUEST:
+  RESOLUTION: standard
+

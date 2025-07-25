@@ -22,9 +22,9 @@ import pwd
 from pathlib import Path
 import sqlite3
 from autosubmit.database.db_common import get_experiment_id
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
 
 
 LOCAL_TZ = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo

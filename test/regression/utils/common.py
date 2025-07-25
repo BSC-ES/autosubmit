@@ -18,7 +18,7 @@
 import os
 
 from autosubmit.autosubmit import Autosubmit
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 
 
 def create_database(env):

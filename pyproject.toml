@@ -57,10 +57,13 @@ dependencies = [
     "py3dotplus==1.1.0",
     "numpy<3",
     "rocrate==0.*",
-    "autosubmitconfigparser==1.0.79",
     "configparser",
     "setproctitle",
-    "invoke>=2.0"
+    "invoke>=2.0",
+    "ruamel.yaml==0.18.14",
+    "configobj",
+    "pyparsing",
+    "configparser"
     # 'sqlalchemy[mypy]' # TODO: pending Postgres MR
 ]
 
@@ -76,6 +79,8 @@ readme = {file = "README_PIP.md"}
 [project.optional-dependencies]
 postgres = ["psycopg2"]
 tests = [
+    # TODO: remove mock by pytest-mock
+    "mock",
     "pytest>=8.2,<8.5",
     "pytest-cov",
     "pytest-mock",
@@ -105,6 +110,7 @@ package-data = { "autosubmit" = [
     "autosubmit/config/files/autosubmit.conf",
     "autosubmit/config/files/expdef.conf",
     "autosubmit/database/data/autosubmit.sql",
+    "autosubmit/config/conf/files/*",
     "README",
     "CHANGELOG",
     "VERSION",

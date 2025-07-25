@@ -27,7 +27,7 @@ from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.platforms.platform import CopyQueue
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from autosubmit.config.configcommon import AutosubmitConfig
 
 
 def _get_script_files_path() -> Path:

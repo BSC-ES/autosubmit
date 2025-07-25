@@ -1,0 +1,36 @@
+CONFIGURATION:
+  DQC_PROFILE: develop
+  DATA_PORTFOLIO: production
+  ICON:
+    ATM_GID: "0033"
+    ATM_REF: "R02B08"
+    OCE_GID: "0034"
+    OCE_REF: "R02B08"
+
+    ATM_NPROMA: 32
+    OCE_NPROMA: 8
+
+    ATM_LEVELS: 90                    
+    ATM_HALFLEVELS: 91
+    OCE_LEVELS: 72                    
+    OCE_HALFLEVELS: 73 
+
+PLATFORMS:
+  LUMI:
+    WALLCLOCK: '08:00'
+    MAX_WALLCLOCK: '48:00'
+    PARTITION: standard
+    NODES: 270
+    TASKS: 32
+    THREADS: 8
+    PROCESSORS_PER_NODE: 128
+    CUSTOM_DIRECTIVES: "['#SBATCH --export=ALL --exclusive']"
+  LEVANTE:
+    WALLCLOCK: '08:00'
+    PARTITION: compute
+    NODES: 200
+    TASKS_PER_NODE: 32
+    CPUS_PER_TASK: 8
+    PROCESSORS: 25600
+    CUSTOM_DIRECTIVES: "['#SBATCH --export=ALL --distribution=block:cyclic']"
+    OCEAN_NODES: 10

@@ -20,7 +20,7 @@ import traceback
 from .database_managers.experiment_status_db_manager import create_experiment_status_db_manager
 from .database_managers.database_manager import DEFAULT_LOCAL_ROOT_DIR, DEFAULT_HISTORICAL_LOGS_DIR
 from .internal_logging import Logging
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 
 class ExperimentStatus:
   """ Represents the Experiment Status Mechanism that keeps track of currently active experiments """

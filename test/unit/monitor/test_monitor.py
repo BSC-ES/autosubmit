@@ -35,7 +35,7 @@ from autosubmit.monitor.monitor import (
     _check_final_status, _check_node_exists, _color_status, _create_node, _display_file,
     _display_file_xdg, clean_plot, clean_stats, Monitor
 )
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from autosubmit.config.yamlparser import YAMLParserFactory
 from log.log import AutosubmitCritical
 
 _EXPID = 't000'

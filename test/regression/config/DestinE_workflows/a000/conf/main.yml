@@ -1,0 +1,52 @@
+RUN:
+  WORKFLOW: end-to-end
+  ENVIRONMENT: intel
+  PROCESSOR_UNIT: cpu
+  TYPE: test
+
+MODEL:
+  NAME: ifs-nemo
+  SIMULATION: test-ifs-nemo
+  GRID_ATM: tco79l137
+  GRID_OCE: eORCA1_Z75
+  VERSION: 'DE_CY48R1.0_climateDT_20240523'
+
+APP:
+  NAMES: ['ENERGY_ONSHORE']
+  OUTPATH: "%CURRENT_PROJECT_SCRATCH%/tmp/%DEFAULT.EXPID%/"
+
+JOBS:
+  SIM:
+    WALLCLOCK: "00:30"
+    NODES: 4
+  LRA_GENERATOR:
+    DEPENDENCIES: SIM
+    FREQUENCY: 3
+
+
+EXPERIMENT:
+  DATELIST: 20200101 #Startdate
+  MEMBERS: fc0
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: 1
+  NUMCHUNKS: 2
+  CALENDAR: standard
+
+CONFIGURATION:
+  INPUTS: "experiment/scenario-20y-2020-debug-configuration-2y-coupled-spinup"
+  ADDITIONAL_JOBS:
+    TRANSFER: "False"
+    BACKUP: "False"
+    MEMORY_CHECKER: "False"
+    DQC: "True"
+    AQUA: "True"
+
+AQUA:
+  CONTAINER_VERSION: "0.11.3"
+  CATALOG_NAME: mn5-phase2 # TO-DO: should be different for each platform
+  SOURCE_SFC: hourly-hpz5-atm2d
+  SOURCE_PL: hourly-hpz5-atm3d
+  SOURCE_HL: hourly-hpz5-hl
+  SOURCE_O2D: daily-hpz5-o2d
+  SOURCE_O3D: daily-hpz5-o3d
+  SOURCE_SOL: hourly-hpz5-sol

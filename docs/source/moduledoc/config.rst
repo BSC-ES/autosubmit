@@ -1,17 +1,17 @@
 autosubmit.config
 =================
 
-autosubmitconfigparser.config.basicConfig
+autosubmit.config.basicConfig
 -----------------------------------------
 
-.. automodule:: autosubmitconfigparser.config.basicconfig
+.. automodule:: autosubmit.config.basicconfig
    :show-inheritance:
    :inherited-members:
    :members:
 
-autosubmitconfigparser.config.config_common
+autosubmit.config.config_common
 -------------------------------------------
-.. automodule:: autosubmitconfigparser.config.configcommon
+.. automodule:: autosubmit.config.configcommon
    :show-inheritance:
    :inherited-members:
    :members:

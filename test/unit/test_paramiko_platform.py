@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
+from getpass import getuser
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -100,7 +100,7 @@ def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_p
     job.name = 'TEST'
     with pytest.raises(AutosubmitError) as cm:
         platform.check_Alljobs(
-            job_list=[(job, None)],
+            job_list=[[job, None]],
             as_conf=as_conf,
             retries=-1)
     assert cm.value.message == 'Some Jobs are in Unknown status'
@@ -128,7 +128,7 @@ def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_p
 
     with pytest.raises(AutosubmitError) as cm:
         platform.check_Alljobs(
-            job_list=[(job, None)],
+            job_list=[[job, None]],
             as_conf=as_conf,
             retries=1)
     assert cm.value.message == ae.error_message
@@ -170,23 +170,29 @@ Host mn5-gpp
     HostName glogin1.bsc.es
     ForwardAgent yes
 """
-    for user in [os.environ["USER"], "dummy-one"]:
+    for user in [getuser(), "dummy-one"]:
         ssh_content_user = ssh_content.replace("%change%", user)
         add_ssh_config_file(tmpdir, user, ssh_content_user)
     return tmpdir
 
 
-@pytest.mark.parametrize("user, env_ssh_config_defined",
-                         [(os.environ["USER"], False),
-                          ("dummy-one", True),
-                          ("dummy-one", False),
-                          ("not-exists", True),
-                          ("not_exists", False)],
-                         ids=["OWNER",
-                              "SUDO USER(exists) + AS_ENV_CONFIG_SSH_PATH(defined)",
-                              "SUDO USER(exists) + AS_ENV_CONFIG_SSH_PATH(not defined)",
-                              "SUDO USER(not exists) + AS_ENV_CONFIG_SSH_PATH(defined)",
-                              "SUDO USER(not exists) + AS_ENV_CONFIG_SSH_PATH(not defined)"])
+@pytest.mark.parametrize(
+    "user, env_ssh_config_defined",
+    [
+        (getuser(), False),
+        ("dummy-one", True),
+        ("dummy-one", False),
+        ("not-exists", True),
+        ("not_exists", False)
+    ],
+    ids=[
+        "OWNER",
+        "SUDO USER(exists) + AS_ENV_CONFIG_SSH_PATH(defined)",
+        "SUDO USER(exists) + AS_ENV_CONFIG_SSH_PATH(not defined)",
+        "SUDO USER(not exists) + AS_ENV_CONFIG_SSH_PATH(defined)",
+        "SUDO USER(not exists) + AS_ENV_CONFIG_SSH_PATH(not defined)"
+    ]
+)
 def test_map_user_config_file(tmpdir, autosubmit_config, mocker, generate_all_files, user, env_ssh_config_defined):
     experiment_data = {
         "ROOTDIR": str(tmpdir),
@@ -198,8 +204,8 @@ def test_map_user_config_file(tmpdir, autosubmit_config, mocker, generate_all_fi
     if env_ssh_config_defined:
         experiment_data["AS_ENV_SSH_CONFIG_PATH"] = str(tmpdir.join(f".ssh/config_{user}"))
     as_conf = autosubmit_config(expid='a000', experiment_data=experiment_data)
-    mocker.patch('autosubmitconfigparser.config.configcommon.AutosubmitConfig.is_current_real_user_owner',
-                 os.environ["USER"] == user)
+    mocker.patch('autosubmit.config.configcommon.AutosubmitConfig.is_current_real_user_owner',
+                 getuser() == user)
     platform = ParamikoPlatform(expid='a000', name='ps', config=experiment_data)
     platform._ssh_config = mocker.MagicMock()
     mocker.patch('os.path.expanduser',

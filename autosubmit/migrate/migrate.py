@@ -7,9 +7,9 @@ import os
 from bscearth.utils.date import Log
 
 from autosubmit.helpers.utils import restore_platforms
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
 from log.log import Log, AutosubmitCritical, AutosubmitError
 from autosubmit.job.job_utils import _get_submitter
 

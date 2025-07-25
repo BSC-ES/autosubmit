@@ -31,8 +31,8 @@ import math
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
 
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
 
 from log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.job.job_utils import transitive_reduction

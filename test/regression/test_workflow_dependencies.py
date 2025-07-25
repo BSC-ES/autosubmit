@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Optional, Tuple
 
 import pytest
 
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 from test.regression.utils.common import create_database, init_expid
 
 PROFILE = False  # Enable/disable profiling ( speed up the tests )

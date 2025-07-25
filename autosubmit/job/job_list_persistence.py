@@ -23,7 +23,7 @@ import shutil
 from autosubmit.database.db_manager import create_db_manager
 from log.log import AutosubmitCritical, Log
 from contextlib import suppress
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 from pathlib import Path
 
 

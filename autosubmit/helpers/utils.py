@@ -6,7 +6,7 @@ from pathlib import Path
 
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 from log.log import AutosubmitCritical, Log
 
 

@@ -14,7 +14,7 @@ from autosubmit.job.metrics_processor import (
 from unittest.mock import MagicMock, patch
 
 from autosubmit.platforms.locplatform import LocalPlatform
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 
 
 @pytest.fixture

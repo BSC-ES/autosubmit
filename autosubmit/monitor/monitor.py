@@ -32,7 +32,7 @@ from autosubmit.helpers.utils import NaturalSort, check_experiment_ownership
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.monitor.diagram import create_stats_report
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 from log.log import Log, AutosubmitCritical
 
 _GENERAL_STATS_OPTION_MAX_LENGTH = 1000

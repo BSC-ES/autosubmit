@@ -24,8 +24,8 @@ from typing import Union, Any
 
 from autosubmit.database.db_common import check_experiment_exists
 from autosubmit.history.experiment_history import ExperimentHistory
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
 from log.log import AutosubmitCritical, Log
 
 

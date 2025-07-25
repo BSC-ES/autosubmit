@@ -1,0 +1,3 @@
+# currently not used TODO: logic to manage container versions from applications.
+#ENERGY_ONSHORE:
+#    CONTAINER_VERSION: "0.2.1"

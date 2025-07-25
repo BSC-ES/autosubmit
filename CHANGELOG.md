@@ -12,6 +12,8 @@
   coverage of the Platforms #977
 - Execute scripts to generate the documentation and standardize expid on documentation #1160
 - Added new Autosubmit users GANANA, ESiWACE HPCW, and TerraDT #2445
+- The autosubmit-config-parser GitHub project has been archived and its code moved
+  to Autosubmit repository, merging the projects again #2052
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 

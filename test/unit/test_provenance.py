@@ -29,9 +29,9 @@ def mock_paths(tmp_path, mocker):
     """
     Fixture to set temporary paths for BasicConfig values.
     """
-    mocker.patch('autosubmitconfigparser.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR', str(tmp_path))
-    mocker.patch('autosubmitconfigparser.config.basicconfig.BasicConfig.LOCAL_TMP_DIR', 'tmp')
-    mocker.patch('autosubmitconfigparser.config.basicconfig.BasicConfig.LOCAL_ASLOG_DIR', 'ASLOGS')
+    mocker.patch('autosubmit.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR', str(tmp_path))
+    mocker.patch('autosubmit.config.basicconfig.BasicConfig.LOCAL_TMP_DIR', 'tmp')
+    mocker.patch('autosubmit.config.basicconfig.BasicConfig.LOCAL_ASLOG_DIR', 'ASLOGS')
     yield tmp_path
 
 

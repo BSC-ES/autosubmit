@@ -22,7 +22,7 @@ from random import randrange
 
 import networkx
 import pytest
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from autosubmit.config.yamlparser import YAMLParserFactory
 from networkx import DiGraph  # type: ignore
 
 from autosubmit.job.job import Job

@@ -42,7 +42,7 @@ from autosubmit.provenance.rocrate import (
     _get_git_branch_and_commit,
     create_rocrate_archive
 )
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from autosubmit.config.configcommon import AutosubmitConfig
 from log.log import AutosubmitCritical
 
 """Tests for the RO-Crate generation in Autosubmit."""

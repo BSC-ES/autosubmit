@@ -42,8 +42,8 @@ from autosubmit.job.job_utils import get_job_package_code, get_split_size_unit, 
 from autosubmit.job.metrics_processor import UserMetricProcessor
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
 from log.log import Log, AutosubmitCritical
 
 if TYPE_CHECKING:

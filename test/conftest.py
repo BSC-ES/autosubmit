@@ -28,16 +28,16 @@ from random import seed, randint, choice
 from re import sub
 from textwrap import dedent
 from time import time
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional, Protocol, Tuple, Type
+from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Protocol, Tuple, Type
 
 import pytest
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from pytest_mock import MockerFixture
 from ruamel.yaml import YAML
 from testcontainers.sftp import DockerContainer, wait_for_logs
 
 from autosubmit.autosubmit import Autosubmit
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
@@ -294,8 +294,14 @@ def autosubmit() -> Autosubmit:
 # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
 class AutosubmitConfigFactory(Protocol):
 
-    def __call__(self, expid: str, experiment_data: Optional[Dict] = None, *args: Any,
-                 **kwargs: Any) -> AutosubmitConfig: ...
+    def __call__(
+            self,
+            expid: str,
+            experiment_data: Optional[Dict] = None,
+            include_basic_config: bool = True,
+            *args: Any,
+            **kwargs: Any
+    ) -> AutosubmitConfig: ...
 
 
 @pytest.fixture(scope="function")
@@ -343,6 +349,7 @@ def autosubmit_config(
     def _create_autosubmit_config(
             expid: str,
             experiment_data: Dict = None,
+            include_basic_config: bool = True,
             *_,
             **kwargs
     ) -> AutosubmitConfig:
@@ -356,6 +363,8 @@ def autosubmit_config(
 
         :param expid: Experiment ID
         :param experiment_data: YAML experiment data dictionary
+        :param include_basic_config: Whether to include ``BasicConfig`` attributes or not (for some platforms).
+        Enabled by default.
         """
         if not expid:
             raise ValueError("No value provided for expid")
@@ -400,9 +409,10 @@ def autosubmit_config(
         # Populate the configuration object's ``experiment_data`` dictionary with the values
         # in ``BasicConfig``. For some reason, some platforms use variables like ``LOCAL_ROOT_DIR``
         # from the configuration object, instead of using ``BasicConfig``.
-        for k, v in {k: v for k, v in basic_config.__class__.__dict__.items() if not k.startswith('__')}.items():
-            config.experiment_data[k] = v
-        config.experiment_data.update(experiment_data)
+        if include_basic_config:
+            for k, v in {k: v for k, v in basic_config.__class__.__dict__.items() if not k.startswith('__')}.items():
+                config.experiment_data[k] = v
+            config.experiment_data.update(experiment_data)
 
         # Default values for experiment data
         # TODO: This probably has a way to be initialized in config-parser?
@@ -599,7 +609,6 @@ def create_jobs(
 
 @pytest.fixture(scope="function")
 def git_server(tmp_path) -> Generator[Tuple[DockerContainer, Path, str], None, None]:
-
     # Start a container to server it -- otherwise, we would have to use
     # `git -c protocol.file.allow=always submodule ...`, and we cannot
     # change how Autosubmit uses it in `autosubmit create` (due to bad
@@ -620,5 +629,3 @@ def git_server(tmp_path) -> Generator[Tuple[DockerContainer, Path, str], None, N
         # repositories, using the volume bound onto ``/opt/git-server`` as base
         # for any subdirectory, the Git URL becoming ``git/{subdirectory-name}}``.
         yield container, git_repos_path, f'http://localhost:{http_port}/git'
-
-

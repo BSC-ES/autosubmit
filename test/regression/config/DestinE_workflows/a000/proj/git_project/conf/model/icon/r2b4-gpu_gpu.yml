@@ -1,0 +1,55 @@
+CONFIGURATION:
+  DQC_PROFILE: lowres
+  DATA_PORTFOLIO: production
+  ICON:
+    ATM_GID: "0043"
+    ATM_REF: "R02B04"
+    OCE_GID: "0036"
+    OCE_REF: "R02B04"
+
+    ATM_NPROMA: 500
+    OCE_NPROMA: 32
+
+    ATM_LEVELS: 90                    
+    ATM_HALFLEVELS: 91
+    OCE_LEVELS: 40                    
+    OCE_HALFLEVELS: 41 
+
+PLATFORMS:
+  LUMI:
+    TYPE: slurm
+    MAX_WALLCLOCK: "48:00"
+    PARTITION: small-g
+    PROCESSORS_PER_NODE: 64
+  LEVANTE:
+    WALLCLOCK: '00:30'
+    PARTITION: compute
+    CUSTOM_DIRECTIVES: "['#SBATCH --export=ALL ]"
+
+#
+# HETJOB Settings
+#
+    
+JOBS:
+  SIM:
+    WALLCLOCK: "00:05"
+    MEMORY:
+        - 0
+        - 0
+        - 0
+    NODES:
+        - 1
+        - 1
+        - 1
+    TASKS:
+        - 8
+        - 56
+        - 8
+    THREADS:
+        - 1
+        - 1
+        - 7      
+    CUSTOM_DIRECTIVES:
+        - ['#SBATCH --export=ALL', '#SBATCH --distribution=block:cyclic', '#SBATCH --exclusive','#SBATCH --gpus-per-node=8']
+        - ['#SBATCH --export=ALL', '#SBATCH --distribution=block:cyclic:fcyclic', '#SBATCH --exclusive']
+        - ['#SBATCH --exclusive'] 

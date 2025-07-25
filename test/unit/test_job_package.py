@@ -25,7 +25,7 @@ from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistenceDb
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical
 from autosubmit.job.job_packages import jobs_in_wrapper_str
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from autosubmit.config.yamlparser import YAMLParserFactory
 
 
 @pytest.fixture

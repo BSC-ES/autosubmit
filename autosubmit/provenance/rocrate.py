@@ -36,8 +36,8 @@ from autosubmit.database.db_common import get_autosubmit_version
 from autosubmit.database.db_common import get_experiment_descrip
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
 from log.log import Log, AutosubmitCritical
 
 """List of profiles used in our RO-Crate implementation, plus the one used

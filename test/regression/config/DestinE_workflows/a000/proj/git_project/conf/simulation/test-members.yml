@@ -1,0 +1,26 @@
+## In this file we define the simulations that are being run as defined 
+## in M340.5.1.1) (?)
+
+experiment:
+    DATELIST: 20200120
+    MEMBERS: "fc0 fc1 fc2"
+    CHUNKSIZEUNIT: day
+    CHUNKSIZE: 1
+    NUMCHUNKS: 5
+    CALENDAR: standard
+
+PLATFORMS:
+    LUMI:
+        PARTITION: "small"
+        MAX_WALLCLOCK: "72:00"
+
+JOBS:
+   SIM:
+       WALLCLOCK: "00:30"
+
+RUN:
+        OCE_INI_MEMBER_PERTURB: "true"
+
+
+CONFIGURATION:
+        RAPS_EXPERIMENT: hist

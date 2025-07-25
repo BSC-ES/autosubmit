@@ -1,0 +1,22 @@
+JOBS:
+  TRANSFER:
+    FILE: templates/transfer.sh
+    PLATFORM: lumi-transfer
+    DEPENDENCIES: SIM
+    RUNNING: chunk
+    WALLCLOCK: '04:00'
+    NODES: 1
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+
+WRAPPERS:
+  WRAPPER_0:
+    JOBS_IN_WRAPPER: TRANSFER
+    METHOD: ASTHREAD
+    TYPE: horizontal
+    POLICY: mixed
+    RETRIALS: 5
+    MIN_WRAPPED: 1
+    MAX_WRAPPED: 16

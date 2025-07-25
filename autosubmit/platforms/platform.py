@@ -19,7 +19,7 @@ from multiprocessing.queues import Queue
 import time
 
 if TYPE_CHECKING:
-    from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+    from autosubmit.config.configcommon import AutosubmitConfig
 
 
 def _init_logs_log_process(as_conf, platform_name):

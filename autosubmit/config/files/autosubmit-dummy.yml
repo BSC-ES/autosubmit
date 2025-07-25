@@ -1,0 +1,16 @@
+CONFIG:
+  AUTOSUBMIT_VERSION: 4.0.0b
+  MAXWAITINGJOBS: 20
+  TOTALJOBS: 20
+  SAFETYSLEEPTIME: 10
+  RETRIALS: 0
+#wrappers:
+#  wrapper_sim:
+#    TYPE: "vertical"
+#    JOBS_IN_WRAPPER: "SIM"
+MAIL:
+  NOTIFICATIONS: False
+  TO:
+STORAGE:
+  TYPE: "pkl"
+  COPY_REMOTE_LOGS: True

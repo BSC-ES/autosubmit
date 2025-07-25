@@ -1,0 +1,68 @@
+CONFIGURATION:
+  DQC_PROFILE: production
+  DATA_PORTFOLIO: production
+  ICON:
+    ATM_GID: "0015"
+    ATM_REF: "R02B09"
+    OCE_GID: "0016"
+    OCE_REF: "R02B09"
+
+    ATM_NPROMA: 500
+    OCE_NPROMA: 32
+
+    ATM_LEVELS: 90                    
+    ATM_HALFLEVELS: 91
+    OCE_LEVELS: 72                    
+    OCE_HALFLEVELS: 73 
+
+PLATFORMS:
+  LUMI:
+    PARTITION: standard-g
+    MAX_WALLCLOCK: '48:00'
+    PROCESSORS_PER_NODE: 64
+  LEVANTE:
+    WALLCLOCK: '08:00'
+    PARTITION: compute
+    NODES: 200
+    TASKS_PER_NODE: 32
+    CPUS_PER_TASK: 8
+    PROCESSORS: 25600
+    CUSTOM_DIRECTIVES: "['#SBATCH --export=ALL --distribution=block:cyclic']"
+    OCEAN_NODES: 10
+
+#
+# HETJOB Settings
+#
+
+#wrappers:
+#  wrapper_hetjobs:
+#    JOBS_IN_WRAPPER: SIM
+#    TYPE: vertical
+#    RETRIALS: 3
+#    extend_wallclock: 1
+#    MAX_WRAPPED: 4
+
+JOBS:
+  SIM:
+    WALLCLOCK: '10:00'
+    MEMORY:
+        - 0
+        - 0
+        - 0
+    NODES:
+        - 128
+        - 28
+        - 2
+    TASKS:
+        - 8
+        - 56
+        - 4
+    THREADS:
+        - 1
+        - 1
+        - 7
+    CUSTOM_DIRECTIVES:
+        - ['#SBATCH --export=ALL', '#SBATCH --exclusive', '#SBATCH --gpus-per-node=8', '#SBATCH --no-requeue']
+        - ['#SBATCH --export=ALL', '#SBATCH --exclusive', '#SBATCH --distribution=block:cyclic:fcyclic', '#SBATCH --no-requeue']
+        - ['#SBATCH --exclusive', '#SBATCH --no-requeue']
+

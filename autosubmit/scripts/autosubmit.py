@@ -28,7 +28,7 @@ from typing import Optional, Union
 from portalocker.exceptions import BaseLockException
 
 from autosubmit.autosubmit import Autosubmit  # noqa: E402
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig  # noqa: E402
+from autosubmit.config.configcommon import AutosubmitConfig  # noqa: E402
 from log.log import Log, AutosubmitCritical, AutosubmitError  # noqa: E402
 
 

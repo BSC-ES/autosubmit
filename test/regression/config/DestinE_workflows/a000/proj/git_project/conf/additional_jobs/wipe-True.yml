@@ -1,0 +1,14 @@
+JOBS:
+  WIPE:
+    FILE: templates/wipe.sh
+    PLATFORM: '%DEFAULT.HPCARCH%'
+    PARTITION: "%CURRENT_APP_PARTITION%"
+    DEPENDENCIES: TRANSFER
+    RUNNING: chunk
+    WALLCLOCK: '00:30'
+    NODES: 1
+    PROCESSORS: 1
+    TASKS: 1
+    THREADS: 1
+    CHECK: on_submission
+

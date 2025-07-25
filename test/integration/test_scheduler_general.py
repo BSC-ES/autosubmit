@@ -20,7 +20,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Callable
 
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from autosubmit.config.configcommon import AutosubmitConfig
 
 
 def _get_script_files_path() -> Path:

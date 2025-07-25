@@ -25,7 +25,7 @@ from networkx.classes import DiGraph
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 from log.log import Log, AutosubmitCritical
 
 if TYPE_CHECKING:

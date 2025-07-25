@@ -20,7 +20,7 @@
 from pathlib import Path
 from textwrap import dedent
 
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 
 from autosubmit.autosubmit import Autosubmit
 from test.conftest import AutosubmitConfigFactory

@@ -22,9 +22,9 @@ from pathlib import Path
 import pytest
 
 from autosubmit.migrate.migrate import Migrate
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
 from log.log import AutosubmitCritical
 
 

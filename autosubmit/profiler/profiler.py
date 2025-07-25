@@ -26,7 +26,7 @@ from pstats import SortKey
 
 from psutil import Process
 
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 from log.log import Log, AutosubmitCritical
 
 _UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]

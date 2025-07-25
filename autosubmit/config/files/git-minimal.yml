@@ -1,0 +1,18 @@
+CONFIG:
+  AUTOSUBMIT_VERSION: 4.0.0b
+  TOTALJOBS: 20
+  MAXWAITINGJOBS: 20
+DEFAULT:
+  EXPID: ""
+  HPCARCH: ""
+  #hint: use %PROJDIR% to point to the project folder (where the project is cloned)
+  CUSTOM_CONFIG: ""
+PROJECT:
+  PROJECT_TYPE: "git"
+  PROJECT_DESTINATION: "git_project"
+GIT:
+  PROJECT_ORIGIN: ""
+  PROJECT_BRANCH: ""
+  PROJECT_COMMIT: ""
+  PROJECT_SUBMODULES: ""
+  FETCH_SINGLE_BRANCH: True

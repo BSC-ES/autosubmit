@@ -1,0 +1,28 @@
+## In this file we define the simulations that are being run as defined 
+## in M340.5.1.1) (?)
+
+experiment:
+    DATELIST: 20200120
+    MEMBERS: fc0
+    CHUNKSIZEUNIT: day
+    CHUNKSIZE: 1
+    NUMCHUNKS: 5
+    CALENDAR: standard
+
+PLATFORMS:
+    LUMI:
+        PARTITION: "debug"
+        MAX_WALLCLOCK: "00:30"
+
+JOBS:
+   SIM:
+       WALLCLOCK: "00:30"
+
+CONFIGURATION:
+        RAPS_EXPERIMENT: "hist"
+
+REQUEST:
+    EXPERIMENT: "hist"
+    ACTIVITY: "CMIP6"
+    GENERATION: 1
+    REALIZATION: 1

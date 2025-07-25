@@ -1,0 +1,30 @@
+CONFIGURATION:
+  DQC_PROFILE: develop
+  DATA_PORTFOLIO: production
+  IFS:
+    GTYPE: tco
+    RESOL: 1279
+    LEVELS: 137
+    EXPVER: hz9o
+    LABEL: LWDA
+
+    IO_NODES: 40
+
+PLATFORMS:
+  LUMI:
+    NODES: 240
+    TASKS: 16
+    THREADS: 8
+    PROCESSORS_PER_NODE: 128
+
+  MARENOSTRUM5:
+    TYPE: slurm
+    QUEUE: "gp_debug"
+    MAX_WALLCLOCK: "00:30"
+    NODES: 2
+    TASKS: 14
+    THREADS: 8
+    PROCESSORS_PER_NODE: 112
+
+REQUEST:
+  RESOLUTION: high

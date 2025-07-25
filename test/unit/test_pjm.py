@@ -24,7 +24,7 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal
 from autosubmit.platforms.pjmplatform import PJMPlatform
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from autosubmit.config.yamlparser import YAMLParserFactory
 
 _EXPECTED_COMPLETED_JOBS = ["167727"]
 _EXPECTED_OUTPUT = """JOB_ID     ST  REASON                         

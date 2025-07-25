@@ -25,7 +25,7 @@ import time
 
 if TYPE_CHECKING:
     # Avoid circular imports
-    from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+    from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.job.job import Job
 
 

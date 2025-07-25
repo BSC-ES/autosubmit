@@ -40,9 +40,9 @@ from pathlib import Path
 from time import sleep
 from typing import Dict, Set, Tuple, Union, Any, List, Optional
 
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
 from bscearth.utils.date import date2str
 from portalocker import Lock
 from portalocker.exceptions import BaseLockException
@@ -1184,7 +1184,7 @@ class Autosubmit:
             local: bool=False,
             parameters: Dict[str, Union[Dict, List, str]] = None
     ) -> None:
-        """Retrieve the configuration from autosubmitconfigparser package.
+        """Retrieve the configuration from autosubmit.config package.
 
         :param exp_id: Experiment ID
         :param dummy: Whether the experiment is a dummy one or not.
@@ -1234,13 +1234,13 @@ class Autosubmit:
                             yield '.'.join([*keys, key]).upper(), value
                         else:
                             yield key, value
-        template_files = [file.name for file in (read_files('autosubmitconfigparser.config')/'files').iterdir() if file.is_file()]
+        template_files = [file.name for file in (read_files('autosubmit.config')/'files').iterdir() if file.is_file()]
         if parameters is None:
             parameters = {}
         parameter_comments = dict(_recurse_into_parameters(parameters))
 
         for as_conf_file in template_files:
-            origin = str(read_files('autosubmitconfigparser.config')/f'files/{as_conf_file}')
+            origin = str(read_files('autosubmit.config')/f'files/{as_conf_file}')
             target = None
 
             if dummy:
@@ -2011,7 +2011,7 @@ class Autosubmit:
         :return: a tuple
         """
         host = platform.node()
-        # Init the autosubmitconfigparser and check that every file exists and it is a valid configuration.
+        # Init the AutosubmitConfig and check that every file exists, and it is a valid configuration.
         as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
         as_conf.check_conf_files(running_time=True, force_load=True)
         if not recover:

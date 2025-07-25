@@ -7,8 +7,8 @@ import locale
 from pathlib import Path
 import sqlite3
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.basicconfig import BasicConfig
 from log.log import Log
 
 if TYPE_CHECKING:

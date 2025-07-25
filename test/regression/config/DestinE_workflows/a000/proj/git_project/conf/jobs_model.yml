@@ -1,0 +1,34 @@
+JOBS:
+  INI:
+    DEPENDENCIES: REMOTE_SETUP
+    FILE: templates/ini.sh
+    PLATFORM: '%DEFAULT.HPCARCH%-login'
+    RUNNING: member
+    WALLCLOCK: 00:30
+    CHECK: on_submission
+  LOCAL_SETUP:
+    FILE: templates/local_setup.sh
+    PLATFORM: LOCAL
+    RUNNING: once
+    CHECK: on_submission
+  REMOTE_SETUP:
+    DEPENDENCIES: SYNCHRONIZE
+    FILE: templates/remote_setup.sh,templates/fdb/confignative.yaml,templates/fdb/configlatlon.yaml,templates/fdb/config.yaml
+    PLATFORM: '%DEFAULT.HPCARCH%-login'
+    RUNNING: once
+    WALLCLOCK: 02:00
+    CHECK: on_submission
+  SIM:
+    DEPENDENCIES: INI SIM-1 DQC_BASIC-10
+    FILE: templates/sim_%MODEL.NAME%.sh
+    PLATFORM: '%DEFAULT.HPCARCH%'
+    WALLCLOCK: 00:30
+    running: chunk
+    CHECK: on_submission
+  SYNCHRONIZE:
+    DEPENDENCIES: LOCAL_SETUP
+    FILE: templates/synchronize.sh
+    PLATFORM: LOCAL
+    RUNNING: once
+    CHECK: on_submission
+

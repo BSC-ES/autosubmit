@@ -1,0 +1,47 @@
+JOBS:
+  LOCAL_SETUP:
+    FILE: templates/local_setup.sh
+    PLATFORM: LOCAL
+    RUNNING: once
+    CHECK: on_submission
+  REMOTE_SETUP:
+    DEPENDENCIES: SYNCHRONIZE
+    FILE: templates/remote_setup.sh,templates/fdb/confignative.yaml,templates/fdb/configlatlon.yaml,templates/fdb/config.yaml
+    PLATFORM: '%DEFAULT.HPCARCH%-login'
+    RUNNING: once
+    WALLCLOCK: 02:00
+    CHECK: on_submission
+  MSTRO_PM:
+    DEPENDENCIES: REMOTE_SETUP MSTRO_PM-1
+    FILE: templates/mstro_pm.sh
+    PLATFORM: '%DEFAULT.HPCARCH%'
+    RUNNING: chunk
+    WALLCLOCK: 01:30
+    CHECK: on_submission
+  MSTRO_LIBRARIAN:
+    DEPENDENCIES:
+       MSTRO_PM:
+         STATUS: "RUNNING"
+    FILE: templates/mstro_librarian.sh
+    PLATFORM: '%DEFAULT.HPCARCH%'
+    RUNNING: chunk
+    SPLITS: 2 # hardcoded for now # "%OPAREQUEST.NSTATS%" #test
+    WALLCLOCK: 01:30
+    CHECK: on_submission
+  MSTRO_OPA:
+    DEPENDENCIES:
+       MSTRO_PM:
+         STATUS: "RUNNING"
+    FILE: templates/mstro_opa.sh
+    PLATFORM: '%DEFAULT.HPCARCH%'
+    RUNNING: chunk
+    SPLITS: 2 # hardcoded for now # "%OPAREQUEST.NSTATS%" #test
+    WALLCLOCK: 01:00
+    CHECK: on_submission
+  SYNCHRONIZE:
+    DEPENDENCIES: LOCAL_SETUP
+    FILE: templates/synchronize.sh
+    PLATFORM: LOCAL
+    RUNNING: once
+    CHECK: on_submission
+

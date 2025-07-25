@@ -20,7 +20,7 @@ from time import time, sleep
 
 import autosubmit.history.database_managers.database_models as Models
 import autosubmit.history.utils as HUtils
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 from log.log import Log
 from .data_classes.experiment_run import ExperimentRun
 from .data_classes.job_data import JobData

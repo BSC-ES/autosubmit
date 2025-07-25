@@ -1,0 +1,3722 @@
+AQUA:
+    1:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "tp"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "tp"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes, 60*timestep 
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    2:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "2t"
+        grid: "0.1/0.1"
+        
+    3:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "skt"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "skt"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    4:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "tcc"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "tcc"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+        
+    5:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "lcc"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "lcc"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    6:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "mcc"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "mcc"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    7:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "hcc"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "hcc"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    8:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "sd"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "sd"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    9:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "tciw"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "tciw"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    10:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "tclw"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "tclw"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    11:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "e"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "e"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    12:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "sf"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "sf"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+        
+    13:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "slhf"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "slhf"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    14:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "sshf"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "sshf"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    15:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "ssr"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "ssr"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    16:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: sfc
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "str"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "str"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    17:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: sfc
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "strd"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "strd"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    18:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: sfc
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "ssrd"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "ssrd"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    19:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: sfc
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "tsr"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "tsr"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    20:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: sfc
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "ttr"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "ttr"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    21:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: sfc
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "tisr"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "tisr"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    22:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "pl"
+        levelist: [1, 5, 10, 20, 30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "q"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "q"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    23:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "pl"
+        levelist: [1, 5, 10, 20, 30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "t"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "t"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    24:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "pl"
+        levelist: [1, 5, 10, 20, 30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "u"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "u"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    25:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "pl"
+        levelist: [1, 5, 10, 20, 30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "v"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "v"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    26:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "o2d"
+        date: split_day
+        time: "0000"
+        param: "avg_tos"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "avg_tos"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 1440 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    27:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "o2d"
+        date: split_day
+        time: "0000"
+        param: "avg_siconc"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "avg_siconc"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 1440 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    28:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "o2d"
+        date: split_day
+        time: "0000"
+        param: "avg_sos"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "avg_sos"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 1440 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    29:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "o3d"
+        levelist: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75]
+        date: split_day 
+        time: "0000"
+        param: "avg_thetao"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "avg_thetao"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 1440 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    30:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "o3d"
+        levelist: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75]
+        date: split_day 
+        time: "0000"
+        param: "avg_so"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "avg_so"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "monthly"
+        output_freq: "monthly"
+        time_step: 1440 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+MHM:
+    1:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "2t"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters:
+        variable: "2t"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    2:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "tprate"
+        grid: "0.1/0.1"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters:
+        variable: "tprate"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+WILDFIRES_FWI:
+    1:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "1200"
+        param: "10u"
+        grid: "1.0/1.0"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters:
+        variable: "10u"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily_noon"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    2:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "1200"
+        param: "10v"
+        grid: "1.0/1.0"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters:
+        variable: "10v"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily_noon"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    3:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "1200"
+        param: "2d"
+        grid: "1.0/1.0"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters:
+        variable: "2d"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily_noon"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    4:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "tp"
+        grid: "1.0/1.0"
+        method: nn
+      OPAREQUEST:
+        # Hardcoded parameters:
+        variable: "tp"
+        stat: "sum"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily_noon"
+        output_freq: "daily_noon"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    5: 
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt 
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "1200"
+        param: "2t"
+        grid: "1.0/1.0"
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters:
+        variable: "2t"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily_noon"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+URBAN:
+    1:
+      GSVREQUEST: #raw data
+        dataset: climate-dt
+        class: d1
+        type: fc
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "2t"
+        grid: "0.1/0.1"
+        method: nn
+        area: [72.1, -25.1, 26.9, 45.1] #Europe
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "2t"
+        stat: "min"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    2:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "2t"
+        grid: "0.1/0.1"
+        method: nn
+        area: [72.1, -25.1, 26.9, 45.1] #Europe
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "2t"
+        stat: "max"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    3:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+ 
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "2t"
+        grid: "0.1/0.1"
+        method: nn
+        area: [72.1, -25.1, 26.9, 45.1] #Europe
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "2t"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "monthly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    4:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "2t"
+        grid: "0.1/0.1"
+        method: nn
+        area: [72.1, -25.1, 26.9, 45.1] #Europe
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "2t"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "weekly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    5:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "10u"
+        grid: "0.1/0.1"
+        method: nn
+        area: [72.1, -25.1, 26.9, 45.1] #Europe
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "10u"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "weekly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    6:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "10v"
+        grid: "0.1/0.1"
+        method: nn
+        area: [72.1, -25.1, 26.9, 45.1] #Europe
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "10v"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "weekly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    7:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "2d"
+        grid: "0.1/0.1"
+        method: nn
+        area: [72.1, -25.1, 26.9, 45.1] #Europe
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "2d"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "weekly"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+ENERGY_ONSHORE:
+    1:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "hl"
+        levelist: 100
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "100v"
+        grid: "0.1/0.1"
+        method: nn
+        area: [72.1, -25.1, 26.9, 45.1] #Europe
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "100v"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    2:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "hl"
+        levelist: 100
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "100u"
+        grid: "0.1/0.1"
+        method: nn
+        area: [72.1, -25.1, 26.9, 45.1] #Europe
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "100u"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    3:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "hl"
+        levelist: 100
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "100v"
+        grid: "0.1/0.1"
+        method: nn
+        area: [72.1, -25.1, 26.9, 45.1] #Europe
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "100v"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    4:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "hl"
+        levelist: 100
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "100u"
+        grid: "0.1/0.1"
+        method: nn
+        area: [72.1, -25.1, 26.9, 45.1] #Europe
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "100u"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    5:
+      GSVREQUEST: #raw data
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "2t"
+        grid: "0.1/0.1"
+        method: nn
+        area: [72.1, -25.1, 26.9, 45.1] #Europe
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "2t"
+        stat: "min"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:        
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    6:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param:  "2t"
+        grid: "0.1/0.1"
+        method: nn
+        area: [72.1, -25.1, 26.9, 45.1] #Europe
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "2t"
+        stat: "max"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:    
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+    7:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+        
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param:  "2t"
+        grid: "0.1/0.1"
+        method: nn
+        area: [72.1, -25.1, 26.9, 45.1] #Europe
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "2t"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+ENERGY_OFFSHORE:
+    1:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "10u"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "10u"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    2:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "10v"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "10v"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    3:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "2t"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "2t"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    4:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "2d"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "2d"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    5:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "tprate"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "tprate"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    6:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "hl"
+        levelist: "100"
+        date: "%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%"
+        time: "0000/to/2300/by/0100"
+        param: "100u"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "100u"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    7:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "hl"
+        levelist: "100"
+        date: "%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%"
+        time: "0000/to/2300/by/0100"
+        param: "100v"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "100v"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    8:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "o2d"
+        date: "%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%"
+        time: "0000"
+        param: "avg_sithick"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "avg_sithick"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    9:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "o2d"
+        date: "%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%"
+        time: "0000"
+        param: "avg_siconc"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "avg_siconc"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    10:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "o2d"
+        date: "%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%"
+        time: "0000"
+        param: "avg_siue"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "avg_siue"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    11:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "o2d"
+        date: "%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%"
+        time: "0000"
+        param: "avg_sivn"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "avg_sivn"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    12:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "o2d"
+        date: "%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%"
+        time: "0000"
+        param: "avg_tos"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "avg_tos"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    13:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "o2d"
+        date: "%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%"
+        time: "0000"
+        param: "avg_sos"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "avg_sos"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    14:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "o2d"
+        date: "%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%"
+        time: "0000"
+        param: "avg_zos"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "avg_zos"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    15:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "pl"
+        levelist: "1000"
+        date: "%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%"
+        time: "0000/to/2300/by/0100"
+        param: "t"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "t"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    16:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "pl"
+        levelist: "1000"
+        date: "%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%"
+        time: "0000/to/2300/by/0100"
+        param: "q"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "q"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    17:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "pl"
+        levelist: "1000"
+        date: "%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%"
+        time: "0000/to/2300/by/0100"
+        param: "clwc"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "clwc"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+    18:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "pl"
+        levelist: "1000"
+        date: "%CHUNK_START_DATE%/to/%CHUNK_SECOND_TO_LAST_DATE%"
+        time: "0000/to/2300/by/0100"
+        param: "z"
+        grid: "0.1/0.1"
+        area: "70/-12/48/31"
+        method: nn
+
+      OPAREQUEST:
+        variable: "z"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+
+        # From <expid>/conf/main.yml:
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+
+HYDROMET:
+    1:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param:  "tp"
+        grid: "0.1/0.1"
+        area: "60.0/5.0/45.0/20.0"
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "tp"
+        stat: "iams"
+        bias_adjustment: none  # True or None
+        stat_freq: "annually"
+        output_freq: "annually"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%" 
+        save_filepath: "%APP.OUTPATH%" 
+        
+    2:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+        
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param:  "tp"
+        grid: "0.1/0.1"
+        area: "60.0/5.0/45.0/20.0"
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "tp"
+        stat: "raw"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "monthly" # Achtung this does not apply for "raw" stat
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%" 
+        save_filepath: "%APP.OUTPATH%" 
+
+WILDFIRES_SPITFIRE:
+    1:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param:  "2t"
+        grid: "0.1/0.1"
+        area: "70.7/19/59.7/31.9"
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "2t"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily" 
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%" 
+        save_filepath: "%APP.OUTPATH%" 
+
+    2:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param:  "10u"
+        grid: "0.1/0.1"
+        area: "70.7/19/59.7/31.9"
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "10u"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%" 
+        save_filepath: "%APP.OUTPATH%" 
+        
+    3:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:        
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param:  "10v"
+        grid: "0.1/0.1"
+        area: "70.7/19/59.7/31.9"
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "10v"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily" 
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%" 
+        save_filepath: "%APP.OUTPATH%" 
+        
+    4:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param:  "2t"
+        grid: "0.1/0.1"
+        area: "70.7/19/59.7/31.9"
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "2t"
+        stat: "max"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily" 
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%" 
+        save_filepath: "%APP.OUTPATH%" 
+        
+    5:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+        
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param:  "tp"
+        grid: "0.1/0.1"
+        area: "70.7/19/59.7/31.9"
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "tp"
+        stat: "sum"
+        bias_adjustment: none  # True or None
+        stat_freq: "daily"
+        output_freq: "daily" 
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%" 
+        save_filepath: "%APP.OUTPATH%"
+
+WILDFIRES_WISE:
+    1:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%"
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param:  "2t"
+        grid: "0.1/0.1"
+        area: "71/19/59.5/32"
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "2t"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+        
+    2:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+        
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param:  "2d"
+        grid: "0.1/0.1"
+        area: "71/19/59.5/32"
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "2d"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+    3:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+        
+        # Hardcoded parameters:        
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param:  "10v"
+        grid: "0.1/0.1"
+        area: "71/19/59.5/32"
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "10v"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+    4:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+        
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+        
+        # Hardcoded parameters:        
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param:  "10u"
+        grid: "0.1/0.1"
+        area: "71/19/59.5/32"
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "10u"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%"
+    5:
+      GSVREQUEST:
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc"
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param:  "tp"
+        grid: "0.1/0.1"
+        area: "71/19/59.5/32"
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "tp"
+        stat: "mean"
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly"
+        output_freq: "daily"
+        time_step: 60 # in minutes
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%" 
+
+OBSALL:
+    1:  
+      GSVREQUEST: #raw data (2t at sfc-level  from IFS model) for SYNOP Part of OBSALL Apps
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+        
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc" # please fill this
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "2t" # 2t - air temperature at 2 m (167)
+        grid: "1.0/1.0" #fill this if needed. 0.05 is 5km
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "2t" # 2t - air temperature at 2 m (167)
+        stat: "raw" # please fill this
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly" # please fill this
+        output_freq: "daily" # please fill this
+        time_step: 60 # in minutes, 60*timestep length in hours TODO: do that automatically
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%" 
+    2:
+      GSVREQUEST: #raw data (t at 850 hPa from IFS model) for RADSOUND Part of OBSALL Apps
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "pl" # please fill this
+        levelist: [850]
+        date: split_day
+        time: "0000/to/2300/by/1200"
+        param: "t" #  t - air temperature (130) at 850 hPa 
+        grid: "1.0/1.0" #fill this if needed. 0.05 is 5km
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "t" # t - air temperature (130) at 850 hPa 
+        stat: "raw" # please fill this
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly" # please fill this
+        output_freq: "daily" # please fill this
+        time_step: 720 # in minutes, 60*timestep length in hours TODO: do that automatically
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%" 
+
+    3:  
+      GSVREQUEST: #raw data (2t at sfc-level from IFS model) for RADSOUND Part of OBSALL Apps
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc" # please fill this
+        date: split_day
+        time: "0000/to/2300/by/1200"
+        param: "2t" # 2t - air temperature at 2 m (167)
+        grid: "1.0/1.0" #fill this if needed. 0.05 is 5km
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "2t" # 2t - air temperature at 2 m (167)
+        stat: "raw" # please fill this
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly" # please fill this
+        output_freq: "daily" # please fill this
+        time_step: 720 # in minutes, 60*timestep length in hours TODO: do that automatically
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%" 
+
+    4:  
+      GSVREQUEST: #raw data (2d at sfc-level from IFS model) for SATELLITE Part of OBSALL Apps
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc" # please fill this
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "2d" # 2d - dewpoint temperature at 2 m (168)
+        grid: "1.0/1.0" #fill this if needed. 0.05 is 5km
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "2d" # 2d - dewpoint temperature at 2 m (168)
+        stat: "raw" # please fill this
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly" # please fill this
+        output_freq: "daily" # please fill this
+        time_step: 60 # in minutes, 60*timestep length in hours TODO: do that automatically
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%" 
+
+    5:  
+      GSVREQUEST: #raw data (10u at sfc-level from IFS model) for SATELLITE Part of OBSALL Apps
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc" # please fill this
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "10u" # 10u - U component of wind speed at 10 m (165)
+        grid: "1.0/1.0" #fill this if needed. 0.05 is 5km
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "10u" # 10u - U component of wind speed at 10 m (165)
+        stat: "raw" # please fill this
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly" # please fill this
+        output_freq: "daily" # please fill this
+        time_step: 60 # in minutes, 60*timestep length in hours TODO: do that automatically
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%" 
+
+    6:  
+      GSVREQUEST: #raw data (10v at sfc-level from IFS model) for SATELLITE Part of OBSALL Apps
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc" # please fill this
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "10v" # 10v - V component of wind speed at 10 m (166)
+        grid: "1.0/1.0" #fill this if needed. 0.05 is 5km
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "10v" # 10v - V component of wind speed at 10 m (166)
+        stat: "raw" # please fill this
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly" # please fill this
+        output_freq: "daily" # please fill this
+        time_step: 60 # in minutes, 60*timestep length in hours TODO: do that automatically
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%" 
+
+    7:  
+      GSVREQUEST: #raw data (sp at sfc-level from IFS model) for SATELLITE Part of OBSALL Apps
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc" # please fill this
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "sp" # sp - surface pressure (134)
+        grid: "1.0/1.0" #fill this if needed. 0.05 is 5km
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "sp" # sp - surface pressure (134)
+        stat: "raw" # please fill this
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly" # please fill this
+        output_freq: "daily" # please fill this
+        time_step: 60 # in minutes, 60*timestep length in hours TODO: do that automatically
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%" 
+
+    8:  
+      GSVREQUEST: #raw data (skt at sfc-level from IFS model) for SATELLITE Part of OBSALL Apps
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "sfc" # please fill this
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "skt" # skt - skin temperature (235)
+        grid: "1.0/1.0" #fill this if needed. 0.05 is 5km
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "skt" # skt - skin temperature (235)
+        stat: "raw" # please fill this
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly" # please fill this
+        output_freq: "daily" # please fill this
+        time_step: 60 # in minutes, 60*timestep length in hours TODO: do that automatically
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%" 
+
+    9:
+      GSVREQUEST: #raw data (t at pl-levels from IFS model) for SATELLITE Part of OBSALL Apps
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "pl" # please fill this
+        levelist: [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100, 70, 50, 30, 20, 10, 5, 1]
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "t" #  t - air temperature (130) at multiple hPa pressure levels (see levelist) 
+        grid: "1.0/1.0" #fill this if needed. 0.05 is 5km
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "t" # t - air temperature (130) at multiple hPa pressure levels (see levelist)
+        stat: "raw" # please fill this
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly" # please fill this
+        output_freq: "daily" # please fill this
+        time_step: 60 # in minutes, 60*timestep length in hours TODO: do that automatically
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%" 
+
+    10:
+      GSVREQUEST: #raw data (q at pl-levels from IFS model) for SATELLITE Part of OBSALL Apps
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "pl" # please fill this
+        levelist: [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100, 70, 50, 30, 20, 10, 5, 1]
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "q" #  q - specific humidity (133) at multiple hPa pressure levels (see levelist) 
+        grid: "1.0/1.0" #fill this if needed. 0.05 is 5km
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "q" #  q - specific humidity (133) at multiple hPa pressure levels (see levelist)
+        stat: "raw" # please fill this
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly" # please fill this
+        output_freq: "daily" # please fill this
+        time_step: 60 # in minutes, 60*timestep length in hours TODO: do that automatically
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%" 
+
+    11:
+      GSVREQUEST: #raw data (clwc at pl-levels from IFS model) for SATELLITE Part of OBSALL Apps
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "pl" # please fill this
+        levelist: [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100, 70, 50, 30, 20, 10, 5, 1]
+        date: split_day
+        time: "0000/to/2300/by/0100"
+        param: "clwc" #  clwc - specific liquid water content (246) at multiple hPa pressure levels (see levelist) 
+        grid: "1.0/1.0" #fill this if needed. 0.05 is 5km
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "clwc" #  clwc - specific liquid water content (246) at multiple hPa pressure levels (see levelist) 
+        stat: "raw" # please fill this
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly" # please fill this
+        output_freq: "daily" # please fill this
+        time_step: 60 # in minutes, 60*timestep length in hours TODO: do that automatically
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%" 
+
+    12:
+      GSVREQUEST: #raw data (avg_siconc at o2d-level from NEMO model) for SATELLITE Part of OBSALL Apps
+        # From <expid>/conf/main.yml:
+        expver: "%APP.READ_EXPID%" 
+
+        # From user input <expid>/conf/request.yml:
+        activity: "%REQUEST.ACTIVITY%"
+        resolution: "%REQUEST.RESOLUTION%"
+        generation: "%REQUEST.GENERATION%"
+        realization: "%REQUEST.REALIZATION%"
+        experiment: "%REQUEST.EXPERIMENT%"
+        model: "%REQUEST.MODEL%"
+
+        # Hardcoded parameters:
+        dataset: climate-dt
+        class: d1
+        type: fc
+        stream: clte
+        levtype: "o2d" # please fill this
+        date: split_day
+        time: "0000" # note, outputting ocean variables as daily averages, from NEMO model
+        param: "avg_siconc" # avg_siconc - sea ice fraction, param: [263001]
+        grid: "1.0/1.0" #fill this if needed. 0.05 is 5km
+        method: nn
+
+      OPAREQUEST:
+        # Hardcoded parameters
+        variable: "avg_siconc" # avg_siconc - sea ice fraction, param: [263001]
+        stat: "raw" # please fill this
+        bias_adjustment: none  # True or None
+        stat_freq: "hourly" # please fill this
+        output_freq: "daily" # please fill this
+        time_step: 0 # in minutes, 60*timestep length in hours TODO: do that automatically
+        save: True
+        checkpoint: True
+        
+        # From <expid>/conf/main.yml:  
+        checkpoint_filepath: "%APP.OUTPATH%"
+        save_filepath: "%APP.OUTPATH%" 
+
+ 
+
+

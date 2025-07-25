@@ -59,7 +59,6 @@ exts_list = [
             }
         }],
     }),
-    ('autosubmitconfigparser', '1.0.78'),
     ('python-xlib', '0.33', {'modulename': 'Xlib'}),
     ('portalocker', '2.7.0'),
     ('pyparsing', '3.2.1'),

@@ -18,7 +18,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from autosubmit.database.db_manager import create_db_manager
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 from pathlib import Path
 from log.log import AutosubmitCritical
 from typing import Any, List

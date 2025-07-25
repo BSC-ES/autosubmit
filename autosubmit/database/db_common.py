@@ -24,7 +24,7 @@ import os
 import sqlite3
 import multiprocessing
 from log.log import Log, AutosubmitCritical
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 
 Log.get_logger("Autosubmit")
 

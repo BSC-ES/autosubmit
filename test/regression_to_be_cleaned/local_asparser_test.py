@@ -2,7 +2,7 @@
 This test checks that the autosubmit report command works as expected.
 It is a regression test, so it is not run by default.
 It only run within my home desktop computer. It is not run in the CI. Eventually it will be included TODO
-Just to be sure that the autosubmitconfigparser work as expected if there are changes.
+Just to be sure that the autosubmit.config work as expected if there are changes.
 """
 
 import subprocess
