@@ -22,23 +22,21 @@ class Utils:
     """
 
     @staticmethod
-    def get_SYPD(
-        start_timestamp: int,
-        finish_timestamp: int,
-        chunk_size: str,
-        chunk_size_unit: str,
-    ) -> float:
+    def get_SYPD(start_timestamp: int, finish_timestamp: int, chunk_size: str, chunk_size_unit: str) -> float:
         """
         Calculate the simulated time in years based on start and finish timestamps, chunk size, and unit.
 
-        Args:
-            start_timestamp: Start timestamp in Unix format.
-            finish_timestamp: Finish timestamp in Unix format.
-            chunk_size: Size of the chunk (e.g., '12').
-            chunk_size_unit: Unit of the chunk size (e.g., 'month').
+        :param start_timestamp: The start timestamp in seconds.
+        :type start_timestamp: int
+        :param finish_timestamp: The finish timestamp in seconds.
+        :type finish_timestamp: int
+        :param chunk_size: The size of the chunk in the specified unit.
+        :type chunk_size: str
+        :param chunk_size_unit: The unit of the chunk size (e.g., 'year', 'month', 'day').
+        :type chunk_size_unit: str
 
-        Returns:
-            float: Simulated time in years.
+        :return: The simulated time in the specified unit.
+        :rtype: float
         """
         duration_seconds = finish_timestamp - start_timestamp
         if chunk_size_unit == "year":
@@ -53,11 +51,15 @@ class Utils:
     def get_under_performance(value: float, threshold: float) -> float:
         """
         Calculate the percentage under performance based on the value and threshold.
-        Args:
-            value: The computed value of the metric.
-            threshold: The threshold value for comparison.
-        Returns:
-            float: Percentage under performance.
+        
+        :param value: The actual value to compare against the threshold.
+        :type value: float 
+
+        :param threshold: The threshold value to compare against.
+        :type threshold: float
+
+        :return: The percentage of underperformance, or 0.0 if the value exceeds the threshold.
+        :rtype: float
         """
         if value > threshold:
             return 0.0

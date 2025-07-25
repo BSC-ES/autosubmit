@@ -31,9 +31,7 @@ class SIMDestinEPerformance(SIMPerformance):
 
     SYPD_THRESHOLD: float = 2  # Threshold for SYPD to consider a job as "fast"
 
-    def compute_and_check_performance_metrics(
-        self, job: "Job"
-    ) -> list[PerformanceMetricInfo]:
+    def compute_and_check_performance_metrics(self, job: "Job") -> list[PerformanceMetricInfo]:
         """
         Compute the performance metrics for a SIM DestinE job and check if it is under a threshold.
 

@@ -16,10 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from typing import TYPE_CHECKING
-from autosubmit.performance.base_performance import (
-    BasePerformance,
-    PerformanceMetricInfo,
-)
+from autosubmit.performance.base_performance import BasePerformance,PerformanceMetricInfo
 
 if TYPE_CHECKING:
     from autosubmit.job.job import Job
@@ -35,9 +32,7 @@ class SIMPerformance(BasePerformance):
 
     # Errors management for each metric
 
-    def _manage_errors_computation_SYPD(
-        start_timestamp, finish_timestamp, chunk_size, chunk_size_unit
-    ):
+    def _manage_errors_computation_SYPD(start_timestamp, finish_timestamp, chunk_size, chunk_size_unit):
         """
         Manage errors in the computation of SYPD.
 
@@ -51,37 +46,23 @@ class SIMPerformance(BasePerformance):
             ValueError: If any of the parameters are invalid.
         """
 
-        if not (
-            start_timestamp and finish_timestamp and chunk_size and chunk_size_unit
-        ):
-            raise ValueError(
-                "Job must have start_time_timestamp, finish_time_timestamp, parameters ['EXPERIMENT']['CHUNKSIZE'] and parameters ['EXPERIMENT']['CHUNKSIZEUNIT'] set."
-            )
+        if not (start_timestamp and finish_timestamp and chunk_size and chunk_size_unit):
+            raise ValueError("Job must have start_time_timestamp, finish_time_timestamp, parameters ['EXPERIMENT']['CHUNKSIZE'] and parameters ['EXPERIMENT']['CHUNKSIZEUNIT'] set.")
 
         if not isinstance(start_timestamp, int):
-            raise TypeError(
-                "start_timestamp must be an integer representing Unix timestamp."
-            )
+            raise TypeError("start_timestamp must be an integer representing Unix timestamp.")
 
         if not isinstance(finish_timestamp, int):
-            raise TypeError(
-                "finish_timestamp must be an integer representing Unix timestamp."
-            )
+            raise TypeError("finish_timestamp must be an integer representing Unix timestamp.")
 
         if not isinstance(chunk_size, str):
-            raise TypeError(
-                "chunk_size must be a string representing the size of the chunk (e.g., '12')."
-            )
+            raise TypeError("chunk_size must be a string representing the size of the chunk (e.g., '12').")
 
         if not isinstance(chunk_size_unit, str):
-            raise TypeError(
-                "chunk_size_unit must be a string representing the unit of the chunk size (e.g., 'month')."
-            )
+            raise TypeError("chunk_size_unit must be a string representing the unit of the chunk size (e.g., 'month').")
 
         if not chunk_size.isdigit() or int(chunk_size) <= 0:
-            raise ValueError(
-                "chunk_size must be a positive numeric string (e.g., '12')."
-            )
+            raise ValueError("chunk_size must be a positive numeric string (e.g., '12').")
 
     # Computation and check of SYPD
 
@@ -102,9 +83,7 @@ class SIMPerformance(BasePerformance):
         chunk_size = job.parameters["EXPERIMENT"]["CHUNKSIZE"]
         chunk_size_unit = job.parameters["EXPERIMENT"]["CHUNKSIZEUNIT"]
 
-        SIMPerformance._manage_errors_computation_SYPD(
-            start_timestamp, finish_timestamp, chunk_size, chunk_size_unit
-        )
+        SIMPerformance._manage_errors_computation_SYPD(start_timestamp, finish_timestamp, chunk_size, chunk_size_unit)
 
         duration_seconds = finish_timestamp - start_timestamp
 
@@ -150,9 +129,7 @@ class SIMPerformance(BasePerformance):
 
     # Computation and check of performance metrics
 
-    def compute_and_check_performance_metrics(
-        self, job: "Job"
-    ) -> list[PerformanceMetricInfo]:
+    def compute_and_check_performance_metrics(self, job: "Job") -> list[PerformanceMetricInfo]:
         """
         Compute the performance metrics for a job and check if it is under a threshold.
 
