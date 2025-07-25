@@ -20,9 +20,51 @@ ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) sou
 # the i18n builder cannot share the environment and doctrees with the others
 I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) source
 
-.PHONY: help clean watch html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext
+.PHONY: help clean watch html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext as_setup .EXPORT_ALL_VARIABLES
+
+# This sets up Autosubmit for Sphinx. It writes experiments to the build directory,
+# inside the sub-directory autosubmit. Note, this is a phony target, and uses
+# `.EXPORT_ALL_VARIABLES`, which was also made phony. All variables defined here
+# are exported to other targets. Use this feature with care!
+as_setup: .EXPORT_ALL_VARIABLES
+	$(eval AUTOSUBMIT_DIRECTORY := $(shell realpath -m $(BUILDDIR)/autosubmit))
+	rm -rf $(AUTOSUBMIT_DIRECTORY)
+	$(eval AUTOSUBMIT_CONFIGURATION := $(AUTOSUBMIT_DIRECTORY)/autosubmitrc)
+	mkdir -p $(AUTOSUBMIT_DIRECTORY)/autosubmit
+	@echo "Autosubmit home: [$(AUTOSUBMIT_DIRECTORY)]"
+	touch $(AUTOSUBMIT_CONFIGURATION)
+	@echo "Autosubmit configuration: [$(AUTOSUBMIT_CONFIGURATION)]"
+
+	$(eval AUTOSUBMIT_CONFIGURATION_CONTENTS="\
+	[database]\n\
+	path = $(AUTOSUBMIT_DIRECTORY)/autosubmit\n\
+	filename = autosubmit.db\n\
+	\n\
+	[local]\n\
+	path = $(AUTOSUBMIT_DIRECTORY)/autosubmit\n\
+	\n\
+	[globallogs]\n\
+	path = $(AUTOSUBMIT_DIRECTORY)/autosubmit/logs\n\
+	\n\
+	[structures]\n\
+	path = $(AUTOSUBMIT_DIRECTORY)/autosubmit/metadata/structures\n\
+	\n\
+	[historicdb]\n\
+	path = $(AUTOSUBMIT_DIRECTORY)/autosubmit/metadata/data\n\
+	\n\
+	[historiclog]\n\
+	path = $(AUTOSUBMIT_DIRECTORY)/autosubmit/metadata/logs")
+	echo $(AUTOSUBMIT_CONFIGURATION_CONTENTS) > $(AUTOSUBMIT_CONFIGURATION)
+
+	@echo "Installing Autosubmit..."
+	AUTOSUBMIT_CONFIGURATION=$(AUTOSUBMIT_CONFIGURATION) autosubmit install
+	@echo "Autosubmit installed!"
+
+# Automatically call Autosubmit's setup target.
+-include as_setup
 
 help:
+	env | grep AUTOSUBMIT
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  html       to make standalone HTML files"
 	@echo "  watch      to make standalone HTML files and watch for changes"
