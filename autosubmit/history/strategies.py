@@ -1,26 +1,27 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from abc import ABCMeta, abstractmethod
-import autosubmit.history.database_managers.database_models as Models
 import traceback
-from .internal_logging import Logging
-from .database_managers.database_manager import DEFAULT_HISTORICAL_LOGS_DIR
+from abc import ABCMeta, abstractmethod
+
+import autosubmit.history.database_managers.database_models as Models
+from autosubmit.history.database_managers.database_manager import DEFAULT_HISTORICAL_LOGS_DIR
+from autosubmit.history.internal_logging import Logging
+
 
 class PlatformInformationHandler:
   def __init__(self, strategy):

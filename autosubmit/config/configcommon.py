@@ -36,9 +36,9 @@ from configobj import ConfigObj
 from pyparsing import nestedExpr
 from ruamel.yaml import YAML
 
-from log.log import Log, AutosubmitCritical, AutosubmitError
-from .basicconfig import BasicConfig
-from .yamlparser import YAMLParserFactory
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError
 
 
 class AutosubmitConfig(object):

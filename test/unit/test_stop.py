@@ -21,7 +21,7 @@ from typing import Optional, List
 
 import pytest
 
-from log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 
 """This file contains tests for the ``autosubmit stop`` command."""
 

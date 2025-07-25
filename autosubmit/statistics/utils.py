@@ -22,7 +22,7 @@ from math import ceil
 from typing import Optional
 
 from autosubmit.job.job import Job
-from log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 
 
 def filter_by_section(jobs: list[Job], section: Optional[str]) -> list[Job]:

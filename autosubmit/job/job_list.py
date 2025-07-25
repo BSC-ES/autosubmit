@@ -1,41 +1,38 @@
-#!/usr/bin/env python3
-
-# Copyright 2017-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import copy
 import datetime
+import math
 import os
 import re
 import traceback
 from contextlib import suppress
-from shutil import move
-from typing import List, Dict, Tuple, Any, Optional, Union
 from pathlib import Path
-
+from shutil import move
 from time import strftime, localtime, mktime
+from typing import List, Dict, Tuple, Any, Optional, Union
 
-import math
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
 
+import autosubmit.database.db_structure as DbStructure
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
-
-from log.log import AutosubmitCritical, AutosubmitError, Log
-from autosubmit.job.job_utils import transitive_reduction
 from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status, bcolors
@@ -43,7 +40,8 @@ from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency, _get_submitter
-import autosubmit.database.db_structure as DbStructure
+from autosubmit.job.job_utils import transitive_reduction
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
 
 class JobList(object):

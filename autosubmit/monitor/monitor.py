@@ -28,12 +28,12 @@ from typing import Any, Callable, Optional, Tuple, Union
 
 import py3dotplus as pydotplus
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.helpers.utils import NaturalSort, check_experiment_ownership
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
+from autosubmit.log.log import Log, AutosubmitCritical
 from autosubmit.monitor.diagram import create_stats_report
-from autosubmit.config.basicconfig import BasicConfig
-from log.log import Log, AutosubmitCritical
 
 _GENERAL_STATS_OPTION_MAX_LENGTH = 1000
 """Maximum length used in the stats plot."""

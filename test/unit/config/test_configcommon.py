@@ -22,7 +22,7 @@ from typing import Callable
 import pytest
 
 from autosubmit.config.configcommon import AutosubmitConfig
-from log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 
 """Basic tests for ``AutosubmitConfig``."""
 

@@ -27,8 +27,7 @@ from typing import List, Optional, Union
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
-
-from log.log import Log, AutosubmitCritical
+from autosubmit.log.log import Log, AutosubmitCritical
 
 Log.get_logger("Autosubmit")
 

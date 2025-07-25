@@ -1,22 +1,40 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import atexit
-import multiprocessing
-import queue  # only for the exception
-from contextlib import suppress
-from os import _exit
-import setproctitle
 import locale
+import multiprocessing
 import os
+import queue  # only for the exception
+import time
 import traceback
-
-from pathlib import Path
-
-from autosubmit.job.job_common import Status
-from typing import List, Union, Set, Any, TYPE_CHECKING
-from autosubmit.helpers.parameters import autosubmit_parameter
-from log.log import AutosubmitCritical, AutosubmitError, Log
+from contextlib import suppress
 from multiprocessing import Event
 from multiprocessing.queues import Queue
-import time
+# noinspection PyProtectedMember
+from os import _exit  # type: ignore
+from pathlib import Path
+from typing import List, Union, Set, Any, TYPE_CHECKING
+
+import setproctitle
+
+from autosubmit.helpers.parameters import autosubmit_parameter
+from autosubmit.job.job_common import Status
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -411,7 +429,6 @@ class Platform(object):
                             job_list.save()
                         if package.x11 != "true":
                             valid_packages_to_submit.append(package)
-                        # Log.debug("FD end-submit: {0}".format(log.fd_show.fd_table_status_str(open()))
                     except (IOError, OSError):
                         if package.jobs[0].id != 0:
                             failed_packages.append(package.jobs[0].id)

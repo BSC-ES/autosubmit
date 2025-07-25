@@ -1,32 +1,32 @@
-#!/usr/bin/env python3
-# Copyright 2017-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+import locale
 import os
 import subprocess
+from time import sleep
 from typing import TYPE_CHECKING
 
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException
-from log.log import Log,AutosubmitError
-from autosubmit.platforms.headers.ec_header import EcHeader
+from autosubmit.log.log import Log, AutosubmitError
 from autosubmit.platforms.headers.ec_cca_header import EcCcaHeader
+from autosubmit.platforms.headers.ec_header import EcHeader
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
+from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException
 from autosubmit.platforms.wrappers.wrapper_factory import EcWrapperFactory
-from time import sleep
-import locale
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig

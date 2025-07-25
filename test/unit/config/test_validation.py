@@ -17,7 +17,7 @@
 
 import pytest
 
-from log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 
 
 @pytest.mark.parametrize("data, must_fail", [

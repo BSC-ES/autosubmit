@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+"""Tests for the RO-Crate generation in Autosubmit."""
+
 import datetime
 import json
 import tempfile
@@ -31,8 +33,10 @@ from ruamel.yaml import YAML
 from ruamel.yaml.representer import RepresenterError
 
 from autosubmit.autosubmit import Autosubmit
+from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
+from autosubmit.log.log import AutosubmitCritical
 from autosubmit.provenance.rocrate import (
     _add_dir_and_files,
     _get_action_status,
@@ -42,10 +46,6 @@ from autosubmit.provenance.rocrate import (
     _get_git_branch_and_commit,
     create_rocrate_archive
 )
-from autosubmit.config.configcommon import AutosubmitConfig
-from log.log import AutosubmitCritical
-
-"""Tests for the RO-Crate generation in Autosubmit."""
 
 _EXPID = 'zzzz'
 """Experiment ID used in all the tests."""

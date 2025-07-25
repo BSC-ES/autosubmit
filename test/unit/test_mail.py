@@ -23,10 +23,10 @@ from typing import Optional
 
 import pytest
 
-from autosubmit.job.job_common import Status
-from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.config.basicconfig import BasicConfig
-from log.log import Log
+from autosubmit.job.job_common import Status
+from autosubmit.log.log import Log
+from autosubmit.notifications.mail_notifier import MailNotifier
 
 
 # -- fixtures

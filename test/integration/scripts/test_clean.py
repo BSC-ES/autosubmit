@@ -24,7 +24,7 @@ from subprocess import check_output
 import pytest
 
 from autosubmit.scripts.autosubmit import main
-from log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 
 _EXPID = 't000'
 
