@@ -58,7 +58,6 @@ class DicJobs: # To rename to JobBuilder or something like that
         self.as_conf = as_conf
         self.experiment_data = as_conf.experiment_data
         self.recreate_jobs = False
-        self.changes = {}
         self._job_list = {}
 
     @property
@@ -579,7 +578,5 @@ class DicJobs: # To rename to JobBuilder or something like that
         else:
             job = Job(loaded_data=self._job_list[name])
 
-        self.changes["NEWJOBS"] = True
-        # job.adjust_loaded_parameters()
         job.update_dict_parameters(self.as_conf)
         section_data.append(job)

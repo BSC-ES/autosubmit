@@ -565,7 +565,7 @@ class JobList(object):
         sections = self._as_conf.jobs_data
         datelist_ref = str(experiment_section.get("DATELIST", ""))
         members_ref = str(experiment_section.get("MEMBERS", ""))
-        numchunks_ref = int(experiment_section.get("NUMCHUNKS", ""))
+        numchunks_ref = int(experiment_section.get("NUMCHUNKS", 1))
         data_to_store: List[Dict[str, Any]] = []
         for section_name, section_data in sections.items():
             splits = None if not section_data.get("SPLITS", None) else str(section_data.get("SPLITS", 0))
@@ -1250,9 +1250,9 @@ class JobList(object):
         :type parent: Job
         """
         status = special_conditions.get("STATUS", "COMPLETED")
-        from_step = special_conditions.get("FROM_STEP", 0)
+        from_step = int(special_conditions.get("FROM_STEP", 0))
         optional = special_conditions.get("OPTIONAL", False)
-        job.max_checkpoint_step = from_step if int(from_step) > job.max_checkpoint_step else job.max_checkpoint_step
+        job.max_checkpoint_step = from_step if from_step > int(job.max_checkpoint_step) else int(job.max_checkpoint_step)
         self.graph.edges[parent.name, job.name].update(status=status, from_step=from_step, optional=optional)
 
     def _apply_jobs_edge_info(self, job, dependencies):
@@ -2664,39 +2664,32 @@ class JobList(object):
         aslogs_path = os.path.join(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
         Log.reset_status_file(os.path.join(aslogs_path, "jobs_active_status.log"), "status")
         Log.reset_status_file(os.path.join(aslogs_path, "jobs_failed_status.log"), "status_failed")
-        job_list = self.get_completed()[-5:] + self.get_in_queue()
-        failed_job_list = self.get_failed()
-        if len(job_list) > 0:
-            Log.status("\n{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", "Job Name",
-                       "Job Id", "Job Status", "Job Platform", "Job Queue")
-        if len(failed_job_list) > 0:
-            Log.status_failed("\n{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", "Job Name",
-                              "Job Id", "Job Status", "Job Platform", "Job Queue")
+        job_list = self.get_completed()[-5:] + self.get_in_queue() + self.get_failed()
+        Log.status("\n{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", "Job Name",
+                   "Job Id", "Job Status", "Job Platform", "Job Queue")
+        Log.status_failed("\n{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", "Job Name",
+                          "Job Id", "Job Status", "Job Platform", "Job Queue")
+
         for job in job_list:
-            if job.platform and len(job.queue) > 0 and str(job.platform.queue).lower() != "none":
-                queue = job.queue
-            elif (job.platform and len(job.platform.queue) > 0 and
-                  str(job.platform.queue).lower() != "none"):
-                queue = job.platform.queue
+            platform_name = job.platform_name if job.platform_name else "no-platform"
+            if job.platform_name:
+                queue = job.queue if job.queue else "no-scheduler"
             else:
-                queue = job.queue
-            platform_name = job.platform.name if job.platform else "no-platform"
-            if job.id is None:
-                job_id = "no-id"
-            else:
-                job_id = job.id
-            try:
-                Log.status("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job_id, Status(
-                ).VALUE_TO_KEY[job.status], platform_name, queue)
-            except Exception:
-                Log.debug(f"Couldn't print job status for job {job.name}")
-        for job in failed_job_list:
-            if len(job.queue) < 1:
                 queue = "no-scheduler"
+            job_id = job.id if job.id else "no-id"
+            if job.status == Status.FAILED:
+                try:
+                    Log.status_failed("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job_id, Status(
+                    ).VALUE_TO_KEY[job.status], platform_name, queue)
+                except Exception:
+                    Log.debug(f"Couldn't print job status for job {job.name}")
             else:
-                queue = job.queue
-            Log.status_failed("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job.id, Status(
-            ).VALUE_TO_KEY[job.status], job.platform.name, queue)
+                try:
+                    Log.status("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job_id, Status(
+                    ).VALUE_TO_KEY[job.status], platform_name, queue)
+                except Exception:
+                    Log.debug(f"Couldn't print job status for job {job.name}")
+
 
     def update_from_file(self, store_change=True):
         """
@@ -3922,6 +3915,11 @@ class JobList(object):
 
     def add_job(self, job: Job):
         self.graph.add_node(job.name, job=job)
+
+    def add_edge(self, edge: Dict[str, Any]):
+        self.graph.add_edge(edge['e_from'], edge['e_to'], from_step=edge['from_step'], status=edge['status'],
+                            completed=edge['completed'], optional=edge['optional'])
+
 
     def check_wrapper_stored_status(self) -> Any:
         """

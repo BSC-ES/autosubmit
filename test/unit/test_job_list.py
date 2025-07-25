@@ -148,58 +148,75 @@ def empty_job_list(tmp_path, as_conf, mocker):
     return fn
 
 
-def test_load(mocker, as_conf, empty_job_list):
-    date_list = ['fake-date1', 'fake-date2']
-    member_list = ['fake-member1', 'fake-member2']
-    num_chunks = 999
-    parameters = {'fake-key': 'fake-value',
-                  'fake-key2': 'fake-value2'}
-    job_list = empty_job_list()
-    job_list.changes = mocker.Mock(return_value=['random_section', 'random_section'])
-    as_conf.detailed_deep_diff = mocker.Mock(return_value={})
-    # act
-    job_list.generate(
-        as_conf=as_conf,
-        date_list=date_list,
-        member_list=member_list,
-        num_chunks=num_chunks,
-        chunk_ini=1,
-        parameters=parameters,
-        date_format='H',
-        default_retrials=9999,
-        default_job_type=Type.BASH,
-        wrapper_jobs={},
-        new=True,
-        full_load=True,
-    )
-    job_list.save()
+def test_save_and_load(as_conf):
+    job_list = JobList(_EXPID, as_conf, YAMLParserFactory())
+    job_list.graph = networkx.DiGraph()
+    jobs = [
+            Job('job1', 1, Status.COMPLETED, 0),
+            Job('job2', 2, Status.RUNNING, 0),
+            Job('job3', 3, Status.READY, 0),
+            Job('job4', 4, Status.FAILED, 0),
+            Job('job5', 5, Status.WAITING, 0)
+    ]
+    edges = [
+        {
+            "e_to": "job2",
+            "e_from": "job1",
+            "from_step": "0",
+            "status": "COMPLETED",
+            "completed": "WAITING",
+            "optional": False
+        },
+        {
+            "e_to": "job3",
+            "e_from": "job2",
+            "from_step": "0",
+            "status": "COMPLETED",
+            "completed": "WAITING",
+            "optional": False
+        },
+        {
+            "e_to": "job4",
+            "e_from": "job3",
+            "from_step": "0",
+            "status": "COMPLETED",
+            "completed": "WAITING",
+            "optional": False
+        },
+        {
+            "e_to": "job5",
+            "e_from": "job4",
+            "from_step": "0",
+            "status": "COMPLETED",
+            "completed": "WAITING",
+            "optional": False
+        }
+
+    ]
+    for job in jobs:
+        job_list.add_job(job)
+    for edge in edges:
+        job_list.add_edge(edge)
+    job_list.save_jobs()
+    job_list.save_edges()
+    job_list.save_sections()
     # Test load
-    job_list_to_load = empty_job_list()
+    loaded_job_list = JobList(_EXPID, as_conf, YAMLParserFactory())
     # chmod
-    job_list_to_load.load(False)
-    assert job_list_to_load._job_list == job_list._job_list
-    job_list_to_load.load(True)
-    assert job_list_to_load._job_list == job_list._job_list
-    temp_dir = as_conf.basic_config.LOCAL_ROOT_DIR
-    pickle_file = Path(temp_dir) / _EXPID / 'pkl' / f'job_list_{_EXPID}.pkl'
-    pickle_file.chmod(0o000)
-    # Works with pytest doesn't work in pipeline TODO enable this test
-    # with assertRaises(AutosubmitCritical):
-    #     job_list_to_load.load(False)
-    job_list_to_load.load(True)
-    assert job_list_to_load._job_list == job_list._job_list
-    pickle_file.chmod(0o777)
-    shutil.copy(str(pickle_file), f'{temp_dir}/{_EXPID}/pkl/job_list_{_EXPID}_backup.pkl')
-    pickle_file.unlink()
-    job_list_to_load.load(False)
-    assert job_list_to_load._job_list == job_list._job_list
-    job_list_to_load.load(True)
-    assert job_list_to_load._job_list == job_list._job_list
+    loaded_job_list._load_graph(full_load=True)
+    view_original = sorted(job_list.job_list, key=lambda j: j.name)
+    view_loaded = sorted(loaded_job_list.job_list, key=lambda j: j.name)
+    for i in range(len(view_original)):
+        assert view_original[i].name == view_loaded[i].name
+        assert view_original[i].id == view_loaded[i].id
+        assert view_original[i].status == view_loaded[i].status
+        assert view_original[i].section == view_loaded[i].section
+
 
 
 def test_get_job_list_returns_the_right_list(job_list):
     other_job_list = job_list.get_job_list()
-    assert job_list._job_list == other_job_list
+    assert job_list.job_list == other_job_list
 
 
 @pytest.mark.parametrize(
@@ -550,7 +567,6 @@ def test_generate_job_list_from_monitor_run(as_conf, mocker, empty_job_list):
                   'fake-key2': 'fake-value2'}
     job_list = empty_job_list()
     job_list.changes = mocker.Mock(return_value=['random_section', 'random_section'])
-    as_conf.detailed_deep_diff = mocker.Mock(return_value={})
     mocker.patch('autosubmit.job.job.Job.update_parameters', return_value={})
     # act
     job_list.generate(
