@@ -1,0 +1,15 @@
+JOBS:
+  GET_FILES:
+    FILE: templates/fail.sh
+    RUNNING: chunk
+
+  IT:
+    FILE: templates/work.sh
+    RUNNING: chunk
+    QUEUE: debug
+
+  CALC_STATS:
+    FILE: templates/work.sh
+    DEPENDENCIES: IT GET_FILES ?
+    RUNNING: chunk
+    SYNCHRONIZE: member

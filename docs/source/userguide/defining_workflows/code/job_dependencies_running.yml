@@ -1,0 +1,19 @@
+JOBS:
+  INI:
+    FILE: ini.sh
+    RUNNING: member
+
+  SIM:
+    FILE: sim.sh
+    DEPENDENCIES: ini sim-1
+    RUNNING: chunk
+
+  POSTPROCESS:
+    FILE: postprocess.sh
+    DEPENDENCIES: sim
+    RUNNING: chunk
+
+  COMBINE:
+    FILE: combine.sh
+    DEPENDENCIES: postprocess
+    RUNNING: member
