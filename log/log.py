@@ -178,7 +178,7 @@ class Log:
         logging.getLogger(name)
 
     @staticmethod
-    def set_file(file_path, type='out', level="WARNING", compress=False):
+    def set_file(file_path, type='out', level="WARNING"):
         """
         Configure the file to store the log. If another file was specified earlier, new messages will only go to the
         new file.
@@ -241,8 +241,6 @@ class Log:
                     status_file_handler.setFormatter(LogFormatter(False))
                     status_file_handler.addFilter(custom_filter)
                     Log.log.addHandler(status_file_handler)
-                if compress:
-                    compress_logfile(file_path)
                 os.chmod(file_path, 509)
             except Exception: # retry again
                 sleep(timeout * retries)
@@ -295,6 +293,25 @@ class Log:
             print(f"Compression failed: {e}")
             # write better error
 
+    @staticmethod
+    def find_uncompressed_files(file_path: str) -> list:
+        """
+        Returns all *.err and *.out files that have not been compressed in a directory
+        """
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f"The file '{file_path}' does not exist.")
+        
+        all_files = os.listdir(file_path)
+        file_set = set(all_files)
+
+        result = []
+        for filename in all_files:
+            if filename.endswith('.err') or filename.endswith('.out'):
+                compressed_version = filename + '.xz'
+                if compressed_version not in file_set:
+                    result.append(os.path.join(directory, filename))
+
+        return result
 
     @staticmethod
     def set_console_level(level):
