@@ -893,7 +893,7 @@ class Autosubmit:
             if args.command == "stop":
                 exp_id = "_".join(expids)
                 Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                          args.command + exp_id + '.log'), "out", args.compress_logs, log_level)
+                                          args.command + exp_id + '.log'), "out", log_level, args.compress_logs)
                 Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
                                           args.command + exp_id + '_err.log'), "err", args.compress_logs)
             else:
