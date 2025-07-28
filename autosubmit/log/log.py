@@ -20,7 +20,7 @@ import os
 import sys
 from datetime import datetime
 from time import sleep
-from typing import Union
+from typing import Any, Union
 
 
 class AutosubmitError(Exception):
@@ -55,10 +55,12 @@ class AutosubmitError(Exception):
 
 
 class AutosubmitCritical(Exception):
-    """Exception raised for Autosubmit critical errors .
+    """Exception raised for Autosubmit critical errors.
+
     Attributes:
         code -- Classified code
-        message -- explanation of the error
+        message -- Explanation of the error
+        trace -- Extra information about the error
     """
 
     def __init__(self, message="Unhandled Error", code=7000, trace=None):
@@ -66,7 +68,7 @@ class AutosubmitCritical(Exception):
         self.message = message
         self.trace = trace
 
-    def __str__(self):
+    def __str__(self) -> str:
         return " "
 
 
@@ -89,6 +91,7 @@ class LogFormatter:
         """
         Initializer for LogFormatter
 
+        :param to_file: Whether to write it to a file or not.
         """
         self._file = to_file
         if self._file:
@@ -96,9 +99,11 @@ class LogFormatter:
         else:
             self._formatter = logging.Formatter('%(message)s')
 
-    def format(self, record):
-        """
-        Format log output, adding labels if needed for log level. If logging to console, also manages font color.
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log output, adding labels if needed for log level.
+
+        If logging to console, also manages font color.
+
         If logging to file adds timestamp
 
         :param record: log record to format
@@ -130,26 +135,24 @@ class LogFormatter:
 
 class StatusFilter(logging.Filter):
 
-    def filter(self, rec):
+    def filter(self, rec) -> bool:
         return rec.levelno == Log.STATUS
 
 
 class StatusFailedFilter(logging.Filter):
-    def filter(self, rec):
+    def filter(self, rec) -> bool:
         return rec.levelno == Log.STATUS_FAILED
 
 
 class Log:
-    """
-    Static class to manage the log for the application. Messages will be sent to console and to file if it is
-    configured. Levels can be set for each output independently. These levels are (from lower to higher priority):
+    """Static class to manage the log for the application.
+
+    Messages will be sent to console and to file if it is configured.
+    Levels can be set for each output independently. These levels are
+    (from lower to higher priority):
     """
 
     date = '{0:%Y%m%d_%H%M%S}_'.format(datetime.now())
-
-    def __init__(self):
-        pass
-
     file_path = ""
     __module__ = __name__
     EVERYTHING = 0
@@ -170,50 +173,54 @@ class Log:
         log = logging.Logger('Autosubmit', EVERYTHING)
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(INFO)
-    console_handler.setFormatter(LogFormatter(False))
+    console_handler.setFormatter(LogFormatter(False))  # type: ignore
     log.addHandler(console_handler)
 
-    def init_variables(self, file_path=""):
+    def __init__(self):
+        pass
+
+    def init_variables(self, file_path="") -> None:
         self.file_path = file_path
 
     @staticmethod
-    def shutdown_logger():
+    def shutdown_logger() -> None:
         """
         Shutdown logger module to prevent race issues on delete
         """
         logging.shutdown()
 
     @staticmethod
-    def get_logger(name="Autosubmit"):
+    def get_logger(name="Autosubmit") -> None:
         """
         Configure the file to store the log. If another file was specified earlier, new messages will only go to the
         new file.
 
-        :param file_path: file to store the log
-        :type file_path: str
+        :param name: name of the logger
+        :type name: str
         """
         logging.getLogger(name)
 
     @staticmethod
-    def set_file(file_path, type='out', level="WARNING"):
-        """
-        Configure the file to store the log. If another file was specified earlier, new messages will only go to the
-        new file.
+    def set_file(file_path: str, type='out', level="WARNING") -> None:
+        """Configure the file to store the log.
+
+        If another file was specified earlier, new messages will only go to the new file.
 
         :param file_path: file to store the log
         :type file_path: str
         :param type: file type
         :param level: log level
         """
-        levels = {}
-        levels["STATUS_FAILED"] = 500
-        levels["STATUS"] = 1000
-        levels["DEBUG"] = 2000
-        levels["WARNING"] = 3000
-        levels["INFO"] = 4000
-        levels["RESULT"] = 5000
-        levels["ERROR"] = 6000
-        levels["CRITICAL"] = 7000
+        levels = {
+            "STATUS_FAILED": 500,
+            "STATUS": 1000,
+            "DEBUG": 2000,
+            "WARNING": 3000,
+            "INFO": 4000,
+            "RESULT": 5000,
+            "ERROR": 6000,
+            "CRITICAL": 7000
+        }
         levels["NO_LOG"] = levels["CRITICAL"] + 1000
 
         level = levels.get(str(level).upper(), "DEBUG")
@@ -225,6 +232,9 @@ class Log:
         while not os.path.exists(file_path) and retries < max_retries:
             try:
                 directory, filename = os.path.split(file_path)
+                # FIXME: This appears to be wrong. If the directory does not exist, we create it here;
+                #        however, below we create a ``FileHandler``, but that fails if the ``file_path``
+                #        does not exist -- which is the case when this directory is empty!
                 if not os.path.exists(directory):
                     os.mkdir(directory)
                 files = [f for f in os.listdir(directory) if os.path.isfile(
@@ -261,11 +271,11 @@ class Log:
                     status_file_handler.addFilter(custom_filter)
                     Log.log.addHandler(status_file_handler)
                 os.chmod(file_path, 509)
-            except Exception:  # retry again
+            except Exception as e:  # retry again
                 sleep(timeout * retries)
 
     @staticmethod
-    def reset_status_file(file_path, type='status', level=WARNING):
+    def reset_status_file(file_path: str, type='status', level=WARNING) -> None:
         """
         Configure the file to store the log. If another file was specified earlier, new messages will only go to the
         new file.
@@ -297,10 +307,10 @@ class Log:
             pass
 
     @staticmethod
-    def set_console_level(level):
-        """
-        Sets log level for logging to console. Every output of level equal or higher to parameter level will be
-        printed on console
+    def set_console_level(level: Union[int, str]) -> None:
+        """Sets log level for logging to console.
+
+        Every output of level equal or higher to parameter level will be printed on console
 
         :param level: new level for console
         :return: None
@@ -323,9 +333,8 @@ class Log:
         return msg
 
     @staticmethod
-    def debug(msg, *args):
-        """
-        Sends debug information to the log
+    def debug(msg: str, *args: Any) -> None:
+        """Sends debug information to the log.
 
         :param msg: message to show
         :param args: arguments for message formating (it will be done using format() method on str)
@@ -334,9 +343,8 @@ class Log:
         Log.log.log(Log.DEBUG, msg)
 
     @staticmethod
-    def info(msg, *args):
-        """
-        Sends information to the log
+    def info(msg: str, *args: Any) -> None:
+        """Sends information to the log.
 
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
@@ -345,9 +353,8 @@ class Log:
         Log.log.log(Log.INFO, msg)
 
     @staticmethod
-    def result(msg, *args):
-        """
-        Sends results information to the log. It will be shown in green in the console.
+    def result(msg: str, *args: Any) -> None:
+        """Sends results information to the log. It will be shown in green in the console.
 
         :param msg: message to show
         :param args: arguments for message formating (it will be done using format() method on str)
@@ -356,9 +363,8 @@ class Log:
         Log.log.log(Log.RESULT, msg)
 
     @staticmethod
-    def warning(msg, *args):
-        """
-        Sends program warnings to the log. It will be shown in yellow in the console.
+    def warning(msg: str, *args: Any) -> None:
+        """Sends program warnings to the log. It will be shown in yellow in the console.
 
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
@@ -367,9 +373,8 @@ class Log:
         Log.log.log(Log.WARNING, msg)
 
     @staticmethod
-    def error(msg, *args):
-        """
-        Sends errors to the log. It will be shown in red in the console.
+    def error(msg: str, *args: Any) -> None:
+        """Sends errors to the log. It will be shown in red in the console.
 
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
@@ -378,9 +383,8 @@ class Log:
         Log.log.log(Log.ERROR, msg)
 
     @staticmethod
-    def critical(msg, *args):
-        """
-        Sends critical errors to the log. It will be shown in red in the console.
+    def critical(msg: str, *args: Any) -> None:
+        """Sends critical errors to the log. It will be shown in red in the console.
 
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
@@ -389,9 +393,8 @@ class Log:
         Log.log.log(Log.CRITICAL, msg)
 
     @staticmethod
-    def status(msg, *args):
-        """
-        Sends status of jobs to the log. It will be shown in white in the console.
+    def status(msg: str, *args: Any) -> None:
+        """Sends status of jobs to the log. It will be shown in white in the console.
 
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
@@ -400,9 +403,8 @@ class Log:
         Log.log.log(Log.STATUS, msg)
 
     @staticmethod
-    def status_failed(msg, *args):
-        """
-        Sends failed status of jobs to the log. It will be shown in white in the console.
+    def status_failed(msg: str, *args: Any):
+        """Sends failed status of jobs to the log. It will be shown in white in the console.
 
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
@@ -411,10 +413,11 @@ class Log:
         Log.log.log(Log.STATUS_FAILED, msg)
 
     @staticmethod
-    def printlog(message="Generic message", code=4000):
-        """Log management for Autosubmit messages .
+    def printlog(message="Generic message", code=4000) -> None:
+        """Log management for Autosubmit messages.
+
         Attributes:
-            errorcode -- Classified code
+            code -- Classified code
             message -- explanation
         """
         if 4000 <= code < 5000:
