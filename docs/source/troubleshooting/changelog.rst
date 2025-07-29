@@ -472,14 +472,6 @@ Basic
 New format
 ==========
 
-.. runcmd:: mv -v ./troubleshooting/code/job_new_format.yml /home/docs/autosubmit/a000/conf/jobs_a000.yml
-    :silent-output: 1
-    :prompt:
-
-.. runcmd:: mv -v ./troubleshooting/code/exp_new_format.yml /home/docs/autosubmit/a000/conf/expdef_a000.yml
-    :silent-output: 1
-    :prompt:
-
 .. code-block:: yaml
 
   JOBS:
@@ -532,33 +524,23 @@ New format
         RUNNING: chunk
 
 
-.. runcmd:: autosubmit create a000 --hide -o png
-    :silent-output: 1
-    :prompt:
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :path: troubleshooting
+    :figure: fig/new_dependencies.png
+    :name: new_dependencies
+    :width: 100%
+    :align: center
+    :alt: new_dependencies
 
-.. runcmd:: find /home/docs/autosubmit/a000/plot/ -type f -iname "a000_*.png" -exec mv -- {} ./troubleshooting/fig/new_dependencies_0.png \;
-    :silent-output: 1
-    :prompt:
-
-
-.. figure:: fig/new_dependencies_0.png
-   :name: new_dependencies_0
-   :align: center
-   :alt: new_dependencies
 
 Example 1: New format with specific dependencies
 ------------------------------------------------
 
 
 In the following example, we want to launch the next member SIM after the last SIM chunk of the previous member is finished.
-
-.. runcmd:: mv -v ./troubleshooting/code/job_new_format_dependencies.yml /home/docs/autosubmit/a001/conf/jobs_a001.yml
-    :silent-output: 1
-    :prompt:
-
-.. runcmd:: cp /home/docs/autosubmit/a000/conf/expdef_a000.yml /home/docs/autosubmit/a001/conf/expdef_a001.yml
-    :silent-output: 1
-    :prompt:
 
 .. code-block:: yaml
 
@@ -607,30 +589,20 @@ In the following example, we want to launch the next member SIM after the last S
             RUNNING: once
 
 
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :path: troubleshooting
+    :figure: fig/new_dependencies_1.png
+    :name: new_format_dependencies
+    :width: 100%
+    :align: center
+    :alt: new_dependencies
 
-.. runcmd:: autosubmit create a001 --hide -o png
-    :silent-output: 1
-    :prompt:
-
-.. runcmd:: find /home/docs/autosubmit/a001/plot/ -type f -iname "a001_*.png" -exec mv -- {} ./troubleshooting/fig/new_dependencies_1.png \;
-    :silent-output: 1
-    :prompt:
-
-.. figure:: fig/new_dependencies_1.png
-   :name: new_dependencies_1
-   :align: center
-   :alt: new_dependencies
 
 Example 2: Crossdate wrappers using the the new dependencies
 ------------------------------------------------------------
-
-.. runcmd:: mv -v ./troubleshooting/code/job_monarch-da.yml /home/docs/autosubmit/a001/conf/jobs_a001.yml
-    :silent-output: 1
-    :prompt:
-
-.. runcmd:: mv -v ./troubleshooting/code/exp_monarch-da.yml /home/docs/autosubmit/a001/conf/expdef_a001.yml
-    :silent-output: 1
-    :prompt:
 
 .. code-block:: yaml
 
@@ -720,15 +692,13 @@ Example 2: Crossdate wrappers using the the new dependencies
         RETRIALS: 0
 
 
-.. runcmd:: autosubmit monitor a001 -cw --hide -o png
-    :silent-output: 1
-    :prompt:
-
-.. runcmd:: find /home/docs/autosubmit/a001/plot/ -type f -iname "a001_*.png" -exec mv -- {} ./troubleshooting/fig/monarch-da.png \;
-    :silent-output: 1
-    :prompt:
-
-.. figure:: fig/monarch-da.png
-   :name: crossdate-example
-   :align: center
-   :alt: crossdate-example
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :path: troubleshooting
+    :figure: fig/monarch-da.png
+    :name: monarch-da
+    :width: 100%
+    :align: center
+    :alt: new_dependencies

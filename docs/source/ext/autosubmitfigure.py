@@ -1,4 +1,3 @@
-import re
 import shutil
 
 from docutils import nodes
@@ -18,35 +17,11 @@ from docs.source.ext.runcmd import RunCmdDirective
 # Ref: https://github.com/common-workflow-language/user_guide/blob/8abf537144d7b63c3561c1ff2b660543effd0eb0/LICENSE.md
 
 """"
-Patched version of https://github.com/sphinx-contrib/sphinxcontrib-runcmd
-with default values to avoid having to re-type in every page. Also
-prepends commands with a value (``$``), see https://github.com/invenia/sphinxcontrib-runcmd/issues/1.
-Finally, it also checks if the command is ``cwltool``, and if then
-tries to remove any paths from the command-line (not the logs).
+Functions focusing in running commands, designed to be run with autosubmit, 
+with that images will be generated and displayed in order to automate the documentation
 """
 
 __version__ = "0.2.0"
-
-# CONSTANTS
-RE_SPLIT = re.compile(r"(?P<pattern>.*)(?<!\\)/(?P<replacement>.*)")
-
-
-# These classes were in the .util module of the original directive.
-class _Singleton(type):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super(_Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
-
-
-class Singleton(_Singleton("SingletonMeta", (object,), {})):
-    pass
-
-
-class Python:
-    pass
 
 
 class AutosubmitFigureDirective(code.CodeBlock):
