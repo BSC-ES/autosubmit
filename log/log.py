@@ -287,19 +287,6 @@ class Log:
         Log.console_handler.level = level
 
     @staticmethod
-    def set_error_level(level):
-        """
-        Sets log level for logging to console. Every output of level equal or higher to parameter level will be
-        printed on console
-
-        :param level: new level for console
-        :return: None
-        """
-        if type(level) is str:
-            level = getattr(Log, level)
-        Log.error.level = level
-
-    @staticmethod
     def _verify_args_message(msg: str, *args):
         """
         Verify if the message has arguments to format
