@@ -947,6 +947,13 @@ Loops definition
 ~~~~~~~~~~~~~~~~
 
 You need to use the ``FOR`` and ``NAME`` keys to define a loop.
+The ``NAME`` key defines a list of values to be used when creating
+the job in the loop.
+
+.. note:: If you use a value in ``NAME`` that is not a string, like ``0_2``,
+          it will be parsed first by the YAML 1.2 parser, and that value will
+          be converted to the string ``2``. To avoid issues like this, it is
+          recommended to wrap such values in quotes, i.e. ``"0_2"`` or ``'0_2'``.
 
 To generate the following jobs:
 
