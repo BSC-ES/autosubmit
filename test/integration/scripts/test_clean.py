@@ -161,11 +161,6 @@ def test_clean_git_project(
     """
     mocked_log = mocker.patch('autosubmit.autosubmit.Log')
 
-    # TODO: Bug in AutosubmitConfigParser, can be deleted once it's fixed,
-    #       https://github.com/BSC-ES/autosubmit-config-parser/issues/87.
-    mocked_autosubmit_config = mocker.patch('autosubmit.autosubmit.AutosubmitConfig.set_git_project_commit')
-    mocked_autosubmit_config.return_value = True
-
     mocker.patch('autosubmit.autosubmit.clean_git', return_value=clean_git_return)
 
     git_project = Path(tmp_path / 'tmp_git_project')
