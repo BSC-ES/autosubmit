@@ -1,5 +1,6 @@
 import logging
 import os
+import subprocess
 import sys
 from time import sleep
 from datetime import datetime
@@ -273,6 +274,45 @@ class Log:
                 Log.log.addHandler(status_file_handler)
         except Exception:  # retry again
             pass
+    
+    @staticmethod
+    def compress_logfile(file_path):
+        """
+        Creates compressed version of logfile using 'xz -9 -T4 -e -k'
+        """
+
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f"The file '{file_path}' does not exist.")
+    
+        try:
+            subprocess.run(
+                ["xz", "-9", "-T4", "-e", "-k", file_path],
+                check=True
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"Compression failed: {e}")
+            # write better error
+
+    @staticmethod
+    def find_uncompressed_files(file_path: str) -> list:
+        """
+        Returns all *.err and *.out files that have not been compressed in a directory
+        """
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f"The file '{file_path}' does not exist.")
+        
+        all_files = os.listdir(file_path)
+        file_set = set(all_files)
+
+        result = []
+        for filename in all_files:
+            if filename.endswith('.err') or filename.endswith('.out'):
+                compressed_version = filename + '.xz'
+                if compressed_version not in file_set:
+                    result.append(os.path.join(directory, filename))
+
+        return result
+
     @staticmethod
     def set_console_level(level):
         """

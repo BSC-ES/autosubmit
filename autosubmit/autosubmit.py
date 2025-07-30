@@ -195,6 +195,8 @@ class Autosubmit:
                                 help="sets file's log level.")
             parser.add_argument('-lc', '--logconsole', choices=log_levels, default='WARNING', type=str,
                                 help="sets console's log level")
+            parser.add_argument('--compress_logs', type=int, default=0,  
+                                help='Number of compressed log files')
 
             subparsers = parser.add_subparsers(dest='command')
             # Run
@@ -831,6 +833,21 @@ class Autosubmit:
             if args.all or args.force_all:
                 expid_less.append("stop")
         global_log_command = ["delete", "archive", "upgrade"]
+
+        if args.compress_logs:
+            uncompressed_files = Log.find_uncompressed_files(BasicConfig.expid_aslog_dir(expid))
+            # Each log record has an .err and .out file: 2 files to compress
+            # per log record
+            num_files_to_compress = 2*args.compress_logs - len(uncompressed_files) 
+            while(num_files_to_compress != 0 and uncompressed_files):
+                # List resturns True if not empty
+                # Files are named with timestamps 
+                # so the most recent ones will be at the end of the list
+                Log.compress_logfile(uncompressed_files[-1])
+                uncompressed_files.pop()
+                num_files_to_compress -= 1
+
+
         if "offer" in args:
             if args.offer:
                 global_log_command.append("migrate")  # offer
@@ -904,8 +921,8 @@ class Autosubmit:
                             os.remove(os.path.join(aslogs_path, 'jobs_active_status.log'))
                         if os.path.exists(os.path.join(aslogs_path, 'jobs_failed_status.log')):
                             os.remove(os.path.join(aslogs_path, 'jobs_failed_status.log'))
-                            Log.set_file(os.path.join(aslogs_path, 'jobs_active_status.log'), "status")
-                            Log.set_file(os.path.join(aslogs_path, 'jobs_failed_status.log'), "status_failed")
+                            Log.set_file(os.path.join(aslogs_path, 'jobs_active_status.log'), "status", args.compress_logs)
+                            Log.set_file(os.path.join(aslogs_path, 'jobs_failed_status.log'), "status_failed", args.compress_logs)
                 else:
                     st = os.stat(tmp_path)
                     oct_perm = str(oct(st.st_mode))[-3:]
