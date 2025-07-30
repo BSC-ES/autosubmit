@@ -1025,6 +1025,8 @@ class AutosubmitConfig(object):
             keys = parameters.get(str(dynamic_var[0][start_long:-1]), None)
             if not keys:
                 keys = parameters.get(str(dynamic_var[0]), None)
+                if type(keys) in [int, float]:
+                    keys = None
         else:
             keys = dynamic_var[1]
         keys = keys if isinstance(keys, list) else [keys]
