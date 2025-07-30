@@ -382,36 +382,6 @@ def test_clean_git_not_pushed(
     assert str(cm.value.code) == '7064'
 
 
-def test_clean_git_set_git_project_commit_fails(
-        tmp_path,
-        autosubmit_exp,
-        mocker,
-        git_server: Generator[Tuple[DockerContainer, Path, str], None, None]
-):
-    """Test that cleaning Git fails when the project commit cannot be recorded."""
-    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str
-
-    mocked_log = mocker.patch('autosubmit.git.autosubmit_git.Log')
-
-    git_repo = git_repos_path / test_clean_git_not_pushed.__name__
-    create_git_repository(git_repo, bare=True)
-
-    git_repo_url = f'{git_url}/{git_repo.name}'
-
-    experiment_data = _get_experiment_data(tmp_path)
-    experiment_data['PROJECT']['PROJECT_TYPE'] = 'git'
-    experiment_data['GIT']['PROJECT_ORIGIN'] = git_repo_url
-
-    as_exp = autosubmit_exp(_EXPID, experiment_data)
-    as_conf = as_exp.as_conf
-
-    mocker.patch.object(as_conf, 'set_git_project_commit', return_value=False)
-
-    assert not clean_git(as_conf)
-
-    assert mocked_log.info.call_args_list[1][0][0] == 'Failed to set Git project commit... SKIPPING!'
-
-
 def test_clean_git(
         tmp_path,
         autosubmit_exp,
@@ -432,9 +402,6 @@ def test_clean_git(
 
     as_exp = autosubmit_exp(_EXPID, experiment_data)
     as_conf = as_exp.as_conf
-
-    # TODO: remove when bug in config parser is fixed!
-    mocker.patch.object(as_conf, 'set_git_project_commit', return_value=True)
 
     proj_dir = Path(as_conf.get_project_dir())
     Path(proj_dir / 'not_committed.txt').touch()
