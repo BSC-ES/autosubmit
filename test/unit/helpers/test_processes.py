@@ -57,7 +57,7 @@ def _create_process(mocker, expid, username: Optional[str] = None, command='run'
         'One expid, but different (and invalid POSIX) user, none is retrieved',
         'Two expids, two are retrieved',
         'Three expids, but one expid is invalid, so only two are retrieved',
-        'Two expids, none are valid, so none is retrievd',
+        'Two expids, none are valid, so none is retrieved',
     ]
 )
 def test_retrieve_expids(mocker, expids: List[str], expected_retrieved: int, username: Optional[str]):

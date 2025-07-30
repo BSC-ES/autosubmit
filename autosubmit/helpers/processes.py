@@ -97,6 +97,10 @@ def _match_autosubmit_cmdline(cmdline: List[str], command='run', expid: Optional
 
     >>> _match_autosubmit_cmdline(['autosubmit', 'running', 'a000'])
 
+    >>> _match_autosubmit_cmdline(['autosubmit', 'a000', 'run'])
+    #
+    >>> _match_autosubmit_cmdline(['autosubmit', 'run', 'a001'])
+
     >>> _match_autosubmit_cmdline(['autosubmit', 'run', 'experiment'])
 
     >>> _match_autosubmit_cmdline(['autosubmit', 'run', 'a000'], 'create')
@@ -131,9 +135,6 @@ def _match_autosubmit_cmdline(cmdline: List[str], command='run', expid: Optional
         return None
 
     if filtered_list[1] != command:
-        return None
-
-    if not _match_expid(filtered_list[2]):
         return None
 
     return filtered_list[2]

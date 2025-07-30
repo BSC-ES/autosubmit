@@ -55,17 +55,21 @@ def test_load_workflow_commit(autosubmit_config, tmpdir, mocker, is_owner):
         "AUTOSUBMIT": {},
         "ROOTDIR": tmpdir.strpath,
         "PROJECT": {
-            "PROJECT_DESTINATION": 'git_project'
+            "PROJECT_DESTINATION": 'git_project',
+            'PROJECT_TYPE': 'GIT'
         }
     }
-    project_dir = f"{as_conf.experiment_data.get('ROOTDIR', '')}/proj"
+    project_dir = Path(as_conf.get_project_dir())
 
-    Path(project_dir).mkdir(parents=True, exist_ok=True)
+    project_dir.mkdir(parents=True, exist_ok=True)
     # Project root is third parent, ../../../.
     project_path = Path(__file__).parents[3]
     # git clone this project
-    output = subprocess.check_output(f"git clone file://{project_path.resolve()} git_project",
-                                     cwd=project_dir, shell=True)
+    output = subprocess.check_output(
+        f"git clone file://{project_path.resolve()} git_project",
+        cwd=project_dir.parent,
+        shell=True
+    )
     assert output is not None
     as_conf.load_workflow_commit()
     if is_owner:
