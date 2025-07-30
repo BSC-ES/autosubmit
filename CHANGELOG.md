@@ -1,3 +1,13 @@
+### 4.1.17: Unreleased
+
+**Bug fixes:**
+
+-
+
+**Enhancements:**
+
+- Fix characters escaped in regexes #2526
+
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
 This release adds support to Postgres using SQLAlchemy, without removing the

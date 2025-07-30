@@ -92,9 +92,10 @@ def test_is_current_real_user_owner(owner: bool, autosubmit_config: 'AutosubmitC
 def test_clean_dynamic_variables(autosubmit_config: 'AutosubmitConfigFactory') -> None:
     """
     This tests that only dynamic variables are kept in the ``dynamic_variables`` dictionary.
-    a dynamic variable is a variable that it's value is a string that starts with ``%^`` or ``%`` and ends with ``%``.
+    A dynamic variable is a variable that its value is a string that starts with ``%^`` or
+    ``%`` and ends with ``%``.
 
-    This tests that once called with the right arguments, ``clean_dynamic_variables`` will
+    These tests that once called with the right arguments, ``clean_dynamic_variables`` will
     leave ``as_conf.dynamic_variables`` with only dynamic variables.
     """
 
@@ -119,10 +120,9 @@ def test_yaml_deprecation_warning(tmp_path, autosubmit_config: 'AutosubmitConfig
     """Test that the conversion from YAML to INI works as expected, without warnings.
 
     Creates a dummy AS3 INI file, calls ``AutosubmitConfig.ini_to_yaml``, and
-    verifies that the YAML files exists and is not empty, and a backup file was
-    created. All without warnings being raised (i.e. they were suppressed).
+    verifies that the YAML files exist and are not empty, and a backup file was
+    created. All without warnings being raised (i.e., they were suppressed).
     """
-
     as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data={})
     ini_file = tmp_path / 'a000_jobs.ini'
     with open(ini_file, 'w+') as f:
@@ -132,7 +132,7 @@ def test_yaml_deprecation_warning(tmp_path, autosubmit_config: 'AutosubmitConfig
             PLATFORM = LOCAL
             '''))
         f.flush()
-    as_conf.ini_to_yaml(root_dir=tmp_path, ini_file=str(ini_file))
+    as_conf.ini_to_yaml(root_dir=tmp_path, ini_file=ini_file)
 
     backup_file = Path(f'{ini_file}_AS_v3_backup')
     assert backup_file.exists()
@@ -185,7 +185,7 @@ def test_check_conf_files_errors(error: Exception, expected: Exception,
     as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data=None)
 
     mocker.patch.object(as_conf, 'reload', side_effect=error)
-    with pytest.raises(expected):
+    with pytest.raises(expected):  # type: ignore[arg-type]
         as_conf.reload.side_effect = as_conf.check_conf_files()
 
 
@@ -254,9 +254,8 @@ def test_set_version(autosubmit_config: 'AutosubmitConfigFactory', experiment_jo
         'invalid_safe_placeholders_type'
     ]
 )
-def test_set_default_parameters(autosubmit_config: 'AutosubmitConfigFactory', experiment_data, raise_error, tmp_path):
+def test_set_default_parameters(autosubmit_config: 'AutosubmitConfigFactory', experiment_data: dict, raise_error, tmp_path):
     """Test that default parameters are set correctly."""
-
     as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data=experiment_data)
     if raise_error:
         with pytest.raises(AutosubmitCritical):
@@ -266,3 +265,21 @@ def test_set_default_parameters(autosubmit_config: 'AutosubmitConfigFactory', ex
         if experiment_data:
             assert "some" in as_conf.default_parameters.keys()
             assert "%some%" in as_conf.default_parameters.values()
+
+
+@pytest.mark.parametrize(
+    'email,expected',
+    [
+        (None, TypeError),
+        ('user@example.com', True),
+        ('user.name@example.com', True),
+        ('user', False),
+        # ('user@localhost', True)  # TODO: Bug. This is a valid email address.
+    ]
+)
+def test_is_valid_mail_address(email, expected):
+    if type(expected) is not bool and issubclass(expected, Exception):
+        with pytest.raises(expected):
+            AutosubmitConfig.is_valid_mail_address(email)
+    else:
+        assert AutosubmitConfig.is_valid_mail_address(email) is expected

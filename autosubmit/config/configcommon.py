@@ -42,7 +42,7 @@ from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError
 
 
 class AutosubmitConfig(object):
-    """Class to handle experiment configuration coming from file or database.
+    """Class to handle experiment configuration coming from a file or database.
 
     :param expid: experiment identifier
     :type expid: str
@@ -69,7 +69,7 @@ class AutosubmitConfig(object):
         self.wrong_config = defaultdict(list)
         self.warn_config = defaultdict(list)
         self.dynamic_variables: dict = {}
-        self.special_dynamic_variables: dict = {}  # variables that will be substituted after all files is loaded
+        self.special_dynamic_variables: dict = {}  # variables that will be substituted after all files are loaded
         self.starter_conf: dict = {}
         self.misc_files = []
         self.misc_data: dict = {}
@@ -106,7 +106,7 @@ class AutosubmitConfig(object):
             )
 
     def get_wrapper_export(self, wrapper=None) -> str:
-        """Returns modules variable from wrapper
+        """Returns modules variable from the wrapper
 
          :return: wrapper report.
          """
@@ -115,9 +115,9 @@ class AutosubmitConfig(object):
         return wrapper.get('EXPORT', self.experiment_data.get("WRAPPERS", {}).get("EXPORT", ""))
 
     def get_project_submodules_depth(self) -> list[int]:
-        """Returns the max depth of submodule at the moment of cloning.
+        """Returns the max depth of the submodule at the moment of cloning.
 
-        Default is -1 (no limit).
+        The default is -1 (no limit).
 
         :return: depth
         """
@@ -1186,7 +1186,7 @@ class AutosubmitConfig(object):
             # Pattern to search a string starting with % and ending with % allowing the chars [],._ to exist in the middle
             dynamic_var_pattern = '%[a-zA-Z0-9_.-]*%'
             # Pattern to search a string starting with %^ and ending with %
-            special_dynamic_var_pattern = '%\^[a-zA-Z0-9_.-]*%'
+            special_dynamic_var_pattern = '%\\^[a-zA-Z0-9_.-]*%'
 
             if not isinstance(val, collections.abc.Mapping) and re.search(dynamic_var_pattern, str(val),
                                                                           flags=re.IGNORECASE) is not None:
@@ -2774,7 +2774,7 @@ class AutosubmitConfig(object):
 
     @staticmethod
     def is_valid_mail_address(mail_address):
-        if re.match('^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})$', mail_address,
+        if re.match('^[_a-z0-9-]+(\\.[_a-z0-9-]+)*@[a-z0-9-]+(\\.[a-z0-9-]+)*(\\.[a-z]{2,4})$', mail_address,
                     flags=re.IGNORECASE):
             return True
         else:
