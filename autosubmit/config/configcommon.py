@@ -556,10 +556,31 @@ class AutosubmitConfig(object):
         for wrapper, wrapper_data in wrappers.items():
             if isinstance(wrapper_data, dict):
                 jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", "")
+                if isinstance(jobs_in_wrapper, list):
+                    jobs_in_wrapper = " ".join(jobs_in_wrapper)
                 if "[" in jobs_in_wrapper:  # if it is a list in string format (due to "%" in the string)
                     jobs_in_wrapper = jobs_in_wrapper.strip("[]").replace("'", "").replace(" ", "").replace(",", " ")
+                jobs_in_wrapper.replace("&", " ")
                 data_fixed["WRAPPERS"][wrapper]["JOBS_IN_WRAPPER"] = jobs_in_wrapper.upper()
                 data_fixed["WRAPPERS"][wrapper]["TYPE"] = str(wrapper_data.get("TYPE", "vertical")).lower()
+
+    def _expand_jobs_in_wrapper_wildcard(self, experiment_data: dict) -> None:
+        """
+        Expand the JOBS_IN_WRAPPER section of the WRAPPERS section to a list of jobs. If any section listed contains a wildcard "*"
+        :param experiment_data: The fixed data dictionary.
+        :type experiment_data: dict
+        """
+        new_jobs_in_wrapper = set()
+        for wrapper, wrapper_data in experiment_data.get("WRAPPERS", {}).items():
+            jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", "")
+            for section in jobs_in_wrapper.split(" "):
+                if "*" in section:
+                    for job in experiment_data.get("JOBS", {}):
+                        if re.match(section.replace("*", ".*"), job):
+                            new_jobs_in_wrapper.add(job)
+                else:
+                    new_jobs_in_wrapper.add(section)
+                experiment_data["WRAPPERS"][wrapper]["JOBS_IN_WRAPPER"] = " ".join(new_jobs_in_wrapper)
 
     @staticmethod
     def _normalize_notify_on(data_fixed: dict, job_section) -> None:
@@ -1835,6 +1856,7 @@ class AutosubmitConfig(object):
             self.experiment_data = self.deep_read_loops(self.experiment_data)
             self.experiment_data = self.substitute_dynamic_variables(self.experiment_data, in_the_end=True)
             self._add_autosubmit_dict()
+            self._expand_jobs_in_wrapper_wildcard(self.experiment_data)
             self.misc_data = {}
             self.misc_files = list(set(self.misc_files))
             for filename in self.misc_files:
