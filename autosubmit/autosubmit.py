@@ -2967,8 +2967,6 @@ class Autosubmit:
 
                 project_type = autosubmit_config.get_project_type()
                 if project_type == "git":
-                    Log.info("Registering commit SHA...")
-                    autosubmit_config.set_git_project_commit(autosubmit_config)
                     Log.info("Cleaning GIT directory...")
                     if not clean_git(autosubmit_config):
                         return False

@@ -2054,25 +2054,6 @@ class AutosubmitConfig(object):
                                section_param] = job_list_by_section[section][0].parameters[section_param]
         return parameters
 
-    def set_expid(self, exp_id) -> None:
-        """Set experiment identifier in autosubmit and experiment config files
-
-        :param exp_id: experiment identifier to store
-        :type exp_id: str
-        """
-        # Experiment conf
-        content = open(self._exp_parser_file).read()
-        if re.search('EXPID:.*', content):
-            content = content.replace(
-                re.search('EXPID:.*', content).group(0), "EXPID: " + exp_id)
-        open(self._exp_parser_file, 'w').write(content)
-
-        content = open(self._conf_parser_file).read()
-        if re.search('EXPID:.*', content):
-            content = content.replace(
-                re.search('EXPID:.*', content).group(0), "EXPID: " + exp_id)
-        open(self._conf_parser_file, 'w').write(content)
-
     def get_project_type(self) -> str:
         """Returns project type from experiment config file.
 
@@ -2198,42 +2179,6 @@ class AutosubmitConfig(object):
             Log.debug(str(exp))
             Log.debug(traceback.format_exc())
         return "project_files"
-
-    def set_git_project_commit(self, as_conf):
-        """Function to register in the configuration the commit SHA of the git project version.
-        :param as_conf: Configuration class for experiment
-        :type as_conf: AutosubmitConfig
-        """
-        full_project_path = as_conf.get_project_dir()
-        try:
-            project_branch = subprocess.check_output(
-                "cd {0}; git rev-parse --abbrev-ref HEAD".format(full_project_path),
-                shell=True
-            )
-        except subprocess.CalledProcessError as e:
-            raise AutosubmitCritical(
-                "Failed to retrieve project branch...", 7014, str(e))
-
-        Log.debug("Project branch is: " + project_branch)
-        try:
-            project_sha = subprocess.check_output(
-                "cd {0}; git rev-parse HEAD".format(full_project_path), shell=True)
-        except subprocess.CalledProcessError as e:
-            raise AutosubmitCritical(
-                "Failed to retrieve project commit SHA...", 7014, str(e))
-        Log.debug("Project commit SHA is: " + project_sha)
-
-        # register changes
-        content = open(self._exp_parser_file).read()
-        if re.search('PROJECT_BRANCH:.*', content):
-            content = content.replace(re.search('PROJECT_BRANCH:.*', content).group(0),
-                                      "PROJECT_BRANCH: " + project_branch)
-        if re.search('PROJECT_COMMIT:.*', content):
-            content = content.replace(re.search('PROJECT_COMMIT:.*', content).group(0),
-                                      "PROJECT_COMMIT: " + project_sha)
-        open(self._exp_parser_file, 'wb').write(content)
-        Log.debug("Project commit SHA successfully registered to the configuration file.")
-        return True
 
     def get_svn_project_url(self):
         """Gets subversion project url
@@ -2406,18 +2351,6 @@ class AutosubmitConfig(object):
             raise AutosubmitCritical(
                 f"Error while reading HPCARCH from the configuration file: {exc}", 7014
             )
-
-    def set_platform(self, hpc):
-        """Sets main platforms in experiment's config file
-
-        :param hpc: main platforms
-        :type: str
-        """
-        content = open(self._exp_parser_file).read()
-        if re.search('HPCARCH:.*', content):
-            content = content.replace(
-                re.search('HPCARCH:.*', content).group(0), "HPCARCH: " + hpc)
-        open(self._exp_parser_file, 'w').write(content)
 
     def set_last_as_command(self, command):
         """Set the last autosubmit command used in the experiment's config file
