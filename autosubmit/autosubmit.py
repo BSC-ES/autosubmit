@@ -1721,7 +1721,8 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def generate_scripts_andor_wrappers(as_conf, job_list, jobs_filtered, packages_persistence, only_wrappers=False):
+    def generate_scripts_andor_wrappers(as_conf: AutosubmitConfig, job_list: JobList, jobs_filtered: list[Job],
+                                        packages_persistence: JobPackagePersistence, only_wrappers: bool = False):
         """
         :param as_conf: Class that handles basic configuration parameters of Autosubmit. \n
         :type as_conf: AutosubmitConfig() Object \n
@@ -1851,9 +1852,9 @@ class Autosubmit:
     def check_wrappers(
         as_conf: AutosubmitConfig,
         job_list: JobList,
-        platforms_to_test: Set[Platform],
+        platforms_to_test: set[Platform],
         expid: str,
-    ) -> Tuple[Dict[str, List[List[Job]]], Dict[str, Tuple[Status, Status]]]:
+    ) -> tuple[dict[str, list[list[Job]]], dict[str, tuple[Status, Status]]]:
         """
         Check wrappers and inner jobs status also order the non-wrapped jobs to be submitted by active platforms
         :param as_conf: a AutosubmitConfig object
@@ -1862,14 +1863,15 @@ class Autosubmit:
         :param expid: a string with the experiment id
         :return: non-wrapped jobs to check and a dictionary with the changes in the jobs status
         """
-        jobs_to_check: Dict[str, List[List[Job]]] = dict()
-        job_changes_tracker: Dict[str, Tuple[Status, Status]] = dict()
+        jobs_to_check: dict[str, list[list[Job]]] = dict()
+        job_changes_tracker: dict[str, tuple[Status, Status]] = dict()
         for platform in platforms_to_test:
             queuing_jobs = job_list.get_in_queue_grouped_id(platform)
             Log.debug(f'Checking jobs for platform={platform.name}')
             for job_id, job in queuing_jobs.items():
                 # Check Wrappers one-by-one
                 if job_list.job_package_map and job_id in job_list.job_package_map:
+
                     wrapper_job, save = Autosubmit.manage_wrapper_job(as_conf, job_list, platform,
                                                                       job_id)
                     # Notifications e-mail
@@ -1989,7 +1991,7 @@ class Autosubmit:
         recover: bool = False,
         check_scripts: bool = False,
         submitter=None
-    ) -> Tuple[
+    ) -> tuple[
         JobList,
         Submitter,
         Optional[ExperimentHistory],
@@ -2007,6 +2009,7 @@ class Autosubmit:
         :param start_after: a string with the experiment id to start after.
         :param run_only_members: a string with the members to run.
         :param recover: a boolean to indicate if the experiment is recovering from a failure.
+        :param check_scripts: a boolean to indicate if the experiment scripts must be verified or not.
         :param submitter: the actual loaded platforms if any
         :return: a tuple
         """
@@ -2549,10 +2552,9 @@ class Autosubmit:
                 raise AutosubmitCritical("Issues while checking the connectivity of platforms.", 7010, issues + "\n" + ssh_config_issues)
 
     @staticmethod
-    def submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence, inspect=False,
-                          only_wrappers=False, hold=False):
-
-        # type: (AutosubmitConfig, JobList, Set[Platform], JobPackagePersistence, bool, bool, bool) -> bool
+    def submit_ready_jobs(as_conf: AutosubmitConfig, job_list: JobList, platforms_to_test: set[Platform],
+                          packages_persistence: JobPackagePersistence, inspect: bool = False,
+                          only_wrappers: bool = False, hold: bool = False) -> bool:
         """
         Gets READY jobs and send them to the platforms if there is available space on the queues
 
