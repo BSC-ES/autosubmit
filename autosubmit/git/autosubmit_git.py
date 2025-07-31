@@ -142,10 +142,6 @@ def clean_git(as_conf: AutosubmitConfig) -> bool:
         Log.info("Changes not pushed detected... SKIPPING!")
         raise AutosubmitCritical("Synchronization needed!", 7064)
 
-    if not as_conf.set_git_project_commit(as_conf):
-        Log.info("Failed to set Git project commit... SKIPPING!")
-        return False
-
     proj_dir = Path(BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, BasicConfig.LOCAL_PROJ_DIR)
     Log.debug(f"Removing project directory {str(proj_dir)}")
     rmtree(proj_dir)
