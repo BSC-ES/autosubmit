@@ -64,7 +64,7 @@ Description of most used commands
 Create a new experiment
 =======================
 
-.. runcmd:: autosubmit expid -dm -H "local" -d "Tutorial"
+autosubmit expid -dm -H "local" -d "Tutorial"
 
 - *-dm: Generates a dummy experiment.*
 - *-H: Sets the principal experiment platform.*

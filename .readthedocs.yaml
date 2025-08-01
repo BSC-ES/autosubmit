@@ -14,6 +14,9 @@ build:
     - graphviz
     - sqlite3
   jobs:
+    build:
+      html:
+        - make html -C ./docs/
     post_install:
       # ruamel.yaml.clib appears to cause the build to fail when
       # using new API in ruamel.yaml

@@ -6,7 +6,7 @@ SPHINXOPTS    = -W
 SPHINXBUILD   = sphinx-build
 PAPER         =
 SOURCEDIR     = source
-BUILDDIR      = build
+BUILDDIR      := $(if $(READTHEDOCS_OUTPUT),$(READTHEDOCS_OUTPUT), build)
 
 # User-friendly check for sphinx-build
 ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $$?), 1)
@@ -114,7 +114,11 @@ xml_coverage:
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html. Coverage in $(BUILDDIR)/htmlcov."
 
 html:
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
+	@echo "$(BUILDDIR)/html"
+	@echo "$(ALLSPHINXOPTS)"
+	autosubmit -v
+	autosubmit expid -H local -d test --dummy
+	$(SPHINXBUILD) -M html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
