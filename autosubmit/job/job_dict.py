@@ -22,7 +22,6 @@ from bscearth.utils.date import date2str
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.log.log import AutosubmitCritical
 
 

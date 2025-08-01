@@ -22,13 +22,13 @@ from pathlib import Path
 from shutil import copy
 
 import pytest
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
 
 from autosubmit.database.db_common import get_experiment_description
 from autosubmit.scripts.autosubmit import main
-from log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 
 _EXPID = 't000'
 
@@ -145,7 +145,7 @@ def test__init_logs_postgres_exp_path_does_not_exist_no_yaml_data(autosubmit, au
     args.command = 'setstatus'
 
     monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
-    mocker.patch('autosubmitconfigparser.config.configcommon.AutosubmitConfig.reload')
+    mocker.patch('autosubmit.config.configcommon.AutosubmitConfig.reload')
 
     with pytest.raises(AutosubmitCritical) as cm:
         autosubmit.run_command(args)

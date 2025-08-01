@@ -19,8 +19,8 @@
 
 import os
 
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.headers.ps_header import PsHeader
+from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 
 
 class PsPlatform(ParamikoPlatform):

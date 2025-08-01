@@ -24,10 +24,10 @@ from contextlib import suppress
 from pathlib import Path
 from typing import List, Optional, cast
 
-from autosubmit.config.basicconfig import BasicConfig
 from sqlalchemy import delete, select, Connection, insert, text, update, func
 from sqlalchemy.schema import CreateTable
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import tables, session
 from autosubmit.log.log import Log, AutosubmitCritical
 

@@ -33,8 +33,8 @@ from autosubmit.helpers.utils import NaturalSort, check_experiment_ownership
 from autosubmit.history.utils import create_path_if_not_exists_group_permission
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import Log, AutosubmitCritical
 from autosubmit.job.job_list import JobList
+from autosubmit.log.log import Log, AutosubmitCritical
 from autosubmit.monitor.diagram import create_stats_report
 
 _GENERAL_STATS_OPTION_MAX_LENGTH = 1000

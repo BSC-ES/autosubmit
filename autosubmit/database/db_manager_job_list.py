@@ -16,27 +16,20 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Contains code to manage a database via SQLAlchemy."""
-from pathlib import Path
 from typing import Any, Optional, List, Dict, TYPE_CHECKING, Union, Tuple
 
-from docutils.nodes import section
-from sqlalchemy import Engine
+from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import relationship
 
-from autosubmit.database import session
-from autosubmit.database.db_common import check_db_path, get_connection_url
-from autosubmitconfigparser.config.basicconfig import BasicConfig
 from autosubmit.database.db_manager import DbManager
 from autosubmit.database.tables import ExperimentStructureTable, PreviewWrapperJobsTable, WrapperJobsTable, \
-    PreviewWrapperInfoTable, WrapperInfoTable, SectionsStructureTable
-from autosubmit.database.tables import JobsTable
-from autosubmit.job.job import Job, WrapperJob
-from log.log import Log
-from sqlalchemy import and_, or_
+    PreviewWrapperInfoTable, WrapperInfoTable, SectionsStructureTable, get_table_from_name
+from autosubmit.database.tables import JobsTable, Table
+from autosubmit.job.job import Job
+from autosubmit.log.log import Log
 
 if TYPE_CHECKING:
-    from autosubmit.job.job_list import JobList
+    pass
 
 
 class JobsDbManager(DbManager):
@@ -53,16 +46,18 @@ class JobsDbManager(DbManager):
 
     def save_jobs(self, job_list: List[Job]) -> None:
         """Save the job list to the database. Normally this will save the current active jobs."""
-        self.create_table(JobsTable.name)
+        table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
+        self.create_table(table.name)
         persistent_data = [job.__getstate__(log_process=False) for job in job_list]
         # from pprint import pprint
         # pprint(persistent_data)  # TODO remove Debug
 
         pkeys = ['name']
-        self.upsert_many(JobsTable.name, persistent_data, pkeys)
+        self.upsert_many(table.name, persistent_data, pkeys)
 
     def load_jobs(self, full_load, load_failed_jobs: bool = False, members: List = None) -> List[dict[str, Any]]:
-        self.create_table(JobsTable.name)
+        table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
+        self.create_table(table.name)
         if full_load:
             job_list = self.select_all_jobs()
         else:
@@ -80,7 +75,8 @@ class JobsDbManager(DbManager):
         :type job_name: str
         :return: Dictionary containing the job information.
         """
-        self.create_table(JobsTable.name)
+        table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
+        self.create_table(table.name)
         job = self.select_job_by_name(job_name)
         return dict(job)
 
@@ -88,26 +84,31 @@ class JobsDbManager(DbManager):
         """
         Return the number of jobs in the database.
         """
-        self.create_table(JobsTable.name)
-        job_list_size = self.count(JobsTable.name)
-        complete_job_list_size = self.count_where(JobsTable.name, {'status': "COMPLETED"})
-        failed_job_list_size = self.count_where(JobsTable.name, {'status': "FAILED"})
+        table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
+
+        self.create_table(table.name)
+        job_list_size = self.count(table.name)
+        complete_job_list_size = self.count_where(table.name, {'status': "COMPLETED"})
+        failed_job_list_size = self.count_where(table.name, {'status': "FAILED"})
         return job_list_size, complete_job_list_size, failed_job_list_size
 
     def select_all_jobs(self) -> List[dict[str, Any]]:
         """
         Return the whole job list from the database (without edges).
         """
-        self.create_table(JobsTable.name)
-        job_list = self.select_all_with_columns(JobsTable.name)
+        table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
+        self.create_table(table.name)
+        job_list = self.select_all_with_columns(table.name)
         return [dict(job) for job in job_list]
 
     def select_jobs_by_section(self, section: str) -> List[dict[str, Any]]:
         """
         Return the jobs from the database that belong to a specific section.
         """
-        self.create_table(JobsTable.name)
-        job_list = self.select_where_with_columns(JobsTable, {'section': section})
+        table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
+
+        self.create_table(table.name)
+        job_list = self.select_where_with_columns(table, {'section': section})
         return [dict(job) for job in job_list]
 
     def select_active_jobs(
@@ -125,17 +126,19 @@ class JobsDbManager(DbManager):
         :return: List of jobs matching the criteria.
         :rtype: List[Union[str, Any]]
         """
-        self.create_table(JobsTable.name)
+        table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
+
+        self.create_table(table.name)
         statuses = self._ACTIVE_STATUSES + (['FAILED'] if include_failed else [])
         if members is not None:
             condition = and_(
-                JobsTable.c.status.in_(statuses),
-                or_(JobsTable.c.member.in_(members), JobsTable.c.member.is_(None))
+                table.c.status.in_(statuses),
+                or_(table.c.member.in_(members), table.c.member.is_(None))
             )
-            job_list = self.select_where_with_columns(JobsTable, condition)
+            job_list = self.select_where_with_columns(table, condition)
         else:
-            condition = JobsTable.c.status.in_(statuses)
-            job_list = self.select_where_with_columns(JobsTable, condition)
+            condition = table.c.status.in_(statuses)
+            job_list = self.select_where_with_columns(table, condition)
         return job_list
 
     def select_children_jobs(
@@ -153,12 +156,16 @@ class JobsDbManager(DbManager):
         :return: List of child jobs.
         :rtype: List[Union[str, Any]]
         """
-        self.create_table(JobsTable.name)
+        jobs_table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
+        experiment_structure_table: Table = get_table_from_name(schema=self.schema, table_name=ExperimentStructureTable.name)
+
+        self.create_table(jobs_table.name)
+        self.create_table(experiment_structure_table.name)
         children_names = set()
         job_list_tmp = [dict(job) for job in job_list]
         for job in job_list_tmp:
             child_rows = [dict(child) for child in
-                          self.select_where_with_columns(ExperimentStructureTable, {'e_from': job['name']})]
+                          self.select_where_with_columns(experiment_structure_table, {'e_from': job['name']})]
             for row in child_rows:
                 children_names.add(row['e_to'])
 
@@ -168,12 +175,12 @@ class JobsDbManager(DbManager):
                 if members is not None:
                     from sqlalchemy import and_
                     condition = and_(
-                        JobsTable.c.name == child_name,
-                        or_(JobsTable.c.member.in_(members), JobsTable.c.member.is_(None))
+                        jobs_table.c.name == child_name,
+                        or_(jobs_table.c.member.in_(members), jobs_table.c.member.is_(None))
                     )
-                    matches = self.select_where_with_columns(JobsTable, condition)
+                    matches = self.select_where_with_columns(jobs_table, condition)
                 else:
-                    matches = self.select_where_with_columns(JobsTable, where)
+                    matches = self.select_where_with_columns(jobs_table, where)
                 if matches:
                     child = matches[0]
                     job_list.append(child)
@@ -182,12 +189,16 @@ class JobsDbManager(DbManager):
 
     def save_edges(self, graph: List[Dict[str, Any]]) -> None:
         """Save the experiment structure into the database."""
-        self.create_table(ExperimentStructureTable.name)
+        table: Table = get_table_from_name(schema=self.schema, table_name=ExperimentStructureTable.name)
+
+        self.create_table(table.name)
         pkeys = ['e_from', 'e_to']
-        self.upsert_many(ExperimentStructureTable.name, graph, pkeys)
+        self.upsert_many(table.name, graph, pkeys)
 
     def load_edges(self, job_list: List[dict[str, Any]], full_load: bool) -> List[dict[str, Any]]:
-        self.create_table(ExperimentStructureTable.name)
+        table: Table = get_table_from_name(schema=self.schema, table_name=ExperimentStructureTable.name)
+
+        self.create_table(table.name)
         if full_load:
             graph = self.select_edges(job_list)
             self.delete_unused_edges(graph)
@@ -200,11 +211,13 @@ class JobsDbManager(DbManager):
         """
         Return the edges from the database.
         """
-        self.create_table(ExperimentStructureTable.name)
+        table: Table = get_table_from_name(schema=self.schema, table_name=ExperimentStructureTable.name)
+
+        self.create_table(table.name)
         graph = set()
         for job in job_list:
-            graph.update(self.select_where_with_columns(ExperimentStructureTable, {'e_from': job['name']}))
-            graph.update(self.select_where_with_columns(ExperimentStructureTable, {'e_to': job['name']}))
+            graph.update(self.select_where_with_columns(table, {'e_from': job['name']}))
+            graph.update(self.select_where_with_columns(table, {'e_to': job['name']}))
 
         return [dict(edge) for edge in graph]
 
@@ -212,8 +225,10 @@ class JobsDbManager(DbManager):
         """
         Delete unused edges from the database.
         """
-        self.create_table(ExperimentStructureTable.name)
-        self.delete_all(ExperimentStructureTable.name)
+        table: Table = get_table_from_name(schema=self.schema, table_name=ExperimentStructureTable.name)
+
+        self.create_table(table.name)
+        self.delete_all(table.name)
         self.save_edges(graph)
 
     # Once wrappers are built, they are saved in the database.
@@ -227,11 +242,11 @@ class JobsDbManager(DbManager):
         :rtype: List[dict[str, Any]]
         """
 
-        jobs_table = JobsTable
+        jobs_table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
         if preview:
-            innerjobs_table = PreviewWrapperJobsTable
+            innerjobs_table: Table = get_table_from_name(schema=self.schema, table_name=PreviewWrapperJobsTable.name)
         else:
-            innerjobs_table = WrapperJobsTable
+            innerjobs_table: Table = get_table_from_name(schema=self.schema, table_name=WrapperJobsTable.name)
         self.create_table(innerjobs_table.name)
         self.create_table(jobs_table.name)
 
@@ -264,9 +279,10 @@ class JobsDbManager(DbManager):
         :type job_name: str
         :return: List of dictionaries containing the job information.
         """
+        table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
 
-        self.create_table(JobsTable.name)
-        job = self.select_where_with_columns(JobsTable, {'name': job_name})
+        self.create_table(table.name)
+        job = self.select_where_with_columns(table, {'name': job_name})
         if job:
             return job[0]
 
@@ -286,11 +302,11 @@ class JobsDbManager(DbManager):
         :type preview: bool
         """
         if preview:
-            innerjobs_table = PreviewWrapperJobsTable
-            wrapper_info_table = PreviewWrapperInfoTable
+            innerjobs_table: Table = get_table_from_name(schema=self.schema, table_name=PreviewWrapperJobsTable.name)
+            wrapper_info_table: Table = get_table_from_name(schema=self.schema, table_name=PreviewWrapperInfoTable.name)
         else:
-            innerjobs_table = WrapperJobsTable
-            wrapper_info_table = WrapperInfoTable
+            innerjobs_table: Table = get_table_from_name(schema=self.schema, table_name=WrapperJobsTable.name)
+            wrapper_info_table: Table = get_table_from_name(schema=self.schema, table_name=WrapperInfoTable.name)
         self.create_table(innerjobs_table.name)
         self.create_table(wrapper_info_table.name)
         for wrapper_info, inner_jobs in wrappers:
@@ -319,11 +335,11 @@ class JobsDbManager(DbManager):
             full_load = False
 
         if preview:
-            innerjobs_table = PreviewWrapperJobsTable
-            wrapper_info_table = PreviewWrapperInfoTable
+            innerjobs_table: Table = get_table_from_name(schema=self.schema, table_name=PreviewWrapperJobsTable.name)
+            wrapper_info_table: Table = get_table_from_name(schema=self.schema, table_name=PreviewWrapperInfoTable.name)
         else:
-            innerjobs_table = WrapperJobsTable
-            wrapper_info_table = WrapperInfoTable
+            innerjobs_table: Table = get_table_from_name(schema=self.schema, table_name=WrapperJobsTable.name)
+            wrapper_info_table: Table = get_table_from_name(schema=self.schema, table_name=WrapperInfoTable.name)
 
         self.create_table(innerjobs_table.name)
         self.create_table(wrapper_info_table.name)
@@ -342,12 +358,21 @@ class JobsDbManager(DbManager):
 
     def reset_workflow(self) -> None:
         """Reset the workflow by dropping all tables related to jobs and wrappers."""
-        self.drop_table(JobsTable.name)
-        self.drop_table(ExperimentStructureTable.name)
-        self.drop_table(PreviewWrapperJobsTable.name)
-        self.drop_table(WrapperJobsTable.name)
-        self.drop_table(PreviewWrapperInfoTable.name)
-        self.drop_table(WrapperInfoTable.name)
+        jobs_table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
+        experiment_structure_table: Table = get_table_from_name(schema=self.schema,
+                                                                table_name=ExperimentStructureTable.name)
+        preview_wrapper_jobs_table: Table = get_table_from_name(schema=self.schema,
+                                                                table_name=PreviewWrapperJobsTable.name)
+        wrapper_jobs_table: Table = get_table_from_name(schema=self.schema, table_name=WrapperJobsTable.name)
+        preview_wrapper_info_table: Table = get_table_from_name(schema=self.schema,
+                                                                table_name=PreviewWrapperInfoTable.name)
+        wrapper_info_table: Table = get_table_from_name(schema=self.schema, table_name=WrapperInfoTable.name)
+        self.drop_table(jobs_table.name)
+        self.drop_table(experiment_structure_table.name)
+        self.drop_table(preview_wrapper_jobs_table.name)
+        self.drop_table(wrapper_jobs_table.name)
+        self.drop_table(preview_wrapper_info_table.name)
+        self.drop_table(wrapper_info_table.name)
 
     def save_sections_data(self, sections_data: List[Dict[str, Any]]) -> None:
         """
@@ -358,14 +383,17 @@ class JobsDbManager(DbManager):
         :return: None
         :rtype: None
         """
-        self.drop_table(SectionsStructureTable.name)
-        self.create_table(SectionsStructureTable.name)
-        self.upsert_many(SectionsStructureTable.name, sections_data, ['name'])
+        section_structure_table: Table = get_table_from_name(schema=self.schema, table_name=SectionsStructureTable.name)
+        self.drop_table(section_structure_table.name)
+        self.create_table(section_structure_table.name)
+        self.upsert_many(section_structure_table.name, sections_data, ['name'])
 
     def load_sections_data(self) -> list[tuple[str, Any]]:
         """Load the section data to the database."""
-        self.create_table(SectionsStructureTable.name)
-        section_data = self.select_all_with_columns(SectionsStructureTable.name)
+        section_structure_table: Table = get_table_from_name(schema=self.schema, table_name=SectionsStructureTable.name)
+
+        self.create_table(section_structure_table.name)
+        section_data = self.select_all_with_columns(section_structure_table.name)
         return section_data
 
     def clear_unused_nodes(self, differences: Dict[str, Any]) -> None:
@@ -376,56 +404,56 @@ class JobsDbManager(DbManager):
         :type differences: Dict[str, Any]
 
         """
-        self.create_table(JobsTable.name)
+        jobs_table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
+
+        self.create_table(jobs_table.name)
         # Delete jobs which section has been removed in the recent yaml file.
         deleted_sections = []
         for section_name, section_data in differences.items():
             if section_data.get('status', None) == 'removed':
                 deleted_sections.append(section_name)
         if deleted_sections:
-            self.delete_where(JobsTable.name, {'section': deleted_sections})
+            self.delete_where(jobs_table.name, {'section': deleted_sections})
 
         for section_name, section_data in differences.items():
             if section_data.get('status', None) == 'modified':
                 # delete if chunk_number is > than the section specified
 
                 condition = and_(
-                    JobsTable.c.section == section_name,
-                    JobsTable.c.numchunks > section_data.get('chunk_number', 0),
+                    jobs_table.c.section == section_name,
+                    jobs_table.c.numchunks > section_data.get('chunk_number', 0),
                 )
-                self.delete_where(JobsTable.name, condition)
+                self.delete_where(jobs_table.name, condition)
 
                 # delete if split_number is > than the section specified
                 condition = and_(
-                    JobsTable.c.section == section_name,
-                    JobsTable.c.split > section_data.get('splits', -1),
+                    jobs_table.c.section == section_name,
+                    jobs_table.c.split > section_data.get('splits', -1),
                 )
-                self.delete_where(JobsTable.name, condition)
+                self.delete_where(jobs_table.name, condition)
 
                 # delete if date is not in the section specified
                 if 'date' in section_data:
                     condition = and_(
-                        JobsTable.c.section == section_name,
-                        ~JobsTable.c.datelist.in_(section_data['datelist'].split(" ")),
+                        jobs_table.c.section == section_name,
+                        ~jobs_table.c.datelist.in_(section_data['datelist'].split(" ")),
                     )
-                    self.delete_where(JobsTable.name, condition)
+                    self.delete_where(jobs_table.name, condition)
                 # delete if member is not in the section specified
                 if 'member' in section_data:
                     condition = and_(
-                        JobsTable.c.section == section_name,
-                        ~JobsTable.c.members.in_(section_data['members'].split(" ")),
+                        jobs_table.c.section == section_name,
+                        ~jobs_table.c.members.in_(section_data['members'].split(" ")),
                     )
-                    self.delete_where(JobsTable.name, condition)
+                    self.delete_where(jobs_table.name, condition)
 
                 # Update node status to 'Waiting' if it was not in the active statuses
                 condition = and_(
-                    JobsTable.c.section == section_name,
-                    ~JobsTable.c.status.in_(self._ACTIVE_STATUSES)
+                    jobs_table.c.section == section_name,
+                    ~jobs_table.c.status.in_(self._ACTIVE_STATUSES)
                 )
-
-                #self.update_where(JobsTable.name, {'status': 'WAITING'}, condition)
-
-
+                # TODO? I don't remember why this was commented out
+                # self.update_where(JobsTable.name, {'status': 'WAITING'}, condition)
 
     def delete_rows_with_number_greater_than(
             self,
@@ -441,8 +469,9 @@ class JobsDbManager(DbManager):
         :return: List of rows as dictionaries.
         :rtype: List[Dict[str, Any]]
         """
+        jobs_table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
 
-        self.delete_where(JobsTable.name, {column.name: column > x})
+        self.delete_where(jobs_table.name, {column.name: column > x})
 
     def remove_section(self, section_name: str) -> None:
         """
@@ -451,8 +480,11 @@ class JobsDbManager(DbManager):
         :param section_name: Name of the section to remove.
         :type section_name: str
         """
-        self.create_table(SectionsStructureTable.name)
-        self.delete_where(SectionsStructureTable.name, {'name': section_name})
+        sections_structure_table: Table = get_table_from_name(schema=self.schema,
+                                                              table_name=SectionsStructureTable.name)
+
+        self.create_table(sections_structure_table.name)
+        self.delete_where(sections_structure_table.name, {'name': section_name})
 
     def update_section(self, section_data: Dict[str, Any]) -> None:
         """
@@ -461,8 +493,11 @@ class JobsDbManager(DbManager):
         :param section_data: Dictionary containing section data to update.
         :type section_data: Dict[str, Any]
         """
-        self.create_table(SectionsStructureTable.name)
-        self.upsert_many(SectionsStructureTable.name, [section_data], ['name'])
+        sections_structure_table: Table = get_table_from_name(schema=self.schema,
+                                                              table_name=SectionsStructureTable.name)
+
+        self.create_table(sections_structure_table.name)
+        self.upsert_many(sections_structure_table.name, [section_data], ['name'])
 
     def add_section(self, section_data: Dict[str, Any]) -> None:
         """
@@ -471,11 +506,17 @@ class JobsDbManager(DbManager):
         :param section_data: Dictionary containing section data to add.
         :type section_data: Dict[str, Any]
         """
-        self.create_table(SectionsStructureTable.name)
-        self.insert_many(SectionsStructureTable.name, [section_data])
+        sections_structure_table: Table = get_table_from_name(schema=self.schema,
+                                                              table_name=SectionsStructureTable.name)
+
+        self.create_table(sections_structure_table.name)
+        self.insert_many(sections_structure_table.name, [section_data])
 
     def clear_edges(self) -> None:
         """Clear all edges from the database."""
-        self.create_table(ExperimentStructureTable.name)
-        self.delete_all(ExperimentStructureTable.name)
-        self.create_table(ExperimentStructureTable.name)
+        experiment_structure_table: Table = get_table_from_name(schema=self.schema,
+                                                                table_name=ExperimentStructureTable.name)
+
+        self.create_table(experiment_structure_table.name)
+        self.delete_all(experiment_structure_table.name)
+        self.create_table(experiment_structure_table.name)

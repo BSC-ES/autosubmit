@@ -16,7 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import cast, List, Optional, Tuple, Set
+from typing import cast, List, Optional
 
 from sqlalchemy import (
     MetaData,
@@ -25,12 +25,9 @@ from sqlalchemy import (
     Table,
     Text,
     Float,
-    LargeBinary,
     UniqueConstraint,
     Column,
-    Boolean, ForeignKey, Enum,
-)
-from sqlalchemy.orm import foreign
+    Boolean, ForeignKey, )
 
 metadata_obj = MetaData()
 

@@ -19,13 +19,10 @@ import math
 from typing import Dict, Optional, TYPE_CHECKING
 
 from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates
-from networkx.classes import DiGraph
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.log.log import Log, AutosubmitCritical
-from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
 if TYPE_CHECKING:
     from autosubmit.job.job_list import JobList
@@ -39,13 +36,15 @@ CALENDAR_UNITSIZE_ENUM = {
 }
 
 
-def _get_submitter(as_conf) -> ParamikoSubmitter:
+def _get_submitter(as_conf):
     """
     Returns the submitter corresponding to the communication defined on autosubmit's config file
 
     :return: submitter
     :rtype: Submitter
     """
+    from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
+
     as_conf.get_communications_library()
     return ParamikoSubmitter()
 

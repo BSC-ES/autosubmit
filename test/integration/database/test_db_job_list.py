@@ -26,7 +26,7 @@ from autosubmit.database import db_manager_job_list
 from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.job.job import Job
 from autosubmit.job.job_list import JobList
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from autosubmit.config.yamlparser import YAMLParserFactory
 
 raw_job_list = [
     {'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None, 'finish_time_timestamp': None,
@@ -65,11 +65,13 @@ raw_graph_edges = [
 ]
 
 
-def generate_job_list(autosubmit_config) -> JobList:
+def generate_job_list(autosubmit_config, db_manager) -> JobList:
     """Generate a JobList with the raw_job_list data."""
     as_conf = autosubmit_config("dummy-expid", {})
 
     job_list = JobList("dummy-expid", as_conf, YAMLParserFactory(), run_mode=True)
+    job_list.dbmanager = db_manager
+
     for job_dict in raw_job_list:
         job = Job(loaded_data=job_dict)
         job_list.add_job(job)
@@ -163,9 +165,9 @@ def test_db_job_list_jobs(tmp_path: Path, db_engine: str, options: dict, request
     else:
         db_manager = _create_db_manager(scheme=options['schema'])
 
-    job_list = generate_job_list(autosubmit_config)
-    job_list.dbmanager = db_manager
+    job_list = generate_job_list(autosubmit_config, db_manager)
     job_list.save_jobs()
+    job_list.save_edges()
 
     # Load jobs active jobs
     loaded_jobs = job_list.dbmanager.load_jobs(full_load=full_load)
@@ -239,7 +241,7 @@ def test_db_job_list_jobs_and_edges_together(
         db_manager = _create_db_manager(scheme=options['schema'])
 
     # Create and save original job list with jobs and edges
-    job_list = generate_job_list(autosubmit_config)
+    job_list = generate_job_list(autosubmit_config, db_manager)
     job_list.dbmanager = db_manager
 
     # Save jobs and edges to database

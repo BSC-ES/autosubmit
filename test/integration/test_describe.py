@@ -26,6 +26,7 @@ from ruamel.yaml import YAML
 from autosubmit.autosubmit import Autosubmit
 from ruamel.yaml import YAML
 import re
+from autosubmit.autosubmit import Log
 _EXPIDS = ['z000', 'z001']
 
 

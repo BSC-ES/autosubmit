@@ -25,7 +25,7 @@ from threading import Thread
 from time import sleep
 import pytest
 
-from log.log import Log
+from autosubmit.log.log import Log
 
 _EXPID = 't000'
 """The experiment ID used throughout the test."""
