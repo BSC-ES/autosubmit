@@ -17,81 +17,107 @@
 
 """Test file for ``autosubmit_helper.py``."""
 
-import datetime
-from datetime import timedelta
-from typing import Callable
+from datetime import datetime, timedelta
+from typing import Callable, Union
 
 import pytest
 
 import autosubmit.helpers.autosubmit_helper as helper
 from autosubmit.log.log import AutosubmitCritical
 
+_EXPID = 't000'
 
-@pytest.mark.parametrize('time', [
-    '04-00-00',
-    '04:00:00',
-    '2020:01:01 04:00:00',
-    '2020-01-01 04:00:00',
-    datetime.datetime.now() + timedelta(seconds=5),
-], ids=['wrong format hours', 'right format hours', 'fulldate wrong format', 'fulldate right format',
-        'execute in 5 seconds']
-                         )
-def teste_handle_start_time(time):
-    """
-    function to test the function handle_start_time inside autosubmit_helper
-    """
+
+@pytest.mark.parametrize(
+    'time',
+    [
+        '04-00-00',
+        '04:00:00',
+        '2020:01:01 04:00:00',
+        '2020-01-01 04:00:00',
+        datetime.now() + timedelta(seconds=5),
+    ],
+    ids=[
+        'wrong format hours',
+        'right format hours',
+        'fulldate wrong format',
+        'fulldate right format',
+        'execute in 5 seconds'
+    ]
+)
+def test_handle_start_time(time):
+    """Test the function handle_start_time inside autosubmit_helper."""
     if not isinstance(time, str):
         time = time.strftime("%Y-%m-%d %H:%M:%S")
     assert helper.handle_start_time(time) is None
 
 
-@pytest.mark.parametrize('ids, return_list_value, result', [
-    (None, [''], []),
-    ('', [''], ''),
-    ('a000', ['a001'], ''),
-    ('a000', ['a000'], ['a000']),
-    ('a000 a001', ['a000', 'a001'], ['a000', 'a001']),
-    ('a000 a001', ['a000', 'a001', 'a002'], ['a000', 'a001']),
-], ids=['None', 'expected AScritical members', 'expected AScritical rmembers',
-        'one ids', 'multiple sent ids', 'multiple return ids']
-                         )
-@pytest.mark.xfail(raise_stmt=AutosubmitCritical)
-def test_get_allowed_members(mocker, ids, return_list_value, result,
-                             autosubmit_config: Callable):
-    """
-        function to test the function get_allowed_members inside autosubmit_helper
-    """
-    expid = 'a000'
+@pytest.mark.parametrize(
+    'ids,return_list_value,result',
+    [
+        (None, [''], []),
+        ('', [''], AutosubmitCritical),
+        (_EXPID, ['a001'], AutosubmitCritical),
+        (_EXPID, [_EXPID], [_EXPID]),
+        (f'{_EXPID} a001', [_EXPID, 'a001'], [_EXPID, 'a001']),
+        (f'{_EXPID} a001', [_EXPID, 'a001', 'a002'], [_EXPID, 'a001']),
+    ], ids=[
+        'None',
+        'expected AScritical members',
+        'expected AScritical run_members',
+        'one ids',
+        'multiple sent ids',
+        'multiple return ids'
+    ]
+)
+def test_get_allowed_members(
+        ids,
+        return_list_value,
+        result: Union[str, Exception],
+        autosubmit_config: Callable,
+        mocker
+) -> None:
+    """Test the function get_allowed_members inside autosubmit_helper."""
+    mocker.patch(
+        'autosubmit.helpers.autosubmit_helper.AutosubmitConfig.get_member_list',
+        return_value=return_list_value
+    )
 
-    as_member_list = mocker.patch('autosubmit.helpers.autosubmit_helper.AutosubmitConfig.get_member_list')
+    as_config = autosubmit_config(_EXPID, experiment_data={})
 
-    as_config = autosubmit_config(expid, experiment_data={})
-    as_member_list.return_value = return_list_value
+    if type(result) is str or type(result) is list:
+        assert helper.get_allowed_members(ids, as_config) == result
+    else:
+        with pytest.raises(result):  # type: ignore
+            helper.get_allowed_members(ids, as_config)
 
-    assert helper.get_allowed_members(ids, as_config) == result
 
 
-@pytest.mark.parametrize('time, header_skip, experiment_exists', [
-    ('a000', False, False),
-    ('04-00-00', False, False),
-    ('04-00-00', False, True),
-    ('04:00:00', True, False),
-    ('04:00:00', True, True),
-], ids=['expid instead of time', 'wrong format hours', 'right format hours', 'fulldate wrong format',
-        'fulldate wrong format false']
-                         )
-def teste_handle_start_after(mocker, autosubmit_config: Callable, time: str,
+@pytest.mark.parametrize(
+    'time,header_skip,experiment_exists',
+    [
+        (_EXPID, False, False),
+        ('04-00-00', False, False),
+        ('04-00-00', False, True),
+        ('04:00:00', True, False),
+        ('04:00:00', True, True),
+    ],
+    ids=[
+        'expid instead of time',
+        'wrong format hours',
+        'right format hours',
+        'fulldate wrong format',
+        'fulldate wrong format false'
+    ]
+)
+def test_handle_start_after(mocker, autosubmit_config: Callable, time: str,
                              header_skip: bool, experiment_exists: bool):
-    """
-    function to test the function handle_start_time inside autosubmit_helper
-    """
+    """Test the function handle_start_time inside autosubmit_helper"""
     autosubmit_helper = mocker.patch('autosubmit.helpers.autosubmit_helper.check_experiment_exists')
     mock_experiment_history = mocker.patch('autosubmit.helpers.autosubmit_helper.ExperimentHistory')
     mocked_sleep = mocker.patch('autosubmit.helpers.autosubmit_helper.sleep')
 
-    expid = 'a000'
-
-    autosubmit_config(expid, experiment_data={})
+    autosubmit_config(_EXPID, experiment_data={})
     experiment_history = mocker.Mock()
     experiment_history2 = mocker.Mock()
 
@@ -115,7 +141,7 @@ def teste_handle_start_after(mocker, autosubmit_config: Callable, time: str,
     autosubmit_helper.return_value = experiment_exists
     mocked_sleep.return_value = 0
 
-    helper.handle_start_after(time, expid)
+    helper.handle_start_after(time, _EXPID)
     if header_skip is True and experiment_exists is True:
         assert mocked_exp_history.manager.get_experiment_run_dc_with_max_id.called
     assert mocked_sleep.has_been_called()

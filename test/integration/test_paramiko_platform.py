@@ -35,6 +35,8 @@ Note that tests will start and destroy an SSH server. For unit tests, see ``para
 in the ``test/unit`` directory."""
 
 
+_SSH_TIMEOUTS_IN_SECONDS = 90
+
 @pytest.mark.docker
 @pytest.mark.parametrize('filename, check', [
     ('test1', True),
@@ -82,9 +84,19 @@ def test_send_file(mocker, filename, ps_platform, check):
             wait_for_logs(container, 'sshd is listening on port 2222')
             _ssh = paramiko.SSHClient()
             _ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            _ssh.connect(hostname=ps_platform.host, username=ps_platform.user, password='password', port=ssh_port)
-            ps_platform._ftpChannel = paramiko.SFTPClient.from_transport(_ssh.get_transport(), window_size=pow(4, 12),
-                                                                      max_packet_size=pow(4, 12))
+            _ssh.connect(
+                hostname=ps_platform.host,
+                username=ps_platform.user,
+                password='password',
+                port=ssh_port,
+                timeout=_SSH_TIMEOUTS_IN_SECONDS,
+                banner_timeout=_SSH_TIMEOUTS_IN_SECONDS,
+                auth_timeout=_SSH_TIMEOUTS_IN_SECONDS
+            )
+            ps_platform._ftpChannel = paramiko.SFTPClient.from_transport(
+                _ssh.get_transport(),
+                window_size=pow(4, 12),
+                max_packet_size=pow(4, 12))
             ps_platform._ftpChannel.get_channel().settimeout(120)
             ps_platform.connected = True
             ps_platform.get_send_file_cmd = mocker.Mock()

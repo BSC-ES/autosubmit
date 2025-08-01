@@ -147,16 +147,22 @@ class AutosubmitConfig(object):
                         f"into the historical database: {str(e)}")
             return ""
 
-    def get_project_dir(self):
-        """Returns experiment's project directory
+    def get_project_dir(self) -> str:
+        """Returns experiment's project destination directory.
+
+        The returned directory will include the local root directory, expid,
+        project directory, and the destination (i.e. absolute directory).
 
         :return: experiment's project directory
         :rtype: str
         """
-
-        dir_templates = os.path.join(self.basic_config.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_PROJ_DIR,
-                                     self.get_project_destination())
-        return dir_templates
+        dir_templates = Path(
+            self.basic_config.LOCAL_ROOT_DIR,
+            self.expid,
+            BasicConfig.LOCAL_PROJ_DIR,
+            self.get_project_destination()
+        )
+        return str(dir_templates)
 
     def get_x11(self, section: str) -> str:
         """Active X11 for this section
@@ -1843,15 +1849,20 @@ class AutosubmitConfig(object):
 
     def load_workflow_commit(self) -> None:
         """Load the workflow commit from the .git folder."""
-        if self.is_current_logged_user_owner:
-            project_dir = f"{self.experiment_data.get('ROOTDIR', '')}/proj/{self.experiment_data.get('PROJECT', {}).get('PROJECT_DESTINATION', 'git_project')}"
-            if Path(project_dir).joinpath(".git").exists():
-                with suppress(KeyError, ValueError, UnicodeDecodeError):
-                    self.experiment_data["AUTOSUBMIT"]["WORKFLOW_COMMIT"] = subprocess.check_output(
-                        "git rev-parse HEAD",
-                        cwd=project_dir,
-                        shell=True
-                    ).decode(locale.getpreferredencoding()).strip("\n")
+        if self.get_project_type().lower() != 'git':
+            return
+
+        if not self.is_current_logged_user_owner:
+            return
+
+        project_dir = Path(self.get_project_dir())
+        if project_dir.joinpath(".git").exists():
+            with suppress(KeyError, ValueError, UnicodeDecodeError):
+                self.experiment_data["AUTOSUBMIT"]["WORKFLOW_COMMIT"] = subprocess.check_output(
+                    "git rev-parse HEAD",
+                    cwd=project_dir,
+                    shell=True
+                ).decode(locale.getpreferredencoding()).strip("\n")
 
     def load_current_hpcarch_parameters(self) -> None:
         """Load custom HPCARCH parameters."""
@@ -2063,12 +2074,15 @@ class AutosubmitConfig(object):
         open(self._conf_parser_file, 'w').write(content)
 
     def get_project_type(self) -> str:
-        """Returns project type from experiment config file
+        """Returns project type from experiment config file.
+
+        ``"none"`` means a dummy project, where every job is replaced
+        by a call to ``sleep`` (for testing platforms).
 
         :return: project type
         :rtype: str
         """
-        return self.get_section(["project", "project_type"], must_exists=False).lower()
+        return self.get_section(["project", "project_type"], "none", must_exists=False).lower()
 
     def get_parse_two_step_start(self) -> str:
         """Returns two-step start jobs

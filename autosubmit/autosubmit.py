@@ -4516,7 +4516,7 @@ class Autosubmit:
                     as_conf.reload(force_load=True,only_experiment_data=True)
                     # Getting output type provided by the user in config, 'pdf' as default
                     try:
-                        if not Autosubmit._copy_code(as_conf, expid, as_conf.experiment_data.get("PROJECT",{}).get("PROJECT_TYPE","none"), False):
+                        if not Autosubmit._copy_code(as_conf, expid, as_conf.get_project_type(), False):
                             return False
                     except AutosubmitCritical as e:
                         raise

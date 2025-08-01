@@ -672,6 +672,11 @@ CONFIG:
 DEFAULT:
     EXPID: {expid}
     HPCARCH: local
+PROJECT:
+    PROJECT_TYPE: local
+    PROJECT_DIRECTORY: local_project
+LOCAL:
+    PROJECT_PATH: ''
 JOBS:
     A:
         FILE: a
