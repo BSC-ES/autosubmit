@@ -65,6 +65,8 @@ Create a new experiment
 =======================
 
 .. runcmd:: autosubmit expid -dm -H "local" -d "Tutorial"
+    :silent-output: 1
+    :prompt:
 
 - *-dm: Generates a dummy experiment.*
 - *-H: Sets the principal experiment platform.*
@@ -106,10 +108,6 @@ Run and monitoring
  - Third, it manages all the **workflow steps by following the dependencies defined by the user** until all jobs are in COMPLETED or FAILED status. There can be jobs left in **WAITING** status if their dependencies are in **FAILED** status.
 
 While the experiment is running, it can be visualized via ``autosubmit monitor <EXPID>``.
-
-.. runcmd:: find /home/docs/autosubmit/a000/plot/ -iname "*a000_*.png" -true -exec mv -- {} ./qstartguide/dummy.png \;
-    :silent-output: 1
-    :prompt:
 
 .. figure:: dummy.png
    :name: dummy_workflow
