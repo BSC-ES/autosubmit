@@ -25,10 +25,10 @@ import inspect
 import os
 
 import pytest
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 
 from autosubmit.database import db_common
-from log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 from test.conftest import _initialize_autosubmitrc
 
 

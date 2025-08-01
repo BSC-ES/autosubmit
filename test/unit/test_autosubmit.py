@@ -22,10 +22,10 @@ from textwrap import dedent
 
 from autosubmit.config.basicconfig import BasicConfig
 import pytest
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 
 from autosubmit.autosubmit import Autosubmit
-from log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 from test.conftest import AutosubmitConfigFactory
 
 

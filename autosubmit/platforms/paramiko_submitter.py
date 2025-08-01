@@ -19,13 +19,7 @@
 import os
 from collections import defaultdict
 
-from log.log import Log, AutosubmitError, AutosubmitCritical
-from .platform import Platform
 
-from .submitter import Submitter
-from autosubmit.platforms.psplatform import PsPlatform
-from autosubmit.platforms.pbsplatform import PBSPlatform
-from autosubmit.platforms.sgeplatform import SgePlatform
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
@@ -36,6 +30,7 @@ from autosubmit.platforms.pjmplatform import PJMPlatform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from autosubmit.platforms.submitter import Submitter
+from .platform import Platform
 
 
 class ParamikoSubmitter(Submitter):

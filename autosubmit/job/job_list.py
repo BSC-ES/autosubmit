@@ -28,22 +28,19 @@ from time import strftime, localtime, mktime
 from typing import List, Dict, Tuple, Any, Optional, Union, Set
 
 from bscearth.utils.date import date2str, parse_date
-from networkx import DiGraph, difference
+from networkx import DiGraph
 
-from autosubmit.database.db_common import check_db_path, get_connection_url
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager_job_list import JobsDbManager
-from autosubmit.database.tables import SectionsStructureTable
 from autosubmit.helpers.data_transfer import JobRow
-from autosubmit.job.job import Job
-from autosubmit.job.job import WrapperJob
+from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_packages import JobPackageThread
-from autosubmit.job.job_utils import Dependency, _get_submitter
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.job.job_utils import transitive_reduction
-from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.job.job_utils import Dependency
+from autosubmit.log.log import AutosubmitCritical, Log
 
 
 class JobList(object):

@@ -27,7 +27,7 @@ from typing import Any, Optional, Tuple
 import pytest
 # noinspection PyProtectedMember
 from _pytest._py.path import LocalPath
-from autosubmitconfigparser.config.yamlparser import YAMLParserFactory
+from autosubmit.config.yamlparser import YAMLParserFactory
 
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job

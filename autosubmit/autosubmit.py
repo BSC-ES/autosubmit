@@ -40,9 +40,6 @@ from pathlib import Path
 from time import sleep
 from typing import Dict, Set, Tuple, Union, Any, List, Optional
 
-from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.config.yamlparser import YAMLParserFactory
 from bscearth.utils.date import date2str
 from portalocker import Lock
 from portalocker.exceptions import BaseLockException
@@ -50,23 +47,20 @@ from pyparsing import nestedExpr
 from ruamel.yaml import YAML
 
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
-import autosubmit.statistics.utils as StatisticsUtils
+import autosubmit.history.utils as HUtils
 
-from autosubmit.database.db_structure import get_structure
-from autosubmit.experiment.detail_updater import ExperimentDetails
-from autosubmit.experiment.experiment_common import copy_experiment
-from autosubmit.experiment.experiment_common import new_experiment
-from autosubmit.git.autosubmit_git import AutosubmitGit, check_unpushed_changes, clean_git
-from autosubmit.helpers.processes import process_id
-from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path
-from autosubmit.helpers.utils import strtobool
+import autosubmit.statistics.utils as StatisticsUtils
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import (
     create_db, delete_experiment, get_experiment_description, get_autosubmit_version, check_experiment_exists,
-    update_experiment_description_version, check_db_path
+    update_experiment_description_version
 )
 from autosubmit.experiment.detail_updater import ExperimentDetails
 from autosubmit.experiment.experiment_common import copy_experiment, new_experiment, create_required_folders
 from autosubmit.git.autosubmit_git import AutosubmitGit
+from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
 from autosubmit.helpers.processes import process_id
 from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, strtobool
 from autosubmit.history.experiment_history import ExperimentHistory
@@ -77,13 +71,13 @@ from autosubmit.job.job_grouping import JobGrouping
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_packager import JobPackager
 from autosubmit.job.job_utils import SubJob, SubJobManager
+from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmit.migrate.migrate import Migrate
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.submitter import Submitter
-from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 
 dialog = None
 
@@ -1002,7 +996,7 @@ class Autosubmit:
                                 "The {2} experiment {0} version is being updated to {1} for match autosubmit version",
                                 as_conf.get_version(), Autosubmit.autosubmit_version, expid)
                             as_conf.set_version(Autosubmit.autosubmit_version)
-                            update_experiment_description_version(expid, version=Autosubmit.autosubmit_version)
+                            update_experiment_descrip_version(expid, version=Autosubmit.autosubmit_version)
 
                     else:
                         if as_conf.get_version() is not None and as_conf.get_version() != Autosubmit.autosubmit_version:
@@ -1022,10 +1016,7 @@ class Autosubmit:
             if args.command not in expid_less:
                 exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
                 if not os.path.exists(exp_path):
-                    if BasicConfig.DATABASE_BACKEND == 'sqlite':
-                        raise AutosubmitCritical("Experiment does not exist", 7012)
-                    else:
-                        os.mkdir(exp_path)
+                    raise AutosubmitCritical("Experiment does not exist", 7012)
             Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
                                       args.command + exp_id + '.log'), "out", log_level)
             Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,

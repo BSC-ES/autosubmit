@@ -20,7 +20,7 @@ import textwrap
 from pathlib import Path
 from typing import Any, Optional, Protocol, cast
 
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 from sqlalchemy import and_, func, inspect, desc, insert, select, update
 from sqlalchemy.schema import CreateTable, CreateSchema
 
