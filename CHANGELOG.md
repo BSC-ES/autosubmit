@@ -15,6 +15,8 @@
 - The autosubmit-config-parser GitHub project has been archived and its code moved
   to Autosubmit repository, merging the projects again #2052
 - Documentation about `FOR.NAME` with values that are not strings #2515
+- Adjusting the documentation to be done in an automatized and self-contained way facilitating 
+  and allowing reproducibility of the examples #2465
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 

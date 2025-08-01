@@ -1,0 +1,25 @@
+JOBS:
+  INI:
+    FILE: INI.sh
+    RUNNING: ONCE
+
+  SIM:
+    FILE: SIM.sh
+    DEPENDENCIES: INI SIM-1
+    RUNNING: ONCE
+
+  ASIM:
+    FILE: ASIM.sh
+    DEPENDENCIES: SIM
+    RUNNING: ONCE
+    SPLITS: 3
+
+  POST:
+    FILE: POST.sh
+    RUNNING: ONCE
+    DEPENDENCIES:
+      ASIM:
+        SPLITS_FROM:
+          2,3: # [2:3] is also valid
+            SPLITS_TO: 1,2*,3* # 1,[2:3]* is also valid, you can also specify the step with [2:3:step]
+    SPLITS: 3
