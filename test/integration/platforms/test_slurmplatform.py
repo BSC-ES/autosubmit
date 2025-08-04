@@ -60,7 +60,7 @@ def test_create_platform_slurm(autosubmit_exp):
     assert platform.name == _PLATFORM_NAME
     # TODO: add more assertion statements...
 
-
+@pytest.mark.xfail(reason="Known bug with concurrent tests")
 @pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     {

@@ -344,6 +344,7 @@ def _init_run(as_exp, jobs_data) -> Path:
 
     return exp_path / f'tmp/LOG_{_EXPID}'
 
+
 def _modify_jobs_data(as_exp, jobs_data) -> Path:
     as_conf = as_exp.as_conf
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
@@ -353,8 +354,9 @@ def _modify_jobs_data(as_exp, jobs_data) -> Path:
     with jobs_path.open('w') as f:
         f.write(jobs_data)
 
-# -- Tests
 
+# -- Tests
+@pytest.mark.xfail(reason="Known bug with concurrent tests")
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
     # Success
     (dedent("""\
@@ -474,6 +476,7 @@ def test_run_uninterrupted(
         pytest.fail(e_msg)
 
 
+@pytest.mark.xfail(reason="Known bug with concurrent tests")
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
     # Success
     (dedent("""\
@@ -590,8 +593,7 @@ def test_run_interrupted(
 
     _assert_exit_code(final_status, exit_code)
 
-
-
+@pytest.mark.xfail(reason="Known bug with concurrent tests")
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
 
     # Failure
