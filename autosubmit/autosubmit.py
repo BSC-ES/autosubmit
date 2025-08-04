@@ -996,7 +996,7 @@ class Autosubmit:
                                 "The {2} experiment {0} version is being updated to {1} for match autosubmit version",
                                 as_conf.get_version(), Autosubmit.autosubmit_version, expid)
                             as_conf.set_version(Autosubmit.autosubmit_version)
-                            update_experiment_descrip_version(expid, version=Autosubmit.autosubmit_version)
+                            update_experiment_description_version(expid, version=Autosubmit.autosubmit_version)
 
                     else:
                         if as_conf.get_version() is not None and as_conf.get_version() != Autosubmit.autosubmit_version:
@@ -3417,7 +3417,7 @@ class Autosubmit:
         if get_from_user == "*" or get_from_user == "":
             get_from_user = pwd.getpwuid(os.getuid())[0]
         user = ""
-        created= ""
+        created = ""
         model = ""
         branch = ""
         hpc = ""
@@ -3476,7 +3476,7 @@ class Autosubmit:
                 Log.result("Branch: {0}", branch)
                 Log.result("HPC: {0}", hpc)
                 Log.result("Description: {0}", description[0][0])
-            except Exception:
+            except Exception as e:
                 not_described_experiments.append(experiment_id)
         if len(not_described_experiments) > 0:
             Log.printlog(f"Could not describe the following experiments:\n"

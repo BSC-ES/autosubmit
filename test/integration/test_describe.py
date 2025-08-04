@@ -73,18 +73,9 @@ def test_describe(
         get_from_user=get_from_user
     )
 
-    # Now we can call printlog more than once without raising a false negative.
-    warning_calls = [
-        call for call in Log.printlog.call_args_list
-        if call.args and
-           isinstance(call.args[0], str) and
-           re.search(r"Could not describe the following experiments", call.args[0])
-    ]
-    if not_described:
-        assert len(warning_calls) == 1
-        assert warning_calls[0].args[1] == Log.WARNING
-    else:
-        assert not warning_calls
+    # Log.printlog is only called when an experiment is not described
+    # TODO: We could re-design the class to make this behaviour clearer.
+    assert mocked_log.printlog.call_count == (1 if not_described else 0)
 
     if exps and not not_described:
         location_lines = [

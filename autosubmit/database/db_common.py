@@ -159,9 +159,9 @@ def save_experiment(name: str, description: Optional[str], version: Optional[str
 
     try:
         result = queue.get(True, TIMEOUT)
-    except Exception:
-        raise AutosubmitCritical(f"The database process exceeded the timeout limit {TIMEOUT}s. "
-                                 f"Your experiment {name} couldn't be stored in the database.")
+    except BaseException:
+        raise AutosubmitCritical(
+            "The database process exceeded the timeout limit {0}s. Your experiment {1} couldn't be stored in the database.".format(TIMEOUT, name))
     finally:
         proc.terminate()
     return result
