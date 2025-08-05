@@ -1,12 +1,3 @@
-import shutil
-
-from docutils import nodes
-from docutils.parsers.rst import directives
-from pathlib import Path
-from sphinx.directives import code
-
-from docs.source.ext.runcmd import RunCmdDirective
-
 # This code is adapted from CWL User Guide, licensed under
 # the CC BY 4.0 license, quoting their license:
 #
@@ -16,10 +7,19 @@ from docs.source.ext.runcmd import RunCmdDirective
 # linking to https://www.commonwl.org/ ),...
 # Ref: https://github.com/common-workflow-language/user_guide/blob/8abf537144d7b63c3561c1ff2b660543effd0eb0/LICENSE.md
 
-""""
-Functions focusing in running commands, designed to be run with autosubmit, 
-with that images will be generated and displayed in order to automate the documentation
-"""
+import shutil
+from pathlib import Path
+from typing import cast
+
+from docutils import nodes
+from docutils.nodes import Element, Node
+from docutils.parsers.rst import directives
+from sphinx.directives import code
+
+from docs.source.ext.runcmd import RunCmdDirective
+
+"""Functions focusing in running commands, designed to be run with autosubmit, 
+with that images will be generated and displayed in order to automate the documentation."""
 
 __version__ = "0.2.0"
 
@@ -38,6 +38,7 @@ class AutosubmitFigureDirective(code.CodeBlock):
         "expid": directives.unchanged_required,
         "type": directives.unchanged,
         "exp": directives.unchanged_required,
+        "output": directives.unchanged_required,
         "figure": directives.path,
         "name": directives.unchanged_required,
         "path": directives.unchanged_required,
@@ -47,7 +48,7 @@ class AutosubmitFigureDirective(code.CodeBlock):
         "caption": directives.unchanged,
     }
 
-    def run(self):
+    def run(self) -> list[Node]:
         caption = self.options.get('caption')
 
         if self.options.get('name'):
@@ -61,7 +62,9 @@ class AutosubmitFigureDirective(code.CodeBlock):
             if Path(path_from).is_file() and Path(path_to).is_file():
                 shutil.copy(path_from, path_to)
 
-        command: str = f"autosubmit {self.options.get('command')} {self.options.get('expid')} --hide -o {self.options.get('type', 'png')}"        RunCmdDirective(
+        command: str = f"autosubmit {self.options.get('command')} {self.options.get('expid')} --hide -o {self.options.get('type', 'png')}"
+
+        run_cmd_node = RunCmdDirective(
             name='runCMD',
             arguments=[command],
             options={},
@@ -72,6 +75,10 @@ class AutosubmitFigureDirective(code.CodeBlock):
             state=self.state,
             state_machine=self.state_machine
         ).run()
+
+        if self.options.get('output'):
+            print("######### FIGURE OUTPUT #########")
+            print(str(cast(Element, run_cmd_node[0])))
 
         for f in Path(f"{self.env.app.outdir.parent}/autosubmit/autosubmit/a000/plot/").glob('*'):
             path_from = f"{self.env.app.outdir.parent}/autosubmit/autosubmit/a000/plot/{f.name}"

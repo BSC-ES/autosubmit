@@ -1,16 +1,3 @@
-import csv
-import os
-import re
-import shlex
-import subprocess
-import sys
-
-from pathlib import Path
-
-from docutils import nodes
-from docutils.parsers.rst import directives
-from sphinx.directives import code
-
 # This code is adapted from CWL User Guide, licensed under
 # the CC BY 4.0 license, quoting their license:
 #
@@ -20,13 +7,24 @@ from sphinx.directives import code
 # linking to https://www.commonwl.org/ ),...
 # Ref: https://github.com/common-workflow-language/user_guide/blob/8abf537144d7b63c3561c1ff2b660543effd0eb0/LICENSE.md
 
-""""
-Patched version of https://github.com/sphinx-contrib/sphinxcontrib-runcmd
+import csv
+import os
+import re
+import shlex
+import subprocess
+import sys
+from pathlib import Path
+
+from docutils import nodes
+from docutils.nodes import Node
+from docutils.parsers.rst import directives
+from sphinx.directives import code
+
+"""Patched version of https://github.com/sphinx-contrib/sphinxcontrib-runcmd
 with default values to avoid having to re-type in every page. Also
 prepends commands with a value (``$``), see https://github.com/invenia/sphinxcontrib-runcmd/issues/1.
 Finally, it also checks if the command is ``cwltool``, and if then
-tries to remove any paths from the command-line (not the logs).
-"""
+tries to remove any paths from the command-line (not the logs)."""
 
 __version__ = "0.2.0"
 
@@ -128,7 +126,7 @@ class RunCmdDirective(code.CodeBlock):
         "working-directory": directives.unchanged,
     }
 
-    def run(self):
+    def run(self) -> list[Node]:
         # Grab a cache singleton instance
         cache = CMDCache()
 
