@@ -61,9 +61,7 @@ class AutosubmitFigureDirective(code.CodeBlock):
             if Path(path_from).is_file() and Path(path_to).is_file():
                 shutil.copy(path_from, path_to)
 
-        command: str = f"autosubmit {self.options.get('command')} {self.options.get('expid')} --hide -o {self.options.get('type', 'png')}"
-
-        RunCmdDirective(
+        command: str = f"autosubmit {self.options.get('command')} {self.options.get('expid')} --hide -o {self.options.get('type', 'png')}"        RunCmdDirective(
             name='runCMD',
             arguments=[command],
             options={},

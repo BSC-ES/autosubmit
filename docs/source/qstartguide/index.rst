@@ -64,9 +64,7 @@ Description of most used commands
 Create a new experiment
 =======================
 
-.. runcmd:: autosubmit expid -dm -H "local" -d "Tutorial"
-    :silent-output: 1
-    :prompt:
+autosubmit expid -dm -H "local" -d "Tutorial"
 
 - *-dm: Generates a dummy experiment.*
 - *-H: Sets the principal experiment platform.*
@@ -109,11 +107,16 @@ Run and monitoring
 
 While the experiment is running, it can be visualized via ``autosubmit monitor <EXPID>``.
 
-.. figure:: dummy.png
-   :name: dummy_workflow
-   :width: 100%
-   :align: center
-   :alt: experiment_view
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :path: qstartguide
+    :figure: fig/dummy.png
+    :name: dummy
+    :width: 100%
+    :align: center
+    :alt: dummy
 
 illustrates the output of the autosubmit monitor. It describes all workflow jobs' possible status and actual status.
 

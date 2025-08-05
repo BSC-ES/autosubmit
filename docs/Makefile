@@ -115,6 +115,7 @@ xml_coverage:
 
 html:
 	@echo "$(READTHEDOCS_OUTPUT)"
+	autosubmit expid -dm -H "local" -d "Tutorial"
 	$(SPHINXBUILD) -M html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
