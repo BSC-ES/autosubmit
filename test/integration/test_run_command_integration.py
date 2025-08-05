@@ -25,19 +25,36 @@ from threading import Thread
 from time import sleep
 import pytest
 
-from autosubmit.log.log import Log
 
 _EXPID = 't000'
 """The experiment ID used throughout the test."""
 
+
 # TODO expand the tests to test Slurm, PSPlatform, Ecplatform whenever possible
 
+
 # --- Fixtures.
-Log.set_console_level("DEBUG")
+@pytest.fixture(autouse=True, scope="function")
+def set_debug_log_level() -> None:
+    """
+    Set the console log level to DEBUG for all tests in the session.
+    """
+    from autosubmit.log.log import Log
+    Log.set_console_level("DEBUG")
 
 
 @pytest.fixture
-def as_exp(autosubmit_exp):
+def as_exp(autosubmit_exp, tmp_path: Path) -> Any:
+    """
+    Create an isolated experiment using a temporary directory for each test.
+
+    :param autosubmit_exp: Factory fixture for creating experiment objects.
+    :type autosubmit_exp: Callable
+    :param tmp_path: Temporary directory unique to the test.
+    :type tmp_path: Path
+    :return: Configured experiment object.
+    :rtype: Any
+    """
     exp = autosubmit_exp(_EXPID, experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'none',
@@ -45,22 +62,21 @@ def as_exp(autosubmit_exp):
         },
         'AUTOSUBMIT': {
             'WORKFLOW_COMMIT': 'dummy_commit',
+            'LOCAL_ROOT_DIR': str(tmp_path)  # Override root dir to tmp_path
         }
     })
 
-    run_tmpdir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR)
+    run_tmpdir = tmp_path
 
-    dummy_dir = Path(run_tmpdir, f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/dummy_dir")
-    real_data = Path(run_tmpdir, f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/real_data")
-    # We write some dummy data inside the scratch_dir
+    dummy_dir = run_tmpdir / f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/dummy_dir"
+    real_data = run_tmpdir / f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/real_data"
     dummy_dir.mkdir(parents=True)
     real_data.mkdir(parents=True)
 
     with open(dummy_dir / 'dummy_file', 'w') as f:
         f.write('dummy data')
 
-    # create some dummy absolute symlinks in expid_dir to test migrate function
-    Path(real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
+    (real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
 
     exp.as_conf.reload(force_load=True)
 
@@ -356,7 +372,6 @@ def _modify_jobs_data(as_exp, jobs_data) -> Path:
 
 
 # -- Tests
-@pytest.mark.xfail(reason="Known bug with concurrent tests")
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
     # Success
     (dedent("""\
@@ -476,7 +491,6 @@ def test_run_uninterrupted(
         pytest.fail(e_msg)
 
 
-@pytest.mark.xfail(reason="Known bug with concurrent tests")
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
     # Success
     (dedent("""\
@@ -593,7 +607,7 @@ def test_run_interrupted(
 
     _assert_exit_code(final_status, exit_code)
 
-@pytest.mark.xfail(reason="Known bug with concurrent tests")
+
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
 
     # Failure

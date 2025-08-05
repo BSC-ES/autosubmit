@@ -1121,12 +1121,17 @@ class Autosubmit:
 
         :raises AutosubmitCritical: If the experiment does not exist or if there are insufficient permissions.
         """
-
+        if isinstance(expid_delete, str):
+            expid_delete = expid_delete.strip()
         if not expid_delete:
             raise AutosubmitCritical("Experiment identifier is required for deletion.", 7012)
+
         experiment_path = Path(f"{BasicConfig.LOCAL_ROOT_DIR}/{expid_delete}")
         structure_db_path = Path(f"{BasicConfig.STRUCTURES_DIR}/structure_{expid_delete}.db")
         job_data_db_path = Path(f"{BasicConfig.JOBDATA_DIR}/job_data_{expid_delete}")
+        experiment_path = experiment_path.resolve()
+        structure_db_path = structure_db_path.resolve()
+        job_data_db_path = job_data_db_path.resolve()
         if Path(BasicConfig.LOCAL_ROOT_DIR) == experiment_path or \
                 Path(BasicConfig.STRUCTURES_DIR) == structure_db_path or \
                 Path(BasicConfig.JOBDATA_DIR) == job_data_db_path:
@@ -1689,7 +1694,9 @@ class Autosubmit:
 
             # TODO reset wrapper
             job_list = Autosubmit.load_job_list(
-                expid, as_conf, notransitive=notransitive, full_load=False)
+                expid, as_conf, notransitive=notransitive, full_load=True)
+            job_list.clear_wrappers_db(preview=True)
+
             job_list.packages_dict = {}
             job_list.packages_id = {}
 
@@ -1811,9 +1818,7 @@ class Autosubmit:
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, False)
-
-            # obtain base script
-
+            job_list.clear_wrappers_db(preview=True)
             Log.info("No more scripts to generate, you can proceed to check them manually")
             Log.result(file_paths)
 
@@ -4680,7 +4685,7 @@ class Autosubmit:
                                       as_conf.get_retrials(),
                                       as_conf.get_default_job_type(),
                                       wrapper_jobs, run_only_members=run_only_members, force=force, full_load=True)
-
+                    job_list.clear_wrappers_db(preview=check_wrappers)
                     if str(rerun).lower() == "true":
                         job_list.rerun(as_conf.get_rerun_jobs(), as_conf)
                     else:
@@ -4689,7 +4694,6 @@ class Autosubmit:
                     job_list.clear_generate()
                     job_list.save_jobs()
                     as_conf.save()
-                    # TODO Add preview wrapper code
                     groups_dict = dict()
                     # Setting up job historical database header. Must create a new run.
                     # Historical Database: Setup new run
@@ -4730,7 +4734,7 @@ class Autosubmit:
                             Autosubmit.generate_scripts_andor_wrappers(
                                 as_conf, job_list, True)
                         job_list.load_wrappers(preview=check_wrappers)
-                        packages = list(job_list.job_package_map.values())
+                        job_list.clear_wrappers_db(preview=check_wrappers)
                         Log.info("\nPlotting the jobs list...")
                         monitor_exp = Monitor(edge_info=job_list.graph_dict_by_job_name)
                         # if output is set, use output

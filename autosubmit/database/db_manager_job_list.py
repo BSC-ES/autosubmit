@@ -18,7 +18,7 @@
 """Contains code to manage a database via SQLAlchemy."""
 from typing import Any, Optional, List, Dict, TYPE_CHECKING, Union, Tuple
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, select, desc, func
 from sqlalchemy.exc import IntegrityError
 
 from autosubmit.database.db_manager import DbManager
@@ -157,7 +157,8 @@ class JobsDbManager(DbManager):
         :rtype: List[Union[str, Any]]
         """
         jobs_table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
-        experiment_structure_table: Table = get_table_from_name(schema=self.schema, table_name=ExperimentStructureTable.name)
+        experiment_structure_table: Table = get_table_from_name(schema=self.schema,
+                                                                table_name=ExperimentStructureTable.name)
 
         self.create_table(jobs_table.name)
         self.create_table(experiment_structure_table.name)
@@ -316,6 +317,36 @@ class JobsDbManager(DbManager):
             except IntegrityError as e:
                 Log.warning(f"Unique constraint failed when inserting inner jobs: {e}")
 
+    def select_latest_inner_jobs(
+            self,
+            innerjobs_table: Table,
+            job_names: Optional[List[str]] = None
+    ) -> List[Dict[str, object]]:
+        """
+        Select the row with the latest timestamp for each job_name from the inner jobs table.
+        If job_names is provided, filter only those job_names.
+
+        :param innerjobs_table: SQLAlchemy Table object for the inner jobs.
+        :type innerjobs_table: Table
+        :param job_names: Optional list of job_name values to filter by.
+        :type job_names: Optional[List[str]]
+        :return: List of dictionaries with the latest row per job_name.
+        :rtype: List[Dict[str, object]]
+        """
+        row_number = func.row_number().over(
+            partition_by=innerjobs_table.c.job_name,
+            order_by=desc(innerjobs_table.c.timestamp)
+        ).label('row_number')
+
+        stmt = select(*innerjobs_table.c, row_number)
+        if job_names:
+            stmt = stmt.where(innerjobs_table.c.job_name.in_(job_names))
+        subquery = stmt.alias('subq')
+        query = select(*(col for col in subquery.c if col.name != 'row_number')).where(subquery.c.row_number == 1)
+        with self.engine.connect() as conn:
+            result = conn.execute(query)
+            return [dict(row) for row in result.mappings().all()]
+
     def load_wrappers(self, preview: bool = False, job_list: Any = None) -> Tuple[
         List[dict[str, Any]], List[dict[str, Any]]]:
         """
@@ -345,12 +376,13 @@ class JobsDbManager(DbManager):
         self.create_table(wrapper_info_table.name)
         if full_load:
             # Load wrapper jobs
-            wrappers_inner_jobs = self.select_all_with_columns(innerjobs_table.name)
+            wrappers_inner_jobs = self.select_latest_inner_jobs(innerjobs_table)
             wrappers_info = self.select_all_with_columns(wrapper_info_table.name)
         else:
             # Load only active wrapper jobs
             job_names = [job.name for job in job_list] if job_list else []
-            wrappers_inner_jobs = self.select_where_with_columns(innerjobs_table, {'job_name': job_names})
+            # TODO: This need test
+            wrappers_inner_jobs = self.select_latest_inner_jobs(innerjobs_table, {'job_name': job_names})
             packages_names = list(set([job['package_name'] for job in wrappers_inner_jobs]))
             wrappers_info = self.select_where_with_columns(wrapper_info_table, {'name': packages_names})
 
@@ -520,3 +552,22 @@ class JobsDbManager(DbManager):
         self.create_table(experiment_structure_table.name)
         self.delete_all(experiment_structure_table.name)
         self.create_table(experiment_structure_table.name)
+
+    def clear_wrappers(self, preview: bool = False) -> None:
+        """
+        Clear all wrapper jobs and their associated information from the database.
+
+        :param preview: If True, use preview tables; otherwise, use production tables.
+        :type preview: bool
+        """
+        if preview:
+            innerjobs_table: Table = get_table_from_name(schema=self.schema, table_name=PreviewWrapperJobsTable.name)
+            wrapper_info_table: Table = get_table_from_name(schema=self.schema, table_name=PreviewWrapperInfoTable.name)
+        else:
+            innerjobs_table: Table = get_table_from_name(schema=self.schema, table_name=WrapperJobsTable.name)
+            wrapper_info_table: Table = get_table_from_name(schema=self.schema, table_name=WrapperInfoTable.name)
+
+        self.create_table(innerjobs_table.name)
+        self.create_table(wrapper_info_table.name)
+        self.delete_all(innerjobs_table.name)
+        self.delete_all(wrapper_info_table.name)

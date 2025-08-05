@@ -227,8 +227,10 @@ def create_wrapper_tables(name, metadata_obj_):
     table_jobs_inside_wrapper = Table(
         f"{name}_jobs",
         metadata_obj_,
+        Column("package_id", Integer, ForeignKey("{name}_info.id"), nullable=False, primary_key=True),
         Column("package_name", String, ForeignKey(f"{name}_info.name"), nullable=False, primary_key=True),
         Column("job_name", String, ForeignKey("jobs.name"), nullable=False, primary_key=True),
+        Column("timestamp", String, nullable=True),
     )
     return table_package_info, table_jobs_inside_wrapper
 

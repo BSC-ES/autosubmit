@@ -96,6 +96,7 @@ class JobList(object):
         # -cw flag, inspect
         self.disable_save = disable_save
         self.submitter = submitter
+        self.check_wrapper_fake_ids = set()
 
     @property
     def graph_dict(self):
@@ -269,6 +270,9 @@ class JobList(object):
     def clear(self) -> None:
         self.graph.clear()
         self.graph.clear_edges()
+
+    def clear_wrappers_db(self, preview=False) -> None:
+        self.dbmanager.clear_wrappers(preview=preview)
 
     def _reset_workflow_graph(self) -> None:
         Log.debug("Resetting the workflow graph to a zero state")
@@ -3234,6 +3238,29 @@ class JobList(object):
         self.fill_parents_children()
         self.dbmanager.save_edges(self.graph_dict)
 
+    def assign_unique_fake_id(self, package: Any, max_retries: int = 2) -> None:
+        """
+        Assign a unique fake ID to all jobs in the package, ensuring no collision with existing IDs.
+
+        :param package: The job package containing jobs to assign the ID.
+        :type package: Anyh
+        :param max_retries: Maximum number of attempts to generate a unique ID.
+        :type max_retries: int
+        :raises RuntimeError: If a unique ID cannot be generated after max_retries.
+        """
+        import secrets
+        retries = max_retries
+        while retries > 0:
+            new_id = secrets.randbelow(100000)
+            if new_id not in self.check_wrapper_fake_ids:
+                for job in package.jobs:
+                    job.id = new_id
+                self.check_wrapper_fake_ids.add(new_id)
+                break
+            retries -= 1
+        else:
+            raise RuntimeError("Failed to generate a unique fake ID after multiple attempts.")
+
     def save_wrappers(
             self,
             packages_to_save: List[Any],
@@ -3267,6 +3294,9 @@ class JobList(object):
         wrappers = []
         initial_status = Status.SUBMITTED if not preview else Status.COMPLETED
         for package in packages_to_save_gen:
+            # Add a fake id while using inspect -cw, create -cw or monitor -cw
+            if preview:
+                self.assign_unique_fake_id(package)
             self.packages_dict[package.name] = package.jobs
             # TODO: For another day, tried to change this, results in a circular import
             from ..job.job import WrapperJob
@@ -3299,11 +3329,6 @@ class JobList(object):
         :return: None
         :rtype: None
         """
-        # Retrieve wrapper and inner job info from the database
-        job_list = None
-        if not preview:
-            job_list = self.job_list
-
         un_mapped_wrapper_info, un_mapped_inner_jobs = self.dbmanager.load_wrappers(preview, self.job_list)
 
         # Build a dictionary of wrapper info indexed by wrapper name
@@ -3311,12 +3336,12 @@ class JobList(object):
             dict(wrapper)['name']: dict(wrapper) for wrapper in un_mapped_wrapper_info
         }
 
-        # Group inner jobs by package name
+        # Group inner jobs by package id
         inner_jobs_by_package: Dict[str, list] = {}
-        for package_name_tuple, job_name_tuple in un_mapped_inner_jobs:
-            package_name = package_name_tuple[1]
-            job_name = job_name_tuple[1]
-            inner_jobs_by_package.setdefault(package_name, []).append(job_name)
+        for job in un_mapped_inner_jobs:
+            if job['package_name'] not in inner_jobs_by_package:
+                inner_jobs_by_package[job['package_name']] = []
+            inner_jobs_by_package[job['package_name']].append(job['job_name'])
 
         # Attach job objects to each wrapper's job list and update packages_dict
         for package_name, job_names in inner_jobs_by_package.items():
@@ -3374,7 +3399,12 @@ class JobList(object):
             "method": getattr(wrapper_job, "method", None),
         }
         wrapper_inner_jobs = [
-            {'package_name': wrapper_job.name, 'job_name': job.name}
+            {
+                'package_id': wrapper_job.id,
+                'package_name': wrapper_job.name,
+                'job_name': job.name,
+                'timestamp': datetime.datetime.now().isoformat()
+            }
             for job in wrapper_job.job_list
         ]
         return wrapper_info, wrapper_inner_jobs

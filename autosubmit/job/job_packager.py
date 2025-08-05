@@ -279,6 +279,7 @@ class JobPackager(object):
         if self.is_deadlock(any_simple_packages, not_wrappeable_package_info, built_packages_tmp):
             max_jobs_to_submit = self.process_not_wrappeable_packages(not_wrappeable_package_info, packages_to_submit,
                                                                       max_jobs_to_submit, wrapper_limits)
+
         return packages_to_submit, max_jobs_to_submit
 
     def is_deadlock(self, any_simple_packages: bool, not_wrappeable_package_info: list, built_packages_tmp: list) -> bool:
