@@ -271,18 +271,18 @@ class DicJobs: # To rename to JobBuilder or something like that
                 else:
                     if job.running == "once":
                         for key in jobs.keys():
-                            if type(jobs.get(key, None)) is list:  # TODO
+                            if type(jobs.get(key, None)) is list:
                                 for aux_job in jobs[key]:
                                     final_jobs_list.append(aux_job)
-                            elif type(jobs.get(key, None)) is Job:  # TODO
+                            elif type(jobs.get(key, None)) is Job:
                                 final_jobs_list.append(jobs[key])
                             elif type(jobs.get(key, None)) is dict:
                                 jobs_aux = self.update_jobs_filtered(jobs_aux, jobs[key])
                     elif jobs.get(job.date, None):
-                        if type(jobs.get(natural_date, None)) is list:  # TODO
+                        if type(jobs.get(natural_date, None)) is list:
                             for aux_job in jobs[natural_date]:
                                 final_jobs_list.append(aux_job)
-                        elif type(jobs.get(natural_date, None)) is Job:  # TODO
+                        elif type(jobs.get(natural_date, None)) is Job:
                             final_jobs_list.append(jobs[natural_date])
                         elif type(jobs.get(natural_date, None)) is dict:
                             jobs_aux = self.update_jobs_filtered(jobs_aux, jobs[natural_date])

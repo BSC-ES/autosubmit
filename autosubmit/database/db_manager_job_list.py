@@ -49,8 +49,7 @@ class JobsDbManager(DbManager):
         table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
         self.create_table(table.name)
         persistent_data = [job.__getstate__(log_process=False) for job in job_list]
-        # from pprint import pprint
-        # pprint(persistent_data)  # TODO remove Debug
+
 
         pkeys = ['name']
         self.upsert_many(table.name, persistent_data, pkeys)

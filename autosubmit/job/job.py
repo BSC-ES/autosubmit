@@ -54,7 +54,6 @@ Log.get_logger("Autosubmit")
 # A wrapper for encapsulate threads , TODO: Python 3+ to be replaced by the < from concurrent.futures >
 
 EXCLUDED = ["_platform", "_children", "_parents", "submitter"]
-# TODO MOVE OUTSIDE OF JOB CLASS
 PERSISTENT_ATTRIBUTES = (
     "name",
     "id",

@@ -83,7 +83,7 @@ class JobList(object):
         self.path_to_logs = Path(BasicConfig.LOCAL_ROOT_DIR,
                                  self.expid, BasicConfig.LOCAL_TMP_DIR, f'LOG_{self.expid}')
         self.dbmanager = JobsDbManager(get_connection_url(self._persistence_full_path),
-                                       schema=None)  # TODO, from where I get the schema?
+                                       schema=None)
         self.run_mode = run_mode
         self._INACTIVE_STATUSES = [Status.DELAYED, Status.SUSPENDED, Status.WAITING]
         self._ACTIVE_STATUSES = [Status.READY, Status.SUBMITTED, Status.QUEUING,
@@ -115,7 +115,6 @@ class JobList(object):
                 "optional": attributes.get("optional", False),
                 "completed": attributes.get("completed", False),
                 # check if the edge completion status is fullfilled or not
-                # TODO this should be False once this is fixed: related to  https://github.com/BSC-ES/autosubmit/pull/2006 https://github.com/BSC-ES/autosubmit/issues/2373
             })
         return edges_dict
 
@@ -242,7 +241,6 @@ class JobList(object):
         )
 
         if force:
-            # TODO delete or clean tables not delete the file
             self._reset_workflow_graph()
             changes = True
         else:
@@ -796,13 +794,11 @@ class JobList(object):
         parameters = dic_jobs.experiment_data["JOBS"]
         dependencies = dict()
         for key in list(dependencies_keys):
-            # TODO: This("SPLITS") was always None pre-refactor, not sure if this is a bug or not
             splits = None
             section, distance, sign = JobList._parse_dependency_yaml_key(key)
             if parameters.get(section, None):
                 dependency_running_type = str(parameters[section].get('RUNNING', 'once')).lower()
                 delay = int(parameters[section].get('DELAY', -1))
-                # TODO: Splits is always None? it is like this in the master_branch
                 dependency = Dependency(section, distance, dependency_running_type,
                                         sign, delay, splits, relationships=dependencies_keys[key])
                 dependencies[key] = dependency
@@ -2877,10 +2873,6 @@ class JobList(object):
         log_recovered = self.check_if_log_is_recovered(job)
         if log_recovered:
             job.updated_log = True
-            # TODO in pickle -> db/yaml migration(I): 
-            #  Do the save of the job here then clean attributes from mem ( or even the full job )
-            # TODO in pickle -> db/yaml migration(II):
-            #  And remove these two lines
             # we only want the last one
             job.local_logs = (log_recovered.name, log_recovered.name[:-4] + ".err")
             job.updated_log = True
@@ -2947,7 +2939,7 @@ class JobList(object):
         else:
             self._reset_jobs_on_first_run()
         save |= self._handle_special_checkpoint_jobs()
-        save |= self._sync_completed_jobs()  # TODO This code was existing before but not sure what is doing?
+        save |= self._sync_completed_jobs()
         if not fromSetStatus:
             save |= self._update_waiting_and_delayed_jobs(as_conf)
             save |= self._update_held_jobs(as_conf)
@@ -3220,7 +3212,7 @@ class JobList(object):
                                 save = True
         return save
 
-    def fill_parents_children(self):  # TODO maybe remove this to revise at the end of the merge
+    def fill_parents_children(self):
         """
         Fill the job._parents and job._children attributes
         """

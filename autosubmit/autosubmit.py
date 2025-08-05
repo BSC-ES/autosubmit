@@ -435,7 +435,7 @@ class Autosubmit:
 
             # Report
             subparser = subparsers.add_parser(
-                'report', description="Show metrics.. ")  # TODO
+                'report', description="Show metrics.. ")
             subparser.add_argument('expid', help='experiment identifier')
             subparser.add_argument(
                 '-t', '--template', type=str, help='Supply the metric template.')
@@ -1692,7 +1692,6 @@ class Autosubmit:
             Log.debug("The Experiment name is: {0}", expid)
             Log.debug("Sleep: {0}", safetysleeptime)
 
-            # TODO reset wrapper
             job_list = Autosubmit.load_job_list(
                 expid, as_conf, notransitive=notransitive, full_load=True)
             job_list.clear_wrappers_db(preview=True)
@@ -2175,8 +2174,6 @@ class Autosubmit:
                 "Error while checking job templates", 7014, str(e))
         Log.debug("Loading job packages")
         # Packages == wrappers and jobs inside wrappers. Name is also misleading.
-        # TODO : Add wrappers code
-
         # Check if the user wants to continue using wrappers and loads the appropriate info.
         if as_conf.experiment_data.get("WRAPPERS", None) is not None:
             Log.debug("Processing job packages")
@@ -2849,7 +2846,7 @@ class Autosubmit:
 
         # WRAPPERS
         try:
-            if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrapper:  # TODO WRAPPERS
+            if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrapper:
                 # Permissions
                 os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "db", "job_packages_" + expid + ".db"), 0o644)
                 # Database modification

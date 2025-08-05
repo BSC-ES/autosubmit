@@ -155,10 +155,10 @@ JobsTable = Table(
     Column("status", String, nullable=False),  # Should be job_status_enum
     Column("frequency", String),  # TODO move to Section table ?
     Column("synchronize", Boolean),  # TODO move to Section table ?
-    Column("section", String, ForeignKey("sections.name")),  # TODO Foreign key?
+    Column("section", String, ForeignKey("sections.name")),
     Column("chunk", Integer),
     Column("member", Text),
-    Column("splits", Integer),  # TODO move to Section table?
+    Column("splits", Integer),
     Column("split", Integer),
     Column("date", String),
     Column("date_split", String),
