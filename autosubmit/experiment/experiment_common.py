@@ -204,4 +204,4 @@ def create_required_folders(exp_id: str, exp_folder: Path) -> None:
 
     required_dirs = ["conf", "db", "tmp", "tmp/ASLOGS", f"tmp/LOG_{exp_id}", "plot", "status"]
     for required_dir in required_dirs:
-        Path(exp_folder / required_dir).mkdir(mode=dir_mode)
+        Path(exp_folder / required_dir).mkdir(mode=dir_mode, exist_ok=True)
