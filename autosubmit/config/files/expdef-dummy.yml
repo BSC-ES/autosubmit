@@ -1,6 +1,6 @@
 DEFAULT:
   EXPID: ''
-  HPCARCH: 'local'
+  HPCARCH: ''
 EXPERIMENT:
   DATELIST: "20000101"
   MEMBERS: "fc0"
