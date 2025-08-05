@@ -1034,21 +1034,22 @@ class Autosubmit:
         """
 
         if not expid_delete:
-            raise AutosubmitCritical("Experiment identifier is required for deletion.", 7012)
+            raise AutosubmitCritical("Experiment identifier is required for deletion.", 7011)
         experiment_path = Path(f"{BasicConfig.LOCAL_ROOT_DIR}/{expid_delete}")
         structure_db_path = Path(f"{BasicConfig.STRUCTURES_DIR}/structure_{expid_delete}.db")
         job_data_db_path = Path(f"{BasicConfig.JOBDATA_DIR}/job_data_{expid_delete}")
+        experiment_path = experiment_path.resolve()
+        structure_db_path = structure_db_path.resolve()
+        job_data_db_path = job_data_db_path.resolve()
         if Path(BasicConfig.LOCAL_ROOT_DIR) == experiment_path or \
                 Path(BasicConfig.STRUCTURES_DIR) == structure_db_path or \
                 Path(BasicConfig.JOBDATA_DIR) == job_data_db_path:
             raise AutosubmitCritical(f"Invalid paths for experiment deletion: {expid_delete}. "
-                                     "Paths must not be the root directories.", 7012)
+                                     "Paths must not be the root directories.", 7011)
 
-        if not (experiment_path.is_relative_to(BasicConfig.LOCAL_ROOT_DIR) and
-                structure_db_path.is_relative_to(BasicConfig.STRUCTURES_DIR) and
-                job_data_db_path.is_relative_to(BasicConfig.JOBDATA_DIR)):
+        if not experiment_path.is_relative_to(BasicConfig.LOCAL_ROOT_DIR):
             raise AutosubmitCritical(f"Invalid paths for experiment deletion: {expid_delete}. "
-                                     "Paths must be within the configured directories.", 7012)
+                                     "Paths must be within the configured directories.", 7011)
 
         if not experiment_path.exists():
             Log.printlog("Experiment directory does not exist.", Log.WARNING)

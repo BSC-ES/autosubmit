@@ -528,11 +528,26 @@ def test_delete_experiment_not_owner(mocker, tmp_path, autosubmit_exp, autosubmi
         cursor.close()
 
 
-def test_delete_expid(mocker, tmp_path, autosubmit_exp, autosubmit):
+@pytest.mark.parametrize(
+    "expid_value",
+    [
+        pytest.param("..", id="parent_dir"),
+        pytest.param("", id="empty_string"),
+        pytest.param(".", id="current_dir"),
+        pytest.param("as_exp.expid", id="valid_expid"),
+    ]
+)
+def test_delete_expid(mocker, tmp_path, autosubmit_exp, autosubmit, expid_value):
     as_exp = autosubmit_exp(_EXPID, _get_experiment_data(tmp_path))
     mocker.patch('autosubmit.autosubmit.Autosubmit._perform_deletion', return_value="error")
-    with pytest.raises(AutosubmitError):
-        autosubmit._delete_expid(as_exp.expid, force=True)
+    expid_value = as_exp.expid if expid_value == "as_exp.expid" else expid_value
+    if expid_value in ["..", "", "."]:
+        with pytest.raises(AutosubmitCritical) as exc_info:
+            autosubmit._delete_expid(expid_value, force=True)
+            assert exc_info.value.code == 7001
+    else:
+        with pytest.raises(AutosubmitError):
+            autosubmit._delete_expid(as_exp.expid, force=True)
     mocker.stopall()
     autosubmit._delete_expid(as_exp.expid, force=True)
     assert not autosubmit._delete_expid(as_exp.expid, force=True)
