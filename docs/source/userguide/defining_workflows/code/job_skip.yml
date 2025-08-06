@@ -1,6 +1,6 @@
 JOBS:
   SIM:
-    FILE: sim.sh
+    SCRIPT: 'sleep 0'
     DEPENDENCIES: INI POST-1
     WALLCLOCK: 00:15
     RUNNING: chunk
@@ -8,7 +8,7 @@ JOBS:
     SKIPPABLE: TRUE
 
   POST:
-    FILE: post.sh
+    SCRIPT: 'sleep 0'
     DEPENDENCIES: SIM
     WALLCLOCK: 00:05
     RUNNING: member

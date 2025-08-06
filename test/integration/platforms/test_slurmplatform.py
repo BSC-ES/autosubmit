@@ -90,12 +90,12 @@ def test_create_platform_slurm(autosubmit_exp):
             'SIM': {
                 'PLATFORM': _PLATFORM_NAME,
                 'RUNNING': 'chunk',
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
             },
             'SIM_2': {
                 'PLATFORM': _PLATFORM_NAME,
                 'RUNNING': 'chunk',
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'DEPENDENCIES': 'SIM',
             },
         },
@@ -134,7 +134,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
                 'DEPENDENCIES': {
                     'SIM-1': {}
                 },
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -144,7 +144,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
                 'DEPENDENCIES': {
                     'SIM',
                 },
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -155,7 +155,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
                     'SIM',
                     'POST',
                 },
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'once',
                 'CHECK': 'on_submission',
@@ -191,7 +191,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
                 'DEPENDENCIES': {
                     'SIMV-1': {}
                 },
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -228,7 +228,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
                 'DEPENDENCIES': {
                     'SIMH-1': {}
                 },
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -265,7 +265,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
                 'DEPENDENCIES': {
                     'SIMHV-1': {}
                 },
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -302,7 +302,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
                 'DEPENDENCIES': {
                     'SIMVH-1': {},
                 },
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -367,35 +367,35 @@ def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFix
     {
         'JOBS': {
             'LOCAL_SETUP': {
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'RUNNING': 'once',
                 'NOTIFY_ON': 'COMPLETED',
                 'PLATFORM': _PLATFORM_NAME,
             },
             'LOCAL_SEND_SOURCE': {
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'PLATFORM': _PLATFORM_NAME,
                 'DEPENDENCIES': 'LOCAL_SETUP',
                 'RUNNING': 'once',
                 'NOTIFY_ON': 'FAILED',
             },
             'LOCAL_SEND_STATIC': {
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'PLATFORM': _PLATFORM_NAME,
                 'DEPENDENCIES': 'LOCAL_SETUP',
                 'RUNNING': 'once',
                 'NOTIFY_ON': 'FAILED',
             },
             'REMOTE_COMPILE': {
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'DEPENDENCIES': 'LOCAL_SEND_SOURCE',
                 'RUNNING': 'once',
-                'PROCESSORS': '4',
+                'PROCESSORS': '1',
                 'WALLCLOCK': '00:01',
                 'NOTIFY_ON': 'COMPLETED',
             },
             'SIM': {
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'DEPENDENCIES': {
                     'LOCAL_SEND_STATIC': {},
                     'REMOTE_COMPILE': {},
@@ -403,13 +403,13 @@ def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFix
                     'DA-1': {},
                 },
                 'RUNNING': 'once',
-                'PROCESSORS': '4',
+                'PROCESSORS': '1',
                 'WALLCLOCK': '00:01',
                 'NOTIFY_ON': 'FAILED',
                 'PLATFORM': _PLATFORM_NAME,
             },
             'LOCAL_SEND_INITIAL_DA': {
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'PLATFORM': _PLATFORM_NAME,
                 'DEPENDENCIES': 'LOCAL_SETUP LOCAL_SEND_INITIAL_DA-1',
                 'RUNNING': 'chunk',
@@ -417,14 +417,14 @@ def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFix
                 'DELAY': '0',
             },
             'COMPILE_DA': {
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'DEPENDENCIES': 'LOCAL_SEND_SOURCE',
                 'RUNNING': 'once',
                 'WALLCLOCK': '00:01',
                 'NOTIFY_ON': 'FAILED',
             },
             'DA': {
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'DEPENDENCIES': {
                     'SIM': {},
                     'LOCAL_SEND_INITIAL_DA': {
@@ -439,7 +439,6 @@ def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFix
                                 'CHUNKS_FROM':{
                                     '1':{
                                         'DATES_TO': '20120101',
-                                        'CHUNKS_TO': '1',
                                     },
                                 },
                             },
@@ -450,7 +449,7 @@ def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFix
                 'SYNCHRONIZE': 'member',
                 'DELAY': '0',
                 'WALLCLOCK': '00:01',
-                'PROCESSORS': '4',
+                'PROCESSORS': '1',
                 'NOTIFY_ON': 'FAILED',
                 'PLATFORM': _PLATFORM_NAME,
             },
@@ -459,9 +458,9 @@ def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFix
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
                 'HOST': 'localDocker',
-                'MAX_WALLCLOCK': '00:01',
+                'MAX_WALLCLOCK': '48:00',
                 'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
+                'QUEUE': 'debug',
                 'SCRATCH_DIR': '/tmp/scratch/',
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
@@ -481,14 +480,14 @@ def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFix
     {
         'JOBS': {
             'LOCAL_SETUP': {
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'RUNNING': 'once',
                 'WALLCLOCK': '00:01',
                 'NOTIFY_ON': 'COMPLETED',
                 'PLATFORM': _PLATFORM_NAME,
             },
             'LOCAL_SEND_SOURCE': {
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'DEPENDENCIES': 'LOCAL_SETUP',
                 'RUNNING': 'once',
                 'WALLCLOCK': '00:01',
@@ -496,7 +495,7 @@ def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFix
                 'PLATFORM': _PLATFORM_NAME,
             },
             'LOCAL_SEND_STATIC': {
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'DEPENDENCIES': 'LOCAL_SETUP',
                 'RUNNING': 'once',
                 'WALLCLOCK': '00:01',
@@ -504,15 +503,15 @@ def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFix
                 'PLATFORM': _PLATFORM_NAME,
             },
             'REMOTE_COMPILE': {
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'DEPENDENCIES': 'LOCAL_SEND_SOURCE',
                 'RUNNING': 'once',
-                'PROCESSORS': '4',
+                'PROCESSORS': '1',
                 'WALLCLOCK': '00:01',
                 'NOTIFY_ON': 'COMPLETED',
             },
             'SIM': {
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'DEPENDENCIES': {
                     'LOCAL_SEND_STATIC': {},
                     'REMOTE_COMPILE': {},
@@ -520,13 +519,13 @@ def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFix
                     'DA-1': {},
                 },
                 'RUNNING': 'once',
-                'PROCESSORS': '4',
+                'PROCESSORS': '1',
                 'WALLCLOCK': '00:01',
                 'NOTIFY_ON': 'FAILED',
                 'PLATFORM': _PLATFORM_NAME,
             },
             'LOCAL_SEND_INITIAL_DA': {
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'DEPENDENCIES': 'LOCAL_SETUP LOCAL_SEND_INITIAL_DA-1',
                 'RUNNING': 'chunk',
                 'WALLCLOCK': '00:01',
@@ -535,7 +534,7 @@ def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFix
                 'PLATFORM': _PLATFORM_NAME,
             },
             'COMPILE_DA': {
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'DEPENDENCIES': 'LOCAL_SEND_SOURCE',
                 'RUNNING': 'once',
                 'WALLCLOCK': '00:01',
@@ -568,7 +567,7 @@ def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFix
                 'SYNCHRONIZE': 'member',
                 'DELAY': '0',
                 'WALLCLOCK': '00:01',
-                'PROCESSORS': '4',
+                'PROCESSORS': '1',
                 'NOTIFY_ON': 'FAILED',
                 'PLATFORM': _PLATFORM_NAME,
             },
@@ -577,15 +576,15 @@ def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFix
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
                 'HOST': 'localDocker',
-                'MAX_WALLCLOCK': '00:01',
+                'MAX_WALLCLOCK': '48:00',
                 'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
+                'QUEUE': 'debug',
                 'SCRATCH_DIR': '/tmp/scratch/',
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
-                'MAX_PROCESSORS': 2,
-                'PROCESSORS_PER_NODE': 2,
+                'MAX_PROCESSORS': 10,
+                'PROCESSORS_PER_NODE': 10,
             },
         },
         'WRAPPERS': {
@@ -595,7 +594,7 @@ def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFix
                 'RETRIALS': '0',
             }
         },
-    },
+    }
 ], ids=[
     'Complex Wrapper vertical-horizontal',
     'Complex Wrapper horizontal-vertical',

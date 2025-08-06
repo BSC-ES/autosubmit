@@ -1,6 +1,6 @@
 JOBS:
   ONE:
-      FILE: one.sh
+      SCRIPT: 'sleep 0'
   TWO:
-      FILE: two.sh
+      SCRIPT: 'sleep 0'
       DEPENDENCIES: One

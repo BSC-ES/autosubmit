@@ -1,29 +1,29 @@
 JOBS:
   LOCAL_SETUP:
-    SCRIPT: echo "0"
+    SCRIPT: 'sleep 0'
     RUNNING: once
     NOTIFY_ON: COMPLETED
   LOCAL_SEND_SOURCE:
-    SCRIPT: echo "0"
+    SCRIPT: 'sleep 0'
     DEPENDENCIES: LOCAL_SETUP
     RUNNING: once
     WALLCLOCK: 00:01
     NOTIFY_ON: FAILED
   LOCAL_SEND_STATIC:
-    SCRIPT: echo "0"
+    SCRIPT: 'sleep 0'
     DEPENDENCIES: LOCAL_SETUP
     RUNNING: once
     WALLCLOCK: 00:01
     NOTIFY_ON: FAILED
   REMOTE_COMPILE:
-    SCRIPT: echo "0"
+    SCRIPT: 'sleep 0'
     DEPENDENCIES: LOCAL_SEND_SOURCE
     RUNNING: once
     PROCESSORS: '4'
     WALLCLOCK: 00:01
     NOTIFY_ON: FAILED
   SIM:
-    SCRIPT: echo "0"
+    SCRIPT: 'sleep 0'
     DEPENDENCIES:
       LOCAL_SEND_STATIC: {}
       REMOTE_COMPILE: {}
@@ -34,20 +34,20 @@ JOBS:
     WALLCLOCK: 00:01
     NOTIFY_ON: FAILED
   LOCAL_SEND_INITIAL_DA:
-    SCRIPT: echo "0"
+    SCRIPT: 'sleep 0'
     DEPENDENCIES: LOCAL_SETUP LOCAL_SEND_INITIAL_DA-1
     RUNNING: chunk
     WALLCLOCK: 00:01
     SYNCHRONIZE: member
     DELAY: '0'
   COMPILE_DA:
-    SCRIPT: echo "0"
+    SCRIPT: 'sleep 0'
     DEPENDENCIES: LOCAL_SEND_SOURCE
     RUNNING: once
     WALLCLOCK: 00:01
     NOTIFY_ON: FAILED
   DA:
-    FILE: templates/05c_da.sh
+    SCRIPT: 'sleep 0'
     DEPENDENCIES:
       SIM:
       LOCAL_SEND_INITIAL_DA:

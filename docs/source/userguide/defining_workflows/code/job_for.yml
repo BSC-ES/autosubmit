@@ -5,7 +5,7 @@ JOBS:
       PROCESSORS: [ 20,40,80 ]
       THREADS: [ 1,1,1 ]
       DEPENDENCIES: [ SIM_20-1,SIM_40-1,SIM_80-1 ]
-    FILE: POST.sh
+    SCRIPT: 'sleep 0'
     RUNNING: chunk
     WALLCLOCK: '00:05'
 
@@ -15,6 +15,6 @@ JOBS:
       PROCESSORS: [ 20,40,80 ]
       THREADS: [ 1,1,1 ]
       DEPENDENCIES: [ SIM_20 POST_20,SIM_40 POST_40,SIM_80 POST_80 ]
-    FILE: POST.sh
+    SCRIPT: 'sleep 0'
     RUNNING: chunk
     WALLCLOCK: '00:05'

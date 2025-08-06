@@ -1,36 +1,36 @@
 JOBS:
     SIM:
-      FILE: sim.sh
+      SCRIPT: 'sleep 0'
       RUNNING: chunk
       QUEUE: debug
       DEPENDENCIES: SIM-1
       WALLCLOCK: 00:15
     SIM2:
-      FILE: sim.sh
+      SCRIPT: 'sleep 0'
       RUNNING: chunk
       QUEUE: debug
       DEPENDENCIES: SIM2-1
       WALLCLOCK: 00:15
     SIM3:
-      FILE: sim.sh
+      SCRIPT: 'sleep 0'
       RUNNING: chunk
       QUEUE: debug
       DEPENDENCIES: SIM3-1
       WALLCLOCK: 00:15
     SIM4:
-      FILE: sim.sh
+      SCRIPT: 'sleep 0'
       RUNNING: chunk
       QUEUE: debug
       DEPENDENCIES: SIM4-1
       WALLCLOCK: 00:15
     SIM5:
-      FILE: sim.sh
+      SCRIPT: 'sleep 0'
       RUNNING: chunk
       QUEUE: debug
       DEPENDENCIES: SIM5-1
       WALLCLOCK: 00:15
     SIM6:
-      FILE: sim.sh
+      SCRIPT: 'sleep 0'
       RUNNING: chunk
       QUEUE: debug
       DEPENDENCIES: SIM6-1

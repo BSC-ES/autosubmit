@@ -1,18 +1,18 @@
 JOBS:
   ONCE:
-    FILE: Once.sh
+    SCRIPT: 'sleep 0'
 
   DATE:
-    FILE: date.sh
+    SCRIPT: 'sleep 0'
     DEPENDENCIES: once
     RUNNING: date
 
   MEMBER:
-    FILE: Member.sh
+    SCRIPT: 'sleep 0'
     DEPENDENCIES: date
     RUNNING: member
 
   CHUNCK:
-    FILE: Chunk.sh
+    SCRIPT: 'sleep 0'
     DEPENDENCIES: member
     RUNNING: chunk

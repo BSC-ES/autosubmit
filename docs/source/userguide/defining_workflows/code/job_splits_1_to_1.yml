@@ -1,12 +1,12 @@
 JOBS:
   TEST:
-    FILE: TEST.sh
+    SCRIPT: 'sleep 0'
     RUNNING: chunk
     SPLITS: 1
     WALLCLOCK: 00:30
 
   TEST2:
-    FILE: TEST2.sh
+    SCRIPT: 'sleep 0'
     DEPENDENCIES:
       TEST:
         SPLITS_FROM:

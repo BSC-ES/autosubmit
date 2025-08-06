@@ -1,9 +1,9 @@
 JOBS:
     JOB_1:
-        FILE: job1.sh
+        SCRIPT: 'sleep 0'
         RUNNING: chunk
     JOB_2:
-        FILE: job2.sh
+        SCRIPT: 'sleep 0'
         DEPENDENCIES:
             JOB_1:
                 dates_to: "natural"
@@ -11,7 +11,7 @@ JOBS:
                 chunks_to: "natural"
         RUNNING: chunk
     JOB_3:
-        FILE: job3.sh
+        SCRIPT: 'sleep 0'
         DEPENDENCIES:
             JOB_2:
                 dates_to: "natural"
@@ -19,7 +19,7 @@ JOBS:
                 chunks_to: "natural"
         RUNNING: chunk
     SIM:
-        FILE: sim.sh
+        SCRIPT: 'sleep 0'
         DEPENDENCIES:
             JOB_3:
                 dates_to: "natural"
@@ -31,7 +31,7 @@ JOBS:
                 chunks_to: "natural"
         RUNNING: chunk
     POST:
-        FILE: post.sh
+        SCRIPT: 'sleep 0'
         DEPENDENCIES:
             SIM:
                 dates_to: "natural"
@@ -39,7 +39,7 @@ JOBS:
                 chunks_to: "natural"
         RUNNING: chunk
     TEST:
-        FILE: test.sh
+        SCRIPT: 'sleep 0'
         DEPENDENCIES:
             POST:
                 dates_to: "natural"

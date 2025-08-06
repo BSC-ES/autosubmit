@@ -59,6 +59,9 @@ as_setup: .EXPORT_ALL_VARIABLES
 	@echo "Installing Autosubmit..."
 	AUTOSUBMIT_CONFIGURATION=$(AUTOSUBMIT_CONFIGURATION) autosubmit install
 	@echo "Autosubmit installed!"
+	autosubmit -lc DEBUG expid -dm -H "local" -d "Tutorial"
+	@echo "Autosubmit Experiment Created!"
+
 
 # Automatically call Autosubmit's setup target.
 -include as_setup
@@ -115,8 +118,6 @@ xml_coverage:
 
 html:
 	@echo "$(READTHEDOCS_OUTPUT)"
-	autosubmit expid -dm -H "local" -d "Tutorial"
-	autosubmit create a000 --hide -o png
 	$(SPHINXBUILD) -M html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."

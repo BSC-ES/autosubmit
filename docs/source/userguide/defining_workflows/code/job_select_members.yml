@@ -18,7 +18,7 @@ JOBS:
     FREQUENCY: 4
 
   REDUCE_AN:
-    FILE: templates/05b_sim.sh
+    SCRIPT: 'sleep 0'
     DEPENDENCIES: DA
     RUNNING: chunk
     SYNCHRONIZE: member

@@ -1,6 +1,6 @@
 JOBS:
   APP:
-    FILE: app.sh
+    SCRIPT: 'sleep 0'
     FOR:
       DEPENDENCIES:
       - APP_ENERGY_ONSHORE:
@@ -28,14 +28,14 @@ JOBS:
         SPLITS_FROM:
           all:
             SPLITS_TO: previous
-    FILE: dn.sh
+    SCRIPT: 'sleep 0'
     PLATFORM: 'local'
     RUNNING: chunk
     SPLITS: auto
     WALLCLOCK: 00:05
   OPA:
     CHECK: on_submission
-    FILE: opa.sh
+    SCRIPT: 'sleep 0'
     FOR:
       DEPENDENCIES:
       - DN:

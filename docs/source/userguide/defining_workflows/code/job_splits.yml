@@ -1,21 +1,21 @@
 JOBS:
   INI:
-    FILE: INI.sh
+    SCRIPT: 'sleep 0'
     RUNNING: ONCE
 
   SIM:
-    FILE: SIM.sh
+    SCRIPT: 'sleep 0'
     DEPENDENCIES: INI SIM-1
     RUNNING: ONCE
 
   ASIM:
-    FILE: ASIM.sh
+    SCRIPT: 'sleep 0'
     DEPENDENCIES: SIM
     RUNNING: ONCE
     SPLITS: 3
 
   POST:
-    FILE: POST.sh
+    SCRIPT: 'sleep 0'
     RUNNING: ONCE
     DEPENDENCIES:
       ASIM:

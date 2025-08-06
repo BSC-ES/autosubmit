@@ -1,6 +1,6 @@
 JOBS:
     SIM:
-      FILE: sim.sh
+      SCRIPT: 'sleep 0'
       RUNNING: chunk
       QUEUE: debug
       DEPENDENCIES: SIM-1

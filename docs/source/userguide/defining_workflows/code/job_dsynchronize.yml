@@ -1,15 +1,15 @@
 JOBS:
   INI:
-    FILE: ini.sh
+    SCRIPT: 'sleep 0'
     RUNNING: member
 
   SIM:
-    FILE: sim.sh
+    SCRIPT: 'sleep 0'
     DEPENDENCIES: INI SIM-1
     RUNNING: chunk
 
   ASIM:
-    FILE: asim.sh
+    SCRIPT: 'sleep 0'
     DEPENDENCIES: SIM
     RUNNING: chunk
     SYNCHRONIZE: date

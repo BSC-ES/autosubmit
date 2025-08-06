@@ -1,15 +1,15 @@
 JOBS:
   GET_FILES:
-    FILE: templates/fail.sh
+    SCRIPT: 'sleep 0'
     RUNNING: chunk
 
   IT:
-    FILE: templates/work.sh
+    SCRIPT: 'sleep 0'
     RUNNING: chunk
     QUEUE: debug
 
   CALC_STATS:
-    FILE: templates/work.sh
+    SCRIPT: 'sleep 0'
     DEPENDENCIES: IT GET_FILES ?
     RUNNING: chunk
     SYNCHRONIZE: member
