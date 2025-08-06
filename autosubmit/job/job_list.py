@@ -2594,14 +2594,12 @@ class JobList(object):
         return None
 
     def update_list(self, as_conf: AutosubmitConfig, store_change: bool = True,
-                    fromSetStatus: bool = False, submitter: object = None,
-                    first_time: bool = False) -> bool:
+                    fromSetStatus: bool = False, first_time: bool = False) -> bool:
         """
         Updates job list, resetting failed jobs and changing to READY
         all WAITING jobs with all parents COMPLETED
 
         :param first_time:
-        :param submitter:
         :param fromSetStatus:
         :param store_change:
         :param as_conf: autosubmit config object
@@ -2757,8 +2755,6 @@ class JobList(object):
                                     break
             if as_conf.get_remote_dependencies() == "true":
                 for job in self.get_prepared():
-                    tmp = [
-                        parent for parent in job.parents if parent.status == Status.COMPLETED]
                     tmp2 = [parent for parent in job.parents if
                             parent.status == Status.COMPLETED or parent.status == Status.SKIPPED
                             or parent.status == Status.FAILED]

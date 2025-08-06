@@ -728,7 +728,7 @@ class Autosubmit:
             return Autosubmit.monitor(args.expid, args.output, args.list, args.filter_chunks, args.filter_status,
                                       args.filter_type, args.hide, args.text, args.group_by, args.expand,
                                       args.expand_status, args.hide_groups, args.notransitive, args.check_wrapper,
-                                      args.txt_logfiles, args.profile, detail=False)
+                                      args.txt_logfiles, args.profile)
         elif args.command == 'stats':
             return Autosubmit.statistics(args.expid, args.filter_type, args.filter_period, args.output,
                                          args.section_summary, args.jobs_summary, args.hide, args.notransitive)
@@ -1905,7 +1905,7 @@ class Autosubmit:
                             jobs_to_check[platform.name].append([job, job_prev_status])
                         else:
                             jobs_to_check[platform.name] = [[job, job_prev_status]]
-        return jobs_to_check,job_changes_tracker
+        return jobs_to_check, job_changes_tracker
 
     @staticmethod
     def check_wrapper_stored_status(as_conf: Any, job_list: Any, wrapper_wallclock: str) -> Any:
@@ -2325,12 +2325,12 @@ class Autosubmit:
                                 if job_prev_status != job.update_status(as_conf):
                                     Autosubmit.job_notify(as_conf,expid,job,job_prev_status,job_changes_tracker)
                         # Updates all workflow status with the new information.
-                        job_list.update_list(as_conf, submitter=submitter)
+                        job_list.update_list(as_conf)
                         job_list.save()
                         # Submit jobs that are ready to run
                         if len(job_list.get_ready()) > 0:
                             Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence, hold=False)
-                            job_list.update_list(as_conf, submitter=submitter)
+                            job_list.update_list(as_conf)
                             job_list.save()
                             as_conf.save()
 
@@ -2340,7 +2340,7 @@ class Autosubmit:
                         if as_conf.get_remote_dependencies() == "true" and len(job_list.get_prepared()) > 0:
                             Autosubmit.submit_ready_jobs(
                                 as_conf, job_list, platforms_to_test, packages_persistence, hold=True)
-                            job_list.update_list(as_conf, submitter=submitter)
+                            job_list.update_list(as_conf)
                             job_list.save()
                             as_conf.save()
                         # Safe spot to store changes
@@ -2617,7 +2617,7 @@ class Autosubmit:
                 if not inspect and len(valid_packages_to_submit) > 0:
                     job_list.save()
                 save_2 = False
-                if platform.type.lower() in [ "slurm" , "pjm" ] and not inspect and not only_wrappers:
+                if platform.type.lower() in ["slurm", "pjm"] and not inspect and not only_wrappers:
                     # Process the script generated in submit_ready_jobs
                     save_2, valid_packages_to_submit = platform.process_batch_ready_jobs(valid_packages_to_submit,
                                                                                          failed_packages,
@@ -2640,18 +2640,18 @@ class Autosubmit:
                 return True
             else:
                 return False
-
-        except AutosubmitError as e:
+        except AutosubmitError:
             raise
-        except AutosubmitCritical as e:
+        except AutosubmitCritical:
             raise
-        except BaseException as e:
+        except BaseException:
             raise
 
     @staticmethod
-    def monitor(expid, file_format, lst, filter_chunks, filter_status, filter_section, hide, txt_only=False,
-                group_by=None, expand="", expand_status=list(), hide_groups=False, notransitive=False,
-                check_wrapper=False, txt_logfiles=False, profile=False, detail=False):
+    def monitor(expid: str, file_format: str, lst: str, filter_chunks: str, filter_status: str,
+                filter_section: str, hide: bool, txt_only=False, group_by: Optional[bool] = None,
+                expand="", expand_status: Optional[str] = None, hide_groups=False, notransitive=False,
+                check_wrapper=False, txt_logfiles=False, profile=False):
         """
         Plots workflow graph for a given experiment with status of each job coded by node color.
         Plot is created in experiment's plot folder with name <expid>_<date>_<time>.<file_format>
@@ -2687,11 +2687,11 @@ class Autosubmit:
         :type check_wrapper: bool
         :param notransitive: Some dependencies will be omitted
         :type notransitive: bool
-        :param detail: better text format representation but more expensive
-        :type detail: bool
-
         """
         from .monitor.monitor import Monitor
+
+        if not expand_status:
+            expand_status = []
 
         # Start profiling if the flag has been used
         if profile:
