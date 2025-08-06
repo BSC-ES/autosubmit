@@ -2569,7 +2569,7 @@ class JobList(object):
             job.platform.add_job_to_log_recover(job)
         return log_recovered
 
-    def check_if_log_is_recovered(self, job: Job) -> Path:
+    def check_if_log_is_recovered(self, job: Job) -> Optional[Path]:
         """
         Check if the log is recovered.
 
