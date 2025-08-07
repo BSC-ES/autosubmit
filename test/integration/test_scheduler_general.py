@@ -15,12 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import pytest
 from pathlib import Path
 from textwrap import dedent
 from typing import Callable
 
 from autosubmit.config.configcommon import AutosubmitConfig
+import pytest
 
 
 def _get_script_files_path() -> Path:
@@ -34,11 +34,12 @@ def _write_test_files(expid, local_root_dir: Path):
 
     exp_tmp_dir = local_root_dir / expid / 'tmp'
     aslogs_dir = local_root_dir / expid / 'ASLOGS'
-
     # Add each platform to test
     with platforms_path.open('w') as f:
         f.write(
             dedent(f"""\
+                STORAGE:
+                    TYPE: sqlite
                 LOCAL_ROOT_DIR: {str(local_root_dir)}
                 LOCAL_ASLOG_DIR: {aslogs_dir}
                 LOCAL_TMP_DIR: {exp_tmp_dir}

@@ -279,11 +279,11 @@ def test_get_git_branch_and_commit(mocked_check_output: Mock):
 
 
 @patch('autosubmit.provenance.rocrate.BasicConfig')
-@patch('autosubmit.provenance.rocrate.get_experiment_descrip')
+@patch('autosubmit.provenance.rocrate.get_experiment_description')
 @patch('autosubmit.provenance.rocrate.get_autosubmit_version')
 def test_rocrate(
         mocked_get_autosubmit_version: Mock,
-        mocked_get_experiment_descrip: Mock,
+        mocked_get_experiment_description: Mock,
         mocked_BasicConfig: Mock,
         as_conf: AutosubmitConfig,
         empty_rocrate: ROCrate,
@@ -301,7 +301,7 @@ def test_rocrate(
         for output_file in ['graph_1.png', 'graph_2.gif', 'graph_3.gif', 'graph.jpg']:
             Path(project_path, output_file).touch()
         # required paths for AS
-        for other_required_path in ['conf', 'pkl', 'plot', 'status']:
+        for other_required_path in ['conf', 'db', 'plot', 'status']:
             Path(experiment_path, other_required_path).mkdir()
         as_conf.experiment_data = {
             'DEFAULT': {
@@ -346,7 +346,7 @@ def test_rocrate(
         end_time = ''
 
         mocked_get_autosubmit_version.return_value = '4.0.0b0'
-        mocked_get_experiment_descrip.return_value = [
+        mocked_get_experiment_description.return_value = [
             ['mocked test project']
         ]
 
@@ -363,11 +363,11 @@ def test_rocrate(
 
 @patch('autosubmit.provenance.rocrate._get_project_entity')
 @patch('autosubmit.provenance.rocrate.BasicConfig')
-@patch('autosubmit.provenance.rocrate.get_experiment_descrip')
+@patch('autosubmit.provenance.rocrate.get_experiment_description')
 @patch('autosubmit.provenance.rocrate.get_autosubmit_version')
 def test_rocrate_invalid_project(
         mocked_get_autosubmit_version: Mock,
-        mocked_get_experiment_descrip: Mock,
+        mocked_get_experiment_description: Mock,
         mocked_BasicConfig: Mock,
         mocked_get_project_entity: Mock,
         as_conf: AutosubmitConfig,
@@ -386,7 +386,7 @@ def test_rocrate_invalid_project(
         for output_file in ['graph_1.png', 'graph_2.gif', 'graph_3.gif', 'graph.jpg']:
             Path(project_path, output_file).touch()
         # required paths for AS
-        for other_required_path in ['conf', 'pkl', 'plot', 'status']:
+        for other_required_path in ['conf', 'db', 'plot', 'status']:
             Path(experiment_path, other_required_path).mkdir()
         as_conf.experiment_data = {
             'DEFAULT': {
@@ -409,7 +409,7 @@ def test_rocrate_invalid_project(
         jobs = []
 
         mocked_get_autosubmit_version.return_value = '4.0.0b0'
-        mocked_get_experiment_descrip.return_value = [
+        mocked_get_experiment_description.return_value = [
             ['mocked test project']
         ]
 
@@ -427,11 +427,11 @@ def test_rocrate_invalid_project(
 
 
 @patch('autosubmit.provenance.rocrate.BasicConfig')
-@patch('autosubmit.provenance.rocrate.get_experiment_descrip')
+@patch('autosubmit.provenance.rocrate.get_experiment_description')
 @patch('autosubmit.provenance.rocrate.get_autosubmit_version')
 def test_rocrate_invalid_parameter_type(
         mocked_get_autosubmit_version: Mock,
-        mocked_get_experiment_descrip: Mock,
+        mocked_get_experiment_description: Mock,
         mocked_BasicConfig: Mock,
         as_conf: AutosubmitConfig,
         create_conf_dir: Callable):
@@ -451,7 +451,7 @@ def test_rocrate_invalid_parameter_type(
         for output_file in ['graph_1.png', 'graph_2.gif', 'graph_3.gif', 'graph.jpg']:
             Path(project_path, output_file).touch()
         # required paths for AS
-        for other_required_path in ['conf', 'pkl', 'plot', 'status']:
+        for other_required_path in ['conf', 'db', 'plot', 'status']:
             Path(experiment_path, other_required_path).mkdir()
         as_conf.experiment_data = {
             'DEFAULT': {
@@ -474,7 +474,7 @@ def test_rocrate_invalid_parameter_type(
         }
 
         mocked_get_autosubmit_version.return_value = '4.0.0b0'
-        mocked_get_experiment_descrip.return_value = [
+        mocked_get_experiment_description.return_value = [
             ['mocked test project']
         ]
 
@@ -507,11 +507,11 @@ def test_rocrate_main_fail_missing_rocrate(
 @patch('autosubmit.autosubmit.JobList')
 @patch('autosubmit.autosubmit.AutosubmitConfig')
 @patch('autosubmit.provenance.rocrate.BasicConfig')
-@patch('autosubmit.provenance.rocrate.get_experiment_descrip')
+@patch('autosubmit.provenance.rocrate.get_experiment_description')
 @patch('autosubmit.provenance.rocrate.get_autosubmit_version')
 def test_rocrate_main(
         mocked_get_autosubmit_version: Mock,
-        mocked_get_experiment_descrip: Mock,
+        mocked_get_experiment_description: Mock,
         mocked_BasicConfig: Mock,
         mocked_AutosubmitConfig: Mock,
         mocked_JobList: Mock,
@@ -529,7 +529,7 @@ def test_rocrate_main(
         for output_file in ['graph_1.png', 'graph_2.gif', 'graph_3.gif', 'graph.jpg']:
             Path(project_path, output_file).touch()
         # required paths for AS
-        for other_required_path in ['conf', 'pkl', 'plot', 'status']:
+        for other_required_path in ['conf', 'db', 'plot', 'status']:
             Path(experiment_path, other_required_path).mkdir()
         mocked_as_conf = Mock(autospec=AutosubmitConfig)
         mocked_AutosubmitConfig.return_value = mocked_as_conf
@@ -567,11 +567,11 @@ def test_rocrate_main(
             }
         }
         create_conf_dir(experiment_path, as_conf=mocked_as_conf)
-        mocked_as_conf.get_storage_type.return_value = 'pkl'
+        mocked_as_conf.get_storage_type.return_value = 'db'
         mocked_as_conf.get_date_list.return_value = []
 
         mocked_get_autosubmit_version.return_value = '4.0.0b0'
-        mocked_get_experiment_descrip.return_value = [
+        mocked_get_experiment_description.return_value = [
             ['mocked test project']
         ]
 
@@ -613,11 +613,11 @@ def test_rocrate_main(
 
 
 @patch('autosubmit.provenance.rocrate.BasicConfig')
-@patch('autosubmit.provenance.rocrate.get_experiment_descrip')
+@patch('autosubmit.provenance.rocrate.get_experiment_description')
 @patch('autosubmit.provenance.rocrate.get_autosubmit_version')
 def test_custom_config_loaded_file(
         mocked_get_autosubmit_version: Mock,
-        mocked_get_experiment_descrip: Mock,
+        mocked_get_experiment_description: Mock,
         mocked_BasicConfig: Mock,
         as_conf: AutosubmitConfig,
         create_conf_dir: Callable):
@@ -631,7 +631,7 @@ def test_custom_config_loaded_file(
         project_path = Path(experiment_path, 'proj')
         project_path.mkdir()
         # required paths for AS
-        for other_required_path in ['conf', 'pkl', 'plot', 'status']:
+        for other_required_path in ['conf', 'db', 'plot', 'status']:
             Path(experiment_path, other_required_path).mkdir()
 
         # custom config file
@@ -687,7 +687,7 @@ def test_custom_config_loaded_file(
         end_time = ''
 
         mocked_get_autosubmit_version.return_value = '4.0.0b0'
-        mocked_get_experiment_descrip.return_value = [
+        mocked_get_experiment_description.return_value = [
             ['mocked test project']
         ]
 
@@ -706,11 +706,11 @@ def test_custom_config_loaded_file(
 
 
 @patch('autosubmit.provenance.rocrate.BasicConfig')
-@patch('autosubmit.provenance.rocrate.get_experiment_descrip')
+@patch('autosubmit.provenance.rocrate.get_experiment_description')
 @patch('autosubmit.provenance.rocrate.get_autosubmit_version')
 def test_no_duplicate_ids(
         mocked_get_autosubmit_version: Mock,
-        mocked_get_experiment_descrip: Mock,
+        mocked_get_experiment_description: Mock,
         mocked_BasicConfig: Mock,
         as_conf: AutosubmitConfig,
         create_conf_dir: Callable):
@@ -724,7 +724,7 @@ def test_no_duplicate_ids(
         project_path = Path(experiment_path, 'proj')
         project_path.mkdir()
         # required paths for AS
-        for other_required_path in ['conf', 'pkl', 'plot', 'status']:
+        for other_required_path in ['conf', 'db', 'plot', 'status']:
             Path(experiment_path, other_required_path).mkdir()
 
         # custom config file
@@ -780,7 +780,7 @@ def test_no_duplicate_ids(
         end_time = ''
 
         mocked_get_autosubmit_version.return_value = '4.0.0b0'
-        mocked_get_experiment_descrip.return_value = [
+        mocked_get_experiment_description.return_value = [
             ['mocked test project']
         ]
 

@@ -20,9 +20,11 @@ import pwd
 import sqlite3
 from pathlib import Path
 from textwrap import dedent
-from typing import Any
-
+from typing import Any, Callable
+from threading import Thread
+from time import sleep
 import pytest
+
 
 _EXPID = 't000'
 """The experiment ID used throughout the test."""
@@ -30,30 +32,51 @@ _EXPID = 't000'
 
 # TODO expand the tests to test Slurm, PSPlatform, Ecplatform whenever possible
 
+
 # --- Fixtures.
+@pytest.fixture(autouse=True, scope="function")
+def set_debug_log_level() -> None:
+    """
+    Set the console log level to DEBUG for all tests in the session.
+    """
+    from autosubmit.log.log import Log
+    Log.set_console_level("DEBUG")
+
 
 @pytest.fixture
-def as_exp(autosubmit_exp):
+def as_exp(autosubmit_exp, tmp_path: Path) -> Any:
+    """
+    Create an isolated experiment using a temporary directory for each test.
+
+    :param autosubmit_exp: Factory fixture for creating experiment objects.
+    :type autosubmit_exp: Callable
+    :param tmp_path: Temporary directory unique to the test.
+    :type tmp_path: Path
+    :return: Configured experiment object.
+    :rtype: Any
+    """
     exp = autosubmit_exp(_EXPID, experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'none',
             'PROJECT_DESTINATION': 'dummy_project'
+        },
+        'AUTOSUBMIT': {
+            'WORKFLOW_COMMIT': 'dummy_commit',
+            'LOCAL_ROOT_DIR': str(tmp_path)  # Override root dir to tmp_path
         }
     })
 
-    run_tmpdir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR)
+    run_tmpdir = tmp_path
 
-    dummy_dir = Path(run_tmpdir, f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/dummy_dir")
-    real_data = Path(run_tmpdir, f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/real_data")
-    # We write some dummy data inside the scratch_dir
+    dummy_dir = run_tmpdir / f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/dummy_dir"
+    real_data = run_tmpdir / f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/real_data"
     dummy_dir.mkdir(parents=True)
     real_data.mkdir(parents=True)
 
     with open(dummy_dir / 'dummy_file', 'w') as f:
         f.write('dummy data')
 
-    # create some dummy absolute symlinks in expid_dir to test migrate function
-    Path(real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
+    (real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
 
     exp.as_conf.reload(force_load=True)
 
@@ -97,6 +120,24 @@ def _print_db_results(db_check_list, rows_as_dicts, run_tmpdir):
                 print(f"Job entry: {job_name} retrial: {job_counter} assert {str(all_ok).upper()}")
             else:
                 print(f"Job entry: {job_name} assert {str(all_ok).upper()}")
+
+
+def run_in_thread(target: Callable[..., Any], *args, **kwargs) -> "threading.Thread":
+    """
+    Run the given target function in a separate thread.
+
+    :param target: The function to execute in the thread.
+    :type target: Callable[..., Any]
+    :param args: Positional arguments for the target function.
+    :type args: Any
+    :param kwargs: Keyword arguments for the target function.
+    :type kwargs: Any
+    :return: The started Thread object.
+    :rtype: Thread
+    """
+    thread = Thread(target=target, args=args, kwargs=kwargs)
+    thread.start()
+    return thread
 
 
 def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[str, (bool, str)]:
@@ -320,8 +361,17 @@ def _init_run(as_exp, jobs_data) -> Path:
     return exp_path / f'tmp/LOG_{_EXPID}'
 
 
-# -- Tests
+def _modify_jobs_data(as_exp, jobs_data) -> Path:
+    as_conf = as_exp.as_conf
+    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
+    exp_path = run_tmpdir / _EXPID
+    jobs_path = exp_path / f"conf/jobs_{_EXPID}.yml"
+    with jobs_path.open('w') as f:
+        f.write(jobs_data)
+
+
+# -- Tests
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
     # Success
     (dedent("""\
@@ -531,9 +581,9 @@ def test_run_interrupted(
     log_dir = _init_run(as_exp, jobs_data)
 
     # Run the experiment
-    exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
-    _assert_exit_code(final_status, exit_code)
-
+    # This was not being interrupted, so we run it in a thread to simulate the interruption and then stop it.
+    run_in_thread(as_exp.autosubmit.run_experiment, expid=_EXPID)
+    sleep(2)
     current_statuses = 'SUBMITTED, QUEUING, RUNNING'
     as_exp.autosubmit.stop(
         all_expids=False,
@@ -545,7 +595,6 @@ def test_run_interrupted(
         status='FAILED')
 
     exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
-    _assert_exit_code(final_status, exit_code)
 
     # Check and display results
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
@@ -555,3 +604,50 @@ def test_run_interrupted(
 
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
     _assert_files_recovered(files_check_list)
+
+    _assert_exit_code(final_status, exit_code)
+
+
+@pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
+
+    # Failure
+    (dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        job:
+            SCRIPT: |
+                d_echo "Hello World with id=FAILED"
+            PLATFORM: local
+            RUNNING: chunk
+            wallclock: 00:01
+            retrials: 2  # In local, it started to fail at 18 retrials.
+    """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
+], ids=["Failure"])
+def test_run_failed_set_to_ready_on_new_run(
+        as_exp,
+        jobs_data,
+        expected_db_entries,
+        final_status,
+        wrapper_type):
+    _init_run(as_exp, jobs_data)
+
+    exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
+    _assert_exit_code(final_status, exit_code)
+
+    jobs_data = dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World with id=READY"
+            PLATFORM: local
+            RUNNING: chunk
+            wallclock: 00:01
+            retrials: 2  # In local, it started to fail at 18 retrials.
+    """)
+    _modify_jobs_data(as_exp, jobs_data)
+    exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
+
+    _assert_exit_code("SUCCESS", exit_code)

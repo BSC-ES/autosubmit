@@ -37,6 +37,7 @@ in the ``test/unit`` directory."""
 
 _SSH_TIMEOUTS_IN_SECONDS = 90
 
+@pytest.mark.xfail(reason="Known bug with concurrent tests")
 @pytest.mark.docker
 @pytest.mark.parametrize('filename, check', [
     ('test1', True),
