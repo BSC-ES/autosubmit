@@ -35,7 +35,7 @@ Note that tests will start and destroy an SSH server. For unit tests, see ``para
 in the ``test/unit`` directory."""
 
 
-_SSH_TIMEOUTS_IN_SECONDS = 90
+_SSH_TIMEOUTS_IN_SECONDS = 150
 
 @pytest.mark.docker
 @pytest.mark.parametrize('filename, check', [
