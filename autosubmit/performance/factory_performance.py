@@ -18,9 +18,8 @@
 import copy
 from typing import TYPE_CHECKING
 from autosubmit.job.job_common import Status
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.performance.base_performance import BasePerformance
-from log.log import Log
 
 if TYPE_CHECKING:
     from autosubmit.job.job import Job

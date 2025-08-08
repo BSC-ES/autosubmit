@@ -17,7 +17,7 @@
 
 from test.unit.performance.support_job import JobTestPerformance, TransformToJob
 from test.unit.performance.utils import Utils
-from autosubmitconfigparser.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import BasicConfig
 import pytest
 from autosubmit.performance.type_job.SIM.SIM_performance import SIMPerformance
 from autosubmit.notifications.mail_notifier import MailNotifier

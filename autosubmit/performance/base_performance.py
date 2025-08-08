@@ -17,8 +17,8 @@
 
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Optional, NamedTuple
-from autosubmitconfigparser.config.basicconfig import BasicConfig
-from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.notifications.mail_notifier import MailNotifier
 
 if TYPE_CHECKING:
