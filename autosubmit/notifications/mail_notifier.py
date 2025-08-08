@@ -216,6 +216,23 @@ class MailNotifier:
 
         self._send_message(mail_to, self.config.MAIL_FROM, message)
 
+    def notify_custom_alert(self, subject: str, mail_to: list[str], message: str) -> None:
+        """
+        Send a custom alert email.
+        Args:
+            subject (str): The subject of the email.
+            message (str): The body of the email.
+        """
+        _check_mail_address(mail_to)
+
+        message = MIMEText(message)
+        message['From'] = email.utils.formataddr(
+            ('Autosubmit', self.config.MAIL_FROM))
+        message['Subject'] = subject
+        message['Date'] = email.utils.formatdate(localtime=True)
+
+        self._send_message(mail_to, self.config.MAIL_FROM, message)
+
     def _send_message(self, mail_to: list[str], mail_from: str, message) -> None:
         formatted_addresses = [
                 email.utils.formataddr(
