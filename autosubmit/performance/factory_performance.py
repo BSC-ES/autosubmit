@@ -15,9 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import copy
 from typing import TYPE_CHECKING
+from autosubmit.job.job_common import Status
 from autosubmitconfigparser.config.configcommon import AutosubmitConfig
 from autosubmit.performance.base_performance import BasePerformance
+from log.log import Log
 
 if TYPE_CHECKING:
     from autosubmit.job.job import Job
@@ -39,6 +42,8 @@ class PerformanceFactory:
         :rtype: BasePerformance
         """
 
+        config = copy.deepcopy(config)
+
         performance_config = config.experiment_data.get("PERFORMANCE", {})
 
         if not performance_config:
@@ -52,12 +57,14 @@ class PerformanceFactory:
 
         job_in_sections = job.section in sections if sections else False
 
-        job_in_status = job.status in notify_on if notify_on else False
+        job_status_string = Status.VALUE_TO_KEY.get(job.status, 'UNKNOWN')
+        job_in_status = job_status_string in notify_on if notify_on else False
 
-        if not job_in_sections or not job_in_status:
-            raise ValueError(
-                f"Job section '{job.section}' or status '{job.status}' is not configured for performance metrics."
-            )
+        if not job_in_sections:
+            return None
+
+        if not job_in_status:
+            return None
 
         return self._create_performance_by_type(f"{job.section}_{project}", config)
 
@@ -75,6 +82,7 @@ class PerformanceFactory:
         :return: An instance of a class derived from BasePerformance specific to the job type.
         :rtype: BasePerformance
         """
+
         if job_type == "SIM_DESTINE":
             from autosubmit.performance.type_job.SIM.project.SIM_DestinE import (
                 SIMDestinEPerformance,

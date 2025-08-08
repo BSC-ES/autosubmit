@@ -84,6 +84,7 @@ def recover_platform_job_logs_wrapper(
                                                                                     "DEBUG"),
         "LOG_RECOVERY_FILE_LEVEL": as_conf.experiment_data.get("CONFIG", {}).get("LOG_RECOVERY_FILE_LEVEL",
                                                                                  "EVERYTHING"),
+        "PERFORMANCE": as_conf.experiment_data.get("PERFORMANCE", {}),
     }
     _init_logs_log_process(as_conf, platform.name)
     platform.recover_platform_job_logs(as_conf)
@@ -1088,9 +1089,10 @@ class Platform(object):
         :param as_conf: The Autosubmit configuration object containing experiment data.
         :type as_conf: AutosubmitConfig
         """
-
         try:
             manager_performance = self._performance_factory.create_performance(job, as_conf)
+            if not manager_performance:
+                return
             manager_performance.compute_and_check_performance_metrics(job)
         except Exception as e:
             Log.error(f"Failed to compute performance metrics for job '{job.name}': {e}")
@@ -1118,9 +1120,9 @@ class Platform(object):
                 job.platform_name = self.name  # Change the original platform to this process platform.
                 job.platform = self
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
-                self._compute_performance_metrics(job, as_conf)
                 try:
                     job.retrieve_logfiles(raise_error=True)
+                    self._compute_performance_metrics(job, as_conf)
                 except Exception:
                     jobs_pending_to_process.add(job)
                     job._log_recovery_retries += 1

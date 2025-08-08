@@ -36,14 +36,17 @@ class SIMPerformance(BasePerformance):
         """
         Manage errors in the computation of SYPD.
 
-        Args:
-            start_timestamp: Start timestamp in Unix format.
-            finish_timestamp: Finish timestamp in Unix format.
-            chunk_size: Size of the chunk (e.g., '12').
-            chunk_size_unit: Unit of the chunk size (e.g., 'month').
+        :param start_timestamp: Start time of the job in Unix timestamp.
+        :type start_timestamp: intu
+        :param finish_timestamp: Finish time of the job in Unix timestamp.
+        :type finish_timestamp: int
+        :param chunk_size: Size of the chunk as a string (e.g., '12').
+        :type chunk_size: str
+        :param chunk_size_unit: Unit of the chunk size as a string (e.g., 'month').
+        :type chunk_size_unit: str
 
-        Raises:
-            ValueError: If any of the parameters are invalid.
+        :raises ValueError: If any of the required parameters are missing or invalid.
+        :raises TypeError: If the parameters are not of the expected type.
         """
 
         if not (start_timestamp and finish_timestamp and chunk_size and chunk_size_unit):
@@ -80,8 +83,8 @@ class SIMPerformance(BasePerformance):
 
         start_timestamp = job.start_time_timestamp
         finish_timestamp = job.finish_time_timestamp
-        chunk_size = job.parameters["EXPERIMENT"]["CHUNKSIZE"]
-        chunk_size_unit = job.parameters["EXPERIMENT"]["CHUNKSIZEUNIT"]
+        chunk_size = job.parameters['EXPERIMENT']['CHUNKSIZE']
+        chunk_size_unit = job.parameters['EXPERIMENT']['CHUNKSIZEUNIT']
 
         SIMPerformance._manage_errors_computation_SYPD(start_timestamp, finish_timestamp, chunk_size, chunk_size_unit)
 
@@ -139,6 +142,7 @@ class SIMPerformance(BasePerformance):
         :return: A list of PerformanceMetricInfo instances containing metric details.
         :rtype: list[PerformanceMetricInfo]
         """
+
         message_parts = ["🚨 Performance Alert\n===================\n"]
 
         SYPD_info = self.compute_and_check_SYPD_threshold(job)

@@ -115,6 +115,20 @@ class AutosubmitExperimentFixture(Protocol):
         ...
 
 
+def _recursive_merge(dict1: dict, dict2: dict) -> dict:
+    """Merge dictionaries, for YAML.
+
+    Do not use for large, nested dictionaries.
+    From: https://www.geeksforgeeks.org/python/recursively-merge-dictionaries-in-python/
+    """
+    for key, value in dict2.items():
+        if key in dict1 and isinstance(dict1[key], dict) and isinstance(value, dict):
+            dict1[key] = _recursive_merge(dict1[key], value)
+        else:
+            dict1[key] = value
+    return dict1
+
+
 @pytest.fixture(scope='function')
 def autosubmit_exp(
         autosubmit: Autosubmit,
@@ -210,9 +224,24 @@ def autosubmit_exp(
 
         for key, file in key_file.items():
             if key in experiment_data:
-                mode = 'a' if key == 'EXPERIMENT' else 'w'
-                with open(conf_dir / f'{file}_{expid}.yml', mode) as f:
-                    YAML().dump({key: experiment_data[key]}, f)
+                yaml_config_file = Path(conf_dir, f'{file}_{expid}.yml')
+
+                if yaml_config_file.exists():
+                    # Update YAML
+                    with open(yaml_config_file, 'r') as f:
+                        yaml_contents = YAML().load(f)
+                        if key not in yaml_contents:
+                            # File exists, but doesn't have the key defined?
+                            yaml_contents[key] = experiment_data[key]
+                        else:
+                            existing = yaml_contents[key]
+                            merged = _recursive_merge(existing, experiment_data[key])
+                            yaml_contents[key] = merged
+                else:
+                    yaml_contents = {key: experiment_data[key]}
+
+                with open(conf_dir / f'{file}_{expid}.yml', 'w') as f:
+                    YAML().dump(yaml_contents, f)
 
         other_yaml = {
             k: v for k, v in experiment_data.items()
