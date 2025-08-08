@@ -728,7 +728,7 @@ class Autosubmit:
             return Autosubmit.monitor(args.expid, args.output, args.list, args.filter_chunks, args.filter_status,
                                       args.filter_type, args.hide, args.text, args.group_by, args.expand,
                                       args.expand_status, args.hide_groups, args.notransitive, args.check_wrapper,
-                                      args.txt_logfiles, args.profile, detail=False)
+                                      args.txt_logfiles, args.profile)
         elif args.command == 'stats':
             return Autosubmit.statistics(args.expid, args.filter_type, args.filter_period, args.output,
                                          args.section_summary, args.jobs_summary, args.hide, args.notransitive)
@@ -1736,7 +1736,8 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def generate_scripts_andor_wrappers(as_conf, job_list, jobs_filtered, packages_persistence, only_wrappers=False):
+    def generate_scripts_andor_wrappers(as_conf: AutosubmitConfig, job_list: JobList, jobs_filtered: list[Job],
+                                        packages_persistence: JobPackagePersistence, only_wrappers: bool = False):
         """
         :param as_conf: Class that handles basic configuration parameters of Autosubmit. \n
         :type as_conf: AutosubmitConfig() Object \n
@@ -1866,9 +1867,9 @@ class Autosubmit:
     def check_wrappers(
         as_conf: AutosubmitConfig,
         job_list: JobList,
-        platforms_to_test: Set[Platform],
+        platforms_to_test: set[Platform],
         expid: str,
-    ) -> Tuple[Dict[str, List[List[Job]]], Dict[str, Tuple[Status, Status]]]:
+    ) -> tuple[dict[str, list[list[Job]]], dict[str, tuple[Status, Status]]]:
         """
         Check wrappers and inner jobs status also order the non-wrapped jobs to be submitted by active platforms
         :param as_conf: a AutosubmitConfig object
@@ -1877,14 +1878,15 @@ class Autosubmit:
         :param expid: a string with the experiment id
         :return: non-wrapped jobs to check and a dictionary with the changes in the jobs status
         """
-        jobs_to_check: Dict[str, List[List[Job]]] = dict()
-        job_changes_tracker: Dict[str, Tuple[Status, Status]] = dict()
+        jobs_to_check: dict[str, list[list[Job]]] = dict()
+        job_changes_tracker: dict[str, tuple[Status, Status]] = dict()
         for platform in platforms_to_test:
             queuing_jobs = job_list.get_in_queue_grouped_id(platform)
             Log.debug(f'Checking jobs for platform={platform.name}')
             for job_id, job in queuing_jobs.items():
                 # Check Wrappers one-by-one
                 if job_list.job_package_map and job_id in job_list.job_package_map:
+
                     wrapper_job, save = Autosubmit.manage_wrapper_job(as_conf, job_list, platform,
                                                                       job_id)
                     # Notifications e-mail
@@ -1903,7 +1905,7 @@ class Autosubmit:
                             jobs_to_check[platform.name].append([job, job_prev_status])
                         else:
                             jobs_to_check[platform.name] = [[job, job_prev_status]]
-        return jobs_to_check,job_changes_tracker
+        return jobs_to_check, job_changes_tracker
 
     @staticmethod
     def check_wrapper_stored_status(as_conf: Any, job_list: Any, wrapper_wallclock: str) -> Any:
@@ -2004,7 +2006,7 @@ class Autosubmit:
         recover: bool = False,
         check_scripts: bool = False,
         submitter=None
-    ) -> Tuple[
+    ) -> tuple[
         JobList,
         Submitter,
         Optional[ExperimentHistory],
@@ -2022,6 +2024,7 @@ class Autosubmit:
         :param start_after: a string with the experiment id to start after.
         :param run_only_members: a string with the members to run.
         :param recover: a boolean to indicate if the experiment is recovering from a failure.
+        :param check_scripts: a boolean to indicate if the experiment scripts must be verified or not.
         :param submitter: the actual loaded platforms if any
         :return: a tuple
         """
@@ -2322,12 +2325,12 @@ class Autosubmit:
                                 if job_prev_status != job.update_status(as_conf):
                                     Autosubmit.job_notify(as_conf,expid,job,job_prev_status,job_changes_tracker)
                         # Updates all workflow status with the new information.
-                        job_list.update_list(as_conf, submitter=submitter)
+                        job_list.update_list(as_conf)
                         job_list.save()
                         # Submit jobs that are ready to run
                         if len(job_list.get_ready()) > 0:
                             Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence, hold=False)
-                            job_list.update_list(as_conf, submitter=submitter)
+                            job_list.update_list(as_conf)
                             job_list.save()
                             as_conf.save()
 
@@ -2337,7 +2340,7 @@ class Autosubmit:
                         if as_conf.get_remote_dependencies() == "true" and len(job_list.get_prepared()) > 0:
                             Autosubmit.submit_ready_jobs(
                                 as_conf, job_list, platforms_to_test, packages_persistence, hold=True)
-                            job_list.update_list(as_conf, submitter=submitter)
+                            job_list.update_list(as_conf)
                             job_list.save()
                             as_conf.save()
                         # Safe spot to store changes
@@ -2564,10 +2567,9 @@ class Autosubmit:
                 raise AutosubmitCritical("Issues while checking the connectivity of platforms.", 7010, issues + "\n" + ssh_config_issues)
 
     @staticmethod
-    def submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence, inspect=False,
-                          only_wrappers=False, hold=False):
-
-        # type: (AutosubmitConfig, JobList, Set[Platform], JobPackagePersistence, bool, bool, bool) -> bool
+    def submit_ready_jobs(as_conf: AutosubmitConfig, job_list: JobList, platforms_to_test: set[Platform],
+                          packages_persistence: JobPackagePersistence, inspect: bool = False,
+                          only_wrappers: bool = False, hold: bool = False) -> bool:
         """
         Gets READY jobs and send them to the platforms if there is available space on the queues
 
@@ -2615,7 +2617,7 @@ class Autosubmit:
                 if not inspect and len(valid_packages_to_submit) > 0:
                     job_list.save()
                 save_2 = False
-                if platform.type.lower() in [ "slurm" , "pjm" ] and not inspect and not only_wrappers:
+                if platform.type.lower() in ["slurm", "pjm"] and not inspect and not only_wrappers:
                     # Process the script generated in submit_ready_jobs
                     save_2, valid_packages_to_submit = platform.process_batch_ready_jobs(valid_packages_to_submit,
                                                                                          failed_packages,
@@ -2638,18 +2640,18 @@ class Autosubmit:
                 return True
             else:
                 return False
-
-        except AutosubmitError as e:
+        except AutosubmitError:
             raise
-        except AutosubmitCritical as e:
+        except AutosubmitCritical:
             raise
-        except BaseException as e:
+        except BaseException:
             raise
 
     @staticmethod
-    def monitor(expid, file_format, lst, filter_chunks, filter_status, filter_section, hide, txt_only=False,
-                group_by=None, expand="", expand_status=list(), hide_groups=False, notransitive=False,
-                check_wrapper=False, txt_logfiles=False, profile=False, detail=False):
+    def monitor(expid: str, file_format: str, lst: str, filter_chunks: str, filter_status: str,
+                filter_section: str, hide: bool, txt_only=False, group_by: Optional[bool] = None,
+                expand="", expand_status: Optional[str] = None, hide_groups=False, notransitive=False,
+                check_wrapper=False, txt_logfiles=False, profile=False):
         """
         Plots workflow graph for a given experiment with status of each job coded by node color.
         Plot is created in experiment's plot folder with name <expid>_<date>_<time>.<file_format>
@@ -2685,11 +2687,11 @@ class Autosubmit:
         :type check_wrapper: bool
         :param notransitive: Some dependencies will be omitted
         :type notransitive: bool
-        :param detail: better text format representation but more expensive
-        :type detail: bool
-
         """
         from .monitor.monitor import Monitor
+
+        if not expand_status:
+            expand_status = []
 
         # Start profiling if the flag has been used
         if profile:

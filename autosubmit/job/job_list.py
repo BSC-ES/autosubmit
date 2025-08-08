@@ -25,7 +25,7 @@ from contextlib import suppress
 from pathlib import Path
 from shutil import move
 from time import strftime, localtime, mktime
-from typing import List, Dict, Tuple, Any, Optional, Union
+from typing import List, Dict, Tuple, Any, Optional, Union, TYPE_CHECKING
 
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
@@ -43,6 +43,9 @@ from autosubmit.job.job_utils import Dependency, _get_submitter
 from autosubmit.job.job_utils import transitive_reduction
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
+if TYPE_CHECKING:
+    from autosubmit.job.job_list_persistence import JobListPersistence
+
 
 class JobList(object):
     """
@@ -50,7 +53,7 @@ class JobList(object):
 
     """
 
-    def __init__(self, expid, config, parser_factory, job_list_persistence):
+    def __init__(self, expid, config, parser_factory, job_list_persistence: 'JobListPersistence'):
         self._persistence_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")
         self._update_file = "updated_list_" + expid + ".txt"
         self._failed_file = "failed_job_list_" + expid + ".pkl"
@@ -2262,10 +2265,9 @@ class JobList(object):
                     jobs.append(job)
         return jobs
 
-    def get_in_queue_grouped_id(self, platform):
-        # type: (object) -> Dict[int, List[Job]]
-        jobs = self.get_in_queue(platform)
-        jobs_by_id = dict()
+    def get_in_queue_grouped_id(self, platform) -> dict[str, list[Job]]:
+        jobs: list[Job] = self.get_in_queue(platform)
+        jobs_by_id: dict[str, list[Job]] = dict()
         for job in jobs:
             if job.id not in jobs_by_id:
                 jobs_by_id[job.id] = list()
@@ -2567,7 +2569,7 @@ class JobList(object):
             job.platform.add_job_to_log_recover(job)
         return log_recovered
 
-    def check_if_log_is_recovered(self, job: Job) -> Path:
+    def check_if_log_is_recovered(self, job: Job) -> Optional[Path]:
         """
         Check if the log is recovered.
 
@@ -2592,14 +2594,12 @@ class JobList(object):
         return None
 
     def update_list(self, as_conf: AutosubmitConfig, store_change: bool = True,
-                    fromSetStatus: bool = False, submitter: object = None,
-                    first_time: bool = False) -> bool:
+                    fromSetStatus: bool = False, first_time: bool = False) -> bool:
         """
         Updates job list, resetting failed jobs and changing to READY
         all WAITING jobs with all parents COMPLETED
 
         :param first_time:
-        :param submitter:
         :param fromSetStatus:
         :param store_change:
         :param as_conf: autosubmit config object
@@ -2755,8 +2755,6 @@ class JobList(object):
                                     break
             if as_conf.get_remote_dependencies() == "true":
                 for job in self.get_prepared():
-                    tmp = [
-                        parent for parent in job.parents if parent.status == Status.COMPLETED]
                     tmp2 = [parent for parent in job.parents if
                             parent.status == Status.COMPLETED or parent.status == Status.SKIPPED
                             or parent.status == Status.FAILED]
@@ -2905,7 +2903,7 @@ class JobList(object):
         out = True
         # Implementing checking scripts feedback to the users in a minimum of 4 messages
         count = stage = 0
-        for job in (job for job in self._job_list):
+        for job in self._job_list:
             job.update_check_variables(as_conf)
             count += 1
             if (count >= len(self._job_list) / 4 * (stage + 1)) or count == len(self._job_list):
