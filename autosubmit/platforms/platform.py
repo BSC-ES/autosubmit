@@ -1108,11 +1108,11 @@ class Platform(object):
 
         performance_config = as_conf.experiment_data.get('PERFORMANCE', {})
         try:
-            self.update_job_information(job, as_conf)
             manager_performance = self._performance_factory.create_performance(job, performance_config)
             if not manager_performance:
                 Log.warning(f"No performance manager found for job '{job.name}'. Skipping performance metrics computation.")
                 return
+            self.update_job_information(job, as_conf)
             manager_performance.compute_and_check_performance_metrics(job)
         except Exception as e:
             Log.error(f"Failed to compute performance metrics for job '{job.name}': {e}")
