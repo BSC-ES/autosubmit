@@ -169,7 +169,7 @@ def mock_base_performance_notifier(performance_mail_notifier, mocker):
     :param performance_mail_notifier: The MailNotifier instance with Docker.
     :param mocker: The pytest-mock fixture for mocking.
     """
-    mocker.patch.object(BasePerformance, '_mail_notifier', performance_mail_notifier)
+    mocker.patch('autosubmit.performance.base_performance.MailNotifier', return_value=performance_mail_notifier)
 
 @pytest.fixture(autouse=True)
 def clear_mail_api(fake_smtp_server):

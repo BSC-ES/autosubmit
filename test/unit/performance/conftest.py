@@ -71,7 +71,7 @@ def naive_job(job_factory) -> Job:
     return job_factory.create_job(test_job)
 
 
-# -- fixtures for MailNotifier and Platform
+# Fixtures for MailNotifier and Platform
 
 
 @pytest.fixture
@@ -106,8 +106,22 @@ def mock_mail_notifier(mock_basic_config) -> MailNotifier:
     """
     return MailNotifier(mock_basic_config)
 
+# Fixtures for Performance Configuration 
 
-# -- fixtures for Performance class and Utils
+@pytest.fixture
+def mock_performance_config():
+    """
+    Mock fixture for performance configuration.
+    """
+    return {
+        'PROJECT': 'DEFAULT',
+        'SECTION': ['SIM'],
+        'NOTIFY_ON': ['COMPLETED'],
+        'NOTIFY_TO': ['test@example.com', 'admin@example.com'],
+    }
+
+
+# Fixtures for Performance class and Utils
 
 
 @pytest.fixture
@@ -119,11 +133,11 @@ def sim_performance() -> SIMPerformance:
 
 
 @pytest.fixture
-def sim_performance_with_mail_notifier(mock_mail_notifier) -> SIMPerformance:
+def sim_performance_with_mail_notifier(mock_mail_notifier, mock_performance_config) -> SIMPerformance:
     """
     Fixture to provide the Performance class with a MailNotifier instance.
     """
-    performance_instance = SIMPerformance()
+    performance_instance = SIMPerformance(mock_performance_config)
     performance_instance.set_mail_notifier(mock_mail_notifier)
     return performance_instance
 

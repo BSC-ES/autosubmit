@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from typing import TYPE_CHECKING
+from autosubmit.log.log import Log
 from autosubmit.performance.base_performance import BasePerformance,PerformanceMetricInfo
 
 if TYPE_CHECKING:
@@ -58,14 +59,17 @@ class SIMPerformance(BasePerformance):
         if not isinstance(finish_timestamp, int):
             raise TypeError("finish_timestamp must be an integer representing Unix timestamp.")
 
-        if not isinstance(chunk_size, str):
-            raise TypeError("chunk_size must be a string representing the size of the chunk (e.g., '12').")
+        if finish_timestamp <= start_timestamp:
+            raise ValueError(f"Finish timestamp ({finish_timestamp}) must be greater than start timestamp ({start_timestamp})")
+        
+        if not isinstance(chunk_size, int):
+            raise TypeError("chunk_size must be an integer representing the size of the chunk (e.g., 12).")
+        
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be a positive integer (e.g., 12).")
 
         if not isinstance(chunk_size_unit, str):
             raise TypeError("chunk_size_unit must be a string representing the unit of the chunk size (e.g., 'month').")
-
-        if not chunk_size.isdigit() or int(chunk_size) <= 0:
-            raise ValueError("chunk_size must be a positive numeric string (e.g., '12').")
 
     # Computation and check of SYPD
 
@@ -81,26 +85,25 @@ class SIMPerformance(BasePerformance):
         :rtype: float
         """
 
-        start_timestamp = job.start_time_timestamp
-        finish_timestamp = job.finish_time_timestamp
-        chunk_size = job.parameters['EXPERIMENT']['CHUNKSIZE']
-        chunk_size_unit = job.parameters['EXPERIMENT']['CHUNKSIZEUNIT']
+        start_timestamp = int(job.start_time_timestamp)
+        finish_timestamp = int(job.finish_time_timestamp)
+        chunk_size = int(job.chunk_length)
+        chunk_size_unit = job.chunk_unit
+
+        Log.info(f"Computing SYPD for job {job.name} with start timestamp {start_timestamp}, finish timestamp {finish_timestamp}, chunk size {chunk_size}, and chunk size unit {chunk_size_unit}.")
 
         SIMPerformance._manage_errors_computation_SYPD(start_timestamp, finish_timestamp, chunk_size, chunk_size_unit)
 
         duration_seconds = finish_timestamp - start_timestamp
 
-        if duration_seconds <= 0:
-            raise ValueError("Finish timestamp must be greater than start timestamp.")
-
         if chunk_size_unit == "year":
-            return duration_seconds / (365 * 24 * 3600) * float(chunk_size)
+            return duration_seconds / (365 * 24 * 3600) * chunk_size
         elif chunk_size_unit == "month":
-            return duration_seconds / (30 * 24 * 3600) * float(chunk_size)
+            return duration_seconds / (30 * 24 * 3600) * chunk_size
         elif chunk_size_unit == "day":
-            return duration_seconds / (24 * 3600) * float(chunk_size)
+            return duration_seconds / (24 * 3600) * chunk_size
         elif chunk_size_unit == "hour":
-            return duration_seconds / 3600 * float(chunk_size)
+            return duration_seconds / 3600 * chunk_size
         raise ValueError(f"Unsupported chunk size unit: {chunk_size_unit}")
 
     def compute_and_check_SYPD_threshold(self, job: "Job") -> PerformanceMetricInfo:
@@ -115,7 +118,7 @@ class SIMPerformance(BasePerformance):
         :rtype: PerformanceMetricInfo
         """
 
-        sypd = self.compute_sypd_from_job(job)
+        sypd = SIMPerformance.compute_sypd_from_job(job)
         under_threshold = sypd < self.SYPD_THRESHOLD
 
         return PerformanceMetricInfo(

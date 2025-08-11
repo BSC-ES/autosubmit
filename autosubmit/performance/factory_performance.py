@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import copy
 from typing import TYPE_CHECKING
 from autosubmit.job.job_common import Status
 from autosubmit.config.configcommon import AutosubmitConfig
@@ -26,33 +25,40 @@ if TYPE_CHECKING:
 
 
 class PerformanceFactory:
-
-    def create_performance(self, job: "Job", config: AutosubmitConfig) -> BasePerformance:
+    
+    def create_performance(self, job: "Job", performance_config: dict[str, any]) -> BasePerformance:
         """
         Factory method to create a performance metric calculator for a job.
 
         :param job: Job instance containing the necessary attributes.
         :type job: Job
 
-        :param config: Autosubmit configuration containing performance settings.
-        :type config: AutosubmitConfig
+        :param performance_config: Autosubmit configuration containing performance settings.
+        :type performance_config: dict[str, any]
 
         :return: An instance of a class derived from BasePerformance.
         :rtype: BasePerformance
         """
 
-        config = copy.deepcopy(config)
-
-        performance_config = config.experiment_data.get("PERFORMANCE", {})
-
         if not performance_config:
             raise ValueError(
-                "Performance configuration is not set in the AutosubmitConfig."
+                "Performance configuration is not set."
             )
 
         project = performance_config.get("PROJECT", {})
+
+        if not project:
+            raise ValueError("Project configuration is not set in the performance configuration.")
+
         sections = performance_config.get("SECTION", [])
+
+        if not sections:
+            raise ValueError("Sections configuration is not set in the performance configuration.")
+        
         notify_on = performance_config.get("NOTIFY_ON", [])
+
+        if not notify_on:
+            raise ValueError("Notify on configuration is not set in the performance configuration.")
 
         job_in_sections = job.section in sections if sections else False
 
@@ -65,18 +71,18 @@ class PerformanceFactory:
         if not job_in_status:
             return None
 
-        return self._create_performance_by_type(f"{job.section}_{project}", config)
+        return self._create_performance_by_type(f"{job.section}_{project}", performance_config)
 
     @staticmethod
-    def _create_performance_by_type(job_type: str, config: AutosubmitConfig) -> BasePerformance:
+    def _create_performance_by_type(job_type: str, performance_config: dict[str, any]) -> BasePerformance:
         """
         Create a performance calculator based on the job type.
 
         :param job_type: Type of the job, e.g., "SIM_DESTINE" or "SIM_DEFAULT".
         :type job_type: str
 
-        :param config: Autosubmit configuration containing performance settings.
-        :type config: AutosubmitConfig
+        :param performance_config: Autosubmit configuration containing performance settings.
+        :type performance_config: dict[str, any]
 
         :return: An instance of a class derived from BasePerformance specific to the job type.
         :rtype: BasePerformance
@@ -87,14 +93,14 @@ class PerformanceFactory:
                 SIMDestinEPerformance,
             )
 
-            return SIMDestinEPerformance(config)
+            return SIMDestinEPerformance(performance_config)
         elif job_type == "SIM_DEFAULT":
             from autosubmit.performance.type_job.SIM.SIM_performance import (
                 SIMPerformance,
             )
 
-            return SIMPerformance(config)
-        else:
-            raise ValueError(
-                f"Unsupported job type: {job_type}. Cannot create performance calculator."
-            )
+            return SIMPerformance(performance_config)
+
+        raise ValueError(
+            f"Unsupported job type: {job_type}. Cannot create performance calculator."
+        )

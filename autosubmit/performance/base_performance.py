@@ -18,7 +18,6 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Optional, NamedTuple
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.notifications.mail_notifier import MailNotifier
 
 if TYPE_CHECKING:
@@ -47,16 +46,15 @@ class PerformanceMetricInfo(NamedTuple):
 class BasePerformance(ABC):
     """Base class for performance metrics calculation"""
 
-    _mail_notifier = MailNotifier(BasicConfig())  # Default MailNotifier with BasicConfig
-
-    def __init__(self, autosubmit_config: Optional[AutosubmitConfig] = None):
+    def __init__(self, performance_config: dict[str, any] = None):
         """
         Initialize the BasePerformance class.
 
-        :param autosubmit_config: Autosubmit configuration containing performance settings.
-        :type autosubmit_config: Optional[AutosubmitConfig]
+        :param performance_config: Performance configuration containing performance settings.
+        :type performance_config: dict[str, any]
         """
-        self._autosubmit_config = autosubmit_config
+        self._performance_config = performance_config 
+        self._mail_notifier = MailNotifier(BasicConfig.read())
 
     @abstractmethod
     def compute_and_check_performance_metrics(self, job: "Job") -> list[PerformanceMetricInfo]:
@@ -110,17 +108,6 @@ class BasePerformance(ABC):
 
         self._mail_notifier = mail_notifier
 
-    # Autosubmit configuration setter
-
-    def set_autosubmit_config(self, autosubmit_config: AutosubmitConfig):
-        """
-        Set the Autosubmit configuration for the Performance class.
-
-        :param autosubmit_config: An instance of AutosubmitConfig containing performance settings.
-        :type autosubmit_config: AutosubmitConfig
-        """
-        self._autosubmit_config = autosubmit_config
-
     # Get Autosubmit configuration
 
     def _get_mail_recipients(self) -> list[str]:
@@ -130,22 +117,12 @@ class BasePerformance(ABC):
         :return: A list of email addresses to notify.
         :rtype: list[str]
         """
-        try:
-            if not self._autosubmit_config:
-                raise ValueError("Autosubmit configuration is not set.")
 
-            performance_config = self._autosubmit_config.experiment_data.get(
-                "PERFORMANCE", {}
+        notify_to = self._performance_config.experiment_data.get("NOTIFY_TO", [])
+
+        if not notify_to:
+            raise ValueError(
+                "No email recipients configured for performance notifications."
             )
 
-            notify_to = performance_config.get("NOTIFY_TO", [])
-
-            if not notify_to:
-                raise ValueError(
-                    "No email recipients configured for performance notifications."
-                )
-
-            return notify_to
-
-        except Exception as e:
-            raise ValueError(f"Error retrieving email recipients: {e}") from e
+        return notify_to

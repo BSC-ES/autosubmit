@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import atexit
+import copy
 import locale
 import multiprocessing
 import os
@@ -1080,6 +1081,21 @@ class Platform(object):
                 break
         return process_log
     
+    @staticmethod
+    def update_job_information(job: 'Job', as_conf: 'AutosubmitConfig') -> None:
+        """
+        Updates the job information in the Autosubmit configuration.
+
+        :param job: The job object to update.
+        :type job: Job
+        :param as_conf: The Autosubmit configuration object containing experiment data.
+        :type as_conf: AutosubmitConfig
+        """
+        
+        as_conf_copy = copy.deepcopy(as_conf)
+        as_conf_copy.reload(force_load=True)
+        job.update_parameters(as_conf_copy, set_attributes=True)
+    
     def _compute_performance_metrics(self, job: 'Job', as_conf: 'AutosubmitConfig'):
         """
         Computes performance metrics for the job.
@@ -1089,9 +1105,13 @@ class Platform(object):
         :param as_conf: The Autosubmit configuration object containing experiment data.
         :type as_conf: AutosubmitConfig
         """
+
+        performance_config = as_conf.experiment_data.get('PERFORMANCE', {})
         try:
-            manager_performance = self._performance_factory.create_performance(job, as_conf)
+            self.update_job_information(job, as_conf)
+            manager_performance = self._performance_factory.create_performance(job, performance_config)
             if not manager_performance:
+                Log.warning(f"No performance manager found for job '{job.name}'. Skipping performance metrics computation.")
                 return
             manager_performance.compute_and_check_performance_metrics(job)
         except Exception as e:
@@ -1141,6 +1161,7 @@ class Platform(object):
             try:
                 job.retrieve_logfiles(raise_error=True)
                 job._log_recovery_retries += 1
+                self._compute_performance_metrics(job, as_conf)
             except:
                 if job._log_recovery_retries < 5:
                     jobs_pending_to_process.add(job)
