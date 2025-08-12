@@ -6039,6 +6039,6 @@ class Autosubmit:
                 log_utils.compress_gzip(
                     file, keep_input=keep_input, compression_level=9
                 )
-            Log.info(f"Compressed {file}")
+            Log.result(f"Compressed {file}")
 
         return True
