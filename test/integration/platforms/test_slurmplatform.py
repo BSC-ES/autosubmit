@@ -17,11 +17,13 @@
 
 """Integration tests for the Slurm platform."""
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.log.utils import is_gzip_file, is_xz_file
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 if TYPE_CHECKING:
@@ -652,3 +654,95 @@ def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubm
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
+
+@pytest.mark.slurm
+@pytest.mark.parametrize(
+    "experiment_data",
+    [
+        {
+            "JOBS": {
+                "SIM": {
+                    "PLATFORM": _PLATFORM_NAME,
+                    "RUNNING": "once",
+                    "SCRIPT": 'echo "This is job ${SLURM_JOB_ID} EOM"',
+                },
+            },
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "127.0.0.1",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "COMPRESS_REMOTE_LOGS": True,
+                },
+            },
+        },
+        {
+            "JOBS": {
+                "SIM": {
+                    "PLATFORM": _PLATFORM_NAME,
+                    "RUNNING": "once",
+                    "SCRIPT": 'echo "This is job ${SLURM_JOB_ID} EOM"',
+                },
+            },
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "127.0.0.1",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "COMPRESS_REMOTE_LOGS": True,
+                    "REMOTE_LOGS_COMPRESS_TYPE": "xz",
+                },
+            },
+        },
+    ],
+    ids=[
+        "Compress logs with default gzip",
+        "Compress logs with xz",
+    ],
+)
+def test_simple_workflow_compress_logs_slurm(
+    autosubmit_exp: 'AutosubmitExperimentFixture',
+    experiment_data: dict,
+    slurm_server: "DockerContainer",
+):
+    """Test compressing remote logs in a simple workflow using Slurm."""
+    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
+    _create_slurm_platform(exp.expid, exp.as_conf)
+
+    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
+    assert 0 == exp.autosubmit.run_experiment(exp.expid)
+
+    # Check if the log files are compressed
+    logs_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR).joinpath(
+        exp.expid, exp.as_conf.basic_config.LOCAL_TMP_DIR, f"LOG_{exp.expid}"
+    )
+    compression_type = (
+        experiment_data.get("PLATFORMS", {})
+        .get(_PLATFORM_NAME, {})
+        .get("REMOTE_LOGS_COMPRESS_TYPE", "gzip")
+    )
+
+    files = [f for f in Path(logs_dir).glob("*")]
+
+    assert len(files) > 0, f"No log files found in {logs_dir}"
+
+    if compression_type == "xz":
+        assert any(is_xz_file(str(f)) for f in files), (
+            "No compressed xz log files found."
+        )
+    else:
+        assert any(is_gzip_file(str(f)) for f in files), (
+            "No compressed gzip log files found."
+        )

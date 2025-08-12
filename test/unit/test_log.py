@@ -27,6 +27,7 @@ from autosubmit.log.utils import compress_xz, find_uncompressed_files, is_xz_fil
 if TYPE_CHECKING:
     from pytest_mock import MockFixture
 
+
 """Tests for the log module."""
 
 
