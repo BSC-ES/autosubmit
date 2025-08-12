@@ -53,6 +53,8 @@ def compress_xz(
     if not keep_input and input_path != output_path:
         Path(input_path).unlink(missing_ok=True)
 
+    return output_path
+
 
 def compress_gzip(
     input_path: str,
@@ -80,6 +82,8 @@ def compress_gzip(
 
     if not keep_input and input_path != output_path:
         Path(input_path).unlink(missing_ok=True)
+
+    return output_path
 
 
 def is_xz_file(filepath: str):
