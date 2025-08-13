@@ -196,6 +196,8 @@ class Autosubmit:
                                 help="sets file's log level.")
             parser.add_argument('-lc', '--logconsole', choices=log_levels, default='WARNING', type=str,
                                 help="sets console's log level")
+            parser.add_argument('--compresslogs', action='store_true', default=False,
+                                help='Compress all uncompressed command logs at the end of the command execution')
 
             subparsers = parser.add_subparsers(dest='command')
             # Run
@@ -5964,8 +5966,10 @@ class Autosubmit:
             Log.info(f"  {ftc}")
 
         if dry_run:
-            return
+            return True
 
         for file in files_to_compress:
-            log_utils.compress_xz(file, keep_input=keep_input)
+            log_utils.compress_xz(file, keep_input=keep_input, preset=9, extreme=True)
             Log.info(f"Compressed {file}")
+
+        return True
