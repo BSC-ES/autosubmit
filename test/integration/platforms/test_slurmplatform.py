@@ -129,6 +129,10 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
 @pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     {
+        'DEFAULT':{
+            'EXPID': 't000',
+            'HPCARCH': _PLATFORM_NAME,
+        },
         'JOBS': {
             'SIM': {
                 'DEPENDENCIES': {
@@ -186,6 +190,10 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
         },
     },
     {
+        'DEFAULT':{
+            'EXPID': 't000',
+            'HPCARCH': _PLATFORM_NAME,
+        },
         'JOBS': {
             'SIMV': {
                 'DEPENDENCIES': {
@@ -223,6 +231,10 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
         },
     },
     {
+        'DEFAULT':{
+            'EXPID': 't000',
+            'HPCARCH': _PLATFORM_NAME,
+        },
         'JOBS': {
             'SIMH': {
                 'DEPENDENCIES': {
@@ -260,6 +272,10 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
         },
     },
     {
+        'DEFAULT':{
+            'EXPID': 't000',
+            'HPCARCH': _PLATFORM_NAME,
+        },
         'JOBS': {
             'SIMHV': {
                 'DEPENDENCIES': {
@@ -297,6 +313,10 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
         },
     },
     {
+        'DEFAULT':{
+            'EXPID': 't000',
+            'HPCARCH': _PLATFORM_NAME,
+        },
         'JOBS': {
             'SIMVH': {
                 'DEPENDENCIES': {
