@@ -9,7 +9,7 @@ DEFAULT:
   # Job experiment ID.
   EXPID: "a000"
   # Default HPC platform name.
-  HPCARCH: "local"
+  HPCARCH: "TEST_SLURM"
   #hint: use %PROJDIR% to point to the project folder (where the project is cloned)
   # Custom configuration location.
   CUSTOM_CONFIG:
@@ -25,3 +25,16 @@ GIT:
   PROJECT_COMMIT: ''
   PROJECT_SUBMODULES: ''
   FETCH_SINGLE_BRANCH: true
+PLATFORMS:
+  TEST_SLURM:
+    ADD_PROJECT_TO_HOST: false
+    HOST: localDocker
+    MAX_WALLCLOCK: 48:00
+    PROJECT: group
+    QUEUE: debug
+    SCRATCH_DIR: /tmp/scratch/
+    TEMP_DIR: ''
+    TYPE: slurm
+    USER: root
+    MAX_PROCESSORS: 10
+    PROCESSORS_PER_NODE: 10

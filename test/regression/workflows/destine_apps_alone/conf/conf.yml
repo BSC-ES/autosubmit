@@ -1,24 +1,24 @@
 DEFAULT:
   EXPID: t03k
-  HPCARCH: local
+  HPCARCH: TEST_SLURM
   CUSTOM_CONFIG: hidden
 JOBS:
   LOCAL_SETUP:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: once
     CHECK: on_submission
     DEPENDENCIES: {}
   SYNCHRONIZE:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: {}
     RUNNING: once
     CHECK: on_submission
   REMOTE_SETUP:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       SYNCHRONIZE: {}
     RUNNING: once
@@ -54,7 +54,7 @@ JOBS:
         ANY_FINAL_STATUS_IS_VALID: false
     RUNNING: chunk
     WALLCLOCK: 02:00
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     SPLITS: auto
     TOTALJOBS: 1
     CHECK: on_submission
@@ -71,7 +71,7 @@ JOBS:
             SPLITS_TO: previous
             STATUS: FAILED
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     PARTITION: '%CURRENT_APP_PARTITION%'
     RUNNING: chunk
     NODES: 1
@@ -96,7 +96,7 @@ JOBS:
             SPLITS_TO: previous
             STATUS: FAILED
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     PARTITION: '%CURRENT_APP_PARTITION%'
     RUNNING: chunk
     NODES: 1
@@ -121,7 +121,7 @@ JOBS:
             SPLITS_TO: previous
             STATUS: FAILED
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     PARTITION: '%CURRENT_APP_PARTITION%'
     RUNNING: chunk
     NODES: 1
@@ -146,7 +146,7 @@ JOBS:
             SPLITS_TO: previous
             STATUS: FAILED
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     PARTITION: '%CURRENT_APP_PARTITION%'
     RUNNING: chunk
     NODES: 1
@@ -171,7 +171,7 @@ JOBS:
             SPLITS_TO: previous
             STATUS: FAILED
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     PARTITION: '%CURRENT_APP_PARTITION%'
     RUNNING: chunk
     NODES: 1
@@ -196,7 +196,7 @@ JOBS:
             SPLITS_TO: previous
             STATUS: FAILED
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     PARTITION: '%CURRENT_APP_PARTITION%'
     RUNNING: chunk
     NODES: 1
@@ -224,7 +224,7 @@ JOBS:
             STATUS: FAILED
     RUNNING: chunk
     WALLCLOCK: 00:20
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     PARTITION: '%CURRENT_APP_PARTITION%'
     NODES: 1
     PROCESSORS: 1
@@ -248,7 +248,7 @@ JOBS:
             STATUS: FAILED
     RUNNING: chunk
     WALLCLOCK: 00:20
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     PARTITION: '%CURRENT_APP_PARTITION%'
     NODES: 1
     PROCESSORS: 1
@@ -272,7 +272,7 @@ JOBS:
             STATUS: FAILED
     RUNNING: chunk
     WALLCLOCK: 00:20
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     PARTITION: '%CURRENT_APP_PARTITION%'
     NODES: 1
     PROCESSORS: 1
@@ -296,7 +296,7 @@ JOBS:
             STATUS: FAILED
     RUNNING: chunk
     WALLCLOCK: 00:20
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     PARTITION: '%CURRENT_APP_PARTITION%'
     NODES: 1
     PROCESSORS: 1
@@ -320,7 +320,7 @@ JOBS:
             STATUS: FAILED
     RUNNING: chunk
     WALLCLOCK: 00:20
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     PARTITION: '%CURRENT_APP_PARTITION%'
     NODES: 1
     PROCESSORS: 1
@@ -344,7 +344,7 @@ JOBS:
             STATUS: FAILED
     RUNNING: chunk
     WALLCLOCK: 00:20
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     PARTITION: '%CURRENT_APP_PARTITION%'
     NODES: 1
     PROCESSORS: 1
@@ -370,3 +370,16 @@ GIT:
   PROJECT_COMMIT: ''
   PROJECT_SUBMODULES: ''
   FETCH_SINGLE_BRANCH: true
+PLATFORMS:
+  TEST_SLURM:
+    ADD_PROJECT_TO_HOST: false
+    HOST: localDocker
+    MAX_WALLCLOCK: 48:00
+    PROJECT: group
+    QUEUE: debug
+    SCRATCH_DIR: /tmp/scratch/
+    TEMP_DIR: ''
+    TYPE: slurm
+    USER: root
+    MAX_PROCESSORS: 10
+    PROCESSORS_PER_NODE: 10

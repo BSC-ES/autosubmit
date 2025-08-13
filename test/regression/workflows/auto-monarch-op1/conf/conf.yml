@@ -1,38 +1,38 @@
 DEFAULT:
   EXPID: t0jm
-  HPCARCH: local
+  HPCARCH: TEST_SLURM
 JOBS:
   LOCAL_SETUP:
     FILE: hidden
     TYPE: python
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: once
     NOTIFY_ON: FAILED COMPLETED
     DEPENDENCIES: {}
   LOCAL_SEND_INITIAL:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: {}
     RUNNING: chunk
     NOTIFY_ON: FAILED
   LOCAL_SEND_SPINUP:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: {}
     RUNNING: member
     NOTIFY_ON: FAILED
   LOCAL_SEND_SOURCE:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: {}
     RUNNING: once
     NOTIFY_ON: FAILED
   LOCAL_SEND_STATIC:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: {}
     RUNNING: once
@@ -41,12 +41,12 @@ JOBS:
     FILE: hidden
     DEPENDENCIES:
       LOCAL_SEND_SOURCE: {}
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: once
     NOTIFY: FAILED
   LOCAL_SEND_EMISSIONS:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: {}
       LOCAL_SEND_EMISSIONS-1: {}
@@ -56,7 +56,7 @@ JOBS:
     NOTIFY_ON: FAILED
   LOCAL_SEND_CHEM:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: {}
       LOCAL_SEND_CHEM-1: {}
@@ -145,7 +145,7 @@ JOBS:
     DEPENDENCIES:
       POSTPROC_ICAP: {}
       ARCHIVE-1: {}
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: chunk
     WALLCLOCK: 02:00
     NOTIFY_ON: FAILED
@@ -154,7 +154,7 @@ JOBS:
     DEPENDENCIES:
       POSTPROC+1: {}
       ARCHIVE: {}
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: chunk
     WALLCLOCK: 00:10
     NOTIFY_ON: FAILED
@@ -175,3 +175,16 @@ GIT:
   PROJECT_COMMIT: ''
   PROJECT_SUBMODULES: ''
   FETCH_SINGLE_BRANCH: 'true'
+PLATFORMS:
+  TEST_SLURM:
+    ADD_PROJECT_TO_HOST: false
+    HOST: localDocker
+    MAX_WALLCLOCK: 48:00
+    PROJECT: group
+    QUEUE: debug
+    SCRATCH_DIR: /tmp/scratch/
+    TEMP_DIR: ''
+    TYPE: slurm
+    USER: root
+    MAX_PROCESSORS: 10
+    PROCESSORS_PER_NODE: 10

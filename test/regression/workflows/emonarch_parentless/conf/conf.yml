@@ -1,17 +1,17 @@
 DEFAULT:
   EXPID: a8oq
-  HPCARCH: local
+  HPCARCH: TEST_SLURM
 JOBS:
   LOCAL_SETUP:
     FILE: hidden
     TYPE: python
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: once
     NOTIFY_ON: FAILED COMPLETED
     DEPENDENCIES: { }
   LOCAL_SEND_SOURCE:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: { }
     RUNNING: once
@@ -19,7 +19,7 @@ JOBS:
     WALLCLOCK: 00:20
   LOCAL_SEND_STATIC:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SEND_SOURCE: { }
     RUNNING: once
@@ -78,7 +78,7 @@ JOBS:
     RETRIALS: '2'
   MOVE:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       POSTPROC: { }
       SIM+2: { }
@@ -91,7 +91,7 @@ JOBS:
     DEPENDENCIES:
       MOVE: { }
       CLEAN-1: { }
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: chunk
     WALLCLOCK: 00:20
     NOTIFY_ON: FAILED COMPLETED
@@ -113,3 +113,16 @@ GIT:
   PROJECT_SUBMODULES: ''
   FETCH_SINGLE_BRANCH: 'true'
   PROJECT_SUBMODULES_DEPTH: '10'
+PLATFORMS:
+  TEST_SLURM:
+    ADD_PROJECT_TO_HOST: false
+    HOST: localDocker
+    MAX_WALLCLOCK: 48:00
+    PROJECT: group
+    QUEUE: debug
+    SCRATCH_DIR: /tmp/scratch/
+    TEMP_DIR: ''
+    TYPE: slurm
+    USER: root
+    MAX_PROCESSORS: 10
+    PROCESSORS_PER_NODE: 10

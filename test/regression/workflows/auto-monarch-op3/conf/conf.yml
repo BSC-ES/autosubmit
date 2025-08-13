@@ -1,11 +1,11 @@
 DEFAULT:
   EXPID: t0ke
-  HPCARCH: local
+  HPCARCH: TEST_SLURM
 JOBS:
   LOCAL_SETUP:
     FILE: hidden
     TYPE: python
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: once
     NOTIFY_ON:
     - FAILED
@@ -19,7 +19,7 @@ JOBS:
     DEPENDENCIES: {}
   LOCAL_SEND_INITIAL:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: {}
       FIRST_CLEAN: {}
@@ -29,7 +29,7 @@ JOBS:
     WALLCLOCK: 02:00
   LOCAL_SEND_SPINUP:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: {}
       FIRST_CLEAN: {}
@@ -39,7 +39,7 @@ JOBS:
     WALLCLOCK: 02:00
   LOCAL_SEND_SOURCE:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: {}
       FIRST_CLEAN: {}
@@ -48,7 +48,7 @@ JOBS:
     - FAILED
   LOCAL_SEND_STATIC:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: {}
       FIRST_CLEAN: {}
@@ -59,13 +59,13 @@ JOBS:
     FILE: hidden
     DEPENDENCIES:
       LOCAL_SEND_SOURCE: {}
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: once
     NOTIFY: FAILED
     WALLCLOCK: 02:00
   LOCAL_SEND_EMISSIONS:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: {}
       FIRST_CLEAN: {}
@@ -76,7 +76,7 @@ JOBS:
     WALLCLOCK: 02:00
   CHECK_GFAS:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SEND_EMISSIONS:
         STATUS: FAILED
@@ -88,7 +88,7 @@ JOBS:
     - FAILED
   LOCAL_SEND_CHEM:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: {}
       FIRST_CLEAN: {}
@@ -118,7 +118,7 @@ JOBS:
     - FAILED
   CHECK_CAMS:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SEND_CHEM:
         STATUS: FAILED
@@ -186,7 +186,7 @@ JOBS:
     FILE: hidden
     DEPENDENCIES:
       POSTPROC: {}
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: chunk
     WALLCLOCK: 01:00
     NOTIFY_ON:
@@ -195,7 +195,7 @@ JOBS:
     FILE: hidden
     DEPENDENCIES:
       POSTPROC: {}
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: chunk
     SYNCHRONIZE: member
     WALLCLOCK: 01:30
@@ -206,7 +206,7 @@ JOBS:
     DEPENDENCIES:
       ARCHIVE: {}
       ARCHIVE_CAMS: {}
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: chunk
     WALLCLOCK: 00:10
     NOTIFY_ON:
@@ -216,7 +216,7 @@ JOBS:
     DEPENDENCIES:
       ARCHIVE: {}
       ARCHIVE_CAMS: {}
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: chunk
     WALLCLOCK: 00:10
     NOTIFY_ON:
@@ -239,3 +239,16 @@ GIT:
   PROJECT_SUBMODULES: ''
   PROJECT_SUBMODULES_DEPTH: '1'
   FETCH_SINGLE_BRANCH: 'true'
+PLATFORMS:
+  TEST_SLURM:
+    ADD_PROJECT_TO_HOST: false
+    HOST: localDocker
+    MAX_WALLCLOCK: 48:00
+    PROJECT: group
+    QUEUE: debug
+    SCRATCH_DIR: /tmp/scratch/
+    TEMP_DIR: ''
+    TYPE: slurm
+    USER: root
+    MAX_PROCESSORS: 10
+    PROCESSORS_PER_NODE: 10
