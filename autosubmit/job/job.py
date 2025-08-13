@@ -1866,9 +1866,9 @@ class Job(object):
         if self.het['HETSIZE'] == 1:
             self.het = dict()
         if not self.wallclock:
-            if job_platform.type.lower() not in ['ps', "local"]:
+            if job_platform.type.lower() not in ['ps']:
                 self.wallclock = "01:59"
-            elif job_platform.type.lower() in ['ps', 'local']:
+            elif job_platform.type.lower() in ['ps']:
                 self.wallclock = "00:00"
         # Increasing according to chunk
         self.wallclock = increase_wallclock_by_chunk(
@@ -3034,13 +3034,9 @@ class WrapperJob(Job):
                 os.chmod(log_dir, 0o770)
             open(multiple_checker_inner_jobs, 'w+').write(command)
             os.chmod(multiple_checker_inner_jobs, 0o770)
-            if self.platform.name != "local":  # already "sent"...
-                self._platform.send_file(multiple_checker_inner_jobs, False)
-                command = (f"cd {self._platform.get_files_path()}; "
-                           f"{os.path.join(self._platform.get_files_path(), 'inner_jobs_checker.sh')}")
-            else:
-                command = f"cd {self._platform.get_files_path()}; ./inner_jobs_checker.sh; cd {os.getcwd()}"
-            #
+            self._platform.send_file(multiple_checker_inner_jobs, False)
+            command = (f"cd {self._platform.get_files_path()}; "
+                       f"{os.path.join(self._platform.get_files_path(), 'inner_jobs_checker.sh')}")
             wait = 2
             retries = 5
             over_wallclock = False
@@ -3134,13 +3130,8 @@ class WrapperJob(Job):
         If not on these status and it is a vertical wrapper it will set the fail_count to the number of retrials.
         """
         try:
-            if self.platform_name == "local":
-                # Check if the job is still running to avoid a misleading message in the logs
-                if self.platform.get_pscall(self.id):
-                    self._platform.send_command(self._platform.cancel_cmd + " " + str(self.id))
-            else:
-                Log.warning(f"Wrapper {self.name} failed, cancelling it")
-                self._platform.send_command(self._platform.cancel_cmd + " " + str(self.id))
+            Log.warning(f"Wrapper {self.name} failed, cancelling it")
+            self._platform.send_command(self._platform.cancel_cmd + " " + str(self.id))
         except Exception as e:
             Log.info(f'Job with {self.id} was finished before canceling it: {str(e)}')
         self._check_running_jobs()

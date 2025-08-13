@@ -821,8 +821,7 @@ class ParamikoPlatform(Platform):
         :return: current job status
         :rtype: autosubmit.job.job_common.Status
         """
-        job_status = Status.UNKNOWN
-        remote_logs = as_conf.get_copy_remote_logs()
+        as_conf.get_copy_remote_logs()
         job_list_cmd = self.parse_joblist(job_list)
         cmd = self.get_checkAlljobs_cmd(job_list_cmd)
         sleep_time = 5

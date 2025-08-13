@@ -3544,11 +3544,7 @@ class Autosubmit:
                     Log.error("Not a valid path. You must include '~/' at the beginning.")
             local_root_path = Path(local_root_path).expanduser().resolve()
 
-            # if not os.path.exists(local_root_path):
             Path(local_root_path).mkdir(parents=True, exist_ok=True)
-            # Log.error("Local Root path does not exist.")
-            # return False
-            # else:
             global_logs_path = local_root_path / 'logs'
             structures_path = local_root_path / 'metadata/structures'
             historicdb_path = local_root_path / 'metadata/data'
@@ -3598,8 +3594,6 @@ class Autosubmit:
                     parser.set("historiclog", "path", str(historiclog_path))
                     parser.add_section("autosubmitapi")
                     parser.set("autosubmitapi", "url", autosubmitapi_url)
-                    # parser.add_section("hosts")
-                    # parser.set("hosts", "whitelist", " localhost # Add your machine names")
                     parser.write(config_file)
                     Log.result(f"Configuration file written successfully: \n\t{rc_path}")
                     Path(local_root_path).mkdir(parents=True, exist_ok=True)
