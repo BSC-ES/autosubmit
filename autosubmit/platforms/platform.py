@@ -409,9 +409,7 @@ class Platform(object):
                         job_list.packages_dict[package.name] = package.jobs
                         from ..job.job import WrapperJob
                         wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.READY, 0,
-                                                 package.jobs,
-                                                 package._wallclock, package._num_processors,
-                                                 package.platform, as_conf, hold)
+                                                 package.jobs, package._wallclock, package.platform, as_conf, hold)
                         job_list.job_package_map[package.jobs[0].id] = wrapper_job
                         packages_persistence.save(package, inspect)
                     for innerJob in package._jobs:

@@ -1626,7 +1626,7 @@ class Job(object):
             if not self.platform_name:
                 self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
             job_platform = submitter.platforms.get(self.platform_name)
-            self.platform = job_platform
+            self.platform: 'ParamikoPlatform' = job_platform
         parameters['CURRENT_ARCH'] = self.platform.name
         parameters['CURRENT_HOST'] = self.platform.host
         parameters['CURRENT_USER'] = self.platform.user
@@ -2773,29 +2773,18 @@ class Job(object):
 
 
 class WrapperJob(Job):
-    """
-    Defines a wrapper from a package.
+    """Defines a wrapper from a package.
 
     Calls Job constructor.
 
-    :param name: Name of the Package \n
-    :type name: String \n
-    :param job_id: ID of the first Job of the package \n
-    :type job_id: Integer \n
-    :param status: 'READY' when coming from submit_ready_jobs() \n
-    :type status: String \n
-    :param priority: 0 when coming from submit_ready_jobs() \n
-    :type priority: Integer \n
-    :param job_list: List of jobs in the package \n
-    :type job_list: List() of Job() objects \n
-    :param total_wallclock: Wallclock of the package \n
-    :type total_wallclock: String Formatted \n
-    :param num_processors: Number of processors for the package \n
-    :type num_processors: Integer \n
-    :param platform: Platform object defined for the package \n
-    :type platform: Platform Object. e.g. EcPlatform() \n
-    :param as_config: Autosubmit basic configuration object \n
-    :type as_config: AutosubmitConfig object \n
+    :param name: Name of the Package
+    :param job_id: ID of the first Job of the package
+    :param status: 'READY' when coming from submit_ready_jobs()
+    :param priority: 0 when coming from submit_ready_jobs()
+    :param job_list: List of jobs in the package
+    :param total_wallclock: Wallclock of the package
+    :param platform: Platform object defined for the package
+    :param as_config: Autosubmit basic configuration object
     """
 
     def __init__(
@@ -2806,8 +2795,7 @@ class WrapperJob(Job):
         priority: int,
         job_list: List[Job],
         total_wallclock: str,
-        num_processors: int,
-        platform: "Platform",
+        platform: 'ParamikoPlatform',
         as_config: AutosubmitConfig,
         hold: bool,
     ):
@@ -2815,10 +2803,9 @@ class WrapperJob(Job):
         self.failed = False
         self.job_list = job_list
         # divide jobs in dictionary by state?
-        self.wallclock = total_wallclock # Now it is reloaded after a run -> stop -> run
-        self.num_processors = num_processors
+        self.wallclock = total_wallclock  # Now it is reloaded after a run -> stop -> run
         self.running_jobs_start = OrderedDict()
-        self._platform = platform
+        self._platform: 'ParamikoPlatform' = platform
         self.as_config = as_config
         # save start time, wallclock and processors?!
         self.checked_time = datetime.datetime.now()
@@ -2826,14 +2813,11 @@ class WrapperJob(Job):
         self.inner_jobs_running = list()
         self.is_wrapper = True
 
-
     def _queuing_reason_cancel(self, reason: str) -> bool:
-        """
-        Function return True if a job was cancelled for a listed reason.
+        """Function return True if a job was cancelled for a listed reason.
+
         :param reason: Reason of a job to be cancelled
-        :type reason: str
         :return: True if a job was cancelled for a known reason, False otherwise
-        :rtype: bool
         """
         try:
             if len(reason.split('(', 1)) > 1:
@@ -2851,11 +2835,11 @@ class WrapperJob(Job):
             return False
 
     def check_status(self, status: str) -> None:
-        """
-        Update the status of a job, saving its previous status and update the current one, in case of failure
-        it'll log all the files that were correctly created.
+        """Update the status of a job, saving its previous status and update the current one.
+
+        In case of failure it'll log all the files that were correctly created.
+
         :param status: Reason of a job to be cancelled
-        :type status: str
         """
         prev_status = self.status
         self.prev_status = prev_status
@@ -2866,8 +2850,9 @@ class WrapperJob(Job):
             # This will update the inner jobs to QUEUE or HELD (normal behaviour) or WAITING ( if they fail to be held)
             self._check_inner_jobs_queue(prev_status)
         elif self.status == Status.RUNNING:  # If wrapper is running
-            #Log.info("Wrapper {0} is {1}".format(self.name, Status().VALUE_TO_KEY[self.status]))
-            # This will update the status from submitted or hold to running (if safety timer is high enough or queue is fast enough)
+            # Log.info("Wrapper {0} is {1}".format(self.name, Status().VALUE_TO_KEY[self.status]))
+            # This will update the status from submitted or hold to running
+            # (if safety timer is high enough or queue is fast enough)
             if prev_status in [Status.SUBMITTED]:
                 for job in self.job_list:
                     job.status = Status.QUEUING
@@ -2906,10 +2891,9 @@ class WrapperJob(Job):
                 self.cancel_failed_wrapper_job()
 
     def check_inner_jobs_completed(self, jobs: List[Job]) -> None:
-        """
-        Will get all the jobs that the status are not completed and check if it was completed or not
+        """Will get all the jobs that the status are not completed and check if it was completed or not.
+
         :param jobs: Jobs inside the wrapper
-        :type jobs: [Job]
         """
         not_completed_jobs = [
             job for job in jobs if job.status != Status.COMPLETED]
@@ -2935,14 +2919,15 @@ class WrapperJob(Job):
         for job in not_completed_jobs:
             self._check_finished_job(job)
 
-    def _check_inner_jobs_queue(self, prev_status :str) -> None:
-        """
-        Update previous status of a job and updating the job to a new status.
+    def _check_inner_jobs_queue(self, prev_status: str) -> None:
+        """Update previous status of a job and updating the job to a new status.
+
         If the platform being used is slurm the function will get the status of all the jobs,
         get the parsed queue reason and cancel and fail jobs that has a known reason.
+
         If job is held by admin or user the job will be held to be executed later.
+
         :param prev_status: previous status of a job
-        :type prev_status: str
         """
         reason = str()
         if self._platform.type == 'slurm':
@@ -2961,7 +2946,8 @@ class WrapperJob(Job):
                 return
             if reason == '(JobHeldUser)':
                 if self.hold == "false":
-                    # SHOULD BE MORE CLASS (GET_scontrol release but not sure if this can be implemented on others PLATFORMS
+                    # SHOULD BE MORE CLASS
+                    # GET_scontrol release but not sure if this can be implemented on others PLATFORMS
                     self._platform.send_command("scontrol release " + "{0}".format(self.id))
                     self.new_status = Status.QUEUING
                     for job in self.job_list:
@@ -2986,11 +2972,11 @@ class WrapperJob(Job):
                 job.status = self.status
 
     def _check_inner_job_wallclock(self, job: Job) -> bool:
-        """
-        This will check if the job is running longer than the wallclock was set to be run.
+        """This will check if the job is running longer than the wallclock was set to be run.
+
         :param job: The inner job of a job.
         :type job: Job
-        :return: True if the job is running longer then wallcloclk, otherwise False.
+        :return: True if the job is running longer then wallclock, otherwise False.
         :rtype: bool
         """
         start_time = self.running_jobs_start[job]
@@ -3002,14 +2988,16 @@ class WrapperJob(Job):
         return False
 
     def _check_running_jobs(self) -> None:
-        """
-        Get all jobs that are not "COMPLETED" or "FAILED", for each of the jobs still not completed that are still
-        running a command will be created and executed to either read the first few lines of the _STAT file created or
-        just print the JOB's name if the file don't exist.
-        Depending on the output of the file the status of a job will be set to
-        RUNNING if not over wallclock
-        FAILED if over wallclock and not vertical wrapper
-        If after 5 retries no file is created the status of the job is set to FAIL
+        """Get all jobs that are not "COMPLETED" or "FAILED".
+
+        For each of the jobs still not completed that are still running a command will be
+        created and executed to either read the first few lines of the _STAT file created
+        or just print the JOB's name if the file don't exist.
+
+        Depending on the output of the file the status of a job will be set to RUNNING if
+        not over wallclock FAILED if over wallclock and not vertical wrapper.
+
+        If after 5 retries no file is created the status of the job is set to FAILED.
         """
         not_finished_jobs_dict: OrderedDict[str, Job] = OrderedDict()
         self.inner_jobs_running = list()
@@ -3096,13 +3084,11 @@ class WrapperJob(Job):
                 self.status = Status.FAILED
 
     def _check_finished_job(self, job: Job, failed_file: bool = False) -> None:
-        """
-        Will set the jobs status to failed, unless they're completed, in which,
+        """Will set the jobs status to failed, unless they're completed, in which,
         the function will change it to complete.
+
         :param job: The job to have its status updated.
-        :type job: Job
         :param failed_file: True if system has created a file for a failed execution
-        :type failed_file: bool
         """
         job.new_status = Status.FAILED
         if not failed_file:
@@ -3121,12 +3107,11 @@ class WrapperJob(Job):
         job.update_status(self.as_config, failed_file)
         self.running_jobs_start.pop(job, None)
 
-    def update_failed_jobs(self, check_ready_jobs :bool=False) -> None:
-        """
-        Check all jobs associated, and update their status either to complete or to Failed,
+    def update_failed_jobs(self, check_ready_jobs: bool = False) -> None:
+        """Check all jobs associated, and update their status either to complete or to Failed,
         and if job is still running appends it to they inner jobs of the wrapper.
+
         :param check_ready_jobs: if true check for running jobs with status "READY", "SUBMITTED", "QUEUING"
-        :type check_ready_jobs: bool
         """
         running_jobs = self.inner_jobs_running
         real_running = copy.deepcopy(self.inner_jobs_running)
@@ -3142,23 +3127,22 @@ class WrapperJob(Job):
                     self.inner_jobs_running.append(job)
 
     def cancel_failed_wrapper_job(self) -> None:
-        """
-        When a wrapper is cancelled or run into some problem all its jobs are cancelled,
-        if there are jobs on the list that are not Running, and is not Completed, or Failed set it as WAITING,
-        if not on these status and it is a vertical wrapper it will set the fail_count to the number of retrials.
+        """When a wrapper is cancelled or run into some problem all its jobs are cancelled.
+
+        If there are jobs on the list that are not Running, and is not Completed, or Failed set it as WAITING.
+
+        If not on these status and it is a vertical wrapper it will set the fail_count to the number of retrials.
         """
         try:
             if self.platform_name == "local":
                 # Check if the job is still running to avoid a misleading message in the logs
                 if self.platform.get_pscall(self.id):
-                    self._platform.send_command(
-                        self._platform.cancel_cmd + " " + str(self.id))
+                    self._platform.send_command(self._platform.cancel_cmd + " " + str(self.id))
             else:
                 Log.warning(f"Wrapper {self.name} failed, cancelling it")
-                self._platform.send_command(
-                    self._platform.cancel_cmd + " " + str(self.id))
-        except:
-            Log.info(f'Job with {self.id} was finished before canceling it')
+                self._platform.send_command(self._platform.cancel_cmd + " " + str(self.id))
+        except Exception as e:
+            Log.info(f'Job with {self.id} was finished before canceling it: {str(e)}')
         self._check_running_jobs()
         for job in self.inner_jobs_running:
             job.status = Status.FAILED
@@ -3169,17 +3153,12 @@ class WrapperJob(Job):
                 if job.wrapper_type == "vertical":  # job is being retrieved internally by the wrapper
                     job.fail_count = job.retrials
 
-
     def _is_over_wallclock(self, start_time: str, wallclock: str) -> bool:
-        """
-        This calculates if the job is over its wallclock time,
-        which indicates that a jobs is running for too long
+        """This calculates if the job is over its wallclock time, which indicates that a jobs is running for too long.
+
         :param start_time: When a job started to execute
-        :type start_time: str
         :param wallclock: Time limit a job should run
-        :type wallclock: str
         :return: If start_time is bigger than wallclock return True, otherwise False
-        :rtype: bool
         """
         elapsed = datetime.datetime.now() - parse_date(start_time)
         wallclock = datetime.datetime.strptime(wallclock, '%H:%M')
@@ -3202,26 +3181,21 @@ class WrapperJob(Job):
         return False
 
     def _parse_timestamp(self, timestamp: int) -> datetime:
-        """
-        Parse a date from int to datetime.
+        """Parse a date from int to datetime.
+
         :param timestamp: time to be converted
-        :type timestamp: int
         :return: return time converted
-        :rtype: datetime
         """
         value = datetime.datetime.fromtimestamp(timestamp)
         time = value.strftime('%Y-%m-%d %H:%M:%S')
         return time
 
     def _check_time(self, output: [str], index: int) -> datetime:
-        """
-        Generate the starting time of a job found by a generated command
+        """Generate the starting time of a job found by a generated command.
+
         :param output: The output of a CMD command executed
-        :type output: [str]
         :param index: line in which the "output" should be pointed at to get the time
-        :type index: int
-        :return: Time in which a job started
-        :rtype: datetime
+        :return: Job starting time
         """
         time = int(output[index])
         time = self._parse_timestamp(time)

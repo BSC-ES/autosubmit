@@ -1952,8 +1952,7 @@ class Autosubmit:
                     wrapper_status = Status.SUBMITTED
 
                 wrapper_job = WrapperJob(package_name, jobs[0].id, wrapper_status, 0, jobs,
-                                         wrapper_wallclock,
-                                         None, jobs[0].platform, as_conf, jobs[0].hold)
+                                         wrapper_wallclock, jobs[0].platform, as_conf, jobs[0].hold)
                 job_list.job_package_map[jobs[0].id] = wrapper_job
         return job_list
 
