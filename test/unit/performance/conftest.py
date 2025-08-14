@@ -61,7 +61,7 @@ def naive_job(job_factory) -> Job:
         name="test_job_001",
         status="COMPLETED",
         section="SIM",
-        chunk_size="12",
+        chunk_size=12,
         chunk_size_unit="month",
     )
 

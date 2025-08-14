@@ -32,4 +32,4 @@ def test_creation(naive_job: Job):
     assert naive_job.finish_time_timestamp > 0
 
     assert naive_job.chunk_unit == "month"
-    assert naive_job.chunk_length == "12"
+    assert naive_job.chunk_length == 12

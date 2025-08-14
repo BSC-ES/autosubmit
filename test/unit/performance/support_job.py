@@ -32,7 +32,7 @@ class JobTestPerformance:
     name: str  # e.g. 'test_job'
     status: str  # e.g. 'COMPLETED'
     section: str  # e.g. 'SIM'
-    chunk_size: str  # e.g. '12'
+    chunk_size: int  # e.g. 12
     chunk_size_unit: str  # e.g. 'year'
     start_timestamp: int = None  # Unix timestamp in seconds
     finish_timestamp: int = None  # Unix timestamp in seconds

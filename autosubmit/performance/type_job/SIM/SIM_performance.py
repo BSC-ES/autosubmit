@@ -71,10 +71,10 @@ class SIMPerformance(BasePerformance):
         if finish_timestamp <= start_timestamp:
             raise ValueError(f"Finish timestamp must be greater than start timestamp.")
         
-        if not isinstance(chunk_size, str):
-            raise TypeError("chunk_size must be a string representing the size of the chunk (e.g., '12').")
+        if not isinstance(chunk_size, int):
+            raise TypeError("chunk_size must be an integer representing the size of the chunk (e.g., 12).")
 
-        if not chunk_size.isdigit() or int(chunk_size) <= 0:
+        if chunk_size <= 0:
             raise ValueError("chunk_size must be a positive numeric string (e.g., '12').")
 
         if not isinstance(chunk_size_unit, str):
@@ -102,8 +102,6 @@ class SIMPerformance(BasePerformance):
         Log.info(f"Computing SYPD for job {job.name} with start timestamp {start_timestamp}, finish timestamp {finish_timestamp}, chunk size {chunk_size}, and chunk size unit {chunk_size_unit}.")
 
         SIMPerformance._manage_errors_computation_SYPD(start_timestamp, finish_timestamp, chunk_size, chunk_size_unit)
-
-        chunk_size = int(chunk_size)  
 
         duration_seconds = finish_timestamp - start_timestamp
 

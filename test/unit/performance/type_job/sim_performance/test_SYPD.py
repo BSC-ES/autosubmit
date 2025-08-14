@@ -99,10 +99,10 @@ class TestSIMPerformanceSYPDNaive:
         """
         Test to verify that an error is raised when chunk_size is not a string.
         """
-        naive_job.chunk_length = 12
+        naive_job.chunk_length = '12'
         with pytest.raises(TypeError) as exc_info:
             sim_performance.compute_sypd_from_job(naive_job)
-        assert str(exc_info.value) == "chunk_size must be a string representing the size of the chunk (e.g., '12')."
+        assert str(exc_info.value) == "chunk_size must be an integer representing the size of the chunk (e.g., 12)."
 
     def test_invalid_chunk_size_unit_type(self, sim_performance: SIMPerformance, naive_job: Job):
         """
@@ -121,15 +121,15 @@ class TestSIMPerformanceSYPDNaive:
         Test to verify that an error is raised when chunk_size is not a numeric string.
         """
         naive_job.chunk_length = "invalid_chunk_size"
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(TypeError) as exc_info:
             sim_performance.compute_sypd_from_job(naive_job)
-        assert str(exc_info.value) == "chunk_size must be a positive numeric string (e.g., '12')."
+        assert str(exc_info.value) == "chunk_size must be an integer representing the size of the chunk (e.g., 12)."
 
     def test_negative_chunk_size_unit_value(self, sim_performance: SIMPerformance, naive_job: Job):
         """
         Test to verify that an error is raised when chunk_size is a negative numeric string.
         """
-        naive_job.chunk_length = "-12"
+        naive_job.chunk_length = -12
         with pytest.raises(ValueError) as exc_info:
             sim_performance.compute_sypd_from_job(naive_job)
         assert str(exc_info.value) == "chunk_size must be a positive numeric string (e.g., '12')."
@@ -165,7 +165,7 @@ class TestPerformanceSYPDCheckThreshold:
             name="test_job_001",
             status="COMPLETED",
             section="SIM",
-            chunk_size="12",
+            chunk_size=12,
             chunk_size_unit="hour",
         )
 
@@ -199,7 +199,7 @@ class TestPerformanceSYPDCheckThreshold:
             name="test_job_002",
             status="COMPLETED",
             section="SIM",
-            chunk_size="1",
+            chunk_size=1,
             chunk_size_unit="month",
         )
 
@@ -304,9 +304,9 @@ class TestPerformanceSYPDExtremeCases:
         """
         Test to verify that SYPD raises an error for a Job with an invalid chunk size.
         """
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(TypeError) as exc_info:
             sim_performance.compute_sypd_from_job(job_with_invalid_chunk_size)
-        assert str(exc_info.value) == "chunk_size must be a positive numeric string (e.g., '12')."
+        assert str(exc_info.value) == "chunk_size must be an integer representing the size of the chunk (e.g., 12)."
 
     @pytest.fixture
     def job_with_invalid_chunk_size_unit(self, job_factory):
@@ -317,7 +317,7 @@ class TestPerformanceSYPDExtremeCases:
             name="test_job_006",
             status="COMPLETED",
             section="SIM",
-            chunk_size="12",
+            chunk_size=12,
             chunk_size_unit="invalid_unit",
         )
 
