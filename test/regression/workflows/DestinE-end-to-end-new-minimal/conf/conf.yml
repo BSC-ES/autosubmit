@@ -1,24 +1,24 @@
 DEFAULT:
   EXPID: a2da
-  HPCARCH: local
+  HPCARCH: TEST_SLURM
   CUSTOM_CONFIG: hidden
 JOBS:
   LOCAL_SETUP:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: once
     CHECK: on_submission
     DEPENDENCIES: {}
   SYNCHRONIZE:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: {}
     RUNNING: once
     CHECK: on_submission
   REMOTE_SETUP:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       SYNCHRONIZE: {}
     RUNNING: once
@@ -26,7 +26,7 @@ JOBS:
     CHECK: on_submission
   INI:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       REMOTE_SETUP: {}
     RUNNING: member
@@ -34,7 +34,7 @@ JOBS:
     CHECK: on_submission
   SIM:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       INI: {}
       SIM-1: {}
@@ -56,7 +56,7 @@ JOBS:
       DN-1:
     RUNNING: chunk
     WALLCLOCK: 02:00
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     SPLITS: auto
     TOTALJOBS: 1
     CHECK: on_submission
@@ -91,3 +91,16 @@ GIT:
   PROJECT_COMMIT: ''
   PROJECT_SUBMODULES: data-portfolio dvc-cache-de340
   FETCH_SINGLE_BRANCH: true
+PLATFORMS:
+  TEST_SLURM:
+    ADD_PROJECT_TO_HOST: false
+    HOST: localDocker
+    MAX_WALLCLOCK: 48:00
+    PROJECT: group
+    QUEUE: debug
+    SCRATCH_DIR: /tmp/scratch/
+    TEMP_DIR: ''
+    TYPE: slurm
+    USER: root
+    MAX_PROCESSORS: 10
+    PROCESSORS_PER_NODE: 10
