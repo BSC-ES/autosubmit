@@ -28,16 +28,23 @@ from multiprocessing.queues import Queue
 # noinspection PyProtectedMember
 from os import _exit  # type: ignore
 from pathlib import Path
-from typing import List, Union, Set, Any, TYPE_CHECKING
+from typing import Any, Optional, Union, cast, TYPE_CHECKING
 
 import setproctitle
 
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
+from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
+    from autosubmit.job.job import Job
+    from autosubmit.job.job_list import JobList
+    from autosubmit.job.job_packages import JobPackageBase
+
+
+HACK_GLOBAL_FLAG = False
 
 
 def _init_logs_log_process(as_conf, platform_name):
@@ -69,7 +76,6 @@ def recover_platform_job_logs_wrapper(
     :param as_conf: The Autosubmit configuration object containing experiment data.
     :type as_conf: Any
     :return: None
-    :rtype: None
     """
     platform.recovery_queue = recovery_queue
     platform.work_event = worker_event
@@ -87,8 +93,6 @@ def recover_platform_job_logs_wrapper(
     _init_logs_log_process(as_conf, platform.name)
     platform.recover_platform_job_logs(as_conf)
     _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
-
-
 
 
 class CopyQueue(Queue):
@@ -112,7 +116,6 @@ class CopyQueue(Queue):
         self.block = block
         self.timeout = timeout
         super().__init__(maxsize, ctx=ctx)
-
 
     def put(self, job: Any, block: bool = True, timeout: float = None) -> None:
         """
@@ -231,7 +234,7 @@ class Platform(object):
 
     @classmethod
     def update_workers(cls, event_worker):
-        # This is visible on all instances simultaneosly. Is to send the keep alive signal.
+        # This is visible on all instances simultaneously. Is to send the keep alive signal.
         cls.worker_events.append(event_worker)
 
     @classmethod
@@ -363,28 +366,26 @@ class Platform(object):
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
 
-    def submit_ready_jobs(self, as_conf, job_list, platforms_to_test, packages_persistence, packages_to_submit,
-                          inspect=False, only_wrappers=False, hold=False):
+    def submit_ready_jobs(
+            self,
+            as_conf: 'AutosubmitConfig',
+            job_list: 'JobList',
+            packages_persistence: JobPackagePersistence,
+            packages_to_submit: list['JobPackageBase'],
+            inspect=False,
+            only_wrappers=False,
+            hold=False
+    ) -> tuple[bool, list[str], str, list['JobPackageBase'], bool]:
+        """Gets ``READY`` jobs and send them to the platforms if there is available space on the queues.
 
-        """
-        Gets READY jobs and send them to the platforms if there is available space on the queues
-
-        :param hold:
+        :param as_conf: autosubmit config object
+        :param job_list: job list to check
+        :param packages_persistence: Handles database per experiment.
         :param packages_to_submit:
-        :param as_conf: autosubmit config object \n
-        :type as_conf: AutosubmitConfig object  \n
-        :param job_list: job list to check  \n
-        :type job_list: JobList object  \n
-        :param platforms_to_test: platforms used  \n
-        :type platforms_to_test: set of Platform Objects, e.g. EcPlatform(), SlurmPlatform().  \n
-        :param packages_persistence: Handles database per experiment. \n
-        :type packages_persistence: JobPackagePersistence object \n
-        :param inspect: True if coming from generate_scripts_andor_wrappers(). \n
-        :type inspect: Boolean \n
-        :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw. \n
-        :type only_wrappers: Boolean \n
-        :return: True if at least one job was submitted, False otherwise \n
-        :rtype: Boolean
+        :param inspect: True if coming from generate_scripts_andor_wrappers().
+        :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw.
+        :param hold:
+        :return: True if at least one job was submitted, False otherwise
         """
         any_job_submitted = False
         save = False
@@ -400,7 +401,7 @@ class Platform(object):
                 job_list.get_prepared(self)), self.name)
         if not inspect:
             self.generate_submit_script()
-        valid_packages_to_submit = []  # type: List[JobPackageBase]
+        valid_packages_to_submit: list['JobPackageBase'] = []
         for package in packages_to_submit:
             try:
                 # If called from inspect command or -cw
@@ -411,7 +412,7 @@ class Platform(object):
                         wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.READY, 0,
                                                  package.jobs,
                                                  package._wallclock, package._num_processors,
-                                                 package.platform, as_conf, hold)
+                                                 cast('ParamikoPlatform', package.platform), as_conf, hold)
                         job_list.job_package_map[package.jobs[0].id] = wrapper_job
                         packages_persistence.save(package, inspect)
                     for innerJob in package._jobs:
@@ -459,14 +460,24 @@ class Platform(object):
                         self.connected = False
                         raise
 
+            # FIXME: We have several parts of the code doing this: catching several types of
+            #        exceptions, then just re-raising them. There's no point in wrapping the
+            #        code in a try-catch for that and we can just let them bubble up, making
+            #        the code a bit simpler and easier to read.
             except AutosubmitCritical as e:
                 raise
             except AutosubmitError as e:
                 raise
             except Exception as e:
                 raise
+
+        # FIXME: If we can infer this value based on whether the ``valid_packages_to_submit`` is truthy,
+        #        then users can do that too, or infer it some other way -- i.e. we can probably drop that
+        #        value from the returned tuple, maybe even return a single type in the future or build a
+        #        dataclass or similar (easier for types/test).
         if valid_packages_to_submit:
             any_job_submitted = True
+
         return save, failed_packages, error_message, valid_packages_to_submit, any_job_submitted
 
     @property
@@ -674,14 +685,10 @@ class Platform(object):
         (job_out_filename, job_err_filename) = remote_logs
         self.get_files([job_out_filename, job_err_filename], False, 'LOG_{0}'.format(exp_id))
 
-    def get_checkpoint_files(self, job):
-        """
-        Get all the checkpoint files of a job
+    def get_checkpoint_files(self, job: 'Job'):
+        """Get all the checkpoint files of a job.
 
         :param job: Get the checkpoint files
-        :type job: Job
-        :param max_step: max step possible
-        :type max_step: int
         """
         if not job.current_checkpoint_step:
             job.current_checkpoint_step = 0
@@ -756,7 +763,7 @@ class Platform(object):
         """
         Removes *CHECKPOINT* files from remote
 
-        :param job_name: name of job to check
+        :param filename: name of file to remove
         :return: True if successful, False otherwise
         """
         if self.check_file_exists(filename):
@@ -799,12 +806,11 @@ class Platform(object):
             path = Path(self.remote_log_dir)
         return str(path)
 
-    def submit_job(self, job, script_name, hold=False, export="none"):
+    def submit_job(self, job: Optional['Job'], script_name, hold=False, export="none"):
         """
         Submit a job from a given job object.
 
         :param job: job object
-        :type job: autosubmit.job.job.Job
         :param script_name: job script's name
         :rtype script_name: str
         :param hold: if True, the job will be submitted in hold state
@@ -883,7 +889,7 @@ class Platform(object):
         raise NotImplementedError
 
     def submit_Script(self, hold=False):
-        # type: (bool) -> Union[List[str], str]
+        # type: (bool) -> Union[list[str], str]
         """
         Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once.
         """
@@ -1061,37 +1067,26 @@ class Platform(object):
         return process_log
 
     def wait_until_timeout(self, timeout: int = 60) -> bool:
-        """
-        Waits until the timeout is reached or any signal is set to process logs.
+        """Waits until the timeout is reached or any signal is set to process logs.
 
-        :param sleep_time: Maximum time to wait in seconds. Defaults to 60.
-        :type sleep_time: int
+        :param timeout: Maximum time to wait in seconds. Defaults to 60.
         :return: True if there is work to process, False otherwise.
-        :rtype: bool
         """
-        process_log = False
         for _ in range(timeout, 0, -1):
             time.sleep(1)
             if self.work_event.is_set() or not self.recovery_queue.empty() or self.cleanup_event.is_set():
-                process_log = True
-                break
-        return process_log
+                return True
 
-    def recover_job_log(self, identifier: str, jobs_pending_to_process: Set[Any], as_conf: 'AutosubmitConfig') -> Set[Any]:
-        """
-        Recovers log files for jobs from the recovery queue and retries failed jobs.
+        return False
+
+    def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any], as_conf: 'AutosubmitConfig') -> set[Any]:
+        """Recovers log files for jobs from the recovery queue and retries failed jobs.
 
         :param identifier: Identifier for logging purposes.
-        :type identifier: str
         :param jobs_pending_to_process: Set of jobs that had issues during log retrieval.
-        :type jobs_pending_to_process: Set[Any]
         :param as_conf: The Autosubmit configuration object containing experiment data.
-        :type as_conf: AutosubmitConfig
         :return: Updated set of jobs pending to process.
-        :rtype: Set[Any]
         """
-        job = None
-
         while not self.recovery_queue.empty():
             try:
                 from autosubmit.job.job import Job
@@ -1108,10 +1103,10 @@ class Platform(object):
             except queue.Empty:
                 pass
 
-        if len(jobs_pending_to_process) > 0: # Restore the connection if there was an issue with one or more jobs.
+        if len(jobs_pending_to_process) > 0:  # Restore the connection if there was an issue with one or more jobs.
             self.restore_connection(as_conf, log_recovery_process=True)
 
-        # This second while is to keep retring the failed jobs.
+        # This second while is to keep retrying the failed jobs.
         # With the unique queue, the main process won't send the job again, so we have to store it here.
         while len(jobs_pending_to_process) > 0:  # jobs that had any issue during the log retrieval
             job = jobs_pending_to_process.pop()

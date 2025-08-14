@@ -22,53 +22,43 @@ import shutil
 from contextlib import suppress
 from pathlib import Path
 from sys import setrecursionlimit, getrecursionlimit
+from typing import TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.db_manager import create_db_manager
 from autosubmit.log.log import Log
 
+if TYPE_CHECKING:
+    from autosubmit.config.configcommon import AutosubmitConfig
+    from autosubmit.job.job import Job
+
 
 class JobListPersistence(object):
-    """
-    Class to manage the persistence of the job lists
+    """Class to manage the persistence of the job lists."""
 
-    """
+    def save(self, persistence_path: str, persistence_file: str, job_list: list['Job']) -> None:
+        """Persists a job list.
 
-    def save(self, persistence_path, persistence_file, job_list , graph):
-        """
-        Persists a job list
         :param job_list: JobList
-        :param persistence_file: str
-        :param persistence_path: str
-
+        :param persistence_file: The name of the persistence database file.
+        :param persistence_path: The path to the persistence database.
         """
         raise NotImplementedError
 
-    def load(self, persistence_path, persistence_file):
-        """
-        Loads a job list from persistence
-        :param persistence_file: str
-        :param persistence_path: str
+    def load(self, persistence_path, persistence_file) -> 'JobList':
+        """Loads a job list from persistence
 
+        :param persistence_file: The name of the persistence database file.
+        :param persistence_path: The path to the persistence database.
         """
         raise NotImplementedError
 
 
 class JobListPersistencePkl(JobListPersistence):
-    """
-    Class to manage the pickle persistence of the job lists
+    """Class to manage the pickle persistence of the job lists."""
 
-    """
-
-    EXT = '.pkl'
-
-    def load(self, persistence_path, persistence_file):
-        """
-        Loads a job list from a pkl file
-        :param persistence_file: str
-        :param persistence_path: str
-
-        """
+    def load(self, persistence_path: str, persistence_file: str):
+        """Loads a job list from a pkl file."""
         path = os.path.join(persistence_path, persistence_file + '.pkl')
         path_tmp = os.path.join(persistence_path[:-3]+"tmp", persistence_file + f'.pkl.tmp_{os.urandom(8).hex()}')
 
@@ -94,35 +84,28 @@ class JobListPersistencePkl(JobListPersistence):
 
             return job_list
 
-    def save(self, persistence_path, persistence_file, job_list, graph):
-        """
-        Persists a job list in a pkl file
-        :param job_list: JobList
-        :param persistence_file: str
-        :param persistence_path: str
-
-        """
-
-        path = os.path.join(persistence_path, persistence_file + '.pkl' + '.tmp')
+    def save(self, persistence_path: str, persistence_file: str, job_list: list['Job']):
+        """Persists a job list in a pickle pkl file."""
+        path = Path(persistence_path, f'{persistence_file}.pkl.tmp')
         with suppress(FileNotFoundError, PermissionError):
-            os.remove(path)
-        Log.debug("Saving JobList: " + path)
+            path.unlink(missing_ok=True)
+        Log.debug(f"Saving JobList: {str(path)}")
         with open(path, 'wb') as fd:
             current_limit = getrecursionlimit()
             setrecursionlimit(100000)
             pickle.dump({job.name: job.__getstate__() for job in job_list}, fd, pickle.HIGHEST_PROTOCOL)
             setrecursionlimit(current_limit)
             gc.collect()  # Tracemalloc show leaks without this
-        os.replace(path, path[:-4])
-        Log.debug(f'JobList saved in {path[:-4]}')
 
+        path_tmp_name = str(path)
+        path_name = path_tmp_name[:-4]
+
+        os.replace(path_tmp_name, path_name)
+        Log.debug(f'JobList saved in {path_name}')
 
 
 class JobListPersistenceDb(JobListPersistence):
-    """
-    Class to manage the database persistence of the job lists
-
-    """
+    """Class to manage the database persistence of the job lists."""
 
     VERSION = 3
     JOB_LIST_TABLE = 'job_list'
@@ -154,34 +137,33 @@ class JobListPersistenceDb(JobListPersistence):
         self.db_manager = create_db_manager(BasicConfig.DATABASE_BACKEND, **options)
 
     def load(self, persistence_path, persistence_file):
-        """
-        Loads a job list from a database
-        :param persistence_file: str
-        :param persistence_path: str
-
-        """
+        """Loads a job list from a database."""
         return self.db_manager.select_all(self.JOB_LIST_TABLE)
 
-    def save(self, persistence_path, persistence_file, job_list, graph):
-        """
-        Persists a job list in a database
-        :param job_list: JobList
-        :param persistence_file: str
-        :param persistence_path: str
-
-        """
+    def save(self, persistence_path, persistence_file, job_list):
+        """Persists a job list to a database."""
         self._reset_table()
         jobs_data = [(job.name, job.id, job.status,
                       job.priority, job.section, job.date,
                       job.member, job.chunk, job.split,
                       job.local_logs[0], job.local_logs[1],
-                      job.remote_logs[0], job.remote_logs[1],job.wrapper_type) for job in job_list]
+                      job.remote_logs[0], job.remote_logs[1], job.wrapper_type) for job in job_list]
         self.db_manager.insertMany(self.JOB_LIST_TABLE, jobs_data)
 
-    def _reset_table(self):
-        """
-        Drops and recreates the database
-
-        """
+    def _reset_table(self) -> None:
+        """Drops and recreates the database."""
         self.db_manager.drop_table(self.JOB_LIST_TABLE)
         self.db_manager.create_table(self.JOB_LIST_TABLE, self.TABLE_FIELDS)
+
+
+def get_job_list_persistence(expid: str, as_conf: 'AutosubmitConfig') -> JobListPersistence:
+    """Return the persistence object for a ``JobList`` based on what is configured in Autosubmit."""
+    storage_type = as_conf.get_storage_type()
+
+    if storage_type not in ('pkl', 'db'):
+        raise AutosubmitCritical('Storage type not known', 7014)
+
+    if storage_type == 'pkl':
+        return JobListPersistencePkl()
+    elif storage_type == 'db':
+        return JobListPersistenceDb(expid)

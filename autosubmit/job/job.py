@@ -1354,14 +1354,12 @@ class Job(object):
             except BaseException as e:
                 Log.printlog("Trace {0} \n Failed to write the {1} e=6001".format(str(e), self.name))
 
-    def retrieve_logfiles(self, raise_error: bool = False) -> dict[str, int]:
+    def retrieve_logfiles(self, raise_error: bool = False) -> None:
         """
         Retrieves log files from remote host.
 
         :param raise_error: If True, raises an error if the log files are not retrieved.
         :type raise_error: bool
-        :return: Dictionary with finish timestamps per job.
-        :rtype: dict[str, int]
         """
         backup_logname = copy.copy(self.local_logs)
         if self.wrapper_type == "vertical":
@@ -1458,15 +1456,14 @@ class Job(object):
         self.prev_status = previous_status
         new_status = self.new_status
         if new_status == Status.COMPLETED:
-            Log.debug(
-                "{0} job seems to have completed: checking...".format(self.name))
+            Log.debug(f"{self.name} job seems to have completed: checking...")
             if not self._platform.get_completed_files(self.name, wrapper_failed=self.packed):
-                log_name = os.path.join(
-                    self._tmp_path, self.name + '_COMPLETED')
-
-            self.check_completion()
+                Log.debug("Failed to get platform's completed files")
+            completion_status = self.check_completion()
+            Log.debug(f"Completion status: {completion_status}")
         else:
             self.status = new_status
+
         if self.status == Status.RUNNING:
             Log.info("Job {0} is RUNNING", self.name)
         elif self.status == Status.QUEUING:
@@ -1500,7 +1497,7 @@ class Job(object):
         # Updating logs
         if self.status in [Status.COMPLETED, Status.FAILED, Status.UNKNOWN]:
             if str(as_conf.platforms_data.get(self.platform.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "true":
-                self.retrieve_logfiles(self.platform)
+                self.retrieve_logfiles(raise_error=True)
             else:
                 self.platform.add_job_to_log_recover(self)
 
@@ -1514,8 +1511,8 @@ class Job(object):
                 last_run_id = (
                     exp_history.manager.get_experiment_run_dc_with_max_id().run_id
                 )
-                metric_procesor = UserMetricProcessor(as_conf, self, last_run_id)
-                metric_procesor.process_metrics()
+                metric_processor = UserMetricProcessor(as_conf, self, last_run_id)
+                metric_processor.process_metrics()
             except Exception as exc:
                 # Warn if metrics are not processed
                 Log.printlog(
@@ -2029,7 +2026,7 @@ class Job(object):
                                                                                                  "MAX_WAITING_JOBS",
                                                                                                  -1))))
 
-    def calendar_split(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> None:
+    def calendar_split(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> dict:
         """
         Calculate the calendar splits for the job.
 
@@ -2167,7 +2164,7 @@ class Job(object):
                 parameters['CHUNK_LAST'] = 'FALSE'
         return parameters
 
-    def update_job_parameters(self, as_conf, parameters, set_attributes):
+    def update_job_parameters(self, as_conf, parameters, set_attributes) -> dict:
         if set_attributes:
             if self.splits == "auto":
                 self.splits = parameters.get("CURRENT_SPLITS", None)
@@ -2806,8 +2803,8 @@ class WrapperJob(Job):
         priority: int,
         job_list: List[Job],
         total_wallclock: str,
-        num_processors: int,
-        platform: "Platform",
+        num_processors: Optional[int],
+        platform: ParamikoPlatform,
         as_config: AutosubmitConfig,
         hold: bool,
     ):
@@ -2825,7 +2822,6 @@ class WrapperJob(Job):
         self.hold = hold
         self.inner_jobs_running = list()
         self.is_wrapper = True
-
 
     def _queuing_reason_cancel(self, reason: str) -> bool:
         """
@@ -2866,7 +2862,7 @@ class WrapperJob(Job):
             # This will update the inner jobs to QUEUE or HELD (normal behaviour) or WAITING ( if they fail to be held)
             self._check_inner_jobs_queue(prev_status)
         elif self.status == Status.RUNNING:  # If wrapper is running
-            #Log.info("Wrapper {0} is {1}".format(self.name, Status().VALUE_TO_KEY[self.status]))
+            # Log.info("Wrapper {0} is {1}".format(self.name, Status().VALUE_TO_KEY[self.status]))
             # This will update the status from submitted or hold to running (if safety timer is high enough or queue is fast enough)
             if prev_status in [Status.SUBMITTED]:
                 for job in self.job_list:
@@ -2935,7 +2931,7 @@ class WrapperJob(Job):
         for job in not_completed_jobs:
             self._check_finished_job(job)
 
-    def _check_inner_jobs_queue(self, prev_status :str) -> None:
+    def _check_inner_jobs_queue(self, prev_status: str) -> None:
         """
         Update previous status of a job and updating the job to a new status.
         If the platform being used is slurm the function will get the status of all the jobs,
@@ -2944,7 +2940,6 @@ class WrapperJob(Job):
         :param prev_status: previous status of a job
         :type prev_status: str
         """
-        reason = str()
         if self._platform.type == 'slurm':
             self._platform.send_command(
                 self._platform.get_queue_status_cmd(self.id))
@@ -3121,7 +3116,7 @@ class WrapperJob(Job):
         job.update_status(self.as_config, failed_file)
         self.running_jobs_start.pop(job, None)
 
-    def update_failed_jobs(self, check_ready_jobs :bool=False) -> None:
+    def update_failed_jobs(self, check_ready_jobs: bool = False) -> None:
         """
         Check all jobs associated, and update their status either to complete or to Failed,
         and if job is still running appends it to they inner jobs of the wrapper.
