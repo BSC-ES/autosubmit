@@ -82,6 +82,7 @@ from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.submitter import Submitter
 from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmit.log import utils as log_utils
+from autosubmit.context import create_context_from_args, execution_context
 
 dialog = None
 
@@ -218,6 +219,8 @@ class Autosubmit:
                                    help='Sets members allowed on this run.')
             subparser.add_argument('-p', '--profile', action='store_true', default=False, required=False,
                                    help='Prints performance parameters of the execution of this command.')
+            subparser.add_argument('--compress_remote_logs', action='store_true', default=False,
+                                   help='Compress remote logs during synchronization.')
 
 
             # Expid
@@ -762,7 +765,9 @@ class Autosubmit:
         if args.command != "configure" and args.command != "install":
             Autosubmit._init_logs(args, args.logconsole, args.logfile, expid)
         if args.command == 'run':
-            return Autosubmit.run_experiment(args.expid, args.notransitive,args.start_time,args.start_after, args.run_only_members, args.profile)
+            context = create_context_from_args(args)
+            with execution_context(context):
+                return Autosubmit.run_experiment(args.expid, args.notransitive,args.start_time,args.start_after, args.run_only_members, args.profile)
         elif args.command == 'expid':
             return Autosubmit.expid(args.description,args.HPC,args.copy, args.dummy,args.minimal_configuration,args.git_repo,args.git_branch,args.git_as_conf,args.operational,args.testcase,args.evaluation,args.use_local_minimal) != ''
         elif args.command == 'delete':
