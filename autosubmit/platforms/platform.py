@@ -18,6 +18,7 @@
 import atexit
 import locale
 import multiprocessing
+from multiprocessing.context import SpawnContext
 import os
 import queue  # only for the exception
 import time
@@ -35,6 +36,7 @@ import setproctitle
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.context import get_current_context
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -49,11 +51,11 @@ def _init_logs_log_process(as_conf, platform_name):
 
 
 def recover_platform_job_logs_wrapper(
-        platform: Any,
+        platform: 'Platform',
         recovery_queue: Queue,
         worker_event: Event,
         cleanup_event: Event,
-        as_conf: Any
+        as_conf: 'AutosubmitConfig'
 ) -> None:
     """
     Wrapper function to recover platform job logs.
@@ -228,6 +230,13 @@ class Platform(object):
             log_queue_size = int(platform_total_jobs) * 2
         self.log_queue_size = log_queue_size
         self.remote_log_dir = None
+        self.compress_remote_logs = False
+        try:
+            context = get_current_context()
+            if context:
+                self.compress_remote_logs = context.compress_remote_logs
+        except Exception as exc:
+            Log.warning("Could not get configuration for context for remote log compression: {0}", exc)
 
     @classmethod
     def update_workers(cls, event_worker):
@@ -967,7 +976,7 @@ class Platform(object):
             if not isinstance(self.config[key], dict) or key in ["PLATFORMS", "EXPERIMENT", "DEFAULT", "CONFIG"]:
                 platform.config[key] = self.config[key]
 
-    def prepare_process(self, ctx):
+    def prepare_process(self, ctx) -> 'Platform':
         new_platform = self.create_a_new_copy()
         self.work_event = ctx.Event()
         self.cleanup_event = ctx.Event()
@@ -982,7 +991,7 @@ class Platform(object):
         atexit.register(self.closeConnection)
         return new_platform
 
-    def create_new_process(self, ctx, new_platform, as_conf) -> None:
+    def create_new_process(self, ctx: SpawnContext, new_platform: 'Platform', as_conf) -> None:
         self.log_recovery_process = ctx.Process(
             target=recover_platform_job_logs_wrapper,
             args=(new_platform, self.recovery_queue, self.work_event, self.cleanup_event, as_conf),
