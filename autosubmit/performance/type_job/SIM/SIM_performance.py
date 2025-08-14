@@ -33,6 +33,7 @@ class SIMPerformance(BasePerformance):
 
     # Errors management for each metric
 
+    @staticmethod
     def _manage_errors_computation_SYPD(start_timestamp, finish_timestamp, chunk_size, chunk_size_unit):
         """
         Manage errors in the computation of SYPD.
@@ -62,13 +63,17 @@ class SIMPerformance(BasePerformance):
         if not chunk_size_unit:
             raise ValueError("chunk_size_unit must be set.")
 
-        if not isinstance(start_timestamp, int):
+        try:
+            start_ts_int = int(start_timestamp)
+        except (TypeError, ValueError):
             raise TypeError("start_timestamp must be an integer representing Unix timestamp.")
 
-        if not isinstance(finish_timestamp, int):
+        try:
+            finish_ts_int = int(finish_timestamp)
+        except (TypeError, ValueError):
             raise TypeError("finish_timestamp must be an integer representing Unix timestamp.")
 
-        if finish_timestamp <= start_timestamp:
+        if finish_ts_int <= start_ts_int:
             raise ValueError(f"Finish timestamp must be greater than start timestamp.")
         
         if not isinstance(chunk_size, int):
@@ -102,6 +107,9 @@ class SIMPerformance(BasePerformance):
         Log.info(f"Computing SYPD for job {job.name} with start timestamp {start_timestamp}, finish timestamp {finish_timestamp}, chunk size {chunk_size}, and chunk size unit {chunk_size_unit}.")
 
         SIMPerformance._manage_errors_computation_SYPD(start_timestamp, finish_timestamp, chunk_size, chunk_size_unit)
+
+        start_timestamp = int(start_timestamp)
+        finish_timestamp = int(finish_timestamp)
 
         duration_seconds = finish_timestamp - start_timestamp
 
