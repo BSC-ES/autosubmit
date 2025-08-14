@@ -103,6 +103,8 @@ def main():
         return_value, args = Autosubmit.parse_args()
         if args:
             return_value = Autosubmit.run_command(args)
+            if args.compresslogs and args.expid:
+                Autosubmit.compress_logs(args.expid, keep_input=False)
         delete_lock_file()
     except BaseException as e:
         delete_lock_file()
