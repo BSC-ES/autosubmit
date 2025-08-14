@@ -85,16 +85,8 @@ class TransformToJob:
         job.finish_time_timestamp = test_job.finish_timestamp
 
         job._section = test_job.section
-        job._chunk = test_job.chunk_size
 
-        # For chunk size unit, we ensure its parameters are set correctly
-        if not hasattr(job, "parameters") or job.parameters is None:
-            job.parameters = {}
-
-        if "EXPERIMENT" not in job.parameters:
-            job.parameters["EXPERIMENT"] = {}
-
-        job.parameters["EXPERIMENT"]["CHUNKSIZEUNIT"] = test_job.chunk_size_unit
-        job.parameters["EXPERIMENT"]["CHUNKSIZE"] = test_job.chunk_size
+        job.chunk_unit = test_job.chunk_size_unit
+        job.chunk_length = test_job.chunk_size
 
         return job

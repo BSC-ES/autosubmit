@@ -31,9 +31,5 @@ def test_creation(naive_job: Job):
     assert naive_job.start_time_timestamp > 0
     assert naive_job.finish_time_timestamp > 0
 
-    assert naive_job._chunk == "12"
-
-    assert hasattr(naive_job, "parameters")
-    assert "EXPERIMENT" in naive_job.parameters
-    assert naive_job.parameters["EXPERIMENT"]["CHUNKSIZEUNIT"] == "month"
-    assert naive_job.parameters["EXPERIMENT"]["CHUNKSIZE"] == "12"
+    assert naive_job.chunk_unit == "month"
+    assert naive_job.chunk_length == "12"

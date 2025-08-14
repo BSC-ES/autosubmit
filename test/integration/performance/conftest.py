@@ -151,25 +151,25 @@ def create_platform(platform_config: PlatformConfig):
 
 # Mail Configuration 
 
-@pytest.fixture
-def performance_mail_notifier(integration_mail_notifier):
-    """
-    Fixture to provide the performance mail notifier.
-
-    :param integration_mail_notifier: The MailNotifier instance that use Docker from test_mail.
-    :return: The performance mail notifier instance.
-    """
-    return integration_mail_notifier
-
 @pytest.fixture(autouse=True)
-def mock_base_performance_notifier(performance_mail_notifier, mocker):
+def mock_base_performance_notifier(integration_mail_notifier, mocker):
     """
     Mock the BasePerformance mail notifier to use the performance mail notifier.
 
     :param performance_mail_notifier: The MailNotifier instance with Docker.
     :param mocker: The pytest-mock fixture for mocking.
     """
-    mocker.patch('autosubmit.performance.base_performance.MailNotifier', return_value=performance_mail_notifier)
+    
+    def patched_init(self, performance_config=None):
+        self._performance_config = performance_config
+        self._mail_notifier = integration_mail_notifier
+    
+    mocker.patch.object(BasePerformance, '__init__', patched_init)
+
+    mocker.patch(
+        'autosubmit.performance.base_performance.MailNotifier',
+        return_value=integration_mail_notifier
+    )
 
 @pytest.fixture(autouse=True)
 def clear_mail_api(fake_smtp_server):

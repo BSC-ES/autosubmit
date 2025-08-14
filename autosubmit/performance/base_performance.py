@@ -54,7 +54,8 @@ class BasePerformance(ABC):
         :type performance_config: dict[str, any]
         """
         self._performance_config = performance_config 
-        self._mail_notifier = MailNotifier(BasicConfig.read())
+        BasicConfig.read()
+        self._mail_notifier = MailNotifier(BasicConfig)
 
     @abstractmethod
     def compute_and_check_performance_metrics(self, job: "Job") -> list[PerformanceMetricInfo]:
@@ -118,7 +119,7 @@ class BasePerformance(ABC):
         :rtype: list[str]
         """
 
-        notify_to = self._performance_config.experiment_data.get("NOTIFY_TO", [])
+        notify_to = self._performance_config.get("NOTIFY_TO", [])
 
         if not notify_to:
             raise ValueError(
