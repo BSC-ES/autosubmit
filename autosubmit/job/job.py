@@ -1377,6 +1377,7 @@ class Job(object):
                     dir_path = os.path.join(self._tmp_path, "LOG_" + str(self.expid))
                     log_utils.compress_xz(
                         os.path.join(dir_path, local_log),
+                        output_path=os.path.join(dir_path, local_log), # Same name due to further verification
                         preset=9,
                         extreme=True,
                         keep_input=False
