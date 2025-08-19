@@ -90,7 +90,7 @@ DEFAULT_EXPORTED_KEYS = [
 ]
 
 
-def _add_dir_and_files(crate: ROCrate, base_path: str, relative_path: str, encoding_format: str = None) -> None:
+def _add_dir_and_files(crate: ROCrate, base_path: Path, relative_path: str, encoding_format: str = None) -> None:
     """Add a directory and its files into the RO-Crate.
 
     :param crate: the RO-Crate instance.
@@ -109,7 +109,7 @@ def _add_dir_and_files(crate: ROCrate, base_path: str, relative_path: str, encod
     )
 
 
-def _add_file(crate: ROCrate, base_path: Union[str, None], file_path: Path, encoding_format: str = None, use_uri: bool = False, **args: Any) -> Any:
+def _add_file(crate: ROCrate, base_path: Union[Path, None], file_path: Path, encoding_format: str = None, use_uri: bool = False, **args: Any) -> Any:
     """Add a file into the RO-Crate.
 
     :param crate: the RO-Crate instance.
@@ -140,11 +140,11 @@ def _add_file(crate: ROCrate, base_path: Union[str, None], file_path: Path, enco
     if base_path:
         dest_path = file_path.relative_to(base_path)
     file = File(crate=crate,
-        source=source,
-        dest_path=dest_path,
-        fetch_remote=False,
-        validate_url=False,
-        properties=properties)
+                source=source,
+                dest_path=dest_path,
+                fetch_remote=False,
+                validate_url=False,
+                properties=properties)
     # This is to prevent ``metadata/experiment_data.yml`` to be added twice.
     # Once as the workflow main file, and twice when scanning the experiment
     # ``conf`` folder for YAML files.
@@ -225,8 +225,6 @@ def _get_project_entity(as_configuration: AutosubmitConfig, crate: ROCrate) -> U
     project_values = as_configuration.experiment_data.get(project_type, {})
     project_path = as_configuration.get_project_dir()
 
-    project_url = None
-    project_version = None  # version is the commit/revision/etc., as per schema.org
     if project_type == 'NONE':
         project_url = ''
         project_version = ''
@@ -279,10 +277,10 @@ def _create_formal_parameter(crate, parameter_name, name=None, **kwargs) -> Any:
     return crate.add(ContextEntity(crate, properties=properties))
 
 
-def _create_parameter(crate, parameter_name, parameter_value, formal_parameter, type='PropertyValue', **kwargs) -> Any:
+def _create_parameter(crate, parameter_name, parameter_value, formal_parameter, _type='PropertyValue', **kwargs) -> Any:
     properties = {
         '@id': f'#{parameter_name}-pv',
-        '@type': type,
+        '@type': _type,
         'exampleOfWork': {
             '@id': formal_parameter['@id']
         },
@@ -323,8 +321,8 @@ def create_rocrate_archive(
     workflow_configuration = as_conf.experiment_data
     expid = workflow_configuration['DEFAULT']['EXPID']
     as_version = get_autosubmit_version(expid)
-    experiment_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
-    unified_yaml_configuration = Path(experiment_path, "conf/metadata/experiment_data.yml")
+    experiment_path = Path(BasicConfig.LOCAL_ROOT_DIR, expid)
+    unified_yaml_configuration = experiment_path / "conf/metadata/experiment_data.yml"
 
     root_profiles = [
         {"@id": profile["@id"]} for profile in PROFILES
@@ -514,7 +512,7 @@ def create_rocrate_archive(
                 param_name,
                 e_v,
                 formal_parameter,
-                type='PropertyValue'
+                _type='PropertyValue'
             )
 
             create_action.append_to('object', {'@id': parameter_value['@id']})
