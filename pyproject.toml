@@ -46,7 +46,7 @@ classifiers = [
 dependencies = [
     "xlib==0.21",
     "bscearth.utils<=0.5.2",
-    "requests<=2.32.4",
+    "requests<=2.32.5",
     "networkx<=3.2.1",
     "portalocker<=3.2.0",
     "paramiko>=3.5.0",
