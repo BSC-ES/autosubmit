@@ -830,9 +830,11 @@ class AutosubmitConfig(object):
                 current_data_aux = self.substitute_dynamic_variables(current_data_aux)
                 pointer_to_last_data[section_ending_name] = current_data_aux
                 try:
+                    last_data_section = pointer_to_last_data[section_ending_name]
                     for key, value in for_sections.items():
                         if key != "NAME":
-                            pointer_to_last_data[section_ending_name][key] = value[name_index]
+                            last_data_section[key] = value[name_index]
+                            pass
                 except IndexError as e:
                     Log.printlog(f"A job has an issue related to a FOR configuration. \n Please revise that the"
                                  f" number of elements matches, or if there is an unintended indentation."
