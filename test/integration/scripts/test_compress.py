@@ -19,6 +19,8 @@
 
 from pathlib import Path
 
+import pytest
+
 # from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.scripts.autosubmit import main
@@ -26,13 +28,22 @@ from autosubmit.scripts.autosubmit import main
 _EXPID = "t111"
 
 
-def test_autosubmit_compresslogs(autosubmit_exp, mocker):
+@pytest.mark.parametrize(
+    "dry_run",
+    [True, False],
+)
+def test_autosubmit_compresslogs(autosubmit_exp, mocker, dry_run: bool):
     exp = autosubmit_exp(_EXPID, experiment_data={})
 
     # autosubmit: Autosubmit = exp.autosubmit
     as_conf: AutosubmitConfig = exp.as_conf
 
-    mocker.patch("sys.argv", ["autosubmit", "compresslogs", _EXPID])
+    cmd = ["autosubmit", "compresslogs"]
+    if dry_run:
+        cmd.append("--dry-run")
+    cmd.append(_EXPID)
+
+    mocker.patch("sys.argv", cmd)
 
     assert 0 == main()
 
@@ -41,7 +52,14 @@ def test_autosubmit_compresslogs(autosubmit_exp, mocker):
     )
     aslogs_files = list(aslogs_folder.iterdir())
 
-    assert len(aslogs_files) > 0 and any(f.name.endswith(".xz") for f in aslogs_files)
+    if dry_run:
+        assert len(aslogs_files) > 0 and not any(
+            f.name.endswith(".xz") for f in aslogs_files
+        )
+    else:
+        assert len(aslogs_files) > 0 and any(
+            f.name.endswith(".xz") for f in aslogs_files
+        )
 
 
 def test_autosubmit_compresslogs_option(autosubmit_exp, mocker):
