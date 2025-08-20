@@ -18,8 +18,10 @@
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
-from autosubmit.log.utils import compress_xz, is_xz_file, find_uncompressed_files
+from autosubmit.log.utils import compress_xz, find_uncompressed_files, is_xz_file
 
 """Tests for the log module."""
 
@@ -97,3 +99,7 @@ def test_compress_xz(tmp_path: Path):
         ["xz", "-d", "-c", output_file], text=True
     ) == subprocess.check_output(["xz", "-d", "-c", output_file2], text=True)
     assert subprocess.run(["cmp", output_file, output_file2], check=True)
+
+    # Cover unexistent path
+    with pytest.raises(FileNotFoundError):
+        find_uncompressed_files(str(tmp_path.joinpath("unexistent_path")))
