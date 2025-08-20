@@ -46,7 +46,7 @@ def compress_xz(
         with lzma.open(output_path, "wb", preset=final_preset) as output_file:
             output_file.writelines(input_file)
 
-    if not keep_input:
+    if not keep_input and input_path != output_path:
         Path(input_path).unlink(missing_ok=True)
 
 
