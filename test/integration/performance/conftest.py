@@ -17,10 +17,11 @@
 
 import copy
 from dataclasses import dataclass
+
+from pytest_mock import mocker
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 import pytest 
-from test.integration.test_mail import fake_smtp_server, mail_notifier as integration_mail_notifier
-from autosubmit.performance.base_performance import BasePerformance
+from test.integration.test_mail import fake_smtp_server, mail_notifier as performance_mail_notifier
 import requests
 
 # Platforms Configuration
@@ -152,23 +153,16 @@ def create_platform(platform_config: PlatformConfig):
 # Mail Configuration 
 
 @pytest.fixture(autouse=True)
-def mock_base_performance_notifier(integration_mail_notifier, mocker):
+def mock_base_performance_notifier(performance_mail_notifier, monkeypatch):
     """
-    Mock the BasePerformance mail notifier to use the performance mail notifier.
+    Mock the get_mail_notifier method to use the performance mail notifier.
 
-    :param performance_mail_notifier: The MailNotifier instance with Docker.
-    :param mocker: The pytest-mock fixture for mocking.
+    :param performance_mail_notifier: The MailNotifier instance with Docker for testing.
+    :param mocker: The pytest mocker fixture to replace the __init__ method.
     """
-    
-    def patched_init(self, performance_config=None):
-        self._performance_config = performance_config
-        self._mail_notifier = integration_mail_notifier
-    
-    mocker.patch.object(BasePerformance, '__init__', patched_init)
-
-    mocker.patch(
-        'autosubmit.performance.base_performance.MailNotifier',
-        return_value=integration_mail_notifier
+    monkeypatch.setattr(
+        'autosubmit.performance.factory_performance.UtilsPerformance.get_mail_notifier',
+        staticmethod(lambda: performance_mail_notifier)
     )
 
 @pytest.fixture(autouse=True)

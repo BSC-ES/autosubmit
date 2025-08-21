@@ -17,7 +17,6 @@
 
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Optional, NamedTuple
-from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.notifications.mail_notifier import MailNotifier
 
 if TYPE_CHECKING:
@@ -46,7 +45,8 @@ class PerformanceMetricInfo(NamedTuple):
 class BasePerformance(ABC):
     """Base class for performance metrics calculation"""
 
-    def __init__(self, performance_config: dict[str, any] = None):
+
+    def __init__(self, performance_config: dict[str, any], mail_notifier: MailNotifier):
         """
         Initialize the BasePerformance class.
 
@@ -54,8 +54,7 @@ class BasePerformance(ABC):
         :type performance_config: dict[str, any]
         """
         self._performance_config = performance_config 
-        BasicConfig.read()
-        self._mail_notifier = MailNotifier(BasicConfig)
+        self._mail_notifier = mail_notifier
 
     @abstractmethod
     def compute_and_check_performance_metrics(self, job: "Job") -> list[PerformanceMetricInfo]:
@@ -96,18 +95,6 @@ class BasePerformance(ABC):
 
         🔍 Performance is {metric_info.under_performance:.1f}% below expected threshold.
         """
-
-    # Mail notifier setter
-
-    def set_mail_notifier(self, mail_notifier: MailNotifier):
-        """
-        Set the MailNotifier instance for the Performance class.
-
-        :param mail_notifier: An instance of MailNotifier to handle email notifications.
-        :type mail_notifier: MailNotifier
-        """
-
-        self._mail_notifier = mail_notifier
 
     # Get Autosubmit configuration
 

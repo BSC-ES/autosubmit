@@ -26,7 +26,7 @@ class TestPerformanceMetricsNaive:
     Test class for performance metrics calculations, check threshold and send mail.
     """
 
-    def test_check_and_compute_performance_metrics(self, mocker, naive_job: Job, sim_performance_with_mail_notifier: SIMPerformance, mock_smtp, utils: Utils):
+    def test_check_and_compute_performance_metrics(self, mocker, naive_job: Job, sim_performance: SIMPerformance, mock_smtp, utils: Utils):
         """
         Test the performance metrics calculations for a naive job.
         Check if the metrics are under the threshold and if the mail is sent.
@@ -34,10 +34,10 @@ class TestPerformanceMetricsNaive:
         expected_mail_to = ["test@gmail.com"]
         expected_subject = f"[Autosubmit] Performance Alert for Job: {naive_job.name}"
 
-        expected_sypd = sim_performance_with_mail_notifier.compute_sypd_from_job(
+        expected_sypd = sim_performance.compute_sypd_from_job(
             naive_job
         )
-        expected_threshold = sim_performance_with_mail_notifier.SYPD_THRESHOLD
+        expected_threshold = sim_performance.SYPD_THRESHOLD
         expected_under_performance = utils.get_under_performance(
             expected_sypd, expected_threshold
         )
@@ -61,16 +61,16 @@ class TestPerformanceMetricsNaive:
         expected_message = "\n".join(message_parts)
 
         mock_get_mail_recipients = mocker.patch.object(
-            sim_performance_with_mail_notifier,
+            sim_performance,
             "_get_mail_recipients",
             return_value=expected_mail_to,
         )
 
         mock_notify_custom_alert = mocker.patch.object(
-            sim_performance_with_mail_notifier._mail_notifier, "notify_custom_alert"
+            sim_performance._mail_notifier, "notify_custom_alert"
         )
 
-        sim_performance_with_mail_notifier.compute_and_check_performance_metrics(
+        sim_performance.compute_and_check_performance_metrics(
             naive_job
         )
 

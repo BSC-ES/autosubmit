@@ -17,8 +17,8 @@
 
 from typing import TYPE_CHECKING
 from autosubmit.job.job_common import Status
-from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.performance.base_performance import BasePerformance
+from autosubmit.performance.utils import UtilsPerformance
 
 if TYPE_CHECKING:
     from autosubmit.job.job import Job
@@ -93,13 +93,13 @@ class PerformanceFactory:
                 SIMDestinEPerformance,
             )
 
-            return SIMDestinEPerformance(performance_config)
+            return SIMDestinEPerformance(performance_config, UtilsPerformance.get_mail_notifier())
         elif job_type == "SIM_DEFAULT":
             from autosubmit.performance.type_job.SIM.SIM_performance import (
                 SIMPerformance,
             )
 
-            return SIMPerformance(performance_config)
+            return SIMPerformance(performance_config, UtilsPerformance.get_mail_notifier())
 
         raise ValueError(
             f"Unsupported job type: {job_type}. Cannot create performance calculator."

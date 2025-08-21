@@ -88,7 +88,7 @@ class TestSimPerformanceBaseNaive:
         expid: str,
         experiment_config: dict,
         mail_expected: bool,
-        check_mail_sent
+        check_mail_sent,
     ):
         """Test simple workflow performance monitoring and mail notification."""
 
@@ -184,11 +184,8 @@ class TestSimPerformanceBaseNaive:
         experiment_config: dict,
         mail_expected: bool,
         check_mail_sent,
-        mocker
     ):
         """Test complex workflow performance monitoring and mail notification."""
-
-        print('Here we go!')
 
         experiment_data = experiment_data_factory(experiment_config)
 

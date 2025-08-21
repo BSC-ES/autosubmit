@@ -123,22 +123,12 @@ def mock_performance_config():
 
 # Fixtures for Performance class and Utils
 
-
 @pytest.fixture
-def sim_performance() -> SIMPerformance:
-    """
-    Fixture to provide an instance of the Performance class.
-    """
-    return SIMPerformance()
-
-
-@pytest.fixture
-def sim_performance_with_mail_notifier(mock_mail_notifier, mock_performance_config) -> SIMPerformance:
+def sim_performance(mock_mail_notifier, mock_performance_config) -> SIMPerformance:
     """
     Fixture to provide the Performance class with a MailNotifier instance.
     """
-    performance_instance = SIMPerformance(mock_performance_config)
-    performance_instance.set_mail_notifier(mock_mail_notifier)
+    performance_instance = SIMPerformance(mock_performance_config, mock_mail_notifier)
     return performance_instance
 
 
