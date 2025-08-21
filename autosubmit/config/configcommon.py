@@ -1584,10 +1584,7 @@ class AutosubmitConfig(object):
                         ]
                     ]
                     continue
-                if platform_name == "":
-                    platform_name = self.get_platform().upper()
-                if platform_name == "LOCAL":
-                    continue
+                platform_name = self.get_platform().upper()
                 if not self.is_valid_jobs_in_wrapper(wrapper_values):
                     self.wrong_config["WRAPPERS"] += [[wrapper_name,
                                                        "JOBS_IN_WRAPPER contains non-defined jobs.  parameter is invalid"]]
