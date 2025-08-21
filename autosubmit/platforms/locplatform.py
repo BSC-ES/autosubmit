@@ -268,6 +268,7 @@ class LocalPlatform(ParamikoPlatform):
             Log.debug('Could not remove file {0}'.format(os.path.join(self.tmp_path, filename)))
             return False
         return True
+
     def move_file(self, src, dest, must_exist=False):
         """
         Moves a file on the platform (includes .err and .out)
