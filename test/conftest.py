@@ -109,6 +109,9 @@ class AutosubmitExperimentFixture(Protocol):
             self,
             expid: Optional[str] = None,
             experiment_data: Optional[Dict] = None,
+            wrapper: Optional[bool] = False,
+            create: Optional[bool] = True,
+            reload: Optional[bool] = True,
             *args: Any,
             **kwargs: Any
     ) -> AutosubmitExperiment:
@@ -144,6 +147,8 @@ def autosubmit_exp(
             expid: Optional[str] = None,
             experiment_data: Optional[Dict] = None,
             wrapper=False,
+            reload=True,
+            create=True,
             *_,
             **kwargs
     ):
@@ -222,7 +227,8 @@ def autosubmit_exp(
             with open(conf_dir / f'tests_{expid}.yml', 'w') as f:
                 YAML().dump(other_yaml, f)
 
-        config.reload(force_load=True)
+        if reload:
+            config.reload(force_load=True)
 
         # TBD: this is not set in ``AutosubmitConfig``, but
         # maybe it should be? Ignore linter errors for now.
@@ -267,7 +273,8 @@ def autosubmit_exp(
         #       needed, especially if the disk has the valid value?
         config.experiment_data['DEFAULT']['EXPID'] = expid
 
-        autosubmit.create(expid, noplot=True, hide=False, force=True, check_wrappers=wrapper)
+        if create:
+            autosubmit.create(expid, noplot=True, hide=False, force=True, check_wrappers=wrapper)
 
         return AutosubmitExperiment(
             expid=expid,

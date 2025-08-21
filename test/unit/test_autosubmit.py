@@ -17,16 +17,20 @@
 
 """Tests for ``AutosubmitGit``."""
 
+from contextlib import nullcontext as does_not_raise
 from pathlib import Path
 from textwrap import dedent
+from typing import TYPE_CHECKING
 
 import pytest
 
-from autosubmit.config.basicconfig import BasicConfig
-
 from autosubmit.autosubmit import Autosubmit
+from autosubmit.config.basicconfig import BasicConfig
 from test.conftest import AutosubmitConfigFactory
 
+if TYPE_CHECKING:
+    from test.conftest import AutosubmitExperimentFixture
+    from contextlib import AbstractContextManager
 
 def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
     """function to test copy_as_config from autosubmit.py
@@ -65,45 +69,39 @@ def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
     assert new_yaml_file.stat().st_size > 0
 
 
-@pytest.mark.parametrize('experiment_data, expected_result', [
+@pytest.mark.parametrize('experiment_data,context_mgr', [
     ({
-        'JOBS': {
-            'DQC': {
-                'FOR': {
-                    'NAME': [
-                        'BASIC',
-                        'FULL',
-                    ],
-                'WALLCLOCK': "00:40",
-                },
-            },
-        },
-    }, IndexError),
+         'JOBS': {
+             'DQC': {
+                 'FOR': {
+                     'NAME': [
+                         'BASIC',
+                         'FULL',
+                     ],
+                     'WALLCLOCK': "00:40",
+                 },
+             },
+         },
+     }, pytest.raises(IndexError)),
     ({
-        'JOBS': {
-            'DQC': {
-                'FOR': {
-                    'NAME': [
-                        'BASIC',
-                        'FULL',
-                    ],
-                },
-                'WALLCLOCK': "00:40",
-            },
-        },
-    }, dict),
+         'JOBS': {
+             'DQC': {
+                 'FOR': {
+                     'NAME': [
+                         'BASIC',
+                         'FULL',
+                     ],
+                 },
+                 'WALLCLOCK': "00:40",
+             },
+         },
+     }, does_not_raise()),
 ], ids=[
-    'Forced Error For',
+    'Missing WALLCLOCK in FOR',
     'Correct FOR',
 ])
-def test_parse_data_loops(autosubmit_config: AutosubmitConfigFactory, experiment_data: dict, expected_result: type):
-    as_conf = autosubmit_config('t000', {})
-    as_conf.data_loops = {
-                            'JOBS,DQC',
-                         }
-    as_conf.section = 'JOBS'
-    if expected_result == IndexError:
-        with pytest.raises(IndexError):
-            as_conf.parse_data_loops(experiment_data)
-    else:
-        assert isinstance(as_conf.parse_data_loops(experiment_data), expected_result)
+def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict, context_mgr: 'AbstractContextManager'):
+    exp = autosubmit_exp('t000', experiment_data, reload=False, create=False)
+    as_conf = exp.as_conf
+    with context_mgr:
+        as_conf.reload(force_load=True)
