@@ -31,6 +31,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.experiment.experiment_common import new_experiment, copy_experiment
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
+from test.conftest import _initialize_autosubmitrc
 
 _EXPID = 't000'
 _DESCRIPTION = "for testing"
@@ -79,7 +80,7 @@ def test_copy_experiment(type_flag: str, autosubmit_exp: Callable, autosubmit: A
         'ev'
     ]
 )
-def test_expid_mutually_exclusive_arguments(type_flag: str, autosubmit: Autosubmit) -> None:
+def test_expid_mutually_exclusive_arguments(type_flag: str,  autosubmit: Autosubmit, tmp_path, autosubmit_exp: Callable) -> None:
     """Test for issue 2280, where mutually exclusive arguments like op/ev flags and min were not working.
 
     :param type_flag: Variable to check which kind of flag it is.
@@ -89,6 +90,8 @@ def test_expid_mutually_exclusive_arguments(type_flag: str, autosubmit: Autosubm
 
     :return: None
     """
+    base_experiment = autosubmit_exp('t000', experiment_data={})  # this calls to _initialize_autosubmitrc(tmp_path)
+
     is_operational = type_flag == 'op'
     is_evaluation = type_flag == 'ev'
 
@@ -535,35 +538,39 @@ def test_delete_experiment_not_owner(mocker, tmp_path, autosubmit_exp, autosubmi
         pytest.param("", id="empty_string"),
         pytest.param(".", id="current_dir"),
         pytest.param("as_exp.expid", id="valid_expid"),
+        pytest.param(" ", id="whitespace_string"),
     ]
 )
 def test_delete_expid(mocker, tmp_path, autosubmit_exp, autosubmit, expid_value):
     as_exp = autosubmit_exp(_EXPID, _get_experiment_data(tmp_path))
     mocker.patch('autosubmit.autosubmit.Autosubmit._perform_deletion', return_value="error")
     expid_value = as_exp.expid if expid_value == "as_exp.expid" else expid_value
-    if expid_value in ["..", "", "."]:
+    if expid_value in ["..", "", ".", " "]:
         with pytest.raises(AutosubmitCritical) as exc_info:
             autosubmit._delete_expid(expid_value, force=True)
-            assert exc_info.value.code == 7001
+            assert exc_info.value.code == 7012
     else:
-        with pytest.raises(AutosubmitError):
+        with pytest.raises(AutosubmitError) as exc_info:
             autosubmit._delete_expid(as_exp.expid, force=True)
+            assert exc_info.value.code == 6004
+
     mocker.stopall()
     autosubmit._delete_expid(as_exp.expid, force=True)
     assert not autosubmit._delete_expid(as_exp.expid, force=True)
 
 
 def test_perform_deletion(mocker, tmp_path, autosubmit_exp, autosubmit):
+
     as_exp = autosubmit_exp(_EXPID, _get_experiment_data(tmp_path))
-    mocker.patch("shutil.rmtree", side_effect=FileNotFoundError)
-    mocker.patch("os.remove", side_effect=FileNotFoundError)
+    mocker.patch("shutil.rmtree", side_effect=BaseException)
+    mocker.patch("os.remove", side_effect=BaseException)
     basic_config = as_exp.as_conf.basic_config
     experiment_path = Path(f"{basic_config.LOCAL_ROOT_DIR}/{_EXPID}")
     structure_db_path = Path(f"{basic_config.STRUCTURES_DIR}/structure_{_EXPID}.db")
-    job_data_db_path = Path(f"{basic_config.JOBDATA_DIR}/job_data_{_EXPID}")
+    job_data_db_path = Path(f"{basic_config.JOBDATA_DIR}/job_data_{_EXPID}.db")
     if all("tmp" not in path for path in [str(experiment_path), str(structure_db_path), str(job_data_db_path)]):
         raise AutosubmitCritical("tmp not in path")
-    mocker.patch("autosubmit.autosubmit.delete_experiment", side_effect=FileNotFoundError)
+    mocker.patch("autosubmit.autosubmit.delete_experiment", side_effect=BaseException)
     err_message = autosubmit._perform_deletion(experiment_path, structure_db_path, job_data_db_path, _EXPID)
     assert all(x in err_message for x in
                ["Cannot delete experiment entry", "Cannot delete directory", "Cannot delete structure",

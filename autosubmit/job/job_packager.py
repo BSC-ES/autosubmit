@@ -279,6 +279,7 @@ class JobPackager(object):
         if self.is_deadlock(any_simple_packages, not_wrappeable_package_info, built_packages_tmp):
             max_jobs_to_submit = self.process_not_wrappeable_packages(not_wrappeable_package_info, packages_to_submit,
                                                                       max_jobs_to_submit, wrapper_limits)
+
         return packages_to_submit, max_jobs_to_submit
 
     def is_deadlock(self, any_simple_packages: bool, not_wrappeable_package_info: list, built_packages_tmp: list) -> bool:
@@ -538,7 +539,6 @@ class JobPackager(object):
         section_jobs_to_submit = dict()
 
         for job in [job for job in jobs_ready]:
-            job.update_parameters(self._as_config, set_attributes=True)
             for event in job.platform.worker_events:  # keep alive log retrieval workers.
                 if not event.is_set():
                     event.set()
@@ -568,6 +568,7 @@ class JobPackager(object):
         # Prepare packages for wrapped jobs
         for wrapper_name, jobs in jobs_to_wrap.items():
             Log.info(f"Building packages for {wrapper_name}")
+            self._jobs_list.process_wrapper_jobs(wrapper_name, self.jobs_in_wrapper[wrapper_name])
             if max_jobs_to_submit == 0:
                 break
             self.current_wrapper_section = wrapper_name
@@ -719,11 +720,11 @@ class JobPackager(object):
         :rtype: List() of JobPackageVertical(), Dictionary Key: String, Value: (Dictionary Key: Variable Name, Value: String/Int)
         """
         packages = []
+        dict_jobs = self._jobs_list.get_ordered_jobs_by_date_member(self.current_wrapper_section)
         for job in section_list:
             if wrapper_limits["max"] > 0:
                 if not job.packed_during_building:
-                    dict_jobs = self._jobs_list.get_ordered_jobs_by_date_member(self.current_wrapper_section)
-                    job_vertical_packager = JobPackagerVerticalMixed(dict_jobs, job, [job], job.wallclock, wrapper_limits["max"], wrapper_limits, self._platform.max_wallclock,wrapper_info=wrapper_info)
+                    job_vertical_packager = JobPackagerVerticalMixed(dict_jobs, job, [job], "00:00", wrapper_limits["max"], wrapper_limits, self._platform.max_wallclock,wrapper_info=wrapper_info)
                     jobs_list = job_vertical_packager.build_vertical_package(job, wrapper_info)
                     packages.append(JobPackageVertical(jobs_list, configuration=self._as_config,wrapper_section=self.current_wrapper_section,wrapper_info=wrapper_info))
             else:
@@ -924,6 +925,8 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
             member = ready_job.member
         # Extract list of sorted jobs per date and member
         self.sorted_jobs = dict_jobs[date][member]
+        self.sorted_jobs = [job for job in self.sorted_jobs if job not in jobs_list]
+        # sort by chunk number
         self.index = 0
 
 

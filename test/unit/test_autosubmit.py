@@ -21,8 +21,11 @@ from pathlib import Path
 from textwrap import dedent
 
 from autosubmit.config.basicconfig import BasicConfig
+import pytest
+from autosubmit.config.basicconfig import BasicConfig
 
 from autosubmit.autosubmit import Autosubmit
+from autosubmit.log.log import AutosubmitCritical
 from test.conftest import AutosubmitConfigFactory
 
 
@@ -61,3 +64,11 @@ def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
 
     assert new_yaml_file.exists()
     assert new_yaml_file.stat().st_size > 0
+
+
+def test_database_backup_postgres(monkeypatch, autosubmit, mocker):
+    """Test that trying to back up a Postgres DB results in just a log message of WIP."""
+    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
+    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
+    autosubmit.database_backup('a000')
+    assert mocked_log.debug.called
