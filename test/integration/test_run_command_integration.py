@@ -100,6 +100,255 @@ def _print_db_results(db_check_list, rows_as_dicts, run_tmpdir):
                 print(f"Job entry: {job_name} assert {str(all_ok).upper()}")
 
 
+@pytest.mark.parametrize("experiment_data,jobs_data,platform_data,expected_db_entries,final_status,wrapper_type", [
+    # Success
+    (
+        dedent("""
+    DEFAULT:
+        EXPID: "t000"
+        HPCARCH: TEST_SLURM
+    EXPERIMENT:
+        DATELIST: '20000101'
+        MEMBERS: fc0
+        CHUNKSIZEUNIT: month
+        CHUNKSIZE: 1
+        NUMCHUNKS: 3
+        CALENDAR: standard
+        SPLITSIZEUNIT: day
+    PROJECT:
+        PROJECT_TYPE: none
+        PROJECT_DESTINATION: ''
+        """),
+        dedent(f"""\
+    EXPERIMENT:
+        NUMCHUNKS: '3'
+    JOBS:
+        JOB:
+            SCRIPT: |
+                echo "Hello World with id=Success"
+                sleep 1
+            PLATFORM: {_PLATFORM_NAME}
+            RUNNING: CHUNK
+            WALLCLOCK: 00:01
+        """),
+        dedent(f"""\
+    PLATFORMS:
+        {_PLATFORM_NAME}:
+            ADD_PROJECT_TO_HOST: False
+            HOST: localDocker
+            MAX_WALLCLOCK: 01:00
+            PROJECT: group
+            QUEUE: debug
+            SCRATCH_DIR: /tmp/scratch/
+            TEMP_DIR: ''
+            TYPE: slurm
+            USER: root
+            MAX_PROCESSORS: 10
+            PROCESSORS_PER_NODE: 1
+        """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
+
+    # Success wrapper
+    (
+        dedent("""
+    DEFAULT:
+        EXPID: "t000"
+        HPCARCH: TEST_SLURM
+    EXPERIMENT:
+        DATELIST: '20000101'
+        MEMBERS: fc0
+        CHUNKSIZEUNIT: month
+        CHUNKSIZE: 1
+        NUMCHUNKS: 3
+        CALENDAR: standard
+        SPLITSIZEUNIT: day
+    PROJECT:
+        PROJECT_TYPE: none
+        PROJECT_DESTINATION: ''
+        """),
+        dedent(f"""\
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        JOB:
+            SCRIPT: |
+                echo "Hello World with id=Success + wrappers"
+                sleep 1
+            DEPENDENCIES: JOB-1
+            PLATFORM: {_PLATFORM_NAME}
+            RUNNING: CHUNK
+            WALLCLOCK: 00:01
+
+        JOB2:
+            SCRIPT: |
+                echo "Hello World with id=Success + wrappers"
+                sleep 1
+            DEPENDENCIES: JOB2-1
+            PLATFORM: {_PLATFORM_NAME}
+            RUNNING: CHUNK
+            WALLCLOCK: 00:01
+
+    WRAPPERS:
+        WRAPPER:
+            JOBS_IN_WRAPPER: JOB
+            TYPE: vertical
+        WRAPPER2:
+            JOBS_IN_WRAPPER: JOB2
+            TYPE: vertical
+        """),
+        dedent(f"""\
+    PLATFORMS:
+        {_PLATFORM_NAME}:
+            ADD_PROJECT_TO_HOST: False
+            HOST: localDocker
+            MAX_WALLCLOCK: 01:00
+            PROJECT: group
+            QUEUE: debug
+            SCRATCH_DIR: /tmp/scratch/
+            TEMP_DIR: ''
+            TYPE: slurm
+            USER: root
+            MAX_PROCESSORS: 10
+            PROCESSORS_PER_NODE: 1
+        """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
+
+    # Failure
+    (
+        dedent("""
+    DEFAULT:
+        EXPID: "t000"
+        HPCARCH: TEST_SLURM
+    EXPERIMENT:
+        DATELIST: '20000101'
+        MEMBERS: fc0
+        CHUNKSIZEUNIT: month
+        CHUNKSIZE: 1
+        NUMCHUNKS: 3
+        CALENDAR: standard
+        SPLITSIZEUNIT: day
+    PROJECT:
+        PROJECT_TYPE: none
+        PROJECT_DESTINATION: ''
+        """),
+        dedent(f"""\
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        JOB:
+            SCRIPT: |
+                sleep 2
+                d_echo "Hello World with id=FAILED"
+            PLATFORM: {_PLATFORM_NAME}
+            RUNNING: CHUNK
+            WALLCLOCK: 00:01
+            RETRIALS: 2  # In local, it started to fail at 18 retrials.
+        """),
+        dedent(f"""\
+    PLATFORMS:
+        {_PLATFORM_NAME}:
+            ADD_PROJECT_TO_HOST: False
+            HOST: localDocker
+            MAX_WALLCLOCK: 01:00
+            PROJECT: group
+            QUEUE: debug
+            SCRATCH_DIR: /tmp/scratch/
+            TEMP_DIR: ''
+            TYPE: slurm
+            USER: root
+            MAX_PROCESSORS: 10
+            PROCESSORS_PER_NODE: 1
+        """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
+
+    # Failure wrappers
+    (
+        dedent("""
+    DEFAULT:
+        EXPID: "t000"
+        HPCARCH: TEST_SLURM
+    EXPERIMENT:
+        DATELIST: '20000101'
+        MEMBERS: fc0
+        CHUNKSIZEUNIT: month
+        CHUNKSIZE: 1
+        NUMCHUNKS: 3
+        CALENDAR: standard
+        SPLITSIZEUNIT: day
+    PROJECT:
+        PROJECT_TYPE: none
+        PROJECT_DESTINATION: ''
+        """),
+        dedent(f"""\
+    JOBS:
+        JOB:
+            SCRIPT: |
+                sleep 2
+                d_echo "Hello World with id=FAILED + wrappers"
+            PLATFORM: {_PLATFORM_NAME}
+            DEPENDENCIES: JOB-1
+            RUNNING: CHUNK
+            WALLCLOCK: 00:10
+            RETRIALS: 2
+    WRAPPERS:
+        WRAPPER:
+            JOBS_IN_WRAPPER: JOB
+            TYPE: vertical
+        """),
+        dedent(f"""\
+    PLATFORMS:
+        {_PLATFORM_NAME}:
+            ADD_PROJECT_TO_HOST: False
+            HOST: localDocker
+            MAX_WALLCLOCK: 01:00
+            PROJECT: group
+            QUEUE: debug
+            SCRATCH_DIR: /tmp/scratch/
+            TEMP_DIR: ''
+            TYPE: slurm
+            USER: root
+            MAX_PROCESSORS: 10
+            PROCESSORS_PER_NODE: 1
+        """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
+], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
+def test_run_uninterrupted(
+        as_exp,
+        experiment_data,
+        jobs_data,
+        platform_data,
+        expected_db_entries,
+        final_status,
+        wrapper_type):
+    as_conf = as_exp.as_conf
+    log_dir = _init_run(as_exp, experiment_data, jobs_data, platform_data,)
+
+    # Run the experiment
+    exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
+    _assert_exit_code(final_status, exit_code)
+
+    # Check and display results
+    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status)
+    e_msg = f"Current folder: {str(run_tmpdir)}\n"
+    files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
+    for check, value in db_check_list.items():
+        if not value:
+            e_msg += f"{check}: {value}\n"
+        elif isinstance(value, dict):
+            for job_name in value:
+                for job_counter in value[job_name]:
+                    for check_name, value_ in value[job_name][job_counter].items():
+                        if not value_:
+                            e_msg += f"{job_name}_run_number_{job_counter} field: {check_name}: {value_}\n"
+
+    for check, value in files_check_list.items():
+        if not value:
+            e_msg += f"{check}: {value}\n"
+    try:
+        _assert_db_fields(db_check_list)
+        _assert_files_recovered(files_check_list)
+    except AssertionError:
+        pytest.fail(e_msg)
+
+
 def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[str, (bool, str)]:
     """
     Check that the database contains the expected number of entries, and that all fields contain data after a completed run.
@@ -253,9 +502,6 @@ def _check_files_recovered(as_conf, log_dir, expected_files) -> dict:
     for f in log_dir.glob('*'):
         files_check_list[f.name] = not any(
             str(f).endswith(f".{i}.err") or str(f).endswith(f".{i}.out") for i in range(retrials + 1))
-    stat_files = [str(f).split("_")[-1] for f in log_dir.glob('*') if "STAT" in str(f)]
-    for i in range(retrials + 1):
-        files_check_list[f"STAT_{i}"] = str(i) in stat_files
 
     print("\nFiles check results:")
     all_ok = True
@@ -300,6 +546,8 @@ def _assert_files_recovered(files_check_list):
         assert files_check_list[check_name]
 
 
+# -- Tests
+
 def _init_run(as_exp, experiment_data, jobs_data, platform_data) -> Path:
     as_conf = as_exp.as_conf
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
@@ -330,130 +578,55 @@ def _init_run(as_exp, experiment_data, jobs_data, platform_data) -> Path:
     return exp_path / f'tmp/LOG_{_EXPID}'
 
 
-# -- Tests
-
-@pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
+@pytest.mark.parametrize("experiment_data, jobs_data, platform_data, expected_db_entries, final_status, wrapper_type", [
     # Success
-    (dedent("""\
+    (
+        dedent("""
+    DEFAULT:
+        EXPID: "t000"
+        HPCARCH: TEST_SLURM
     EXPERIMENT:
-        NUMCHUNKS: '3'
+        DATELIST: '20000101'
+        MEMBERS: fc0
+        CHUNKSIZEUNIT: month
+        CHUNKSIZE: 1
+        NUMCHUNKS: 3
+        CALENDAR: standard
+        SPLITSIZEUNIT: day
+    PROJECT:
+        PROJECT_TYPE: none
+        PROJECT_DESTINATION: ''
+        """),
+        dedent(f"""\
     JOBS:
         JOB:
             SCRIPT: |
                 echo "Hello World with id=Success"
                 sleep 1
-            PLATFORM: TEST_SLURM
+            PLATFORM: {_PLATFORM_NAME}
             RUNNING: CHUNK
             WALLCLOCK: 00:01
-    """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
+        """),
+        dedent(f"""\
+    PLATFORMS:
+        {_PLATFORM_NAME}:
+            ADD_PROJECT_TO_HOST: False
+            HOST: localDocker
+            MAX_WALLCLOCK: 01:00
+            PROJECT: group
+            QUEUE: debug
+            SCRATCH_DIR: /tmp/scratch/
+            TEMP_DIR: ''
+            TYPE: slurm
+            USER: root
+            MAX_PROCESSORS: 10
+            PROCESSORS_PER_NODE: 1
+        """), 3, "COMPLETED", "simple"
+    ),  # No wrappers, simple type
 
     # Success wrapper
-    (dedent("""\
-    EXPERIMENT:
-        NUMCHUNKS: '2'
-    JOBS:
-        JOB:
-            SCRIPT: |
-                echo "Hello World with id=Success + wrappers"
-                sleep 1
-            DEPENDENCIES: JOB-1
-            PLATFORM: TEST_SLURM
-            RUNNING: CHUNK
-            WALLCLOCK: 00:01
-
-        JOB2:
-            SCRIPT: |
-                echo "Hello World with id=Success + wrappers"
-                sleep 1
-            DEPENDENCIES: JOB2-1
-            PLATFORM: TEST_SLURM
-            RUNNING: CHUNK
-            WALLCLOCK: 00:01
-
-    WRAPPERS:
-        WRAPPER:
-            JOBS_IN_WRAPPER: JOB
-            TYPE: vertical
-        WRAPPER2:
-            JOBS_IN_WRAPPER: JOB2
-            TYPE: vertical
-    """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
-
-    # Failure
-    (dedent("""\
-    EXPERIMENT:
-        NUMCHUNKS: '2'
-    JOBS:
-        JOB:
-            SCRIPT: |
-                sleep 2
-                d_echo "Hello World with id=FAILED"
-            PLATFORM: TEST_SLURM
-            RUNNING: CHUNK
-            WALLCLOCK: 00:01
-            RETRIALS: 2  # In local, it started to fail at 18 retrials.
-    """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
-
-    # Failure wrappers
-    (dedent("""\
-    JOBS:
-        JOB:
-            SCRIPT: |
-                sleep 2
-                d_echo "Hello World with id=FAILED + wrappers"
-            PLATFORM: TEST_SLURM
-            DEPENDENCIES: JOB-1
-            RUNNING: CHUNK
-            WALLCLOCK: 00:10
-            RETRIALS: 2
-    WRAPPERS:
-        WRAPPER:
-            JOBS_IN_WRAPPER: JOB
-            TYPE: vertical
-    """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
-], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
-def test_run_uninterrupted(
-        as_exp,
-        jobs_data,
-        expected_db_entries,
-        final_status,
-        wrapper_type):
-    as_conf = as_exp.as_conf
-    log_dir = _init_run(as_exp, jobs_data)
-
-    # Run the experiment
-    exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
-    _assert_exit_code(final_status, exit_code)
-
-    # Check and display results
-    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
-
-    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status)
-    e_msg = f"Current folder: {str(run_tmpdir)}\n"
-    files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
-    for check, value in db_check_list.items():
-        if not value:
-            e_msg += f"{check}: {value}\n"
-        elif isinstance(value, dict):
-            for job_name in value:
-                for job_counter in value[job_name]:
-                    for check_name, value_ in value[job_name][job_counter].items():
-                        if not value_:
-                            e_msg += f"{job_name}_run_number_{job_counter} field: {check_name}: {value_}\n"
-
-    for check, value in files_check_list.items():
-        if not value:
-            e_msg += f"{check}: {value}\n"
-    try:
-        _assert_db_fields(db_check_list)
-        _assert_files_recovered(files_check_list)
-    except AssertionError:
-        pytest.fail(e_msg)
-
-
-@pytest.mark.parametrize("experiment_data, jobs_data, platform_data, expected_db_entries, final_status, wrapper_type", [
-    # Success wrapper
-    (dedent("""
+    (
+        dedent("""
     DEFAULT:
         EXPID: "t000"
         HPCARCH: TEST_SLURM
@@ -468,14 +641,15 @@ def test_run_uninterrupted(
     PROJECT:
         PROJECT_TYPE: none
         PROJECT_DESTINATION: ''
-    """), dedent("""\
+        """),
+        dedent(f"""\
     JOBS:
         JOB:
             SCRIPT: |
                 echo "Hello World with id=Success + wrappers"
                 sleep 1
             DEPENDENCIES: job-1
-            PLATFORM: TEST_SLURM
+            PLATFORM: {_PLATFORM_NAME}
             RUNNING: chunk
             WALLCLOCK: 00:01
 
@@ -484,7 +658,7 @@ def test_run_uninterrupted(
                 echo "Hello World with id=Success + wrappers"
                 sleep 1
             DEPENDENCIES: job2-1
-            PLATFORM: TEST_SLURM
+            PLATFORM: {_PLATFORM_NAME}
             RUNNING: chunk
             WALLCLOCK: 00:01
 
@@ -495,10 +669,10 @@ def test_run_uninterrupted(
         WRAPPER2:
             JOBS_IN_WRAPPER: JOB2
             TYPE: vertical
-    """),
-     dedent("""\
+        """),
+        dedent(f"""\
     PLATFORMS:
-        TEST_SLURM:
+        {_PLATFORM_NAME}:
             ADD_PROJECT_TO_HOST: False
             HOST: localDocker
             MAX_WALLCLOCK: 01:00
@@ -510,86 +684,106 @@ def test_run_uninterrupted(
             USER: root
             MAX_PROCESSORS: 10
             PROCESSORS_PER_NODE: 1
-    """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
-    #     # Success
-    #     (dedent("""\
-    #     EXPERIMENT:
-    #         NUMCHUNKS: '3'
-    #     JOBS:
-    #         job:
-    #             SCRIPT: |
-    #                 echo "Hello World with id=Success"
-    #                 sleep 1
-    #             PLATFORM: local
-    #             RUNNING: chunk
-    #             wallclock: 00:01
-    #     """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
-    #
-    #     # Success wrapper
-    #     (dedent("""\
-    #     EXPERIMENT:
-    #         NUMCHUNKS: '2'
-    #     JOBS:
-    #         job:
-    #             SCRIPT: |
-    #                 echo "Hello World with id=Success + wrappers"
-    #                 sleep 1
-    #             DEPENDENCIES: job-1
-    #             PLATFORM: local
-    #             RUNNING: chunk
-    #             wallclock: 00:01
-    #
-    #         job2:
-    #             SCRIPT: |
-    #                 echo "Hello World with id=Success + wrappers"
-    #                 sleep 1
-    #             DEPENDENCIES: job2-1
-    #             PLATFORM: local
-    #             RUNNING: chunk
-    #             wallclock: 00:01
-    #
-    #     wrappers:
-    #         wrapper:
-    #             JOBS_IN_WRAPPER: job
-    #             TYPE: vertical
-    #         wrapper2:
-    #             JOBS_IN_WRAPPER: job2
-    #             TYPE: vertical
-    #     """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
-    #
-    #     # Failure
-    #     (dedent("""\
-    #     EXPERIMENT:
-    #         NUMCHUNKS: '2'
-    #     JOBS:
-    #         job:
-    #             SCRIPT: |
-    #                 sleep 2
-    #                 d_echo "Hello World with id=FAILED"
-    #             PLATFORM: local
-    #             RUNNING: chunk
-    #             wallclock: 00:01
-    #             retrials: 2  # In local, it started to fail at 18 retrials.
-    #     """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
-    #
-    #     # Failure wrappers
-    #     (dedent("""\
-    #     JOBS:
-    #         job:
-    #             SCRIPT: |
-    #                 sleep 2
-    #                 d_echo "Hello World with id=FAILED + wrappers"
-    #             PLATFORM: local
-    #             DEPENDENCIES: job-1
-    #             RUNNING: chunk
-    #             wallclock: 00:10
-    #             retrials: 2
-    #     wrappers:
-    #         wrapper:
-    #             JOBS_IN_WRAPPER: job
-    #             TYPE: vertical
-    #     """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
-], ids=["Success with wrapper"])
+        """), 4, "COMPLETED", "vertical"
+    ),  # Wrappers present, vertical type
+
+    # Failure
+    (
+        dedent("""
+    DEFAULT:
+        EXPID: "t000"
+        HPCARCH: TEST_SLURM
+    EXPERIMENT:
+        DATELIST: '20000101'
+        MEMBERS: fc0
+        CHUNKSIZEUNIT: month
+        CHUNKSIZE: 1
+        NUMCHUNKS: 2
+        CALENDAR: standard
+        SPLITSIZEUNIT: day
+    PROJECT:
+        PROJECT_TYPE: none
+        PROJECT_DESTINATION: ''
+        """),
+        dedent(f"""\
+    JOBS:
+        JOB:
+            SCRIPT: |
+                sleep 2
+                d_echo "Hello World with id=FAILED"
+            PLATFORM: {_PLATFORM_NAME}
+            RUNNING: CHUNK
+            WALLCLOCK: 00:01
+            RETRIALS: 2  # In local, it started to fail at 18 retrials.
+        """),
+        dedent(f"""\
+    PLATFORMS:
+        {_PLATFORM_NAME}:
+            ADD_PROJECT_TO_HOST: False
+            HOST: localDocker
+            MAX_WALLCLOCK: 01:00
+            PROJECT: group
+            QUEUE: debug
+            SCRATCH_DIR: /tmp/scratch/
+            TEMP_DIR: ''
+            TYPE: slurm
+            USER: root
+            MAX_PROCESSORS: 10
+            PROCESSORS_PER_NODE: 1
+        """), (2 + 1) * 2, "FAILED", "simple"
+    ),  # No wrappers, simple type
+
+    # Failure wrappers
+    (
+        dedent("""
+    DEFAULT:
+        EXPID: "t000"
+        HPCARCH: TEST_SLURM
+    EXPERIMENT:
+        DATELIST: '20000101'
+        MEMBERS: fc0
+        CHUNKSIZEUNIT: month
+        CHUNKSIZE: 1
+        NUMCHUNKS: 2
+        CALENDAR: standard
+        SPLITSIZEUNIT: day
+    PROJECT:
+        PROJECT_TYPE: none
+        PROJECT_DESTINATION: ''
+        """),
+        dedent(f"""\
+    JOBS:
+        JOB:
+            SCRIPT: |
+                sleep 2
+                d_echo "Hello World with id=FAILED + wrappers"
+            PLATFORM: {_PLATFORM_NAME}
+            DEPENDENCIES: JOB-1
+            RUNNING: CHUNK
+            WALLCLOCK: 00:10
+            RETRIALS: 2
+    WRAPPERS:
+        WRAPPER:
+            JOBS_IN_WRAPPER: JOB
+            TYPE: vertical
+        """),
+        dedent(f"""\
+    PLATFORMS:
+        {_PLATFORM_NAME}:
+            ADD_PROJECT_TO_HOST: False
+            HOST: localDocker
+            MAX_WALLCLOCK: 01:00
+            PROJECT: group
+            QUEUE: debug
+            SCRATCH_DIR: /tmp/scratch/
+            TEMP_DIR: ''
+            TYPE: slurm
+            USER: root
+            MAX_PROCESSORS: 10
+            PROCESSORS_PER_NODE: 1
+        """), (2 + 1) * 1, "FAILED", "vertical"
+    ),  # Wrappers present, vertical type
+], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
 def test_run_interrupted(
         as_exp,
         experiment_data,

@@ -133,10 +133,10 @@ class JobPackageBase(object):
         for i in range(0, len(jobs)):
             self._job_scripts[jobs[i].name] = jobs[i].create_script(configuration)
 
-    def _create_common_script(self, filename: str=""):
+    def _create_common_script(self, filename: str = ""):
         pass
 
-    def submit_unthreaded(self, configuration: configparser, only_generate: bool=False):
+    def submit_unthreaded(self, configuration: configparser, only_generate: bool = False):
         """
         :param configuration: Autosubmit basic configuration \n
         :type configuration: AutosubmitConfig object \n
@@ -221,7 +221,7 @@ class JobPackageBase(object):
     def _send_files(self):
         """ Send local files to the platform. """
 
-    def _do_submission(self, job_scripts=None, hold: bool=False):
+    def _do_submission(self, job_scripts=None, hold: bool = False):
         """ Submit package to the platform. """
         pass
 
@@ -405,8 +405,8 @@ class JobPackageThread(JobPackageBase):
     """
     FILE_PREFIX = 'ASThread'
 
-    def __init__(self, jobs, dependency=None, jobs_resources: dict = None, method='ASThread',
-                 configuration: configparser=None, wrapper_section="WRAPPERS", wrapper_info: Optional[list] = []):
+    def __init__(self, jobs: list[Job], dependency=None, jobs_resources: dict = dict(), method: str = 'ASThread',
+                 configuration=None, wrapper_section: str = "WRAPPERS", wrapper_info: list = {}):
         super(JobPackageThread, self).__init__(jobs)
         """
         :param dependency: Dependency
@@ -670,7 +670,7 @@ class JobPackageThreadWrapped(JobPackageThread):
     """
     FILE_PREFIX = 'ASThread'
 
-    def __init__(self, jobs, dependency=None, configuration: configparser=None, wrapper_section="WRAPPERS"):
+    def __init__(self, jobs, dependency=None, configuration: configparser = None, wrapper_section="WRAPPERS"):
         super(JobPackageThreadWrapped, self).__init__(jobs, configuration)
         self._name = None
         self._job_scripts = {}
@@ -759,7 +759,8 @@ class JobPackageVertical(JobPackageThread):
     :param: dependency:
     """
 
-    def __init__(self, jobs: list[Job], dependency=None, configuration: configparser = None, wrapper_section: str = "WRAPPERS",
+    def __init__(self, jobs: list[Job], dependency=None, configuration: configparser = None,
+                 wrapper_section: str = "WRAPPERS",
                  wrapper_info: Optional[list] = []):
 
         super(JobPackageVertical, self).__init__(jobs, dependency, configuration=configuration,
@@ -849,8 +850,9 @@ class JobPackageHorizontal(JobPackageThread):
     """
     Class to manage a horizontal thread-based package of jobs to be submitted by autosubmit
     """
+
     def __init__(self, jobs: list[Job], dependency=None, jobs_resources: dict = None, method: str = 'ASThread',
-                 configuration: configparser=None, wrapper_section="WRAPPERS"):
+                 configuration: configparser = None, wrapper_section="WRAPPERS"):
         super(JobPackageHorizontal, self).__init__(jobs, dependency, jobs_resources, configuration=configuration,
                                                    wrapper_section=wrapper_section)
         self.method = method
@@ -883,9 +885,9 @@ class JobPackageHybrid(JobPackageThread):
         """
 
     def __init__(self, jobs, num_processors: str, total_wallclock, dependency=None,
-                 jobs_resources: dict = None, method: str = "ASThread",
-                 configuration: configparser=None, wrapper_section="WRAPPERS"):
-        all_jobs = [item for sublist in jobs for item in sublist]  #flatten list
+                 jobs_resources=dict(), method: str = "ASThread",
+                 configuration: configparser = None, wrapper_section="WRAPPERS"):
+        all_jobs = [item for sublist in jobs for item in sublist]  # flatten list
         super(JobPackageHybrid, self).__init__(all_jobs, dependency, jobs_resources, method,
                                                configuration=configuration, wrapper_section=wrapper_section)
         self.jobs_lists = jobs
