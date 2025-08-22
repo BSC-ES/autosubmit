@@ -60,7 +60,7 @@ dependencies = [
     "configparser",
     "setproctitle",
     "invoke>=2.0",
-    "ruamel.yaml==0.18.14",
+    "ruamel.yaml==0.18.15",
     "configobj",
     "pyparsing",
     "configparser"
