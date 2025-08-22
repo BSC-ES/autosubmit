@@ -17,14 +17,20 @@
 
 """Tests for ``AutosubmitGit``."""
 
+from contextlib import nullcontext as does_not_raise
 from pathlib import Path
 from textwrap import dedent
+from typing import TYPE_CHECKING
 
-from autosubmit.config.basicconfig import BasicConfig
+import pytest
 
 from autosubmit.autosubmit import Autosubmit
+from autosubmit.config.basicconfig import BasicConfig
 from test.conftest import AutosubmitConfigFactory
 
+if TYPE_CHECKING:
+    from test.conftest import AutosubmitExperimentFixture
+    from contextlib import AbstractContextManager
 
 def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
     """function to test copy_as_config from autosubmit.py
@@ -61,3 +67,41 @@ def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
 
     assert new_yaml_file.exists()
     assert new_yaml_file.stat().st_size > 0
+
+
+@pytest.mark.parametrize('experiment_data,context_mgr', [
+    ({
+         'JOBS': {
+             'DQC': {
+                 'FOR': {
+                     'NAME': [
+                         'BASIC',
+                         'FULL',
+                     ],
+                     'WALLCLOCK': "00:40",
+                 },
+             },
+         },
+     }, pytest.raises(IndexError)),
+    ({
+         'JOBS': {
+             'DQC': {
+                 'FOR': {
+                     'NAME': [
+                         'BASIC',
+                         'FULL',
+                     ],
+                 },
+                 'WALLCLOCK': "00:40",
+             },
+         },
+     }, does_not_raise()),
+], ids=[
+    'Missing WALLCLOCK in FOR',
+    'Correct FOR',
+])
+def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict, context_mgr: 'AbstractContextManager'):
+    exp = autosubmit_exp('t000', experiment_data, reload=False, create=False)
+    as_conf = exp.as_conf
+    with context_mgr:
+        as_conf.reload(force_load=True)

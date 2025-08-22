@@ -829,9 +829,17 @@ class AutosubmitConfig(object):
                 self.deep_read_loops(current_data_aux)
                 current_data_aux = self.substitute_dynamic_variables(current_data_aux)
                 pointer_to_last_data[section_ending_name] = current_data_aux
-                for key, value in for_sections.items():
-                    if key != "NAME":
-                        pointer_to_last_data[section_ending_name][key] = value[name_index]
+                try:
+                    last_data_section = pointer_to_last_data[section_ending_name]
+                    for key, value in for_sections.items():
+                        if key != "NAME":
+                            last_data_section[key] = value[name_index]
+                            pass
+                except IndexError as e:
+                    Log.printlog(f"A job has an issue related to a FOR configuration. \n Please revise that the"
+                                 f" number of elements matches, or if there is an unintended indentation."
+                                 f"\n Trace: {str(e)}", Log.ERROR)
+                    raise
             # Delete pointer, because we are going to use it in the next loop
             # for a different section, so we need to delete the pointer to
             # avoid overwriting.
