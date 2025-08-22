@@ -12,11 +12,18 @@ build:
     python: "3.9"
   apt_packages:
     - graphviz
+    - sqlite3
   jobs:
+    build:
+      html:
+        - make html -C ./docs/
     post_install:
-      - autosubmit --version
-      - autosubmit configure
-      - autosubmit install
+      # ruamel.yaml.clib appears to cause the build to fail when
+      # using new API in ruamel.yaml
+      # refs:
+      # - https://earth.bsc.es/gitlab/es/autosubmit/-/merge_requests/340/
+      # - https://yaml.readthedocs.io/en/latest/api.html
+      - pip uninstall ruamel.yaml.clib -y
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
