@@ -113,7 +113,7 @@ class JobPackageBase(object):
         return self._platform
 
     @threaded
-    def check_scripts(self, jobs: list[Job], configuration: configparser, only_generate):
+    def check_scripts(self, jobs: list[Job], configuration: dict = dict(), only_generate: bool = False):
         for job in jobs:
             if only_generate and not os.path.exists(os.path.join(configuration.get_project_dir(), job.file)):
                 break
@@ -129,7 +129,7 @@ class JobPackageBase(object):
             self._custom_directives = self._custom_directives | set(job.custom_directives)
 
     @threaded
-    def _create_scripts_threaded(self, jobs: list[Job], configuration: configparser):
+    def _create_scripts_threaded(self, jobs: list[Job], configuration: dict = dict()):
         for i in range(0, len(jobs)):
             self._job_scripts[jobs[i].name] = jobs[i].create_script(configuration)
 
@@ -138,9 +138,9 @@ class JobPackageBase(object):
 
     def submit_unthreaded(self, configuration: configparser, only_generate: bool = False):
         """
-        :param configuration: Autosubmit basic configuration \n
-        :type configuration: AutosubmitConfig object \n
-        :param only_generate: True if coming from generate_scripts_andor_wrappers(). If true, only generates scripts; otherwise, submits. \n
+        :param configuration: Autosubmit basic configuration
+        :type configuration: AutosubmitConfig object
+        :param only_generate: True if coming from generate_scripts_andor_wrappers(). If true, only generates scripts; otherwise, submits.
         :type only_generate: Boolean
         """
         for job in self.jobs:
@@ -162,11 +162,11 @@ class JobPackageBase(object):
     def submit(self, configuration: configparser, parameters, only_generate: bool = False, hold: bool = False):
         """
         :param hold:
-        :param configuration: Autosubmit basic configuration \n
-        :type configuration: AutosubmitConfig object \n
-        :param parameters; Parameters from joblist \n
-        :type parameters: JobList,parameters \n
-        :param only_generate: True if coming from generate_scripts_andor_wrappers(). If true, only generates scripts; otherwise, submits. \n
+        :param configuration: Autosubmit basic configuration
+        :type configuration: AutosubmitConfig object
+        :param parameters; Parameters from joblist
+        :type parameters: JobList,parameters
+        :param only_generate: True if coming from generate_scripts_andor_wrappers(). If true, only generates scripts; otherwise, submits.
         :type only_generate: Boolean
         """
         thread_number = multiprocessing.cpu_count()

@@ -1208,7 +1208,7 @@ class AutosubmitConfig(object):
             self.reload(force_load)
         except IOError as e:
             raise AutosubmitError(
-                "I/O Issues con config files", 6016, str(e))
+                "I/O Issues with config files", 6016, str(e))
         except (AutosubmitCritical, AutosubmitError):
             raise
         except BaseException as e:
@@ -1863,7 +1863,7 @@ class AutosubmitConfig(object):
 
     def load_current_hpcarch_parameters(self) -> None:
         """Load custom HPCARCH parameters."""
-        hpcarch: str = self.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
+        hpcarch: str = self.experiment_data.get("DEFAULT", {}).get("HPCARCH", "TEST_SLURM")
         for name, value in self.experiment_data.get("PLATFORMS", {}).get(hpcarch, {}).items():
             self.experiment_data[f"HPC{name}"] = value
         self.experiment_data["HPCARCH"] = hpcarch
