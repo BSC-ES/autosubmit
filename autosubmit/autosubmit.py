@@ -591,6 +591,12 @@ class Autosubmit:
             subparser = subparsers.add_parser(
                 'pklfix', description='restore the backup of your pkl')
             subparser.add_argument('expid', help='experiment identifier')
+            subparser.add_argument(
+                "-f",
+                "--force",
+                action="store_true",
+                help="force restore without confirmation",
+            )
 
             # Update Description
             subparser = subparsers.add_parser(
@@ -691,6 +697,13 @@ class Autosubmit:
                                help='Stop all current running autosubmit processes, will ask for confirmation')
             group.add_argument('-fa', '--force_all', default=False, action='store_true',
                                help='Stop all current running autosubmit processes')
+            subparser.add_argument(
+                "-y",
+                "--yes",
+                default=False,
+                action="store_true",
+                help="Automatically answer yes to prompts",
+            )
             subparser.add_argument('-c', '--cancel', action=CancelAction, default=False, nargs=0,
                                 help='Orders to the schedulers to stop active jobs.')
             subparser.add_argument('-fs', '--filter_status', type=str, default="SUBMITTED, QUEUING, RUNNING",
@@ -797,13 +810,13 @@ class Autosubmit:
         elif args.command == 'dbfix':
             return Autosubmit.database_fix(args.expid)
         elif args.command == 'pklfix':
-            return Autosubmit.pkl_fix(args.expid)
+            return Autosubmit.pkl_fix(args.expid, args.force)
         elif args.command == 'updatedescrip':
             return Autosubmit.update_description(args.expid, args.description)
         elif args.command == 'cat-log':
             return Autosubmit.cat_log(args.ID, args.file, args.mode, args.inspect)
         elif args.command == 'stop':
-            return Autosubmit.stop(args.expid, args.force, args.all, args.force_all, args.cancel, args.filter_status, args.target)
+            return Autosubmit.stop(args.expid, args.force, args.all, args.force_all, args.cancel, args.filter_status, args.target, args.yes)
 
     @staticmethod
     def _init_logs(args, console_level='INFO', log_level='DEBUG', expid='None'):
@@ -4058,7 +4071,7 @@ class Autosubmit:
         update_experiment_descrip_version(expid, version=Autosubmit.autosubmit_version)
 
     @staticmethod
-    def pkl_fix(expid):
+    def pkl_fix(expid, force: bool = False):
         """
         Tries to find a backup of the pkl file and restores it. Verifies that autosubmit is not running on this experiment.  
 
@@ -4095,8 +4108,9 @@ class Autosubmit:
                         _stat = os.stat(current_pkl_path)
                         if _stat.st_size > 6:
                             # Greater than 6 bytes -> Not empty
-                            if not Autosubmit._user_yes_no_query(
-                                    f"The current pkl file {current_pkl_path} is not empty. Do you want to continue?"):
+                            if not force and not Autosubmit._user_yes_no_query(
+                                f"The current pkl file {current_pkl_path} is not empty. Do you want to continue?"
+                            ):
                                 # The user chooses not to continue. Operation stopped.
                                 Log.info(
                                     "Pkl restore operation stopped. No changes have been made.")
@@ -5843,7 +5857,7 @@ class Autosubmit:
 
     @staticmethod
     def stop(expids: str, force=False, all_expids=False, force_all=False, cancel=False,
-             current_status="", status="FAILED") -> None:
+             current_status="", status="FAILED", force_yes=False) -> None:
         """The stop command allows users to stop the desired experiments.
 
         :param expids: expids to stop
@@ -5886,7 +5900,7 @@ class Autosubmit:
             expids = [
                 expid
                 for expid in expids
-                if input(f"Confirm stopping the experiment: {expid} (y/n)[enter=y]? ").lower() in truthy_values
+                if force_yes or input(f"Confirm stopping the experiment: {expid} (y/n)[enter=y]? ").lower() in truthy_values
             ]
 
         sig_to_process = signal.SIGKILL if force else signal.SIGINT
