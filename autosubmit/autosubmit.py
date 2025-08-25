@@ -40,9 +40,6 @@ from pathlib import Path
 from time import sleep
 from typing import Dict, Set, Tuple, Union, Any, List, Optional
 
-from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.config.yamlparser import YAMLParserFactory
 from bscearth.utils.date import date2str
 from portalocker import Lock
 from portalocker.exceptions import BaseLockException
@@ -51,6 +48,9 @@ from ruamel.yaml import YAML
 
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 import autosubmit.statistics.utils as StatisticsUtils
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import create_db
 from autosubmit.database.db_common import delete_experiment, get_experiment_descrip
 from autosubmit.database.db_common import get_autosubmit_version, check_experiment_exists
@@ -74,13 +74,13 @@ from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packager import JobPackager
 from autosubmit.job.job_utils import SubJob, SubJobManager
+from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmit.migrate.migrate import Migrate
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.submitter import Submitter
-from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 
 dialog = None
 
@@ -999,7 +999,6 @@ class Autosubmit:
         if owner:
             as_conf.set_last_as_command(command)
         return owner, eadmin, current_owner
-
 
     @staticmethod
     def _check_ownership(expid, raise_error=False):
@@ -3868,7 +3867,7 @@ class Autosubmit:
             Autosubmit._check_ownership(expid, raise_error=True)
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             as_conf.reload(force_load=True)
-            #as_conf.check_conf_files(False)
+            # as_conf.check_conf_files(False)
         except (AutosubmitError, AutosubmitCritical):
             raise
         except BaseException as e:
@@ -4701,7 +4700,6 @@ class Autosubmit:
             if profile:
                 profiler.stop()
 
-
     @staticmethod
     def detail(job_list):
         current_length = len(job_list.get_job_list())
@@ -4713,9 +4711,8 @@ class Autosubmit:
             Log.info(job_list.print_with_status())
             Log.status(job_list.print_with_status(nocolor=True))
 
-
     @staticmethod
-    def _copy_code(as_conf, expid, project_type, force):
+    def _copy_code(as_conf: AutosubmitConfig, expid: str, project_type: str, force: bool) -> bool:
         """
         Method to copy code from experiment repository to project directory.
 
@@ -4749,97 +4746,87 @@ class Autosubmit:
         elif project_type == "svn":
             svn_project_url = as_conf.get_svn_project_url()
             svn_project_revision = as_conf.get_svn_project_revision()
-            project_path = os.path.join(
+            local_proj_dir = os.path.join(
                 BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_PROJ_DIR)
-            if os.path.exists(project_path):
-                Log.info("Using project folder: {0}", project_path)
+            if os.path.exists(local_proj_dir):
+                Log.info(f"Using project folder: {local_proj_dir}")
                 if not force:
                     Log.debug("The project folder exists. SKIPPING...")
                     return True
                 else:
-                    shutil.rmtree(project_path, ignore_errors=True)
+                    shutil.rmtree(local_proj_dir, ignore_errors=True)
             try:
-                os.mkdir(project_path)
+                os.mkdir(local_proj_dir)
             except BaseException as e:
-                raise AutosubmitCritical(f"Project path:{project_path} can't be created. Revise that the path"
+                raise AutosubmitCritical(f"Project path:{local_proj_dir} can't be created. Revise that the path"
                                          f" is the correct one.",7014, str(e))
 
-            Log.debug("The project folder {0} has been created.", project_path)
-            Log.info("Checking out revision {0} into {1}",
-                     svn_project_revision + " " + svn_project_url, project_path)
+            Log.debug(f"The project folder {local_proj_dir} has been created.")
+            Log.info(f"Checking out revision {svn_project_revision} {svn_project_url} into {local_proj_dir}")
             try:
-                output = subprocess.check_output("cd " + project_path + "; svn --force-interactive checkout -r " +
+                output = subprocess.check_output("cd " + local_proj_dir + "; svn --force-interactive checkout -r " +
                                                  svn_project_revision + " " + svn_project_url + " " +
                                                  project_destination, shell=True)
             except subprocess.CalledProcessError:
                 try:
-                    shutil.rmtree(project_path, ignore_errors=True)
+                    shutil.rmtree(local_proj_dir, ignore_errors=True)
                 except Exception as e:
                     pass
                 raise AutosubmitCritical(f"Can not check out revision {svn_project_revision} {svn_project_url} "
-                                         f"into {project_path}", 7062)
+                                         f"into {local_proj_dir}", 7062)
             Log.debug("{0}", output)
-
         elif project_type == "local":
-            local_project_path = as_conf.get_local_project_path()
-            if local_project_path is None or len(local_project_path) == 0:
-                raise AutosubmitCritical("Empty project path! please change this parameter to a valid one.", 7014)
+            local_project_path: str = as_conf.get_local_project_path()
+            if not local_project_path:
+                raise AutosubmitCritical(
+                    "Empty project path! Please change this parameter to a valid one.", 7014)
             # check if local_project_path is a valid path
-            if not Path(local_project_path).is_dir():
-                raise AutosubmitCritical("Local project path is not a valid path and/or it does not exist.", 7014)
+            local_project_path: Path = Path(local_project_path)
+            if not local_project_path.is_dir():
+                msg = f'Local project path is not a valid path and/or it does not exist: {str(local_project_path)}'
+                raise AutosubmitCritical(msg, 7014)
             
-            project_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid,BasicConfig.LOCAL_PROJ_DIR)
-            local_destination = project_path.joinpath(project_destination)
+            local_proj_dir = Path(BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_PROJ_DIR)
+            project_destination = local_proj_dir / project_destination
 
-            if project_path.exists():
-                Log.info("Using project folder: {0}", project_path)
-                # TODO: It accepts a dir with ext name, but we assume that it is already created. Should we accept it?
-                if local_destination.is_dir():
-                    if force:
-                        try:
-                            cmd = ["rsync -ach --info=progress2 " +
-                                   local_project_path + "/* " + str(local_destination)]
-                            subprocess.call(cmd, shell=True)
-                        except (subprocess.CalledProcessError, IOError):
-                            raise AutosubmitCritical(f"Can not rsync {local_project_path} into {project_path}."
-                                                     f" Exiting...", 7063)
-                else:
-                    invalid_char_pattern = re.compile(r'[^a-zA-Z0-9/_\\-]')
-                    # check local_destination is a well-formatted path & create it
-                    # if local_destination.suffix : 
-                    #    raise AutosubmitCritical("Local destination path is not a valid path: ", 7014, local_destination)
-                    if invalid_char_pattern.search(str(local_destination)):
-                        raise AutosubmitCritical("Local destination path contains invalid characters ", 7014)
-
-                    Path(local_destination).mkdir(parents=True)
-                    try:
-                        subprocess.check_output(
-                            "cp -R " + str(local_project_path) + "/* " + str(local_destination), shell=True)
-                    except subprocess.CalledProcessError:
-                        try:
-                            shutil.rmtree(project_path)
-                        except Exception:
-                            pass
-                        raise AutosubmitCritical(f"Can not copy {local_project_path} into {project_path}."
-                                                 f" Exiting...", 7063)
-            else:
-                Path(project_path).mkdir(parents=True)
-                Path(local_destination).mkdir(parents=True) 
-                Log.debug(
-                    "The project folder {0} has been created.", project_path)
-                Log.info("Copying {0} into {1}",
-                         local_project_path, project_path)
+            # TODO: Move to a new package/file once we simplify ``autosubmit.py``.
+            def copy_contents(from_: Path, to: Path):
                 try:
-                    output = subprocess.check_output(
-                        "cp -R " + str(local_project_path) + "/* " + str(local_destination), shell=True)
+                    # TODO: Do it in pure-python?
+                    Log.info(f"Copying {str(from_)} into {str(to)}")
+                    cmd_output = subprocess.check_output(f"cp -R {str(from_)}/* {str(to)}/", shell=True)
+                    Log.debug(str(cmd_output))
                 except subprocess.CalledProcessError:
+                    with suppress(Exception):
+                        Log.debug(f'Deleting {str(to.parent)}')
+                        shutil.rmtree(to.parent)
+                    raise AutosubmitCritical(f"Cannot copy {str(from_)} into {str(to.parent)}. Exiting...", 7063)
+
+            if not local_proj_dir.exists():
+                Path(local_proj_dir).mkdir(parents=True)
+                Path(project_destination).mkdir(parents=True)
+                Log.debug(f"The project folder {local_proj_dir} has been created.")
+                copy_contents(local_project_path, project_destination)
+            else:
+                Log.info(f"Using project folder: {str(local_proj_dir)}")
+
+                # We use ``rsync`` if the directory already exists, syncing existing files.
+                # If the file does not exist, we create the directory and issue an ``cp``
+                # command to copy the files. Otherwise, we inform the user of no action.
+                if not project_destination.exists():
+                    Path(project_destination).mkdir(parents=True)
+                    copy_contents(local_project_path, project_destination)
+                elif force:
                     try:
-                        shutil.rmtree(project_path)
-                    except Exception as e:
-                        pass
-                    raise AutosubmitCritical(f"Can not copy {local_project_path} into {project_path}."
-                                             f" Exiting...", 7063)
-                Log.debug("{0}", output)
+                        cmd = f"rsync -ach --info=progress2 {str(local_project_path)}/* {str(project_destination)}"
+                        subprocess.call([cmd], shell=True)
+                    except (subprocess.CalledProcessError, IOError):
+                        raise AutosubmitCritical(f"Cannot rsync {str(local_project_path)} into "
+                                                 f"{str(project_destination.parent)}. Exiting...", 7063)
+                else:
+                    # Previously we did not inform users when nothing was copied.
+                    Log.info("Local project destination already exists, will not sync project files.")
+
         return True
 
     @staticmethod
