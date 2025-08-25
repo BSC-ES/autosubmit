@@ -8,7 +8,7 @@ CONFIG:
   AUTOSUBMIT_VERSION: 4.1.13
 DEFAULT:
   EXPID: a014
-  HPCARCH: local
+  HPCARCH: TEST_SLURM
 PROJECT:
   PROJECT_TYPE: none
   PROJECT_DESTINATION: auto-performance-profiling
@@ -43,7 +43,7 @@ JOBS:
     RUNNING: once
     WALLCLOCK: 00:10
     CHECK: 'true'
-    #PLATFORM: local
+    #PLATFORM: TEST_SLURM
     DEPENDENCIES:
       CLEAN: {}
     ADDITIONAL_FILES: []
@@ -1168,3 +1168,16 @@ JOBS:
     OIFS_RESOLUTION: TCO95L91
     NEMO_RESOLUTION: eORCA1L75
     ADDITIONAL_FILES: []
+PLATFORMS:
+  TEST_SLURM:
+    ADD_PROJECT_TO_HOST: false
+    HOST: localDocker
+    MAX_WALLCLOCK: 48:00
+    PROJECT: group
+    QUEUE: debug
+    SCRATCH_DIR: /tmp/scratch/
+    TEMP_DIR: ''
+    TYPE: slurm
+    USER: root
+    MAX_PROCESSORS: 10
+    PROCESSORS_PER_NODE: 10

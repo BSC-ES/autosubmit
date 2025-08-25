@@ -1216,7 +1216,7 @@ class AutosubmitConfig(object):
             self.reload(force_load)
         except IOError as e:
             raise AutosubmitError(
-                "I/O Issues con config files", 6016, str(e))
+                "I/O Issues with config files", 6016, str(e))
         except (AutosubmitCritical, AutosubmitError):
             raise
         except BaseException as e:
@@ -1594,8 +1594,6 @@ class AutosubmitConfig(object):
                     continue
                 if platform_name == "":
                     platform_name = self.get_platform().upper()
-                if platform_name == "LOCAL":
-                    continue
                 if not self.is_valid_jobs_in_wrapper(wrapper_values):
                     self.wrong_config["WRAPPERS"] += [[wrapper_name,
                                                        "JOBS_IN_WRAPPER contains non-defined jobs.  parameter is invalid"]]

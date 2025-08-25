@@ -2,7 +2,7 @@ DEFAULT:
   # Job experiment ID.
   EXPID: "a00m"
   # Default HPC platform name.
-  HPCARCH: "local"
+  HPCARCH: "TEST_SLURM"
 EXPERIMENT:
   # List of start dates
   DATELIST: '20000101'
@@ -31,7 +31,7 @@ GIT:
 SVN:
   PROJECT_URL: ''
   PROJECT_REVISION: ''
-LOCAL:
+TEST_SLURM:
   PROJECT_PATH: ''
 PROJECT_FILES:
   FILE_PROJECT_CONF: ''
