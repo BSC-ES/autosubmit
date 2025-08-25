@@ -15,7 +15,7 @@
 - The autosubmit-config-parser GitHub project has been archived and its code moved
   to Autosubmit repository, merging the projects again #2052
 - Documentation about `FOR.NAME` with values that are not strings #2515
-- Improvement of the error message for YAML files #2488
+- Improvement of the error messages for YAML files #2488 and for RO-CRATE #2572
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 
