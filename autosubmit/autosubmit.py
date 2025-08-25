@@ -4242,7 +4242,7 @@ class Autosubmit:
                         ...
                       ]
                     }
-                ''').replace('{', '{{').replace('}', '}}'))
+                '''))
             raise AutosubmitCritical("You must provide an ROCRATE configuration key when using RO-Crate...", 7014)
 
         # Read job list (from pickles) to retrieve start and end time.
