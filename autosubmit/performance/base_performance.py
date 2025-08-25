@@ -1,0 +1,116 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Optional, NamedTuple
+from autosubmit.notifications.mail_notifier import MailNotifier
+
+if TYPE_CHECKING:
+    from autosubmit.job.job import Job
+
+
+class PerformanceMetricInfo(NamedTuple):
+    """
+    Class to hold information about a performance metric.
+
+    Attributes:
+        metric (str): The name of the metric.
+        under_threshold (bool): Whether the metric is under the threshold.
+        value (float): The current value of the metric.
+        threshold (float): The threshold value for the metric.
+        under_performance (Optional[float]): The percentage of underperformance, if applicable.
+    """
+
+    metric: str
+    under_threshold: bool
+    value: float
+    threshold: float
+    under_performance: Optional[float] = None
+
+
+class BasePerformance(ABC):
+    """Base class for performance metrics calculation"""
+
+
+    def __init__(self, performance_config: dict[str, any], mail_notifier: MailNotifier):
+        """
+        Initialize the BasePerformance class.
+
+        :param performance_config: Performance configuration containing performance settings.
+        :type performance_config: dict[str, any]
+        """
+        self._performance_config = performance_config 
+        self._mail_notifier = mail_notifier
+
+    @abstractmethod
+    def compute_and_check_performance_metrics(self, job: "Job") -> list[PerformanceMetricInfo]:
+        """
+        Compute performance metrics for a job.
+
+        :param job: Job instance containing the necessary attributes.
+        :type job: Job
+
+        :return: A list of PerformanceMetricInfo instances containing metric details.
+        :rtype: list[PerformanceMetricInfo]
+        """
+        pass
+
+    # Build mail message for the metrics
+
+    @staticmethod
+    def _template_metric_message(metric_info: PerformanceMetricInfo, job: "Job") -> str:
+        """
+        Generate a message template for the performance metric.
+
+        :param metric_info: PerformanceMetricInfo instance containing metric details.
+        :type metric_info: PerformanceMetricInfo
+
+        :param job: Job instance containing the necessary attributes.
+        :type job: Job
+
+        :return: A formatted message string.
+        :rtype: str
+        """
+        return f"""
+        🧪 Experiment ID: {job.expid}
+        🎯 Job Name: {job.name}
+
+        Metric: {metric_info.metric}
+        📉 Current Value: {metric_info.value:.4f}
+        🎚️ Expected Threshold: {metric_info.threshold}
+
+        🔍 Performance is {metric_info.under_performance:.1f}% below expected threshold.
+        """
+
+    # Get Autosubmit configuration
+
+    def _get_mail_recipients(self) -> list[str]:
+        """
+        Get the email recipients for performance notifications from the Autosubmit configuration.
+
+        :return: A list of email addresses to notify.
+        :rtype: list[str]
+        """
+
+        notify_to = self._performance_config.get("NOTIFY_TO", [])
+
+        if not notify_to:
+            raise ValueError(
+                "No email recipients configured for performance notifications."
+            )
+
+        return notify_to

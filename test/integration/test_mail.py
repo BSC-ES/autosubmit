@@ -177,3 +177,57 @@ def test_recipients_list(
         resp = requests.get(f"{api_base}/api/v2/messages")
         assert len(resp.json()["items"][0]["Raw"]
                    ["To"]) == len(list_recipients)
+
+@pytest.mark.docker
+def test_notify_custom_alert(mail_notifier, fake_smtp_server):
+    """Test that the custom alert notification works as expected."""
+
+    _, api_base = fake_smtp_server
+    subject = 'Custom Alert Subject'
+    message_body = 'This is a custom alert message'
+    to_email = ['test@example.com']
+    expid = 'a000'
+    requests.delete(f"{api_base}/api/v1/messages")
+
+    mail_notifier.notify_custom_alert(subject, to_email, message_body)
+
+    resp = requests.get(f"{api_base}/api/v2/messages")
+    assert resp.json()["count"] == 1
+    emails = resp.json()["items"]
+    
+    # Check metadata
+    _check_metadata(emails, subject, expid, 'notifier@localhost', to_email)
+    
+    # Check sender and recipients
+    assert 'notifier@localhost' in emails[0]["Raw"]["From"]
+    assert to_email[0] in emails[0]["Raw"]["To"]
+
+
+@pytest.mark.parametrize(
+    "list_recipients, expected_error_message",
+    [("test", "Recipients of mail notifications must be a list of emails!"),
+        ([], "Empty recipient list"),
+        (['test'], "Invalid email in recipient list"),
+        (['test@mail.com', 'test2@mail.com'], None)]
+)
+@pytest.mark.docker
+def test_notify_custom_alert_recipients_validation(
+        mail_notifier,
+        fake_smtp_server,
+        list_recipients,
+        expected_error_message):
+    
+    """Test that the custom alert notification handles recipient validation."""
+
+    _, api_base = fake_smtp_server
+    subject = 'Test Subject'
+    message_body = 'Test message'
+    requests.delete(f"{api_base}/api/v1/messages")
+
+    if expected_error_message:
+        with pytest.raises(ValueError, match=expected_error_message):
+            mail_notifier.notify_custom_alert(subject, list_recipients, message_body)
+    else:
+        mail_notifier.notify_custom_alert(subject, list_recipients, message_body)
+        resp = requests.get(f"{api_base}/api/v2/messages")
+        assert len(resp.json()["items"][0]["Raw"]["To"]) == len(list_recipients)
