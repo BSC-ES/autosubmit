@@ -16,6 +16,7 @@
   to Autosubmit repository, merging the projects again #2052
 - Documentation about `FOR.NAME` with values that are not strings #2515
 - Improvement of the error messages for YAML files #2488 and for RO-CRATE #2572
+- Improvement of error message when `LOCAL` project location is a file, not a directory #1972 #1254
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 
