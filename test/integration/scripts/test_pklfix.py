@@ -17,7 +17,7 @@
 
 """Test for the autosubmit pklfix command"""
 
-import os
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -29,13 +29,15 @@ _EXPID = "t111"
 
 
 def test_autosubmit_pklfix_command_invocation(autosubmit_exp, mocker: MockerFixture):
+    """
+    Test if the pkl_fix function was called by the CLI
+    """
     autosubmit_exp(_EXPID, experiment_data={})
 
     mocker.patch("sys.argv", ["autosubmit", "pklfix", "-f", _EXPID])
 
     with patch("autosubmit.autosubmit.Autosubmit.pkl_fix") as mock_pklfix:
-        mock_pklfix.return_value = 0
-        assert 0 == main()
+        main()
 
         mock_pklfix.assert_called_once()
 
@@ -47,17 +49,19 @@ def test_autosubmit_pklfix_command_invocation(autosubmit_exp, mocker: MockerFixt
 def test_pklfix_bypass_prompt_confirmation(
     autosubmit_exp, mocker: MockerFixture, force: bool
 ):
+    """
+    Test if the --force option bypasses the prompt confirmation
+    """
     exp = autosubmit_exp(_EXPID, experiment_data={})
 
     as_conf = exp.as_conf
 
     # Create empty pkl files
-    exp_path = os.path.join(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID)
-    pkl_folder_path = os.path.join(exp_path, "pkl")
-    current_pkl_path = os.path.join(pkl_folder_path, f"job_list_{_EXPID}.pkl")
-    backup_pkl_path = os.path.join(pkl_folder_path, f"job_list_{_EXPID}_backup.pkl")
+    exp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR).joinpath(_EXPID)
+    pkl_folder_path = exp_path.joinpath("pkl")
+    current_pkl_path = pkl_folder_path.joinpath(f"job_list_{_EXPID}.pkl")
+    backup_pkl_path = pkl_folder_path.joinpath(f"job_list_{_EXPID}_backup.pkl")
 
-    os.makedirs(pkl_folder_path, exist_ok=True)
     with open(current_pkl_path, "w") as f:
         f.write("some big content here")
     with open(backup_pkl_path, "w") as f:

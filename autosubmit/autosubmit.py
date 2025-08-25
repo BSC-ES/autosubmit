@@ -694,7 +694,7 @@ class Autosubmit:
             subparser.add_argument('-f', '--force', default=False, action='store_true',
                                    help='Forces to stop autosubmit process, equivalent to kill -9')
             group.add_argument('-a', '--all', default=False, action='store_true',
-                               help='Stop all current running autosubmit processes, will ask for confirmation')
+                               help='Stop all current running autosubmit processes, will ask for confirmation unless -y is used')
             group.add_argument('-fa', '--force_all', default=False, action='store_true',
                                help='Stop all current running autosubmit processes')
             subparser.add_argument(
@@ -4077,6 +4077,8 @@ class Autosubmit:
 
         :param expid: experiment identifier
         :type expid: str
+        :param force: force the operation without confirmation
+        :type force: bool
         :return:
         :rtype: 
         """
@@ -5874,6 +5876,8 @@ class Autosubmit:
         :type current_status: str
         :param status: status to change the active jobs to
         :type status: str
+        :param force_yes: force yes answer to prompts
+        :type force_yes: bool
         """
         from autosubmit.helpers.processes import process_id, retrieve_expids
         from autosubmit.job.job_utils import cancel_jobs
