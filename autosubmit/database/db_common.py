@@ -73,6 +73,7 @@ def check_db() -> None:
         raise AutosubmitCritical(f'DB path does not exist: {BasicConfig.DB_PATH}', 7003)
 
 
+
 def open_conn(check_version=True):
     """
     Opens a connection to database
@@ -96,22 +97,16 @@ def open_conn(check_version=True):
             version = row[0]
         except sqlite3.OperationalError:
             # If this exception is thrown it's because db_version does not exist.
-            # Database is from 2.x or 3.0 beta releases
-            try:
-                cursor.execute('SELECT type FROM experiment;')
-                # If type field exists, it's from 2.x
-                version = -1
-            except sqlite3.Error:
-                # If raises and error , it's from 3.0 beta releases
-                version = 0
+            version = 0
+            Log.warning("Database version table does not exist. Assuming version 0.")
 
         # If database version is not the expected, update database....
-        if version < CURRENT_DATABASE_VERSION:
+        if int(version) < int(CURRENT_DATABASE_VERSION):
             if not _update_database(version, cursor):
                 raise AutosubmitCritical('Database version does not match', 7001)
 
         # ... or ask for autosubmit upgrade
-        elif version > CURRENT_DATABASE_VERSION:
+        elif int(version) > int(CURRENT_DATABASE_VERSION):
             raise AutosubmitCritical('Database version is not compatible with this autosubmit version. '
                                      'Please execute pip install autosubmit --upgrade', 7002)
     return conn, cursor
@@ -246,9 +241,9 @@ def get_autosubmit_version(expid):
 
     try:
         result = queue.get(True, TIMEOUT)
-    except Exception:
+    except Exception as e:
         raise AutosubmitCritical(f"The database process exceeded the timeout limit {TIMEOUT}s. "
-                                 f"Get experiment {expid} version failed to complete.")
+                                 f"Get experiment {expid} version failed to complete. {str(e)}")
     finally:
         proc.terminate()
     return result

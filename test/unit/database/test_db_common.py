@@ -97,3 +97,16 @@ def test_save_experiment_sqlite_open_conn_error(monkeypatch, tmp_path, mocker):
             sig = inspect.signature(db_common_fn)
             params = ['' for _ in range(len(sig.parameters))]
             db_common_fn(*params)
+
+def test_save_experiment_integrity_error(monkeypatch, tmp_path, mocker):
+    """Test the ``IntegrityError`` error path for ``db_common.save_experiment``.."""
+    monkeypatch.setattr(db_common, 'TIMEOUT', 1)
+    monkeypatch.setattr(BasicConfig, 'DB_PATH', str(tmp_path))
+
+    from sqlalchemy.exc import IntegrityError
+
+    mocker.patch('autosubmit.database.db_common.open_conn', side_effect=IntegrityError('bla', 'bla', 'bla'))
+
+    with pytest.raises(AutosubmitCritical) as e:
+        db_common.save_experiment('', '', '')
+        assert "could not register experiment" in str(e.value)
