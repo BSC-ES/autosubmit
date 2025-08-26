@@ -204,7 +204,7 @@ class EcPlatform(ParamikoPlatform):
         """
         self.connect(as_conf)
 
-    def check_remote_permissions(self):
+    def check_remote_permissions(self) -> bool:
         try:
             try:
                 subprocess.check_output(self.check_remote_permissions_remove_cmd, shell=False)

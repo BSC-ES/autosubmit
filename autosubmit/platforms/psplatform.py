@@ -1,44 +1,29 @@
-#!/usr/bin/env python3
-
-# Copyright 2017-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
 
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+from autosubmit.log.log import Log
 from autosubmit.platforms.headers.ps_header import PsHeader
+from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 
 
 class PsPlatform(ParamikoPlatform):
-    """
-    Class to manage jobs to host not using any scheduler
-
-    :param expid: experiment's identifier
-    :type expid: str
-    """
-
-    def get_checkAlljobs_cmd(self, jobs_id):
-        pass
-
-    def parse_Alljobs_output(self, output, job_id):
-        pass
-
-    def parse_queue_reason(self, output, job_id):
-        pass
+    """Class to manage jobs to host not using any scheduler."""
 
     def __init__(self, expid, name, config):
         ParamikoPlatform.__init__(self, expid, name, config)
@@ -57,6 +42,15 @@ class PsPlatform(ParamikoPlatform):
         self.job_status['FAILED'] = []
         self.update_cmds()
 
+    def get_checkAlljobs_cmd(self, jobs_id):
+        pass
+
+    def parse_Alljobs_output(self, output, job_id):
+        pass
+
+    def parse_queue_reason(self, output, job_id):
+        pass
+
     def create_a_new_copy(self):
         return PsPlatform(self.expid, self.name, self.config)
 
@@ -64,9 +58,7 @@ class PsPlatform(ParamikoPlatform):
         pass
 
     def update_cmds(self):
-        """
-        Updates commands for platforms
-        """
+        """Updates commands for platforms."""
         self.root_dir = os.path.join(self.scratch, self.project_dir, self.user, self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
         self.cancel_cmd = "kill -SIGINT"
@@ -106,14 +98,16 @@ class PsPlatform(ParamikoPlatform):
         for job,prev_status in job_list:
             self.check_job(job)
 
-    def check_remote_permissions(self):
+    def check_remote_permissions(self) -> bool:
         try:
             try:
                 self.send_command(self.remove_checker)
             except Exception as e:
-                pass
+                Log.debug(f'Failed to send command to remove checker files: {e}')
             self.send_command(self.mkdir_checker)
             self.send_command(self.remove_checker)
             return True
         except Exception as e:
-            return False
+            Log.debug(f'Failed to check remote dependencies for PS platform: {e}')
+
+        return False

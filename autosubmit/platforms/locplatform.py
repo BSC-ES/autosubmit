@@ -227,7 +227,7 @@ class LocalPlatform(ParamikoPlatform):
             return False
         return True
 
-    def check_remote_permissions(self):
+    def check_remote_permissions(self) -> bool:
         return True
 
     # Moves .err .out

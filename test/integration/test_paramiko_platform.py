@@ -15,95 +15,89 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
-from getpass import getuser
-from pathlib import Path
-from tempfile import TemporaryDirectory, gettempdir
-
-import paramiko
-import pytest
-from testcontainers.core.waiting_utils import wait_for_logs
-from testcontainers.sftp import DockerContainer
-
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform
-from autosubmit.platforms.psplatform import PsPlatform
-from test.integration.test_utils.networking import get_free_port
-
 """Integration tests for the paramiko platform.
 
-Note that tests will start and destroy an SSH server. For unit tests, see ``paramiko_platform.py``
+Note that tests will start and destroy an SSH server. For unit tests, see ``test_paramiko_platform.py``
 in the ``test/unit`` directory."""
 
+from getpass import getuser
+from pathlib import Path
+from typing import TYPE_CHECKING
 
-_SSH_TIMEOUTS_IN_SECONDS = 90
+import pytest
+
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
+
+if TYPE_CHECKING:
+    from autosubmit.platforms.psplatform import PsPlatform
+
+_EXPID = 't000'
+
 
 @pytest.mark.docker
 @pytest.mark.parametrize('filename, check', [
     ('test1', True),
     ('sub/test2', True)
 ], ids=['filename', 'filename_long_path'])
-def test_send_file(mocker, filename, ps_platform, check):
+def test_send_file(filename: str, check: bool, autosubmit_exp, ssh_server):
     """This test opens an SSH connection (via sftp) and sends a file to the remote location.
 
     It launches a Docker Image using testcontainers library.
     """
-    remote_dir = Path(ps_platform.root_dir) / f'LOG_{ps_platform.expid}'
-    remote_dir.mkdir(parents=True, exist_ok=True)
-    Path(ps_platform.tmp_path).mkdir(parents=True, exist_ok=True)
+    user = getuser()
+    platform_name = 'TEST_PS_PLATFORM'
+
+    remote_dir = '/app/'
+    project = 'test'
+
+    exp = autosubmit_exp(_EXPID, experiment_data={
+        'PLATFORMS': {
+            platform_name: {
+                'TYPE': 'ps',
+                'HOST': ssh_server.get_docker_client().host(),
+                'PROJECT': project,
+                'USER': user,
+                'SCRATCH_DIR': remote_dir,
+                'ADD_PROJECT_TO_HOST': 'False',
+                'MAX_WALLCLOCK': '48:00',
+                'DISABLE_RECOVERY_THREADS': 'True'
+            }
+        },
+        'JOBS': {
+            # FIXME: This is poorly designed. First, to load platforms you need an experiment
+            #        (even if you are in test/code mode). Then, platforms only get the user
+            #        populated by a submitter. This is strange, as the information about the
+            #        user is in the ``AutosubmitConfig``, and the platform has access to the
+            #        ``AutosubmitConfig``. It is just never accessing the user (expid, yes).
+            'BECAUSE_YOU_NEED_AT_LEAST_ONE_JOB_USING_THE_PLATFORM': {
+                'RUNNING': 'once',
+                'SCRIPT': "sleep 0",
+                'PLATFORM': platform_name
+            }
+        }
+    })
+
+    # We load the platforms with the submitter so that the platforms have all attributes.
+    # NOTE: The set up of platforms is done partially in the platform constructor, and
+    #       partially by a submitter (i.e. they are tightly coupled, which makes it hard
+    #       to maintain & test).
+    submitter = ParamikoSubmitter()
+    submitter.load_platforms(asconf=exp.as_conf, retries=0)
+
+    ps_platform: 'PsPlatform' = submitter.platforms[platform_name]
+
+    ps_platform.connect(as_conf=exp.as_conf, reconnect=False, log_recovery_process=False)
+    assert ps_platform.check_remote_permissions()
+
     # generate file
     if "/" in filename:
         filename_dir = Path(filename).parent
-        (Path(ps_platform.tmp_path) / filename_dir).mkdir(parents=True, exist_ok=True)
+        Path(ps_platform.tmp_path, filename_dir).mkdir(parents=True, exist_ok=True)
         filename = Path(filename).name
-    with open(Path(ps_platform.tmp_path) / filename, 'w') as f:
+    with open(str(Path(ps_platform.tmp_path, filename)), 'w') as f:
         f.write('test')
 
-    # NOTE: because the test will run inside a container, with a different UID and GID,
-    #       sftp would not be able to write to the folder in the temporary directory
-    #       created by another user uid/gid (inside the container the user will be nobody).
-    from_env = os.environ.get("PYTEST_DEBUG_TEMPROOT")
-    temproot = Path(from_env or gettempdir()).resolve()
-    user = getuser() or "unknown"
-    rootdir = temproot / f"pytest-of-{user}"
+    assert ps_platform.send_file(filename)
 
-    # To write in the /tmp (sticky bit, different uid/gid), reset it later (default pytest is 700)
-    os.system(f'chmod 777 -R {str(rootdir)}')
-
-    ssh_port = get_free_port()
-
-    try:
-        image = 'lscr.io/linuxserver/openssh-server:latest'
-        with DockerContainer(image=image, remove=True, hostname='openssh-server') \
-                .with_env('TZ', 'Etc/UTC') \
-                .with_env('SUDO_ACCESS', 'false') \
-                .with_env('USER_NAME', user) \
-                .with_env('USER_PASSWORD', 'password') \
-                .with_env('PASSWORD_ACCESS', 'true') \
-                .with_bind_ports(2222, ssh_port) \
-                .with_volume_mapping('/tmp', '/tmp', mode='rw') as container:
-            wait_for_logs(container, 'sshd is listening on port 2222')
-            _ssh = paramiko.SSHClient()
-            _ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            _ssh.connect(
-                hostname=ps_platform.host,
-                username=ps_platform.user,
-                password='password',
-                port=ssh_port,
-                timeout=_SSH_TIMEOUTS_IN_SECONDS,
-                banner_timeout=_SSH_TIMEOUTS_IN_SECONDS,
-                auth_timeout=_SSH_TIMEOUTS_IN_SECONDS
-            )
-            ps_platform._ftpChannel = paramiko.SFTPClient.from_transport(
-                _ssh.get_transport(),
-                window_size=pow(4, 12),
-                max_packet_size=pow(4, 12))
-            ps_platform._ftpChannel.get_channel().settimeout(120)
-            ps_platform.connected = True
-            ps_platform.get_send_file_cmd = mocker.Mock()
-            ps_platform.get_send_file_cmd.return_value = 'ls'
-            ps_platform.send_command = mocker.Mock()
-
-            ps_platform.send_file(filename)
-            assert check == (remote_dir / filename).exists()
-    finally:
-        os.system(f'chmod 700 -R {str(rootdir)}')
+    result = ssh_server.exec(f'ls {remote_dir}/{project}/{user}/{exp.expid}/LOG_{exp.expid}/{filename}')
+    assert result.exit_code == 0

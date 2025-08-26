@@ -59,7 +59,6 @@ class ParamikoSubmitter(Submitter):
         platforms['LOCAL'] = local_platform
         self.platforms = platforms
 
-
     def load_platforms(self, asconf, retries=5, auth_password = None, local_auth_password = None):
         """
         Create all the platforms object that will be used by the experiment
@@ -71,8 +70,8 @@ class ParamikoSubmitter(Submitter):
         :rtype: dict
         """
         exp_data = asconf.experiment_data
-        raise_message=""
-        platforms_used = list()
+        raise_message = ""
+        platforms_used = []
         hpcarch = asconf.get_platform()
         platforms_used.append(hpcarch)
         platforms_serial_in_paralell = defaultdict(list)
@@ -84,7 +83,7 @@ class ParamikoSubmitter(Submitter):
                 platforms_used.append(hpc)
         # Traverse used platforms and look for serial_platforms and add them if not already included
         for platform in platforms_used:
-            hpc = asconf.experiment_data.get("PLATFORMS",{}).get(platform,{}).get("SERIAL_PLATFORM", None)
+            hpc = asconf.experiment_data.get("PLATFORMS", {}).get(platform, {}).get("SERIAL_PLATFORM", None)
             if hpc is not None:
                 platforms_serial_in_paralell[hpc].append(platform)
                 if hpc not in platforms_used:
@@ -95,7 +94,7 @@ class ParamikoSubmitter(Submitter):
         platforms = dict()
 
         # Build Local Platform Object
-        local_platform = LocalPlatform(asconf.expid, 'local', exp_data, auth_password = local_auth_password)
+        local_platform = LocalPlatform(asconf.expid, 'local', exp_data, auth_password=local_auth_password)
         local_platform.max_wallclock = asconf.get_max_wallclock()
         local_platform.max_processors = asconf.get_max_processors()
         local_platform.max_waiting_jobs = asconf.get_max_waiting_jobs()
