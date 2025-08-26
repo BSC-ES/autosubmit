@@ -24,21 +24,12 @@ from autosubmit.log.log import AutosubmitCritical
 
 
 class JobPackagePersistence(object):
-    """
-    Class that handles packages workflow.
-
-    Create Packages Table, Wrappers Table.
-
-    :param persistence_path: Path to the persistence folder pkl. \n
-    :type persistence_path: String \n
-    :param persistence_file: Name of the persistence pkl file. \n
-    :type persistence_file: String
-    """
+    """Class that handles packages workflow."""
 
     VERSION = 1
     JOB_PACKAGES_TABLE = 'job_package'
     WRAPPER_JOB_PACKAGES_TABLE = 'wrapper_job_package'
-    TABLE_FIELDS = ['exp_id', 'package_name', 'job_name', 'wallclock' ]  # new field, needs a new autosubmit create
+    TABLE_FIELDS = ['exp_id', 'package_name', 'job_name', 'wallclock']  # new field, needs a new autosubmit create
 
     def __init__(self, expid: str):
         options = {
@@ -73,21 +64,12 @@ class JobPackagePersistence(object):
                                              "'autosubmit create -f <EXPID>' to fix this issue.")
         return results
 
-    def reset(self):
-        """
-        Loads package of jobs from a database
-
-        """
-        self.db_manager.drop_table(self.WRAPPER_JOB_PACKAGES_TABLE)
-        self.db_manager.create_table(self.WRAPPER_JOB_PACKAGES_TABLE, self.TABLE_FIELDS)
-
     def save(self, package, preview_wrappers=False):
         """
         Persists a job list in a database
         :param package: all wrapper attributes
         :param preview_wrappers: boolean
         """
-        #self._reset_table()
         job_packages_data = []
         for job in package.jobs:
             job_packages_data += [(package._expid, package.name, job.name, package._wallclock)]
@@ -98,7 +80,7 @@ class JobPackagePersistence(object):
             self.db_manager.insertMany(self.JOB_PACKAGES_TABLE, job_packages_data)
             self.db_manager.insertMany(self.WRAPPER_JOB_PACKAGES_TABLE, job_packages_data)
 
-    def reset_table(self,wrappers=False):
+    def reset_table(self, wrappers=False):
         """
         Drops and recreates the database
         """

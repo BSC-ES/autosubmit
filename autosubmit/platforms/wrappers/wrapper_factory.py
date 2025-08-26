@@ -1,26 +1,29 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from autosubmit.platforms.wrappers.wrapper_builder import WrapperDirector, PythonVerticalWrapperBuilder, \
-    PythonHorizontalWrapperBuilder, PythonHorizontalVerticalWrapperBuilder, PythonVerticalHorizontalWrapperBuilder, \
-    BashHorizontalWrapperBuilder, BashVerticalWrapperBuilder, SrunHorizontalWrapperBuilder,SrunVerticalHorizontalWrapperBuilder
 import re
+
+from autosubmit.platforms.wrappers.wrapper_builder import (
+    WrapperDirector, PythonVerticalWrapperBuilder, PythonHorizontalWrapperBuilder,
+    PythonHorizontalVerticalWrapperBuilder, PythonVerticalHorizontalWrapperBuilder,
+    BashHorizontalWrapperBuilder, BashVerticalWrapperBuilder, SrunHorizontalWrapperBuilder,
+    SrunVerticalHorizontalWrapperBuilder
+)
+
 
 class WrapperFactory(object):
 
@@ -31,7 +34,7 @@ class WrapperFactory(object):
         self.exception = "This type of wrapper is not supported for this platform"
 
     def get_wrapper(self, wrapper_builder, **kwargs):
-        wrapper_data = kwargs['wrapper_data'] # this refers to the object with all parameters init
+        wrapper_data = kwargs['wrapper_data']  # this refers to the object with all parameters init
         wrapper_data.wallclock = kwargs['wallclock']
         if wrapper_data.het.get("HETSIZE",0) <= 1:
             if not str(kwargs['num_processors_value']).isdigit():
@@ -58,7 +61,7 @@ class WrapperFactory(object):
 
         # look for placeholders inside constructed ( CURRENT_ variables )
         placeholders_inside_wrapper = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)',
-                                                             wrapper_cmd, flags=re.IGNORECASE)
+                                                 wrapper_cmd, flags=re.IGNORECASE)
         for placeholder in placeholders_inside_wrapper:
             placeholder = placeholder[1:-1]
 
@@ -94,26 +97,35 @@ class WrapperFactory(object):
 
     def dependency(self, dependency):
         return '#' if dependency is None else self.dependency_directive(dependency)
+
     def queue(self, queue):
         return '#' if not queue else self.queue_directive(queue)
+
     def processors(self, processors):
         return '#' if not processors or processors == "0" else self.processors_directive(processors)
+
     def nodes(self, nodes):
         return '#' if not nodes else self.nodes_directive(nodes)
+
     def tasks(self, tasks):
         return '#' if not tasks or int(tasks) < 1 else self.tasks_directive(tasks)
+
     def partition(self, partition):
         return '#' if not partition else self.partition_directive(partition)
+
     def threads(self, threads):
-        return '#' if not threads or threads in ["0","1"] else self.threads_directive(threads)
+        return '#' if not threads or threads in ["0", "1"] else self.threads_directive(threads)
+
     def exclusive(self, exclusive):
         return '#' if not exclusive or str(exclusive).lower() == "false" else self.exclusive_directive(exclusive)
+
     def custom_directives(self, custom_directives):
         return '#' if not custom_directives else self.get_custom_directives(custom_directives)
+
     def get_custom_directives(self, custom_directives):
-        """
-        Returns custom directives for the specified job
-        :param job: Job object
+        """Returns custom directives for the specified job.
+
+        :param custom_directives: Original custom directive
         :return: String with custom directives
         """
         # There is no custom directives, so directive is empty
@@ -123,20 +135,28 @@ class WrapperFactory(object):
 
     def reservation_directive(self, reservation):
         return '#'
+
     def dependency_directive(self, dependency):
         raise NotImplemented(self.exception)
+
     def queue_directive(self, queue):
         raise NotImplemented(self.exception)
+
     def processors_directive(self, processors):
         raise NotImplemented(self.exception)
+
     def nodes_directive(self, nodes):
         raise NotImplemented(self.exception)
+
     def tasks_directive(self, tasks):
         raise NotImplemented(self.exception)
+
     def partition_directive(self, partition):
         raise NotImplemented(self.exception)
+
     def exclusive_directive(self, exclusive):
         raise NotImplemented(self.exception)
+
     def threads_directive(self, threads):
         raise NotImplemented(self.exception)
 
@@ -222,20 +242,28 @@ class SlurmWrapperFactory(WrapperFactory):
 
     def reservation_directive(self, reservation):
         return "#SBATCH --reservation={0}".format(reservation)
+
     def dependency_directive(self, dependency):
         return '#SBATCH --dependency=afterok:{0}'.format(dependency)
+
     def queue_directive(self, queue):
         return '#SBATCH --qos={0}'.format(queue)
+
     def partition_directive(self, partition):
         return '#SBATCH --partition={0}'.format(partition)
+
     def exclusive_directive(self, exclusive):
         return '#SBATCH --exclusive'
+
     def tasks_directive(self, tasks):
         return '#SBATCH --ntasks-per-node={0}'.format(tasks)
+
     def nodes_directive(self, nodes):
         return '#SBATCH -N {0}'.format(nodes)
+
     def processors_directive(self, processors):
         return '#SBATCH -n {0}'.format(processors)
+
     def threads_directive(self, threads):
         return '#SBATCH --cpus-per-task={0}'.format(threads)
 
@@ -268,20 +296,26 @@ class PJMWrapperFactory(WrapperFactory):
         return self.platform.allocated_nodes()
 
     def reservation_directive(self, reservation):
-        return "#" # Reservation directive doesn't exist in PJM, they're handled directly by admins
+        return "#"  # Reservation directive doesn't exist in PJM, they're handled directly by admins
 
     def queue_directive(self, queue):
         return '#PJM --qos={0}'.format(queue)
+
     def partition_directive(self, partition):
         return '#PJM --partition={0}'.format(partition)
+
     def exclusive_directive(self, exclusive):
         return '#PJM --exclusive'
+
     def tasks_directive(self, tasks):
-        return "#PJM --mpi max-proc-per-node={0}".format(tasks) # searchhint
+        return "#PJM --mpi max-proc-per-node={0}".format(tasks)  # search hint
+
     def nodes_directive(self, nodes):
         return '#PJM -N {0}'.format(nodes)
+
     def processors_directive(self, processors):
         return '#PJM -n {0}'.format(processors)
+
     def threads_directive(self, threads):
         return f"export OMP_NUM_THREADS={threads}"
 
@@ -308,5 +342,3 @@ class EcWrapperFactory(WrapperFactory):
 
     def dependency_directive(self, dependency):
         return '#PBS -v depend=afterok:{0}'.format(dependency)
-
-
