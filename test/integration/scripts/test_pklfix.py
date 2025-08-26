@@ -18,7 +18,6 @@
 """Test for the autosubmit pklfix command"""
 
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from pytest_mock import MockerFixture
@@ -26,23 +25,6 @@ from pytest_mock import MockerFixture
 from autosubmit.scripts.autosubmit import main
 
 _EXPID = "t111"
-
-
-def test_autosubmit_pklfix_command_invocation(autosubmit_exp, mocker: MockerFixture):
-    """
-    Test if the pkl_fix function was called by the CLI
-    """
-    autosubmit_exp(_EXPID, experiment_data={})
-
-    mocker.patch("sys.argv", ["autosubmit", "pklfix", "-f", _EXPID])
-
-    with patch("autosubmit.autosubmit.Autosubmit.pkl_fix") as mock_pklfix:
-        main()
-
-        mock_pklfix.assert_called_once()
-
-        passed_args = mock_pklfix.call_args[0]
-        assert passed_args[1] is True
 
 
 @pytest.mark.parametrize("force", [True, False])
@@ -71,14 +53,11 @@ def test_pklfix_bypass_prompt_confirmation(
     passed_args = ["autosubmit", "pklfix"] + (["-f"] if force else []) + [_EXPID]
     mocker.patch("sys.argv", passed_args)
 
-    with patch(
+    mock_user_yes_no_query = mocker.patch(
         "autosubmit.autosubmit.Autosubmit._user_yes_no_query"
-    ) as mock_user_yes_no_query:
-        mock_user_yes_no_query.return_value = False
+    )
+    mock_user_yes_no_query.return_value = False
 
-        assert main() is None
+    assert main() is None
 
-        if force:
-            mock_user_yes_no_query.assert_not_called()
-        else:
-            mock_user_yes_no_query.assert_called_once()
+    assert mock_user_yes_no_query.call_count == (0 if force else 1)

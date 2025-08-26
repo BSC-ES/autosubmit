@@ -17,31 +17,12 @@
 
 """Test for the autosubmit stop command"""
 
-from unittest.mock import patch
-
 import pytest
 from pytest_mock import MockerFixture
 
 from autosubmit.scripts.autosubmit import main
 
 _EXPID = "t111"
-
-
-def test_autosubmit_stop_command_invocation(autosubmit_exp, mocker: MockerFixture):
-    """
-    Test if the stop function was called by the CLI
-    """
-    autosubmit_exp(_EXPID, experiment_data={})
-
-    mocker.patch("sys.argv", ["autosubmit", "stop", "-y", _EXPID])
-
-    with patch("autosubmit.autosubmit.Autosubmit.stop") as mock_stop:
-        main()
-
-        mock_stop.assert_called_once()
-
-        passed_args = mock_stop.call_args[0]
-        assert passed_args[7] is True
 
 
 @pytest.mark.parametrize("force_yes", [True, False])
@@ -57,12 +38,9 @@ def test_stop_bypass_prompt_confirmation(
     passed_args = ["autosubmit", "stop"] + (["-y"] if force_yes else []) + [_EXPID]
     mocker.patch("sys.argv", passed_args)
 
-    with patch("builtins.input") as mock_input:
-        mock_input.return_value = "no"
+    mock_input = mocker.patch("builtins.input")
+    mock_input.return_value = "no"
 
-        assert main() is None
+    assert main() is None
 
-        if force_yes:
-            mock_input.assert_not_called()
-        else:
-            mock_input.assert_called_once()
+    assert mock_input.call_count == (0 if force_yes else 1)
