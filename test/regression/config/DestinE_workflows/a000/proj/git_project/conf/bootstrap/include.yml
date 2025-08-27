@@ -35,6 +35,7 @@ DEFAULT:
       # Mother request
       - "%PROJDIR%/conf/mother_request.yml" 
 
-    POST:
-      - "~/platforms.yml"
+    # POST:
+      # Removed so the test doesn't behave differently depending on where it runs.
+      #- "~/platforms.yml"
 
