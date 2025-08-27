@@ -34,7 +34,7 @@ class BasicConfig:
     def __init__(self):
         pass
 
-    def props(self):
+    def props(self) -> dict:
         pr = {}
         for name in dir(self):
             value = getattr(self, name)

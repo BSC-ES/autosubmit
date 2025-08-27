@@ -86,9 +86,9 @@ def recover_platform_job_logs_wrapper(
     }
     _init_logs_log_process(as_conf, platform.name)
     platform.recover_platform_job_logs(as_conf)
-    _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
-
-
+    # Exit userspace after manually closing ssh sockets, recommended for child processes,
+    # the queue() and shared signals should be in charge of the main process.
+    _exit(0)
 
 
 class CopyQueue(Queue):
@@ -113,7 +113,6 @@ class CopyQueue(Queue):
         self.timeout = timeout
         super().__init__(maxsize, ctx=ctx)
 
-
     def put(self, job: Any, block: bool = True, timeout: float = None) -> None:
         """
         Puts a job into the queue if it is not a duplicate.
@@ -128,7 +127,7 @@ class CopyQueue(Queue):
         super().put(job.__getstate__(), block, timeout)
 
 
-class Platform(object):
+class Platform:
     """
     Class to manage the connections to the different platforms.
     """
@@ -678,8 +677,6 @@ class Platform(object):
 
         :param job: Get the checkpoint files
         :type job: Job
-        :param max_step: max step possible
-        :type max_step: int
         """
         if not job.current_checkpoint_step:
             job.current_checkpoint_step = 0
@@ -751,10 +748,9 @@ class Platform(object):
         return False
 
     def remove_checkpoint_file(self, filename):
-        """
-        Removes *CHECKPOINT* files from remote
+        """Removes *CHECKPOINT* files from remote.
 
-        :param job_name: name of job to check
+        :param filename: file name to delete.
         :return: True if successful, False otherwise
         """
         if self.check_file_exists(filename):
@@ -814,7 +810,7 @@ class Platform(object):
         """
         raise NotImplementedError
 
-    def check_Alljobs(self, job_list, as_conf, retries=5):
+    def check_all_jobs(self, job_list, as_conf, retries=5):
         for job, job_prev_status in job_list:
             self.check_job(job)
 
@@ -833,7 +829,7 @@ class Platform(object):
         """
         raise NotImplementedError
 
-    def closeConnection(self):
+    def close_connection(self):
         return
 
     def write_jobid(self, jobid, complete_path):
@@ -880,7 +876,7 @@ class Platform(object):
         """ Opens Submit script file """
         raise NotImplementedError
 
-    def submit_Script(self, hold=False):
+    def submit_script(self, hold=False):
         # type: (bool) -> Union[List[str], str]
         """
         Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once.
@@ -977,7 +973,7 @@ class Platform(object):
         self.recovery_queue = CopyQueue(ctx=ctx)
         # Cleanup will be automatically prompt on control + c or a normal exit
         atexit.register(self.send_cleanup_signal)
-        atexit.register(self.closeConnection)
+        atexit.register(self.close_connection)
         return new_platform
 
     def create_new_process(self, ctx, new_platform, as_conf) -> None:
@@ -1059,13 +1055,10 @@ class Platform(object):
         return process_log
 
     def wait_until_timeout(self, timeout: int = 60) -> bool:
-        """
-        Waits until the timeout is reached or any signal is set to process logs.
+        """Waits until the timeout is reached or any signal is set to process logs.
 
-        :param sleep_time: Maximum time to wait in seconds. Defaults to 60.
-        :type sleep_time: int
+        :param timeout: Maximum time to wait in seconds. Defaults to 60.
         :return: True if there is work to process, False otherwise.
-        :rtype: bool
         """
         process_log = False
         for _ in range(timeout, 0, -1):
@@ -1117,11 +1110,12 @@ class Platform(object):
             try:
                 job.retrieve_logfiles(raise_error=True)
                 job._log_recovery_retries += 1
-            except:
+            except Exception as e:
                 if job._log_recovery_retries < 5:
                     jobs_pending_to_process.add(job)
                 Log.warning(
-                    f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry '{job.fail_count}'.")
+                    f"{identifier} (Retry) Failed to recover log for job '{job.name}' "
+                    f"and retry '{job.fail_count}': {str(e)}")
             Log.result(
                 f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
         if len(jobs_pending_to_process) > 0:
@@ -1155,10 +1149,12 @@ class Platform(object):
             Log.debug(traceback.format_exc())
 
         with suppress(Exception):
-            self.closeConnection()
+            self.close_connection()
 
         Log.info(f"{identifier} Exiting.")
-        _exit(0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
+        # Exit userspace after manually closing ssh sockets, recommended for child processes,
+        # the queue() and shared signals should be in charge of the main process.
+        _exit(0)
 
     def create_a_new_copy(self):
         raise NotImplementedError

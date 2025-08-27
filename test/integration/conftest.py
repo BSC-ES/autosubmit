@@ -21,7 +21,7 @@ from getpass import getuser
 from pwd import getpwnam
 from random import randrange
 from tempfile import TemporaryDirectory
-from typing import Callable, Iterator, TYPE_CHECKING
+from typing import Callable, Iterator, Optional, TYPE_CHECKING
 
 import paramiko
 import pytest
@@ -41,7 +41,7 @@ _DOCKER_PASSWORD = 'password'
 
 
 @pytest.fixture
-def make_ssh_client() -> Callable[[int, str], paramiko.SSHClient]:
+def make_ssh_client() -> Callable[[int, Optional[str]], paramiko.SSHClient]:
     """Creates the SSH client
 
     It modifies the list of arguments so that the port is always
@@ -53,7 +53,7 @@ def make_ssh_client() -> Callable[[int, str], paramiko.SSHClient]:
     :return: A normal Paramiko SSH Client, but that used the Docker SSH port and password to connect.
     """
 
-    def _make_ssh_client(ssh_port: int, password) -> paramiko.SSHClient:
+    def _make_ssh_client(ssh_port: int, password: Optional[str]) -> paramiko.SSHClient:
         ssh_client = _create_ssh_client()
 
         orig_ssh_client_connect = ssh_client.connect
@@ -76,6 +76,10 @@ def make_ssh_client() -> Callable[[int, str], paramiko.SSHClient]:
                 # tuple to list, and then replace the port...
                 args = [x for x in args]
                 args[1] = ssh_port
+
+            ssh_timeout = 180  # 3 minutes
+            for timeout in ['banner_timeout', 'auth_timeout', 'channel_timeout']:
+                kwargs[timeout] = ssh_timeout
 
             return orig_ssh_client_connect(*args, **kwargs)
 

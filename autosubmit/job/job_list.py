@@ -2893,7 +2893,7 @@ class JobList(object):
                         # Need to store the wallclock for the is_overwallclock function
                         packages_persistence.save(package, inspect)
 
-    def check_scripts(self, as_conf):
+    def check_scripts(self, as_conf) -> bool:
         """
         When we have created the scripts, all parameters should have been substituted.
         %PARAMETER% handlers not allowed
@@ -3014,10 +3014,8 @@ class JobList(object):
                          'conf', "jobs_" + self._expid + ".yaml"))
         return jobs_parser
 
-    def remove_rerun_only_jobs(self, notransitive=False):
-        """
-        Removes all jobs to be run only in reruns
-        """
+    def remove_rerun_only_jobs(self) -> None:
+        """Removes all jobs to be run only in reruns."""
         flag = False
         for job in self._job_list[:]:
             if job.rerun_only == "true":

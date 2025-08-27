@@ -38,8 +38,7 @@ exclude_lines =
     @(abc\.)?abstractmethod
 
     # Ignore pass statements
-    pass
-   
+    ^\s*pass$
 
 fail_under=0
 ignore_errors = False
@@ -48,6 +47,7 @@ omit =
 precision = 2
 show_missing = False
 skip_covered = False
+skip_empty = False
 sort = Name
 
 [html]
