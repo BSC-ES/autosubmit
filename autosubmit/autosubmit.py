@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -1824,14 +1824,13 @@ class Autosubmit:
         :return: Nothing\n
         :rtype: \n
         """
-        Log.warning("Generating the auxiliary job_list used for the -CW flag.")
+        Log.warning("Generating the auxiliary job_list used for the -cw flag.")
         job_list._job_list = jobs_filtered
         job_list._persistence_file = job_list._persistence_file + "_cw_flag"
         as_conf.load_parameters()
         date_list = as_conf.get_date_list()
         if len(date_list) != len(set(date_list)):
-            raise AutosubmitCritical(
-                'There are repeated start dates!', 7014)
+            raise AutosubmitCritical('There are repeated start dates!', 7014)
         num_chunks = as_conf.get_num_chunks()
         chunk_ini = as_conf.get_chunk_ini()
         member_list = as_conf.get_member_list()
@@ -1850,8 +1849,11 @@ class Autosubmit:
                 continue
             wrapper_jobs[wrapper_section] = as_conf.get_wrapper_jobs(wrapper_data)
         Log.warning("Aux Job_list was generated successfully")
+
+        # Load platforms.
         submitter = ParamikoSubmitter(as_conf=as_conf)
         hpcarch = as_conf.get_platform()
+
         Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
         platforms_to_test = set()
         for job in job_list.get_job_list():
@@ -5660,12 +5662,8 @@ class Autosubmit:
         return data
 
     @staticmethod
-    def _get_submitter(as_conf):
-        """Returns the submitter corresponding to the communication defined on autosubmit's config file.
-
-        :return: submitter
-        :rtype: Submitter
-        """
+    def _get_submitter(as_conf) -> ParamikoSubmitter:
+        """Returns the submitter corresponding to the communication defined on autosubmit's config file."""
         return ParamikoSubmitter(as_conf=as_conf)
 
     @staticmethod

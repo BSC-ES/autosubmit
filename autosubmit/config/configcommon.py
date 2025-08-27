@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -1966,6 +1966,8 @@ class AutosubmitConfig(object):
             target["HPCROOTDIR"] = str(target["HPCROOTDIR"])
             target["HPCLOGDIR"] = str(target["HPCLOGDIR"])
 
+        self.substitute_dynamic_variables(target)
+
     def save(self) -> None:
         """Saves the experiment data into the ``experiment_folder/conf/metadata`` folder as a YAML file."""
         if self.is_current_logged_user_owner:
@@ -2888,22 +2890,6 @@ class AutosubmitConfig(object):
                 raise Exception(
                     "{}\n This file and the correctness of its content are necessary.".format(str(exp)))
         return parser
-
-    @staticmethod
-    def parse_placeholders(content, parameters) -> str:
-        """Parse placeholders in content.
-
-        :param content: content to be parsed
-        :type content: str
-        :param parameters: parameters to be used in parsing
-        :type parameters: dict
-        :return: parsed content
-        """
-        matches = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', content, flags=re.I)
-        for match in matches:
-            # replace all '%(?<!%%)\w+%(?!%%)' with parameters value
-            content = content.replace(match, parameters.get(match[1:-1], ""))
-        return content
 
     def get_current_wrapper(self, section: str) -> dict:
         """Returns the wrapper configuration for a given job section.
