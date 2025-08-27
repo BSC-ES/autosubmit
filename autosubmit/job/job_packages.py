@@ -157,7 +157,8 @@ class JobPackageBase(object):
             # looking for directives on jobs
             self._custom_directives = self._custom_directives | set(job.custom_directives)
         self._create_scripts(configuration)
-    def submit(self, configuration, parameters,only_generate=False,hold=False):
+
+    def submit(self, configuration, parameters, only_generate=False, hold=False):
         """
         :param hold:
         :para configuration: Autosubmit basic configuration \n

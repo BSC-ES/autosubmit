@@ -40,9 +40,6 @@ from pathlib import Path
 from time import sleep
 from typing import Dict, Set, Tuple, Union, Any, List, Optional
 
-from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.config.yamlparser import YAMLParserFactory
 from bscearth.utils.date import date2str
 from portalocker import Lock
 from portalocker.exceptions import BaseLockException
@@ -51,6 +48,9 @@ from ruamel.yaml import YAML
 
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 import autosubmit.statistics.utils as StatisticsUtils
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import create_db
 from autosubmit.database.db_common import delete_experiment, get_experiment_descrip
 from autosubmit.database.db_common import get_autosubmit_version, check_experiment_exists
@@ -74,13 +74,12 @@ from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packager import JobPackager
 from autosubmit.job.job_utils import SubJob, SubJobManager
+from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmit.migrate.migrate import Migrate
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
-from autosubmit.platforms.submitter import Submitter
-from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 
 dialog = None
 
@@ -1764,18 +1763,15 @@ class Autosubmit:
         :return: Nothing\n
         :rtype: \n
         """
-        Log.warning("Generating the auxiliary job_list used for the -CW flag.")
+        Log.warning("Generating the auxiliary job_list used for the -cw flag.")
         job_list._job_list = jobs_filtered
         job_list._persistence_file = job_list._persistence_file + "_cw_flag"
-        parameters = as_conf.load_parameters()
         date_list = as_conf.get_date_list()
         if len(date_list) != len(set(date_list)):
-            raise AutosubmitCritical(
-                'There are repeated start dates!', 7014)
+            raise AutosubmitCritical('There are repeated start dates!', 7014)
         num_chunks = as_conf.get_num_chunks()
         chunk_ini = as_conf.get_chunk_ini()
         member_list = as_conf.get_member_list()
-        run_only_members = as_conf.get_member_list(run_only=True)
         date_format = ''
         if as_conf.get_chunk_size_unit() == 'hour':
             date_format = 'H'
@@ -1790,9 +1786,32 @@ class Autosubmit:
                 continue
             wrapper_jobs[wrapper_section] = as_conf.get_wrapper_jobs(wrapper_data)
         Log.warning("Aux Job_list was generated successfully")
-        submitter = Autosubmit._get_submitter(as_conf)
+
+        # Here we will get the Autosubmit configuration parameters (which will include things
+        # like HPC%PARAM%), and then use it to replace placeholders used in jobs. The real
+        # challenge here is that we MUST do it before the submitter, since if the user has a
+        # placeholder as platform name, then the submitter would lot include the platform
+        # when creating the list of platforms (which shouldn't be responsibility of a submitter
+        # probably...).
+        parameters = as_conf.load_parameters()
+        for job in job_list.get_job_list():
+            # TODO: Should we allow users to customize anything in the Job?
+            #       And then iterate `__dict__` or similar and replace any
+            #       placeholder used? Doing only the ``platform_name`` for now...
+            name_or_placeholder = job.platform_name
+            # noinspection PyProtectedMember
+            new_platform_name = job._substitute_placeholders(
+                name_or_placeholder, parameters, as_conf=as_conf, undefined_variables=None
+            ).upper()
+            if name_or_placeholder != new_platform_name:
+                job.platform_name = new_platform_name
+                as_conf.experiment_data['JOBS'][job.section]['PLATFORM'] = new_platform_name
+
+        # Load platforms.
+        submitter = ParamikoSubmitter()
         submitter.load_platforms(as_conf)
         hpcarch = as_conf.get_platform()
+
         Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
         platforms_to_test = set()
         for job in job_list.get_job_list():
@@ -2019,7 +2038,7 @@ class Autosubmit:
         submitter=None
     ) -> Tuple[
         JobList,
-        Submitter,
+        ParamikoSubmitter,
         Optional[ExperimentHistory],
         Optional[str],
         AutosubmitConfig,
@@ -5573,13 +5592,8 @@ class Autosubmit:
         return data
 
     @staticmethod
-    def _get_submitter(as_conf):
-        """
-        Returns the submitter corresponding to the communication defined on autosubmit's config file
-
-        :return: submitter
-        :rtype: Submitter
-        """
+    def _get_submitter(as_conf) -> ParamikoSubmitter:
+        """Returns the submitter corresponding to the communication defined on autosubmit's config file."""
         as_conf.get_communications_library()
         return ParamikoSubmitter()
 

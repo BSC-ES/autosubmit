@@ -1354,14 +1354,10 @@ class Job(object):
             except BaseException as e:
                 Log.printlog("Trace {0} \n Failed to write the {1} e=6001".format(str(e), self.name))
 
-    def retrieve_logfiles(self, raise_error: bool = False) -> dict[str, int]:
-        """
-        Retrieves log files from remote host.
+    def retrieve_logfiles(self, raise_error: bool = False) -> None:
+        """Retrieves log files from remote host.
 
         :param raise_error: If True, raises an error if the log files are not retrieved.
-        :type raise_error: bool
-        :return: Dictionary with finish timestamps per job.
-        :rtype: dict[str, int]
         """
         backup_logname = copy.copy(self.local_logs)
         if self.wrapper_type == "vertical":
@@ -1392,8 +1388,7 @@ class Job(object):
         return None
 
     def _time_in_seconds_and_margin(self, wallclock: datetime.timedelta) -> int:
-        """
-        Calculate the total wallclock time in seconds and the wallclock time with a margin.
+        """Calculate the total wallclock time in seconds and the wallclock time with a margin.
 
         This method increases the given wallclock time by 30%.
         It then converts the total wallclock time to seconds and returns both the total
@@ -1419,7 +1414,8 @@ class Job(object):
 
     @staticmethod
     def parse_time(wallclock):
-        if type(wallclock) != str:  # TODO This is a workaround for the time being, just defined for tests passing without more issues
+        # TODO This is a workaround for the time being, just defined for tests passing without more issues
+        if type(wallclock) is not str:
             return datetime.timedelta(24 * 60 * 60)
         regex = re.compile(r'(((?P<hours>\d+):)((?P<minutes>\d+)))(:(?P<seconds>\d+))?')
         parts = regex.match(wallclock)
@@ -1432,14 +1428,10 @@ class Job(object):
                 time_params[name] = int(param)
         return datetime.timedelta(**time_params)
 
-    # TODO Duplicated for wrappers and jobs to fix in 4.1.X but in wrappers is called _is_over_wallclock for unknown reasons
-    def is_over_wallclock(self):
-        """
-        Check if the job is over the wallclock time, it is an alternative method to avoid platform issues
-
-        :return:
-        :rtype: bool
-        """
+    # TODO: Duplicated for wrappers and jobs to fix in 4.1.X but in wrappers is called
+    #       _is_over_wallclock for unknown reasons.
+    def is_over_wallclock(self) -> bool:
+        """Check if the job is over the wallclock time, it is an alternative method to avoid platform issues."""
         elapsed = datetime.datetime.now() - self.start_time
         if int(elapsed.total_seconds()) > self.wallclock_in_seconds:
             Log.warning(f"Job {self.name} is over wallclock time, Autosubmit will check if it is completed")
@@ -1461,8 +1453,8 @@ class Job(object):
             Log.debug(
                 "{0} job seems to have completed: checking...".format(self.name))
             if not self._platform.get_completed_files(self.name, wrapper_failed=self.packed):
-                log_name = os.path.join(
-                    self._tmp_path, self.name + '_COMPLETED')
+                # FIXME: log_name is never used?
+                log_name = os.path.join(self._tmp_path, self.name + '_COMPLETED')
 
             self.check_completion()
         else:
@@ -1500,7 +1492,7 @@ class Job(object):
         # Updating logs
         if self.status in [Status.COMPLETED, Status.FAILED, Status.UNKNOWN]:
             if str(as_conf.platforms_data.get(self.platform.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "true":
-                self.retrieve_logfiles(self.platform)
+                self.retrieve_logfiles(raise_error=True)
             else:
                 self.platform.add_job_to_log_recover(self)
 
@@ -1514,8 +1506,8 @@ class Job(object):
                 last_run_id = (
                     exp_history.manager.get_experiment_run_dc_with_max_id().run_id
                 )
-                metric_procesor = UserMetricProcessor(as_conf, self, last_run_id)
-                metric_procesor.process_metrics()
+                metric_processor = UserMetricProcessor(as_conf, self, last_run_id)
+                metric_processor.process_metrics()
             except Exception as exc:
                 # Warn if metrics are not processed
                 Log.printlog(
@@ -1525,21 +1517,6 @@ class Job(object):
                 )
 
         return self.status
-
-    @staticmethod
-    def _get_submitter(as_conf):
-        """
-        Returns the submitter corresponding to the communication defined on Autosubmit's config file
-
-        :return: submitter
-        :rtype: Submitter
-        """
-        #communications_library = as_conf.get_communications_library()
-        # if communications_library == 'paramiko':
-        return ParamikoSubmitter()
-        # communications library not known
-        # raise AutosubmitCritical(
-        #    'You have defined a not valid communications library on the configuration file', 7014)
 
     def update_children_status(self):
         children = list(self.children)
@@ -1642,13 +1619,8 @@ class Job(object):
         parameters['CURRENT_LOGDIR'] = self.platform.get_files_path()
         return parameters
 
-    def process_scheduler_parameters(self, job_platform, chunk):
-        """
-        Parsers yaml data stored in the dictionary and calculates the components of the heterogeneous job if any
-
-        :return:
-        """
-        hetsize = 0
+    def process_scheduler_parameters(self, job_platform: 'Platform', chunk: int) -> None:
+        """Parsers yaml data stored in the dictionary and calculates the components of the heterogeneous job if any."""
         if type(self.processors) is list:
             hetsize = (len(self.processors))
         else:
@@ -2029,7 +2001,7 @@ class Job(object):
                                                                                                  "MAX_WAITING_JOBS",
                                                                                                  -1))))
 
-    def calendar_split(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> None:
+    def calendar_split(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> dict:
         """
         Calculate the calendar splits for the job.
 
@@ -2167,7 +2139,7 @@ class Job(object):
                 parameters['CHUNK_LAST'] = 'FALSE'
         return parameters
 
-    def update_job_parameters(self, as_conf, parameters, set_attributes):
+    def update_job_parameters(self, as_conf, parameters, set_attributes) -> dict:
         if set_attributes:
             if self.splits == "auto":
                 self.splits = parameters.get("CURRENT_SPLITS", None)
@@ -2179,7 +2151,7 @@ class Job(object):
             self.x11 = False if str(parameters.get("CURRENT_X11", False)).lower() == "false" else True
             self.notify_on = parameters.get("CURRENT_NOTIFY_ON", [])
             self.update_stat_file()
-            if self.checkpoint:  # To activate placeholder sustitution per <empty> in the template
+            if self.checkpoint:  # To activate placeholder substitution per <empty> in the template
                 parameters["AS_CHECKPOINT"] = self.checkpoint
             self.wchunkinc = as_conf.get_wchunkinc(self.section)
 
@@ -2505,7 +2477,6 @@ class Job(object):
         real_name = str(f"{Path(file_name).stem}_{self.name}")
         real_name = real_name.replace(f"{self.expid}_", "")
         return real_name
-
 
     def create_wrapped_script(self, as_conf, wrapper_tag='wrapped'):
         parameters = self.update_parameters(as_conf, set_attributes=False)
