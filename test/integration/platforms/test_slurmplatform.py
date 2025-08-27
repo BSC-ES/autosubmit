@@ -340,8 +340,18 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
     'Wrapper Horizontal-vertical',
     'Wrapper Vertical-horizontal',
 ])
-def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, experiment_data):
+def test_run_all_wrappers_workflow_slurm(
+        autosubmit_exp: AutosubmitExperimentFixture,
+        experiment_data: dict,
+        make_ssh_client,
+        mocker
+):
     """Runs a simple Bash script using Slurm."""
+
+    # 2222 is the SSH port used in the GitHub service, see GH Actions configuration;
+    # for running locally you must launch the container with this port too.
+    ssh_client = make_ssh_client(2222, None)
+    mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
 
     exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, wrapper=True)
     _create_slurm_platform(exp.as_conf)

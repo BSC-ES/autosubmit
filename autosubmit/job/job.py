@@ -1354,14 +1354,10 @@ class Job(object):
             except BaseException as e:
                 Log.printlog("Trace {0} \n Failed to write the {1} e=6001".format(str(e), self.name))
 
-    def retrieve_logfiles(self, raise_error: bool = False) -> dict[str, int]:
-        """
-        Retrieves log files from remote host.
+    def retrieve_logfiles(self, raise_error: bool = False) -> None:
+        """Retrieves log files from remote host.
 
         :param raise_error: If True, raises an error if the log files are not retrieved.
-        :type raise_error: bool
-        :return: Dictionary with finish timestamps per job.
-        :rtype: dict[str, int]
         """
         backup_logname = copy.copy(self.local_logs)
         if self.wrapper_type == "vertical":
@@ -1500,7 +1496,7 @@ class Job(object):
         # Updating logs
         if self.status in [Status.COMPLETED, Status.FAILED, Status.UNKNOWN]:
             if str(as_conf.platforms_data.get(self.platform.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "true":
-                self.retrieve_logfiles(self.platform)
+                self.retrieve_logfiles(raise_error=True)
             else:
                 self.platform.add_job_to_log_recover(self)
 
@@ -2029,7 +2025,7 @@ class Job(object):
                                                                                                  "MAX_WAITING_JOBS",
                                                                                                  -1))))
 
-    def calendar_split(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> None:
+    def calendar_split(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> dict:
         """
         Calculate the calendar splits for the job.
 
@@ -2806,7 +2802,7 @@ class WrapperJob(Job):
         priority: int,
         job_list: List[Job],
         total_wallclock: str,
-        num_processors: int,
+        num_processors: Optional[int],
         platform: "Platform",
         as_config: AutosubmitConfig,
         hold: bool,
@@ -2825,7 +2821,6 @@ class WrapperJob(Job):
         self.hold = hold
         self.inner_jobs_running = list()
         self.is_wrapper = True
-
 
     def _queuing_reason_cancel(self, reason: str) -> bool:
         """

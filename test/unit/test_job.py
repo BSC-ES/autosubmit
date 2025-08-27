@@ -41,6 +41,7 @@ from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.job.job_utils import get_job_package_code, SubJob, SubJobManager
 from autosubmit.log.log import AutosubmitCritical
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
@@ -353,7 +354,7 @@ CONFIG:
                         )
                         job_list = job_list_obj.get_job_list()
 
-                        submitter = Autosubmit._get_submitter(config)
+                        submitter = ParamikoSubmitter()
                         submitter.load_platforms(config)
 
                         hpcarch = config.get_platform()
@@ -513,7 +514,7 @@ CONFIG:
             job_list = job_list_obj.get_job_list()
             assert 1 == len(job_list)
 
-            submitter = Autosubmit._get_submitter(config)
+            submitter = ParamikoSubmitter()
             submitter.load_platforms(config)
 
             hpcarch = config.get_platform()
@@ -739,7 +740,7 @@ CONFIG:
                         )
                         job_list = job_list_obj.get_job_list()
 
-                        submitter = Autosubmit._get_submitter(config)
+                        submitter = ParamikoSubmitter()
                         submitter.load_platforms(config)
 
                         hpcarch = config.get_platform()
@@ -887,7 +888,7 @@ CONFIG:
                 job_list = job_list_obj.get_job_list()
                 assert 1 == len(job_list)
 
-                submitter = Autosubmit._get_submitter(config)
+                submitter = ParamikoSubmitter()
                 submitter.load_platforms(config)
 
                 hpcarch = config.get_platform()
@@ -1273,7 +1274,7 @@ CONFIG:
             job_list = job_list.get_job_list()
             assert 24 == len(job_list)
 
-            submitter = Autosubmit._get_submitter(config)
+            submitter = ParamikoSubmitter()
             submitter.load_platforms(config)
 
             hpcarch = config.get_platform()
