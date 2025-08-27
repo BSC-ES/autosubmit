@@ -24,6 +24,7 @@ exclude_lines =
 
     # Don't complain if tests don't hit defensive assertion code:
     raise NotImplementedError
+    raise NotImplemented
     return NotImplemented
 
     # Ignore type checking code:
@@ -35,6 +36,10 @@ exclude_lines =
 
     # Ignore abstract methods
     @(abc\.)?abstractmethod
+
+    # Ignore pass statements
+    pass
+   
 
 fail_under=0
 ignore_errors = False
