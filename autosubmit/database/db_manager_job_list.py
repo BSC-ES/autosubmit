@@ -433,63 +433,6 @@ class JobsDbManager(DbManager):
             if jobs_to_delete:
                 self.delete_where(JobsTable.name, {'name': list(jobs_to_delete)})
 
-    def delete_rows_with_number_greater_than(
-            self,
-            column: "Column",
-            x: int
-    ) -> List[Dict[str, Any]]:
-        """
-        Delete rows from the JobsTable where the specified column's value is greater than x.
-        :param column: SQLAlchemy Column object to compare.
-        :type column: Column
-        :param x: Value to compare against.
-        :type x: int
-        :return: List of rows as dictionaries.
-        :rtype: List[Dict[str, Any]]
-        """
-        jobs_table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
-
-        self.delete_where(jobs_table.name, {column.name: column > x})
-
-    def remove_section(self, section_name: str) -> None:
-        """
-        Remove a section from the database by name.
-
-        :param section_name: Name of the section to remove.
-        :type section_name: str
-        """
-        sections_structure_table: Table = get_table_from_name(schema=self.schema,
-                                                              table_name=SectionsStructureTable.name)
-
-        self.create_table(sections_structure_table.name)
-        self.delete_where(sections_structure_table.name, {'name': section_name})
-
-    def update_section(self, section_data: Dict[str, Any]) -> None:
-        """
-        Update a section in the database.
-
-        :param section_data: Dictionary containing section data to update.
-        :type section_data: Dict[str, Any]
-        """
-        sections_structure_table: Table = get_table_from_name(schema=self.schema,
-                                                              table_name=SectionsStructureTable.name)
-
-        self.create_table(sections_structure_table.name)
-        self.upsert_many(sections_structure_table.name, [section_data], ['name'])
-
-    def add_section(self, section_data: Dict[str, Any]) -> None:
-        """
-        Add a new section to the database.
-
-        :param section_data: Dictionary containing section data to add.
-        :type section_data: Dict[str, Any]
-        """
-        sections_structure_table: Table = get_table_from_name(schema=self.schema,
-                                                              table_name=SectionsStructureTable.name)
-
-        self.create_table(sections_structure_table.name)
-        self.insert_many(sections_structure_table.name, [section_data])
-
     def clear_edges(self) -> None:
         """Clear all edges from the database."""
         experiment_structure_table: Table = get_table_from_name(schema=self.schema,
