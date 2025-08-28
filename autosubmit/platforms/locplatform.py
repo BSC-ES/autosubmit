@@ -250,7 +250,7 @@ class LocalPlatform(ParamikoPlatform):
             if os.path.isfile(os.path.join(self.get_files_path(), src)):
                 return True
             sleep(sleeptime)
-        Log.warning("File {0} does not exist".format(src))
+        Log.warning(f"File {src} does not exist")
         return False
 
     def delete_file(self, filename, del_cmd=False):

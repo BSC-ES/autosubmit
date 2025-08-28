@@ -207,7 +207,7 @@ class Platform:
         else:
             self.pw = None
         self.max_waiting_jobs = 20
-        self.recovery_queue = None
+        self.recovery_queue: Optional[Queue] = None
         self.work_event = None
         self.cleanup_event = None
         self.log_retrieval_process_active = False
@@ -704,16 +704,14 @@ class Platform:
         if recovery:
             retries = 5
             for i in range(retries):
-                if self.get_file('{0}_COMPLETED'.format(job_name), False, ignore_log=recovery):
+                if self.get_file(f'{job_name}_COMPLETED', False, ignore_log=recovery):
                     return True
             return False
-        if self.check_file_exists('{0}_COMPLETED'.format(job_name), wrapper_failed=wrapper_failed):
-            if self.get_file('{0}_COMPLETED'.format(job_name), True, wrapper_failed=wrapper_failed):
-                return True
-            else:
-                return False
-        else:
-            return False
+
+        if self.check_file_exists(f'{job_name}_COMPLETED', wrapper_failed=wrapper_failed):
+            return self.get_file(f'{job_name}_COMPLETED', True, wrapper_failed=wrapper_failed)
+
+        return False
 
     def remove_stat_file(self, job: Any) -> bool:
         """
