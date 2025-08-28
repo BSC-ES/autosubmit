@@ -396,6 +396,9 @@ def test_select_latest_inner_jobs(
 
     db_manager.save_wrappers(wrappers, preview=False)
 
+    # Try to insert again the same inner jobs, should warns  ( TODO: check the log.warning somehow)
+    db_manager.save_wrappers(wrappers, preview=False)
+
     newer_timestamp = "2023-01-02T00:00:00"
     updated_job = {
         "package_id": 2,
