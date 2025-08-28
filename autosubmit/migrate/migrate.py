@@ -25,8 +25,8 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.helpers.utils import restore_platforms
-from autosubmit.job.job_utils import _get_submitter
 from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
 
 class Migrate:
@@ -226,8 +226,7 @@ class Migrate:
 
     def load_platforms_in_use(self, as_conf):
         platforms_to_test = set()
-        submitter = _get_submitter(as_conf)
-        submitter.load_platforms(as_conf)
+        submitter = ParamikoSubmitter(as_conf=as_conf)
         if submitter.platforms is None:
             raise AutosubmitCritical("No platforms configured!!!", 7014)
         platforms = submitter.platforms

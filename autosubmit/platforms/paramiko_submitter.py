@@ -17,7 +17,7 @@
 
 """Jobs submitter for ``ParamikoPlatform``.
 
-In the past we had a different submitter, for SGE. But at the
+In the past we had a different submitter, for Sage. But at the
 moment this is our only submitter available. The previous dependency
 to ``Submitter`` has been removed.
 """
@@ -46,8 +46,10 @@ class ParamikoSubmitter:
     Class to manage the experiments platform
     """
 
-    def __init__(self):
+    def __init__(self, as_conf: Optional[AutosubmitConfig] = None):
         self.platforms = None
+        if as_conf:
+            self.load_platforms(as_conf=as_conf)
 
     def load_local_platform(self, as_conf: AutosubmitConfig, exp_data: Optional[dict] = None,
                             auth_password: Optional[Union[str, list[str]]] = None) -> None:

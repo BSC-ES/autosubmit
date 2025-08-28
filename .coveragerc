@@ -47,7 +47,6 @@ omit =
 precision = 2
 show_missing = False
 skip_covered = False
-skip_empty = False
 sort = Name
 
 [html]
