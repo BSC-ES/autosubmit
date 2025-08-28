@@ -2790,8 +2790,6 @@ class WrapperJob(Job):
     :type job_list: List() of Job() objects \n
     :param total_wallclock: Wallclock of the package \n
     :type total_wallclock: String Formatted \n
-    :param num_processors: Number of processors for the package \n
-    :type num_processors: Integer \n
     :param platform: Platform object defined for the package \n
     :type platform: Platform Object. e.g. EcPlatform() \n
     :param as_config: Autosubmit basic configuration object \n
@@ -2806,7 +2804,6 @@ class WrapperJob(Job):
         priority: int,
         job_list: List[Job],
         total_wallclock: str,
-        num_processors: int,
         platform: "Platform",
         as_config: AutosubmitConfig,
         hold: bool,
@@ -2816,7 +2813,6 @@ class WrapperJob(Job):
         self.job_list = job_list
         # divide jobs in dictionary by state?
         self.wallclock = total_wallclock # Now it is reloaded after a run -> stop -> run
-        self.num_processors = num_processors
         self.running_jobs_start = OrderedDict()
         self._platform = platform
         self.as_config = as_config

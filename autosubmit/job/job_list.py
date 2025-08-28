@@ -2885,7 +2885,7 @@ class JobList(object):
                     self.packages_dict[package.name] = package.jobs
                     from ..job.job import WrapperJob
                     wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.SUBMITTED, 0,
-                                             package.jobs, package._wallclock, package._num_processors,
+                                             package.jobs, package._wallclock,
                                              package.platform, as_conf, hold)
                     self.job_package_map[package.jobs[0].id] = wrapper_job
                     if isinstance(package, JobPackageThread):
