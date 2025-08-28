@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from test.conftest import AutosubmitExperimentFixture
     from contextlib import AbstractContextManager
 
+
 def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
     """function to test copy_as_config from autosubmit.py
 

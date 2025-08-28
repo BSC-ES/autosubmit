@@ -63,7 +63,9 @@ class JobPackager(object):
         self.calculate_job_limits(platform)
         self.special_variables = dict()
         self.wrappers_with_error = {}
-
+        self.running_jobs_len = None
+        self.queuing_jobs_len = None
+        self.waiting_jobs_len = None
 
         #todo add default values
         #Wrapper building starts here

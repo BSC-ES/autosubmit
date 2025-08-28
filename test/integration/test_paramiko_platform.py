@@ -81,8 +81,7 @@ def test_send_file(filename: str, check: bool, autosubmit_exp, ssh_server):
     # NOTE: The set up of platforms is done partially in the platform constructor, and
     #       partially by a submitter (i.e. they are tightly coupled, which makes it hard
     #       to maintain & test).
-    submitter = ParamikoSubmitter()
-    submitter.load_platforms(asconf=exp.as_conf, retries=0)
+    submitter = ParamikoSubmitter(as_conf=exp.as_conf)
 
     ps_platform: 'PsPlatform' = submitter.platforms[platform_name]
 

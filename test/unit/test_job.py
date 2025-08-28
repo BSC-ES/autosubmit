@@ -38,9 +38,10 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
-from autosubmit.job.job_utils import calendar_chunk_section
-from autosubmit.job.job_utils import get_job_package_code, SubJob, SubJobManager
+from autosubmit.job.job_utils import calendar_chunk_section, get_job_package_code, SubJob, SubJobManager
 from autosubmit.log.log import AutosubmitCritical
+from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
@@ -353,8 +354,7 @@ CONFIG:
                         )
                         job_list = job_list_obj.get_job_list()
 
-                        submitter = Autosubmit._get_submitter(config)
-                        submitter.load_platforms(config)
+                        submitter = ParamikoSubmitter(as_conf=config)
 
                         hpcarch = config.get_platform()
                         for job in job_list:
@@ -513,8 +513,7 @@ CONFIG:
             job_list = job_list_obj.get_job_list()
             assert 1 == len(job_list)
 
-            submitter = Autosubmit._get_submitter(config)
-            submitter.load_platforms(config)
+            submitter = ParamikoSubmitter(as_conf=config)
 
             hpcarch = config.get_platform()
             for job in job_list:
@@ -739,8 +738,7 @@ CONFIG:
                         )
                         job_list = job_list_obj.get_job_list()
 
-                        submitter = Autosubmit._get_submitter(config)
-                        submitter.load_platforms(config)
+                        submitter = ParamikoSubmitter(as_conf=config)
 
                         hpcarch = config.get_platform()
                         for job in job_list:
@@ -751,8 +749,9 @@ CONFIG:
                         # pick ur single job
                         job = job_list[0]
                         with suppress(Exception):
-                            job.update_parameters(config,
-                                                  set_attributes=True)  # TODO quick fix. This sets some attributes and eventually fails, should be fixed in the future
+                            # TODO: quick fix. This sets some attributes and eventually fails,
+                            #       should be fixed in the future
+                            job.update_parameters(config, set_attributes=True)
 
                         if extended_position == "header" or extended_position == "tailer" or extended_position == "header tailer":
                             if extended_type == script_type:
@@ -887,8 +886,7 @@ CONFIG:
                 job_list = job_list_obj.get_job_list()
                 assert 1 == len(job_list)
 
-                submitter = Autosubmit._get_submitter(config)
-                submitter.load_platforms(config)
+                submitter = ParamikoSubmitter(as_conf=config)
 
                 hpcarch = config.get_platform()
                 for job in job_list:
@@ -1273,8 +1271,7 @@ CONFIG:
             job_list = job_list.get_job_list()
             assert 24 == len(job_list)
 
-            submitter = Autosubmit._get_submitter(config)
-            submitter.load_platforms(config)
+            submitter = ParamikoSubmitter(as_conf=config)
 
             hpcarch = config.get_platform()
             for job in job_list:
@@ -1856,7 +1853,8 @@ def test_sub_job_manager(current_structure):
 
 
 def test_update_parameters_reset_logs(autosubmit_config, tmpdir):
-    # TODO This experiment_data (aside from WORKFLOW_COMMIT and maybe JOBS) could be a good candidate for a fixture in the conf_test. "basic functional configuration"
+    # TODO This experiment_data (aside from WORKFLOW_COMMIT and maybe JOBS)
+    #  could be a good candidate for a fixture in the conf_test. "basic functional configuration"
     as_conf = autosubmit_config(
         expid='a000',
         experiment_data={
@@ -2072,3 +2070,186 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
     existing_lines = len(existing_lines.split('\n')) - 1 if existing_lines else 0
     expected_lines = existing_lines + 1
     assert len(total_stats.read_text().split('\n')) == expected_lines
+
+
+def test_job_repr():
+    job = Job('name', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    assert f'name STATUS: {Status.KEY_TO_VALUE["WAITING"]}' == repr(job)
+
+
+def test_job_str():
+    job = Job('name', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    assert f'name STATUS: {Status.KEY_TO_VALUE["WAITING"]}' == str(job)
+
+
+def test_job_retries():
+    """Test that ``Job`` ignores when retrials is ``None``."""
+    job = Job('name', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    assert job.retrials == 0
+    job.retrials = None
+    assert job.retrials == 0
+    job.retrials = 2
+    assert job.retrials == 2
+
+
+def test_job_wallclock():
+    """Test that ``Job`` ignores when wallclock is ``None``."""
+    job = Job('name', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    assert job.wallclock is None
+    job.wallclock = "10:00"
+    assert job.wallclock == "10:00"
+    job.wallclock = None
+    assert job.wallclock == "10:00"
+
+
+def test_job_parents():
+    single_parent = Job('single', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+
+    parents_1 = [
+        Job('mare', 'job_id', status=Status.WAITING, priority=0, loaded_data=None),
+        Job('pare', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    ]
+
+    parents_2 = [
+        Job('mae', 'job_id', status=Status.WAITING, priority=0, loaded_data=None),
+        Job('pae', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    ]
+
+    job = Job('name', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    assert len(job.parents) == 0
+
+    job.add_parent(single_parent)
+    assert len(job.parents) == 1
+
+    job.add_parent(*parents_1)
+    assert len(job.parents) == 3
+
+    job.add_parent(parents_2)  # type: ignore
+    assert len(job.parents) == 5
+
+    job.delete_parent(single_parent)
+    assert len(job.parents) == 4
+
+
+def test_job_getters_setters():
+    """Tests for a few sorted properties to verify they behave as expected."""
+    job = Job('name', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    for p in ['frequency', 'synchronize', 'delay_retrials', 'long_name']:
+        assert getattr(job, p) is None
+        setattr(job, p, 10)
+        assert getattr(job, p) == 10
+
+    # When ``_long_name`` does not exist, it falls back to the ``.name``.
+    del job._long_name
+    assert job.long_name == 'name'
+
+    assert job.log_recovered is False
+    job.log_recovered = True
+    assert job.log_recovered
+
+    assert job.remote_logs == ('', '')
+    job.remote_logs = ('a.err', 'b.err')
+    assert job.remote_logs == ('a.err', 'b.err')
+
+
+def test_job_read_tailer_no_script():
+    job = Job('name', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    assert job.read_header_tailer_script('/', None, False) == ''  # type: ignore
+
+
+@pytest.mark.parametrize(
+    'status',
+    [
+        (Status.RUNNING),
+        (Status.QUEUING),
+        (Status.HELD)
+    ]
+)
+def test_update_status_logs(status: Status, autosubmit_config, mocker):
+    platform_name = 'knock'
+    as_conf = autosubmit_config('t000', experiment_data={
+        'PLATFORMS': {
+            platform_name: {
+                'DISABLE_RECOVERY_THREADS': False
+            }
+        }
+    })
+    job = Job('name', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    job.platform_name = platform_name
+    job.new_status = status
+
+    assert job.status == Status.WAITING
+
+    mocked_log = mocker.patch('autosubmit.job.job.Log')
+
+    job.update_status(as_conf=as_conf, failed_file=False)
+
+    assert job.status == status
+
+    assert mocked_log.info.call_args_list[0][0][0] == f'Job {job.name} is {Status.VALUE_TO_KEY[status].upper()}'
+
+
+@pytest.mark.parametrize(
+    'has_completed_files,job_id',
+    [
+        (True, '0'),
+        (True, '1'),
+        (False, '0')
+    ]
+)
+def test_update_status_completed(has_completed_files: bool, job_id: str, autosubmit_config, mocker):
+    """Test that marking a job as completed works as expected.
+
+    When a job changes status to completed it tries to retrieve the completed files,
+    checks for completion (which uses the completed files retrieved), prints a result
+    entry in the logs, may retrieve the remote logs, and updates history and metrics.
+
+    Only when completed files are found, then the status is really updated to
+    completed, otherwise, the job will fail to perform this double verification and
+    will set its status to failed.
+
+    TODO: We might remove the _COMPLETED FILES altogether soon in
+          https://github.com/BSC-ES/autosubmit/issues/2559
+    """
+    platform_name = 'knock'
+    as_conf = autosubmit_config('t000', experiment_data={
+        'PLATFORMS': {
+            platform_name: {
+                'DISABLE_RECOVERY_THREADS': False
+            }
+        }
+    })
+    job = Job(as_conf.expid, job_id, status=Status.WAITING, priority=0, loaded_data=None)
+    job.platform_name = platform_name
+    job.new_status = Status.COMPLETED
+
+    local = LocalPlatform(expid='t000', name='local', config=as_conf.experiment_data)
+    local.recovery_queue = mocker.MagicMock()
+    job.platform = local
+
+    assert job.status == Status.WAITING
+
+    mocked_log = mocker.patch('autosubmit.job.job.Log')
+
+    if has_completed_files:
+        job_completed_file = Path(
+            local.root_dir,
+            local.config.get('LOCAL_TMP_DIR'),
+            f'LOG_{as_conf.expid}',
+            f'{job.name}_COMPLETED'
+        )
+        job_completed_file.parent.mkdir(parents=True, exist_ok=True)
+        job_completed_file.touch()
+        job.update_status(as_conf=as_conf, failed_file=False)
+        assert job.status == Status.COMPLETED
+
+        assert mocked_log.result.call_args_list[0][0][0] == f'Job {job.name} is COMPLETED'
+
+        if job_id == '0':
+            assert job.updated_log
+        else:
+            assert job.platform.recovery_queue.put.called  # type: ignore
+    else:
+        job.update_status(as_conf=as_conf, failed_file=False)
+        assert job.status == Status.FAILED
+
