@@ -36,7 +36,6 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
-from autosubmit.job import job_utils
 from autosubmit.job.job_common import StatisticsSnippetBash, StatisticsSnippetPython
 from autosubmit.job.job_common import StatisticsSnippetR, StatisticsSnippetEmpty
 from autosubmit.job.job_common import Status, Type, increase_wallclock_by_chunk
@@ -468,7 +467,7 @@ class Job(object):
     @property
     @autosubmit_parameter(name='checkpoint')
     def checkpoint(self):
-        '''Generates a checkpoint step for this job based on job.type.'''
+        """Generates a checkpoint step for this job based on job.type."""
         if self.type == Type.PYTHON:
             return "checkpoint()"
         elif self.type == Type.R:
@@ -1522,21 +1521,6 @@ class Job(object):
 
         return self.status
 
-    @staticmethod
-    def _get_submitter(as_conf):
-        """
-        Returns the submitter corresponding to the communication defined on Autosubmit's config file
-
-        :return: submitter
-        :rtype: Submitter
-        """
-        #communications_library = as_conf.get_communications_library()
-        # if communications_library == 'paramiko':
-        return ParamikoSubmitter()
-        # communications library not known
-        # raise AutosubmitCritical(
-        #    'You have defined a not valid communications library on the configuration file', 7014)
-
     def update_children_status(self):
         children = list(self.children)
         for child in children:
@@ -1617,8 +1601,7 @@ class Job(object):
 
     def update_platform_parameters(self, as_conf, parameters):
         if not self.platform:
-            submitter = job_utils._get_submitter(as_conf)
-            submitter.load_platforms(as_conf)
+            submitter = ParamikoSubmitter(as_conf=as_conf)
             if not self.platform_name:
                 self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
             job_platform = submitter.platforms.get(self.platform_name)

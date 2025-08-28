@@ -343,7 +343,7 @@ class LocalPlatform(ParamikoPlatform):
             return self._ssh_output
         return None
 
-    def get_file_size(self, src: str) -> Union[int, None]:
+    def get_file_size(self, src: Union[str, Path]) -> Union[int, None]:
         """
         Get file size in bytes
         :param src: file path
@@ -354,7 +354,7 @@ class LocalPlatform(ParamikoPlatform):
             Log.debug(f"Error getting file size for {src}: {str(e)}")
         return None
 
-    def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
+    def read_file(self, src: Union[str, Path], max_size: int = None) -> Union[bytes, None]:
         """
         Read file content as bytes. If max_size is set, only the first max_size bytes are read.
         :param src: file path

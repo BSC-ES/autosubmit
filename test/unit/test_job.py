@@ -354,8 +354,7 @@ CONFIG:
                         )
                         job_list = job_list_obj.get_job_list()
 
-                        submitter = ParamikoSubmitter()
-                        submitter.load_platforms(config)
+                        submitter = ParamikoSubmitter(as_conf=config)
 
                         hpcarch = config.get_platform()
                         for job in job_list:
@@ -514,8 +513,7 @@ CONFIG:
             job_list = job_list_obj.get_job_list()
             assert 1 == len(job_list)
 
-            submitter = ParamikoSubmitter()
-            submitter.load_platforms(config)
+            submitter = ParamikoSubmitter(as_conf=config)
 
             hpcarch = config.get_platform()
             for job in job_list:
@@ -740,8 +738,7 @@ CONFIG:
                         )
                         job_list = job_list_obj.get_job_list()
 
-                        submitter = ParamikoSubmitter()
-                        submitter.load_platforms(config)
+                        submitter = ParamikoSubmitter(as_conf=config)
 
                         hpcarch = config.get_platform()
                         for job in job_list:
@@ -888,8 +885,7 @@ CONFIG:
                 job_list = job_list_obj.get_job_list()
                 assert 1 == len(job_list)
 
-                submitter = ParamikoSubmitter()
-                submitter.load_platforms(config)
+                submitter = ParamikoSubmitter(as_conf=config)
 
                 hpcarch = config.get_platform()
                 for job in job_list:
@@ -1274,8 +1270,7 @@ CONFIG:
             job_list = job_list.get_job_list()
             assert 24 == len(job_list)
 
-            submitter = ParamikoSubmitter()
-            submitter.load_platforms(config)
+            submitter = ParamikoSubmitter(as_conf=config)
 
             hpcarch = config.get_platform()
             for job in job_list:

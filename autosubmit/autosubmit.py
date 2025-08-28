@@ -39,7 +39,7 @@ from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
-from typing import Dict, Set, Tuple, Union, Any, List, Optional
+from typing import Any, Optional, Union, TYPE_CHECKING
 
 from bscearth.utils.date import date2str
 from portalocker import Lock
@@ -81,6 +81,9 @@ from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
+
+if TYPE_CHECKING:
+    from autosubmit.job.job import WrapperJob
 
 dialog = None
 
@@ -128,6 +131,7 @@ class MyParser(argparse.ArgumentParser):
         self.print_help()
         sys.exit(2)
 
+
 class CancelAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):  # noqa: F841
         setattr(namespace, self.dest, True)
@@ -136,13 +140,11 @@ class CancelAction(argparse.Action):
         else:
             parser.error("-fs and -t can only be used when --cancel is provided")
 
+
 class Autosubmit:
     """
     Interface class for autosubmit.
     """
-
-    def __init__(self):
-        self.command = None
 
     @property
     def experiment_data(self):
@@ -162,7 +164,7 @@ class Autosubmit:
         with open(version_path) as f:
             autosubmit_version = f.read().strip()
     else:
-        autosubmit_version = version("autosubmit") # from importlib.metadata
+        autosubmit_version = version("autosubmit")  # from importlib.metadata
 
     exit = False
 
@@ -174,7 +176,7 @@ class Autosubmit:
         os.environ['PYTHONUNBUFFERED'] = 'true'
 
     @staticmethod
-    def parse_args() -> Tuple[int, Optional[argparse.Namespace]]:
+    def parse_args() -> tuple[int, Optional[argparse.Namespace]]:
         """
         Parse arguments given to an executable and start execution of command given.
 
@@ -214,7 +216,6 @@ class Autosubmit:
             subparser.add_argument('-p', '--profile', action='store_true', default=False, required=False,
                                    help='Prints performance parameters of the execution of this command.')
 
-
             # Expid
             subparser = subparsers.add_parser(
                 'expid', description="Creates a new experiment")
@@ -240,7 +241,7 @@ class Autosubmit:
                                    help='sets a git repository for the experiment')
             subparser.add_argument('-b', '--git_branch', type=str, default="", required=False,
                                    help='sets a git branch for the experiment')
-            subparser.add_argument('-conf', '--git_as_conf', type=str, default="", required=False,help='sets the git path to as_conf')
+            subparser.add_argument('-conf', '--git_as_conf', type=str, default="", required=False, help='sets the git path to as_conf')
             subparser.add_argument('-local', '--use_local_minimal', required=False, action="store_true", help='uses local minimal file instead of git')
 
             subparser.add_argument('-H', '--HPC', required=False, default="local",
@@ -429,7 +430,7 @@ class Autosubmit:
             subparser = subparsers.add_parser(
                 'describe', description="Show details for specified experiment")
             subparser.add_argument('expid', help='experiment identifier, can be a list of expid separated by comma or spaces', default="*", nargs="?")
-            subparser.add_argument('-u','--user', help='username, default is current user or listed expid', default=""),
+            subparser.add_argument('-u', '--user', help='username, default is current user or listed expid', default=""),
             subparser.add_argument('-v', '--update_version', action='store_true',
                                    default=False, help='Update experiment version')
 
@@ -582,7 +583,7 @@ class Autosubmit:
                                    help='sets a git repository for the experiment')
             subparser.add_argument('-b', '--git_branch', type=str, default="", required=False,
                                    help='sets a git branch for the experiment')
-            subparser.add_argument('-conf', '--git_as_conf', type=str, default="", required=False,help='sets the git path to as_conf')
+            subparser.add_argument('-conf', '--git_as_conf', type=str, default="", required=False, help='sets the git path to as_conf')
             subparser.add_argument('-local', '--use_local_minimal', required=False, action="store_true", help='uses local minimal file instead of git')
 
             # Database Fix
@@ -671,7 +672,7 @@ class Autosubmit:
             # update proj files
             subparser = subparsers.add_parser('upgrade', description='Updates autosubmit 3 proj files to autosubmit 4')
             subparser.add_argument('expid', help='experiment identifier')
-            subparser.add_argument('-f','--files',default='',type=str, help='list of files')
+            subparser.add_argument('-f', '--files', default='', type=str, help='list of files')
             # Readme
             subparsers.add_parser('readme', description='show readme')
 
@@ -739,9 +740,9 @@ class Autosubmit:
         if args.command != "configure" and args.command != "install":
             Autosubmit._init_logs(args, args.logconsole, args.logfile, expid)
         if args.command == 'run':
-            return Autosubmit.run_experiment(args.expid, args.start_time,args.start_after, args.run_only_members, args.profile)
+            return Autosubmit.run_experiment(args.expid, args.start_time, args.start_after, args.run_only_members, args.profile)
         elif args.command == 'expid':
-            return Autosubmit.expid(args.description,args.HPC,args.copy, args.dummy,args.minimal_configuration,args.git_repo,args.git_branch,args.git_as_conf,args.operational,args.testcase,args.evaluation,args.use_local_minimal) != ''
+            return Autosubmit.expid(args.description, args.HPC, args.copy, args.dummy,args.minimal_configuration, args.git_repo, args.git_branch, args.git_as_conf, args.operational, args.testcase, args.evaluation, args.use_local_minimal) != ''
         elif args.command == 'delete':
             return Autosubmit.delete(args.expid, args.force)
         elif args.command == 'monitor':
@@ -796,7 +797,7 @@ class Autosubmit:
                 warnings.warn('member is deprecated and will be removed in a future major release!')
             if args.member:
                 warnings.warn('stardate is deprecated and will be removed in a future major release!')
-            return Autosubmit.testcase(args.description, args.HPC, args.copy,args.minimal_configuration,args.git_repo,args.git_branch,args.git_as_conf,args.use_local_minimal)
+            return Autosubmit.testcase(args.description, args.HPC, args.copy, args.minimal_configuration, args.git_repo, args.git_branch, args.git_as_conf, args.use_local_minimal)
         elif args.command == 'refresh':
             return Autosubmit.refresh(args.expid, args.model_conf, args.jobs_conf)
         elif args.command == 'updateversion':
@@ -1224,7 +1225,7 @@ class Autosubmit:
             dummy: bool=False,
             minimal_configuration: bool=False,
             local: bool=False,
-            parameters: Dict[str, Union[Dict, List, str]] = None
+            parameters: dict[str, Union[dict, list, str]] = None
     ) -> None:
         """Retrieve the configuration from autosubmit.config package.
 
@@ -1250,7 +1251,7 @@ class Autosubmit:
                             comment = parameters[parameter_key]
                             yaml_data.yaml_set_comment_before_after_key(key, before=comment, indent=yaml_data.lc.col)
 
-        def _recurse_into_parameters(parameters: Dict[str, Union[Dict, List, str]], keys=None) -> Tuple[str, str]:
+        def _recurse_into_parameters(parameters: dict[str, Union[dict, list, str]], keys=None) -> tuple[str, str]:
             """Recurse into the ``PARAMETERS`` dictionary, and emits a dictionary.
 
             The key in the dictionary is the flattened parameter key/ID, and the value
@@ -1799,8 +1800,7 @@ class Autosubmit:
                 continue
             wrapper_jobs[wrapper_section] = as_conf.get_wrapper_jobs(wrapper_data)
         Log.warning("Aux Job_list was generated successfully")
-        submitter = ParamikoSubmitter()
-        submitter.load_platforms(as_conf)
+        submitter = ParamikoSubmitter(as_conf=as_conf)
         hpcarch = as_conf.get_platform()
         Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
         platforms_to_test = set()
@@ -1888,9 +1888,9 @@ class Autosubmit:
     def check_wrappers(
         as_conf: AutosubmitConfig,
         job_list: JobList,
-        platforms_to_test: Set[Platform],
+        platforms_to_test: set[Platform],
         expid: str,
-    ) -> Tuple[Dict[str, List[List[Job]]], Dict[str, Tuple[Status, Status]]]:
+    ) -> tuple[dict[str, list[list[Job]]], dict[str, tuple[Status, Status]]]:
         """
         Check wrappers and inner jobs status also order the non-wrapped jobs to be submitted by active platforms
         :param as_conf: a AutosubmitConfig object
@@ -1899,8 +1899,8 @@ class Autosubmit:
         :param expid: a string with the experiment id
         :return: non-wrapped jobs to check and a dictionary with the changes in the jobs status
         """
-        jobs_to_check: Dict[str, List[List[Job]]] = dict()
-        job_changes_tracker: Dict[str, Tuple[Status, Status]] = dict()
+        jobs_to_check: dict[str, list[list[Job]]] = dict()
+        job_changes_tracker: dict[str, tuple[Status, Status]] = dict()
         for platform in platforms_to_test:
             queuing_jobs = job_list.get_in_queue_grouped_id(platform)
             Log.debug(f'Checking jobs for platform={platform.name}')
@@ -2025,13 +2025,13 @@ class Autosubmit:
         recover: bool = False,
         check_scripts: bool = False,
         submitter: Optional[ParamikoSubmitter] = None
-    ) -> Tuple[
+    ) -> tuple[
         JobList,
         ParamikoSubmitter,
         Optional[ExperimentHistory],
         Optional[str],
         AutosubmitConfig,
-        Set[Platform],
+        set[Platform],
         JobPackagePersistence,
         bool,
     ]:
@@ -2076,11 +2076,8 @@ class Autosubmit:
             Log.debug(
                 "Starting from job list restored from {0} files", pkl_dir)
 
-        # Loads the communication lib, always paramiko.
-        # Paramiko is the only way to communicate with the remote machines. Previously we had also Saga.
         if not submitter:
-            submitter = ParamikoSubmitter()
-            submitter.load_platforms(as_conf)
+            submitter = ParamikoSubmitter(as_conf=as_conf)
         # Tries to load the job_list from disk, discarding any changes in running time ( if recovery ).
         # Could also load a backup from previous iteration.
         # The submit ready functions will cancel all job submitted if one submitted in that iteration had issues,
@@ -2229,7 +2226,7 @@ class Autosubmit:
             job_list.update_log_status(job, as_conf, new_run)
 
     @staticmethod
-    def refresh_log_recovery_process(platforms: List[Platform], as_conf: AutosubmitConfig) -> None:
+    def refresh_log_recovery_process(platforms: list[Platform], as_conf: AutosubmitConfig) -> None:
         """Relaunch the log recovery processes for each platform if necessary."""
         for p in platforms:  # Send keep_alive signal
             if not p.log_recovery_process or not p.log_recovery_process.is_alive():
@@ -2405,7 +2402,7 @@ class Autosubmit:
                             consecutive_retrials = consecutive_retrials + 1
                             Log.info(f"Waiting {delay} seconds before continue")
                             try:
-                                job_list, submitter, _, _, as_conf, platforms_to_test, packages_persistence, recovery  = Autosubmit.prepare_run(expid,
+                                job_list, submitter, _, _, as_conf, platforms_to_test, packages_persistence, recovery = Autosubmit.prepare_run(expid,
                                                                                                 start_time,
                                                                                                 start_after,
                                                                                                 run_only_members,
@@ -2463,8 +2460,7 @@ class Autosubmit:
                 job_list.save()
                 if not did_run and len(job_list.get_completed_failed_without_logs()) > 0: # Revise if there is any log unrecovered from previous run
                     Log.info(f"Connecting to the platforms, to recover missing logs")
-                    submitter = ParamikoSubmitter()
-                    submitter.load_platforms(as_conf)
+                    submitter = ParamikoSubmitter(as_conf=as_conf)
                     if submitter.platforms is None:
                         raise AutosubmitCritical("No platforms configured!!!", 7014)
                     platforms_to_test = [value for value in submitter.platforms.values()]
@@ -2623,14 +2619,10 @@ class Autosubmit:
             for platform in platforms_to_test:
                 packager = JobPackager(as_conf, platform, job_list, hold=hold)
                 packages_to_submit = packager.build_packages()
-                save_1, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = platform.submit_ready_jobs(as_conf,
-                                                                                                              job_list,
-                                                                                                              platforms_to_test,
-                                                                                                              packages_persistence,
-                                                                                                              packages_to_submit,
-                                                                                                              inspect=inspect,
-                                                                                                              only_wrappers=only_wrappers,
-                                                                                                              hold=hold)
+                save_1, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = (
+                    platform.submit_ready_jobs(as_conf, job_list, packages_persistence, packages_to_submit,
+                                               inspect=inspect, only_wrappers=only_wrappers, hold=hold)
+                )
                 wrapper_errors.update(packager.wrappers_with_error)
                 # Jobs that are being retrieved in batch. Right now, only available for slurm platforms.
 
@@ -3037,8 +3029,7 @@ class Autosubmit:
             # all the platforms, even if the user removed any from the experiment configuration.
             # TODO: Centralize how the platforms are created, possibly in a function that receives
             #       the ``AutosubmitConfiguration``, and an optional list of jobs?
-            submitter = ParamikoSubmitter()
-            submitter.load_platforms(as_conf)
+            submitter = ParamikoSubmitter(as_conf=as_conf)
             if submitter.platforms is None:
                 Log.warning('No platforms found in the experiment configuration!')
                 return False
@@ -3214,8 +3205,7 @@ class Autosubmit:
                 experiment_id, BasicConfig, YAMLParserFactory())
             as_conf.check_conf_files(False)
 
-            submitter = ParamikoSubmitter()
-            submitter.load_platforms(as_conf)
+            submitter = ParamikoSubmitter(as_conf=as_conf)
             if not submitter.platforms:
                 return False
 
@@ -3281,11 +3271,12 @@ class Autosubmit:
                 Log.printlog("Autosubmit couldn't retrieve performance metrics.")
                 performance_metrics = None
             # Preparation for section parameters
-            submitter = ParamikoSubmitter()
             try:
-                submitter.load_platforms(as_conf)
+                submitter = ParamikoSubmitter(as_conf=as_conf)
                 hpcarch = submitter.platforms[as_conf.get_platform()]
             except Exception as e:
+                Log.warning(f'Failed creating Paramiko submitter, will try loading only the local platform: {str(e)}')
+                submitter = ParamikoSubmitter()
                 submitter.load_local_platform(as_conf)
                 hpcarch = submitter.platforms[as_conf.get_platform()]
 
@@ -3431,9 +3422,8 @@ class Autosubmit:
                 if branch == "":
                     branch = "Not Found"
 
-                submitter = ParamikoSubmitter()
-                submitter.load_platforms(as_conf)
-                if len(submitter.platforms) == 0:
+                submitter = ParamikoSubmitter(as_conf=as_conf)
+                if not submitter.platforms:
                     return False
                 hpc = as_conf.get_platform()
                 description = get_experiment_descrip(experiment_id)
@@ -4699,8 +4689,7 @@ class Autosubmit:
 
         if project_type == "git":
             try:
-                submitter = ParamikoSubmitter()
-                submitter.load_platforms(as_conf)
+                submitter = ParamikoSubmitter(as_conf=as_conf)
                 hpcarch = submitter.platforms[as_conf.get_platform()]
             except AutosubmitCritical as e:
                 Log.warning(f"{e.message}\nRemote git cloning is disabled")
@@ -4854,6 +4843,7 @@ class Autosubmit:
                                               "\n\tRemember that this option expects section names separated by a blank space as input."
 
             raise AutosubmitCritical("Error in the supplied input for -ft.", 7011, section_validation_message)
+
     @staticmethod
     def _validate_list(as_conf,job_list,filter_list):
         job_validation_error = False
@@ -5213,8 +5203,7 @@ class Autosubmit:
                 # Getting db connections
                 # To be added in a function that checks which platforms must be connected to
                 job_list = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
-                submitter = ParamikoSubmitter()
-                submitter.load_platforms(as_conf)
+                submitter = ParamikoSubmitter(as_conf=as_conf)
                 hpcarch = as_conf.get_platform()
                 for job in job_list.get_job_list():
                     job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", "").upper()

@@ -38,38 +38,35 @@ from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
+    from autosubmit.job.job_packages import JobPackageBase
+    from autosubmit.job.job_list import JobList
+    from autosubmit.job.job_package_persistence import JobPackagePersistence
 
 
-def _init_logs_log_process(as_conf, platform_name):
+def _init_logs_log_process(as_conf: 'AutosubmitConfig', platform_name: str) -> None:
     Log.set_console_level(as_conf.experiment_data.get("LOG_RECOVERY_CONSOLE_LEVEL", "DEBUG"))
     if as_conf.experiment_data["ROOTDIR"]:
         aslogs_path = Path(as_conf.experiment_data["ROOTDIR"], "tmp/ASLOGS")
-        Log.set_file(aslogs_path.joinpath(f'{platform_name.lower()}_log_recovery.log'), "out", as_conf.experiment_data.get("LOG_RECOVERY_FILE_LEVEL", "EVERYTHING"))
-        Log.set_file(aslogs_path.joinpath(f'{platform_name.lower()}_log_recovery_err.log'), "err")
+        Log.set_file(
+            str(aslogs_path / f'{platform_name.lower()}_log_recovery.log'), "out",
+            as_conf.experiment_data.get("LOG_RECOVERY_FILE_LEVEL", "EVERYTHING"))
+        Log.set_file(str(aslogs_path / f'{platform_name.lower()}_log_recovery_err.log'), "err")
 
 
 def recover_platform_job_logs_wrapper(
-        platform: Any,
+        platform: 'Platform',
         recovery_queue: Queue,
         worker_event: Event,
         cleanup_event: Event,
-        as_conf: Any
+        as_conf: 'AutosubmitConfig'
 ) -> None:
-    """
-    Wrapper function to recover platform job logs.
+    """Wrapper function to recover platform job logs.
 
     :param platform: The platform object responsible for managing the connection and job recovery.
-    :type platform: Any
     :param recovery_queue: A multiprocessing queue used to store jobs for recovery.
-    :type recovery_queue: multiprocessing.Queue
     :param worker_event: An event to signal work availability.
-    :type worker_event: multiprocessing.Event
     :param cleanup_event: An event to signal cleanup operations.
-    :type cleanup_event: multiprocessing.Event
     :param as_conf: The Autosubmit configuration object containing experiment data.
-    :type as_conf: Any
-    :return: None
-    :rtype: None
     """
     platform.recovery_queue = recovery_queue
     platform.work_event = worker_event
@@ -203,7 +200,7 @@ class Platform:
         if not self.two_factor_auth:
             self.pw = None
         elif auth_password is not None and self.two_factor_auth:
-            if type(auth_password) == list:
+            if type(auth_password) is list:
                 self.pw = auth_password[0]
             else:
                 self.pw = auth_password
@@ -362,11 +359,11 @@ class Platform:
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
 
-    def submit_ready_jobs(self, as_conf, job_list, platforms_to_test, packages_persistence, packages_to_submit,
+    def submit_ready_jobs(self, as_conf: 'AutosubmitConfig', job_list: 'JobList',
+                          packages_persistence: 'JobPackagePersistence', packages_to_submit: list['JobPackageBase'],
                           inspect=False, only_wrappers=False, hold=False):
 
-        """
-        Gets READY jobs and send them to the platforms if there is available space on the queues
+        """Gets READY jobs and send them to the platforms if there is available space on the queues.
 
         :param hold:
         :param packages_to_submit:
@@ -399,7 +396,7 @@ class Platform:
                 job_list.get_prepared(self)), self.name)
         if not inspect:
             self.generate_submit_script()
-        valid_packages_to_submit = []  # type: List[JobPackageBase]
+        valid_packages_to_submit = []  # type: List['JobPackageBase']
         for package in packages_to_submit:
             try:
                 # If called from inspect command or -cw
@@ -760,7 +757,6 @@ class Platform:
         return True
 
     def get_stat_file(self, job, count=-1):
-
         if count == -1:  # No internal retrials
             filename = f"{job.stat_file}{job.fail_count}"
         else:
@@ -781,8 +777,7 @@ class Platform:
 
     @autosubmit_parameter(name='current_logdir')
     def get_files_path(self):
-        """
-        The platform's LOG directory.
+        """The platform's LOG directory.
 
         :return: platform's LOG directory
         :rtype: str
@@ -794,8 +789,7 @@ class Platform:
         return str(path)
 
     def submit_job(self, job, script_name, hold=False, export="none"):
-        """
-        Submit a job from a given job object.
+        """Submit a job from a given job object.
 
         :param job: job object
         :type job: autosubmit.job.job.Job
@@ -815,8 +809,7 @@ class Platform:
             self.check_job(job)
 
     def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
-        """
-        Checks job running status
+        """Checks job running status.
 
         :param is_wrapper:
         :param submit_hold_check:
@@ -833,8 +826,7 @@ class Platform:
         return
 
     def write_jobid(self, jobid, complete_path):
-        """
-        Writes Job id in an out file.
+        """Writes Job id in an out file.
 
         :param jobid: job id
         :type jobid: str

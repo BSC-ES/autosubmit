@@ -126,8 +126,7 @@ def remote_platform(autosubmit_config, autosubmit):
     parser.data = parser.load(yml_file)
     as_conf.experiment_data.update(parser.data)
 
-    submitter = ParamikoSubmitter()
-    submitter.load_platforms(as_conf)
+    submitter = ParamikoSubmitter(as_conf=as_conf)
     return submitter.platforms['ARM']
 
 
