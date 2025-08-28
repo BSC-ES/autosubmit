@@ -82,14 +82,10 @@ from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 
-if TYPE_CHECKING:
-    from autosubmit.job.job import WrapperJob
 
 dialog = None
 
-"""
-Main module for autosubmit. Only contains an interface class to all functionality implemented on autosubmit
-"""
+"""Main module for autosubmit. Only contains an interface class to all functionality implemented on autosubmit."""
 
 sys.path.insert(0, os.path.abspath('.'))
 
