@@ -37,6 +37,7 @@ from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical
+# noinspection PyProtectedMember
 from autosubmit.provenance.rocrate import (
     _add_dir_and_files,
     _get_action_status,
@@ -87,7 +88,7 @@ def test_add_dir_and_files_empty_folder(empty_rocrate: ROCrate):
     with TemporaryDirectory() as d:
         _add_dir_and_files(
             crate=empty_rocrate,
-            base_path=d,
+            base_path=Path(d),
             relative_path=d,
             encoding_format=None
         )
@@ -104,7 +105,7 @@ def test_add_dir_and_files(empty_rocrate: ROCrate):
 
             _add_dir_and_files(
                 crate=empty_rocrate,
-                base_path=d,
+                base_path=Path(d),
                 relative_path=str(sub_path),
                 encoding_format=None
             )
@@ -132,7 +133,7 @@ def test_add_dir_and_files_set_encoding(empty_rocrate: ROCrate):
 
                 _add_dir_and_files(
                     crate=empty_rocrate,
-                    base_path=d,
+                    base_path=Path(d),
                     relative_path=str(sub_path),
                     encoding_format=encoding
                 )

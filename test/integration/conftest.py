@@ -18,7 +18,6 @@
 """Fixtures for integration tests."""
 
 from getpass import getuser
-from pathlib import Path
 from pwd import getpwnam
 from random import randrange
 from tempfile import TemporaryDirectory
@@ -32,12 +31,10 @@ from testcontainers.sftp import DockerContainer
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import _create_ssh_client
-from autosubmit.platforms.psplatform import PsPlatform
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
     from py._path.local import LocalPath  # type: ignore
-
 
 _DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
 _DOCKER_PASSWORD = 'password'
@@ -106,34 +103,6 @@ def paramiko_platform() -> Iterator[ParamikoPlatform]:
     local_root_dir.cleanup()
 
 
-@pytest.fixture
-def ps_platform(tmp_path_factory: Path) -> PsPlatform:
-    platform_tmp_dir = tmp_path_factory.mktemp('ps_platform')
-    config = {
-        "LOCAL_ROOT_DIR": str(platform_tmp_dir),
-        "LOCAL_TMP_DIR": 'tmp',
-        "PLATFORMS": {
-            "pytest-ps": {
-                "type": "ps",
-                "host": "127.0.0.1",
-                "user": platform_tmp_dir.owner(),
-                "project": "whatever",
-                "scratch_dir": f"{platform_tmp_dir.name}",
-                "MAX_WALLCLOCK": "48:00",
-                "DISABLE_RECOVERY_THREADS": True
-            }
-        }
-    }
-    platform = PsPlatform(expid='a000', name='local-ps', config=config)
-    platform.host = '127.0.0.1'
-    platform.user = platform_tmp_dir.owner()
-    platform.scratch = str(platform_tmp_dir / 'scratch')
-    platform.project_dir = 'project'
-    platform.update_cmds()
-    Path(platform.root_dir).mkdir(parents=True, exist_ok=True)
-    return platform
-
-
 @pytest.fixture()
 def ssh_server(mocker, tmp_path, make_ssh_client, request):
     ssh_port = randrange(2000, 4000)
@@ -147,11 +116,12 @@ def ssh_server(mocker, tmp_path, make_ssh_client, request):
             .with_env('TZ', 'Etc/UTC') \
             .with_env('SUDO_ACCESS', 'false') \
             .with_env('USER_NAME', user) \
+            .with_env('USER_PASSWORD', 'password') \
             .with_env('PUID', str(uid)) \
             .with_env('PGID', str(gid)) \
+            .with_env('UMASK', '000') \
             .with_env('PASSWORD_ACCESS', 'true') \
-            .with_bind_ports(2222, ssh_port) \
-            .with_volume_mapping(str(tmp_path), '/app', mode='rw') as container:
+            .with_bind_ports(2222, ssh_port) as container:
         wait_for_logs(container, 'sshd is listening on port 2222')
 
         ssh_client = make_ssh_client(ssh_port, _DOCKER_PASSWORD)

@@ -28,7 +28,7 @@ from multiprocessing.queues import Queue
 # noinspection PyProtectedMember
 from os import _exit  # type: ignore
 from pathlib import Path
-from typing import List, Union, Set, Any, TYPE_CHECKING
+from typing import Any, List, Optional, Set, Union, TYPE_CHECKING
 
 import setproctitle
 
@@ -137,7 +137,7 @@ class Platform(object):
     # Shared lock between the main process and a retrieval log process
     lock = multiprocessing.Lock()
 
-    def __init__(self, expid, name, config, auth_password=None):
+    def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
         """
         Initializes the Platform object with the given experiment ID, platform name, configuration,
         and optional authentication password for two-factor authentication.
@@ -596,13 +596,11 @@ class Platform(object):
 
         as_conf.experiment_data['{0}LOGDIR'.format(prefix)] = self.get_files_path()
 
-    def send_file(self, filename, check=True):
-        """
-        Sends a local file to the platform
+    def send_file(self, filename: str, check=True) -> bool:
+        """Sends a local file to the platform
 
-        :param check:
-        :param filename: name of the file to send
-        :type filename: str
+        :param filename: The name of the file to send.
+        :param check: Whether the platform must perform tests (e.g. for permission).
         """
         raise NotImplementedError
 

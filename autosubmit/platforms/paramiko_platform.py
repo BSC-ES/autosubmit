@@ -69,20 +69,16 @@ def _create_ssh_client() -> paramiko.SSHClient:
     return ssh
 
 
-# noinspection PyMethodParameters
 class ParamikoPlatform(Platform):
-    """
-    Class to manage the connections to the different platforms with the Paramiko library.
-    """
+    """Class to manage the connections to the different platforms with the Paramiko library."""
 
-    def __init__(self, expid, name, config, auth_password = None):
+    def __init__(self, expid, name, config, auth_password=None):
+        """An SSH-enabled platform, that uses the Paramiko library.
+
+        :param expid: Experiment ID.
+        :param name: Platform name.
+        :param config: Autosubmit configuration dictionary.
         """
-
-        :param config:
-        :param expid:
-        :param name:
-        """
-
         Platform.__init__(self, expid, name, config, auth_password=auth_password)
         self._proxy = None
         self._ssh_output_err = ""
@@ -106,7 +102,7 @@ class ParamikoPlatform(Platform):
         self._header = None
         self._wrapper = None
         self.remote_log_dir = ""
-        #self.get_job_energy_cmd = ""
+        # self.get_job_energy_cmd = ""
         display = os.getenv('DISPLAY')
         if display is None:
             display = "localhost:0"
@@ -159,6 +155,7 @@ class ParamikoPlatform(Platform):
         except Exception as e:
             Log.warning(f"X11 display not found: {e}")
             self.local_x11_display = None
+
     def test_connection(self,as_conf):
         """
         Test if the connection is still alive, reconnect if not.
@@ -189,7 +186,7 @@ class ParamikoPlatform(Platform):
         except BaseException as e:
             self.connected = False
             raise AutosubmitCritical(str(e),7051)
-            #raise AutosubmitError("[{0}] connection failed for host: {1}".format(self.name, self.host), 6002, e.message)
+            # raise AutosubmitError("[{0}] connection failed for host: {1}".format(self.name, self.host), 6002, e.message)
 
     def restore_connection(self, as_conf: 'AutosubmitConfig', log_recovery_process: bool = False) -> None:
         """
@@ -213,10 +210,8 @@ class ParamikoPlatform(Platform):
                     raise AutosubmitCritical(f"First connection to {self.host} is failed, check host configuration"
                                              f" or try another login node ", 7050, str(e))
             while self.connected is False and retry < retries:
-                try:
+                with suppress(Exception):
                     self.connect(as_conf, True, log_recovery_process=log_recovery_process)
-                except Exception as e:
-                    pass
                 retry += 1
             if not self.connected:
                 trace = ('Can not create ssh or sftp connection to {self.host}: Connection could not be established to'
@@ -363,10 +358,12 @@ class ParamikoPlatform(Platform):
                     else:
                         try:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
-                                              key_filename=self._host_config_id, timeout=60 , banner_timeout=60)
+                                              key_filename=self._host_config_id, timeout=60, banner_timeout=60)
                         except Exception as e:
+                            Log.warning(f'Failed to SSH connect to {self._host_config["hostname"]}: {e}')
+                            Log.warning('Will try different SSH key algorithms...')
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
-                                              key_filename=self._host_config_id, timeout=60 , banner_timeout=60,
+                                              key_filename=self._host_config_id, timeout=60, banner_timeout=60,
                                               disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
                 self.transport = self._ssh.get_transport()
                 self.transport.banner_timeout = 60
@@ -397,8 +394,6 @@ class ParamikoPlatform(Platform):
             self.connected = True
             if not log_recovery_process:
                 self.spawn_log_retrieval_process(as_conf)
-
-
         except SSHException:
             raise
         except IOError as e:
@@ -420,6 +415,7 @@ class ParamikoPlatform(Platform):
             else:
                 raise AutosubmitError(
                     "Couldn't establish a connection to the specified host, wrong configuration?", 6003, str(e))
+
     def check_completed_files(self, sections=None):
         if self.host == 'localhost':
             return None
@@ -459,14 +455,7 @@ class ParamikoPlatform(Platform):
                 return ""
         return ""
 
-    def send_file(self, filename, check=True):
-        """
-        Sends a local file to the platform
-        :param check:
-        :param filename: name of the file to send
-        :type filename: str
-        """
-
+    def send_file(self, filename, check=True) -> bool:
         if check:
             self.check_remote_log_dir()
             self.delete_file(filename)
@@ -480,10 +469,8 @@ class ParamikoPlatform(Platform):
         except IOError as e:
             raise AutosubmitError(f'Can not send file {os.path.join(self.tmp_path, filename)} to '
                                   f'{os.path.join(self.get_files_path(), filename)}', 6004, str(e))
-        except BaseException as e:
-            raise AutosubmitError(
-                'Send file failed. Connection seems to no be active', 6004)
-
+        except Exception as e:
+            raise AutosubmitError(f'Failed to send file, the SSH connection may be inactive: {str(e)}', 6004)
 
     def get_list_of_files(self):
         return self._ftpChannel.get(self.get_files_path)
@@ -504,7 +491,6 @@ class ParamikoPlatform(Platform):
         :return: True if file is copied successfully, false otherwise
         :rtype: bool
         """
-
         local_path = os.path.join(self.tmp_path, relative_path)
         if not os.path.exists(local_path):
             os.makedirs(local_path)
@@ -1209,7 +1195,6 @@ class ParamikoPlatform(Platform):
                 stdout.close()
                 stderr.close()
 
-
             self._ssh_output = ""
             self._ssh_output_err = ""
             for s in stdout_chunks:
@@ -1497,20 +1482,35 @@ class ParamikoPlatform(Platform):
                 self.transport.close()
                 self.transport.stop_thread()
 
-    def check_remote_permissions(self):
+    def check_remote_permissions(self) -> bool:
+        """Check remote permissions on a platform.
+
+        This is needed for Paramiko and PS and other platforms.
+
+        It uses the platform scratch project directory to create a subdirectory, and then
+        removes it. It does it that way to verify that the user running Autosubmit has the
+        minimum permissions required to run Autosubmit.
+
+        It does not check Slurm, queues, modules, software, etc., only the file system
+        permissions required.
+
+        :return: ``True`` on success, ``False`` otherwise.
+        """
         try:
             path = os.path.join(self.scratch, self.project_dir, self.user, "permission_checker_azxbyc")
             try:
                 self._ftpChannel.mkdir(path)
                 self._ftpChannel.rmdir(path)
             except IOError as e:
+                Log.warning(f'Failed checking remote permissions (1): {str(e)}')
                 self._ftpChannel.rmdir(path)
                 self._ftpChannel.mkdir(path)
                 self._ftpChannel.rmdir(path)
             return True
         except Exception as e:
-            return False
-    
+            Log.warning(f'Failed checking remote permissions (2): {str(e)}')
+        return False
+
     def check_remote_log_dir(self):
         """
         Creates log dir on remote host
