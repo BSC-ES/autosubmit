@@ -18,6 +18,8 @@
 - Improvement of the error messages for YAML files #2488 and for RO-CRATE #2572
 - Added `--force` flag to `autosubmit pklfix` command, and `--yes` flag to `autosubmit stop` to
   automatically answer yes to prompts #2569
+- Adjusting the documentation to be done in an automatized and self-contained way facilitating 
+  and allowing reproducibility of the examples #2465
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 
