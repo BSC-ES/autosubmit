@@ -230,7 +230,7 @@ class ParamikoPlatform(Platform):
             raise AutosubmitCritical(
                 'Cant connect to this platform due an unknown error', 7050, str(e))
 
-    def agent_auth(self,port):
+    def agent_auth(self, port):
         """
         Attempt to authenticate to the given SSH server using the most common authentication methods available.
             This will always try to use the SSH agent first, and will fall back to using the others methods if
@@ -821,8 +821,7 @@ class ParamikoPlatform(Platform):
         :return: current job status
         :rtype: autosubmit.job.job_common.Status
         """
-        job_status = Status.UNKNOWN
-        remote_logs = as_conf.get_copy_remote_logs()
+        as_conf.get_copy_remote_logs()
         job_list_cmd = self.parse_joblist(job_list)
         cmd = self.get_checkAlljobs_cmd(job_list_cmd)
         sleep_time = 5
@@ -854,11 +853,11 @@ class ParamikoPlatform(Platform):
             Log.debug('Successful check job command')
             in_queue_jobs = []
             list_queue_jobid = ""
-            for job,job_prev_status in job_list:
+            for job, job_prev_status in job_list:
                 if not slurm_error:
                     job_id = job.id
                     job_status = self.parse_Alljobs_output(job_list_status, job_id)
-                    while len(job_status) <= 0 and retries >= 0:
+                    while len(job_status) <= 0 <= retries:
                         retries -= 1
                         self.send_command(cmd)
                         job_list_status = self.get_ssh_output()
