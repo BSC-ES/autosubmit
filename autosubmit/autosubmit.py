@@ -2187,7 +2187,7 @@ class Autosubmit:
             return job_list, submitter , exp_history, host , as_conf, platforms_to_test, packages_persistence, False
         else:
             return job_list, submitter, None, None, as_conf, platforms_to_test, packages_persistence, True
-        
+
     @staticmethod
     def get_iteration_info(as_conf,job_list):
         """
@@ -2552,7 +2552,7 @@ class Autosubmit:
                 issues += platform_issues
                 continue
             if platform.check_remote_permissions():
-                Log.result("[{1}] Correct user privileges for host {0}", platform.host, platform.name)
+                Log.result("[{platform.name}] Correct user privileges for host {platform.host}")
             else:
                 platform_issues += (f"\n[{platform.name}] has configuration issues.\n Check that the connection is"
                                     f" passwd-less.(ssh {platform.user}@{platform.host})\n Check the parameters that"
@@ -2576,28 +2576,25 @@ class Autosubmit:
                 raise AutosubmitCritical("Issues while checking the connectivity of platforms.", 7010, issues + "\n" + ssh_config_issues)
 
     @staticmethod
-    def submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence, inspect=False,
-                          only_wrappers=False, hold=False):
-
-        # type: (AutosubmitConfig, JobList, Set[Platform], JobPackagePersistence, bool, bool, bool) -> bool
-        """
-        Gets READY jobs and send them to the platforms if there is available space on the queues
+    def submit_ready_jobs(as_conf: AutosubmitConfig, job_list: JobList, platforms_to_test: set[Platform],
+                          packages_persistence: JobPackagePersistence, inspect=False,
+                          only_wrappers=False, hold=False) -> bool:
+        """Gets READY jobs and send them to the platforms if there is available space on the queues.
 
         :param hold:
-        :param as_conf: autosubmit config object \n
-        :type as_conf: AutosubmitConfig object  \n
-        :param job_list: job list to check  \n
-        :type job_list: JobList object  \n
-        :param platforms_to_test: platforms used  \n
-        :type platforms_to_test: set of Platform Objects, e.g. SgePlatform(), SlurmPlatform().  \n
-        :param packages_persistence: Handles database per experiment. \n
-        :type packages_persistence: JobPackagePersistence object \n
-        :param inspect: True if coming from generate_scripts_andor_wrappers(). \n
-        :type inspect: Boolean \n
-        :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw. \n
-        :type only_wrappers: Boolean \n
-        :return: True if at least one job was submitted, False otherwise \n
-        :rtype: Boolean
+        :param as_conf: autosubmit config object
+        :type as_conf: AutosubmitConfig object
+        :param job_list: job list to check
+        :type job_list: JobList object
+        :param platforms_to_test: platforms used
+        :type platforms_to_test: set of Platform Objects, e.g. SgePlatform(), SlurmPlatform().
+        :param packages_persistence: Handles database per experiment.
+        :type packages_persistence: JobPackagePersistence object
+        :param inspect: True if coming from generate_scripts_andor_wrappers().
+        :type inspect: Boolean
+        :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw.
+        :type only_wrappers: Boolean
+        :return: True if at least one job was submitted, False otherwise
         """
         save_1 = False
         save_2 = False
@@ -2627,7 +2624,7 @@ class Autosubmit:
                 if not inspect and len(valid_packages_to_submit) > 0:
                     job_list.save()
                 save_2 = False
-                if platform.type.lower() in [ "slurm" , "pjm" ] and not inspect and not only_wrappers:
+                if platform.type.lower() in ["slurm", "pjm"] and not inspect and not only_wrappers:
                     # Process the script generated in submit_ready_jobs
                     save_2, valid_packages_to_submit = platform.process_batch_ready_jobs(valid_packages_to_submit,
                                                                                          failed_packages,
@@ -2646,16 +2643,12 @@ class Autosubmit:
                 for wrapper in wrapper_errors:
                     err_msg += f"wrapped_jobs:{wrapper} in {wrapper_errors[wrapper]}\n"
                 raise AutosubmitCritical(err_msg, 7014)
-            if save_1 or save_2:
-                return True
-            else:
-                return False
-
-        except AutosubmitError as e:
+            return save_1 or save_2
+        except AutosubmitError:
             raise
-        except AutosubmitCritical as e:
+        except AutosubmitCritical:
             raise
-        except BaseException as e:
+        except BaseException:
             raise
 
     @staticmethod

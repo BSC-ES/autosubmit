@@ -617,7 +617,7 @@ class JobPackager(object):
                     continue
             elif max_jobs_to_submit == 0:
                 break
-            if len(self._jobs_list.jobs_to_run_first) > 0: # if user wants to run first some jobs, submit them first
+            if len(self._jobs_list.jobs_to_run_first) > 0:  # if user wants to run first some jobs, submit them first
                 if job not in self._jobs_list.jobs_to_run_first:
                     continue
             if job.type == Type.PYTHON and not self._platform.allow_python_jobs:
@@ -628,7 +628,6 @@ class JobPackager(object):
             max_jobs_to_submit = max_jobs_to_submit - 1
             if job.section in section_jobs_to_submit:
                 section_jobs_to_submit[job.section] = section_jobs_to_submit[job.section] - 1
-
 
         for package in packages_to_submit:
             self.max_jobs = self.max_jobs - 1

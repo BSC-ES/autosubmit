@@ -182,12 +182,6 @@ jobs:
 
   test-slurm:
     runs-on: ubuntu-latest
-    services:
-      slurm:
-        image: autosubmit/slurm-openssh-container:25-05-0-1
-        ports:
-          - 2222:2222
-        options: --rm -it --cgroupns=host --privileged --volume /sys/fs/cgroup:/sys/fs/cgroup:rw --hostname slurmctld --name slurm-container
 
     strategy:
       matrix:
@@ -196,23 +190,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Copy SSH access key
-        run: |
-          docker cp slurm-container:/root/.ssh/container_root_pubkey /tmp/container_root_pubkey
-          chmod 600 /tmp/container_root_pubkey
-
-      - name: Configure SSH host
-        run: |
-          sudo bash -c 'mkdir /home/runner/.ssh/'
-          sudo bash -c 'echo -e $"Host localDocker\n  HostName localhost\n  User root\nStrictHostKeyChecking no\n UserKnownHostsFile /dev/null\n  IdentityFile /tmp/container_root_pubkey\n  Port 2222\n   ForwardX11 yes" >> /home/runner/.ssh/config'
-
-      - name: Run sinfo over SSH on SLURM container
-        run: |
-          ssh localDocker -p 2222 -i /tmp/container_root_pubkey sinfo
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -241,6 +218,7 @@ jobs:
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
             test/integration \
+            --capture=no \
             -m 'slurm'
 
       - name: Coverage report

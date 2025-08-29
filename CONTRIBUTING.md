@@ -88,8 +88,9 @@ $ sudo setfacl --modify user:$USER:rw /var/run/docker.sock
 # $ sudo setfacl --remove user:$USER /var/run/docker.sock
 ```
 
-For the Slurm tests (pytest marker `slurm`) you will need the Slurm container
-built and running locally. Below is the step-by-step on how to run locally
+You can follow the steps below if you would like to have a Slurm container
+locally for the tests marked with `slurm`. This step is optional as each test
+launches the container in an isolated manner.
 
 ```bash
 $ docker pull autosubmit/slurm-openssh-container:25-05-0-1
@@ -120,10 +121,6 @@ Host localDocker
 EOF
 ```
 
-We run it as a service in the CI pipeline, in case of doubt, see the
-file `.github/workflows/ci.yaml` for details -- there is a Docker service initialized
-for the `test-slurm` job.
-
 Then you can run all the tests, with
 
 ```bash
@@ -144,9 +141,10 @@ $ pytest -m 'slurm'
 
 ## Random ports
 
-Some tests require random ports. This table below can be useful for troubleshooting
-if we ever start running out of ports.
+Some tests require random ports. To acquire a free random port, we rely
+on a Linux feature where we create a socket without specifying address
+or port number. The socket created has a random free port in the system.
+We close the socket and use that port for our next test. Chances or the
+port being used by multiple tests is smaller than using random or ranges.
 
-- The integration test `test_paramiko_platform.py` uses the range `2500` to `3000`
-- The integration test `test_mail.py` uses the range `3500` to `4000`
-- The integration test `test_autosubmit_git.py` uses the range `4000` to `4500`
+See `test/integration/test_utils/networking.py` for more.

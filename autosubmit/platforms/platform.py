@@ -427,9 +427,10 @@ class Platform(object):
                             job_list.save()
                         if package.x11 != "true":
                             valid_packages_to_submit.append(package)
-                    except (IOError, OSError):
+                    except (IOError, OSError) as e:
                         if package.jobs[0].id != 0:
                             failed_packages.append(package.jobs[0].id)
+                        Log.warning(f'An unexpected error happened while submitting the package: {str(e)}')
                         continue
                     except AutosubmitError as e:
                         if package.jobs[0].id != 0:

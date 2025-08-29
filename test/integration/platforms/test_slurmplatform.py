@@ -17,21 +17,26 @@
 
 """Integration tests for the Slurm platform."""
 
-import pytest
-from autosubmit.config.configcommon import AutosubmitConfig
+from typing import TYPE_CHECKING
 
+import pytest
+
+from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from test.conftest import AutosubmitExperimentFixture
 
-_EXPID = "t000"
+if TYPE_CHECKING:
+    from testcontainers.core.container import DockerContainer
+
+_EXPID = 't001'
+
 _PLATFORM_NAME = 'TEST_SLURM'
 
 
-def _create_slurm_platform(as_conf: AutosubmitConfig):
-    return SlurmPlatform(_EXPID, _PLATFORM_NAME, config=as_conf.experiment_data, auth_password=None)
+def _create_slurm_platform(expid: str, as_conf: AutosubmitConfig):
+    return SlurmPlatform(expid, _PLATFORM_NAME, config=as_conf.experiment_data, auth_password=None)
 
 
-@pytest.mark.slurm
 def test_create_platform_slurm(autosubmit_exp):
     """Test the Slurm platform object creation."""
     exp = autosubmit_exp(_EXPID, experiment_data={
@@ -45,7 +50,7 @@ def test_create_platform_slurm(autosubmit_exp):
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -56,7 +61,7 @@ def test_create_platform_slurm(autosubmit_exp):
             }
         }
     })
-    platform = _create_slurm_platform(exp.as_conf)
+    platform = _create_slurm_platform(exp.expid, exp.as_conf)
     assert platform.name == _PLATFORM_NAME
     # TODO: add more assertion statements...
 
@@ -74,7 +79,7 @@ def test_create_platform_slurm(autosubmit_exp):
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -102,7 +107,7 @@ def test_create_platform_slurm(autosubmit_exp):
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -117,20 +122,21 @@ def test_create_platform_slurm(autosubmit_exp):
     'Simple Workflow',
     'Dependency Workflow',
 ])
-def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, experiment_data):
+def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, experiment_data: dict,
+                                   slurm_server: 'DockerContainer'):
     """Runs a simple Bash script using Slurm."""
     exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
-    _create_slurm_platform(exp.as_conf)
+    _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
-    assert 0 == exp.autosubmit.run_experiment(_EXPID)
+    assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 
 @pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     {
-        'DEFAULT':{
-            'EXPID': 't000',
+        'DEFAULT': {
+            'EXPID': _EXPID,
             'HPCARCH': _PLATFORM_NAME,
         },
         'JOBS': {
@@ -169,8 +175,8 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
-                'MAX_WALLCLOCK': '00:03',
+                'HOST': '127.0.0.1',
+                'MAX_WALLCLOCK': '02:00',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
                 'SCRATCH_DIR': '/tmp/scratch/',
@@ -190,14 +196,14 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
         },
     },
     {
-        'DEFAULT':{
-            'EXPID': 't000',
+        'DEFAULT': {
+            'EXPID': _EXPID,
             'HPCARCH': _PLATFORM_NAME,
         },
         'JOBS': {
-            'SIMV': {
+            'SIM_V': {
                 'DEPENDENCIES': {
-                    'SIMV-1': {}
+                    'SIM_V-1': {}
                 },
                 'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
@@ -210,7 +216,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -223,22 +229,22 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
             },
         },
         'WRAPPERS': {
-            'WRAPPERV': {
+            'WRAPPER_V': {
                 'TYPE': 'vertical',
-                'JOBS_IN_WRAPPER': 'SIMV',
+                'JOBS_IN_WRAPPER': 'SIM_V',
                 'RETRIALS': 0,
             },
         },
     },
     {
-        'DEFAULT':{
-            'EXPID': 't000',
+        'DEFAULT': {
+            'EXPID': _EXPID,
             'HPCARCH': _PLATFORM_NAME,
         },
         'JOBS': {
-            'SIMH': {
+            'SIM_H': {
                 'DEPENDENCIES': {
-                    'SIMH-1': {}
+                    'SIM_H-1': {}
                 },
                 'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
@@ -251,7 +257,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -264,22 +270,22 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
             },
         },
         'WRAPPERS': {
-            'WRAPPERH': {
+            'WRAPPER_H': {
                 'TYPE': 'horizontal',
-                'JOBS_IN_WRAPPER': 'SIMH',
+                'JOBS_IN_WRAPPER': 'SIM_H',
                 'RETRIALS': 0,
             },
         },
     },
     {
-        'DEFAULT':{
-            'EXPID': 't000',
+        'DEFAULT': {
+            'EXPID': _EXPID,
             'HPCARCH': _PLATFORM_NAME,
         },
         'JOBS': {
-            'SIMHV': {
+            'SIM_H_V': {
                 'DEPENDENCIES': {
-                    'SIMHV-1': {}
+                    'SIM_H_V-1': {}
                 },
                 'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
@@ -292,7 +298,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -305,22 +311,22 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
             },
         },
         'WRAPPERS': {
-            'WRAPPERHV': {
+            'WRAPPER_H_V': {
                 'TYPE': 'horizontal-vertical',
-                'JOBS_IN_WRAPPER': 'SIMHV',
+                'JOBS_IN_WRAPPER': 'SIM_H_V',
                 'RETRIALS': 0,
             },
         },
     },
     {
-        'DEFAULT':{
-            'EXPID': 't000',
+        'DEFAULT': {
+            'EXPID': _EXPID,
             'HPCARCH': _PLATFORM_NAME,
         },
         'JOBS': {
-            'SIMVH': {
+            'SIM_H_V': {
                 'DEPENDENCIES': {
-                    'SIMVH-1': {},
+                    'SIM_H_V-1': {},
                 },
                 'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
@@ -333,7 +339,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -346,9 +352,9 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
             },
         },
         'WRAPPERS': {
-            'WRAPPERVH': {
+            'WRAPPER_V_H': {
                 'TYPE': 'vertical-horizontal',
-                'JOBS_IN_WRAPPER': 'SIMVH',
+                'JOBS_IN_WRAPPER': 'SIM_V_H',
                 'RETRIALS': 0,
             },
         },
@@ -360,11 +366,11 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
     'Wrapper Horizontal-vertical',
     'Wrapper Vertical-horizontal',
 ])
-def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, experiment_data):
+def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, experiment_data,
+                                         slurm_server: 'DockerContainer'):
     """Runs a simple Bash script using Slurm."""
-
     exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, wrapper=True)
-    _create_slurm_platform(exp.as_conf)
+    _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.as_conf.experiment_data = {
         'EXPERIMENT': {
@@ -379,4 +385,4 @@ def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFix
     }
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
-    assert 0 == exp.autosubmit.run_experiment(_EXPID)
+    assert 0 == exp.autosubmit.run_experiment(exp.expid)

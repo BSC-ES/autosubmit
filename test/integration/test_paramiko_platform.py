@@ -42,7 +42,7 @@ _EXPID = 't000'
 def test_send_file(filename: str, check: bool, autosubmit_exp, ssh_server):
     """This test opens an SSH connection (via sftp) and sends a file to the remote location.
 
-    It launches a Docker Image using testcontainers library.
+    It launches a Docker Image using the testcontainers library.
     """
     user = getuser()
     platform_name = 'TEST_PS_PLATFORM'
@@ -78,9 +78,9 @@ def test_send_file(filename: str, check: bool, autosubmit_exp, ssh_server):
     })
 
     # We load the platforms with the submitter so that the platforms have all attributes.
-    # NOTE: The set up of platforms is done partially in the platform constructor, and
-    #       partially by a submitter (i.e. they are tightly coupled, which makes it hard
-    #       to maintain & test).
+    # NOTE: The set up of platforms is done partially in the platform constructor and
+    #       partially by a submitter (i.e., they are tightly coupled, which makes it hard
+    #       to maintain and test).
     submitter = ParamikoSubmitter()
     submitter.load_platforms(asconf=exp.as_conf, retries=0)
 
@@ -89,7 +89,7 @@ def test_send_file(filename: str, check: bool, autosubmit_exp, ssh_server):
     ps_platform.connect(as_conf=exp.as_conf, reconnect=False, log_recovery_process=False)
     assert ps_platform.check_remote_permissions()
 
-    # generate file
+    # generate the file
     if "/" in filename:
         filename_dir = Path(filename).parent
         Path(ps_platform.tmp_path, filename_dir).mkdir(parents=True, exist_ok=True)

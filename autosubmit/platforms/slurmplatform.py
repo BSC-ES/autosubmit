@@ -266,7 +266,7 @@ class SlurmPlatform(ParamikoPlatform):
             raise
         except Exception as e:
             raise AutosubmitError(f"{self.name} submission failed", 6015, str(e)) from e
-        return save,valid_packages_to_submit
+        return save, valid_packages_to_submit
 
     def generate_submit_script(self) -> None:
         """
