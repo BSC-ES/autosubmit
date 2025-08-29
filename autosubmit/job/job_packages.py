@@ -16,27 +16,30 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import datetime
 import json
+import locale
+import multiprocessing
 import os
 import random
+import re
+import tarfile
 import time
+from contextlib import suppress
 from datetime import timedelta
+from threading import Thread
+from typing import Optional, TYPE_CHECKING
 
+from bscearth.utils.date import sum_str_hours
+
+from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log, AutosubmitCritical
 
-Log.get_logger("Autosubmit")
-from autosubmit.job.job import Job
-from bscearth.utils.date import sum_str_hours
-from threading import Thread, Lock
-from typing import List, Dict, Optional
-import multiprocessing
-import tarfile
-import datetime
-import re
-import locale
+if TYPE_CHECKING:
+    from autosubmit.config.configcommon import AutosubmitConfig
 
-lock = Lock()
+Log.get_logger("Autosubmit")
 
 
 def threaded(fn):
@@ -66,13 +69,12 @@ class JobPackageBase(object):
     """
 
     def __init__(self, jobs: list[Job]):
-        # type: (List[Job]) -> None
         self._job_scripts = None
         self.nodes = ""
         self._common_script = None
-        self._jobs = jobs  # type: List[Job]
-        self._expid = jobs[0].expid  # type: str
-        self.hold = False  # type: bool
+        self._jobs = jobs
+        self._expid = jobs[0].expid
+        self.hold = False
         self.export = jobs[0].export
         self.x11 = jobs[0].x11
         self.het = dict()
@@ -92,13 +94,11 @@ class JobPackageBase(object):
         return self._jobs.__len__()
 
     @property
-    def jobs(self):
-        # type: () -> List[Job]
+    def jobs(self) -> list[Job]:
         """
         Returns the jobs
 
         :return: jobs
-        :rtype: List[Job]
         """
         return self._jobs
 
@@ -113,7 +113,7 @@ class JobPackageBase(object):
         return self._platform
 
     @threaded
-    def check_scripts(self, jobs: list[Job], configuration: dict = [], only_generate: bool = False):
+    def check_scripts(self, jobs: list[Job], configuration: 'AutosubmitConfig', only_generate: bool = False):
         for job in jobs:
             if only_generate and not os.path.exists(os.path.join(configuration.get_project_dir(), job.file)):
                 break
@@ -129,15 +129,14 @@ class JobPackageBase(object):
             self._custom_directives = self._custom_directives | set(job.custom_directives)
 
     @threaded
-    def _create_scripts_threaded(self, jobs: list[Job], configuration: dict = dict()):
+    def _create_scripts_threaded(self, jobs: list[Job], configuration: 'AutosubmitConfig'):
         for i in range(0, len(jobs)):
             self._job_scripts[jobs[i].name] = jobs[i].create_script(configuration)
 
     def _create_common_script(self, filename: str = ""):
         pass
 
-
-    def submit_unthreaded(self, configuration: dict = dict(), only_generate:bool = False, hold:bool = False):
+    def submit_unthreaded(self, configuration: 'AutosubmitConfig', only_generate: bool = False):
         """
         :param configuration: Autosubmit basic configuration
         :type configuration: AutosubmitConfig object
@@ -160,7 +159,7 @@ class JobPackageBase(object):
             self._custom_directives = self._custom_directives | set(job.custom_directives)
         self._create_scripts(configuration)
 
-    def submit(self, configuration: dict = dict(), parameters: dict = dict(), only_generate: bool = False, hold: bool = False):
+    def submit(self, configuration: 'AutosubmitConfig', parameters: Optional[dict] = None, only_generate: bool = False, hold: bool = False):
         """
         :param hold:
         :param configuration: Autosubmit basic configuration
@@ -170,6 +169,8 @@ class JobPackageBase(object):
         :param only_generate: True if coming from generate_scripts_andor_wrappers(). If true, only generates scripts; otherwise, submits.
         :type only_generate: Boolean
         """
+        if parameters is None:
+            parameters = {}
         thread_number = multiprocessing.cpu_count()
         if len(self.jobs) > 2500:
             thread_number = thread_number * 2
@@ -216,7 +217,7 @@ class JobPackageBase(object):
         except BaseException as e:
             raise AutosubmitCritical("Error while submitting jobs: {0}".format(e), 7013)
 
-    def _create_scripts(self, configuration: dict = dict()):
+    def _create_scripts(self, configuration: 'AutosubmitConfig'):
         raise Exception('Not implemented')
 
     def _send_files(self):
@@ -247,28 +248,28 @@ class JobPackageSimple(JobPackageBase):
         super(JobPackageSimple, self).__init__(jobs)
         self._job_scripts = {}
         self.export = jobs[0].export
-        # self.name = "simple_package" TODO this should be possible, but it crashes accross the code. Add a property that defines what is a package with wrappers
+        # TODO: This should be possible, but it crashes across the code.
+        #  Add a property that defines what is a package with wrappers
+        # self.name = "simple_package"
 
-    def _create_scripts(self, configuration: dict = dict()):
+    def _create_scripts(self, configuration: 'AutosubmitConfig'):
         for job in self.jobs:
             self._job_scripts[job.name] = job.create_script(configuration)
 
     def _send_files(self):
-        # TODO: pytests when the slurm container is avaliable
+        # TODO: Add tests when the slurm container is available.
         for job in self.jobs:
             self.platform.send_file(self._job_scripts[job.name])
             for f in job.additional_files:
                 real_name = job.construct_real_additional_file_name(f)
                 self.platform.send_file(real_name)
 
-    def _do_submission(self, job_scripts: Dict[str, str] = "", hold: bool = False) -> None:
+    def _do_submission(self, job_scripts: dict[str, str] = "", hold: bool = False) -> None:
         """
         Submits jobs to the platform, cleans previous run logs and stats files and updates job status.
 
         :param job_scripts: Dictionary of job scripts, defaults to an empty string.
-        :type job_scripts: Dict[str, str]
         :param hold: If True, the job won't immediately start, defaults to False.
-        :type hold: bool
         """
         if len(job_scripts) == 0:
             job_scripts = self._job_scripts
@@ -304,7 +305,7 @@ class JobPackageSimpleWrapped(JobPackageSimple):
         super(JobPackageSimpleWrapped, self).__init__(jobs)
         self._job_wrapped_scripts = {}
 
-    def _create_scripts(self, configuration: dict = dict()):
+    def _create_scripts(self, configuration: 'AutosubmitConfig'):
         super(JobPackageSimpleWrapped, self)._create_scripts(configuration)
         for job in self.jobs:
             self._job_wrapped_scripts[job.name] = job.create_wrapped_script(configuration)
@@ -342,7 +343,7 @@ class JobPackageArray(JobPackageBase):
                 self._num_processors = job.processors
         super(JobPackageArray, self).__init__(jobs)
 
-    def _create_scripts(self, configuration: dict = dict()):
+    def _create_scripts(self, configuration: 'AutosubmitConfig'):
         timestamp = str(int(time.time()))
         for i in range(0, len(self.jobs)):
             self._job_scripts[self.jobs[i].name] = self.jobs[i].create_script(configuration)
@@ -371,12 +372,11 @@ class JobPackageArray(JobPackageBase):
             self.platform.send_file(self._job_inputs[job.name])
         self.platform.send_file(self._common_script)
 
-    def _do_submission(self, job_scripts: Dict[str, str] = None, hold: bool = False) -> None:
+    def _do_submission(self, job_scripts: dict[str, str] = None, hold: bool = False) -> None:
         """
         Submits jobs to the platform, cleans previous run logs, and updates job status.
 
         :param job_scripts: Dictionary of job scripts, defaults to None.
-        :type job_scripts: Optional[Dict[str, str]]
         :param hold: If True, holds the job submission, defaults to False.
         :type hold: bool
         """
@@ -406,9 +406,9 @@ class JobPackageThread(JobPackageBase):
     """
     FILE_PREFIX = 'ASThread'
 
-    def __init__(self, jobs: list[Job], dependency=None, jobs_resources: dict = dict(), method: str = 'ASThread',
-                 configuration: dict = dict(), wrapper_section: str = "WRAPPERS", wrapper_info: list = {}):
-        super(JobPackageThread, self).__init__(jobs)
+    def __init__(self, jobs: list[Job], dependency=None, jobs_resources: Optional[dict] = None,
+                 method: str = 'ASThread', configuration: Optional['AutosubmitConfig'] = None,
+                 wrapper_section: str = "WRAPPERS", wrapper_info: Optional[list] = None):
         """
         :param dependency: Dependency
         :type dependency: String
@@ -418,13 +418,18 @@ class JobPackageThread(JobPackageBase):
         :type method: String
         :param configuration: Autosubmit configuration
         :type configuration: Autosubmitconfigparser instance
-            
         """
         # This function is called from the JobPackageThread constructor
         # and from the JobPackageThread.create_scripts function
-        # It is in charge of merging ( switch ) the wrapper info by checking if the value is defined by the user in the wrapper section, current wrapper section, job or platform in that order.
+        # It is in charge of merging ( switch ) the wrapper info by checking if the value is defined by
+        # the user in the wrapper section, current wrapper section, job or platform in that order.
         # Some variables are calculated in further functions, like num_processors and wallclock.
         # These variables can only be present in the wrapper itself
+        super(JobPackageThread, self).__init__(jobs)
+        if jobs_resources is None:
+            jobs_resources = {}
+        if wrapper_info is None:
+            wrapper_info = []
         if len(wrapper_info) > 0:
             self.wrapper_type = wrapper_info[0]
             self.wrapper_policy = wrapper_info[1]
@@ -546,6 +551,7 @@ class JobPackageThread(JobPackageBase):
 
     @property
     def name(self):
+        # FIXME: Calling this raises an exception at runtime?
         return self._name
 
     @property
@@ -557,10 +563,8 @@ class JobPackageThread(JobPackageBase):
                 self._jobs_resources[job.section] = dict()
                 self._jobs_resources[job.section]['PROCESSORS'] = job.processors
                 self._jobs_resources[job.section]['TASKS'] = job.tasks
-            try:
+            with suppress(Exception):
                 jobs_scripts.append(self._job_scripts[job.name])
-            except BaseException:
-                pass
         return jobs_scripts
 
     @property
@@ -583,7 +587,7 @@ class JobPackageThread(JobPackageBase):
     def set_job_dependency(self, dependency):
         self._job_dependency = dependency
 
-    def _create_scripts(self, configuration: dict = dict()):
+    def _create_scripts(self, configuration: 'AutosubmitConfig'):
         for i in range(0, len(self.jobs)):
             self._job_scripts[self.jobs[i].name] = self.jobs[i].create_script(configuration)
         self._common_script = self._create_common_script()
@@ -626,14 +630,12 @@ class JobPackageThread(JobPackageBase):
         Log.debug("Send_file: common_script")
         self.platform.send_file(self._common_script)
 
-    def _do_submission(self, job_scripts: Dict[str, str] = None, hold: bool = False) -> None:
+    def _do_submission(self, job_scripts: dict[str, str] = None, hold: bool = False) -> None:
         """
         Submits jobs to the platform, cleans previous run logs, and updates job status.
 
         :param job_scripts: Dictionary of job scripts, defaults to None.
-        :type job_scripts: Dict[str, str]
         :param hold: If True, the job won't start immediately, defaults to False.
-        :type hold: bool
         """
         if callable(getattr(self.platform, 'remove_multiple_files')):
             filenames = str()
@@ -661,7 +663,7 @@ class JobPackageThread(JobPackageBase):
             self.jobs[i].status = Status.SUBMITTED
             self.jobs[i].wrapper_name = self.name
 
-    def _common_script_content(self):
+    def _common_script_content(self) -> str:
         pass
 
 
@@ -671,7 +673,8 @@ class JobPackageThreadWrapped(JobPackageThread):
     """
     FILE_PREFIX = 'ASThread'
 
-    def __init__(self, jobs: list[Job], dependency=None, configuration: dict = dict(), wrapper_section="WRAPPERS"):
+    def __init__(self, jobs: list[Job], dependency=None, configuration: Optional['AutosubmitConfig'] = None,
+                 wrapper_section="WRAPPERS"):
         super(JobPackageThreadWrapped, self).__init__(jobs, configuration)
         self._name = None
         self._job_scripts = {}
@@ -708,7 +711,7 @@ class JobPackageThreadWrapped(JobPackageThread):
     def _project(self):
         return self._platform.project
 
-    def _create_scripts(self, configuration: dict = dict()):
+    def _create_scripts(self, configuration: 'AutosubmitConfig'):
         for i in range(0, len(self.jobs)):
             self._job_scripts[self.jobs[i].name] = self.jobs[i].create_script(configuration)
         self._common_script = self._create_common_script()
@@ -725,12 +728,11 @@ class JobPackageThreadWrapped(JobPackageThread):
             self.platform.send_file(self._job_scripts[job.name])
         self.platform.send_file(self._common_script)
 
-    def _do_submission(self, job_scripts: Dict[str, str] = None, hold: bool = False) -> None:
+    def _do_submission(self, job_scripts: dict[str, str] = None, hold: bool = False) -> None:
         """
         Submits jobs to the platform, cleans previous run logs, and updates job status.
 
         :param job_scripts: Dictionary of job scripts, defaults to None.
-        :type job_scripts: Optional[Dict[str, str]]
         :param hold: If True, the job won't start immediately, defaults to False.
         :type hold: bool
         """
@@ -760,10 +762,10 @@ class JobPackageVertical(JobPackageThread):
     :param: dependency:
     """
 
-    def __init__(self, jobs: list[Job], dependency=None, configuration: dict = dict(),
-                 wrapper_section: str = "WRAPPERS",
-                 wrapper_info: Optional[list] = []):
-
+    def __init__(self, jobs: list[Job], dependency=None, configuration: Optional['AutosubmitConfig'] = None,
+                 wrapper_section: str = "WRAPPERS", wrapper_info: Optional[list] = None):
+        if wrapper_info is None:
+            wrapper_info = []
         super(JobPackageVertical, self).__init__(jobs, dependency, configuration=configuration,
                                                  wrapper_section=wrapper_section, wrapper_info=wrapper_info)
         for job in jobs:
@@ -794,7 +796,7 @@ class JobPackageVertical(JobPackageThread):
                 time_params[name] = int(param)
         return timedelta(**time_params), format_
 
-    def _common_script_content(self):
+    def _common_script_content(self) -> str:
         # TODO: normalize this logic to be the same as the one in the Job class
         if self.jobs[0].wrapper_type == "vertical":
             wallclock, format_ = self.parse_time()
@@ -852,7 +854,7 @@ class JobPackageHorizontal(JobPackageThread):
     Class to manage a horizontal thread-based package of jobs to be submitted by autosubmit
     """
     def __init__(self, jobs: list[Job], dependency=None, jobs_resources: dict = None, method: str = 'ASThread',
-                 configuration: dict = dict(), wrapper_section="WRAPPERS"):
+                 configuration: Optional['AutosubmitConfig'] = None, wrapper_section="WRAPPERS"):
         super(JobPackageHorizontal, self).__init__(jobs, dependency, jobs_resources, configuration=configuration,
                                                    wrapper_section=wrapper_section)
         self.method = method
@@ -868,7 +870,7 @@ class JobPackageHorizontal(JobPackageThread):
 
         self._jobs_resources = jobs_resources
 
-    def _common_script_content(self):
+    def _common_script_content(self) -> str:
         return self._wrapper_factory.get_wrapper(self._wrapper_factory.horizontal_wrapper, name=self._name,
                                                  queue=self._queue, project=self._project, wallclock=self._wallclock,
                                                  num_processors=self._num_processors, jobs_scripts=self._jobs_scripts,
@@ -884,10 +886,12 @@ class JobPackageHybrid(JobPackageThread):
         Class to manage a hybrid (horizontal and vertical) thread-based package of jobs to be submitted by autosubmit
         """
 
-    def __init__(self, jobs: list[Job], num_processors: str, total_wallclock, dependency=None,
-                 jobs_resources: dict = dict(), method: str = "ASThread",
-                 configuration: dict = dict(), wrapper_section="WRAPPERS"):
+    def __init__(self, jobs: list[list[Job]], num_processors: str, total_wallclock, dependency=None,
+                 jobs_resources: Optional[dict] = None, method: str = "ASThread",
+                 configuration: Optional['AutosubmitConfig'] = None, wrapper_section="WRAPPERS"):
         all_jobs = [item for sublist in jobs for item in sublist]  # flatten list
+        if jobs_resources is None:
+            jobs_resources = {}
         super(JobPackageHybrid, self).__init__(all_jobs, dependency, jobs_resources, method,
                                                configuration=configuration, wrapper_section=wrapper_section)
         self.jobs_lists = jobs
@@ -916,7 +920,7 @@ class JobPackageHybrid(JobPackageThread):
 
 class JobPackageVerticalHorizontal(JobPackageHybrid):
 
-    def _common_script_content(self):
+    def _common_script_content(self) -> str:
         return self._wrapper_factory.get_wrapper(self._wrapper_factory.hybrid_wrapper_vertical_horizontal,
                                                  name=self._name, queue=self._queue, project=self._project,
                                                  wallclock=self._wallclock, num_processors=self._num_processors,
@@ -930,7 +934,7 @@ class JobPackageVerticalHorizontal(JobPackageHybrid):
 
 class JobPackageHorizontalVertical(JobPackageHybrid):
 
-    def _common_script_content(self):
+    def _common_script_content(self) -> str:
         return self._wrapper_factory.get_wrapper(self._wrapper_factory.hybrid_wrapper_horizontal_vertical,
                                                  name=self._name, queue=self._queue, project=self._project,
                                                  wallclock=self._wallclock, num_processors=self._num_processors,
