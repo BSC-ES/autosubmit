@@ -101,7 +101,7 @@ def prepare_workflow_runs(current_tmpdir: Path) -> Path:
         if not experiment.is_file():
             experiment.joinpath("proj").mkdir(parents=True, exist_ok=True)
             experiment.joinpath("conf").mkdir(parents=True, exist_ok=True)
-            experiment.joinpath("pkl").mkdir(parents=True, exist_ok=True)
+            experiment.joinpath("db").mkdir(parents=True, exist_ok=True)
             experiment.joinpath("plot").mkdir(parents=True, exist_ok=True)
             experiment.joinpath("status").mkdir(parents=True, exist_ok=True)
             as_tmp = experiment.joinpath("tmp")
@@ -256,7 +256,7 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
     add_new_test = False  # Enable when adding a new test
     show_workflow_plot = False  # Enable only for debugging purposes
     expids_to_plot = []
-    if expid.startswith("auto-monarch-op"):  # Modify only for debugging purposes
+    if expid.startswith("basic_dependencies"):  # Modify only for debugging purposes
         expids_to_plot.append(expid)
     profiler = cProfile.Profile()
 
@@ -268,7 +268,7 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
     if PROFILE:
         profiler.enable()
 
-    init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, create=True, test_type='test')
+    init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, full_load=True, test_type='test')
 
     with open(Path(f"{current_tmpdir}/workflows/{expid}/tmp/ASLOGS/jobs_active_status.log"), "r") as new_file:
         new_lines = new_file.readlines()
@@ -304,7 +304,7 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
             differences.extend(compare_and_print_differences(new_root, ref_root))
 
     if show_workflow_plot and expid in expids_to_plot:
-        init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, create=True, test_type='test',
+        init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, full_load=True, test_type='test',
                    plot=show_workflow_plot)
     if differences:
         pytest.fail("\n".join(differences))
