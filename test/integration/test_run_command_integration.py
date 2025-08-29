@@ -24,7 +24,7 @@ from typing import Any
 
 import pytest
 
-_EXPID = 't000'
+_NUM_EXPID = 4
 """The experiment ID used throughout the test."""
 _PLATFORM_NAME = 'TEST_SLURM'
 
@@ -35,28 +35,31 @@ _PLATFORM_NAME = 'TEST_SLURM'
 
 @pytest.fixture
 def as_exp(autosubmit_exp):
-    exp = autosubmit_exp(_EXPID, experiment_data={
-        'PROJECT': {
-            'PROJECT_TYPE': 'none',
-            'PROJECT_DESTINATION': 'dummy_project'
-        }
-    })
+    for exp_id in range(_NUM_EXPID):
+        expid = "t00"+str(exp_id)
 
-    run_tmpdir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR)
+        exp = autosubmit_exp(expid, experiment_data={
+            'PROJECT': {
+                'PROJECT_TYPE': 'none',
+                'PROJECT_DESTINATION': 'dummy_project'
+            }
+        })
 
-    dummy_dir = Path(run_tmpdir, f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/dummy_dir")
-    real_data = Path(run_tmpdir, f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/real_data")
-    # We write some dummy data inside the scratch_dir
-    dummy_dir.mkdir(parents=True)
-    real_data.mkdir(parents=True)
+        run_tmpdir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    with open(dummy_dir / 'dummy_file', 'w') as f:
-        f.write('dummy data')
+        dummy_dir = Path(run_tmpdir, f"scratch/whatever/{run_tmpdir.owner()}/{expid}/dummy_dir")
+        real_data = Path(run_tmpdir, f"scratch/whatever/{run_tmpdir.owner()}/{expid}/real_data")
+        # We write some dummy data inside the scratch_dir
+        dummy_dir.mkdir(parents=True)
+        real_data.mkdir(parents=True)
 
-    # create some dummy absolute symlinks in expid_dir to test migrate function
-    Path(real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
+        with open(dummy_dir / 'dummy_file', 'w') as f:
+            f.write('dummy data')
 
-    exp.as_conf.reload(force_load=True)
+        # create some dummy absolute symlinks in expid_dir to test migrate function
+        Path(real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
+
+        exp.as_conf.reload(force_load=True)
 
     return exp
 
@@ -100,12 +103,12 @@ def _print_db_results(db_check_list, rows_as_dicts, run_tmpdir):
                 print(f"Job entry: {job_name} assert {str(all_ok).upper()}")
 
 
-def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[str, (bool, str)]:
+def _check_db_fields(run_tmpdir: Path, expected_entries: int, final_status: str, expid: str) -> dict[str, (bool, str)]:
     """
     Check that the database contains the expected number of entries, and that all fields contain data after a completed run.
     """
     # Test database exists.
-    job_data_db = run_tmpdir / f'metadata/data/job_data_{_EXPID}.db'
+    job_data_db = run_tmpdir / f'metadata/data/job_data_{expid}.db'
     autosubmit_db = Path(run_tmpdir, "tests.db")
     db_check_list = {
         "JOB_DATA_EXIST": (job_data_db.exists(), f"DB {str(job_data_db)} missing"),
@@ -253,9 +256,9 @@ def _check_files_recovered(as_conf, log_dir, expected_files) -> dict:
     for f in log_dir.glob('*'):
         files_check_list[f.name] = not any(
             str(f).endswith(f".{i}.err") or str(f).endswith(f".{i}.out") for i in range(retrials + 1))
-    stat_files = [str(f).split("_")[-1] for f in log_dir.glob('../*') if "STATS" in str(f)]
+    stat_files = [str(f).split("_")[-1] for f in log_dir.glob('*') if "STAT" in str(f)]
     for i in range(retrials + 1):
-        files_check_list[f"STAT_{i}"] = 'STATS' in stat_files
+        files_check_list[f"STAT_{i}"] = str(i) in stat_files
 
     print("\nFiles check results:")
     all_ok = True
@@ -300,16 +303,16 @@ def _assert_files_recovered(files_check_list):
         assert files_check_list[check_name]
 
 
-def _init_run(as_exp, jobs_data, platform_data) -> Path:
+def _init_run(as_exp, jobs_data: str, platform_data: str, expid: str) -> Path:
     as_conf = as_exp.as_conf
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    exp_path = run_tmpdir / _EXPID
-    jobs_path = exp_path / f"conf/jobs_{_EXPID}.yml"
+    exp_path = run_tmpdir / expid
+    jobs_path = exp_path / f"conf/jobs_{expid}.yml"
     with jobs_path.open('w') as f:
         f.write(jobs_data)
 
-    platforms_path = exp_path / f"conf/platforms_{_EXPID}.yml"
+    platforms_path = exp_path / f"conf/platforms_{expid}.yml"
     with platforms_path.open('w') as f:
         f.write(platform_data)
 
@@ -322,15 +325,15 @@ def _init_run(as_exp, jobs_data, platform_data) -> Path:
     # We have to reload as we changed the jobs.
     as_conf.reload(force_load=True)
 
-    return exp_path / f'tmp/LOG_{_EXPID}'
+    return exp_path / f'tmp/LOG_{expid}'
 
 
 # -- Tests
 @pytest.mark.slurm
-@pytest.mark.parametrize("jobs_data,platform_data,expected_db_entries,final_status,wrapper_type", [
+@pytest.mark.parametrize("jobs_data,platform_data,expected_db_entries, final_status, wrapper_type, expid", [
     # Success
     (
-        dedent(f"""\
+        dedent("""\
     EXPERIMENT:
         NUMCHUNKS: '3'
     JOBS:
@@ -356,7 +359,7 @@ def _init_run(as_exp, jobs_data, platform_data) -> Path:
             USER: root
             MAX_PROCESSORS: 10
             PROCESSORS_PER_NODE: 1
-        """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
+        """), 3, "COMPLETED", "simple", "t000"),  # No wrappers, simple type
 
     # Success wrapper
     (
@@ -404,7 +407,7 @@ def _init_run(as_exp, jobs_data, platform_data) -> Path:
             USER: root
             MAX_PROCESSORS: 10
             PROCESSORS_PER_NODE: 1
-        """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
+        """), 4, "COMPLETED", "vertical", "t001"),  # Wrappers present, vertical type
 
     # Failure
     (
@@ -434,7 +437,7 @@ def _init_run(as_exp, jobs_data, platform_data) -> Path:
             USER: root
             MAX_PROCESSORS: 10
             PROCESSORS_PER_NODE: 1
-        """), 2, "FAILED", "simple"),  # No wrappers, simple type
+        """), 2, "FAILED", "simple", "t002"),  # No wrappers, simple type
 
     # Failure wrappers
     (
@@ -468,7 +471,7 @@ def _init_run(as_exp, jobs_data, platform_data) -> Path:
             USER: root
             MAX_PROCESSORS: 10
             PROCESSORS_PER_NODE: 1
-        """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
+        """), (2 + 1) * 1, "FAILED", "vertical", "t003"),  # Wrappers present, vertical type
 ], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
 def test_run_uninterrupted(
         as_exp,
@@ -476,18 +479,19 @@ def test_run_uninterrupted(
         platform_data,
         expected_db_entries,
         final_status,
-        wrapper_type):
+        wrapper_type,
+        expid):
     as_conf = as_exp.as_conf
-    log_dir = _init_run(as_exp, jobs_data, platform_data)
+    log_dir = _init_run(as_exp, jobs_data, platform_data, expid)
 
     # Run the experiment
-    exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
+    exit_code = as_exp.autosubmit.run_experiment(expid=expid)
     _assert_exit_code(final_status, exit_code)
 
     # Check and display results
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status)
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, expid)
     e_msg = f"Current folder: {str(run_tmpdir)}\n"
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
     for check, value in db_check_list.items():
@@ -513,7 +517,7 @@ def test_run_uninterrupted(
 
 
 @pytest.mark.slurm
-@pytest.mark.parametrize("jobs_data,platform_data,expected_db_entries,final_status,wrapper_type", [
+@pytest.mark.parametrize("jobs_data,platform_data,expected_db_entries,final_status,wrapper_type, expid", [
     # Success
     (
         dedent("""\
@@ -542,7 +546,7 @@ def test_run_uninterrupted(
             USER: root
             MAX_PROCESSORS: 10
             PROCESSORS_PER_NODE: 1
-        """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
+        """), 3, "COMPLETED", "simple", "t000"),  # No wrappers, simple type
 
     # Success wrapper
     (
@@ -590,7 +594,7 @@ def test_run_uninterrupted(
             USER: root
             MAX_PROCESSORS: 10
             PROCESSORS_PER_NODE: 1
-        """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
+        """), 4, "COMPLETED", "vertical", "t001"),  # Wrappers present, vertical type
 
     # Failure
     (
@@ -621,7 +625,7 @@ def test_run_uninterrupted(
             USER: root
             MAX_PROCESSORS: 10
             PROCESSORS_PER_NODE: 1
-        """), 6, "FAILED", "simple"),  # No wrappers, simple type
+        """), 6, "FAILED", "simple", "t002"),  # No wrappers, simple type
 
     # Failure wrappers
     (dedent(f"""\
@@ -654,7 +658,7 @@ def test_run_uninterrupted(
             USER: root
             MAX_PROCESSORS: 10
             PROCESSORS_PER_NODE: 1
-        """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
+        """), (2 + 1) * 1, "FAILED", "vertical", "t003"),  # Wrappers present, vertical type
 ], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
 def test_run_interrupted(
         as_exp,
@@ -662,12 +666,13 @@ def test_run_interrupted(
         platform_data,
         expected_db_entries,
         final_status,
-        wrapper_type):
+        wrapper_type,
+        expid):
     as_conf = as_exp.as_conf
-    log_dir = _init_run(as_exp, jobs_data, platform_data)
+    log_dir = _init_run(as_exp, jobs_data, platform_data, expid)
 
     # Run the experiment
-    exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
+    exit_code = as_exp.autosubmit.run_experiment(expid=expid)
     _assert_exit_code(final_status, exit_code)
 
     current_statuses = 'SUBMITTED, QUEUING, RUNNING'
@@ -675,18 +680,18 @@ def test_run_interrupted(
         all_expids=False,
         cancel=False,
         current_status=current_statuses,
-        expids=_EXPID,
+        expids=expid,
         force=True,
         force_all=True,
         status='FAILED')
 
-    exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
+    exit_code = as_exp.autosubmit.run_experiment(expid=expid)
     _assert_exit_code(final_status, exit_code)
 
     # Check and display results
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status)
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, expid)
     _assert_db_fields(db_check_list)
 
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
