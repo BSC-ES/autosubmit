@@ -1866,9 +1866,9 @@ class Job(object):
         if self.het['HETSIZE'] == 1:
             self.het = dict()
         if not self.wallclock:
-            if job_platform.type.lower() not in ['ps']:
+            if job_platform.type.lower() not in ['ps', 'local']:
                 self.wallclock = "01:59"
-            elif job_platform.type.lower() in ['ps']:
+            elif job_platform.type.lower() in ['ps', 'local']:
                 self.wallclock = "00:00"
         # Increasing according to chunk
         self.wallclock = increase_wallclock_by_chunk(
