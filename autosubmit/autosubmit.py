@@ -81,6 +81,7 @@ from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.submitter import Submitter
 from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
+from autosubmit.log import utils as log_utils
 
 dialog = None
 
@@ -195,6 +196,8 @@ class Autosubmit:
                                 help="sets file's log level.")
             parser.add_argument('-lc', '--logconsole', choices=log_levels, default='WARNING', type=str,
                                 help="sets console's log level")
+            parser.add_argument('--compresslogs', action='store_true', default=False,
+                                help='Compress all uncompressed command logs at the end of the command execution')
 
             subparsers = parser.add_subparsers(dest='command')
             # Run
@@ -710,6 +713,16 @@ class Autosubmit:
                                 help='Select the status (one or more) to filter the list of jobs.')
             subparser.add_argument('-t', '--target', type=str, default="FAILED", metavar='STATUS',
                                 help='Final status of killed jobs. Default is FAILED.')
+            
+            # compress logs
+            subparser = subparsers.add_parser(
+                'compresslogs', description='Compress job logs.')
+            subparser.add_argument('expid', help='experiment identifier')
+            subparser.add_argument('--dry-run', default=False, action='store_true',
+                                   help='Show what would be done without actually doing it.')
+            subparser.add_argument('--keep-input', default=False, action='store_true',
+                                   help='Keep the original input file after compression.')
+
             args, unknown = parser.parse_known_args()
             if args.version:
                 Log.info(Autosubmit.autosubmit_version)
@@ -817,6 +830,8 @@ class Autosubmit:
             return Autosubmit.cat_log(args.ID, args.file, args.mode, args.inspect)
         elif args.command == 'stop':
             return Autosubmit.stop(args.expid, args.force, args.all, args.force_all, args.cancel, args.filter_status, args.target, args.yes)
+        elif args.command == 'compresslogs':
+            return Autosubmit.compress_logs(args.expid, args.dry_run, args.keep_input)
 
     @staticmethod
     def _init_logs(args, console_level='INFO', log_level='DEBUG', expid='None'):
@@ -5932,3 +5947,29 @@ class Autosubmit:
             if cancel:
                 job_list, _, _, _, _, _, _, _ = Autosubmit.prepare_run(expid, check_scripts=False)
                 cancel_jobs(job_list, active_jobs_filter=current_status, target_status=status)
+
+    def compress_logs(expid: str, dry_run: bool = False, keep_input: bool = False):
+        """
+        Compress job logs for a specific experiment.
+
+        :param expid: The expid of the experiment.
+        :param dry_run: If True, show what would be done without actually doing it.
+        :param keep_input: If True, keep the original input file after compression.
+        """
+
+        files_to_compress = log_utils.find_uncompressed_files(
+            BasicConfig.expid_aslog_dir(expid), r".*\.log$"
+        )
+
+        Log.info(f"Found {len(files_to_compress)} files to compress for experiment {expid}:")
+        for ftc in files_to_compress:
+            Log.info(f"  {ftc}")
+
+        if dry_run:
+            return True
+
+        for file in files_to_compress:
+            log_utils.compress_xz(file, keep_input=keep_input, preset=9, extreme=True)
+            Log.info(f"Compressed {file}")
+
+        return True
