@@ -192,7 +192,6 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.9"]
-      max-parallel: 1
 
     steps:
       - name: Checkout repository
