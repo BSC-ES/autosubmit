@@ -20,7 +20,7 @@ import os
 import textwrap
 from contextlib import suppress
 from time import sleep
-from typing import List, Union, TYPE_CHECKING
+from typing import Union, TYPE_CHECKING
 
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
@@ -53,7 +53,7 @@ class PJMPlatform(ParamikoPlatform):
         self.cancel_cmd = None
         self._header = PJMHeader()
         self._wrapper = PJMWrapperFactory(self)
-        #https://software.fujitsu.com/jp/manual/manualfiles/m220008/j2ul2452/02enz007/j2ul-2452-02enz0.pdf page 16
+        # https://software.fujitsu.com/jp/manual/manualfiles/m220008/j2ul2452/02enz007/j2ul-2452-02enz0.pdf page 16
         self.job_status = dict()
         self.job_status['COMPLETED'] = ['EXT']
         self.job_status['RUNNING'] = ['RNO','RNE','RUN']
@@ -102,7 +102,7 @@ class PJMPlatform(ParamikoPlatform):
             valid_packages_to_submit = [ package for package in valid_packages_to_submit ]
             if len(valid_packages_to_submit) > 0:
                 try:
-                    jobs_id = self.submit_Script(hold=hold)
+                    jobs_id = self.submit_script(hold=hold)
                 except AutosubmitError as e:
                     jobnames = [job.name for job in valid_packages_to_submit[0].jobs]
                     for jobname in jobnames:
@@ -191,9 +191,7 @@ class PJMPlatform(ParamikoPlatform):
         self.get_submit_cmd(script_name, job, hold=hold, export=export)
         return None
 
-
-    def submit_Script(self, hold=False):
-        # type: (bool) -> Union[List[str], str]
+    def submit_script(self, hold=False) -> Union[list[str], str]:
         """
         Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once.
 
@@ -307,7 +305,7 @@ class PJMPlatform(ParamikoPlatform):
             return False
         except Exception as e:
             return False
-    def get_queue_status(self, in_queue_jobs: List['Job'], list_queue_jobid, as_conf):
+    def get_queue_status(self, in_queue_jobs: list['Job'], list_queue_jobid, as_conf):
         if not in_queue_jobs:
             return
         cmd = self.get_queue_status_cmd(list_queue_jobid)
@@ -325,7 +323,7 @@ class PJMPlatform(ParamikoPlatform):
                 if not job.hold:
                     self.send_command("{0} {1}".format(self.cancel_cmd,job.id))
                     job.new_status = Status.QUEUING  # If it was HELD and was released, it should be QUEUING next.
-    def parse_Alljobs_output(self, output, job_id):
+    def parse_all_jobs_output(self, output, job_id):
         status = ""
         try:
             status = [x.split()[1] for x in output.splitlines()
@@ -379,8 +377,7 @@ class PJMPlatform(ParamikoPlatform):
         else:
             export += " ; "
 
-
-        with suppress(BaseException):
+        with suppress(Exception):
             lang = locale.getlocale()[1]
             if lang is None:
                 lang = locale.getdefaultlocale()[1]
@@ -392,33 +389,30 @@ class PJMPlatform(ParamikoPlatform):
                 else:
                     submit_script_file.write((export + self._submit_hold_cmd + job_script + "\n").encode(lang))
 
-
-    def get_checkAlljobs_cmd(self, jobs_id):
+    def get_check_all_jobs_cmd(self, jobs_id):
         # jobs_id = "jobid1+jobid2+jobid3"
         # -H == sacct
         if jobs_id[-1] == ",":
             jobs_id = jobs_id[:-1] # deletes comma
         return "pjstat -H -v --choose jid,st,ermsg --filter \"jid={0}\" > as_checkalljobs.txt ; pjstat -v --choose jid,st,ermsg --filter \"jid={0}\" >> as_checkalljobs.txt ; cat as_checkalljobs.txt ; rm as_checkalljobs.txt".format(jobs_id)
 
-    def get_checkjob_cmd(self, job_id):
+    def get_check_job_cmd(self, job_id):
         return f"pjstat -H -v --choose st --filter \"jid={job_id}\" > as_checkjob.txt ; pjstat -v --choose st --filter \"jid={job_id}\" >> as_checkjob.txt ; cat as_checkjob.txt ; rm as_checkjob.txt"
+        # return 'pjstat -v --choose jid,st,ermsg --filter \"jid={0}\"'.format(job_id)
 
-        #return 'pjstat -v --choose jid,st,ermsg --filter \"jid={0}\"'.format(job_id)
     def get_queue_status_cmd(self, job_id):
-        return self.get_checkAlljobs_cmd(job_id)
+        return self.get_check_all_jobs_cmd(job_id)
 
     def get_jobid_by_jobname_cmd(self, job_name):
         if job_name[-1] == ",":
             job_name = job_name[:-1]
         return 'pjstat -v --choose jid,st,ermsg --filter \"jnam={0}\"'.format(job_name)
 
-
-
     def cancel_job(self, job_id):
         return '{0} {1}'.format(self.cancel_cmd,job_id)
 
-    #def get_job_energy_cmd(self, job_id):
-    #    return 'sacct -n --jobs {0} -o JobId%25,State,NCPUS,NNodes,Submit,Start,End,ConsumedEnergy,MaxRSS%25,AveRSS%25'.format(job_id)
+    # def get_job_energy_cmd(self, job_id):
+    #     return 'sacct -n --jobs {0} -o JobId%25,State,NCPUS,NNodes,Submit,Start,End,ConsumedEnergy,MaxRSS%25,AveRSS%25'.format(job_id)
 
     def parse_queue_reason(self, output, job_id):
         # split() is used to remove the trailing whitespace but also \t and multiple spaces

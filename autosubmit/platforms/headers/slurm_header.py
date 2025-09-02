@@ -42,7 +42,7 @@ class SlurmHeader(object):
                 return "SBATCH --qos={0}".format(parameters['CURRENT_QUEUE'])
         return ""
 
-    def get_proccesors_directive(self, job, parameters, het=-1):
+    def get_processors_directive(self, job, parameters, het=-1):
         """
         Returns processors directive for the specified job
 
@@ -352,7 +352,7 @@ class SlurmHeader(object):
             header = header.replace(
                 f'%NODES_DIRECTIVE_{components}%', self.get_nodes_directive(wr_job, components))
             header = header.replace(
-                f'%NUMPROC_DIRECTIVE_{components}%', self.get_proccesors_directive(wr_job, components))
+                f'%NUMPROC_DIRECTIVE_{components}%', self.get_processors_directive(wr_job, components))
             header = header.replace(
                 f'%RESERVATION_DIRECTIVE_{components}%', self.get_reservation_directive(wr_job, components))
             header = header.replace(
@@ -393,7 +393,7 @@ class SlurmHeader(object):
             header = header.replace(
                 f'%NODES_DIRECTIVE_{components}%', self.get_nodes_directive(job, parameters, components))
             header = header.replace(
-                f'%NUMPROC_DIRECTIVE_{components}%', self.get_proccesors_directive(job, parameters, components))
+                f'%NUMPROC_DIRECTIVE_{components}%', self.get_processors_directive(job, parameters, components))
             header = header.replace(
                 f'%RESERVATION_DIRECTIVE_{components}%', self.get_reservation_directive(job, parameters, components))
             header = header.replace(

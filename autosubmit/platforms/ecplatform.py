@@ -42,16 +42,16 @@ class EcPlatform(ParamikoPlatform):
     :type scheduler: str (pbs, loadleveler)
     """
 
-    def parse_Alljobs_output(self, output, job_id):
+    def parse_all_jobs_output(self, output, job_id):
         pass
 
     def parse_queue_reason(self, output, job_id):
         pass
 
-    def get_checkAlljobs_cmd(self, jobs_id):
+    def get_check_all_jobs_cmd(self, jobs_id):
         pass
 
-    def submit_Script(self, hold=False):
+    def submit_script(self, hold=False):
         pass
 
     def __init__(self, expid, name, config, scheduler):
@@ -73,7 +73,7 @@ class EcPlatform(ParamikoPlatform):
         self.job_status['FAILED'] = ['STOP']
         self._pathdir = "\\$HOME/LOG_" + self.expid
         self._allow_arrays = False
-        self._allow_wrappers = False # TODO
+        self._allow_wrappers = False  # TODO
         self._allow_python_jobs = False
         self.root_dir = ""
         self.remote_log_dir = ""
@@ -108,8 +108,8 @@ class EcPlatform(ParamikoPlatform):
         self.mkdir_cmd = ("ecaccess-file-mkdir " + self.host + ":" + self.scratch + "/" + self.project + "/" +
                           self.user + "/" + self.expid + "; " + "ecaccess-file-mkdir " + self.host + ":" +
                           self.remote_log_dir)
-        self.check_remote_permissions_cmd = "ecaccess-file-mkdir " + self.host+":"+os.path.join(self.scratch,self.project,self.user,"_permission_checker_azxbyc")
-        self.check_remote_permissions_remove_cmd = "ecaccess-file-rmdir " + self.host+":"+os.path.join(self.scratch,self.project,self.user,"_permission_checker_azxbyc")
+        self.check_remote_permissions_cmd = "ecaccess-file-mkdir " + self.host+":"+os.path.join(self.scratch, self.project,self.user, "_permission_checker_azxbyc")
+        self.check_remote_permissions_remove_cmd = "ecaccess-file-rmdir " + self.host+":"+os.path.join(self.scratch, self.project, self.user,"_permission_checker_azxbyc")
 
     def get_checkhost_cmd(self):
         return self._checkhost_cmd
@@ -124,7 +124,7 @@ class EcPlatform(ParamikoPlatform):
         self._submit_cmd = ("ecaccess-job-submit -distant -queueName " + ec_queue + " " + self.host + ":" +
                             self.remote_log_dir + "/")
 
-    def check_Alljobs(self, job_list, as_conf, retries=5):
+    def check_all_jobs(self, job_list, as_conf, retries=5):
         for job,prev_status in job_list:
             self.check_job(job)
 
@@ -139,7 +139,7 @@ class EcPlatform(ParamikoPlatform):
     def get_submitted_job_id(self, output, x11 = False):
         return output
 
-    def get_checkjob_cmd(self, job_id):
+    def get_check_job_cmd(self, job_id):
         return self._checkjob_cmd + str(job_id)
 
     def get_submit_cmd(self, job_script, job, hold=False, export=""):

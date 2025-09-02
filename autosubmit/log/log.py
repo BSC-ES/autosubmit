@@ -272,6 +272,8 @@ class Log:
                     Log.log.addHandler(status_file_handler)
                 os.chmod(file_path, 509)
             except Exception as e:  # retry again
+                Log.warning(f'Unexpected error setting the log file {str(file_path)}, retry {retries} out '
+                            f'of {max_retries}: {str(e)}')
                 sleep(timeout * retries)
 
     @staticmethod

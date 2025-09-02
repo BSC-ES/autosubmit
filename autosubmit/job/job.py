@@ -36,7 +36,6 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
-from autosubmit.job import job_utils
 from autosubmit.job.job_common import StatisticsSnippetBash, StatisticsSnippetPython
 from autosubmit.job.job_common import StatisticsSnippetR, StatisticsSnippetEmpty
 from autosubmit.job.job_common import Status, Type, increase_wallclock_by_chunk
@@ -54,15 +53,6 @@ Log.get_logger("Autosubmit")
 # A wrapper for encapsulate threads , TODO: Python 3+ to be replaced by the < from concurrent.futures >
 
 EXCLUDED = ["_platform", "_children", "_parents", "submitter"]
-
-
-def threaded(fn):
-    def wrapper(*args, **kwargs):
-        thread = Thread(target=fn, args=args, kwargs=kwargs)
-        thread.name = "JOB_" + str(args[0].name)
-        thread.start()
-        return thread
-    return wrapper
 
 
 # This decorator contains groups of parameters, with each
@@ -185,10 +175,10 @@ class Job(object):
     #     return self.name == other.name and self.id == other.id
 
     def __str__(self):
-        return "{0} STATUS: {1}".format(self.name, self.status)
+        return f"{self.name} STATUS: {self.status}"
 
     def __repr__(self):
-        return "{0} STATUS: {1}".format(self.name, self.status)
+        return f"{self.name} STATUS: {self.status}"
 
     def __init__(self, name=None, job_id=None, status=None, priority=None, loaded_data=None):
 
@@ -468,7 +458,7 @@ class Job(object):
     @property
     @autosubmit_parameter(name='checkpoint')
     def checkpoint(self):
-        '''Generates a checkpoint step for this job based on job.type.'''
+        """Generates a checkpoint step for this job based on job.type."""
         if self.type == Type.PYTHON:
             return "checkpoint()"
         elif self.type == Type.R:
@@ -720,7 +710,6 @@ class Job(object):
         if not script_name:
             return ''
         script = ''
-
 
         # adjusts the error message to the type of the script
         if is_header:
@@ -1354,14 +1343,10 @@ class Job(object):
             except BaseException as e:
                 Log.printlog("Trace {0} \n Failed to write the {1} e=6001".format(str(e), self.name))
 
-    def retrieve_logfiles(self, raise_error: bool = False) -> dict[str, int]:
-        """
-        Retrieves log files from remote host.
+    def retrieve_logfiles(self, raise_error: bool = False) -> None:
+        """Retrieves log files from remote host.
 
         :param raise_error: If True, raises an error if the log files are not retrieved.
-        :type raise_error: bool
-        :return: Dictionary with finish timestamps per job.
-        :rtype: dict[str, int]
         """
         backup_logname = copy.copy(self.local_logs)
         if self.wrapper_type == "vertical":
@@ -1447,60 +1432,56 @@ class Job(object):
         return False
 
     def update_status(self, as_conf: AutosubmitConfig, failed_file: bool = False) -> Status:
-        """
-        Updates job status, checking COMPLETED file if needed
+        """Updates job status, checking COMPLETED file if needed.
 
-        :param as_conf:
+        :param as_conf: Autosubmit configuration.
         :param failed_file: boolean, if True, checks if the job failed
-        :return:
+        :return: The new status.
         """
         previous_status = self.status
         self.prev_status = previous_status
         new_status = self.new_status
         if new_status == Status.COMPLETED:
-            Log.debug(
-                "{0} job seems to have completed: checking...".format(self.name))
+            Log.debug(f"{self.name} job seems to have completed: checking...")
             if not self._platform.get_completed_files(self.name, wrapper_failed=self.packed):
-                log_name = os.path.join(
-                    self._tmp_path, self.name + '_COMPLETED')
+                # FIXME: log_name not used?
+                log_name = os.path.join(self._tmp_path, self.name + '_COMPLETED')
 
             self.check_completion()
         else:
             self.status = new_status
+
         if self.status == Status.RUNNING:
-            Log.info("Job {0} is RUNNING", self.name)
+            Log.info(f"Job {self.name} is RUNNING")
         elif self.status == Status.QUEUING:
-            Log.info("Job {0} is QUEUING", self.name)
+            Log.info(f"Job {self.name} is QUEUING")
         elif self.status == Status.HELD:
-            Log.info("Job {0} is HELD", self.name)
+            Log.info(f"Job {self.name} is HELD")
         elif self.status == Status.COMPLETED:
-            Log.result("Job {0} is COMPLETED", self.name)
+            Log.result(f"Job {self.name} is COMPLETED")
         elif self.status == Status.FAILED:
             if not failed_file:
                 if self.status == Status.COMPLETED:
-                    Log.result("Job {0} is COMPLETED", self.name)
+                    Log.result(f"Job {self.name} is COMPLETED")
                 else:
                     self.update_children_status()
         elif self.status == Status.UNKNOWN:
-            Log.printlog("Job {0} is UNKNOWN. Checking completed files to confirm the failure...".format(
-                self.name), 3000)
+            Log.printlog(f"Job {self.name} is UNKNOWN. Checking completed files to confirm the failure...", 3000)
             self._platform.get_completed_files(
                 self.name, wrapper_failed=self.packed)
             self.check_completion(Status.UNKNOWN)
             if self.status == Status.UNKNOWN:
-                Log.printlog("Job {0} is UNKNOWN. Checking completed files to confirm the failure...".format(
-                    self.name), 6009)
+                Log.printlog(f"Job {self.name} is UNKNOWN. Checking completed files to confirm the failure...", 6009)
             elif self.status == Status.COMPLETED:
-                Log.result("Job {0} is COMPLETED", self.name)
+                Log.result(f"Job {self.name} is COMPLETED")
         elif self.status == Status.SUBMITTED:
             # after checking the jobs , no job should have the status "submitted"
-            Log.printlog("Job {0} in SUBMITTED status. This should never happen on this step..".format(
-                self.name), 6008)
+            Log.printlog(f"Job {self.name} in SUBMITTED status. This should never happen on this step..", 6008)
 
         # Updating logs
         if self.status in [Status.COMPLETED, Status.FAILED, Status.UNKNOWN]:
             if str(as_conf.platforms_data.get(self.platform.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "true":
-                self.retrieve_logfiles(self.platform)
+                self.retrieve_logfiles(raise_error=True)
             else:
                 self.platform.add_job_to_log_recover(self)
 
@@ -1514,8 +1495,8 @@ class Job(object):
                 last_run_id = (
                     exp_history.manager.get_experiment_run_dc_with_max_id().run_id
                 )
-                metric_procesor = UserMetricProcessor(as_conf, self, last_run_id)
-                metric_procesor.process_metrics()
+                metric_processor = UserMetricProcessor(as_conf, self, last_run_id)
+                metric_processor.process_metrics()
             except Exception as exc:
                 # Warn if metrics are not processed
                 Log.printlog(
@@ -1525,21 +1506,6 @@ class Job(object):
                 )
 
         return self.status
-
-    @staticmethod
-    def _get_submitter(as_conf):
-        """
-        Returns the submitter corresponding to the communication defined on Autosubmit's config file
-
-        :return: submitter
-        :rtype: Submitter
-        """
-        #communications_library = as_conf.get_communications_library()
-        # if communications_library == 'paramiko':
-        return ParamikoSubmitter()
-        # communications library not known
-        # raise AutosubmitCritical(
-        #    'You have defined a not valid communications library on the configuration file', 7014)
 
     def update_children_status(self):
         children = list(self.children)
@@ -1621,8 +1587,7 @@ class Job(object):
 
     def update_platform_parameters(self, as_conf, parameters):
         if not self.platform:
-            submitter = job_utils._get_submitter(as_conf)
-            submitter.load_platforms(as_conf)
+            submitter = ParamikoSubmitter(as_conf=as_conf)
             if not self.platform_name:
                 self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
             job_platform = submitter.platforms.get(self.platform_name)
@@ -2029,7 +1994,7 @@ class Job(object):
                                                                                                  "MAX_WAITING_JOBS",
                                                                                                  -1))))
 
-    def calendar_split(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> None:
+    def calendar_split(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> dict:
         """
         Calculate the calendar splits for the job.
 
@@ -2806,7 +2771,7 @@ class WrapperJob(Job):
         priority: int,
         job_list: List[Job],
         total_wallclock: str,
-        num_processors: int,
+        num_processors: Optional[int],
         platform: "Platform",
         as_config: AutosubmitConfig,
         hold: bool,
@@ -2825,7 +2790,6 @@ class WrapperJob(Job):
         self.hold = hold
         self.inner_jobs_running = list()
         self.is_wrapper = True
-
 
     def _queuing_reason_cancel(self, reason: str) -> bool:
         """

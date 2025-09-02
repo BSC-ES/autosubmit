@@ -15,7 +15,16 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Integration tests for the Slurm platform."""
+"""Integration tests for the Slurm platform.
+
+As these tests use a GitHub Actions service with limited capacity for running jobs,
+we limit in pytest how many tests we run in parallel to avoid the service becoming
+unresponsive (which likely explains our banner timeout messages before, as probably
+it was busy churning the previous messages and Slurm jobs).
+
+This is done by assigning the tests the group "slurm". This forces pytest to send
+all the grouped tests to the same worker,
+"""
 
 import pytest
 from autosubmit.config.configcommon import AutosubmitConfig
@@ -23,18 +32,18 @@ from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from test.conftest import AutosubmitExperimentFixture
 
-_EXPID = "t000"
 _PLATFORM_NAME = 'TEST_SLURM'
 
 
-def _create_slurm_platform(as_conf: AutosubmitConfig):
-    return SlurmPlatform(_EXPID, _PLATFORM_NAME, config=as_conf.experiment_data, auth_password=None)
+def _create_slurm_platform(expid: str, as_conf: AutosubmitConfig):
+    return SlurmPlatform(expid, _PLATFORM_NAME, config=as_conf.experiment_data, auth_password=None)
 
 
+@pytest.mark.xdist_group('slurm')
 @pytest.mark.slurm
 def test_create_platform_slurm(autosubmit_exp):
     """Test the Slurm platform object creation."""
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp('t000', experiment_data={
         'JOBS': {
             'SIM': {
                 'PLATFORM': _PLATFORM_NAME,
@@ -56,11 +65,12 @@ def test_create_platform_slurm(autosubmit_exp):
             }
         }
     })
-    platform = _create_slurm_platform(exp.as_conf)
+    platform = _create_slurm_platform(exp.expid, exp.as_conf)
     assert platform.name == _PLATFORM_NAME
     # TODO: add more assertion statements...
 
 
+@pytest.mark.xdist_group('slurm')
 @pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     {
@@ -119,13 +129,14 @@ def test_create_platform_slurm(autosubmit_exp):
 ])
 def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, experiment_data):
     """Runs a simple Bash script using Slurm."""
-    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
-    _create_slurm_platform(exp.as_conf)
+    exp = autosubmit_exp('t001', experiment_data=experiment_data)
+    _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
-    assert 0 == exp.autosubmit.run_experiment(_EXPID)
+    assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 
+@pytest.mark.xdist_group('slurm')
 @pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     {
@@ -340,11 +351,21 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
     'Wrapper Horizontal-vertical',
     'Wrapper Vertical-horizontal',
 ])
-def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, experiment_data):
+def test_run_all_wrappers_workflow_slurm(
+        autosubmit_exp: AutosubmitExperimentFixture,
+        experiment_data: dict,
+        make_ssh_client,
+        mocker
+):
     """Runs a simple Bash script using Slurm."""
 
-    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, wrapper=True)
-    _create_slurm_platform(exp.as_conf)
+    # 2222 is the SSH port used in the GitHub service, see GH Actions configuration;
+    # for running locally you must launch the container with this port too.
+    ssh_client = make_ssh_client(2222, None)
+    mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
+
+    exp = autosubmit_exp('t002', experiment_data=experiment_data, wrapper=True)
+    _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.as_conf.experiment_data = {
         'EXPERIMENT': {
@@ -359,4 +380,4 @@ def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFix
     }
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
-    assert 0 == exp.autosubmit.run_experiment(_EXPID)
+    assert 0 == exp.autosubmit.run_experiment(exp.expid)
