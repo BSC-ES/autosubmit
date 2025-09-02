@@ -1,17 +1,16 @@
+from datetime import datetime
+
 import mock
 import pytest
-from datetime import datetime
-from mock.mock import MagicMock
 from networkx import DiGraph  # type: ignore
 from typing_extensions import Tuple
 
-from autosubmit.autosubmit import Autosubmit
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_utils import Dependency
-from autosubmit.config.yamlparser import YAMLParserFactory
 
 _MEMBER_LIST = ["fc1", "fc2", "fc3", "fc4", "fc5", "fc6", "fc7", "fc8", "fc9", "fc10"]
 _CHUNK_LIST = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -366,7 +365,7 @@ def test_check_dates(joblist, test_job, relationships_dates, relationships_chunk
         "MEMBERS_TO": "fc2",
         "CHUNKS_TO": "all",
         "SPLITS_TO": "1",
-        "STATUS": "COMPLETED"
+        "MIN_TRIGGER_STATUS": "COMPLETED"
     }
     assert result == expected_output
 
@@ -380,7 +379,7 @@ def test_check_dates(joblist, test_job, relationships_dates, relationships_chunk
         "MEMBERS_TO": "none",
         "CHUNKS_TO": "none",
         "SPLITS_TO": "none",
-        "STATUS": "COMPLETED"
+        "MIN_TRIGGER_STATUS": "COMPLETED"
     }
     assert result == expected_output
 
@@ -403,7 +402,7 @@ def test_check_members(joblist, test_job, relationships_members, relationships_c
         "MEMBERS_TO": "fc2",
         "CHUNKS_TO": "all",
         "SPLITS_TO": "1",
-        "STATUS": "COMPLETED"
+        "MIN_TRIGGER_STATUS": "COMPLETED"
     }
     assert result == expected_output
 
@@ -415,7 +414,7 @@ def test_check_members(joblist, test_job, relationships_members, relationships_c
         "MEMBERS_TO": "fc2",
         "CHUNKS_TO": "all",
         "SPLITS_TO": "1",
-        "STATUS": "COMPLETED"
+        "MIN_TRIGGER_STATUS": "COMPLETED"
 
     }
     assert result == expected_output
@@ -429,7 +428,7 @@ def test_check_members(joblist, test_job, relationships_members, relationships_c
         "MEMBERS_TO": "none",
         "CHUNKS_TO": "none",
         "SPLITS_TO": "none",
-        "STATUS": "COMPLETED"
+        "MIN_TRIGGER_STATUS": "COMPLETED"
     }
     assert result == expected_output
 
@@ -453,7 +452,7 @@ def test_check_splits(joblist, test_job, relationships_splits):
         "MEMBERS_TO": "fc2",
         "CHUNKS_TO": "all",
         "SPLITS_TO": "1",
-        "STATUS": "COMPLETED"
+        "MIN_TRIGGER_STATUS": "COMPLETED"
     }
     assert result == expected_output
     test_job.split = 2
@@ -481,7 +480,7 @@ def test_check_chunks(joblist, test_job, relationships_chunks):
     }
 
     result = joblist._check_chunks(chunks, test_job)
-    expected_output = {'SPLITS_TO': '4', "STATUS": "COMPLETED"}
+    expected_output = {'SPLITS_TO': '4', "MIN_TRIGGER_STATUS": "COMPLETED"}
 
     assert result == expected_output
     chunks = {
@@ -492,7 +491,7 @@ def test_check_chunks(joblist, test_job, relationships_chunks):
 
     result = joblist._check_chunks(chunks, test_job)
     expected_output = {'DATES_TO': 'none', 'MEMBERS_TO': 'none', 'CHUNKS_TO': 'none', 'SPLITS_TO': 'none',
-                       "STATUS": "COMPLETED"}
+                       "MIN_TRIGGER_STATUS": "COMPLETED"}
     assert result == expected_output
 
     test_job.chunk = 2
@@ -525,40 +524,46 @@ def test_check_general(joblist, test_job, relationships_general):
 def test_check_relationship(joblist):
     relationships = {'MEMBERS_FROM': {
         'TestMember,   TestMember2,TestMember3   ': {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0,
-                                                     'MEMBERS_TO': 'None', 'STATUS': 'COMPLETED'}}}
+                                                     'MEMBERS_TO': 'None', 'MIN_TRIGGER_STATUS': 'COMPLETED'}}}
     level_to_check = "MEMBERS_FROM"
     value_to_check = "TestMember"
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None', 'STATUS': "COMPLETED"}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
+         'MIN_TRIGGER_STATUS': "COMPLETED"}]
     assert result == expected_output
     value_to_check = "TestMember2"
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None', 'STATUS': 'COMPLETED'}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
+         'MIN_TRIGGER_STATUS': 'COMPLETED'}]
     assert result == expected_output
     value_to_check = "TestMember3"
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None', 'STATUS': 'COMPLETED'}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
+         'MIN_TRIGGER_STATUS': 'COMPLETED'}]
     assert result == expected_output
     value_to_check = "TestMember   "
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None', 'STATUS': 'COMPLETED'}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
+         'MIN_TRIGGER_STATUS': 'COMPLETED'}]
     assert result == expected_output
     value_to_check = "   TestMember"
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None', 'STATUS': 'COMPLETED'}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
+         'MIN_TRIGGER_STATUS': 'COMPLETED'}]
     assert result == expected_output
     relationships = {'DATES_FROM': {
         '20000101, 20000102, 20000103 ': {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0,
-                                          'MEMBERS_TO': 'None', 'STATUS': 'COMPLETED'}}}
+                                          'MEMBERS_TO': 'None', 'MIN_TRIGGER_STATUS': 'COMPLETED'}}}
     value_to_check = datetime(2000, 1, 1)
     result = joblist._check_relationship(relationships, "DATES_FROM", value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None', 'STATUS': 'COMPLETED'}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
+         'MIN_TRIGGER_STATUS': 'COMPLETED'}]
     assert result == expected_output
 
 
@@ -581,7 +586,7 @@ def _init_special_conditions(joblist: JobList) -> Tuple[Job, Job, Job, dict, Job
     job.splits = 1
     job.max_checkpoint_step = 0
     job.status = Status.WAITING
-    special_conditions = {"STATUS": "RUNNING", "FROM_STEP": "2", "OPTIONAL": False}
+    special_conditions = {"MIN_TRIGGER_STATUS": "RUNNING", "FROM_STEP": "2", "FAIL_OK": False}
 
     parent = Job("parent", 1, Status.READY, 1)
     parent.section = "parent_one"
@@ -605,7 +610,7 @@ def _init_special_conditions(joblist: JobList) -> Tuple[Job, Job, Job, dict, Job
     joblist.graph.add_edge(parent2.name, job.name)
     joblist._job_list = [parent, job]
     joblist.add_special_conditions(job, special_conditions, parent)
-    special_conditions = {"STATUS": "FAILED", "FROM_STEP": 0, "OPTIONAL": False}
+    special_conditions = {"MIN_TRIGGER_STATUS": "FAILED", "FROM_STEP": 0, "FAIL_OK": False}
     joblist.add_special_conditions(job, special_conditions, parent2)
     return job, parent, parent2, special_conditions, joblist
 
@@ -616,15 +621,15 @@ def test_add_special_conditions(mocker, _init_special_conditions):
     edge = joblist.graph.edges[parent.name, job.name]
     assert job.max_checkpoint_step == 2
     assert edge.get("from_step") == 2
-    assert edge.get("status") == "RUNNING"
-    assert not edge.get("optional")
+    assert edge.get("min_trigger_status") == "RUNNING"
+    assert not edge.get("fail_ok")
 
     edge = joblist.graph.edges[parent2.name, job.name]
     # Still 2 because it is the MAX value between all dependencies
     assert job.max_checkpoint_step == 2
     assert edge.get("from_step") == 0
-    assert edge.get("status") == "FAILED"
-    assert not edge.get("optional")
+    assert edge.get("min_trigger_status") == "FAILED"
+    assert not edge.get("fail_ok")
 
 
 def test_job_dict_get_jobs_filtered(mocker, joblist):

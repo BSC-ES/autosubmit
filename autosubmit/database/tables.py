@@ -184,10 +184,10 @@ ExperimentStructureTable = Table(
     metadata_obj,
     Column("e_from", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True),
     Column("e_to", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True),
-    Column("status", String),  # TODO To rename to target_status
-    Column("completed", String),  # TODO to rename to edge_is_completed? (WAITING | RUNNING | COMPLETED)
+    Column("min_trigger_status", String),
+    Column("completion_status", String),
     Column("from_step", Integer),
-    Column("optional", Boolean),
+    Column("fail_ok", Boolean),
     UniqueConstraint("e_from", "e_to", name="unique_e_from_and_e_to"),
 )
 

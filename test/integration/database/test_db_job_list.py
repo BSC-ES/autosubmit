@@ -54,12 +54,12 @@ raw_job_list = [
 ]
 
 raw_graph_edges = [
-    {'completed': 'WAITING', 'e_from': 'a01f_REMOTE_SETUP', 'e_to': 'a01f_20000101_fc0_INI', 'from_step': 0,
-     'optional': True, 'status': 'COMPLETED'},
-    {'completed': 'WAITING', 'e_from': 'a01f_LOCAL_SETUP', 'e_to': 'a01f_REMOTE_SETUP', 'from_step': 0,
-     'optional': True, 'status': 'COMPLETED'},
-    {'completed': 'WAITING', 'e_from': 'a01f_20000101_fc0_INI', 'e_to': 'a01f_SIM', 'from_step': 0,
-     'optional': True, 'status': 'COMPLETED'},
+    {'completion_status': 'WAITING', 'e_from': 'a01f_REMOTE_SETUP', 'e_to': 'a01f_20000101_fc0_INI', 'from_step': 0,
+     'fail_ok': True, 'min_trigger_status': 'COMPLETED'},
+    {'completion_status': 'WAITING', 'e_from': 'a01f_LOCAL_SETUP', 'e_to': 'a01f_REMOTE_SETUP', 'from_step': 0,
+     'fail_ok': True, 'min_trigger_status': 'COMPLETED'},
+    {'completion_status': 'WAITING', 'e_from': 'a01f_20000101_fc0_INI', 'e_to': 'a01f_SIM', 'from_step': 0,
+     'fail_ok': True, 'min_trigger_status': 'COMPLETED'},
 ]
 
 
@@ -76,8 +76,9 @@ def generate_job_list(autosubmit_config, db_manager) -> JobList:
 
     for edge in raw_graph_edges:
         if edge['e_from'] in job_list.graph and edge['e_to'] in job_list.graph:
-            job_list.graph.add_edge(edge['e_from'], edge['e_to'], from_step=edge['from_step'], status=edge['status'],
-                                    completed=edge['completed'], optional=edge['optional'])
+            job_list.graph.add_edge(edge['e_from'], edge['e_to'], from_step=edge['from_step'],
+                                    min_trigger_status=edge['min_trigger_status'],
+                                    completion_status=edge['completion_status'], fail_ok=edge['fail_ok'])
     return job_list
 
 
@@ -135,11 +136,12 @@ def test_db_job_list_edges(
         # Check that the edge is a dict
         assert isinstance(edge, dict)
         # Check that the edge has the expected keys
-        assert set(edge.keys()) == {'e_from', 'e_to', 'from_step', 'status', 'completed', 'optional'}
+        assert set(edge.keys()) == {'e_from', 'e_to', 'from_step', 'min_trigger_status', 'completion_status',
+                                    'fail_ok'}
         assert edge['e_from'] == raw_graph_edges_local[i]['e_from']
         assert edge['e_to'] == raw_graph_edges_local[i]['e_to']
         assert edge['from_step'] == raw_graph_edges_local[i]['from_step']
-        assert edge['status'] == raw_graph_edges_local[i]['status']
+        assert edge['min_trigger_status'] == raw_graph_edges_local[i]['min_trigger_status']
 
 
 @pytest.mark.parametrize(
@@ -270,7 +272,7 @@ def test_db_job_list_jobs_and_edges_together(
 
     for edge in loaded_edges:
         assert isinstance(edge, dict)
-        assert set(edge.keys()) == {'e_from', 'e_to', 'from_step', 'status', 'completed', 'optional'}
+        assert set(edge.keys()) == {'e_from', 'e_to', 'from_step', 'min_trigger_status', 'completion_status', 'fail_ok'}
 
 
 @pytest.mark.parametrize(

@@ -110,10 +110,10 @@ class JobList(object):
             edges_dict.append({
                 "e_from": e_from,
                 "e_to": e_to,
-                "status": attributes.get("status", "COMPLETED"),
+                "min_trigger_status": attributes.get("min_trigger_status", "COMPLETED"),
                 "from_step": attributes.get("from_step", 0),
-                "optional": attributes.get("optional", False),
-                "completed": attributes.get("completed", False),
+                "fail_ok": attributes.get("fail_ok", False),
+                "completion_status": attributes.get("completion_status", "WAITING"),
                 # check if the edge completion status is fullfilled or not
             })
         return edges_dict
@@ -138,10 +138,10 @@ class JobList(object):
                 edges_by_job_name[e_from] = []
             edges_by_job_name[e_from].append({
                 "e_to": e_to,
-                "status": attributes.get("status", "COMPLETED"),
+                "min_trigger_status": attributes.get("min_trigger_status", "COMPLETED"),
                 "from_step": attributes.get("from_step", 0),
-                "optional": attributes.get("optional", False),
-                "completed": attributes.get("completed", False),
+                "fail_ok": attributes.get("fail_ok", False),
+                "completion_status": attributes.get("completion_status", "WAITING"),
                 # check if the edge completion status is fullfilled or not
             })
         return edges_by_job_name
@@ -328,8 +328,8 @@ class JobList(object):
         """
         Add an edge to the graph and update the parent relationship for the job nodes.
 
-        :param edge: Dictionary containing edge data with keys 'e_from', 'e_to', 'status', 'completed',
-                        'from_step', and 'optional'.
+        :param edge: Dictionary containing edge data with keys 'e_from', 'e_to', 'min_trigger_status', 'completion_status',
+                        'from_step', and 'fail_ok'.
         :type edge: dict[str, Any]
         :return: None
         :rtype: None
@@ -338,10 +338,9 @@ class JobList(object):
             'e_from': edge['e_from'],
             'e_to': edge['e_to'],
             'from_step': edge.get('from_step', "0"),
-            'status': edge.get('status', "COMPLETED"),  # rename to Target_status
-            'completed': edge.get('completed', "WAITING"),
-            # rename to edge_is_completed? (WAITING |RUNNING | COMPLETED)
-            'optional': edge.get('optional', False)
+            'min_trigger_status': edge.get('min_trigger_status', "COMPLETED"),
+            'completion_status': edge.get('completion_status', "WAITING"),
+            'fail_ok': edge.get('fail_ok', False)
         }
         if not self.graph.has_edge(edge["e_from"], edge["e_to"]):
             if edge['e_from'] not in self.graph.nodes or edge['e_to'] not in self.graph.nodes:
@@ -350,10 +349,10 @@ class JobList(object):
             self.graph.add_edge(
                 edge["e_from"],
                 edge["e_to"],
-                status=edge["status"],
-                completed=edge["completed"],
+                min_trigger_status=edge["min_trigger_status"],
+                completion_status=edge["completion_status"],
                 from_step=edge["from_step"],
-                optional=edge["optional"]
+                fail_ok=edge["fail_ok"]
             )
             # Update the parent job
             self.graph.nodes[edge["e_to"]]["job"].add_parent(self.graph.nodes[edge["e_from"]]["job"])
@@ -1007,7 +1006,7 @@ class JobList(object):
             values_list = []  # splits, int list ( artificially generated later )
 
         relationship = relationships.get(level_to_check, {})
-        status = relationship.pop("STATUS", relationships.get("STATUS", "COMPLETED"))
+        status = relationship.pop("MIN_TRIGGER_STATUS", relationships.get("MIN_TRIGGER_STATUS", "COMPLETED"))
         from_step = relationship.pop("FROM_STEP", relationships.get("FROM_STEP", 0))
         for filter_range, filter_data in relationship.items():
             selected_filter = JobList._parse_filters_to_check(filter_range, values_list,
@@ -1023,8 +1022,8 @@ class JobList(object):
                         included = True
                         break
             if included:
-                if not filter_data.get("STATUS", None):
-                    filter_data["STATUS"] = status
+                if not filter_data.get("MIN_TRIGGER_STATUS", None):
+                    filter_data["MIN_TRIGGER_STATUS"] = status
                 if not filter_data.get("FROM_STEP", None):
                     filter_data["FROM_STEP"] = from_step
                 filters.append(filter_data)
@@ -1210,8 +1209,8 @@ class JobList(object):
         """
         unified_filter = {"DATES_TO": "", "MEMBERS_TO": "", "CHUNKS_TO": "", "SPLITS_TO": ""}
         for filter_to in filter_to_apply:
-            if "STATUS" not in unified_filter and filter_to.get("STATUS", None):
-                unified_filter["STATUS"] = filter_to["STATUS"]
+            if "MIN_TRIGGER_STATUS" not in unified_filter and filter_to.get("MIN_TRIGGER_STATUS", None):
+                unified_filter["MIN_TRIGGER_STATUS"] = filter_to["MIN_TRIGGER_STATUS"]
             if "FROM_STEP" not in unified_filter and filter_to.get("FROM_STEP", None):
                 unified_filter["FROM_STEP"] = filter_to["FROM_STEP"]
             if len(filter_to) > 0:
@@ -1295,23 +1294,24 @@ class JobList(object):
 
         :param job: The child job to which special conditions are applied.
         :type job: Job
-        :param special_conditions: Dictionary containing special condition parameters (e.g., STATUS, FROM_STEP, OPTIONAL).
+        :param special_conditions: Dictionary containing special condition parameters (e.g., STATUS, FROM_STEP, FAIL_OK).
         :type special_conditions: Dict[str, Any]
         :param parent: The parent job from which the edge originates.
         :type parent: Job
         """
-        status = special_conditions.get("STATUS", "COMPLETED")
+        min_trigger_status = special_conditions.get("MIN_TRIGGER_STATUS", "COMPLETED")
         from_step = int(special_conditions.get("FROM_STEP", 0))
-        optional = special_conditions.get("OPTIONAL", False)
+        fail_ok = special_conditions.get("FAIL_OK", False)
         job.max_checkpoint_step = from_step if from_step > int(job.max_checkpoint_step) else int(
             job.max_checkpoint_step)
-        self.graph.edges[parent.name, job.name].update(status=status, from_step=from_step, optional=optional)
+        self.graph.edges[parent.name, job.name].update(min_trigger_status=min_trigger_status, from_step=from_step,
+                                                       fail_ok=fail_ok)
 
     def _apply_jobs_edge_info(self, job, dependencies):
         filters_to_apply_by_section = dict()
         for key, dependency in dependencies.items():
             filters_to_apply = self._filter_current_job(job, copy.deepcopy(dependency.relationships))
-            if "STATUS" in filters_to_apply:
+            if "MIN_TRIGGER_STATUS" in filters_to_apply:
                 key, _, _ = JobList._parse_dependency_yaml_key(key)
                 filters_to_apply_by_section[key] = filters_to_apply
         if not filters_to_apply_by_section:
@@ -1325,11 +1325,11 @@ class JobList(object):
                 (parents_by_section[self.graph.nodes[parent]['job'].section].add(self.graph.nodes[parent]['job']))
         for key, list_of_parents in parents_by_section.items():
             special_conditions = dict()
-            status = filters_to_apply_by_section[key].get("STATUS", "COMPLETED")
-            status = status if "?" != status[-1] else status[:-1]
-            special_conditions["STATUS"] = status
+            min_trigger_status = filters_to_apply_by_section[key].get("MIN_TRIGGER_STATUS", "COMPLETED")
+            min_trigger_status = min_trigger_status if "?" != min_trigger_status[-1] else min_trigger_status[:-1]
+            special_conditions["MIN_TRIGGER_STATUS"] = min_trigger_status
             special_conditions["FROM_STEP"] = (filters_to_apply_by_section[key].pop("FROM_STEP", 0))
-            special_conditions["OPTIONAL"] = (filters_to_apply_by_section[key].pop("OPTIONAL", False))
+            special_conditions["FAIL_OK"] = (filters_to_apply_by_section[key].pop("FAIL_OK", False))
 
             for parent in list_of_parents:
                 self.add_special_conditions(job, special_conditions, parent)
@@ -1420,17 +1420,21 @@ class JobList(object):
                 if job.section == parent.section:
                     if not self.actual_job_depends_on_previous_chunk:
                         if parent.section not in self.dependency_map[job.section]:
-                            graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
+                            graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED",
+                                           completion_status="WAITING")
                 else:
                     if self.actual_job_depends_on_special_chunk and not self.actual_job_depends_on_previous_chunk:
                         if parent.section not in self.dependency_map[job.section]:
                             if parent.running == job.running:
-                                graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
+                                graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED",
+                                               completion_status="WAITING")
                     elif not self.actual_job_depends_on_previous_chunk:
-                        graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
+                        graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED",
+                                       completion_status="WAITING")
                     elif not self.actual_job_depends_on_special_chunk and self.actual_job_depends_on_previous_chunk:
                         if job.running == "chunk" and job.chunk == 1 or job.running == "member" and parent.running == "member" or job.running == "chunk" and parent.running == "chunk":
-                            graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
+                            graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED",
+                                           completion_status="WAITING")
             else:
                 if job.section == parent.section:
                     if self.actual_job_depends_on_previous_chunk:
@@ -1453,15 +1457,18 @@ class JobList(object):
                                     skip = False
                         if not skip:
                             problematic_dependencies.add(parent.name)
-                            graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
+                            graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED",
+                                           completion_status="WAITING")
                 else:
                     if job.running == parent.running:
                         skip = False
                         problematic_dependencies.add(parent.name)
-                        graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
+                        graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED",
+                                       completion_status="WAITING")
                     if parent.running == "chunk":
                         if parent.chunk > (len(chunk_list) - max_distance):
-                            graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
+                            graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED",
+                                           completion_status="WAITING")
         JobList.handle_frequency_interval_dependencies(chunk, chunk_list, date, date_list, dic_jobs, job,
                                                        member,
                                                        member_list, dependency.section, natural_parents)
@@ -1474,7 +1481,7 @@ class JobList(object):
                     if found:
                         continue
                 problematic_dependencies.add(parent.name)
-                graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
+                graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED", completion_status="WAITING")
 
         return problematic_dependencies
 
@@ -1538,12 +1545,12 @@ class JobList(object):
                 if not job.split or int(job.split) > 0:
                     self.depends_on_previous_split[job.section] = int(parent.split)
             if self.actual_job_depends_on_previous_chunk and parent.section == job.section:
-                graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
+                graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED", completion_status="WAITING")
                 edge_added = True
             else:
                 if parent.name not in self.depends_on_previous_special_section.get(
                         job.section, set()) or job.split > 0:
-                    graph.add_edge(parent.name, job.name, status="COMPLETED", completed="WAITING")
+                    graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED", completion_status="WAITING")
                     edge_added = True
             if parent.section == job.section:
                 self.actual_job_depends_on_special_chunk = True
@@ -1570,7 +1577,7 @@ class JobList(object):
 
     def get_filters_to_apply(self, job, dependency):
         filters_to_apply = self._filter_current_job(job, copy.deepcopy(dependency.relationships))
-        filters_to_apply.pop("STATUS", "COMPLETED")
+        filters_to_apply.pop("MIN_TRIGGER_STATUS", "COMPLETED")
         # Don't do perform special filter if only "FROM_STEP" is applied
         if "FROM_STEP" in filters_to_apply:
             if (filters_to_apply.get("CHUNKS_TO", "none") == "none" and filters_to_apply.
@@ -1578,6 +1585,9 @@ class JobList(object):
                     == "none" and filters_to_apply.get("SPLITS_TO", "none") == "none"):
                 filters_to_apply = {}
         filters_to_apply.pop("FROM_STEP", 0)
+        filters_to_apply.pop("FAIL_OK", False)
+
+        # BACKWARDS COMPATIBILITY
         filters_to_apply.pop("OPTIONAL", False)
 
         # If the selected filter is "natural" for all filters_to, trigger the natural dependency
@@ -2870,9 +2880,9 @@ class JobList(object):
         for parent_name, edge_info in parents_edge_info.items():
             parent = parents_nodes[parent_name]
             p_status = parent.status
-            edge_status = Status.KEY_TO_VALUE[edge_info["status"].upper()]
-            optional = edge_info.get("OPTIONAL", False)
-            from_step = edge_info.get("FROM_STEP", 0)
+            edge_status = Status.KEY_TO_VALUE[edge_info["min_trigger_status"].upper()]
+            fail_ok = edge_info.get("fail_ok", False)
+            from_step = edge_info.get("from_step", 0)
 
             # SUSPENDED
             if p_status == Status.SUSPENDED:
@@ -2881,7 +2891,7 @@ class JobList(object):
             elif p_status in [Status.COMPLETED, Status.SKIPPED]:
                 if edge_status in [Status.COMPLETED, Status.SKIPPED]:
                     completed.append(parent)
-                elif edge_status == Status.FAILED and optional or (job.current_checkpoint_step >= from_step > 0):
+                elif edge_status == Status.FAILED and fail_ok or (job.current_checkpoint_step >= from_step > 0):
                     completed.append(parent)
                 else:
                     non_completed.append(parent)
@@ -2890,7 +2900,7 @@ class JobList(object):
                 if edge_status == Status.FAILED:
                     completed.append(parent)
                 elif edge_status in [Status.COMPLETED, Status.SKIPPED]:
-                    if optional or (job.current_checkpoint_step >= from_step > 0):
+                    if fail_ok or (job.current_checkpoint_step >= from_step > 0):
                         completed.append(parent)
                     else:
                         non_completed.append(parent)
@@ -3417,6 +3427,9 @@ class JobList(object):
         # Create WrapperJob objects and populate job_package_map
         from ..job.job import WrapperJob
         for wrapper_info in wrappers_info.values():
+
+            if not wrapper_info.get("job_list", None):  # to delete TODO (horizontal-vertical issue)
+                continue
             wrapper_job = WrapperJob(
                 name=wrapper_info["name"],
                 job_id=wrapper_info["id"],

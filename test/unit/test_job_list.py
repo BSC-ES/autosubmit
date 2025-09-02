@@ -14,23 +14,17 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-import os
-import shutil
-from copy import copy
 from pathlib import Path
-from random import randrange
 from typing import Any
 
 import networkx
 import pytest
+from networkx import DiGraph  # type: ignore
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
-from networkx import DiGraph  # type: ignore
-
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_common import Type
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from test.conftest import _initialize_autosubmitrc
@@ -67,33 +61,33 @@ def setup_job_list(as_conf, tmp_path):
             "e_to": "job2",
             "e_from": "job1",
             "from_step": "0",
-            "status": "COMPLETED",
-            "completed": "WAITING",
-            "optional": False
+            "min_trigger_status": "COMPLETED",
+            "completion_status": "WAITING",
+            "fail_ok": False
         },
         {
             "e_to": "job3",
             "e_from": "job2",
             "from_step": "0",
-            "status": "COMPLETED",
-            "completed": "WAITING",
-            "optional": False
+            "min_trigger_status": "COMPLETED",
+            "completion_status": "WAITING",
+            "fail_ok": False
         },
         {
             "e_to": "job5",
             "e_from": "job4",
             "from_step": "0",
-            "status": "COMPLETED",
-            "completed": "WAITING",
-            "optional": False
+            "min_trigger_status": "COMPLETED",
+            "completion_status": "WAITING",
+            "fail_ok": False
         },
         {
             "e_to": "job6",
             "e_from": "job5",
             "from_step": "0",
-            "status": "COMPLETED",
-            "completed": "WAITING",
-            "optional": False
+            "min_trigger_status": "COMPLETED",
+            "completion_status": "WAITING",
+            "fail_ok": False
         }
     ]
     for job in jobs:
@@ -289,25 +283,25 @@ def test_find_and_delete_redundant_relations(setup_job_list):
         {"e_to": "job1",
          "e_from": "job2",
          "from_step": "0",
-         "status": "COMPLETED",
-         "completed": "WAITING",
-         "optional": False
+         "min_trigger_status": "COMPLETED",
+         "completion_status": "WAITING",
+         "fail_ok": False
          },
         {
             "e_to": "job1",
             "e_from": "job3",
             "from_step": "0",
-            "status": "COMPLETED",
-            "completed": "WAITING",
-            "optional": False
+            "min_trigger_status": "COMPLETED",
+            "completion_status": "WAITING",
+            "fail_ok": False
         },
         {
             "e_to": "job2",
             "e_from": "job3",
             "from_step": "0",
-            "status": "COMPLETED",
-            "completed": "WAITING",
-            "optional": False
+            "min_trigger_status": "COMPLETED",
+            "completion_status": "WAITING",
+            "fail_ok": False
         },
     ]
     for edge in redundant:
@@ -419,7 +413,6 @@ def test_get_jobs_by_section(setup_job_list, section_list, banned_jobs, get_only
     job_list.add_job(job1)
     job_list.add_job(job2)
     job_list.add_job(job3)
-
 
     result = job_list.get_jobs_by_section(section_list, banned_jobs, get_only_non_completed)
     assert len(result) == expected_length

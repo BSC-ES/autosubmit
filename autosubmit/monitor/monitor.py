@@ -30,7 +30,6 @@ import py3dotplus as pydotplus
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.helpers.utils import NaturalSort, check_experiment_ownership
-from autosubmit.history.utils import create_path_if_not_exists_group_permission
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
@@ -63,7 +62,6 @@ _MONITOR_STATUS_TO_COLOR: dict[int, str] = {
     Status.SKIPPED: 'lightyellow'
 }
 """Conversion dict, from status to color."""
-
 
 _CHECK_STATUS_STATUS_LIST = [
     Status.FAILED, Status.RUNNING, Status.QUEUING, Status.HELD,
@@ -226,8 +224,8 @@ def _create_node(job, groups, hide_groups) -> Optional[pydotplus.Node]:
 
 
 def _check_final_status(
-    job_edges_info: Optional[List[Dict[str, Any]]],
-    child: Job,
+        job_edges_info: Optional[List[Dict[str, Any]]],
+        child: Job,
 ) -> Tuple[Optional[str], Optional[int], Optional[bool]]:
     """
     Check the final status between a job and its child using edge information.
@@ -252,16 +250,16 @@ def _check_final_status(
     if not child_edge_info:
         return None, None, None
 
-    status_id = Status.KEY_TO_VALUE[child_edge_info['status']]
-    if child_edge_info['status'] == "COMPLETED":
+    status_id = Status.KEY_TO_VALUE[child_edge_info['min_trigger_status']]
+    if child_edge_info['min_trigger_status'] == "COMPLETED":
         # Avoid "yellow" arrows for completed jobs (old normal behaviour)
         edge_color = "black"
     else:
         edge_color = _color_status(status_id)
     label = str(child_edge_info['from_step']) if child_edge_info['from_step'] > 0 else None
-    optional = child_edge_info.get('optional', False)
+    fail_ok = child_edge_info.get('fail_ok', False)
 
-    return edge_color, label, optional
+    return edge_color, label, fail_ok
 
 
 def _delete_stats_files_but_two_newest(expid: str, _filter: Callable[[Path], bool]) -> None:
@@ -278,7 +276,7 @@ def _delete_stats_files_but_two_newest(expid: str, _filter: Callable[[Path], boo
     search_dir_files = [
         f for f in search_dir.iterdir()
         if f.is_file()
-        and _filter(f)
+           and _filter(f)
     ]
 
     search_dir_files.sort(key=lambda f: f.stat().st_mtime)
@@ -374,7 +372,8 @@ class Monitor:
             if job.has_parents():
                 continue
 
-            if not groups or job.name not in groups['jobs'] or (job.name in groups['jobs'] and len(groups['jobs'][job.name]) == 1):
+            if not groups or job.name not in groups['jobs'] or (
+                    job.name in groups['jobs'] and len(groups['jobs'][job.name]) == 1):
                 node_job = pydotplus.Node(job.name, shape='box', style="filled", fillcolor=_color_status(job.status))
 
                 if groups and job.name in groups['jobs']:
@@ -460,8 +459,8 @@ class Monitor:
         if job.has_children() != 0:
             for child in sorted(job.children, key=lambda k: NaturalSort(k.name)):
                 node_child, skip = _check_node_exists(exp, child, groups, hide_groups)
-                color, label, optional = _check_final_status(self.edge_info.get(job.name, None), child)
-                if optional:
+                color, label, fail_ok = _check_final_status(self.edge_info.get(job.name, None), child)
+                if fail_ok:
                     style = "dotted"
                 else:
                     style = "solid"
@@ -472,7 +471,8 @@ class Monitor:
                         if color:
                             # label = None doesn't disable label, instead it sets it to nothing and complain about invalid syntax
                             if label:
-                                exp.add_edge(pydotplus.Edge(node_job, node_child, style=style, color=color, label=label))
+                                exp.add_edge(
+                                    pydotplus.Edge(node_job, node_child, style=style, color=color, label=label))
                             else:
                                 exp.add_edge(pydotplus.Edge(node_job, node_child, style=style, color=color))
                         else:
@@ -564,7 +564,6 @@ class Monitor:
             else:
                 Log.printlog(str(e), 7014)
         Log.result('Plotting finished')
-
 
     def generate_output_txt(self, expid: str, joblist: list[Job], path: str, classictxt=False,
                             job_list_object=None) -> None:
@@ -661,21 +660,28 @@ class Monitor:
         output_complete_path_stats = os.path.join(BasicConfig.DEFAULT_OUTPUT_DIR, output_filename)
         is_default_path = True
         if is_owner or is_eadmin:
-            Path(BasicConfig.LOCAL_ROOT_DIR, expid, "stats").mkdir(mode=_DEFAULT_MKDIR_GROUP_PERMISSION, parents=True, exist_ok=True)
+            Path(BasicConfig.LOCAL_ROOT_DIR, expid, "stats").mkdir(mode=_DEFAULT_MKDIR_GROUP_PERMISSION, parents=True,
+                                                                   exist_ok=True)
             output_complete_path_stats = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "stats", output_filename)
             is_default_path = False
         else:
-            if os.path.exists(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "stats")) and os.access(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "stats"), os.W_OK):
+            if os.path.exists(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "stats")) and os.access(
+                    os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "stats"), os.W_OK):
                 output_complete_path_stats = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "stats", output_filename)
                 is_default_path = False
-            elif os.path.exists(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_TMP_DIR)) and os.access(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_TMP_DIR), os.W_OK):
+            elif os.path.exists(
+                    os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_TMP_DIR)) and os.access(
+                os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_TMP_DIR), os.W_OK):
                 output_complete_path_stats = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_TMP_DIR,
                                                           output_filename)
                 is_default_path = False
         if is_default_path:
-            Log.info("You don't have enough permissions to the experiment's ({}) folder. The output file will be created in the default location: {}".format(expid, BasicConfig.DEFAULT_OUTPUT_DIR))
+            Log.info(
+                "You don't have enough permissions to the experiment's ({}) folder. The output file will be created in the default location: {}".format(
+                    expid, BasicConfig.DEFAULT_OUTPUT_DIR))
 
-            Path(BasicConfig.DEFAULT_OUTPUT_DIR).mkdir(mode=_DEFAULT_MKDIR_GROUP_PERMISSION, parents=True, exist_ok=True)
+            Path(BasicConfig.DEFAULT_OUTPUT_DIR).mkdir(mode=_DEFAULT_MKDIR_GROUP_PERMISSION, parents=True,
+                                                       exist_ok=True)
 
         report_created = create_stats_report(
             expid, joblist, str(output_complete_path_stats), section_summary, jobs_summary,

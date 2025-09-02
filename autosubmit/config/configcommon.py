@@ -667,12 +667,17 @@ class AutosubmitConfig(object):
         elif isinstance(dependencies, dict):
             for dependency, dependency_data in dependencies.items():
                 aux_dependencies[dependency.upper()] = dependency_data
-                if type(dependency_data) is dict and dependency_data.get("STATUS", None):
-                    dependency_data["STATUS"] = dependency_data["STATUS"].upper()
-                    dependency_data["OPTIONAL"] = dependency_data.get("OPTIONAL", False)
-                    if dependency_data["STATUS"][-1] == "?":
-                        dependency_data["STATUS"] = dependency_data["STATUS"][:-1]
-                        dependency_data["OPTIONAL"] = True
+                if type(dependency_data) is dict:
+                    # Backwards compatibility
+                    user_set_status = dependency_data.pop("MIN_TRIGGER_STATUS", dependency_data.pop("STATUS", None))
+                    if user_set_status:
+                        dependency_data["MIN_TRIGGER_STATUS"] = user_set_status.upper()
+                        # Backwards compatibility
+                        fail_ok = dependency_data.get("FAIL_OK", dependency_data.get("OPTIONAL", False))
+                        dependency_data["FAIL_OK"] = fail_ok
+                        if dependency_data["MIN_TRIGGER_STATUS"][-1] == "?":
+                            dependency_data["MIN_TRIGGER_STATUS"] = dependency_data["MIN_TRIGGER_STATUS"][:-1]
+                            dependency_data["FAIL_OK"] = True
 
         return aux_dependencies
 
@@ -2947,6 +2952,6 @@ class AutosubmitConfig(object):
         """
         jobs_in_wrapper = self.experiment_data.get("WRAPPERS", {}).get("JOBS_IN_WRAPPER", [])
         if isinstance(jobs_in_wrapper, str):
-            jobs_in_wrapper = wrapped_jobs.split("&") if "&" in wrapped_jobs else wrapped_jobs.split()
+            jobs_in_wrapper = jobs_in_wrapper.split("&") if "&" in jobs_in_wrapper else jobs_in_wrapper.split()
 
         return [job.strip() for job in jobs_in_wrapper if job.strip()]

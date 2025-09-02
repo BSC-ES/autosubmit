@@ -261,8 +261,6 @@ class JobPackageSimple(JobPackageBase):
                 real_name = job.construct_real_additional_file_name(f)
                 self.platform.send_file(real_name)
 
-
-
     def _do_submission(self, job_scripts: Dict[str, str] = "", hold: bool = False) -> None:
         """
         Submits jobs to the platform, cleans previous run logs and stats files and updates job status.

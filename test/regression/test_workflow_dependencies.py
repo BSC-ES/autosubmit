@@ -259,7 +259,6 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
     if expid.startswith("basic_dependencies"):  # Modify only for debugging purposes
         expids_to_plot.append(expid)
     profiler = cProfile.Profile()
-
     # Running section
     workflow_dir = get_project_root() / 'test' / 'regression' / 'workflows'
 
@@ -304,7 +303,8 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
             differences.extend(compare_and_print_differences(new_root, ref_root))
 
     if show_workflow_plot and expid in expids_to_plot:
-        init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, full_load=True, test_type='test',
+        init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, full_load=True,
+                   test_type='test',
                    plot=show_workflow_plot)
     if differences:
         pytest.fail("\n".join(differences))

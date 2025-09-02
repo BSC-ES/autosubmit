@@ -22,12 +22,11 @@ from os import utime
 from pathlib import Path
 from shutil import rmtree
 from subprocess import CalledProcessError, SubprocessError
-from typing import Any, Optional, Tuple
+from typing import Any, Tuple, Optional
 
 import pytest
 # noinspection PyProtectedMember
 from _pytest._py.path import LocalPath
-from autosubmit.config.yamlparser import YAMLParserFactory
 
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
@@ -39,7 +38,6 @@ from autosubmit.monitor.monitor import (
     _check_final_status, _check_node_exists, _color_status, _create_node, _display_file,
     _display_file_xdg, clean_plot, clean_stats, Monitor
 )
-from typing import Any, Dict, Tuple, List, Optional
 
 _EXPID = 't000'
 
@@ -175,245 +173,91 @@ _COLORS = [
     ('HELD', 'salmon'),
     ('QUEUING', 'pink'),
     ('RUNNING', 'green'),
-    ('COMPLETED', 'black'), # edge is black instead of the COMPLETED yellow box
+    ('COMPLETED', 'black'),  # edge is black instead of the COMPLETED yellow box
     ('FAILED', 'red'),
     ('DELAYED', 'lightcyan'),
     ('SUSPENDED', 'orange'),
     ('SKIPPED', 'lightyellow')
 ]
+
+
 @pytest.mark.parametrize(
     "job_edges_info,expected",
     [
         (
-            {
-                "needle": []
-            },
-            (None, None, None)
-        ),
-        (
-            {
-                "needle": [{
-                    "completed": "WAITING",
-                    "e_to": "nothing",
-                    "from_step": 0,
-                    "optional": False,
-                    "status": _COLORS[0][0],
-                }]
-            },
-            (None, None, None)
+                {
+                    "needle": []
+                },
+                (None, None, None)
         ),
         (
                 {
                     "needle": [{
-                        "completed": "WAITING",
+                        "completion_status": "WAITING",
+                        "e_to": "nothing",
+                        "from_step": 0,
+                        "fail_ok": False,
+                        "min_trigger_status": _COLORS[0][0],
+                    }]
+                },
+                (None, None, None)
+        ),
+        (
+                {
+                    "needle": [{
+                        "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 0,
-                        "optional": False,
-                        "status": _COLORS[0][0],
+                        "fail_ok": False,
+                        "min_trigger_status": _COLORS[0][0],
                     }]
                 },
                 (_COLORS[0][1], None, False)
         ),
         (
-            {
-                "needle": [{
-                    "completed": "WAITING",
-                    "e_to": "child_needle",
-                    "from_step": 1,
-                    "optional": False,
-                    "status": _COLORS[0][0],
-                }]
-            },
-            (_COLORS[0][1], '1', False)
+                {
+                    "needle": [{
+                        "completion_status": "WAITING",
+                        "e_to": "child_needle",
+                        "from_step": 1,
+                        "fail_ok": False,
+                        "min_trigger_status": _COLORS[0][0],
+                    }]
+                },
+                (_COLORS[0][1], '1', False)
         ),
         (
                 {
                     "needle": [{
-                        "completed": "WAITING",
+                        "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "optional": False,
-                        "status": _COLORS[1][0],
+                        "fail_ok": False,
+                        "min_trigger_status": _COLORS[1][0],
                     }]
                 },
                 (_COLORS[1][1], '1', False)
         ),
         (
-            {
-                "needle": [{
-                    "completed": "WAITING",
-                    "e_to": "child_needle",
-                    "from_step": 1,
-                    "optional": False,
-                    "status": _COLORS[2][0],
-                }]
-            },
-            (_COLORS[2][1], '1', False)
-        ),
-        (
-            {
-                "needle": [{
-                    "completed": "WAITING",
-                    "e_to": "child_needle",
-                    "from_step": 1,
-                    "optional": True,
-                    "status": _COLORS[3][0],
-                }]
-            },
-            (_COLORS[3][1], '1', True)
-        ),
-        (
-            {
-                "needle": [{
-                    "completed": "WAITING",
-                    "e_to": "child_needle",
-                    "from_step": 1,
-                    "optional": False,
-                    "status": _COLORS[4][0],
-                }]
-            },
-            (_COLORS[4][1], '1', False)
-        ),
-        (
-            {
-                "needle": [{
-                    "completed": "WAITING",
-                    "e_to": "child_needle",
-                    "from_step": 1,
-                    "optional": False,
-                    "status": _COLORS[5][0],
-                }]
-            },
-            (_COLORS[5][1], '1', False)
-        ),
-        (
-            {
-                "needle": [{
-                    "completed": "WAITING",
-                    "e_to": "child_needle",
-                    "from_step": 1,
-                    "optional": False,
-                    "status": _COLORS[6][0],
-                }]
-            },
-            (_COLORS[6][1], '1', False)
-        ),
-        (
-            {
-                "needle": [{
-                    "completed": "WAITING",
-                    "e_to": "child_needle",
-                    "from_step": 1,
-                    "optional": False,
-                    "status": _COLORS[7][0],
-                }]
-            },
-            (_COLORS[7][1], '1', False)
-        ),
-        (
-            {
-                "needle": [{
-                    "completed": "WAITING",
-                    "e_to": "child_needle",
-                    "from_step": 1,
-                    "optional": False,
-                    "status": _COLORS[8][0],
-                }]
-            },
-            (_COLORS[8][1], '1', False)
-        ),
-        (
-            {
-                "needle": [{
-                    "completed": "WAITING",
-                    "e_to": "child_needle",
-                    "from_step": 1,
-                    "optional": False,
-                    "status": _COLORS[9][0],
-                }]
-            },
-            (_COLORS[9][1], '1', False)
-        ),
-        (
-            {
-                "needle": [{
-                    "completed": "WAITING",
-                    "e_to": "child_needle",
-                    "from_step": 1,
-                    "optional": False,
-                    "status": _COLORS[10][0],
-                }]
-            },
-            (_COLORS[10][1], '1', False)
-        ),
-        (
-            {
-                "needle": [{
-                    "completed": "WAITING",
-                    "e_to": "child_needle",
-                    "from_step": 1,
-                    "optional": False,
-                    "status": _COLORS[11][0],
-                }]
-            },
-            (_COLORS[11][1], '1', False)
-        ),
-        (
-            {
-                "needle": [{
-                    "completed": "WAITING",
-                    "e_to": "child_needle",
-                    "from_step": 1,
-                    "optional": False,
-                    "status": _COLORS[12][0],
-                }]
-            },
-            (_COLORS[12][1], '1', False)
-        ),
-        (
                 {
                     "needle": [{
-                        "completed": "WAITING",
+                        "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "optional": True,
-                        "status": _COLORS[0][0],
+                        "fail_ok": False,
+                        "min_trigger_status": _COLORS[2][0],
                     }]
                 },
-                (_COLORS[0][1], '1', True)
+                (_COLORS[2][1], '1', False)
         ),
         (
                 {
                     "needle": [{
-                        "completed": "WAITING",
+                        "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "optional": True,
-                        "status": _COLORS[1][0],
-                    }]
-                },
-                (_COLORS[1][1], '1', True)
-        ),
-        (
-                {
-                    "needle": [{
-                        "completed": "WAITING",
-                        "e_to": "child_needle",
-                        "from_step": 1,
-                        "optional": True,
-                        "status": _COLORS[2][0],
-                    }]
-                },
-                (_COLORS[2][1], '1', True)
-        ),
-        (
-                {
-                    "needle": [{
-                        "completed": "WAITING",
-                        "e_to": "child_needle",
-                        "from_step": 1,
-                        "optional": True,
-                        "status": _COLORS[3][0],
+                        "fail_ok": True,
+                        "min_trigger_status": _COLORS[3][0],
                     }]
                 },
                 (_COLORS[3][1], '1', True)
@@ -421,11 +265,167 @@ _COLORS = [
         (
                 {
                     "needle": [{
-                        "completed": "WAITING",
+                        "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "optional": True,
-                        "status": _COLORS[4][0],
+                        "fail_ok": False,
+                        "min_trigger_status": _COLORS[4][0],
+                    }]
+                },
+                (_COLORS[4][1], '1', False)
+        ),
+        (
+                {
+                    "needle": [{
+                        "completion_status": "WAITING",
+                        "e_to": "child_needle",
+                        "from_step": 1,
+                        "fail_ok": False,
+                        "min_trigger_status": _COLORS[5][0],
+                    }]
+                },
+                (_COLORS[5][1], '1', False)
+        ),
+        (
+                {
+                    "needle": [{
+                        "completion_status": "WAITING",
+                        "e_to": "child_needle",
+                        "from_step": 1,
+                        "fail_ok": False,
+                        "min_trigger_status": _COLORS[6][0],
+                    }]
+                },
+                (_COLORS[6][1], '1', False)
+        ),
+        (
+                {
+                    "needle": [{
+                        "completion_status": "WAITING",
+                        "e_to": "child_needle",
+                        "from_step": 1,
+                        "fail_ok": False,
+                        "min_trigger_status": _COLORS[7][0],
+                    }]
+                },
+                (_COLORS[7][1], '1', False)
+        ),
+        (
+                {
+                    "needle": [{
+                        "completion_status": "WAITING",
+                        "e_to": "child_needle",
+                        "from_step": 1,
+                        "fail_ok": False,
+                        "min_trigger_status": _COLORS[8][0],
+                    }]
+                },
+                (_COLORS[8][1], '1', False)
+        ),
+        (
+                {
+                    "needle": [{
+                        "completion_status": "WAITING",
+                        "e_to": "child_needle",
+                        "from_step": 1,
+                        "fail_ok": False,
+                        "min_trigger_status": _COLORS[9][0],
+                    }]
+                },
+                (_COLORS[9][1], '1', False)
+        ),
+        (
+                {
+                    "needle": [{
+                        "completion_status": "WAITING",
+                        "e_to": "child_needle",
+                        "from_step": 1,
+                        "fail_ok": False,
+                        "min_trigger_status": _COLORS[10][0],
+                    }]
+                },
+                (_COLORS[10][1], '1', False)
+        ),
+        (
+                {
+                    "needle": [{
+                        "completion_status": "WAITING",
+                        "e_to": "child_needle",
+                        "from_step": 1,
+                        "fail_ok": False,
+                        "min_trigger_status": _COLORS[11][0],
+                    }]
+                },
+                (_COLORS[11][1], '1', False)
+        ),
+        (
+                {
+                    "needle": [{
+                        "completion_status": "WAITING",
+                        "e_to": "child_needle",
+                        "from_step": 1,
+                        "fail_ok": False,
+                        "min_trigger_status": _COLORS[12][0],
+                    }]
+                },
+                (_COLORS[12][1], '1', False)
+        ),
+        (
+                {
+                    "needle": [{
+                        "completion_status": "WAITING",
+                        "e_to": "child_needle",
+                        "from_step": 1,
+                        "fail_ok": True,
+                        "min_trigger_status": _COLORS[0][0],
+                    }]
+                },
+                (_COLORS[0][1], '1', True)
+        ),
+        (
+                {
+                    "needle": [{
+                        "completion_status": "WAITING",
+                        "e_to": "child_needle",
+                        "from_step": 1,
+                        "fail_ok": True,
+                        "min_trigger_status": _COLORS[1][0],
+                    }]
+                },
+                (_COLORS[1][1], '1', True)
+        ),
+        (
+                {
+                    "needle": [{
+                        "completion_status": "WAITING",
+                        "e_to": "child_needle",
+                        "from_step": 1,
+                        "fail_ok": True,
+                        "min_trigger_status": _COLORS[2][0],
+                    }]
+                },
+                (_COLORS[2][1], '1', True)
+        ),
+        (
+                {
+                    "needle": [{
+                        "completion_status": "WAITING",
+                        "e_to": "child_needle",
+                        "from_step": 1,
+                        "fail_ok": True,
+                        "min_trigger_status": _COLORS[3][0],
+                    }]
+                },
+                (_COLORS[3][1], '1', True)
+        ),
+        (
+                {
+                    "needle": [{
+                        "completion_status": "WAITING",
+                        "e_to": "child_needle",
+                        "from_step": 1,
+                        "fail_ok": True,
+                        "min_trigger_status": _COLORS[4][0],
                     }]
                 },
                 (_COLORS[4][1], '1', True)
@@ -433,11 +433,11 @@ _COLORS = [
         (
                 {
                     "needle": [{
-                        "completed": "WAITING",
+                        "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "optional": True,
-                        "status": _COLORS[5][0],
+                        "fail_ok": True,
+                        "min_trigger_status": _COLORS[5][0],
                     }]
                 },
                 (_COLORS[5][1], '1', True)
@@ -445,11 +445,11 @@ _COLORS = [
         (
                 {
                     "needle": [{
-                        "completed": "WAITING",
+                        "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "optional": True,
-                        "status": _COLORS[6][0],
+                        "fail_ok": True,
+                        "min_trigger_status": _COLORS[6][0],
                     }]
                 },
                 (_COLORS[6][1], '1', True)
@@ -457,11 +457,11 @@ _COLORS = [
         (
                 {
                     "needle": [{
-                        "completed": "WAITING",
+                        "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "optional": True,
-                        "status": _COLORS[7][0],
+                        "fail_ok": True,
+                        "min_trigger_status": _COLORS[7][0],
                     }]
                 },
                 (_COLORS[7][1], '1', True)
@@ -469,11 +469,11 @@ _COLORS = [
         (
                 {
                     "needle": [{
-                        "completed": "WAITING",
+                        "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "optional": True,
-                        "status": _COLORS[8][0],
+                        "fail_ok": True,
+                        "min_trigger_status": _COLORS[8][0],
                     }]
                 },
                 (_COLORS[8][1], '1', True)
@@ -481,11 +481,11 @@ _COLORS = [
         (
                 {
                     "needle": [{
-                        "completed": "WAITING",
+                        "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "optional": True,
-                        "status": _COLORS[9][0],
+                        "fail_ok": True,
+                        "min_trigger_status": _COLORS[9][0],
                     }]
                 },
                 (_COLORS[9][1], '1', True)
@@ -493,11 +493,11 @@ _COLORS = [
         (
                 {
                     "needle": [{
-                        "completed": "WAITING",
+                        "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "optional": True,
-                        "status": _COLORS[10][0],
+                        "fail_ok": True,
+                        "min_trigger_status": _COLORS[10][0],
                     }]
                 },
                 (_COLORS[10][1], '1', True)
@@ -505,11 +505,11 @@ _COLORS = [
         (
                 {
                     "needle": [{
-                        "completed": "WAITING",
+                        "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "optional": True,
-                        "status": _COLORS[11][0],
+                        "fail_ok": True,
+                        "min_trigger_status": _COLORS[11][0],
                     }]
                 },
                 (_COLORS[11][1], '1', True)
@@ -517,11 +517,11 @@ _COLORS = [
         (
                 {
                     "needle": [{
-                        "completed": "WAITING",
+                        "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "optional": True,
-                        "status": _COLORS[12][0],
+                        "fail_ok": True,
+                        "min_trigger_status": _COLORS[12][0],
                     }]
                 },
                 (_COLORS[12][1], '1', True)
@@ -532,32 +532,32 @@ _COLORS = [
         'Empty job_edges_info',
         'job name not found',
         'label == 0',
-        f'Status: {_COLORS[0][0]} {_COLORS[0][1]}, label 1, OPTIONAL',
-        f'Status: {_COLORS[1][0]} {_COLORS[1][1]}, label 1, OPTIONAL',
-        f'Status: {_COLORS[2][0]} {_COLORS[2][1]}, label 1, OPTIONAL',
-        f'Status: {_COLORS[3][0]} {_COLORS[3][1]}, label 1, OPTIONAL',
-        f'Status: {_COLORS[4][0]} {_COLORS[4][1]}, label 1, OPTIONAL',
-        f'Status: {_COLORS[5][0]} {_COLORS[5][1]}, label 1, OPTIONAL',
-        f'Status: {_COLORS[6][0]} {_COLORS[6][1]}, label 1, OPTIONAL',
-        f'Status: {_COLORS[7][0]} {_COLORS[7][1]}, label 1, OPTIONAL',
-        f'Status: {_COLORS[8][0]} {_COLORS[8][1]}, label 1, OPTIONAL',
-        f'Status: {_COLORS[9][0]} {_COLORS[9][1]}, label 1, OPTIONAL',
-        f'Status: {_COLORS[10][0]} {_COLORS[10][1]}, label 1, OPTIONAL',
-        f'Status: {_COLORS[11][0]} {_COLORS[11][1]}, label 1, OPTIONAL',
-        f'Status: {_COLORS[12][0]} {_COLORS[12][1]}, label 1, OPTIONAL',
-        f'Status: {_COLORS[0][0]} {_COLORS[0][1]}, label 1, MANDATORY',
-        f'Status: {_COLORS[1][0]} {_COLORS[1][1]}, label 1, MANDATORY',
-        f'Status: {_COLORS[2][0]} {_COLORS[2][1]}, label 1, MANDATORY',
-        f'Status: {_COLORS[3][0]} {_COLORS[3][1]}, label 1, MANDATORY',
-        f'Status: {_COLORS[4][0]} {_COLORS[4][1]}, label 1, MANDATORY',
-        f'Status: {_COLORS[5][0]} {_COLORS[5][1]}, label 1, MANDATORY',
-        f'Status: {_COLORS[6][0]} {_COLORS[6][1]}, label 1, MANDATORY',
-        f'Status: {_COLORS[7][0]} {_COLORS[7][1]}, label 1, MANDATORY',
-        f'Status: {_COLORS[8][0]} {_COLORS[8][1]}, label 1, MANDATORY',
-        f'Status: {_COLORS[9][0]} {_COLORS[9][1]}, label 1, MANDATORY',
-        f'Status: {_COLORS[10][0]} {_COLORS[10][1]}, label 1, MANDATORY',
-        f'Status: {_COLORS[11][0]} {_COLORS[11][1]}, label 1, MANDATORY',
-        f'Status: {_COLORS[12][0]} {_COLORS[12][1]}, label 1, MANDATORY',
+        f'MIN_TRIGGER_STATUS: {_COLORS[0][0]} {_COLORS[0][1]}, label 1, FAIL_OK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[1][0]} {_COLORS[1][1]}, label 1, FAIL_OK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[2][0]} {_COLORS[2][1]}, label 1, FAIL_OK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[3][0]} {_COLORS[3][1]}, label 1, FAIL_OK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[4][0]} {_COLORS[4][1]}, label 1, FAIL_OK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[5][0]} {_COLORS[5][1]}, label 1, FAIL_OK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[6][0]} {_COLORS[6][1]}, label 1, FAIL_OK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[7][0]} {_COLORS[7][1]}, label 1, FAIL_OK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[8][0]} {_COLORS[8][1]}, label 1, FAIL_OK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[9][0]} {_COLORS[9][1]}, label 1, FAIL_OK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[10][0]} {_COLORS[10][1]}, label 1, FAIL_OK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[11][0]} {_COLORS[11][1]}, label 1, FAIL_OK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[12][0]} {_COLORS[12][1]}, label 1, FAIL_OK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[0][0]} {_COLORS[0][1]}, label 1, MANDATORY',
+        f'MIN_TRIGGER_STATUS: {_COLORS[1][0]} {_COLORS[1][1]}, label 1, MANDATORY',
+        f'MIN_TRIGGER_STATUS: {_COLORS[2][0]} {_COLORS[2][1]}, label 1, MANDATORY',
+        f'MIN_TRIGGER_STATUS: {_COLORS[3][0]} {_COLORS[3][1]}, label 1, MANDATORY',
+        f'MIN_TRIGGER_STATUS: {_COLORS[4][0]} {_COLORS[4][1]}, label 1, MANDATORY',
+        f'MIN_TRIGGER_STATUS: {_COLORS[5][0]} {_COLORS[5][1]}, label 1, MANDATORY',
+        f'MIN_TRIGGER_STATUS: {_COLORS[6][0]} {_COLORS[6][1]}, label 1, MANDATORY',
+        f'MIN_TRIGGER_STATUS: {_COLORS[7][0]} {_COLORS[7][1]}, label 1, MANDATORY',
+        f'MIN_TRIGGER_STATUS: {_COLORS[8][0]} {_COLORS[8][1]}, label 1, MANDATORY',
+        f'MIN_TRIGGER_STATUS: {_COLORS[9][0]} {_COLORS[9][1]}, label 1, MANDATORY',
+        f'MIN_TRIGGER_STATUS: {_COLORS[10][0]} {_COLORS[10][1]}, label 1, MANDATORY',
+        f'MIN_TRIGGER_STATUS: {_COLORS[11][0]} {_COLORS[11][1]}, label 1, MANDATORY',
+        f'MIN_TRIGGER_STATUS: {_COLORS[12][0]} {_COLORS[12][1]}, label 1, MANDATORY',
     ]
 )
 def test_check_final_status(job_edges_info: dict[str, Any], expected: Tuple[Any, Any], mocker):
@@ -866,7 +866,7 @@ def test_generate_output_unexpected_error(error_msg: str, mocker):
     ],
     ids=[
         'no jobs, nothing written',
-        'jobs, classic, no jobs completed nor finished, one line written',
+        'jobs, classic, no jobs completion_status nor finished, one line written',
         'jobs, classic, one job finished, one line written',
         'no job list, not classic, two lines one being a log',
         'job list, not classic, two lines one being a note about a Job List used',
@@ -922,7 +922,7 @@ def test_generate_output_txt_job_with_children(tmp_path, autosubmit_config, mock
     jobs = [parent_job, child_1, child_2]
 
     monitor = Monitor()
-    monitor.generate_output_txt(_EXPID, joblist=jobs, path=str(tmp_path), classictxt=False,job_list_object=None)
+    monitor.generate_output_txt(_EXPID, joblist=jobs, path=str(tmp_path), classictxt=False, job_list_object=None)
 
     assert status_file.exists()
 
