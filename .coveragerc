@@ -38,7 +38,7 @@ exclude_lines =
     @(abc\.)?abstractmethod
 
     # Ignore pass statements
-    pass
+    ^\s*pass$
    
 
 fail_under=0
