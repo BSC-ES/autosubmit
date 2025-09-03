@@ -91,77 +91,7 @@ class Type:
         return getattr(self, value)
 
 
-# TODO: Statistics classes refactor proposal: replace tailer by footer
-
-
-class StatisticsSnippetBash:
-    """
-    Class to handle the statistics snippet of a job. It contains header and tailer for
-    local and remote jobs
-    """
-
-    @staticmethod
-    def as_header(scheduler_header, executable):
-        if not executable:
-            executable = "/bin/bash"
-        return textwrap.dedent("""\
-            #!{0}
-
-            """).format(executable) + \
-            scheduler_header + \
-            textwrap.dedent("""\
-            ###################
-            # Autosubmit header
-            ###################
-            locale_to_set=$(locale -a | grep ^C.)
-            if [ -z "$locale_to_set" ] ; then
-                # locale installed...
-                export LC_ALL=$locale_to_set
-            else
-                # locale not installed...
-                locale_to_set=$(locale -a | grep ^en_GB.utf8)
-                if [ -z "$locale_to_set" ] ; then
-                    export LC_ALL=$locale_to_set
-                else
-                    export LC_ALL=C
-                fi 
-            fi
-
-            set -xuve
-            job_name_ptrn='%CURRENT_LOGDIR%/%JOBNAME%'
-            echo $(date +%s) > ${job_name_ptrn}_STAT_%FAIL_COUNT%
-
-            ################### 
-            # AS CHECKPOINT FUNCTION
-            ###################
-            # Creates a new checkpoint file upon call based on the current numbers of calls to the function
-
-            AS_CHECKPOINT_CALLS=0
-            function as_checkpoint {
-                AS_CHECKPOINT_CALLS=$((AS_CHECKPOINT_CALLS+1))
-                touch ${job_name_ptrn}_CHECKPOINT_${AS_CHECKPOINT_CALLS}
-            }
-            %EXTENDED_HEADER%
-            ###################
-            # Autosubmit job
-            ###################
-
-            """)
-
-    @staticmethod
-    def as_tailer():
-        return textwrap.dedent("""\
-                %EXTENDED_TAILER%
-                ###################
-                # Autosubmit tailer
-                ###################
-                set -xuve
-                echo $(date +%s) >> ${job_name_ptrn}_STAT_%FAIL_COUNT%
-                touch ${job_name_ptrn}_COMPLETED
-                exit 0
-
-                """)
-
+# TODO: remove the other snippets from this file...
 
 class StatisticsSnippetPython:
     """
@@ -172,7 +102,7 @@ class StatisticsSnippetPython:
     def __init__(self, version="3"):
         self.version = version
 
-    def as_header(self, scheduler_header, executable):
+    def as_header(self, scheduler_header, executable) -> str:
         if not executable:
             executable = f"/usr/bin/env python{str(self.version)}"
         else:
@@ -215,16 +145,10 @@ class StatisticsSnippetPython:
                 global job_name_ptrn
                 AS_CHECKPOINT_CALLS = AS_CHECKPOINT_CALLS + 1
                 open(job_name_ptrn + '_CHECKPOINT_' + str(AS_CHECKPOINT_CALLS), 'w').close()      
-            %EXTENDED_HEADER%          
-            ###################
-            # Autosubmit job
-            ###################
-
-
-            """)
+            %EXTENDED_HEADER%""")
 
     # expand tailer to use python3
-    def as_tailer(self):
+    def as_tailer(self) -> str:
         return textwrap.dedent("""\
                 %EXTENDED_TAILER%
                 ###################
@@ -312,59 +236,6 @@ class StatisticsSnippetR:
             close(fileConn)
             quit(save = 'no', status = 0)
             """)
-
-
-class StatisticsSnippetEmpty:
-    """
-    Class to handle the statistics snippet of a job. It contains header and footer for
-    local and remote jobs
-    """
-
-    @staticmethod
-    def as_header(scheduler_header, executable):
-        if not executable:
-            executable = "/bin/bash"
-        return textwrap.dedent("""\
-            #!{0}
-
-            """).format(executable) + \
-            scheduler_header
-
-    @staticmethod
-    def as_tailer():
-        return ''
-
-
-def parse_output_number(string_number):
-    """
-    Parses number in format 1.0K 1.0M 1.0G
-
-    :param string_number: String representation of number
-    :type string_number: str
-    :return: number in float format
-    :rtype: float
-    """
-    number = 0.0
-    if string_number:
-        last_letter = string_number.strip()[-1]
-        multiplier = 1
-        if last_letter == "G":
-            multiplier = 1000000000
-            number = string_number[:-1]
-        elif last_letter == "M":
-            multiplier = 1000000
-            number = string_number[:-1]
-        elif last_letter == "K":
-            multiplier = 1000
-            number = string_number[:-1]
-        else:
-            number = string_number
-        try:
-            number = float(number) * multiplier
-        except Exception as exp:
-            number = 0.0
-            pass
-    return number
 
 
 def increase_wallclock_by_chunk(current, increase, chunk):

@@ -34,6 +34,7 @@ import pytest
 
 if TYPE_CHECKING:
     from testcontainers.core.container import DockerContainer
+    from test.conftest import AutosubmitExperiment
 
 _EXPID = 't000'
 """The experiment ID used throughout the test."""
@@ -126,7 +127,7 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[s
     with sqlite3.connect(job_data_db) as conn:
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        c.execute("SELECT * FROM job_data")
+        c.execute("SELECT * FROM job_data ORDER BY job_name, counter")
         rows = c.fetchall()
         db_check_list["JOB_DATA_ENTRIES"] = len(rows) == expected_entries, \
             f"Expected {expected_entries} entries, found {len(rows)}"
@@ -626,11 +627,11 @@ def test_run_uninterrupted(
     """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
 ], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
 def test_run_interrupted(
-        as_exp,
-        jobs_data,
-        expected_db_entries,
-        final_status,
-        wrapper_type,
+        jobs_data: str,
+        expected_db_entries: int,
+        final_status: str,
+        wrapper_type: str,
+        as_exp: 'AutosubmitExperiment',
         slurm_server: 'DockerContainer'
 ):
     as_conf = as_exp.as_conf
