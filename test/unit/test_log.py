@@ -15,7 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from autosubmit.log.log import AutosubmitError, AutosubmitCritical, Log
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.log.utils import compress_xz, find_uncompressed_files, is_xz_file
 
 """Tests for the log module."""
 
@@ -65,3 +71,35 @@ def test_log_not_format():
     # Format messages
     msg = "Test {foo, bar}"
     _send_messages(msg)
+
+
+def test_compress_xz(tmp_path: Path):
+    test_content = "Test content foo bar"
+
+    input_file = str(tmp_path.joinpath("test-input.txt"))
+    with open(input_file, "w") as f:
+        f.write(test_content)
+
+    output_file = str(tmp_path.joinpath("test-compressed.xz"))
+    compress_xz(input_file, output_file, preset=9, extreme=True)
+
+    assert Path(output_file).exists()
+    assert is_xz_file(output_file)
+    assert len(find_uncompressed_files(str(tmp_path))) == 1
+
+    # Verify same result with xz
+    output_file2 = input_file + ".xz"
+    subprocess.run(["xz", "-9", "-e", "-k", input_file], check=True)
+
+    assert Path(output_file2).exists()
+    assert is_xz_file(output_file2)
+
+    # Verify both files output_file and output_file2 are equal
+    assert subprocess.check_output(
+        ["xz", "-d", "-c", output_file], text=True
+    ) == subprocess.check_output(["xz", "-d", "-c", output_file2], text=True)
+    assert subprocess.run(["cmp", output_file, output_file2], check=True)
+
+    # Cover unexistent path
+    with pytest.raises(FileNotFoundError):
+        find_uncompressed_files(str(tmp_path.joinpath("unexistent_path")))
