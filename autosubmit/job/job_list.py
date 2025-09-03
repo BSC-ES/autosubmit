@@ -321,6 +321,8 @@ class JobList(object):
                      edge.get("e_from", "") in self.graph.nodes and edge.get("e_to", "") in self.graph.nodes):
             self._add_edge_and_parent(edge)
 
+        self.fill_parents_children()
+
     def _add_edge_and_parent(
             self,
             edge: dict[str, Any]
@@ -632,7 +634,7 @@ class JobList(object):
                         if job:
                             if job.section == section:
                                 tmp_loaded_jobs.append(job)
-                            elif job.section != section and edge["completed"] != "COMPLETED":
+                            elif job.section != section and edge["COMPLETION_STATUS"] != "COMPLETED":
                                 # If the job is not in the current section and is not completed, it cannot be loaded
                                 can_be_loaded = False
                                 break
@@ -2537,14 +2539,13 @@ class JobList(object):
         If there are active jobs, it returns True, otherwise it returns False.
         """
 
-        self._load_graph(full_load=False)  # TODO put this to False when fixing bugs
+        self._load_graph(full_load=False)
         for job in self.job_list:
             if not job.platform:
                 self._assign_platforms(self._as_conf, job, create=False, new=False)
             # if job.status not in (self._IN_SCHEDULER + self._FINAL_STATUSES):
             if not job.updated:
-                self.update_parents_edge_completeness(job, ready_job=False if job.status in [Status.WAITING,
-                                                                                             Status.SUSPENDED] else True)
+                self.update_parents_edge_completeness(job)
                 job.update_parameters(self._as_conf, set_attributes=True, reset_logs=False if job.status in (
                         self._IN_SCHEDULER + self._FINAL_STATUSES) else True)
 
@@ -2571,6 +2572,9 @@ class JobList(object):
                 if self.graph.has_edge(parent.name, job.name):
                     self.graph.remove_edge(parent.name, job.name)
                 self.graph.remove_node(job.name)
+            job.children = set()
+            job.parents = set()
+            del job
 
     def get_active(self, platform=None, wrapper=False):
         """
@@ -3022,29 +3026,28 @@ class JobList(object):
             save |= self._update_held_jobs(as_conf)
             save |= self._skip_jobs(as_conf)
         for job in self.get_ready():
-            self.update_parents_edge_completeness(job, ready_job=True)
+            self.update_parents_edge_completeness(job)
             job.set_ready_date()
         self.update_two_step_jobs()
         Log.debug('Update finished')
         return save
 
-    def update_parents_edge_completeness(self, job: Job, ready_job: bool) -> None:
+    def update_parents_edge_completeness(self, job: Job) -> None:
         """
         Update the 'completed' status of all edges from each parent to the given job.
 
         :param job: The job whose parent edges will be updated.
         :type job: Job
-        :param ready_job: The status to set for the edge's 'completed' field.
-        :type ready_job: bool
         """
+
         for parent in job.parents:
             self.update_edge_completed(
                 e_from=parent.name,
                 e_to=job.name,
-                completed=ready_job
+                status=job.status
             )
 
-    def update_edge_completed(self, e_from: str, e_to: str, completed: bool) -> None:
+    def update_edge_completed(self, e_from: str, e_to: str, status: int) -> None:
         """
         Update the 'completed' status of the edge between two jobs in the graph.
 
@@ -3052,12 +3055,9 @@ class JobList(object):
         :type e_from: str
         :param e_to: Name of the child job.
         :type e_to: str
-        :param completed: The status to set for the edge's 'completed' field.
-        :type completed: bool
         """
         if e_from in self.graph_dict and e_to in self.graph_dict[e_from]:
-            self.graph_dict[e_from][e_to]["completed"] = completed
-            Log.debug(f"Edge from {e_from} to {e_to} set to COMPLETED.")
+            self.graph_dict[e_from][e_to]["COMPLETION_STATUS"] = status
 
     def _update_failed_jobs(self, as_conf: AutosubmitConfig) -> bool:
         """

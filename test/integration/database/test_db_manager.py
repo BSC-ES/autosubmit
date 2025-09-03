@@ -20,12 +20,11 @@ import sqlite3
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.db_common import get_autosubmit_version, _get_autosubmit_version, \
-    _update_experiment_description_version, _get_autosubmit_version_sqlalchemy, _last_name_used_sqlalchemy
-
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.database.db_common import get_autosubmit_version, _get_autosubmit_version, \
+    _update_experiment_description_version, _get_autosubmit_version_sqlalchemy, _last_name_used_sqlalchemy, delete_experiment, check_db_path
 from autosubmit.database.db_common import get_connection_url, DbException, create_db, open_conn
 from autosubmit.database.db_manager import DbManager
 from autosubmit.database.tables import DBVersionTable
@@ -439,7 +438,7 @@ def test_last_name_used_sqlalchemy(monkeypatch, tmp_path, db_engine, request):
     assert last_name == 'xp4'
 
 
-def test_delete_experiment_sqlalchemy(monkeypatch, tmp_path):
+def test_delete_experiment_db(monkeypatch, tmp_path):
     """
     Test that delete_experiment works correctly using DbManager (SQLAlchemy).
     """
@@ -454,3 +453,53 @@ def test_delete_experiment_sqlalchemy(monkeypatch, tmp_path):
     db_manager.delete_where('experiment', {'name': 'test_experiment'})
     count = db_manager.count('experiment')
     assert count == 0
+
+
+@pytest.mark.parametrize(
+    "db_engine",
+    [
+        # postgres
+        pytest.param("postgres", marks=[pytest.mark.postgres, pytest.mark.docker]),
+        # sqlite
+        pytest.param("sqlite")
+    ],
+)
+def test_delete_experiment_sqlalchemy(monkeypatch, tmp_path, db_engine: str, request):
+    """
+    Test that delete_experiment works correctly without DbManager (mainly sqlite)
+    """
+
+    request.getfixturevalue(f"as_db_{db_engine}")
+    db_manager = _create_db_manager(BasicConfig.DB_PATH)
+    db_manager.create_table('experiment')
+    db_manager.insert('experiment', {'name': 'test_experiment', 'autosubmit_version': 1,
+                                     'description': 'Test experiment description'})
+    assert db_manager.count('experiment') == 1
+    delete_experiment(experiment_id='test_experiment')
+    assert db_manager.count('experiment') == 0
+
+
+@pytest.mark.parametrize(
+    "db_engine",
+    [
+        # sqlite
+        pytest.param("sqlite")
+    ],
+)
+def test_check_db_sqlite(monkeypatch, tmp_path, db_engine: str, request):
+    """
+    Test that check_db works correctly without DbManager (mainly sqlite)
+    """
+
+    request.getfixturevalue(f"as_db_{db_engine}")
+    db_manager = _create_db_manager(BasicConfig.DB_PATH)
+    db_manager.create_table(DBVersionTable.name)
+    db_manager.insert(DBVersionTable.name, {'version': 3})
+    with pytest.raises(ValueError) as e:
+        check_db_path(Path("dummy"), must_exists=True)
+
+    exists = check_db_path(Path("dummy"), must_exists=False)
+    assert not exists
+
+    exists = check_db_path(Path(BasicConfig.DB_PATH), must_exists=True)
+    assert exists

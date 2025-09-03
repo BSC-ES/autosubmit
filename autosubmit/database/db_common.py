@@ -33,10 +33,8 @@ from autosubmit.log.log import Log, AutosubmitCritical
 
 Log.get_logger("Autosubmit")
 
-
 CURRENT_DATABASE_VERSION = 1
 TIMEOUT = 15
-
 
 
 def create_db(qry):
@@ -71,7 +69,6 @@ def check_db() -> None:
     """
     if not Path(BasicConfig.DB_PATH).exists():
         raise AutosubmitCritical(f'DB path does not exist: {BasicConfig.DB_PATH}', 7003)
-
 
 
 def open_conn(check_version=True):
@@ -230,7 +227,7 @@ def get_autosubmit_version(expid):
     :type expid: str
     :return: If experiment exists returns the autosubmit version for it, if not returns None
     :rtype: str
-    """    
+    """
     fn = _get_autosubmit_version
     if BasicConfig.DATABASE_BACKEND == 'postgres':
         fn = _get_autosubmit_version_sqlalchemy
@@ -292,7 +289,6 @@ def delete_experiment(experiment_id):
     fn = _delete_experiment
     if BasicConfig.DATABASE_BACKEND == 'postgres':
         fn = _delete_experiment_sqlalchemy
-
     queue = multiprocessing.Queue(1)
     proc = multiprocessing.Process(target=fn_wrapper, args=(fn, queue, experiment_id))
     proc.start()
@@ -481,7 +477,7 @@ def _get_autosubmit_version(expid):
     # behaviour with the next sentence
     conn.text_factory = str
     cursor.execute('SELECT autosubmit_version FROM experiment WHERE name=:expid', {
-                   'expid': expid})
+        'expid': expid})
     row = cursor.fetchone()
     close_conn(conn, cursor)
     if row is None:
@@ -501,7 +497,7 @@ def _last_name_used(test=False, operational=False, evaluation=False):
     :type test: bool
     :return: last experiment identifier used, 'empty' if there is none
     :rtype: str
-    """    
+    """
     check_db()
 
     try:
@@ -727,7 +723,7 @@ def _get_experiment_description_sqlalchemy(expid) -> List[List[str]]:
 
 
 def _update_experiment_description_version_sqlalchemy(
-    name: str, description: Optional[str] = None, version: Optional[str] = None
+        name: str, description: Optional[str] = None, version: Optional[str] = None
 ) -> bool:
     # Conditional update statement
     if description is None and version is None:
@@ -801,7 +797,7 @@ def _last_name_used_sqlalchemy(test=False, operational=False, evaluation=False) 
 
 def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:
     if not _check_experiment_exists_sqlalchemy(
-        experiment_id, False
+            experiment_id, False
     ):  # Reference the no anti-lock version.
         return True
 

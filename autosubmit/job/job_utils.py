@@ -27,7 +27,6 @@ from autosubmit.log.log import Log, AutosubmitCritical
 if TYPE_CHECKING:
     from autosubmit.job.job_list import JobList
 
-
 CALENDAR_UNITSIZE_ENUM = {
     "hour": 0,
     "day": 1,
@@ -54,7 +53,7 @@ def is_leap_year(year) -> bool:
     return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
 
-def calendar_unitsize_isgreater(split_unit,chunk_unit) -> bool:
+def calendar_unitsize_isgreater(split_unit, chunk_unit) -> bool:
     """
     Check if the split unit is greater than the chunk unit
     :param split_unit:
@@ -101,8 +100,7 @@ def calendar_get_month_days(date_str) -> int:
         return 31
 
 
-def get_chunksize_in_hours(date_str,chunk_unit,chunk_length) -> int:
-
+def get_chunksize_in_hours(date_str, chunk_unit, chunk_length) -> int:
     if is_leap_year(int(date_str[0:4])):
         num_days_in_a_year = 366
     else:
@@ -156,15 +154,16 @@ def calendar_chunk_section(exp_data, section, date, chunk) -> int:
     :param parameters:
     :return: int
     """
-    #next_auto_date = date
+    # next_auto_date = date
     splits = 0
     jobs_data = exp_data.get('JOBS', {})
-    split_unit = str(exp_data.get("EXPERIMENT", {}).get('SPLITSIZEUNIT', jobs_data.get(section,{}).get("SPLITSIZEUNIT", None))).lower()
+    split_unit = str(exp_data.get("EXPERIMENT", {}).get('SPLITSIZEUNIT', jobs_data.get(section, {}).get("SPLITSIZEUNIT", None))).lower()
     chunk_unit = str(exp_data.get("EXPERIMENT", {}).get('CHUNKSIZEUNIT', "day")).lower()
-    split_policy = str(exp_data.get("EXPERIMENT", {}).get('SPLITPOLICY', jobs_data.get(section,{}).get("SPLITPOLICY", "flexible"))).lower()
+    split_policy = str(exp_data.get("EXPERIMENT", {}).get('SPLITPOLICY', jobs_data.get(section, {}).get("SPLITPOLICY", "flexible"))).lower()
     if chunk_unit == "hour":
-        raise AutosubmitCritical("Chunk unit is hour, Autosubmit doesn't support lower than hour splits. Please change the chunk unit to day or higher. Or don't use calendar splits.")
-    if jobs_data.get(section,{}).get("RUNNING","once") != "once":
+        raise AutosubmitCritical(
+            "Chunk unit is hour, Autosubmit doesn't support lower than hour splits. Please change the chunk unit to day or higher. Or don't use calendar splits.")
+    if jobs_data.get(section, {}).get("RUNNING", "once") != "once":
         chunk_length = int(exp_data.get("EXPERIMENT", {}).get('CHUNKSIZE', 1))
         cal = str(exp_data.get('CALENDAR', "standard")).lower()
         chunk_start = chunk_start_date(
@@ -174,8 +173,9 @@ def calendar_chunk_section(exp_data, section, date, chunk) -> int:
         run_days = subs_dates(chunk_start, chunk_end, cal)
         if split_unit == "none":
             split_unit = calendar_unitsize_getlowersize(chunk_unit)
-        if calendar_unitsize_isgreater(split_unit,chunk_unit):
-            raise AutosubmitCritical("Split unit is greater than chunk unit. Autosubmit doesn't support this configuration. Please change the split unit to day or lower. Or don't use calendar splits.")
+        if calendar_unitsize_isgreater(split_unit, chunk_unit):
+            raise AutosubmitCritical(
+                "Split unit is greater than chunk unit. Autosubmit doesn't support this configuration. Please change the split unit to day or lower. Or don't use calendar splits.")
         if split_unit == "hour":
             num_max_splits = run_days * 24
         elif split_unit == "month":
@@ -188,23 +188,25 @@ def calendar_chunk_section(exp_data, section, date, chunk) -> int:
         else:
             num_max_splits = run_days
         split_size = get_split_size(exp_data, section)
-        chunk_size_in_hours = get_chunksize_in_hours(date2str(chunk_start),chunk_unit,chunk_length)
+        chunk_size_in_hours = get_chunksize_in_hours(date2str(chunk_start), chunk_unit, chunk_length)
         if not calendar_split_size_isvalid(date2str(chunk_start), split_size, split_unit, chunk_size_in_hours):
             raise AutosubmitCritical(f"Invalid split size for the calendar. The split size is {split_size} and the unit is {split_unit}.")
         splits = num_max_splits / split_size
         if not splits.is_integer() and split_policy == "flexible":
-            Log.warning(f"The number of splits:{num_max_splits}/{split_size} is not an integer. The number of splits will be rounded up due the flexible split policy.\n You can modify the SPLITPOLICY parameter in the section {section} to 'strict' to avoid this behavior.")
+            Log.warning(
+                f"The number of splits:{num_max_splits}/{split_size} is not an integer. The number of splits will be rounded up due the flexible split policy.\n You can modify the SPLITPOLICY parameter in the section {section} to 'strict' to avoid this behavior.")
         elif not splits.is_integer() and split_policy == "strict":
-            raise AutosubmitCritical(f"The number of splits is not an integer. Autosubmit can't continue.\nYou can modify the SPLITPOLICY parameter in the section {section} to 'flexible' to roundup the number. Or change the SPLITSIZE parameter to a value in which the division is an integer.")
+            raise AutosubmitCritical(
+                f"The number of splits is not an integer. Autosubmit can't continue.\nYou can modify the SPLITPOLICY parameter in the section {section} to 'flexible' to roundup the number. Or change the SPLITSIZE parameter to a value in which the division is an integer.")
         splits = math.ceil(splits)
         Log.info(f"For the section {section} with date:{date2str(chunk_start)} the number of splits is {splits}.")
     return splits
 
 
 def get_split_size_unit(data, section) -> str:
-    split_unit = str(data.get('JOBS',{}).get(section,{}).get('SPLITSIZEUNIT', "none")).lower()
+    split_unit = str(data.get('JOBS', {}).get(section, {}).get('SPLITSIZEUNIT', "none")).lower()
     if split_unit == "none":
-        split_unit = str(data.get('EXPERIMENT',{}).get("CHUNKSIZEUNIT", "day")).lower()
+        split_unit = str(data.get('EXPERIMENT', {}).get("CHUNKSIZEUNIT", "day")).lower()
         if split_unit == "year":
             return "month"
         elif split_unit == "month":
@@ -221,7 +223,7 @@ def get_split_size(as_conf, section) -> int:
     return int(job_data.get("SPLITSIZE", 1))
 
 
-def get_job_package_code(expid: str, job_name: str) -> int:
+def get_job_package_code(expid: str, wrapped_job: str) -> int:
     """
     Finds the package code and retrieves it. None if no package.
 
@@ -232,20 +234,18 @@ def get_job_package_code(expid: str, job_name: str) -> int:
     :return: package code, None if not found
     :rtype: int or None
     """
-    try:
-        basic_conf = BasicConfig()
-        basic_conf.read()
-        # wrapper load
-        packages_wrapper = JobPackagePersistence(expid).load(wrapper=True)
-        packages_wrapper_plus = JobPackagePersistence(expid).load(wrapper=False)
-        if packages_wrapper or packages_wrapper_plus:
-            packages = packages_wrapper if len(packages_wrapper) > len(packages_wrapper_plus) else packages_wrapper_plus
-            for exp, package_name, _job_name in packages:
-                if job_name == _job_name:
-                    code = int(package_name.split("_")[-3])
-                    return code
-    except Exception as e:
-        pass
+    basic_conf = BasicConfig()
+    basic_conf.read()
+    # TODO this is used to store something for the GUI/API? not sure what is this "code" @Luiggi
+    # # wrapper load
+    # packages_wrapper = JobPackagePersistence(expid).load(wrapper=True)
+    # packages_wrapper_plus = JobPackagePersistence(expid).load(wrapper=False)
+    # if packages_wrapper or packages_wrapper_plus:
+    #     packages = packages_wrapper if len(packages_wrapper) > len(packages_wrapper_plus) else packages_wrapper_plus
+    #     for exp, package_name, _job_name in packages:
+    #         if job_name == _job_name:
+    #             code = int(package_name.split("_")[-3])
+    #             return code
     return 0
 
 

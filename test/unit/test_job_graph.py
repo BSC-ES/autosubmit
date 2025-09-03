@@ -15,14 +15,15 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import pytest
 from random import randrange
 
+import pytest
+
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.monitor.monitor import Monitor
-from autosubmit.config.yamlparser import YAMLParserFactory
 
 _EXPID = 'random-id'
 
@@ -467,7 +468,7 @@ def setup_wrappers(job_list, autosubmit_config):
     for job in jobs:
         job_list.add_job(job)
 
-    for edge in [ edge for edge in edges if edge[0].startswith('expid_') and edge[1].startswith('expid_') ]:
+    for edge in [edge for edge in edges if edge[0].startswith('expid_') and edge[1].startswith('expid_')]:
         job_list._add_edge_and_parent({"e_from": edge[0], "e_to": edge[1]})
 
     as_conf = autosubmit_config(_EXPID, {
@@ -528,6 +529,24 @@ def test_wrapper_package(setup_wrappers, autosubmit_config):
     assert not graph.obj_dict['strict']
     for wrapper_job in packages:
         assert 'cluster_' + wrapper_job.name in graph.obj_dict['subgraphs']
+
+
+# TODO wip
+# def test_wrapper_package_with_job_edges(setup_wrappers, autosubmit_config):
+#     _, _, job_list, packages = setup_wrappers
+#     test = job_list.graph_dict
+#     job_edges = job_list.graph_dict_by_job_name
+#     job_edges['expid_d1_m1_1_SIM'] = [{'e_to': 'expid_d1_m1_2_SIM', 'from_step': 0, 'min_trigger_status': 'COMPLETED',
+#                                        'completion_status': 'WAITING', 'fail_ok': True}]
+#     job_edges['expid_d2_m2_1_SIM'] = [{'e_to': 'expid_d2_m2_2_SIM', 'from_step': 1, 'min_trigger_status': 'RUNNING',
+#                                        'completion_status': 'WAITING', 'fail_ok': True}]
+#
+#     monitor = Monitor(job_edges)
+#
+#     graph = monitor.create_tree_list(_EXPID, job_list.get_job_list(), packages, dict())
+#     assert not graph.obj_dict['strict']
+#     for wrapper_job in packages:
+#         assert 'cluster_' + wrapper_job.name in graph.obj_dict['subgraphs']
 
 
 def test_synchronize_member_group_member(job_list):
@@ -1009,10 +1028,9 @@ def test_wrapper_and_groups(setup_wrappers):
         else:
             assert 'cluster_' + wrapper_job.name in graph.obj_dict['subgraphs']
 
-
     # TODO: This test does not match the original expected results.
     # This may be due to differences in the job_list ( there are more jobs) or the definition of groups_dict['jobs'].
-    #subgraph = graph.obj_dict['subgraphs']['Experiment'][0]
-    #nodes_str = [node.name for node in nodes]
-    #assert sorted(list(subgraph['nodes'].keys())) == sorted(nodes_str)
+    # subgraph = graph.obj_dict['subgraphs']['Experiment'][0]
+    # nodes_str = [node.name for node in nodes]
+    # assert sorted(list(subgraph['nodes'].keys())) == sorted(nodes_str)
     # assert sorted(list(subgraph['edges'].keys())) == sorted(edges)
