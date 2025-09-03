@@ -34,7 +34,7 @@ from mock.mock import patch
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.configcommon import BasicConfig, YAMLParserFactory
-from autosubmit.job.job import Job
+from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
@@ -2072,3 +2072,37 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
     existing_lines = len(existing_lines.split('\n')) - 1 if existing_lines else 0
     expected_lines = existing_lines + 1
     assert len(total_stats.read_text().split('\n')) == expected_lines
+
+
+def test_wrapper_job_cancel_failed_wrapper_job_error(autosubmit_config, mocker):
+    """Test that an exception raised in ``cancel_failed_wrapper_job`` logs correctly."""
+    as_conf = autosubmit_config(_EXPID, {})
+    platform = mocker.MagicMock()
+    error_message = 'fatal error'
+    platform.send_command.side_effect = Exception(error_message)
+    wrapper_job = WrapperJob(_EXPID, 1, 'WAITING', 0, [], '00:30', platform, as_conf, False)
+
+    mocked_log = mocker.patch('autosubmit.job.job.Log')
+
+    wrapper_job.cancel_failed_wrapper_job()
+
+    assert mocked_log.info.called
+    assert error_message in mocked_log.info.call_args_list[0][0][0]
+
+
+@pytest.mark.parametrize(
+    'pid_found',
+    [True, False]
+)
+def test_wrapper_job_cancel_failed_local_send_command_pid_not_found(pid_found, autosubmit_config, mocker):
+    """Test that when a pid is not found for a local platform, the command is not sent."""
+    as_conf = autosubmit_config(_EXPID, {})
+    platform = mocker.MagicMock()
+    platform.get_pscall.return_value = pid_found
+    wrapper_job = WrapperJob(_EXPID, 1, 'WAITING', 0, [], '00:30', platform, as_conf, False)
+    wrapper_job.platform_name = 'local'
+    wrapper_job.processors = 2  # not serial
+
+    wrapper_job.cancel_failed_wrapper_job()
+
+    assert platform.send_command.called == pid_found
