@@ -37,32 +37,23 @@ from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job import job_utils
-from autosubmit.job.job_common import StatisticsSnippetBash, StatisticsSnippetPython
-from autosubmit.job.job_common import StatisticsSnippetR, StatisticsSnippetEmpty
 from autosubmit.job.job_common import Status, Type, increase_wallclock_by_chunk
 from autosubmit.job.job_utils import get_job_package_code, get_split_size_unit, get_split_size
 from autosubmit.job.metrics_processor import UserMetricProcessor
+from autosubmit.job.template import get_template_snippet, Language
 from autosubmit.log.log import Log, AutosubmitCritical
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
 if TYPE_CHECKING:
     from autosubmit.platforms.platform import Platform
+    from autosubmit.job.template import TemplateSnippet
 
 Log.get_logger("Autosubmit")
 
 # A wrapper for encapsulate threads , TODO: Python 3+ to be replaced by the < from concurrent.futures >
 
 EXCLUDED = ["_platform", "_children", "_parents", "submitter"]
-
-
-def threaded(fn):
-    def wrapper(*args, **kwargs):
-        thread = Thread(target=fn, args=args, kwargs=kwargs)
-        thread.name = "JOB_" + str(args[0].name)
-        thread.start()
-        return thread
-    return wrapper
 
 
 # This decorator contains groups of parameters, with each
@@ -2287,8 +2278,7 @@ class Job(object):
                 event.set()
         return parameters
 
-
-    def update_content_extra(self,as_conf,files):
+    def update_content_extra(self, as_conf, files) -> list[str]:
         additional_templates = []
         for file in files:
             if as_conf.get_project_type().lower() == "none":
@@ -2298,14 +2288,12 @@ class Job(object):
             additional_templates += [template]
         return additional_templates
 
-    def update_content(self, as_conf, parameters):
-        """
-        Create the script content to be run for the job
+    def update_content(self, as_conf: AutosubmitConfig, parameters: dict) -> tuple[str, list[str]]:
+        """Create the script content to be run for the job.
 
-        :param as_conf: Autosubmit configuration object
-        :type as_conf: AutosubmitConfig
-        :return: script code
-        :rtype: str
+        :param as_conf: Autosubmit configuration.
+        :param parameters: Parameters dictionary.
+        :return: A tuple with the job script template and a list with the additional file names.
         """
         if self.script:
             if self.file:
@@ -2339,44 +2327,30 @@ class Job(object):
                     else:
                         template = ''
             except Exception as e:
+                Log.warning(f'Failed to create the template script {self.file}: {str(e)}')
                 template = ''
 
         if self.type == Type.BASH:
-            snippet = StatisticsSnippetBash
-        elif self.type == Type.PYTHON or self.type == Type.PYTHON3:
-            snippet = StatisticsSnippetPython("3")
-        elif self.type == Type.PYTHON2:
-            snippet = StatisticsSnippetPython("2")
-        elif self.type == Type.R:
-            snippet = StatisticsSnippetR
+            language = Language.BASH
         else:
-            raise Exception('Job type {0} not supported'.format(self.type))
-        template_content = self._get_template_content(as_conf, snippet, template, parameters)
+            raise ValueError('TODO need to change everywhere to use the enum, or translate it here for now...')
+
+        snippet = get_template_snippet(language)
+
+        template_content = self._get_paramiko_template(snippet, template, parameters)
         additional_content = self.update_content_extra(as_conf, self.additional_files)
-        return template_content,additional_content
+        return template_content, additional_content
 
     def get_wrapped_content(self, as_conf, parameters):
-        snippet = StatisticsSnippetEmpty
-        template = 'python $SCRATCH/{1}/LOG_{1}/{0}.cmd'.format(
-            self.name, self.expid)
-        template_content = self._get_template_content(
-            as_conf, snippet, template, parameters)
-        return template_content
-
-    def _get_template_content(self, as_conf, snippet, template, parameters):
-        #communications_library = as_conf.get_communications_library()
-        # if communications_library == 'paramiko':
+        snippet: 'TemplateSnippet' = get_template_snippet(Language.EMPTY)
+        template = f'python $SCRATCH/{self.expid}/LOG_{self.expid}/{self.name}.cmd'
         return self._get_paramiko_template(snippet, template, parameters)
-        # else:
-        #    raise AutosubmitCritical(
-        #        "Job {0} does not have a correct template// template not found".format(self.name), 7014)
 
-    def _get_paramiko_template(self, snippet, template, parameters):
+    def _get_paramiko_template(self, snippet: 'TemplateSnippet', template, parameters) -> str:
         current_platform = self._platform
         return ''.join([
-            snippet.as_header(
-                current_platform.get_header(self, parameters), self.executable),
-            template,
+            snippet.as_header(current_platform.get_header(self, parameters), self.executable),
+            snippet.as_body(template),
             snippet.as_tailer()
         ])
 
@@ -2578,7 +2552,7 @@ class Job(object):
         """
         Writes submit date and time to TOTAL_STATS file. It doesn't write if hold is True.
         """
-        data_time = ["",int(datetime.datetime.strptime(self.submit_time_timestamp, "%Y%m%d%H%M%S").timestamp())]
+        data_time = ["", int(datetime.datetime.strptime(self.submit_time_timestamp, "%Y%m%d%H%M%S").timestamp())]
         path = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
         if os.path.exists(path):
             with open(path, 'a') as f:

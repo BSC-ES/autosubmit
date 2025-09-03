@@ -164,11 +164,12 @@ class TestJob:
 
         # set up
 
-        expid = 'zzyy'
+        expid = 't000'
 
         with tempfile.TemporaryDirectory() as temp_dir:
             Path(temp_dir, expid).mkdir()
-            # FIXME: (Copied from Bruno) Not sure why but the submitted and Slurm were using the $expid/tmp/ASLOGS folder?
+            # FIXME: (Copied from Bruno) Not sure why but the submitted and
+            #        Slurm were using the $expid/tmp/ASLOGS folder?
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
                          f'{expid}/conf', f'{expid}/proj/project_files']:
                 Path(temp_dir, path).mkdir()
