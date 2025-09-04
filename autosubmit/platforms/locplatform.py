@@ -51,8 +51,8 @@ class LocalPlatform(ParamikoPlatform):
     def get_checkAlljobs_cmd(self, jobs_id):
         pass
 
-    def __init__(self, expid, name, config, auth_password = None):
-        ParamikoPlatform.__init__(self, expid, name, config, auth_password= auth_password)
+    def __init__(self, expid, name, config, auth_password=None):
+        ParamikoPlatform.__init__(self, expid, name, config, auth_password=auth_password)
         self.cancel_cmd = None
         self.mkdir_cmd = None
         self.del_cmd = None

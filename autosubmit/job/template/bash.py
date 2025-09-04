@@ -19,7 +19,7 @@
 
 from textwrap import dedent
 
-_DEFAULT_EXECUTABLE = "/bin/bash"
+_DEFAULT_EXECUTABLE = "/bin/bash\n"
 """The default executable used when none provided."""
 
 _AS_BASH_HEADER = dedent("""\
@@ -86,25 +86,28 @@ def as_header(platform_header: str, executable: str) -> str:
 
 def as_body(body: str) -> str:
     return dedent(f"""\
-    ###################
-    # Autosubmit job
-    ###################
-    
-    r=0
-    $(
-        {body}
-    ) || r=$?
-    
-    # Write the finish time in the job _STAT_
-    echo $(date +%s) >> ${{job_name_ptrn}}_STAT_%FAIL_COUNT%
-    
-    # If the user-provided script failed, we exit here with the same exit code;
-    # otherwise, we let the execution of the tailer happen, where the _COMPLETED
-    # file will be created.
-    if [ $r != 0 ]; then
-        exit $r
-    fi
-    """)
+###################
+# Autosubmit job
+###################
+
+r=0
+set +e
+bash -e <<__AS_CMD__
+set -xuve
+{body}
+__AS_CMD__
+
+r=$?
+
+# Write the finish time in the job _STAT_
+echo $(date +%s) >> ${{job_name_ptrn}}_STAT_%FAIL_COUNT%
+
+# If the user-provided script failed, we exit here with the same exit code;
+# otherwise, we let the execution of the tailer happen, where the _COMPLETED
+# file will be created.
+if [ $r -ne 0 ]; then
+    exit $r
+fi""")
 
 
 def as_tailer() -> str:

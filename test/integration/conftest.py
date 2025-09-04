@@ -25,7 +25,7 @@ from pathlib import Path
 from pwd import getpwnam
 from subprocess import check_output
 from tempfile import TemporaryDirectory
-from typing import Iterator, Optional, Protocol, Union, TYPE_CHECKING
+from typing import Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING
 
 import paramiko
 import pytest
@@ -126,6 +126,30 @@ def paramiko_platform() -> Iterator[ParamikoPlatform]:
     local_root_dir.cleanup()
 
 
+@pytest.fixture(scope="function")
+def git_server(tmp_path) -> Generator[tuple[DockerContainer, Path, str], None, None]:
+    # Start a container to server it -- otherwise, we would have to use
+    # `git -c protocol.file.allow=always submodule ...`, and we cannot
+    # change how Autosubmit uses it in `autosubmit create` (due to bad
+    # code design choices).
+
+    git_repos_path = tmp_path / 'git_repos'
+    git_repos_path.mkdir(exist_ok=True, parents=True)
+
+    http_port = get_free_port()
+
+    image = 'githttpd/githttpd:latest'
+    with DockerContainer(image=image, remove=True) \
+            .with_bind_ports(80, http_port) \
+            .with_volume_mapping(str(git_repos_path), '/opt/git-server', mode='rw') as container:
+        wait_for_logs(container, "Command line: 'httpd -D FOREGROUND'")
+
+        # The docker image ``githttpd/githttpd`` creates an HTTP server for Git
+        # repositories, using the volume bound onto ``/opt/git-server`` as base
+        # for any subdirectory, the Git URL becoming ``git/{subdirectory-name}}``.
+        yield container, git_repos_path, f'http://localhost:{http_port}/git'
+
+
 @pytest.fixture()
 def ssh_server(mocker, tmp_path, make_ssh_client, request):
     ssh_port = get_free_port()
@@ -208,4 +232,3 @@ def slurm_server(mocker, tmp_path: 'LocalPath', make_ssh_client: MakeSSHClientFi
         )
 
         yield container
-

@@ -30,9 +30,30 @@ if TYPE_CHECKING:
 class Language(str, Enum):
     BASH = 'bash'
     PYTHON2 = 'python2'
+    PYTHON = 'python'
     PYTHON3 = 'python3'
     R = 'r'
+    # TODO: Is empty == wrapper?
     EMPTY = 'empty'
+
+    @staticmethod
+    def get_executable(language: 'Language') -> str:
+        _EXECUTABLES: dict['Language', str] = {
+            Language.BASH: 'bash',
+            Language.PYTHON2: 'python2',
+            Language.PYTHON: 'python3',
+            Language.PYTHON3: 'python3',
+            Language.R: 'Rscript',
+            Language.EMPTY: 'python3'
+        }
+        return _EXECUTABLES[language]
+
+    @property
+    def checkpoint(self) -> str:
+        if self in [Language.PYTHON, Language.PYTHON2, Language.PYTHON3, Language.R]:
+            return 'checkpoint()'
+        # Bash, empty for wrappers, etc.
+        return 'as_checkpoint'
 
 
 # NOTE: PyCharm may complain about a type error here, but ``mypy`` will
@@ -41,12 +62,24 @@ _LANGUAGES_SNIPPETS: dict[Language, 'TemplateSnippet'] = {
     Language.BASH: bash,
     Language.EMPTY: empty,
     Language.PYTHON2: python2,
+    Language.PYTHON: python3,
     Language.PYTHON3: python3,
     Language.R: r
 }
 
 
 def get_template_snippet(language: Language) -> 'TemplateSnippet':
+    """
+    >>> get_template_snippet(Language.PYTHON).__name__
+    'autosubmit.job.template.python3'
+    >>> get_template_snippet(None)
+    Traceback (most recent call last):
+    ...
+    ValueError: Unknown Autosubmit template language requested: None
+
+    :param language:
+    :return:
+    """
     if language not in _LANGUAGES_SNIPPETS:
         raise ValueError(f'Unknown Autosubmit template language requested: {language}')
     return _LANGUAGES_SNIPPETS[language]

@@ -2540,7 +2540,7 @@ class Autosubmit:
                         ssh_config_issues += message + (f" this is an PARAMIKO SSHEXCEPTION: indicates that there is "
                                                         f"something incompatible in the ssh_config for host:{platform.host}\n maybe"
                                                         f" you need to contact your sysadmin")
-            except BaseException as e:
+            except Exception as e:
                 try:
                     if mail_notify:
                         email = as_conf.get_mails_to()
@@ -2552,7 +2552,7 @@ class Autosubmit:
                 issues += platform_issues
                 continue
             if platform.check_remote_permissions():
-                Log.result("[{platform.name}] Correct user privileges for host {platform.host}")
+                Log.result(f"[{platform.name}] Correct user privileges for host {platform.host}")
             else:
                 platform_issues += (f"\n[{platform.name}] has configuration issues.\n Check that the connection is"
                                     f" passwd-less.(ssh {platform.user}@{platform.host})\n Check the parameters that"
@@ -2644,11 +2644,7 @@ class Autosubmit:
                     err_msg += f"wrapped_jobs:{wrapper} in {wrapper_errors[wrapper]}\n"
                 raise AutosubmitCritical(err_msg, 7014)
             return save_1 or save_2
-        except AutosubmitError:
-            raise
-        except AutosubmitCritical:
-            raise
-        except BaseException:
+        except Exception:
             raise
 
     @staticmethod

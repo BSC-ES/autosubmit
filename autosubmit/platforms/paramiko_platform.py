@@ -38,7 +38,7 @@ from paramiko.agent import Agent
 from paramiko.ssh_exception import (SSHException)
 
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_common import Type
+from autosubmit.job.template import Language
 from autosubmit.log.log import AutosubmitError, AutosubmitCritical, Log
 from autosubmit.platforms.platform import Platform
 
@@ -1314,34 +1314,24 @@ class ParamikoPlatform(Platform):
     def get_ssh_output_err(self):
         return self._ssh_output_err
 
-    def get_call(self, job_script, job, export="none",timeout=-1):
-        """
-        Gets execution command for given job
+    def get_call(self, job_script: str, job: 'Job', export="none", timeout=-1) -> str:
+        """Gets execution command for given job.
 
-        :param timeout:
-        :param export:
-        :param job: job
-        :type job: Job
         :param job_script: script to run
-        :type job_script: str
+        :param job: job
+        :param export:
+        :param timeout:
         :return: command to execute script
-        :rtype: str
         """
-        if job: # If job is None, it is a wrapper. ( 0 clarity there, to be improved in a rework TODO )
-            executable = ''
-            if job.type == Type.BASH:
-                executable = 'bash'
-            elif job.type == Type.PYTHON:
-                executable = 'python3'
-            elif job.type == Type.PYTHON2:
-                executable = 'python2'
-            elif job.type == Type.R:
-                executable = 'Rscript'
+        # If job is None, it is a wrapper. ( 0 clarity there, to be improved in a rework TODO )
+        if job:
             if job.executable != '':
-                executable = '' # Alternative: use job.executable with substituted placeholders
+                executable = ''  # Alternative: use job.executable with substituted placeholders
+            else:
+                executable = Language.get_executable(job.type)
             remote_logs = (job.script_name + ".out."+str(job.fail_count), job.script_name + ".err."+str(job.fail_count))
         else:
-            executable = 'python3' # wrappers are always python3
+            executable = Language.get_executable(Language.EMPTY)  # wrappers are always python3
             remote_logs = (f"{job_script}.out", f"{job_script}.err")
 
         if timeout < 1:

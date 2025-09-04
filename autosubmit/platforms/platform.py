@@ -28,7 +28,7 @@ from multiprocessing.queues import Queue
 # noinspection PyProtectedMember
 from os import _exit  # type: ignore
 from pathlib import Path
-from typing import Any, List, Optional, Set, Union, TYPE_CHECKING
+from typing import Any, Optional, Union, TYPE_CHECKING
 
 import setproctitle
 
@@ -38,6 +38,7 @@ from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
+    from autosubmit.job.job_packages import JobPackageBase
 
 
 def _init_logs_log_process(as_conf, platform_name):
@@ -371,18 +372,18 @@ class Platform(object):
 
         :param hold:
         :param packages_to_submit:
-        :param as_conf: autosubmit config object \n
-        :type as_conf: AutosubmitConfig object  \n
-        :param job_list: job list to check  \n
-        :type job_list: JobList object  \n
-        :param platforms_to_test: platforms used  \n
-        :type platforms_to_test: set of Platform Objects, e.g. EcPlatform(), SlurmPlatform().  \n
-        :param packages_persistence: Handles database per experiment. \n
-        :type packages_persistence: JobPackagePersistence object \n
-        :param inspect: True if coming from generate_scripts_andor_wrappers(). \n
-        :type inspect: Boolean \n
-        :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw. \n
-        :type only_wrappers: Boolean \n
+        :param as_conf: autosubmit config object
+        :type as_conf: AutosubmitConfig object
+        :param job_list: job list to check
+        :type job_list: JobList object
+        :param platforms_to_test: platforms used
+        :type platforms_to_test: set of Platform Objects, e.g. EcPlatform(), SlurmPlatform().
+        :param packages_persistence: Handles database per experiment.
+        :type packages_persistence: JobPackagePersistence object
+        :param inspect: True if coming from generate_scripts_andor_wrappers().
+        :type inspect: Boolean
+        :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw.
+        :type only_wrappers: Boolean
         :return: True if at least one job was submitted, False otherwise \n
         :rtype: Boolean
         """
@@ -400,7 +401,7 @@ class Platform(object):
                 job_list.get_prepared(self)), self.name)
         if not inspect:
             self.generate_submit_script()
-        valid_packages_to_submit = []  # type: List[JobPackageBase]
+        valid_packages_to_submit: list['JobPackageBase'] = []
         for package in packages_to_submit:
             try:
                 # If called from inspect command or -cw
@@ -454,15 +455,10 @@ class Platform(object):
                                     error_msg[:-1], self.name)
                     except AutosubmitCritical:
                         raise
-                    except Exception as e:
+                    except Exception:
                         self.connected = False
                         raise
-
-            except AutosubmitCritical as e:
-                raise
-            except AutosubmitError as e:
-                raise
-            except Exception as e:
+            except Exception:
                 raise
         if valid_packages_to_submit:
             any_job_submitted = True
@@ -880,7 +876,7 @@ class Platform(object):
         raise NotImplementedError
 
     def submit_Script(self, hold=False):
-        # type: (bool) -> Union[List[str], str]
+        # type: (bool) -> Union[list[str], str]
         """
         Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once.
         """
@@ -1074,18 +1070,14 @@ class Platform(object):
                 break
         return process_log
 
-    def recover_job_log(self, identifier: str, jobs_pending_to_process: Set[Any], as_conf: 'AutosubmitConfig') -> Set[Any]:
+    def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any], as_conf: 'AutosubmitConfig') -> set[Any]:
         """
         Recovers log files for jobs from the recovery queue and retries failed jobs.
 
         :param identifier: Identifier for logging purposes.
-        :type identifier: str
         :param jobs_pending_to_process: Set of jobs that had issues during log retrieval.
-        :type jobs_pending_to_process: Set[Any]
         :param as_conf: The Autosubmit configuration object containing experiment data.
-        :type as_conf: AutosubmitConfig
         :return: Updated set of jobs pending to process.
-        :rtype: Set[Any]
         """
         job = None
 
