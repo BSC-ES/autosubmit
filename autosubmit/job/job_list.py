@@ -250,7 +250,7 @@ class JobList(object):
             self._create_and_add_jobs(show_log, default_job_type, date_list, member_list)
 
         if changes or new:
-            self._initialize_new_jobs(changes)
+            self._initialize_new_jobs(changes, new)
 
         if changes or not self.run_mode:
             self._save_workflow_state(wrapper_jobs, as_conf, full_load, new)
@@ -508,11 +508,14 @@ class JobList(object):
         if len(self.graph.edges) > 0:
             self._delete_edgeless_jobs()
 
-    def _initialize_new_jobs(self, changes: bool) -> None:
+    def _initialize_new_jobs(self, changes: bool, new: bool) -> None:
         for job in self.job_list:
             if changes:
                 job._fail_count = 0
-            job.status = Status.READY if not self.has_parents(job.name) else job.status
+            if new:
+                job.status = Status.READY if not self.has_parents(job.name) else Status.WAITING
+            else:
+                job.status = Status.READY if not self.has_parents(job.name) else job.status
             self.graph.nodes[job.name]["job"] = job
 
     def has_parents(self, job_name: str) -> bool:
@@ -2538,6 +2541,8 @@ class JobList(object):
         Checks if there are active jobs in the workflow.
         If there are active jobs, it returns True, otherwise it returns False.
         """
+        for job in self.job_list:
+            self.update_parents_edge_completeness(job)
 
         self._load_graph(full_load=False)
         for job in self.job_list:
@@ -2545,7 +2550,6 @@ class JobList(object):
                 self._assign_platforms(self._as_conf, job, create=False, new=False)
             # if job.status not in (self._IN_SCHEDULER + self._FINAL_STATUSES):
             if not job.updated:
-                self.update_parents_edge_completeness(job)
                 job.update_parameters(self._as_conf, set_attributes=True, reset_logs=False if job.status in (
                         self._IN_SCHEDULER + self._FINAL_STATUSES) else True)
 
@@ -2759,7 +2763,7 @@ class JobList(object):
 
         for job in job_list:
             platform_name = job.platform_name if job.platform_name else "no-platform"
-            if job.platform_name:
+            if job.platform_name and job.platform:
                 queue = job.queue if job.queue else "no-scheduler"
             else:
                 queue = "no-scheduler"
