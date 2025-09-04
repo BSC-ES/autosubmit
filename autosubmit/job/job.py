@@ -2837,6 +2837,7 @@ class WrapperJob(Job):
         priority: int,
         job_list: List[Job],
         total_wallclock: str,
+        num_processors: int,
         platform: 'ParamikoPlatform',
         as_config: AutosubmitConfig,
         hold: bool,
@@ -2846,6 +2847,7 @@ class WrapperJob(Job):
         self.job_list = job_list
         # divide jobs in dictionary by state?
         self.wallclock = total_wallclock  # Now it is reloaded after a run -> stop -> run
+        self.num_processors = num_processors
         self.running_jobs_start = OrderedDict()
         self._platform: 'ParamikoPlatform' = platform
         self.as_config = as_config
