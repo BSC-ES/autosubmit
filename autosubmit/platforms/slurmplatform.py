@@ -64,6 +64,7 @@ class SlurmPlatform(ParamikoPlatform):
         self.x11_options = None
         self._submit_cmd_x11 = f'{self.remote_log_dir}'
         self.cancel_cmd = None
+        self.type = 'slurm'
         self._header = SlurmHeader()
         self._wrapper = SlurmWrapperFactory(self)
         self.job_status = dict()

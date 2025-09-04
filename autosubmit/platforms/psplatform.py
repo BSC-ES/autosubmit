@@ -25,7 +25,7 @@ from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 class PsPlatform(ParamikoPlatform):
     """Class to manage jobs to host not using any scheduler."""
 
-    def __init__(self, expid, name, config):
+    def __init__(self, expid: str, name: str, config: dict):
         ParamikoPlatform.__init__(self, expid, name, config)
         self.mkdir_checker = None
         self.remove_checker = None
@@ -33,6 +33,7 @@ class PsPlatform(ParamikoPlatform):
         self.get_cmd = None
         self.put_cmd = None
         self._checkhost_cmd = None
+        self.type = 'ps'
         self.cancel_cmd = None
         self._header = PsHeader()
         self.job_status = dict()

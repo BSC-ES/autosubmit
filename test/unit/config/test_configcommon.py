@@ -15,26 +15,29 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+"""Basic tests for ``AutosubmitConfig``."""
+
 from pathlib import Path
 from textwrap import dedent
-from typing import Callable
+from typing import TYPE_CHECKING
 
 import pytest
 
 from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 
-"""Basic tests for ``AutosubmitConfig``."""
+if TYPE_CHECKING:
+    from test.conftest import AutosubmitConfigFactory
 
 
-def test_get_submodules_list_default_empty_list(autosubmit_config: Callable):
+def test_get_submodules_list_default_empty_list(autosubmit_config: 'AutosubmitConfigFactory'):
     """If nothing is provided, we get a list with an empty string."""
     as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data={})
     submodules_list = as_conf.get_submodules_list()
     assert submodules_list == ['']
 
 
-def test_get_submodules_list_returns_false(autosubmit_config: Callable):
+def test_get_submodules_list_returns_false(autosubmit_config: 'AutosubmitConfigFactory'):
     """If the user provides a boolean ``False``, we return that value.
 
     This effectively disables submodules. See issue https://earth.bsc.es/gitlab/es/autosubmit/-/issues/1130.
@@ -48,7 +51,7 @@ def test_get_submodules_list_returns_false(autosubmit_config: Callable):
     assert submodules_list is False
 
 
-def test_get_submodules_true_not_valid_value(autosubmit_config: Callable):
+def test_get_submodules_true_not_valid_value(autosubmit_config: 'AutosubmitConfigFactory'):
     """If nothing is provided, we get a list with an empty string."""
     # TODO: move this to configuration validator when we have that...
     as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data={
@@ -62,7 +65,7 @@ def test_get_submodules_true_not_valid_value(autosubmit_config: Callable):
     assert str(cm.value) == 'GIT.PROJECT_SUBMODULES must be false (bool) or a string'
 
 
-def test_get_submodules(autosubmit_config: Callable):
+def test_get_submodules(autosubmit_config: 'AutosubmitConfigFactory'):
     """A string separated by spaces is returned as a list."""
     as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data={
         'GIT': {
@@ -76,7 +79,7 @@ def test_get_submodules(autosubmit_config: Callable):
 
 
 @pytest.mark.parametrize('owner', [True, False])
-def test_is_current_real_user_owner(autosubmit_config: Callable, owner):
+def test_is_current_real_user_owner(owner: bool, autosubmit_config: 'AutosubmitConfigFactory'):
     as_conf = autosubmit_config(expid='a000', experiment_data={})
     as_conf.experiment_data = as_conf.load_common_parameters(as_conf.experiment_data)
     if owner:
@@ -86,7 +89,7 @@ def test_is_current_real_user_owner(autosubmit_config: Callable, owner):
     assert as_conf.is_current_real_user_owner == owner
 
 
-def test_clean_dynamic_variables(autosubmit_config: Callable) -> None:
+def test_clean_dynamic_variables(autosubmit_config: 'AutosubmitConfigFactory') -> None:
     """
     This tests that only dynamic variables are kept in the ``dynamic_variables`` dictionary.
     a dynamic variable is a variable that it's value is a string that starts with ``%^`` or ``%`` and ends with ``%``.
@@ -112,7 +115,7 @@ def test_clean_dynamic_variables(autosubmit_config: Callable) -> None:
     assert 'jaspion_eats' in as_conf.dynamic_variables
 
 
-def test_yaml_deprecation_warning(tmp_path, autosubmit_config: Callable):
+def test_yaml_deprecation_warning(tmp_path, autosubmit_config: 'AutosubmitConfigFactory'):
     """Test that the conversion from YAML to INI works as expected, without warnings.
 
     Creates a dummy AS3 INI file, calls ``AutosubmitConfig.ini_to_yaml``, and
@@ -140,7 +143,7 @@ def test_yaml_deprecation_warning(tmp_path, autosubmit_config: Callable):
     assert new_yaml_file.stat().st_size > 0
 
 
-def test_key_error_raise(autosubmit_config: Callable):
+def test_key_error_raise(autosubmit_config: 'AutosubmitConfigFactory'):
     """Test that a KeyError is raised when a key is not found in the configuration."""
     as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data=None)
     # We need to set it here again, as the fixture prevents ``experiment_data``
@@ -165,3 +168,22 @@ def test_key_error_raise(autosubmit_config: Callable):
     assert as_conf.jobs_data == {"SIM": {}}
     assert as_conf.platforms_data == {"LOCAL": {}}
     assert as_conf.get_platform() == "DUMMY"
+
+
+@pytest.mark.parametrize(
+    'error,expected',
+    [
+        [IOError, AutosubmitError],  # type: ignore
+        [AutosubmitCritical, AutosubmitCritical],
+        [AutosubmitError, AutosubmitError],
+        [ValueError, AutosubmitCritical]
+    ]
+)
+def test_check_conf_files_errors(error: Exception, expected: Exception,
+                                 autosubmit_config: 'AutosubmitConfigFactory', mocker):
+    """Test errors when calling ``check_conf_files()``."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data=None)
+
+    mocker.patch.object(as_conf, 'reload', side_effect=error)
+    with pytest.raises(expected):
+        as_conf.reload.side_effect = as_conf.check_conf_files()

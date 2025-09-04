@@ -16,17 +16,18 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import math
-import pytest
 from datetime import datetime
+
+import pytest
 from mock import Mock
 
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_common import Type
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistenceDb
-from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.job.template import Language
 
 _EXPID = 't001'
 _DATE_LIST = ['fake-date1', 'fake-date2']
@@ -87,11 +88,11 @@ def test_read_section_running_once_create_jobs_once(mocker, dictionary):
     dictionary.compare_section = mocker.Mock()
 
     # act
-    dictionary.read_section(section, priority, Type.BASH)
+    dictionary.read_section(section, priority, Language.BASH)
 
     # assert
     dictionary._create_jobs_once.assert_called_once_with(  # type: ignore
-        section, priority, Type.BASH, splits)
+        section, priority, Language.BASH, splits)
     dictionary._create_jobs_startdate.assert_not_called()  # type: ignore
     dictionary._create_jobs_member.assert_not_called()  # type: ignore
     dictionary._create_jobs_chunk.assert_not_called()  # type: ignore
@@ -127,12 +128,12 @@ def test_read_section_running_date_create_jobs_startdate(mocker, dictionary):
     dictionary._create_jobs_chunk = mocker.Mock()
 
     # act
-    dictionary.read_section(section, priority, Type.BASH)
+    dictionary.read_section(section, priority, Language.BASH)
 
     # assert
     dictionary._create_jobs_once.assert_not_called()  # type: ignore
     dictionary._create_jobs_startdate.assert_called_once_with(  # type: ignore
-        section, priority, frequency, Type.BASH, splits)
+        section, priority, frequency, Language.BASH, splits)
     dictionary._create_jobs_member.assert_not_called()  # type: ignore
     dictionary._create_jobs_chunk.assert_not_called()  # type: ignore
 
@@ -167,13 +168,13 @@ def test_read_section_running_member_create_jobs_member(mocker, dictionary):
     dictionary._create_jobs_chunk = mocker.Mock()
 
     # act
-    dictionary.read_section(section, priority, Type.BASH)
+    dictionary.read_section(section, priority, Language.BASH)
 
     # assert
     dictionary._create_jobs_once.assert_not_called()  # type: ignore
     dictionary._create_jobs_startdate.assert_not_called()  # type: ignore
     dictionary._create_jobs_member.assert_called_once_with(  # type: ignore
-        section, priority, frequency, Type.BASH, splits)
+        section, priority, frequency, Language.BASH, splits)
     dictionary._create_jobs_chunk.assert_not_called()  # type: ignore
 
 
@@ -203,7 +204,7 @@ def test_read_section_running_chunk_create_jobs_chunk(mocker, dictionary):
     dictionary._create_jobs_chunk = mocker.Mock()
     dictionary.compare_section = mocker.Mock()
     # act
-    dictionary.read_section(section, options["PRIORITY"], Type.BASH)
+    dictionary.read_section(section, options["PRIORITY"], Language.BASH)
 
     # assert
     dictionary._create_jobs_once.assert_not_called()  # type: ignore
@@ -211,7 +212,7 @@ def test_read_section_running_chunk_create_jobs_chunk(mocker, dictionary):
     dictionary._create_jobs_member.assert_not_called()  # type: ignore
     dictionary._create_jobs_chunk.assert_called_once_with(  # type: ignore
         section, options["PRIORITY"], options["FREQUENCY"],
-        Type.BASH, options["SYNCHRONIZE"], options["DELAY"],
+        Language.BASH, options["SYNCHRONIZE"], options["DELAY"],
         options["SPLITS"])
 
 
@@ -234,8 +235,8 @@ def test_build_job_with_existent_job_list_status(mocker, dictionary):
     for job in job_list:
         dictionary.job_list[job.name] = job.__getstate__()
 
-    dictionary.build_job('fake-section1', priority, date, member, chunk, Type.BASH, section_data, splits=1)
-    dictionary.build_job('fake-section2', priority, date, member, chunk, Type.BASH, section_data, splits=1)
+    dictionary.build_job('fake-section1', priority, date, member, chunk, Language.BASH, section_data, splits=1)
+    dictionary.build_job('fake-section2', priority, date, member, chunk, Language.BASH, section_data, splits=1)
 
     # assert
     assert Status.WAITING == section_data[0].status
@@ -253,7 +254,7 @@ def test_dic_creates_right_jobs_by_startdate(mocker, dictionary):
     frequency = 1
     dictionary.build_job = Mock(wraps=dictionary.build_job)
     # act
-    dictionary._create_jobs_startdate(mock_section.name, priority, frequency, Type.BASH)
+    dictionary._create_jobs_startdate(mock_section.name, priority, frequency, Language.BASH)
 
     # assert
     assert len(_DATE_LIST) == dictionary.build_job.call_count
@@ -273,7 +274,7 @@ def test_dic_creates_right_jobs_by_member(mocker, dictionary):
     dictionary.build_job = Mock(wraps=dictionary.build_job)
 
     # act
-    dictionary._create_jobs_member(mock_section.name, priority, frequency, Type.BASH)
+    dictionary._create_jobs_member(mock_section.name, priority, frequency, Language.BASH)
 
     # assert
     assert len(_DATE_LIST) * len(_MEMBER_LIST) == dictionary.build_job.call_count
@@ -300,7 +301,7 @@ def test_dic_creates_right_jobs_by_chunk_with_frequency_3(mocker, dictionary):
     dictionary.build_job = Mock(return_value=mock_section)
 
     # act
-    dictionary._create_jobs_chunk(mock_section.name, priority, frequency, Type.BASH)
+    dictionary._create_jobs_chunk(mock_section.name, priority, frequency, Language.BASH)
 
     # assert
     assert len(_DATE_LIST) * len(_MEMBER_LIST) * (len(_CHUNK_LIST) / frequency) == \
@@ -317,7 +318,7 @@ def test_dic_creates_right_jobs_by_chunk_with_frequency_4(mocker, dictionary):
     dictionary.build_job = Mock(return_value=mock_section)
 
     # act
-    dictionary._create_jobs_chunk(mock_section.name, priority, frequency, Type.BASH)
+    dictionary._create_jobs_chunk(mock_section.name, priority, frequency, Language.BASH)
 
     # assert
     # you have to multiply to the round upwards (ceil) of the next division
@@ -335,7 +336,7 @@ def test_dic_creates_right_jobs_by_chunk_with_date_synchronize(mocker, dictionar
     dictionary.build_job = Mock(wraps=dictionary.build_job)
 
     # act
-    dictionary._create_jobs_chunk(mock_section.name, priority, frequency, Type.BASH, 'date')
+    dictionary._create_jobs_chunk(mock_section.name, priority, frequency, Language.BASH, 'date')
 
     # assert
     assert len(_CHUNK_LIST) == dictionary.build_job.call_count
@@ -356,7 +357,7 @@ def test_dic_creates_right_jobs_by_chunk_with_date_synchronize_and_frequency_4(m
     dictionary.build_job = Mock(return_value=mock_section)
 
     # act
-    dictionary._create_jobs_chunk(mock_section.name, priority, frequency, Type.BASH, 'date')
+    dictionary._create_jobs_chunk(mock_section.name, priority, frequency, Language.BASH, 'date')
 
     # assert
     assert math.ceil(len(_CHUNK_LIST) / float(frequency)) == \
@@ -376,7 +377,7 @@ def test_dic_creates_right_jobs_by_chunk_with_member_synchronize(mocker, diction
     dictionary.build_job = Mock(wraps=dictionary.build_job)
 
     # act
-    dictionary._create_jobs_chunk(mock_section.name, priority, frequency, Type.BASH, 'member')
+    dictionary._create_jobs_chunk(mock_section.name, priority, frequency, Language.BASH, 'member')
 
     # assert
     assert len(_DATE_LIST) * len(_CHUNK_LIST) == \
@@ -398,7 +399,7 @@ def test_dic_creates_right_jobs_by_chunk_with_member_synchronize_and_frequency_4
     dictionary.build_job = Mock(return_value=mock_section)
 
     # act
-    dictionary._create_jobs_chunk(mock_section.name, priority, frequency, Type.BASH, 'member')
+    dictionary._create_jobs_chunk(mock_section.name, priority, frequency, Language.BASH, 'member')
 
     # assert
     assert len(_DATE_LIST) * math.ceil(len(_CHUNK_LIST) / float(frequency)) == \
@@ -437,7 +438,7 @@ def test_create_job_creates_a_job_with_right_parameters(mocker, dictionary):
     assert member == created_job.member
     assert chunk == created_job.chunk
     assert _DATE_FORMAT == created_job.date_format
-    assert Type.BASH == created_job.type
+    assert Language.BASH == created_job.type
     assert None is created_job.executable
     assert created_job.check
     assert 0 == created_job.retrials
@@ -617,6 +618,6 @@ def test_create_jobs_split(mocker, dictionary):
     mock_date2str = mocker.patch('autosubmit.job.job_dict.date2str')
     mock_date2str.side_effect = lambda x, y: str(x)
     section_data = []
-    dictionary._create_jobs_split(5, 'fake-section', 'fake-date', 'fake-member', 'fake-chunk', 0, Type.BASH,
+    dictionary._create_jobs_split(5, 'fake-section', 'fake-date', 'fake-member', 'fake-chunk', 0, Language.BASH,
                                   section_data)
     assert 5 == len(section_data)

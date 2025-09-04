@@ -15,25 +15,48 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import textwrap
+"""Autosubmit template scripts written with Bash, used by wrappers.
+
+NOTE: This language snippet does NOT create STAT or COMPLETED files.
+"""
+
+_DEFAULT_EXECUTABLE = "/bin/bash"
 
 
-class StatisticsSnippetEmpty:
+def as_header(platform_header: str, executable: str) -> str:
     """
-    Class to handle the statistics snippet of a job. It contains header and footer for
-    local and remote jobs
+    >>> as_header(platform_header="# This is a test", executable="/bin/bash")
+    '#!/bin/bash\\n# This is a test'
+
+    :param platform_header:
+    :param executable:
+    :return:
     """
+    executable = executable or _DEFAULT_EXECUTABLE
+    shebang = f'#!{executable}'
+    return '\n'.join(
+        [
+            shebang,
+            platform_header]
+    )
 
-    @staticmethod
-    def as_header(scheduler_header, executable):
-        if not executable:
-            executable = "/bin/bash"
-        return textwrap.dedent("""\
-            #!{0}
 
-            """).format(executable) + \
-            scheduler_header
+def as_body(body: str) -> str:
+    """
+    >>> as_body(body="echo 'OK!'")
+    "echo 'OK!'"
 
-    @staticmethod
-    def as_tailer():
-        return ''
+    :param body:
+    :return:
+    """
+    return body
+
+
+def as_tailer() -> str:
+    """
+    >>> as_tailer()
+    ''
+
+    :return:
+    """
+    return ''

@@ -134,6 +134,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
 
 @pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
+    # Vertical Wrapper Workflow
     {
         'DEFAULT': {
             'EXPID': _EXPID,
@@ -195,6 +196,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
             }
         },
     },
+    # Wrapper Vertical
     {
         'DEFAULT': {
             'EXPID': _EXPID,
@@ -236,6 +238,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
             },
         },
     },
+    # Wrapper Horizontal
     {
         'DEFAULT': {
             'EXPID': _EXPID,
@@ -277,6 +280,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
             },
         },
     },
+    # Wrapper Horizontal-vertical
     {
         'DEFAULT': {
             'EXPID': _EXPID,
@@ -318,15 +322,16 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
             },
         },
     },
+    # Wrapper Vertical-horizontal
     {
         'DEFAULT': {
             'EXPID': _EXPID,
             'HPCARCH': _PLATFORM_NAME,
         },
         'JOBS': {
-            'SIM_H_V': {
+            'SIM_V_H': {
                 'DEPENDENCIES': {
-                    'SIM_H_V-1': {},
+                    'SIM_V_H-1': {},
                 },
                 'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
@@ -366,7 +371,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
     'Wrapper Horizontal-vertical',
     'Wrapper Vertical-horizontal',
 ])
-def test_run_all_wrappers_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, experiment_data,
+def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: AutosubmitExperimentFixture,
                                          slurm_server: 'DockerContainer'):
     """Runs a simple Bash script using Slurm."""
     exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, wrapper=True)
