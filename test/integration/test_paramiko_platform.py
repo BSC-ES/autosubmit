@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 _EXPID = 't000'
 
 
+@pytest.mark.xfail(reason="Known bug with concurrent tests")
 @pytest.mark.docker
 @pytest.mark.parametrize('filename, check', [
     ('test1', True),

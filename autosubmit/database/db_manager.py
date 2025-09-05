@@ -1,303 +1,223 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import sqlite3
-import os
-from typing import Any, Dict, Iterable, List, Protocol, Union, cast
+"""Contains code to manage a database via SQLAlchemy."""
 
-class DbManager(object):
-    """
-    Class to manage an SQLite database.
-    """
+from typing import Any, Optional, cast, TYPE_CHECKING, List, Dict
 
-    def __init__(self, root_path: str, db_name: str, db_version: int):
-        self.root_path = root_path
-        self.db_name = db_name
-        self.db_version = db_version
-        is_new = not os.path.exists(self._get_db_filepath())
-        self.connection = sqlite3.connect(self._get_db_filepath())
-        if is_new:
-            self._initialize_database()
-    def backup(self):
-        pass
-    def restore(self):
-        pass
+from sqlalchemy import Engine, delete, func, insert, select, ClauseElement
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.schema import CreateTable, CreateSchema, DropTable
 
-    def disconnect(self):
-        """
-        Closes the manager connection
+from autosubmit.database import session
+from autosubmit.database.tables import get_table_from_name
 
-        """
-        self.connection.close()
+if TYPE_CHECKING:
+    from autosubmit.database.tables import Table
 
-    def create_table(self, table_name, fields):
-        """
-        Creates a new table with the given fields
-        :param table_name: str
-        :param fields: [str]
 
-        """
-        cursor = self.connection.cursor()
-        create_command = self.generate_create_table_command(table_name, fields[:])
-        cursor.execute(create_command)
-        self.connection.commit()
+class DbManager:
+    """A database manager using SQLAlchemy.
 
-    def drop_table(self, table_name):
-        """
-        Drops the given table
-        :param table_name: str
-
-        """
-        cursor = self.connection.cursor()
-        drop_command = self.generate_drop_table_command(table_name)
-        cursor.execute(drop_command)
-        self.connection.commit()
-
-    def insert(self, table_name, columns, values):
-        """
-        Inserts a new row on the given table
-        :param table_name: str
-        :param columns: [str]
-        :param values: [str]
-
-        """
-        cursor = self.connection.cursor()
-        insert_command = self.generate_insert_command(table_name, columns[:], values[:])
-        cursor.execute(insert_command)
-        self.connection.commit()
-
-    def insertMany(self, table_name, data):
-        """
-        Inserts multiple new rows on the given table
-        :param table_name: str
-        :param data: [()]
-
-        """
-        cursor = self.connection.cursor()
-        insert_many_command = self.generate_insert_many_command(table_name, len(data[0]))
-        cursor.executemany(insert_many_command, data)
-        self.connection.commit()
-
-    def delete_where(self, table_name: str, where: list[str]):
-        """
-        Deletes the rows of the given table that matches the given where conditions
-        :param table_name: str
-        :param where: [str]
-        """
-        cursor = self.connection.cursor()
-        delete_command = self.generate_delete_command(table_name, where[:])
-        cursor.execute(delete_command)
-        self.connection.commit()
-
-    def select_first(self, table_name):
-        """
-        Returns the first row of the given table
-        :param table_name: str
-        :return row: []
-        """
-        cursor = self._select_with_all_fields(table_name)
-        return cursor.fetchone()
-
-    def select_first_where(self, table_name, where):
-        """
-        Returns the first row of the given table that matches the given where conditions
-        :param table_name: str
-        :param where: [str]
-        :return row: []
-        """
-        cursor = self._select_with_all_fields(table_name, where)
-        return cursor.fetchone()
-
-    def select_all(self, table_name):
-        """
-        Returns all the rows of the given table
-        :param table_name: str
-        :return rows: [[]]
-        """
-        cursor = self._select_with_all_fields(table_name)
-        return cursor.fetchall()
-
-    def count(self, table_name):
-        """
-        Returns the number of rows of the given table
-        :param table_name: str
-        :return int
-        """
-        cursor = self.connection.cursor()
-        count_command = self.generate_count_command(table_name)
-        cursor.execute(count_command)
-        return cursor.fetchone()[0]
-
-    def drop(self):
-        """
-        Drops the database (deletes the .db file)
-
-        """
-        self.connection.close()
-        if os.path.exists(self._get_db_filepath()):
-            os.remove(self._get_db_filepath())
-
-    def _get_db_filepath(self) -> str:
-        """
-        Returns the path of the .db file
-        :return path: int
-
-        """
-        return os.path.join(self.root_path, self.db_name) + '.db'
-
-    def _initialize_database(self):
-        """
-        Initialize the database with an option's table
-        with the name and the version of the DB
-
-        """
-        options_table_name = 'db_options'
-        columns = ['option_name', 'option_value']
-        self.create_table(options_table_name, columns)
-        self.insert(options_table_name, columns, ['name', self.db_name])
-        self.insert(options_table_name, columns, ['version', self.db_version])
-
-    def _select_with_all_fields(self, table_name: str, where: List[str] = []) -> sqlite3.Cursor:
-        """
-        Returns the cursor of the select command with the given parameters
-        :param table_name: str
-        :param where: [str]
-        :return cursor: Cursor
-        """
-        cursor = self.connection.cursor()
-        count_command = self.generate_select_command(table_name, where[:])
-        cursor.execute(count_command)
-        return cursor
-
-    """
-    Static methods that generates the SQLite commands to make the queries
+    It can be used with any engine supported by SQLAlchemy, such
+    as Postgres, Mongo, MySQL, etc.
     """
 
-    @staticmethod
-    def generate_create_table_command(table_name: str, fields: List[str]) -> str:
-        create_command = 'CREATE TABLE IF NOT EXISTS ' + table_name + ' (' + fields.pop(0)
-        for field in fields:
-            create_command += (', ' + field)
-        create_command += ')'
-        return create_command
+    def __init__(self, connection_url: str, schema: Optional[str] = None) -> None:
+        self.engine: Engine = session.create_engine(connection_url)
+        self.schema = schema
 
-    @staticmethod
-    def generate_drop_table_command(table_name: str) -> str:
-        drop_command = 'DROP TABLE IF EXISTS ' + table_name
-        return drop_command
+    def create_table(self, table_name: str) -> None:
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        with self.engine.connect() as conn:
+            if self.schema:
+                conn.execute(CreateSchema(self.schema, if_not_exists=True))
+            conn.execute(CreateTable(table, if_not_exists=True))
+            conn.commit()
 
-    @staticmethod
-    def generate_insert_command(
-        table_name: str, columns: List[str], values: List[str]
-    ) -> str:
-        insert_command = 'INSERT INTO ' + table_name + '(' + columns.pop(0)
-        for column in columns:
-            insert_command += (', ' + column)
-        insert_command += (') VALUES ("' + str(values.pop(0)) + '"')
-        for value in values:
-            insert_command += (', "' + str(value) + '"')
-        insert_command += ')'
-        return insert_command
+    def drop_table(self, table_name: str) -> None:
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        with self.engine.connect() as conn:
+            conn.execute(DropTable(table, if_exists=True))
+            conn.commit()
 
-    @staticmethod
-    def generate_insert_many_command(table_name: str, num_of_values: int) -> str:
-        insert_command = 'INSERT INTO ' + table_name + ' VALUES (?'
-        num_of_values -= 1
-        while num_of_values > 0:
-            insert_command += ',?'
-            num_of_values -= 1
-        insert_command += ')'
-        return insert_command
+    def insert(self, table_name: str, data: dict[str, Any]) -> None:
+        if not data:
+            return
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        with self.engine.connect() as conn:
+            conn.execute(insert(table), data)
+            conn.commit()
 
-    @staticmethod
-    def generate_count_command(table_name: str) -> str:
-        count_command = 'SELECT count(*) FROM ' + table_name
-        return count_command
+    def insert_many(self, table_name: str, data: list[dict[str, Any]]) -> int:
+        if not data:
+            return 0
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        with self.engine.connect() as conn:
+            result = conn.execute(insert(table), data)
+            conn.commit()
+        return cast(int, result.rowcount)
 
-    @staticmethod
-    def generate_select_command(table_name: str, where: List[str] = []) -> str:
-        basic_select = 'SELECT * FROM ' + table_name
-        select_command = basic_select if len(where) == 0 else basic_select + ' WHERE ' + where.pop(0)
-        for condition in where:
-            select_command += ' AND ' + condition
-        return select_command
-    
-    @staticmethod
-    def generate_delete_command(table_name: str, where: List[str] = []) -> str:
-        delete_command = "DELETE FROM " + table_name + " WHERE " + where.pop(0)
-        for condition in where:
-            delete_command += " AND " + condition
-        return delete_command
+    def select_first_where(self, table_name: str, where: Optional[dict[str, str]]) -> Optional[Any]:
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        query = select(table)
+        if where:
+            for key, value in where.items():
+                query = query.where(getattr(table.c, key) == value)
+        with self.engine.connect() as conn:
+            row = conn.execute(query).first()
+        return row.tuple() if row else None
 
-class DatabaseManager(Protocol):
-    """Common interface for database managers.
-    We used a protocol here to avoid having to modify the existing
-    SQLite code (as we would if we used an abstract/ABC class).
-    And the new database manager will "quack" like the other one does.
-    """
+    def select_all_with_columns(self, table_name: str) -> list[tuple[str, Any]]:
+        """Select rows from a table. Return a list of hasheable tuples."""
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        with self.engine.connect() as conn:
+            rows = conn.execute(select(table)).fetchall()
+        columns = table.c.keys()
+        return [tuple(zip(columns, row)) for row in rows]
 
-    connection: Union[sqlite3.Connection]
+    def select_where_with_columns(
+            self,
+            table,
+            where
+    ) -> List[tuple[str, Any]]:
+        """
+        Select rows from a table with specific columns. Return a list of hashable tuples.
 
-    def backup(self): ...
-    def restore(self): ...
-    def disconnect(self): ...
-    def create_table(self, table_name: str, fields: List[str]): ...
-    def drop_table(self, table_name: str): ...
-    def insert(self, table_name: str, columns: List[str], values: List[str]): ...
-    def insertMany(self, table_name: str, data: List[Union[Iterable, Dict]]): ...
-    def delete_where(self, table_name: str, where: List[str]): ...
-    def select_first(self, table_name: str) -> List[Any]: ...
-    def select_first_where(self, table_name: str, where: List[str]) -> List[Any]: ...
-    def select_all(self, table_name: str) -> List[List[Any]]: ...
-    def select_all_where(self, table_name: str, where: List[str]) -> List[List[Any]]: ...
-    def count(self, table_name: str) -> int: ...
-    def drop(self): ...
+        :param table: Table object or table name to select from.
+        :type table: Table
+        :param where: Dictionary of column:value pairs to filter by, or a SQLAlchemy clause.
+        :type where: Dict[str, Any] | ClauseElement
+        :return: List of tuples containing column-value pairs.
+        :rtype: List[tuple[str, Any]]
+        """
+        self.create_table(table.name)  # Ensure the table exists
 
+        query = select(table)
+        columns = table.c.keys()
 
-def create_db_manager(db_engine: str, **options) -> DatabaseManager:
-    """
-    Creates a Postgres or SQLite database manager based on the Autosubmit configuration.
-    Note that you must provide the options even if they are optional, in which case
-    you must provide ``options=None``, or you will get a ``KeyError``.
-    Later we might be able to drop the SQLite database manager. So, for the moment,
-    please call the function providing the database engine type, and the arguments
-    for both SQLite and for SQLAlchemy.
-    This means you do not have to do an ``if/else`` in your code, just give
-    this function the engine type, and all the valid options, and it should
-    handle choosing and building the database manager for you. e.g.
-    ```python
-    from autosubmit.database.db_manager import create_db_manager
-    options = {
-        # these are for sqlite
-        'root_path': '/tmp/',
-        'db_name': 'name.db',
-        'db_version': 1,
-        # and these for sqlalchemy -- not very elegant, but this is
-        # to work-effectively-with-legacy-code (as in that famous book).
-        'schema': 'a001'
-    }
-    db_manager = create_db_manager(db_engine='postgres', **options)
-    ```
-    :param db_engine: The database engine type.
-    :return: A ``DatabaseManager``.
-    :raises ValueError: If the database engine type is not valid.
-    :raises KeyError: If the ``options`` dictionary is missing a required parameter for an engine.
-    """
-    # TODO Create SqlAlchemyDbManager and add it to the if/else
-    return cast(DatabaseManager, DbManager(options['root_path'], options['db_name'], options['db_version']))
+        if isinstance(where, dict):
+            for key, value in where.items():
+                if key in columns:
+                    column = getattr(table.c, key)
+                    if isinstance(value, list):
+                        query = query.where(column.in_(value))
+                    else:
+                        query = query.where(column == value)
+        else:
+            query = query.where(where)
+
+        with self.engine.connect() as conn:
+            rows = conn.execute(query).fetchall()
+
+        return [tuple(zip(columns, row)) for row in rows]
+
+    def count(self, table_name: str) -> int:
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        with self.engine.connect() as conn:
+            row = conn.execute(select(func.count()).select_from(table))
+            return row.scalar()
+
+    def delete_all(self, table_name: str) -> int:
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        with self.engine.connect() as conn:
+            result = conn.execute(delete(table))
+            conn.commit()
+        return cast(int, result.rowcount)
+
+    def delete_where(self, table_name: str, where) -> int:
+        """
+        Delete rows from a table where the specified conditions are met.
+        Supports both equality and 'IN' queries for list values.
+
+        :param table_name: Name of the table to delete from.
+        :type table_name: str
+        :param where: Dictionary of column names and values (single value or list for IN).
+        :type where: Dict[str, Any]
+        :return: Number of rows deleted.
+        :rtype: int
+        :raises ValueError: If 'where' is empty.
+        """
+        if isinstance(where, ClauseElement):
+            raise NotImplementedError("ClauseElement for delete is not implemented in SQLALCHEMY.")
+
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        query = delete(table)
+
+        if where:
+            for key, value in where.items():
+                column = getattr(table.c, key)
+                if isinstance(value, list):
+                    query = query.where(column.in_(value))
+                else:
+                    query = query.where(column == value)
+        else:
+            raise ValueError(
+                "The 'where' parameter must be a non-empty dictionary. Multiple-table criteria within Delete are not supported.")
+
+        with self.engine.connect() as conn:
+            result = conn.execute(query)
+            conn.commit()
+        return cast(int, result.rowcount)
+
+    def upsert_many(self, table_name: str, data: List[Dict[str, Any]], conflict_cols: List[str]) -> int:
+        """
+        Perform an upsert (update or insert) operation.
+        First delete the affected rows
+        then insert the new data.
+
+        :param table_name: Name of the table.
+        :param data: List of dictionaries containing the data to upsert.
+        :param conflict_cols: List of columns to check for conflicts. ( unique keys and primary keys )
+        :return: Number of rows affected.
+        """
+        if not data:
+            return 0
+
+        table: Table = get_table_from_name(schema=self.schema, table_name=table_name)
+
+        # NOTE general insert doesn't have on_conflict
+        if self.engine.dialect.name == "postgresql":
+            insert_stmt = pg_insert(table).values(data)
+        elif self.engine.dialect.name == "sqlite":
+            insert_stmt = sqlite_insert(table).values(data)
+        else:
+            raise ValueError(f"Unsupported dialect: {self.engine.dialect.name}")
+
+        # add on_conflict clause
+        update_stmt = insert_stmt.on_conflict_do_update(
+            index_elements=conflict_cols,
+            set_={c.name: c for c in insert_stmt.excluded if c.name not in conflict_cols},
+        )
+
+        with self.engine.connect() as conn:
+            result = conn.execute(update_stmt)
+            conn.commit()
+
+        # Return the number of rows affected
+        return cast(int, result.rowcount)
+
+    def count_where(self, table_name: str, where: dict[str, Any]) -> int:
+        """Count the number of rows in a table that match a given condition."""
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        query = select(func.count()).select_from(table)
+        for key, value in where.items():
+            query = query.where(getattr(table.c, key) == value)
+        with self.engine.connect() as conn:
+            row = conn.execute(query).scalar()
+        return cast(int, row) if row is not None else 0
