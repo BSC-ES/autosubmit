@@ -23,17 +23,15 @@ from dataclasses import dataclass
 from datetime import datetime
 from fileinput import FileInput
 from pathlib import Path
-from random import randrange
 from random import seed, randint, choice
 from re import sub
 from textwrap import dedent
 from time import time
-from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Protocol, Tuple, Type
+from typing import TYPE_CHECKING, Any, Optional, Protocol, Type
 
 import pytest
 from pytest_mock import MockerFixture
 from ruamel.yaml import YAML
-from testcontainers.sftp import DockerContainer, wait_for_logs
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
@@ -108,7 +106,7 @@ class AutosubmitExperimentFixture(Protocol):
     def __call__(
             self,
             expid: Optional[str] = None,
-            experiment_data: Optional[Dict] = None,
+            experiment_data: Optional[dict] = None,
             wrapper: Optional[bool] = False,
             create: Optional[bool] = True,
             reload: Optional[bool] = True,
@@ -145,7 +143,7 @@ def autosubmit_exp(
 
     def _create_autosubmit_exp(
             expid: Optional[str] = None,
-            experiment_data: Optional[Dict] = None,
+            experiment_data: Optional[dict] = None,
             wrapper=False,
             reload=True,
             create=True,
@@ -304,7 +302,7 @@ class AutosubmitConfigFactory(Protocol):
     def __call__(
             self,
             expid: str,
-            experiment_data: Optional[Dict] = None,
+            experiment_data: Optional[dict] = None,
             include_basic_config: bool = True,
             *args: Any,
             **kwargs: Any
@@ -355,7 +353,7 @@ def autosubmit_config(
 
     def _create_autosubmit_config(
             expid: str,
-            experiment_data: Dict = None,
+            experiment_data: dict = None,
             include_basic_config: bool = True,
             *_,
             **kwargs
@@ -552,7 +550,7 @@ def create_jobs(
             mock,
             num_jobs,
             max_num_retrials_per_job
-    ) -> List[Job]:
+    ) -> list[Job]:
         jobs = []
         seed(time())
         submit_time = datetime(2023, 1, 1, 10, 0, 0)
@@ -612,27 +610,3 @@ def create_jobs(
         return jobs
 
     return _create_jobs(mocker, request.param[0], request.param[1])
-
-
-@pytest.fixture(scope="function")
-def git_server(tmp_path) -> Generator[Tuple[DockerContainer, Path, str], None, None]:
-    # Start a container to server it -- otherwise, we would have to use
-    # `git -c protocol.file.allow=always submodule ...`, and we cannot
-    # change how Autosubmit uses it in `autosubmit create` (due to bad
-    # code design choices).
-
-    git_repos_path = tmp_path / 'git_repos'
-    git_repos_path.mkdir(exist_ok=True, parents=True)
-
-    http_port = randrange(4000, 4500)
-
-    image = 'githttpd/githttpd:latest'
-    with DockerContainer(image=image, remove=True) \
-            .with_bind_ports(80, http_port) \
-            .with_volume_mapping(str(git_repos_path), '/opt/git-server', mode='rw') as container:
-        wait_for_logs(container, "Command line: 'httpd -D FOREGROUND'")
-
-        # The docker image ``githttpd/githttpd`` creates an HTTP server for Git
-        # repositories, using the volume bound onto ``/opt/git-server`` as base
-        # for any subdirectory, the Git URL becoming ``git/{subdirectory-name}}``.
-        yield container, git_repos_path, f'http://localhost:{http_port}/git'

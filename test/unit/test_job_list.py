@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+"""Tests for the ``JobList`` class."""
+
 import shutil
 from copy import copy
 from pathlib import Path
@@ -22,17 +24,15 @@ from random import randrange
 
 import networkx
 import pytest
-from autosubmit.config.yamlparser import YAMLParserFactory
 from networkx import DiGraph  # type: ignore
 
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_common import Type
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
-
-"""Tests for the ``JobList`` class."""
+from autosubmit.job.template import Language
 
 _EXPID = 'a000'
 
@@ -172,7 +172,7 @@ def test_load(mocker, as_conf, empty_job_list):
         parameters=parameters,
         date_format='H',
         default_retrials=9999,
-        default_job_type=Type.BASH,
+        default_job_type=Language.BASH,
         wrapper_jobs={},
         new=True,
         create=True,
@@ -366,7 +366,7 @@ def test_that_create_method_makes_the_correct_calls(mocker, empty_job_list, as_c
         parameters=parameters,
         date_format='H',
         default_retrials=9999,
-        default_job_type=Type.BASH,
+        default_job_type=Language.BASH,
         wrapper_jobs={},
         new=True,
         create=True,
@@ -379,7 +379,7 @@ def test_that_create_method_makes_the_correct_calls(mocker, empty_job_list, as_c
     assert job_list._chunk_list == list(range(1, num_chunks + 1))
 
     cj_args, cj_kwargs = job_list._create_jobs.call_args  # type: ignore
-    assert 0 == cj_args[2]
+    assert Language.BASH == cj_args[2]
 
     # _add_dependencies(date_list, member_list, chunk_list, dic_jobs, option="DEPENDENCIES"):
 
@@ -399,11 +399,11 @@ def test_that_create_job_method_calls_dic_jobs_method_with_increasing_priority(m
     dic_mock.experiment_data = dict()
     dic_mock.experiment_data["JOBS"] = {'fake-section-1': {}, 'fake-section-2': {}}
     # act
-    JobList._create_jobs(dic_mock, 0, Type.BASH)
+    JobList._create_jobs(dic_mock, 0, Language.BASH)
 
     # arrange
-    dic_mock.read_section.assert_any_call('fake-section-1', 0, Type.BASH)
-    dic_mock.read_section.assert_any_call('fake-section-2', 1, Type.BASH)
+    dic_mock.read_section.assert_any_call('fake-section-1', 0, Language.BASH)
+    dic_mock.read_section.assert_any_call('fake-section-2', 1, Language.BASH)
 
 
 def test_run_member(job_list, mocker, as_conf, empty_job_list):
@@ -446,7 +446,7 @@ def test_run_member(job_list, mocker, as_conf, empty_job_list):
         parameters=parameters,
         date_format='H',
         default_retrials=1,
-        default_job_type=Type.BASH,
+        default_job_type=Language.BASH,
         wrapper_jobs={},
         new=True,
         create=True,
@@ -501,7 +501,7 @@ def test_create_dictionary(job_list, mocker, as_conf, empty_job_list):
         parameters=as_conf.load_parameters(),
         date_format='H',
         default_retrials=1,
-        default_job_type=Type.BASH,
+        default_job_type=Language.BASH,
         wrapper_jobs={},
         new=True,
         create=True
@@ -568,7 +568,7 @@ def test_generate_job_list_from_monitor_run(as_conf, mocker, empty_job_list):
         parameters=parameters,
         date_format='H',
         default_retrials=9999,
-        default_job_type=Type.BASH,
+        default_job_type=Language.BASH,
         wrapper_jobs={},
         new=True,
         create=True,
@@ -585,7 +585,7 @@ def test_generate_job_list_from_monitor_run(as_conf, mocker, empty_job_list):
         parameters=parameters,
         date_format='H',
         default_retrials=9999,
-        default_job_type=Type.BASH,
+        default_job_type=Language.BASH,
         wrapper_jobs={},
         new=False,
         create=True,
@@ -616,7 +616,7 @@ def test_generate_job_list_from_monitor_run(as_conf, mocker, empty_job_list):
         parameters=parameters,
         date_format='H',
         default_retrials=9999,
-        default_job_type=Type.BASH,
+        default_job_type=Language.BASH,
         wrapper_jobs={},
         new=False,
     )
@@ -652,7 +652,7 @@ def test_generate_job_list_from_monitor_run(as_conf, mocker, empty_job_list):
         parameters=parameters,
         date_format='H',
         default_retrials=9999,
-        default_job_type=Type.BASH,
+        default_job_type=Language.BASH,
         wrapper_jobs={},
         new=False,
         create=True,
@@ -673,7 +673,7 @@ def test_generate_job_list_from_monitor_run(as_conf, mocker, empty_job_list):
         parameters=parameters,
         date_format='H',
         default_retrials=9999,
-        default_job_type=Type.BASH,
+        default_job_type=Language.BASH,
         wrapper_jobs={},
         new=False,
     )
@@ -691,7 +691,7 @@ def test_generate_job_list_from_monitor_run(as_conf, mocker, empty_job_list):
         parameters=parameters,
         date_format='H',
         default_retrials=9999,
-        default_job_type=Type.BASH,
+        default_job_type=Language.BASH,
         wrapper_jobs={},
         new=False,
     )

@@ -15,14 +15,26 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+"""This integration test runs jobs with the Slurm platform and verifies
+if the database values were created correctly. Previously, this file was
+called ``test_run_command_integration.py`` and it used the ``LOCAL``
+platform with wrappers -- the ``LOCAL`` platform had wrappers support
+removed in #2550 after we introduced Docker containers to run integration
+tests (and because the implementation of wrappers for local platforms was
+an extra and not very well-tested)."""
+
 import os
 import pwd
 import sqlite3
 from pathlib import Path
 from textwrap import dedent
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from testcontainers.core.container import DockerContainer
+    from test.conftest import AutosubmitExperiment
 
 _EXPID = 't000'
 """The experiment ID used throughout the test."""
@@ -100,9 +112,8 @@ def _print_db_results(db_check_list, rows_as_dicts, run_tmpdir):
 
 
 def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[str, (bool, str)]:
-    """
-    Check that the database contains the expected number of entries, and that all fields contain data after a completed run.
-    """
+    """Check that the database contains the expected number of entries,
+    and that all fields contain data after a completed run."""
     # Test database exists.
     job_data_db = run_tmpdir / f'metadata/data/job_data_{_EXPID}.db'
     autosubmit_db = Path(run_tmpdir, "tests.db")
@@ -116,7 +127,7 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[s
     with sqlite3.connect(job_data_db) as conn:
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        c.execute("SELECT * FROM job_data")
+        c.execute("SELECT * FROM job_data ORDER BY job_name, counter")
         rows = c.fetchall()
         db_check_list["JOB_DATA_ENTRIES"] = len(rows) == expected_entries, \
             f"Expected {expected_entries} entries, found {len(rows)}"
@@ -252,7 +263,7 @@ def _check_files_recovered(as_conf, log_dir, expected_files) -> dict:
     for f in log_dir.glob('*'):
         files_check_list[f.name] = not any(
             str(f).endswith(f".{i}.err") or str(f).endswith(f".{i}.out") for i in range(retrials + 1))
-    stat_files = [str(f).split("_")[-1] for f in log_dir.glob('*') if "STAT" in str(f)]
+    stat_files = [str(f).split("_")[-1] for f in log_dir.parent.glob('*') if "STAT" in str(f)]
     for i in range(retrials + 1):
         files_check_list[f"STAT_{i}"] = str(i) in stat_files
 
@@ -322,7 +333,8 @@ def _init_run(as_exp, jobs_data) -> Path:
 
 # -- Tests
 
-@pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
+@pytest.mark.slurm
+@pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
     (dedent("""\
     EXPERIMENT:
@@ -332,9 +344,20 @@ def _init_run(as_exp, jobs_data) -> Path:
             SCRIPT: |
                 echo "Hello World with id=Success"
                 sleep 1
-            PLATFORM: local
+            PLATFORM: TEST_SLURM
             RUNNING: chunk
             wallclock: 00:01
+    PLATFORMS:
+        TEST_SLURM:
+            ADD_PROJECT_TO_HOST: 'False'
+            HOST: '127.0.0.1'
+            MAX_WALLCLOCK: '00:03'
+            PROJECT: 'group'
+            QUEUE: 'gp_debug'
+            SCRATCH_DIR: '/tmp/scratch/'
+            TEMP_DIR: ''
+            TYPE: 'slurm'
+            USER: 'root'
     """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
 
     # Success wrapper
@@ -347,7 +370,7 @@ def _init_run(as_exp, jobs_data) -> Path:
                 echo "Hello World with id=Success + wrappers"
                 sleep 1
             DEPENDENCIES: job-1
-            PLATFORM: local
+            PLATFORM: TEST_SLURM
             RUNNING: chunk
             wallclock: 00:01
 
@@ -356,7 +379,7 @@ def _init_run(as_exp, jobs_data) -> Path:
                 echo "Hello World with id=Success + wrappers"
                 sleep 1
             DEPENDENCIES: job2-1
-            PLATFORM: local
+            PLATFORM: TEST_SLURM
             RUNNING: chunk
             wallclock: 00:01
 
@@ -367,6 +390,18 @@ def _init_run(as_exp, jobs_data) -> Path:
         wrapper2:
             JOBS_IN_WRAPPER: job2
             TYPE: vertical
+            
+    PLATFORMS:
+        TEST_SLURM:
+            ADD_PROJECT_TO_HOST: 'False'
+            HOST: '127.0.0.1'
+            MAX_WALLCLOCK: '00:03'
+            PROJECT: 'group'
+            QUEUE: 'gp_debug'
+            SCRATCH_DIR: '/tmp/scratch/'
+            TEMP_DIR: ''
+            TYPE: 'slurm'
+            USER: 'root'
     """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
 
     # Failure
@@ -378,10 +413,21 @@ def _init_run(as_exp, jobs_data) -> Path:
             SCRIPT: |
                 sleep 2
                 d_echo "Hello World with id=FAILED"
-            PLATFORM: local
+            PLATFORM: TEST_SLURM
             RUNNING: chunk
             wallclock: 00:01
             retrials: 2  # In local, it started to fail at 18 retrials.
+    PLATFORMS:
+        TEST_SLURM:
+            ADD_PROJECT_TO_HOST: 'False'
+            HOST: '127.0.0.1'
+            MAX_WALLCLOCK: '00:03'
+            PROJECT: 'group'
+            QUEUE: 'gp_debug'
+            SCRATCH_DIR: '/tmp/scratch/'
+            TEMP_DIR: ''
+            TYPE: 'slurm'
+            USER: 'root'
     """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
 
     # Failure wrappers
@@ -391,7 +437,7 @@ def _init_run(as_exp, jobs_data) -> Path:
             SCRIPT: |
                 sleep 2
                 d_echo "Hello World with id=FAILED + wrappers"
-            PLATFORM: local
+            PLATFORM: TEST_SLURM
             DEPENDENCIES: job-1
             RUNNING: chunk
             wallclock: 00:10
@@ -400,6 +446,17 @@ def _init_run(as_exp, jobs_data) -> Path:
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
+    PLATFORMS:
+        TEST_SLURM:
+            ADD_PROJECT_TO_HOST: 'False'
+            HOST: '127.0.0.1'
+            MAX_WALLCLOCK: '00:10'
+            PROJECT: 'group'
+            QUEUE: 'gp_debug'
+            SCRATCH_DIR: '/tmp/scratch/'
+            TEMP_DIR: ''
+            TYPE: 'slurm'
+            USER: 'root'
     """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
 ], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
 def test_run_uninterrupted(
@@ -407,7 +464,9 @@ def test_run_uninterrupted(
         jobs_data,
         expected_db_entries,
         final_status,
-        wrapper_type):
+        wrapper_type,
+        slurm_server: 'DockerContainer'
+):
     as_conf = as_exp.as_conf
     log_dir = _init_run(as_exp, jobs_data)
 
@@ -441,7 +500,8 @@ def test_run_uninterrupted(
         pytest.fail(e_msg)
 
 
-@pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
+@pytest.mark.slurm
+@pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
     (dedent("""\
     EXPERIMENT:
@@ -451,9 +511,20 @@ def test_run_uninterrupted(
             SCRIPT: |
                 echo "Hello World with id=Success"
                 sleep 1
-            PLATFORM: local
+            PLATFORM: TEST_SLURM
             RUNNING: chunk
             wallclock: 00:01
+    PLATFORMS:
+        TEST_SLURM:
+            ADD_PROJECT_TO_HOST: 'False'
+            HOST: '127.0.0.1'
+            MAX_WALLCLOCK: '00:03'
+            PROJECT: 'group'
+            QUEUE: 'gp_debug'
+            SCRATCH_DIR: '/tmp/scratch/'
+            TEMP_DIR: ''
+            TYPE: 'slurm'
+            USER: 'root'
     """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
 
     # Success wrapper
@@ -466,7 +537,7 @@ def test_run_uninterrupted(
                 echo "Hello World with id=Success + wrappers"
                 sleep 1
             DEPENDENCIES: job-1
-            PLATFORM: local
+            PLATFORM: TEST_SLURM
             RUNNING: chunk
             wallclock: 00:01
 
@@ -475,7 +546,7 @@ def test_run_uninterrupted(
                 echo "Hello World with id=Success + wrappers"
                 sleep 1
             DEPENDENCIES: job2-1
-            PLATFORM: local
+            PLATFORM: TEST_SLURM
             RUNNING: chunk
             wallclock: 00:01
 
@@ -486,6 +557,18 @@ def test_run_uninterrupted(
         wrapper2:
             JOBS_IN_WRAPPER: job2
             TYPE: vertical
+            
+    PLATFORMS:
+        TEST_SLURM:
+            ADD_PROJECT_TO_HOST: 'False'
+            HOST: '127.0.0.1'
+            MAX_WALLCLOCK: '00:03'
+            PROJECT: 'group'
+            QUEUE: 'gp_debug'
+            SCRATCH_DIR: '/tmp/scratch/'
+            TEMP_DIR: ''
+            TYPE: 'slurm'
+            USER: 'root'
     """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
 
     # Failure
@@ -497,10 +580,21 @@ def test_run_uninterrupted(
             SCRIPT: |
                 sleep 2
                 d_echo "Hello World with id=FAILED"
-            PLATFORM: local
+            PLATFORM: TEST_SLURM
             RUNNING: chunk
             wallclock: 00:01
             retrials: 2  # In local, it started to fail at 18 retrials.
+    PLATFORMS:
+        TEST_SLURM:
+            ADD_PROJECT_TO_HOST: 'False'
+            HOST: '127.0.0.1'
+            MAX_WALLCLOCK: '00:03'
+            PROJECT: 'group'
+            QUEUE: 'gp_debug'
+            SCRATCH_DIR: '/tmp/scratch/'
+            TEMP_DIR: ''
+            TYPE: 'slurm'
+            USER: 'root'
     """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
 
     # Failure wrappers
@@ -510,7 +604,7 @@ def test_run_uninterrupted(
             SCRIPT: |
                 sleep 2
                 d_echo "Hello World with id=FAILED + wrappers"
-            PLATFORM: local
+            PLATFORM: TEST_SLURM
             DEPENDENCIES: job-1
             RUNNING: chunk
             wallclock: 00:10
@@ -519,14 +613,27 @@ def test_run_uninterrupted(
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
+    PLATFORMS:
+        TEST_SLURM:
+            ADD_PROJECT_TO_HOST: 'False'
+            HOST: '127.0.0.1'
+            MAX_WALLCLOCK: '00:10'
+            PROJECT: 'group'
+            QUEUE: 'gp_debug'
+            SCRATCH_DIR: '/tmp/scratch/'
+            TEMP_DIR: ''
+            TYPE: 'slurm'
+            USER: 'root'
     """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
 ], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
 def test_run_interrupted(
-        as_exp,
-        jobs_data,
-        expected_db_entries,
-        final_status,
-        wrapper_type):
+        jobs_data: str,
+        expected_db_entries: int,
+        final_status: str,
+        wrapper_type: str,
+        as_exp: 'AutosubmitExperiment',
+        slurm_server: 'DockerContainer'
+):
     as_conf = as_exp.as_conf
     log_dir = _init_run(as_exp, jobs_data)
 

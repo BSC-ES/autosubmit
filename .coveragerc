@@ -14,6 +14,7 @@ disable_warnings =
     module-not-measured
 omit =
     tests/*
+    autosubmit/job/template/common.py
 parallel = True
 source = ./autosubmit
 timid = False
@@ -45,6 +46,7 @@ fail_under=0
 ignore_errors = False
 omit =
     tests/*
+    autosubmit/job/template/common.py
 precision = 2
 show_missing = False
 skip_covered = False

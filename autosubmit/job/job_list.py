@@ -1937,7 +1937,6 @@ class JobList(object):
             return all_jobs
 
     def update_two_step_jobs(self):
-        prev_jobs_to_run_first = self.jobs_to_run_first
         if len(self.jobs_to_run_first) > 0:
             self.jobs_to_run_first = [job for job in self.jobs_to_run_first
                                       if job.status != Status.COMPLETED]
@@ -1954,10 +1953,7 @@ class JobList(object):
                                          7014)
 
     def parse_jobs_by_filter(self, unparsed_jobs, two_step_start=True):
-        jobs_to_run_first = list()
         select_jobs_by_name = ""  # job_name
-        select_all_jobs_by_section = ""  # all
-        filter_jobs_by_section = ""  # Select, chunk / member
         if "&" in unparsed_jobs:  # If there are explicit jobs add them
             jobs_to_check = unparsed_jobs.split("&")
             select_jobs_by_name = jobs_to_check[0]
