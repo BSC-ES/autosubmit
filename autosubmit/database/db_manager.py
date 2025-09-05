@@ -83,12 +83,6 @@ class DbManager:
             row = conn.execute(query).first()
         return row.tuple() if row else None
 
-    def select_all(self, table_name: str) -> list[Any]:
-        table = get_table_from_name(schema=self.schema, table_name=table_name)
-        with self.engine.connect() as conn:
-            rows = conn.execute(select(table)).all()
-        return [row.tuple() for row in rows]
-
     def select_all_with_columns(self, table_name: str) -> list[tuple[str, Any]]:
         """Select rows from a table. Return a list of hasheable tuples."""
         table = get_table_from_name(schema=self.schema, table_name=table_name)
@@ -96,15 +90,6 @@ class DbManager:
             rows = conn.execute(select(table)).fetchall()
         columns = table.c.keys()
         return [tuple(zip(columns, row)) for row in rows]
-
-    def select_where(self, table_name: str, where: dict[str, Any]) -> list[Any]:
-        table = get_table_from_name(schema=self.schema, table_name=table_name)
-        query = select(table)
-        for key, value in where.items():
-            query = query.where(getattr(table.c, key) == value)
-        with self.engine.connect() as conn:
-            rows = conn.execute(query).all()
-        return [row.tuple() for row in rows]
 
     def select_where_with_columns(
             self,
@@ -236,13 +221,3 @@ class DbManager:
         with self.engine.connect() as conn:
             row = conn.execute(query).scalar()
         return cast(int, row) if row is not None else 0
-
-    def reset_table(self, table_name: str) -> None:
-        """
-        Drop and recreate a table in the database.
-
-        :param table_name: Name of the table to reset.
-        :type table_name: str
-        """
-        self.drop_table(table_name)
-        self.create_table(table_name)
