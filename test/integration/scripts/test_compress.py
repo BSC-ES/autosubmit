@@ -29,10 +29,12 @@ _EXPID = "t111"
 
 
 @pytest.mark.parametrize(
-    "dry_run",
-    [True, False],
+    "dry_run, compress_type",
+    [(True, "gzip"), (False, "gzip"), (True, "xz"), (False, "xz")],
 )
-def test_autosubmit_compresslogs(autosubmit_exp, mocker, dry_run: bool):
+def test_autosubmit_compresslogs(
+    autosubmit_exp, mocker, dry_run: bool, compress_type: str
+):
     exp = autosubmit_exp(_EXPID, experiment_data={})
 
     # autosubmit: Autosubmit = exp.autosubmit
@@ -41,6 +43,7 @@ def test_autosubmit_compresslogs(autosubmit_exp, mocker, dry_run: bool):
     cmd = ["autosubmit", "compresslogs"]
     if dry_run:
         cmd.append("--dry-run")
+    cmd.append(f"--compress-type={compress_type}")
     cmd.append(_EXPID)
 
     mocker.patch("sys.argv", cmd)
@@ -52,23 +55,33 @@ def test_autosubmit_compresslogs(autosubmit_exp, mocker, dry_run: bool):
     )
     aslogs_files = list(aslogs_folder.iterdir())
 
+    extension = "gz" if compress_type == "gzip" else "xz"
     if dry_run:
         assert len(aslogs_files) > 0 and not any(
-            f.name.endswith(".xz") for f in aslogs_files
+            f.name.endswith(f".{extension}") for f in aslogs_files
         )
     else:
         assert len(aslogs_files) > 0 and any(
-            f.name.endswith(".xz") for f in aslogs_files
+            f.name.endswith(f".{extension}") for f in aslogs_files
         )
 
-
-def test_autosubmit_compresslogs_option(autosubmit_exp, mocker):
+@pytest.mark.parametrize("compression_type", ["gzip", "xz"])
+def test_autosubmit_compresslogs_option(autosubmit_exp, mocker, compression_type: str):
     exp = autosubmit_exp(_EXPID, experiment_data={})
 
     # autosubmit: Autosubmit = exp.autosubmit
     as_conf: AutosubmitConfig = exp.as_conf
 
-    mocker.patch("sys.argv", ["autosubmit", "--compresslogs", "create", "-np", _EXPID])
+    cmd = [
+        "autosubmit",
+        "--compresslogs",
+        f"--compress-type={compression_type}",
+        "create",
+        "-np",
+        _EXPID,
+    ]
+
+    mocker.patch("sys.argv", cmd)
 
     assert 0 == main()
 
@@ -77,8 +90,9 @@ def test_autosubmit_compresslogs_option(autosubmit_exp, mocker):
     )
     aslogs_files = list(aslogs_folder.iterdir())
 
+    extension = "gz" if compression_type == "gzip" else "xz"
     assert (
         len(aslogs_files) > 0
-        and any(f.name.endswith("_create.log.xz") for f in aslogs_files)
-        and any(f.name.endswith("_create_err.log.xz") for f in aslogs_files)
+        and any(f.name.endswith(f"_create.log.{extension}") for f in aslogs_files)
+        and any(f.name.endswith(f"_create_err.log.{extension}") for f in aslogs_files)
     )
