@@ -38,7 +38,7 @@ from paramiko.agent import Agent
 from paramiko.ssh_exception import (SSHException)
 
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_common import Type
+from autosubmit.job.template import Language
 from autosubmit.log.log import AutosubmitError, AutosubmitCritical, Log
 from autosubmit.platforms.platform import Platform
 
@@ -230,7 +230,7 @@ class ParamikoPlatform(Platform):
             raise AutosubmitCritical(
                 'Cant connect to this platform due an unknown error', 7050, str(e))
 
-    def agent_auth(self,port):
+    def agent_auth(self, port):
         """
         Attempt to authenticate to the given SSH server using the most common authentication methods available.
             This will always try to use the SSH agent first, and will fall back to using the others methods if
@@ -821,8 +821,7 @@ class ParamikoPlatform(Platform):
         :return: current job status
         :rtype: autosubmit.job.job_common.Status
         """
-        job_status = Status.UNKNOWN
-        remote_logs = as_conf.get_copy_remote_logs()
+        as_conf.get_copy_remote_logs()
         job_list_cmd = self.parse_joblist(job_list)
         cmd = self.get_checkAlljobs_cmd(job_list_cmd)
         sleep_time = 5
@@ -854,11 +853,11 @@ class ParamikoPlatform(Platform):
             Log.debug('Successful check job command')
             in_queue_jobs = []
             list_queue_jobid = ""
-            for job,job_prev_status in job_list:
+            for job, job_prev_status in job_list:
                 if not slurm_error:
                     job_id = job.id
                     job_status = self.parse_Alljobs_output(job_list_status, job_id)
-                    while len(job_status) <= 0 and retries >= 0:
+                    while len(job_status) <= 0 <= retries:
                         retries -= 1
                         self.send_command(cmd)
                         job_list_status = self.get_ssh_output()
@@ -1315,34 +1314,24 @@ class ParamikoPlatform(Platform):
     def get_ssh_output_err(self):
         return self._ssh_output_err
 
-    def get_call(self, job_script, job, export="none",timeout=-1):
-        """
-        Gets execution command for given job
+    def get_call(self, job_script: str, job: 'Job', export="none", timeout=-1) -> str:
+        """Gets execution command for given job.
 
-        :param timeout:
-        :param export:
-        :param job: job
-        :type job: Job
         :param job_script: script to run
-        :type job_script: str
+        :param job: job
+        :param export:
+        :param timeout:
         :return: command to execute script
-        :rtype: str
         """
-        if job: # If job is None, it is a wrapper. ( 0 clarity there, to be improved in a rework TODO )
-            executable = ''
-            if job.type == Type.BASH:
-                executable = 'bash'
-            elif job.type == Type.PYTHON:
-                executable = 'python3'
-            elif job.type == Type.PYTHON2:
-                executable = 'python2'
-            elif job.type == Type.R:
-                executable = 'Rscript'
+        # If job is None, it is a wrapper. ( 0 clarity there, to be improved in a rework TODO )
+        if job:
             if job.executable != '':
-                executable = '' # Alternative: use job.executable with substituted placeholders
+                executable = ''  # Alternative: use job.executable with substituted placeholders
+            else:
+                executable = Language.get_executable(job.type)
             remote_logs = (job.script_name + ".out."+str(job.fail_count), job.script_name + ".err."+str(job.fail_count))
         else:
-            executable = 'python3' # wrappers are always python3
+            executable = Language.get_executable(Language.EMPTY)  # wrappers are always python3
             remote_logs = (f"{job_script}.out", f"{job_script}.err")
 
         if timeout < 1:

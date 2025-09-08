@@ -25,6 +25,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from textwrap import dedent
 from time import time
+from typing import Optional
 
 import pytest
 from bscearth.utils.date import date2str
@@ -40,7 +41,9 @@ from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.job.job_utils import get_job_package_code, SubJob, SubJobManager
+from autosubmit.job.template import Language
 from autosubmit.log.log import AutosubmitCritical
+from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
@@ -161,14 +164,12 @@ class TestJob:
         applies: "Actually one mock, but that's for something in the AutosubmitConfigParser that can
         be modified to remove the need of that mock."
         """
-
-        # set up
-
-        expid = 'zzyy'
+        expid = 't000'
 
         with tempfile.TemporaryDirectory() as temp_dir:
             Path(temp_dir, expid).mkdir()
-            # FIXME: (Copied from Bruno) Not sure why but the submitted and Slurm were using the $expid/tmp/ASLOGS folder?
+            # FIXME: (Copied from Bruno) Not sure why but the submitted and
+            #        Slurm were using the $expid/tmp/ASLOGS folder?
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
                          f'{expid}/conf', f'{expid}/proj/project_files']:
                 Path(temp_dir, path).mkdir()
@@ -371,7 +372,7 @@ CONFIG:
                                 job.check_script(config, parameters)
                                 # create the script
                                 job.create_script(config)
-                                with open(Path(temp_dir, f'{expid}/tmp/zzyy_A.cmd'), 'r') as file:
+                                with open(Path(temp_dir, f'{expid}/tmp/t000_A.cmd'), 'r') as file:
                                     full_script = file.read()
                                     if "header" in extended_position:
                                         assert header_content in full_script
@@ -407,11 +408,11 @@ CONFIG:
                                     if extended_position == "header tailer" or extended_position == "header":
                                         assert context.value.message == \
                                                f"Extended header script: script {header_file_name} seems " \
-                                               f"{extended_type} but job zzyy_A.cmd isn't\n"
+                                               f"{extended_type} but job t000_A.cmd isn't\n"
                                     else:  # extended_position == "tailer"
                                         assert context.value.message == \
                                                f"Extended tailer script: script {tailer_file_name} seems " \
-                                               f"{extended_type} but job zzyy_A.cmd isn't\n"
+                                               f"{extended_type} but job t000_A.cmd isn't\n"
                         else:  # extended_position == "neither"
                             # assert it doesn't exist
                             # load the parameters
@@ -419,7 +420,7 @@ CONFIG:
                             # create the script
                             job.create_script(config)
                             # finally, if we don't have scripts, check if the placeholders have been removed
-                            with open(Path(temp_dir, f'{expid}/tmp/zzyy_A.cmd'), 'r') as file:
+                            with open(Path(temp_dir, f'{expid}/tmp/t000_A.cmd'), 'r') as file:
                                 final_script = file.read()
                                 assert "%EXTENDED_HEADER%" not in final_script
                                 assert "%EXTENDED_TAILER%" not in final_script
@@ -429,7 +430,7 @@ CONFIG:
         Test job platforms with a platform. Builds job and platform using YAML data, without mocks.
         :return:
         """
-        expid = "zzyy"
+        expid = "t000"
         with tempfile.TemporaryDirectory() as temp_dir:
             BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
             Path(temp_dir, expid).mkdir()
@@ -541,14 +542,12 @@ CONFIG:
         applies: "Actually one mock, but that's for something in the AutosubmitConfigParser that can
         be modified to remove the need of that mock."
         """
-
-        # set up
-
-        expid = 'zzyy'
+        expid = 't000'
 
         with tempfile.TemporaryDirectory() as temp_dir:
             Path(temp_dir, expid).mkdir()
-            # FIXME: (Copied from Bruno) Not sure why but the submitted and Slurm were using the $expid/tmp/ASLOGS folder?
+            # FIXME: (Copied from Bruno) Not sure why but the submitted
+            #  and Slurm were using the $expid/tmp/ASLOGS folder?
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
                          f'{expid}/conf', f'{expid}/proj/project_files']:
                 Path(temp_dir, path).mkdir()
@@ -751,8 +750,9 @@ CONFIG:
                         # pick ur single job
                         job = job_list[0]
                         with suppress(Exception):
-                            job.update_parameters(config,
-                                                  set_attributes=True)  # TODO quick fix. This sets some attributes and eventually fails, should be fixed in the future
+                            # TODO quick fix. This sets some attributes and eventually fails,
+                            #  should be fixed in the future
+                            job.update_parameters(config, set_attributes=True)
 
                         if extended_position == "header" or extended_position == "tailer" or extended_position == "header tailer":
                             if extended_type == script_type:
@@ -760,7 +760,7 @@ CONFIG:
                                 job.check_script(config, parameters)
                                 # create the script
                                 job.create_script(config)
-                                with open(Path(temp_dir, f'{expid}/tmp/zzyy_A.cmd'), 'r') as file:
+                                with open(Path(temp_dir, f'{expid}/tmp/t000_A.cmd'), 'r') as file:
                                     full_script = file.read()
                                     if "header" in extended_position:
                                         assert header_content in full_script
@@ -796,11 +796,11 @@ CONFIG:
                                     if extended_position == "header tailer" or extended_position == "header":
                                         assert context.value.message == \
                                                f"Extended header script: script {header_file_name} seems " \
-                                               f"{extended_type} but job zzyy_A.cmd isn't\n"
+                                               f"{extended_type} but job t000_A.cmd isn't\n"
                                     else:  # extended_position == "tailer"
                                         assert context.value.message == \
                                                f"Extended tailer script: script {tailer_file_name} seems " \
-                                               f"{extended_type} but job zzyy_A.cmd isn't\n"
+                                               f"{extended_type} but job t000_A.cmd isn't\n"
                         else:  # extended_position == "neither"
                             # assert it doesn't exist
                             # load the parameters
@@ -808,7 +808,7 @@ CONFIG:
                             # create the script
                             job.create_script(config)
                             # finally, if we don't have scripts, check if the placeholders have been removed
-                            with open(Path(temp_dir, f'{expid}/tmp/zzyy_A.cmd'), 'r') as file:
+                            with open(Path(temp_dir, f'{expid}/tmp/t000_A.cmd'), 'r') as file:
                                 final_script = file.read()
                                 assert "%EXTENDED_HEADER%" not in final_script
                                 assert "%EXTENDED_TAILER%" not in final_script
@@ -820,7 +820,7 @@ CONFIG:
         be modified to remove the need of that mock.
         """
 
-        expid = 'zzyy'
+        expid = 't000'
 
         for reservation in [None, '', '  ', 'some-string', 'a', '123', 'True']:
             reservation_string = '' if not reservation else f'RESERVATION: "{reservation}"'
@@ -1192,7 +1192,7 @@ CONFIG:
     def test_calendar(self):
         split = 12
         splitsize = 2
-        expid = 'zzyy'
+        expid = 't000'
         with tempfile.TemporaryDirectory() as temp_dir:
             BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
             Path(temp_dir, expid).mkdir()
@@ -1444,13 +1444,9 @@ def test_construct_real_additional_file_name(file_name: str, job_name: str, expi
     Test the construct_real_additional_file_name method for various file name patterns.
 
     :param file_name: The input file name.
-    :type file_name: str
     :param job_name: The job name to use.
-    :type job_name: str
     :param expid: The experiment id to use.
-    :type expid: str
     :param expected: The expected output file name.
-    :type expected: str
     """
     job = Job(name=job_name)
     job.expid = expid
@@ -2091,18 +2087,101 @@ def test_wrapper_job_cancel_failed_wrapper_job_error(autosubmit_config, mocker):
 
 
 @pytest.mark.parametrize(
-    'pid_found',
-    [True, False]
+    'job_language',
+    [
+        language for language in Language
+    ]
 )
-def test_wrapper_job_cancel_failed_local_send_command_pid_not_found(pid_found, autosubmit_config, mocker):
-    """Test that when a pid is not found for a local platform, the command is not sent."""
+def test_checkpoint(job_language: Language):
+    job = Job(_EXPID, '1', 'WAITING', 0, None)
+    job.type = job_language
+    assert job.checkpoint == job_language.checkpoint
+
+
+@pytest.mark.parametrize(
+    'wallclock,platform_name,expected_wallclock',
+    [
+        [None, 'ps', '00:00'],
+        [None, 'local', '00:00'],
+        [None, 'primeval', '01:59'],
+        ['', 'ps', '00:00'],
+        ['', 'local', '00:00'],
+        ['', 'primeval', '01:59'],
+        ['03:15', 'ps', '03:15'],
+        ['03:15', 'local', '03:15'],
+        ['03:15', 'primeval', '03:15'],
+    ]
+)
+def test_process_scheduler_parameters_wallclock(wallclock: Optional[str], platform_name: str, expected_wallclock: str,
+                                                autosubmit_config):
+    """Test that if the ``process_scheduler_parameters`` call sets wallclocks by default."""
     as_conf = autosubmit_config(_EXPID, {})
-    platform = mocker.MagicMock()
-    platform.get_pscall.return_value = pid_found
-    wrapper_job = WrapperJob(_EXPID, 1, 'WAITING', 0, [], '00:30', platform, as_conf, False)
-    wrapper_job.platform_name = 'local'
-    wrapper_job.processors = 2  # not serial
 
-    wrapper_job.cancel_failed_wrapper_job()
+    job = Job(_EXPID, '1', 'WAITING', 0, None)
+    job._init_runtime_parameters()
+    job.het['HETSIZE'] = 1
+    job.wallclock = wallclock
+    # FIXME: Job constructor and ``_init_runtime_parameters`` do not fully initialize the object!
+    #        ``custom_directives`` appears to be initialized in one of the ``update_`` functions.
+    #        This makes testing and maintaining the code harder (and more risky -- more bugs).
+    job.custom_directives = []
 
-    assert platform.send_command.called == pid_found
+    # The code distinguishes between [ps, local] versus anything else. Testing these three
+    # we cover the whole domain of values.
+    if platform_name == 'local':
+        job.platform = LocalPlatform(_EXPID, platform_name, as_conf.experiment_data)
+    elif platform_name == 'ps':
+        job.platform = PsPlatform(_EXPID, platform_name, as_conf.experiment_data)
+    else:
+        job.platform = SlurmPlatform(_EXPID, platform_name, as_conf.experiment_data)
+
+    assert job.het['HETSIZE'] == 1
+    job.process_scheduler_parameters(job.platform, 1)
+    assert 'HETSIZE' not in job.het
+    assert not job.het
+    assert job.wallclock == expected_wallclock
+
+
+@pytest.mark.parametrize(
+    'platform_name',
+    [
+        None,
+        'local'
+    ]
+)
+def test_update_dict_parameters_invalid_script_language(platform_name: Optional[str], autosubmit_config):
+    """Test that the ``update_dict_parameters`` function falls back to Bash."""
+    as_conf = autosubmit_config(_EXPID, {
+        'JOBS': {
+            'A': {
+                'TYPE': 'NUCLEAR',
+                'RUNNING': 'once',
+                'SCRIPT': 'sleep 0',
+                'PLATFORM': platform_name
+            }
+        }
+    })
+    job = Job(_EXPID, '1', 'WAITING', 0, None)
+    job._init_runtime_parameters()
+    # Here, the job type is still `BASH`! The value provided in the
+    # configuration is not evaluated, so we need to fake it here.
+    # But it only works with the ``Job`` has a ``.section``...
+    job.type = 'NUCLEAR'
+    # FIXME: Yet another issue with the code design here. The ``Job`` class
+    #        constructor creates a partial object. Then you need to call
+    #        ``_init_runtime_parameters`` to initialize other values.
+    #        Then, other ``Job._update.*`` functions create more member
+    #        attribute values. However, there are still other attributes of
+    #        a ``Job`` that are only filled by ``DictJob``, like the
+    #        ``Job.section``. This makes the object/type highly-fragmented,
+    #        hard to be tested and adds more to developer cognitive load...
+    job.section = 'A'
+
+    job.update_dict_parameters(as_conf)
+
+    assert job.type == Language.BASH
+    # ``update_dict_parameters`` also upper's the platform name.
+    if platform_name is None:
+        assert job.platform_name is None
+    else:
+        assert job.platform_name == platform_name.upper()

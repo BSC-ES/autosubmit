@@ -64,6 +64,7 @@ class SlurmPlatform(ParamikoPlatform):
         self.x11_options = None
         self._submit_cmd_x11 = f'{self.remote_log_dir}'
         self.cancel_cmd = None
+        self.type = 'slurm'
         self._header = SlurmHeader()
         self._wrapper = SlurmWrapperFactory(self)
         self.job_status = dict()
@@ -266,7 +267,7 @@ class SlurmPlatform(ParamikoPlatform):
             raise
         except Exception as e:
             raise AutosubmitError(f"{self.name} submission failed", 6015, str(e)) from e
-        return save,valid_packages_to_submit
+        return save, valid_packages_to_submit
 
     def generate_submit_script(self) -> None:
         """
