@@ -18,6 +18,7 @@
 - Improvement of the error messages for YAML files #2488 and for RO-CRATE #2572
 - Added `--force` flag to `autosubmit pklfix` command, and `--yes` flag to `autosubmit stop` to
   automatically answer yes to prompts #2569
+- Improvement of error message when `LOCAL` project location is a file, not a directory #1972 #1254
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 
