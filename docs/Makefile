@@ -2,7 +2,7 @@
 #
 
 # You can set these variables from the command line.
-SPHINXOPTS    = -W
+SPHINXOPTS    = -W -vvv
 SPHINXBUILD   = sphinx-build
 PAPER         =
 SOURCEDIR     = source
@@ -31,6 +31,12 @@ as_setup: .EXPORT_ALL_VARIABLES
 	rm -rf $(AUTOSUBMIT_DIRECTORY)
 	$(eval AUTOSUBMIT_CONFIGURATION := $(AUTOSUBMIT_DIRECTORY)/autosubmitrc)
 	mkdir -p $(AUTOSUBMIT_DIRECTORY)/autosubmit
+	mkdir -p $(AUTOSUBMIT_DIRECTORY)/autosubmit/metadata
+	mkdir -p $(AUTOSUBMIT_DIRECTORY)/autosubmit/metadata/data
+	mkdir -p $(AUTOSUBMIT_DIRECTORY)/autosubmit/metadata/graph
+	mkdir -p $(AUTOSUBMIT_DIRECTORY)/autosubmit/metadata/logs
+	mkdir -p $(AUTOSUBMIT_DIRECTORY)/autosubmit/metadata/structures
+	mkdir -p $(AUTOSUBMIT_DIRECTORY)/autosubmit/logs
 	@echo "Autosubmit home: [$(AUTOSUBMIT_DIRECTORY)]"
 	touch $(AUTOSUBMIT_CONFIGURATION)
 	@echo "Autosubmit configuration: [$(AUTOSUBMIT_CONFIGURATION)]"

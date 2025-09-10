@@ -13,7 +13,6 @@ docs/build/
 dist/
 build/
 .cache
-*as_generated_image_*.png
 
 # Coverage files
 coverage/

@@ -528,8 +528,7 @@ New format
     :command: create
     :expid: a000
     :type: png
-    :path: troubleshooting
-    :figure: fig/as_generated_image_new_dependencies.png
+    :figure: new_dependencies.png
     :name: new_dependencies
     :width: 100%
     :align: center
@@ -593,8 +592,7 @@ In the following example, we want to launch the next member SIM after the last S
     :command: create
     :expid: a000
     :type: png
-    :path: troubleshooting
-    :figure: fig/as_generated_image_new_dependencies_1.png
+    :figure: new_dependencies_1.png
     :name: new_format_dependencies
     :width: 100%
     :align: center
@@ -696,8 +694,7 @@ Example 2: Crossdate wrappers using the the new dependencies
     :command: create
     :expid: a000
     :type: png
-    :path: troubleshooting
-    :figure: fig/as_generated_image_monarch-da.png
+    :figure: monarch-da.png
     :name: monarch-da
     :width: 100%
     :align: center
