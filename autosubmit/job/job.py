@@ -1370,25 +1370,25 @@ class Job(object):
         self.log_recovered = log_recovered
 
         # Compress in case remote log compression is enabled
-        try:
-            if self.platform.compress_remote_logs:
-                Log.debug("Compressing remote logs in local")
-                for local_log in self.local_logs:
-                    dir_path = os.path.join(self._tmp_path, "LOG_" + str(self.expid))
-                    log_utils.compress_xz(
-                        os.path.join(dir_path, local_log),
-                        output_path=os.path.join(dir_path, local_log), # Same name due to further verification
-                        preset=9,
-                        extreme=True,
-                        keep_input=False
-                    )
-            else:
-                Log.debug(
-                    "Remote log compression is disabled, keeping uncompressed logs"
-                )
-        except Exception as exc:
-            Log.warning("Failed to compress remote log. Keeping uncompressed logs.")
-            Log.debug(f"Exception: {exc}")
+        # try:
+        #     if self.platform.compress_remote_logs:
+        #         Log.debug("Compressing remote logs in local")
+        #         for local_log in self.local_logs:
+        #             dir_path = os.path.join(self._tmp_path, "LOG_" + str(self.expid))
+        #             log_utils.compress_xz(
+        #                 os.path.join(dir_path, local_log),
+        #                 output_path=os.path.join(dir_path, local_log), # Same name due to further verification
+        #                 preset=9,
+        #                 extreme=True,
+        #                 keep_input=False
+        #             )
+        #     else:
+        #         Log.debug(
+        #             "Remote log compression is disabled, keeping uncompressed logs"
+        #         )
+        # except Exception as exc:
+        #     Log.warning("Failed to compress remote log. Keeping uncompressed logs.")
+        #     Log.debug(f"Exception: {exc}")
 
     def _max_possible_wallclock(self):
         if self.platform and self.platform.max_wallclock:

@@ -238,6 +238,7 @@ class Platform(object):
                 self.compress_remote_logs = context.compress_remote_logs
         except Exception as exc:
             Log.warning("Could not get configuration for context for remote log compression: {0}", exc)
+        self.remote_logs_compress_type = "gzip"
 
     @classmethod
     def update_workers(cls, event_worker):
@@ -672,6 +673,12 @@ class Platform(object):
         :type remote_logs: (str, str)
         """
         (job_out_filename, job_err_filename) = remote_logs
+        Log.debug("Getting log files {0} and {1} from {2}", job_out_filename, job_err_filename, self.name)
+        Log.debug("Compressing log files option {0}", self.compress_remote_logs)
+        # Compress before getting logs
+        if self.compress_remote_logs:
+            self.compress_file(job_out_filename)
+            self.compress_file(job_err_filename)
         self.get_files([job_out_filename, job_err_filename], False, 'LOG_{0}'.format(exp_id))
 
     def get_checkpoint_files(self, job):
@@ -1174,5 +1181,12 @@ class Platform(object):
         Read file content as bytes. If max_size is set, only the first max_size bytes are read.
         :param src: file path
         :param max_size: maximum size to read
+        """
+        raise NotImplementedError
+
+    def compress_file(self, file_path: str) -> None:
+        """
+        Compress a file.
+        :param file_path: file path
         """
         raise NotImplementedError

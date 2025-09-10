@@ -27,6 +27,7 @@ from autosubmit.log.log import Log, AutosubmitError
 from autosubmit.platforms.headers.local_header import LocalHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.wrappers.wrapper_factory import LocalWrapperFactory
+import autosubmit.log.utils as log_utils
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -321,6 +322,11 @@ class LocalPlatform(ParamikoPlatform):
         :param remote_logs: names of the log files
         :type remote_logs: (str, str)
         """
+        (job_out_filename, job_err_filename) = remote_logs
+        if self.compress_remote_logs:
+            full_dir = Path(self.tmp_path).joinpath(f"LOG_{self.expid}")
+            self.compress_file(str(full_dir.joinpath(job_out_filename)))
+            self.compress_file(str(full_dir.joinpath(job_err_filename)))
         return
 
     def check_completed_files(self, sections: str = None) -> str:
@@ -371,3 +377,18 @@ class LocalPlatform(ParamikoPlatform):
         except Exception:
             Log.debug(f"Error reading file {src}")
             return None
+
+    def compress_file(self, file_path: str) -> None:
+        Log.debug(f"Compressing file {file_path} using {self.remote_logs_compress_type}")
+        try:
+            if self.remote_logs_compress_type == "xz":
+                output = log_utils.compress_xz(file_path, keep_input=False)
+            else:
+                output = log_utils.compress_gzip(file_path, keep_input=False)
+
+            # TODO: Keep the file name
+            # Path(output).rename(file_path)
+
+            Log.debug(f"File {file_path} compressed")
+        except Exception as exc:
+            Log.error(f"Error compressing file {file_path}: {exc}")
