@@ -191,7 +191,7 @@ class RunCmdDirective(code.CodeBlock):
         #       https://github.com/sphinx-doc/sphinx/blob/c51a88da8b7b40e8d8cbdb1fce85ca2346b2b59a/sphinx/directives/code.py#L114
         #       But the runcmd original code was simply wrapping a string
         #       containing \n in the text as a one-element array, e.g.
-        #       ["cwltool --debug ...\ncwltool Version..."].
+        #       ["cwltool --debug ...cwltool Version..."].
         #       That caused the output to be correctly rendered, but the
         #       emphasize-lines directive parameter to fail if the lines were
         #       anything greater than 0 (as the self.content array had 1 elem).
@@ -200,6 +200,7 @@ class RunCmdDirective(code.CodeBlock):
 
         # Set up our arguments to run the CodeBlock parent run function
         self.arguments[0] = syntax
+        # noinspection PyAttributeOutsideInit
         self.content = output
         node = super(RunCmdDirective, self).run()
 

@@ -391,8 +391,7 @@ Example 2: Crossdate wrappers using the the new dependencies
     :expid: a000
     :type: png
     :args: -cw
-    :path: userguide/run
-    :figure: fig/as_generated_image_monarch_da.png
+    :figure: monarch_da.png
     :name: monarch_da
     :width: 100%
     :align: center
