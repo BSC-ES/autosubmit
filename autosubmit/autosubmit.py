@@ -3168,23 +3168,9 @@ class Autosubmit:
 
             Log.info("Updating the jobs list")
             job_list.update_list(as_conf)
-            job_names = [
-                job.name
-                for job in job_list.get_job_list()
-                if job.status in [Status.COMPLETED, Status.READY, Status.QUEUING, Status.RUNNING] and (not job.local_logs[0] or not job.id)
-            ]
-            # Recover job_id and log name if missing
-            if job_names:
-                exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                                historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR, force_sql_alchemy=True)
-                jobs_data = exp_history.manager.get_jobs_data(job_names)
-                for job in job_list.get_job_list():
-                    if job.name in jobs_data:
-                        job.id = jobs_data[job.name]["job_id"]
-                        job.local_logs = jobs_data[job.name]["out"]
-                        job.remote_logs = jobs_data[job.name]["err"]
 
             if save:
+                job_list.recover_last_data()
                 job_list.save_jobs()
             else:
                 Log.warning('Changes NOT saved to the jobList. Use -s option to save')

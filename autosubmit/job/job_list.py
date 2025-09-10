@@ -35,6 +35,7 @@ from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.helpers.data_transfer import JobRow
+from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
@@ -4060,3 +4061,27 @@ class JobList(object):
             elif any(job.status == Status.SUBMITTED for job in wrapper_job.job_list):
                 wrapper_status = Status.SUBMITTED
             wrapper_job.status = wrapper_status
+
+    def recover_last_data(self):
+        """
+        Recover job_id and log name if missing from the database
+        """
+        job_names = [
+            job.name
+            for job in self.get_job_list()
+            if job.status in [Status.COMPLETED, Status.READY, Status.QUEUING, Status.RUNNING] and (not job.local_logs[0] or not job.id)
+        ]
+        # Recover job_id and log name if missing
+        if job_names:
+            exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
+                                            historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR, force_sql_alchemy=True)
+            jobs_data = exp_history.manager.get_jobs_data(job_names) # This gets only the last row
+            for job in self.get_job_list():
+                if job.name in jobs_data:
+                    job.id = jobs_data[job.name]["job_id"]
+                    job.local_logs = jobs_data[job.name]["out"]
+                    job.remote_logs = jobs_data[job.name]["err"]
+                    # TODO: missing last ready data (job.ready_date  = field on the database) and maybe something else
+                    # TODO: setstatus needs to also call this
+                    # TODO: (new feature) If not last, update_log must be False so it can be recovered on the next autosubmit run ( check the run_id of all jobs somehow)
+                    job.updated_log = True

@@ -56,7 +56,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
         self._set_schema_changes()
         self._set_table_queries()
         self.historicaldb_file_path = str(Path(options.get('jobdata_dir_path', BasicConfig.JOBDATA_DIR)) / f"job_data_{options['expid']}.db")
-        
+
     def initialize(self):
         if self.my_database_exists():
             if not self.is_current_version():
