@@ -722,8 +722,7 @@ class Job(object):
             script_file = open(os.path.join(as_conf.get_project_dir(), script_path), 'r')
         except Exception as e:  # log
             # We stop Autosubmit if we don't find the script
-            raise AutosubmitCritical("Extended {1} script: failed to fetch {0} \n".format(str(e),
-                                                                                          error_message_type), 7014)
+            raise AutosubmitCritical(f"Extended {error_message_type} script: failed to fetch {str(e)} \n", 7014)
 
         for line in script_file:
             if line[:2] != "#!":
@@ -734,35 +733,25 @@ class Job(object):
                 if "bash" in line:
                     if self.type != Type.BASH:
                         raise AutosubmitCritical(
-                            "Extended {2} script: script {0} seems Bash but job {1} isn't\n".format(script_name,
-                                                                                                    self.script_name,
-                                                                                                    error_message_type),
+                            f"Extended {error_message_type} script: script {script_name} seems Bash but job {self.script_name} isn't\n",
                             7011)
                 elif "Rscript" in line:
                     if self.type != Type.R:
                         raise AutosubmitCritical(
-                            "Extended {2} script: script {0} seems Rscript but job {1} isn't\n".format(script_name,
-                                                                                                       self.script_name,
-                                                                                                       error_message_type),
+                            f"Extended {error_message_type} script: script {script_name} seems Rscript but job {self.script_name} isn't\n",
                             7011)
                 elif "python" in line:
                     if self.type not in (Type.PYTHON, Type.PYTHON2, Type.PYTHON3):
                         raise AutosubmitCritical(
-                            "Extended {2} script: script {0} seems Python but job {1} isn't\n".format(script_name,
-                                                                                                      self.script_name,
-                                                                                                      error_message_type),
+                            f"Extended {error_message_type} script: script {script_name} seems Python but job {self.script_name} isn't\n",
                             7011)
                 else:
                     raise AutosubmitCritical(
-                        "Extended {2} script: couldn't figure out script {0} type\n".format(script_name,
-                                                                                            self.script_name,
-                                                                                            error_message_type), 7011)
+                        f"Extended {error_message_type} script: couldn't figure out script {script_name} type\n", 7011)
 
         if not found_hashbang:
             raise AutosubmitCritical(
-                "Extended {2} script: couldn't figure out script {0} type\n".format(script_name,
-                                                                                    self.script_name,
-                                                                                    error_message_type), 7011)
+                f"Extended {error_message_type} script: couldn't figure out script {script_name} type\n", 7011)
 
         if is_header:
             script = "\n###############\n# Header script\n###############\n" + script
@@ -1327,7 +1316,7 @@ class Job(object):
                         self.platform.write_jobid(self.id, os.path.join(
                             self._tmp_path, 'LOG_' + str(self.expid), local_log))
                 except BaseException as e:
-                    Log.printlog("Trace {0} \n Failed to write the {1} e=6001".format(str(e), self.name))
+                    Log.printlog(f"Trace {str(e)} \n Failed to write the {self.name} e=6001")
         else:
             # Update local logs without updating the submit time
             self.update_local_logs(update_submit_time=False)
@@ -1341,7 +1330,7 @@ class Job(object):
                     self.platform.write_jobid(self.id, os.path.join(
                         self._tmp_path, 'LOG_' + str(self.expid), local_log))
             except BaseException as e:
-                Log.printlog("Trace {0} \n Failed to write the {1} e=6001".format(str(e), self.name))
+                Log.printlog(f"Trace {str(e)} \n Failed to write the {self.name} e=6001")
 
     def retrieve_logfiles(self, raise_error: bool = False) -> None:
         """Retrieves log files from remote host.
@@ -1357,7 +1346,7 @@ class Job(object):
         if not log_recovered:
             self.local_logs = backup_logname
             if raise_error and self.wrapper_name not in self.platform.processed_wrapper_logs:
-                raise AutosubmitCritical("Failed to retrieve logs for job {0}".format(self.name), 6000)
+                raise AutosubmitCritical("Failed to retrieve logs for job {self.name}", 6000)
         else:
             self.write_stats(last_retrial)
             if self.wrapper_type == "vertical":
@@ -1903,8 +1892,7 @@ class Job(object):
             parameters['EXTENDED_HEADER'] = self.read_header_tailer_script(self.ext_header_path, as_conf, True)
             parameters['EXTENDED_TAILER'] = self.read_header_tailer_script(self.ext_tailer_path, as_conf, False)
         elif self.ext_header_path or self.ext_tailer_path:
-            Log.warning("An extended header or tailer is defined in {0}, but it is ignored in dummy projects.",
-                        self._section)
+            Log.warning(f"An extended header or tailer is defined in {self._section}, but it is ignored in dummy projects.")
         else:
             parameters['EXTENDED_HEADER'] = ""
             parameters['EXTENDED_TAILER'] = ""
@@ -2315,15 +2303,14 @@ class Job(object):
         elif self.type == Type.R:
             snippet = StatisticsSnippetR
         else:
-            raise Exception('Job type {0} not supported'.format(self.type))
+            raise Exception(f'Job type {self.type} not supported')
         template_content = self._get_template_content(as_conf, snippet, template, parameters)
         additional_content = self.update_content_extra(as_conf, self.additional_files)
         return template_content,additional_content
 
     def get_wrapped_content(self, as_conf, parameters):
         snippet = StatisticsSnippetEmpty
-        template = 'python $SCRATCH/{1}/LOG_{1}/{0}.cmd'.format(
-            self.name, self.expid)
+        template = f'python $SCRATCH/{self.name}/LOG_{self.name}/{self.expid}.cmd'
         template_content = self._get_template_content(
             as_conf, snippet, template, parameters)
         return template_content
@@ -2482,7 +2469,7 @@ class Job(object):
             template_content = re.sub(
                 '%(?<!%%)' + variable + '%(?!%%)', '', template_content,flags=re.I)
         template_content = template_content.replace("%%", "%")
-        script_name = '{0}.{1}.cmd'.format(self.name, wrapper_tag)
+        script_name = f'{self.name}.{wrapper_tag}.cmd'
         open(os.path.join(self._tmp_path, script_name),
              'w').write(template_content)
         os.chmod(os.path.join(self._tmp_path, script_name), 0o755)
@@ -2520,12 +2507,10 @@ class Job(object):
             if not out:
                 self.undefined_variables = set(variables) - set(parameters)
                 if str(show_logs).lower() != "false":
-                    Log.printlog("The following set of variables to be substituted in template script is not part of parameters set, and will be replaced by a blank value: {0}".format(
-                        self.undefined_variables), 5013)
+                    Log.printlog(f"The following set of variables to be substituted in template script is not part of parameters set, and will be replaced by a blank value: {self.undefined_variables}", 5013)
                     if not set(variables).issuperset(set(parameters)):
                         Log.printlog(
-                            "The following set of variables are not being used in the templates: {0}".format(
-                                str(set(parameters) - set(variables))), 5013)
+                            f"The following set of variables are not being used in the templates: {str(set(parameters) - set(variables))}", 5013)
 
         return out
 
@@ -2760,7 +2745,6 @@ class WrapperJob(Job):
         priority: int,
         job_list: List[Job],
         total_wallclock: str,
-        num_processors: Optional[int],
         platform: "Platform",
         as_config: AutosubmitConfig,
         hold: bool,
@@ -2841,9 +2825,9 @@ class WrapperJob(Job):
                 if not self.failed:
                     if self._platform.check_file_exists('WRAPPER_FAILED', wrapper_failed=True):
                         for job in self.inner_jobs_running:
-                            if job.platform.check_file_exists('{0}_FAILED'.format(job.name), wrapper_failed=True):
+                            if job.platform.check_file_exists(f'{job.name}_FAILED', wrapper_failed=True):
                                 Log.info(
-                                    "Wrapper {0} Failed, checking inner_jobs...".format(self.name))
+                                    f"Wrapper {self.name} Failed, checking inner_jobs...")
                                 self.failed = True
                                 self._platform.delete_file('WRAPPER_FAILED')
                                 break
@@ -2902,8 +2886,7 @@ class WrapperJob(Job):
             reason = self._platform.parse_queue_reason(
                 self._platform._ssh_output, self.id)
             if self._queuing_reason_cancel(reason):
-                Log.printlog("Job {0} will be cancelled and set to FAILED as it was queuing due to {1}".format(
-                    self.name, reason), 6009)
+                Log.printlog(f"Job {self.name} will be cancelled and set to FAILED as it was queuing due to {reason}", 6009)
                 # while running jobs?
                 self._check_running_jobs()
                 self.update_failed_jobs(check_ready_jobs=True)
@@ -2914,24 +2897,24 @@ class WrapperJob(Job):
                 if self.hold == "false":
                     # SHOULD BE MORE CLASS
                     # GET_scontrol release but not sure if this can be implemented on others PLATFORMS
-                    self._platform.send_command("scontrol release " + "{0}".format(self.id))
+                    self._platform.send_command("scontrol release " + f"{self.id}")
                     self.new_status = Status.QUEUING
                     for job in self.job_list:
                         job.hold = self.hold
                         job.new_status = Status.QUEUING
                         job.update_status(self.as_config)
-                    Log.info("Job {0} is QUEUING {1}", self.name, reason)
+                    Log.info(f"Job {self.name} is QUEUING {reason}")
                 else:
                     self.status = Status.HELD
-                    Log.info("Job {0} is HELD", self.name)
+                    Log.info(f"Job {self.name} is HELD")
             elif reason == '(JobHeldAdmin)':
                 Log.debug(
-                    "Job {0} Failed to be HELD, canceling... ", self.name)
+                    f"Job {self.name} Failed to be HELD, canceling... ", )
                 self._platform.send_command(
-                    self._platform.cancel_cmd + " {0}".format(self.id))
+                    self._platform.cancel_cmd + f" {self.id}")
                 self.status = Status.WAITING
             else:
-                Log.info("Job {0} is QUEUING {1}", self.name, reason)
+                Log.info(f"Job {self.name} is QUEUING {reason}")
         if prev_status != self.status:
             for job in self.job_list:
                 job.hold = self.hold
@@ -2948,8 +2931,7 @@ class WrapperJob(Job):
         start_time = self.running_jobs_start[job]
         if self._is_over_wallclock(start_time, job.wallclock):
             if job.wrapper_type != "vertical":
-                Log.printlog("Job {0} inside wrapper {1} is running for longer than it's wallclock!".format(
-                    job.name, self.name), 6009)
+                Log.printlog(f"Job {job.name} inside wrapper {self.name} is running for longer than it's wallclock!", 6009)
             return True
         return False
 
@@ -3023,26 +3005,24 @@ class WrapperJob(Job):
                         if len(out) > 1:
                             if job not in self.running_jobs_start:
                                 start_time = self._check_time(out, 1)
-                                Log.info("Job {0} started at {1}".format(
-                                    job_name, str(parse_date(start_time))))
+                                Log.info(f"Job {job_name} started at {str(parse_date(start_time))}")
                                 self.running_jobs_start[job] = start_time
                                 job.new_status = Status.RUNNING
                                 #job.status = Status.RUNNING
                                 job.update_status(self.as_config)
                             if len(out) == 2:
-                                Log.info("Job {0} is RUNNING".format(job_name))
+                                Log.info(f"Job {job_name} is RUNNING")
                                 over_wallclock = self._check_inner_job_wallclock(
                                     job)  # messaged included
                                 if over_wallclock:
                                     if job.wrapper_type != "vertical":
                                         job.status = Status.FAILED
                                         Log.printlog(
-                                            "Job {0} is FAILED".format(job_name), 6009)
+                                            f"Job {job_name} is FAILED", 6009)
                             elif len(out) == 3:
                                 end_time = self._check_time(out, 2)
                                 self._check_finished_job(job)
-                                Log.info("Job {0} finished at {1}".format(
-                                    job_name, str(parse_date(end_time))))
+                                Log.info(f"Job {job_name} finished at {str(parse_date(end_time))}")
                 if content == '':
                     sleep(wait)
                 retries = retries - 1
@@ -3085,8 +3065,8 @@ class WrapperJob(Job):
             running_jobs += [job for job in self.job_list if job.status == Status.READY or job.status == Status.SUBMITTED or job.status == Status.QUEUING]
         self.inner_jobs_running = list()
         for job in running_jobs:
-            if job.platform.check_file_exists('{0}_FAILED'.format(job.name), wrapper_failed=True, max_retries=2):
-                if job.platform.get_file('{0}_FAILED'.format(job.name), False, wrapper_failed=True):
+            if job.platform.check_file_exists(f'{job.name}_FAILED', wrapper_failed=True, max_retries=2):
+                if job.platform.get_file(f'{job.name}_FAILED', False, wrapper_failed=True):
                     self._check_finished_job(job, True)
             else:
                 if job in real_running:

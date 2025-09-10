@@ -712,21 +712,21 @@ class ParamikoPlatform(Platform):
         job_status = Status.UNKNOWN
         if type(job_id) is not int and type(job_id) is not str:
             Log.error(
-                'check_job() The job id ({0}) is not an integer neither a string.', job_id)
+                f'check_job() The job id ({job_id}) is not an integer neither a string.')
             job.new_status = job_status
         sleep_time = 5
         sleep(2)
         self.send_command(self.get_check_job_cmd(job_id))
         while self.get_ssh_output().strip(" ") == "" and retries > 0:
             retries = retries - 1
-            Log.debug('Retrying check job command: {0}', self.get_check_job_cmd(job_id))
-            Log.debug('retries left {0}', retries)
-            Log.debug('Will be retrying in {0} seconds', sleep_time)
+            Log.debug(f'Retrying check job command: {self.get_check_job_cmd(job_id)}')
+            Log.debug(f'retries left {retries}')
+            Log.debug(f'Will be retrying in {sleep_time} seconds')
             sleep(sleep_time)
             sleep_time = sleep_time + 5
             self.send_command(self.get_check_job_cmd(job_id))
         if retries >= 0:
-            Log.debug('Successful check job command: {0}', self.get_check_job_cmd(job_id))
+            Log.debug(f'Successful check job command: {self.get_check_job_cmd(job_id)}')
             job_status = self.parse_job_output(
                 self.get_ssh_output()).strip("\n")
             # URi: define status list in HPC Queue Class
@@ -766,10 +766,10 @@ class ParamikoPlatform(Platform):
                 job_status = Status.UNKNOWN
         else:
             Log.error(
-                " check_job(), job is not on the queue system. Output was: {0}", self.get_check_job_cmd(job_id))
+                f" check_job(), job is not on the queue system. Output was: {self.get_check_job_cmd(job_id)}" )
             job_status = Status.UNKNOWN
             Log.error(
-                'check_job() The job id ({0}) status is {1}.', job_id, job_status)
+                f'check_job() The job id ({job_id}) status is {job_status}.')
 
         if job_status in [Status.FAILED, Status.COMPLETED, Status.UNKNOWN]:
             job.updated_log = False
@@ -849,9 +849,9 @@ class ParamikoPlatform(Platform):
                     e_msg = e.error_message
                     slurm_error = True
                     break
-                Log.debug('Retrying check job command: {0}', cmd)
-                Log.debug('retries left {0}', retries)
-                Log.debug('Will be retrying in {0} seconds', sleep_time)
+                Log.debug(f'Retrying check job command: {cmd}')
+                Log.debug(f'retries left {retries}')
+                Log.debug(f'Will be retrying in {sleep_time} seconds')
                 retries -= 1
                 sleep(sleep_time)
                 sleep_time = sleep_time + 5
@@ -871,9 +871,9 @@ class ParamikoPlatform(Platform):
                         job_list_status = self.get_ssh_output()
                         job_status = self.parse_all_jobs_output(job_list_status, job_id)
                         if len(job_status) <= 0:
-                            Log.debug('Retrying check job command: {0}', cmd)
-                            Log.debug('retries left {0}', retries)
-                            Log.debug('Will be retrying in {0} seconds', sleep_time)
+                            Log.debug(f'Retrying check job command: {cmd}')
+                            Log.debug(f'retries left {retries}')
+                            Log.debug(f'Will be retrying in {sleep_time} seconds')
                             sleep(sleep_time)
                             sleep_time = sleep_time + 5
                     # URi: define status list in HPC Queue Class
@@ -906,7 +906,7 @@ class ParamikoPlatform(Platform):
                 else:
                     job_status = Status.UNKNOWN
                     Log.error(
-                        'check_job() The job id ({0}) status is {1}.', job.id, job_status)
+                        f'check_job() The job id ({job.id}) status is {job_status}.')
                 job.new_status = job_status
             self.get_queue_status(in_queue_jobs, list_queue_jobid, as_conf)
         else:

@@ -389,11 +389,9 @@ class Platform:
         if not inspect:
             job_list.save()
         if not hold:
-            Log.debug("\nJobs ready for {1}: {0}", len(
-                job_list.get_ready(self, hold=hold)), self.name)
+            Log.debug(f"\nJobs ready for {self.name}: {len(job_list.get_ready(self, hold=hold))}")
         else:
-            Log.debug("\nJobs prepared for {1}: {0}", len(
-                job_list.get_prepared(self)), self.name)
+            Log.debug(f"\nJobs prepared for {self.name}: {len(job_list.get_prepared(self))}")
         if not inspect:
             self.generate_submit_script()
         valid_packages_to_submit = []  # type: List['JobPackageBase']
@@ -442,11 +440,9 @@ class Platform:
                                 if job_tmp.section not in error_msg:
                                     error_msg += job_tmp.section + "&"
                             if e.message.lower().find("bad parameters") != -1:
-                                error_message += "\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {0}".format(
-                                    error_msg[:-1])
+                                error_message += f"\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {error_msg[:-1]}"
                             else:
-                                error_message += "\ncheck that {1} platform has set the correct scheduler. Sections that could be affected: {0}".format(
-                                    error_msg[:-1], self.name)
+                                error_message += f"\ncheck that {self.name} platform has set the correct scheduler. Sections that could be affected: {error_msg[:-1]}"
                     except AutosubmitCritical:
                         raise
                     except Exception as e:
@@ -568,27 +564,26 @@ class Platform:
         :param as_conf: autosubmit config object
         :type as_conf: AutosubmitConfig object
         """
-        prefix = 'HPC'
 
-        as_conf.experiment_data['{0}ARCH'.format(prefix)] = self.name
-        as_conf.experiment_data['{0}HOST'.format(prefix)] = self.host
-        as_conf.experiment_data['{0}QUEUE'.format(prefix)] = self.queue
-        as_conf.experiment_data['{0}EC_QUEUE'.format(prefix)] = self.ec_queue
-        as_conf.experiment_data['{0}PARTITION'.format(prefix)] = self.partition
+        as_conf.experiment_data['HPCARCH'] = self.name
+        as_conf.experiment_data['HPCHOST'] = self.host
+        as_conf.experiment_data['HPCQUEUE'] = self.queue
+        as_conf.experiment_data['HPCEC_QUEUE'] = self.ec_queue
+        as_conf.experiment_data['HPCPARTITION'] = self.partition
 
-        as_conf.experiment_data['{0}USER'.format(prefix)] = self.user
-        as_conf.experiment_data['{0}PROJ'.format(prefix)] = self.project
-        as_conf.experiment_data['{0}BUDG'.format(prefix)] = self.budget
-        as_conf.experiment_data['{0}RESERVATION'.format(prefix)] = self.reservation
-        as_conf.experiment_data['{0}EXCLUSIVITY'.format(prefix)] = self.exclusivity
-        as_conf.experiment_data['{0}TYPE'.format(prefix)] = self.type
-        as_conf.experiment_data['{0}SCRATCH_DIR'.format(prefix)] = self.scratch
-        as_conf.experiment_data['{0}TEMP_DIR'.format(prefix)] = self.temp_dir
+        as_conf.experiment_data['HPCUSER'] = self.user
+        as_conf.experiment_data['HPCPROJ'] = self.project
+        as_conf.experiment_data['HPCBUDG'] = self.budget
+        as_conf.experiment_data['HPCRESERVATION'] = self.reservation
+        as_conf.experiment_data['HPCEXCLUSIVITY'] = self.exclusivity
+        as_conf.experiment_data['HPCTYPE'] = self.type
+        as_conf.experiment_data['HPCSCRATCH_DIR'] = self.scratch
+        as_conf.experiment_data['HPCTEMP_DIR'] = self.temp_dir
         if self.temp_dir is None:
             self.temp_dir = ''
-        as_conf.experiment_data['{0}ROOTDIR'.format(prefix)] = self.root_dir
+        as_conf.experiment_data['HPCROOTDIR'] = self.root_dir
 
-        as_conf.experiment_data['{0}LOGDIR'.format(prefix)] = self.get_files_path()
+        as_conf.experiment_data['HPCLOGDIR'] = self.get_files_path()
 
     def send_file(self, filename: str, check=True) -> bool:
         """Sends a local file to the platform
@@ -664,7 +659,7 @@ class Platform:
         :type remote_logs: (str, str)
         """
         (job_out_filename, job_err_filename) = remote_logs
-        self.get_files([job_out_filename, job_err_filename], False, 'LOG_{0}'.format(exp_id))
+        self.get_files([job_out_filename, job_err_filename], False, f'LOG_{exp_id}')
 
     def get_checkpoint_files(self, job):
         """
@@ -736,7 +731,7 @@ class Platform:
         """
         filename = job_name + '_COMPLETED'
         if self.delete_file(filename):
-            Log.debug('{0} been removed', filename)
+            Log.debug(f'{filename} been removed')
             return True
         return False
 

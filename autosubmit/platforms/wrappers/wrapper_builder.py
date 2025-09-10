@@ -910,8 +910,8 @@ class SrunVerticalHorizontalWrapperBuilder(SrunWrapperBuilder):
             scripts_bash+=textwrap.dedent("""
             declare -a scripts_{0}={1}
             """).format(str(list_index),str(built_array), '\n'.ljust(13))
-            scripts_array_vars += "\"scripts_{0}\" ".format(list_index)
-            scripts_array_index += "\"0\" ".format(list_index)
+            scripts_array_vars += f"\"scripts_{list_index}\" "
+            scripts_array_index += f"\"{list_index}\" "
             list_index += 1
         scripts_array_vars += ")"
         scripts_array_index += ")"

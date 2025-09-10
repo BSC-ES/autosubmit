@@ -155,10 +155,10 @@ class LocalPlatform(ParamikoPlatform):
             output = subprocess.check_output(command.encode(lang), shell=True)
         except subprocess.CalledProcessError as e:
             if not ignore_log:
-                Log.error('Could not execute command {0} on {1}'.format(e.cmd, self.host))
+                Log.error(f'Could not execute command {e.cmd} on {self.host}')
             return False
         self._ssh_output = output.decode(lang)
-        Log.debug("Command '{0}': {1}", command, self._ssh_output)
+        Log.debug(f"Command '{command}': {self._ssh_output}")
 
         return True
 
@@ -179,9 +179,7 @@ class LocalPlatform(ParamikoPlatform):
         try:
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError:
-            Log.error('Could not send file {0} to {1}'.format(os.path.join(self.tmp_path, filename),
-                                                              os.path.join(self.tmp_path, 'LOG_' + self.expid,
-                                                                           filename)))
+            Log.error(f'Could not send file {os.path.join(self.tmp_path, filename)} to {os.path.join(self.tmp_path, f"LOG_{self.expid}", filename)}')
             raise
         return True
 
@@ -195,7 +193,7 @@ class LocalPlatform(ParamikoPlatform):
         :rtype: str
         """
         # This function is a copy of the slurm one
-        log_dir = os.path.join(self.tmp_path, 'LOG_{0}'.format(self.expid))
+        log_dir = os.path.join(self.tmp_path, f'LOG_{self.expid}')
         multiple_delete_previous_run = os.path.join(
             log_dir, "multiple_delete_previous_run.sh")
         if os.path.exists(log_dir):
@@ -214,13 +212,12 @@ class LocalPlatform(ParamikoPlatform):
         if os.path.exists(file_path):
             os.remove(file_path)
 
-        command = '{0} {1} {2}'.format(self.get_cmd, os.path.join(self.tmp_path, 'LOG_' + self.expid, filename),
-                                       file_path)
-        try:        
-            subprocess.check_call(command, stdout=open(os.devnull, 'w'), stderr=open(os.devnull, 'w'), shell=True)                      
+        command = f'{self.get_cmd} {os.path.join(self.tmp_path, f"LOG_{self.expid}", filename)} {file_path}'
+        try:
+            subprocess.check_call(command, stdout=open(os.devnull, 'w'), stderr=open(os.devnull, 'w'), shell=True)
         except subprocess.CalledProcessError:
             if must_exist:
-                raise Exception('File {0} does not exists'.format(filename))
+                raise Exception(f'File {filename} does not exists')
             return False
         return True
 
@@ -255,14 +252,14 @@ class LocalPlatform(ParamikoPlatform):
 
     def delete_file(self, filename, del_cmd=False):
         if del_cmd:
-            command = '{0} {1}'.format(self.del_cmd, os.path.join(self.tmp_path, "LOG_"+self.expid, filename))
+            command = f'{self.del_cmd} {os.path.join(self.tmp_path, "LOG_"+self.expid, filename)}'
         else:
-            command = '{0} {1}'.format(self.del_cmd, os.path.join(self.tmp_path, "LOG_"+self.expid, filename))
-            command += ' ; {0} {1}'.format(self.del_cmd, os.path.join(self.tmp_path, filename))
+            command = f'{self.del_cmd} {os.path.join(self.tmp_path, "LOG_"+self.expid, filename)}'
+            command += f' ; {self.del_cmd} {os.path.join(self.tmp_path, filename)}'
         try:
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError:
-            Log.debug('Could not remove file {0}'.format(os.path.join(self.tmp_path, filename)))
+            Log.debug(f'Could not remove file {os.path.join(self.tmp_path, filename)}')
             return False
         return True
 
@@ -284,21 +281,17 @@ class LocalPlatform(ParamikoPlatform):
             return True
         except IOError as e:
             if must_exist:
-                raise AutosubmitError("File {0} does not exists".format(
-                    os.path.join(path_root, src)), 6004, str(e))
+                raise AutosubmitError(f"File {os.path.join(path_root, src)} does not exists", 6004, str(e))
             else:
-                Log.debug("File {0} doesn't exists ".format(path_root))
+                Log.debug(f"File {path_root} doesn't exists ")
                 return False
         except Exception as e:
             if str(e) in "Garbage":
-                raise AutosubmitError('File {0} does not exists'.format(
-                    os.path.join(self.get_files_path(), src)), 6004, str(e))
+                raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exists', 6004, str(e))
             if must_exist:
-                raise AutosubmitError("File {0} does not exists".format(
-                    os.path.join(self.get_files_path(), src)), 6004, str(e))
+                raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exists", 6004, str(e))
             else:
-                Log.printlog("Log file couldn't be moved: {0}".format(
-                    os.path.join(self.get_files_path(), src)), 5001)
+                Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
                 return False
 
     def get_ssh_output(self):

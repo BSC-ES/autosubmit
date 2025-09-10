@@ -134,7 +134,7 @@ class ParamikoSubmitter:
                     raise AutosubmitCritical(f"PLATFORMS.{section.upper()}.TYPE: {platform_type_value} for "
                                              f"{section.upper()} is not supported", 7012)
             except ParamikoPlatformException as e:
-                Log.error("Queue exception: {0}".format(str(e)))
+                Log.error(f"Queue exception: {str(e)}")
                 return None
             # Set the type and version of the platform found
             remote_platform.type = platform_type
@@ -143,14 +143,14 @@ class ParamikoSubmitter:
             # Concatenating host + project and adding to the object
             add_project_to_host = platform_data[section].get('ADD_PROJECT_TO_HOST', False)
             if str(add_project_to_host).lower() != "false":
-                host = '{0}'.format(platform_data[section].get('HOST', ""))
+                host = f'{platform_data[section].get("HOST", "")}'
                 if host.find(",") == -1:
-                    host = '{0}-{1}'.format(host, platform_data[section].get('PROJECT', ""))
+                    host = f'{host}-{platform_data[section].get("PROJECT", "")}'
                 else:
                     host_list = host.split(",")
                     host_aux = ""
                     for ip in host_list:
-                        host_aux += '{0}-{1},'.format(ip, platform_data[section].get('PROJECT', ""))
+                        host_aux += f'{ip}-{platform_data[section].get("PROJECT", "")},'
                     host = host_aux[:-1]
 
             else:

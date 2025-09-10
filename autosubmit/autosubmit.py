@@ -952,9 +952,7 @@ class Autosubmit:
                 if args.command not in ["upgrade", "updateversion"]:
                     if force_update_version:
                         if as_conf.get_version() != Autosubmit.autosubmit_version:
-                            Log.info(
-                                "The {2} experiment {0} version is being updated to {1} for match autosubmit version",
-                                as_conf.get_version(), Autosubmit.autosubmit_version, expid)
+                            Log.info(f"The {expid} experiment {as_conf.get_version()} version is being updated to {Autosubmit.autosubmit_version} for match autosubmit version")
                             as_conf.set_version(Autosubmit.autosubmit_version)
                             update_experiment_descrip_version(expid, version=Autosubmit.autosubmit_version)
 
@@ -997,8 +995,7 @@ class Autosubmit:
             Log.info("Locale C.utf8 is not found, using 'C' as fallback")
             locale.setlocale(locale.LC_ALL, 'C')
 
-        Log.info(
-            "Autosubmit is running with {0}", Autosubmit.autosubmit_version)
+        Log.info(f"Autosubmit is running with {Autosubmit.autosubmit_version}")
 
     @staticmethod
     def _check_ownership_and_set_last_command(as_conf, expid, command):
@@ -1534,7 +1531,7 @@ class Autosubmit:
 
         if experiment_path.exists():
             if force or Autosubmit._user_yes_no_query(f"Do you want to delete {expid} ?"):
-                Log.debug('Enter Autosubmit._delete_expid {0}', expid)
+                Log.debug(f'Enter Autosubmit._delete_expid {expid}')
 
                 # Try to delete the experiment details
                 try:
@@ -1611,8 +1608,8 @@ class Autosubmit:
 
             project_type = as_conf.get_project_type()
             safetysleeptime = as_conf.get_safetysleeptime()
-            Log.debug("The Experiment name is: {0}", expid)
-            Log.debug("Sleep: {0}", safetysleeptime)
+            Log.debug(f"The Experiment name is: {expid}")
+            Log.debug(f"Sleep: {safetysleeptime}")
             packages_persistence = JobPackagePersistence(expid)
             os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid,
                                   "pkl", "job_packages_" + expid + ".db"), 0o644)
@@ -1621,11 +1618,11 @@ class Autosubmit:
             job_list = Autosubmit.load_job_list(expid, as_conf)
             job_list.packages_dict = {}
 
-            Log.debug("Length of the jobs list: {0}", len(job_list))
+            Log.debug(f"Length of the jobs list: {len(job_list)}")
 
             # variables to be updated on the fly
             safetysleeptime = as_conf.get_safetysleeptime()
-            Log.debug("Sleep: {0}", safetysleeptime)
+            Log.debug(f"Sleep: {safetysleeptime}")
             # Generate
             Log.info("Starting to generate cmd scripts")
             jobs = []
@@ -1669,7 +1666,7 @@ class Autosubmit:
 
                         elif filter_status:
                             Log.debug(
-                                "Filtering jobs with status {0}", filter_status)
+                                f"Filtering jobs with status {filter_status}")
                             if filter_status == 'Any':
                                 jobs = job_list.get_job_list()
                             else:
@@ -2060,14 +2057,14 @@ class Autosubmit:
             # The time between running iterations, default to 10 seconds. Can be changed by the user
             safetysleeptime = as_conf.get_safetysleeptime()
             retrials = as_conf.get_retrials()
-            Log.debug("The Experiment name is: {0}", expid)
-            Log.debug("Sleep: {0}", safetysleeptime)
-            Log.debug("Default retrials: {0}", retrials)
+            Log.debug(f"The Experiment name is: {expid}")
+            Log.debug(f"Sleep: {safetysleeptime}")
+            Log.debug(f"Default retrials: {retrials}")
             # Is where Autosubmit stores the job_list and wrapper packages to the disc.
             pkl_dir = os.path.join(
                 BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl')
             Log.debug(
-                "Starting from job list restored from {0} files", pkl_dir)
+                f"Starting from job list restored from {pkl_dir} files")
 
         if not submitter:
             submitter = ParamikoSubmitter(as_conf=as_conf)
@@ -2089,7 +2086,7 @@ class Autosubmit:
             Log.debug(f"Error while loading job_list: {str(e)}")
             raise AutosubmitCritical(
                 "Corrupted job_list, backup couldn't be restored", 7040, str(e))
-        Log.debug("Length of the jobs list: {0}", len(job_list))
+        Log.debug(f"Length of the jobs list: {len(job_list)}")
         if recover:
             Log.info("Recovering parameters info")
         # This function name is not clear after the transformation it received across years.
@@ -2161,7 +2158,7 @@ class Autosubmit:
         job_list.save()
         as_conf.save()
         if not recover:
-            Log.info("Autosubmit is running with v{0}", Autosubmit.autosubmit_version)
+            Log.info(f"Autosubmit is running with v{Autosubmit.autosubmit_version}")
             # Before starting main loop, setup historical database tables and main information
         # Check if the user has launch autosubmit run with -rom option ( previously named -rm )
         allowed_members = AutosubmitHelper.get_allowed_members(run_only_members, as_conf)
@@ -2206,8 +2203,8 @@ class Autosubmit:
         safetysleeptime = as_conf.get_safetysleeptime()
         default_retrials = as_conf.get_retrials()
         check_wrapper_jobs_sleeptime = as_conf.get_wrapper_check_time()
-        Log.debug("Sleep: {0}", safetysleeptime)
-        Log.debug("Number of retrials: {0}", default_retrials)
+        Log.debug(f"Sleep: {safetysleeptime}")
+        Log.debug(f"Number of retrials: {default_retrials}")
         return total_jobs, safetysleeptime, default_retrials, check_wrapper_jobs_sleeptime
 
     @staticmethod
@@ -2373,8 +2370,8 @@ class Autosubmit:
                             as_conf.save()
                         time.sleep(safetysleeptime)
                     except AutosubmitError as e:  # If an error is detected, restore all connections and job_list
-                        Log.error("Trace: {0}", e.trace)
-                        Log.error("{1} [eCode={0}]", e.code, e.message)
+                        Log.error(f"Trace: {e.trace}")
+                        Log.error(f"{e.message} [eCode={e.code}]")
                         # No need to wait until the remote platform reconnection
                         recovery = False
                         as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
@@ -2555,7 +2552,7 @@ class Autosubmit:
                 issues += platform_issues
                 continue
             if platform.check_remote_permissions():
-                Log.result("[{1}] Correct user privileges for host {0}", platform.host, platform.name)
+                Log.result(f"[{platform.name}] Correct user privileges for host {platform.host}")
             else:
                 platform_issues += (f"\n[{platform.name}] has configuration issues.\n Check that the connection is"
                                     f" passwd-less.(ssh {platform.user}@{platform.host})\n Check the parameters that"
@@ -2690,7 +2687,7 @@ class Autosubmit:
             output_type = as_conf.get_output_type()
             pkl_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl')
             job_list = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
-            Log.debug("Job list restored from {0} files", pkl_dir)
+            Log.debug(f"Job list restored from {pkl_dir} files")
         except AutosubmitError as e:
             if profile:
                 profiler.stop()
@@ -2731,7 +2728,7 @@ class Autosubmit:
                                            [job for job in [j for j in jobs_member if j.chunk == chunk]]
 
                 elif filter_status:
-                    Log.debug("Filtering jobs with status {0}", filter_status)
+                    Log.debug(f"Filtering jobs with status {filter_status}")
                     if filter_status == 'Any':
                         jobs = job_list.get_job_list()
                     else:
@@ -2869,7 +2866,7 @@ class Autosubmit:
             for job in job_list.get_job_list():
                 job._init_runtime_parameters()
                 job.update_dict_parameters(as_conf)
-            Log.debug("Job list restored from {0} files", pkl_dir)
+            Log.debug(f"Job list restored from {pkl_dir} files")
             jobs = StatisticsUtils.filter_by_section(job_list.get_job_list(), filter_type)
             jobs, period_ini, period_fi = StatisticsUtils.filter_by_time_period(jobs, filter_period)
             # Package information
@@ -3047,7 +3044,7 @@ class Autosubmit:
                     raise AutosubmitCritical(f"Experiment can't be recovered due being {len(current_active_jobs)} "
                                              f"active jobs in your experiment, If you want to recover the experiment,"
                                              f" please use the flag -f and all active jobs will be cancelled",7000)
-            Log.debug("Job list restored from {0} files", pkl_dir)
+            Log.debug(f"Job list restored from {pkl_dir} files")
         except Exception:
             raise
         Log.info(f'Recovering experiment {expid}')
@@ -3205,7 +3202,7 @@ class Autosubmit:
             pkl_dir = os.path.join(
                 BasicConfig.LOCAL_ROOT_DIR, experiment_id, 'pkl')
             job_list = Autosubmit.load_job_list(experiment_id, as_conf)
-            Log.debug("Job list restored from {0} files", pkl_dir)
+            Log.debug(f"Job list restored from {pkl_dir} files")
 
             Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
 
@@ -3421,7 +3418,6 @@ class Autosubmit:
                 hpc = as_conf.get_platform()
                 description = get_experiment_descrip(experiment_id)
                 Log.result("Describing {0}", experiment_id)
-
                 Log.result("Owner: {0}", user)
                 Log.result("Location: {0}", exp_path)
                 Log.result("Created: {0}", created)
@@ -3568,8 +3564,7 @@ class Autosubmit:
                                f" \n\t{str(global_logs_path)} \n\t{str(structures_path)} \n\t{str(historicdb_path)}"
                                f" \n\t{str(historiclog_path)}")
                 except (IOError, OSError) as e:
-                    raise AutosubmitCritical(
-                        "Can not write config file: {0}", 7012, e.message)
+                    raise AutosubmitCritical(f"Can not write config file: {e.message}", 7012)
         except (AutosubmitCritical, AutosubmitError) as e:
             raise
         except BaseException as e:
@@ -3857,8 +3852,7 @@ class Autosubmit:
         as_conf.reload(force_load=True)
         as_conf.check_expdef_conf()
 
-        Log.info("Changing {0} experiment version from {1} to  {2}",
-                 expid, as_conf.get_version(), Autosubmit.autosubmit_version)
+        Log.info(f"Changing {expid} experiment version from {as_conf.get_version()} to {Autosubmit.autosubmit_version}")
         as_conf.set_version(Autosubmit.autosubmit_version)
         update_experiment_descrip_version(expid, version=Autosubmit.autosubmit_version)
 
@@ -3961,7 +3955,7 @@ class Autosubmit:
                     try:
                         AutosubmitConfig.ini_to_yaml(f.parent, Path(f))
                     except BaseException:
-                        Log.warning("Couldn't convert conf file to yml: {0}", f.parent)
+                        Log.warning(f"Couldn't convert conf file to yml: {f.parent}")
 
             # Converts all ini into yaml
             Log.info("Converting all .conf files into .yml.")
@@ -3970,7 +3964,7 @@ class Autosubmit:
                     try:
                         AutosubmitConfig.ini_to_yaml(Path(f).parent, Path(f))
                     except Exception as e:
-                        Log.warning("Couldn't convert conf file to yml: {0}", Path(f).parent)
+                        Log.warning(f"Couldn't convert conf file to yml: {Path(f).parent}")
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             as_conf.reload(force_load=True)
             # Load current variables
@@ -4029,14 +4023,14 @@ class Autosubmit:
     @staticmethod
     def pkl_fix(expid, force: bool = False):
         """
-        Tries to find a backup of the pkl file and restores it. Verifies that autosubmit is not running on this experiment.  
+        Tries to find a backup of the pkl file and restores it. Verifies that autosubmit is not running on this experiment.
 
         :param expid: experiment identifier
         :type expid: str
         :param force: force the operation without confirmation
         :type force: bool
         :return:
-        :rtype: 
+        :rtype:
         """
         exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
         tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -4119,7 +4113,7 @@ class Autosubmit:
         :param expid: experiment identifier
         :type expid: str
         :return:
-        :rtype:        
+        :rtype:
         """
         os.umask(0) # Overrides user permissions
         current_time = int(time.time())
@@ -4385,9 +4379,9 @@ class Autosubmit:
             year -= 1
 
         if year == 2000:
-            Log.error("Experiment {0} is not archived", experiment_id)
+            Log.error(f"Experiment {experiment_id} is not archived")
             return False
-        Log.info("Experiment located in {0} archive", year)
+        Log.info(f"Experiment located in {year} archive")
 
         # Creating tar file
         Log.info("Unpacking tar file ... ")
@@ -4710,7 +4704,7 @@ class Autosubmit:
                                          f" is the correct one.",7014, str(e))
 
             Log.debug(f"The project folder {local_proj_dir} has been created.")
-            Log.info(f"Checking out revision {svn_project_revision} {svn_project_url} into {local_proj_dir}")
+            Log.info(f"Checking out revision {svn_project_revision + ' ' + svn_project_url} into {local_proj_dir}")
             try:
                 output = subprocess.check_output("cd " + local_proj_dir + "; svn --force-interactive checkout -r " +
                                                  svn_project_revision + " " + svn_project_url + " " +
@@ -4722,7 +4716,7 @@ class Autosubmit:
                     pass
                 raise AutosubmitCritical(f"Can not check out revision {svn_project_revision} {svn_project_url} "
                                          f"into {local_proj_dir}", 7062)
-            Log.debug("{0}", output)
+            Log.debug(f"{output}")
         elif project_type == "local":
             local_project_path: str = as_conf.get_local_project_path()
             if not local_project_path:
@@ -4733,7 +4727,7 @@ class Autosubmit:
             if not local_project_path.is_dir():
                 msg = f'Local project path is not a valid path and/or it does not exist: {str(local_project_path)}'
                 raise AutosubmitCritical(msg, 7014)
-            
+
             local_proj_dir = Path(BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_PROJ_DIR)
             project_destination = local_proj_dir / project_destination
 
@@ -5179,13 +5173,13 @@ class Autosubmit:
                 Log.info(
                     "Preparing .lock file to avoid multiple instances with same expid.")
 
-                Log.debug('Exp ID: {0}', expid)
-                Log.debug('Save: {0}', save)
-                Log.debug('Final status: {0}', final)
-                Log.debug('List of jobs to change: {0}', filter_list)
-                Log.debug('Chunks to change: {0}', filter_chunks)
-                Log.debug('Status of jobs to change: {0}', filter_status)
-                Log.debug('Sections to change: {0}', filter_section)
+                Log.debug(f'Exp ID: {expid}')
+                Log.debug(f'Save: {save}')
+                Log.debug(f'Final status: {final}')
+                Log.debug(f'List of jobs to change: {filter_list}')
+                Log.debug(f'Chunks to change: {filter_chunks}')
+                Log.debug(f'Status of jobs to change: {filter_status}')
+                Log.debug(f'Sections to change: {filter_section}')
 
                 wrongExpid = 0
                 as_conf = AutosubmitConfig(
@@ -5289,7 +5283,7 @@ class Autosubmit:
                                         final_list.append(job)
                 if filter_status:
                     status_list = filter_status.split()
-                    Log.debug("Filtering jobs with status {0}", filter_status)
+                    Log.debug(f"Filtering jobs with status {filter_status}")
                     if str(status_list).upper() == 'ANY':
                         for job in job_list.get_job_list():
                             final_list.append(job)
@@ -5307,8 +5301,7 @@ class Autosubmit:
                     if str(expid) in expidJoblist:
                         wrongExpid = jobs.__len__() - expidJoblist[expid]
                     if wrongExpid > 0:
-                        Log.warning(
-                            "There are {0} job.name with an invalid Expid", wrongExpid)
+                        Log.warning(f"There are {wrongExpid} job.name with an invalid Expid")
                     if str(jobs).upper() == 'ANY':
                         for job in job_list.get_job_list():
                             final_list.append(job)
