@@ -47,6 +47,9 @@ graphviz_output_format = 'svg'
 
 autosectionlabel_prefix_document = True
 
+# To prevent autosectionlabel from breaking our build, ref: https://stackoverflow.com/a/77577337
+suppress_warnings = ['autosectionlabel.*']
+
 numfig = True
 numfig_format = {'figure': '%s', 'table': '%s', 'code-block': '%s'}
 

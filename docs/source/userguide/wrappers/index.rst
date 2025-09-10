@@ -99,8 +99,7 @@ When using multiple wrappers or 2-dim wrappers is essential to define the `JOBS_
     :expid: a000
     :type: png
     :args: -cw
-    :path: userguide/wrappers
-    :figure: fig/as_generated_image_wrapper_all.png
+    :figure: wrapper_all.png
     :name: wrapper_all
     :width: 100%
     :align: center
@@ -329,8 +328,7 @@ Autosubmit supports wrapping together vertically jobs of different types.
     :expid: a000
     :type: png
     :args: -cw
-    :path: userguide/wrappers
-    :figure: fig/as_generated_image_wrapper_v.png
+    :figure: wrapper_v.png
     :name: wrapper_v
     :width: 100%
     :align: center
@@ -357,8 +355,7 @@ Horizontal wrappers are suited for jobs that must run parallel (e.x. members of 
     :expid: a000
     :type: png
     :args: -cw
-    :path: userguide/wrappers
-    :figure: fig/as_generated_image_wrapper_h.png
+    :figure: wrapper_h.png
     :name: wrapper_h
     :width: 100%
     :align: center
@@ -377,8 +374,7 @@ The vertical-horizontal wrapper allows bundling together a vertical sequence of 
     :expid: a000
     :type: png
     :args: -cw
-    :path: userguide/wrappers
-    :figure: fig/as_generated_image_wrapper_vh.png
+    :figure: wrapper_vh.png
     :name: wrapper_vh
     :width: 100%
     :align: center
@@ -396,8 +392,7 @@ The horizontal-vertical wrapper allows bundling together tasks that could run si
     :expid: a000
     :type: png
     :args: -cw
-    :path: userguide/wrappers
-    :figure: fig/as_generated_image_wrapper_hv.png
+    :figure: wrapper_hv.png
     :name: wrapper_hv
     :width: 100%
     :align: center
@@ -505,8 +500,7 @@ Considering the following configuration:
     :expid: a000
     :type: png
     :args: -cw
-    :path: userguide/wrappers
-    :figure: fig/as_generated_image_monarch_da.png
+    :figure: monarch_da.png
     :name: monarch_da
     :width: 100%
     :align: center

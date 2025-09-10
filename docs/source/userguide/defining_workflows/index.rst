@@ -35,8 +35,7 @@ be finished before launching the job that has the DEPENDENCIES attribute.
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_simple.png
+    :figure: simple.png
     :name: simple
     :width: 100%
     :align: center
@@ -94,8 +93,7 @@ The resulting workflow can be seen in Figure  for a experiment with 2 startdates
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_running.png
+    :figure: running.png
     :name: running
     :width: 100%
     :align: center
@@ -155,9 +153,8 @@ The resulting workflow can be seen in Figure `dprevious`
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_dependencies_previous.png
-    :name: dependecy_previous
+    :figure: dependencies_previous.png
+    :name: dependency_previous
     :width: 100%
     :align: center
     :alt: Example showing dependencies between sim jobs on different chunks.
@@ -201,8 +198,7 @@ The resulting workflow can be seen in Figure `dependencies`
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_dependencies_running.png
+    :figure: dependencies_running.png
     :name: dependencies_running
     :width: 100%
     :align: center
@@ -421,8 +417,7 @@ The resulting workflow can be seen in Figure `frequency`
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_frequency.png
+    :figure: frequency.png
     :name: frequency
     :width: 100%
     :align: center
@@ -471,8 +466,7 @@ The resulting workflow can be seen in Figure `nosync`
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_no_synchronize.png
+    :figure: no_synchronize.png
     :name: no_synchronize
     :width: 100%
     :align: center
@@ -493,8 +487,7 @@ The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'member' can be s
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_synchronize.png
+    :figure: synchronize.png
     :name: synchronize
     :width: 100%
     :align: center
@@ -515,8 +508,7 @@ The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'date' can be see
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_dsynchronize.png
+    :figure: dsynchronize.png
     :name: dsynchronize
     :width: 100%
     :align: center
@@ -573,8 +565,7 @@ The 3rd part of the post job will depend on the 3rd part of the asim job.
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_splits.png
+    :figure: splits.png
     :name: splits
     :width: 100%
     :align: center
@@ -615,8 +606,7 @@ Example 1: 1-to-1 dependency
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_splits_1_to_1.png
+    :figure: splits_1_to_1.png
     :name: splits_1_to_1
     :width: 100%
     :align: center
@@ -647,8 +637,7 @@ Example 2: N-to-1 dependency
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_splits_n_to_1.png
+    :figure: splits_n_to_1.png
     :name: splits_n_to_1
     :width: 100%
     :align: center
@@ -679,8 +668,7 @@ Example 3: 1-to-N dependency
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_splits_1_to_n.png
+    :figure: splits_1_to_n.png
     :name: splits_1_to_n
     :width: 100%
     :align: center
@@ -780,8 +768,7 @@ Example4: Auto split
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_splits_auto.png
+    :figure: splits_auto.png
     :name: splits_auto
     :width: 100%
     :align: center
@@ -838,8 +825,7 @@ The resulting workflow can be seen in Figure `delay`
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_delay.png
+    :figure: delay.png
     :name: delay
     :width: 100%
     :align: center
@@ -921,8 +907,7 @@ Example 1: How to select an specific chunk
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_select_chunks.png
+    :figure: select_chunks.png
     :name: select_chunks
     :width: 100%
     :align: center
@@ -965,8 +950,7 @@ In this workflow you can see an illustrated example of ``SKIPPABLE`` parameter u
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_skip.png
+    :figure: skip.png
     :name: skip
     :width: 100%
     :align: center
@@ -1017,8 +1001,7 @@ Weak dependencies, work like this way:
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_dashed.png
+    :figure: dashed.png
     :name: dashed
     :width: 100%
     :align: center
@@ -1070,8 +1053,7 @@ In this workflow you can see an illustrated example of select member. Using 4 me
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_select_members.png
+    :figure: select_members.png
     :name: select_members
     :width: 100%
     :align: center
@@ -1193,8 +1175,7 @@ One can use now the following configuration:
     :command: create
     :expid: a000
     :type: png
-    :path: userguide/defining_workflows
-    :figure: fig/as_generated_image_for.png
+    :figure: for.png
     :name: for
     :width: 100%
     :align: center
