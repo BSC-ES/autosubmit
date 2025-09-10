@@ -45,6 +45,7 @@ from autosubmit.job.metrics_processor import UserMetricProcessor
 from autosubmit.log.log import Log, AutosubmitCritical
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
+from autosubmit.log import utils as log_utils
 
 if TYPE_CHECKING:
     from autosubmit.platforms.platform import Platform
@@ -1384,6 +1385,27 @@ class Job(object):
                     f"{self.platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{self.fail_count}'.")
         self.log_recovered = log_recovered
 
+        # Compress in case remote log compression is enabled
+        # try:
+        #     if self.platform.compress_remote_logs:
+        #         Log.debug("Compressing remote logs in local")
+        #         for local_log in self.local_logs:
+        #             dir_path = os.path.join(self._tmp_path, "LOG_" + str(self.expid))
+        #             log_utils.compress_xz(
+        #                 os.path.join(dir_path, local_log),
+        #                 output_path=os.path.join(dir_path, local_log), # Same name due to further verification
+        #                 preset=9,
+        #                 extreme=True,
+        #                 keep_input=False
+        #             )
+        #     else:
+        #         Log.debug(
+        #             "Remote log compression is disabled, keeping uncompressed logs"
+        #         )
+        # except Exception as exc:
+        #     Log.warning("Failed to compress remote log. Keeping uncompressed logs.")
+        #     Log.debug(f"Exception: {exc}")
+
     def _max_possible_wallclock(self):
         if self.platform and self.platform.max_wallclock:
             wallclock = self.parse_time(self.platform.max_wallclock)
@@ -2719,7 +2741,7 @@ class Job(object):
                 return True
         return False
 
-    def synchronize_logs(self, platform, remote_logs, local_logs, last = True):
+    def synchronize_logs(self, platform: 'Platform', remote_logs, local_logs, last = True):            
         platform.move_file(remote_logs[0], local_logs[0], True)  # .out
         platform.move_file(remote_logs[1], local_logs[1], True)  # .err
         if last and local_logs[0] != "":
