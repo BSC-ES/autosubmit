@@ -52,18 +52,6 @@ import autosubmit.statistics.utils as StatisticsUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.database.db_common import create_db
-from autosubmit.database.db_common import delete_experiment, get_experiment_descrip
-from autosubmit.database.db_common import get_autosubmit_version, check_experiment_exists
-from autosubmit.database.db_common import update_experiment_descrip_version
-from autosubmit.database.db_structure import get_structure
-from autosubmit.experiment.detail_updater import ExperimentDetails
-from autosubmit.experiment.experiment_common import copy_experiment
-from autosubmit.experiment.experiment_common import new_experiment
-from autosubmit.git.autosubmit_git import AutosubmitGit, check_unpushed_changes, clean_git
-from autosubmit.helpers.processes import process_id
-from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path
-from autosubmit.helpers.utils import strtobool
 from autosubmit.database.db_common import (
     create_db, delete_experiment, get_experiment_description, get_autosubmit_version, check_experiment_exists,
     update_experiment_description_version
