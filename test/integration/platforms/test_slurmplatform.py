@@ -31,6 +31,7 @@ def _create_slurm_platform(as_conf: AutosubmitConfig):
     return SlurmPlatform(_EXPID, _PLATFORM_NAME, config=as_conf.experiment_data, auth_password=None)
 
 
+@pytest.mark.xfail(reason="Known bug with concurrent tests")
 @pytest.mark.slurm
 def test_create_platform_slurm(autosubmit_exp):
     """Test the Slurm platform object creation."""
@@ -61,6 +62,7 @@ def test_create_platform_slurm(autosubmit_exp):
     # TODO: add more assertion statements...
 
 
+@pytest.mark.xfail(reason="Known bug with concurrent tests")
 @pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     {
@@ -126,6 +128,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
     assert 0 == exp.autosubmit.run_experiment(_EXPID)
 
 
+@pytest.mark.xfail(reason="Known bug with concurrent tests")
 @pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     {

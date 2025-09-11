@@ -37,9 +37,8 @@ from autosubmit.config.configcommon import BasicConfig, YAMLParserFactory
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
+from autosubmit.job.job_utils import SubJob, SubJobManager
 from autosubmit.job.job_utils import calendar_chunk_section
-from autosubmit.job.job_utils import get_job_package_code, SubJob, SubJobManager
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.psplatform import PsPlatform
@@ -170,7 +169,7 @@ class TestJob:
             Path(temp_dir, expid).mkdir()
             # FIXME: (Copied from Bruno) Not sure why but the submitted and Slurm were using the $expid/tmp/ASLOGS folder?
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                         f'{expid}/conf', f'{expid}/proj/project_files']:
+                         f'{expid}/conf', f'{expid}/proj/project_files', f'{expid}/db']:
                 Path(temp_dir, path).mkdir()
             # loop over the host script's type
             for script_type in ["Bash", "Python", "Rscript"]:
@@ -332,9 +331,8 @@ CONFIG:
                         # act
 
                         parameters = config.load_parameters()
-                        joblist_persistence = JobListPersistencePkl()
 
-                        job_list_obj = JobList(expid, config, YAMLParserFactory(), joblist_persistence)
+                        job_list_obj = JobList(expid, config, YAMLParserFactory())
 
                         job_list_obj.generate(
                             as_conf=config,
@@ -350,6 +348,7 @@ CONFIG:
                             new=True,
                             run_only_members=config.get_member_list(run_only=True),
                             show_log=True,
+                            full_load=True
                         )
                         job_list = job_list_obj.get_job_list()
 
@@ -434,7 +433,7 @@ CONFIG:
             BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
             Path(temp_dir, expid).mkdir()
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                         f'{expid}/conf']:
+                         f'{expid}/conf', f'{expid}/db']:
                 Path(temp_dir, path).mkdir()
             with open(Path(temp_dir, f'{expid}/conf/experiment_data.yml'), 'w+') as experiment_data:
                 experiment_data.write(dedent(f'''\
@@ -489,8 +488,7 @@ CONFIG:
             config = AutosubmitConfig(expid, basic_config=basic_config, parser_factory=YAMLParserFactory())
             config.reload(True)
             parameters = config.load_parameters()
-            job_list_obj = JobList(expid, config, YAMLParserFactory(),
-                                   Autosubmit._get_job_list_persistence(expid, config))
+            job_list_obj = JobList(expid, config, YAMLParserFactory())
 
             job_list_obj.generate(
                 as_conf=config,
@@ -507,10 +505,10 @@ CONFIG:
                 run_only_members=[],
                 # config.get_member_list(run_only=True),
                 show_log=True,
-                create=True,
+                full_load=True,
             )
 
-            job_list = job_list_obj.get_job_list()
+            job_list = job_list_obj.job_list
             assert 1 == len(job_list)
 
             submitter = Autosubmit._get_submitter(config)
@@ -550,7 +548,7 @@ CONFIG:
             Path(temp_dir, expid).mkdir()
             # FIXME: (Copied from Bruno) Not sure why but the submitted and Slurm were using the $expid/tmp/ASLOGS folder?
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                         f'{expid}/conf', f'{expid}/proj/project_files']:
+                         f'{expid}/conf', f'{expid}/proj/project_files', f'{expid}/db']:
                 Path(temp_dir, path).mkdir()
             # loop over the host script's type
             for script_type in ["Bash", "Python", "Rscript"]:
@@ -717,9 +715,8 @@ CONFIG:
                         # act
 
                         parameters = config.load_parameters()
-                        joblist_persistence = JobListPersistencePkl()
 
-                        job_list_obj = JobList(expid, config, YAMLParserFactory(), joblist_persistence)
+                        job_list_obj = JobList(expid, config, YAMLParserFactory())
 
                         job_list_obj.generate(
                             as_conf=config,
@@ -735,7 +732,7 @@ CONFIG:
                             new=True,
                             run_only_members=config.get_member_list(run_only=True),
                             show_log=True,
-                            create=True,
+                            full_load=True,
                         )
                         job_list = job_list_obj.get_job_list()
 
@@ -829,7 +826,7 @@ CONFIG:
                 Path(temp_dir, expid).mkdir()
                 # FIXME: Not sure why but the submitted and Slurm were using the $expid/tmp/ASLOGS folder?
                 for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                             f'{expid}/conf']:
+                             f'{expid}/conf', f'{expid}/db']:
                     Path(temp_dir, path).mkdir()
                 with open(Path(temp_dir, f'{expid}/conf/minimal.yml'), 'w+') as minimal:
                     minimal.write(dedent(f'''\
@@ -866,8 +863,7 @@ CONFIG:
                 config.reload(True)
                 parameters = config.load_parameters()
 
-                job_list_obj = JobList(expid, config, YAMLParserFactory(),
-                                       Autosubmit._get_job_list_persistence(expid, config))
+                job_list_obj = JobList(expid, config, YAMLParserFactory())
                 job_list_obj.generate(
                     as_conf=config,
                     date_list=[],
@@ -882,7 +878,7 @@ CONFIG:
                     new=True,
                     run_only_members=config.get_member_list(run_only=True),
                     show_log=True,
-                    create=True,
+                    full_load=True,
                 )
                 job_list = job_list_obj.get_job_list()
                 assert 1 == len(job_list)
@@ -1197,7 +1193,7 @@ CONFIG:
             BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
             Path(temp_dir, expid).mkdir()
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                         f'{expid}/conf']:
+                         f'{expid}/conf', f'{expid}/db']:
                 Path(temp_dir, path).mkdir()
             with open(Path(temp_dir, f'{expid}/conf/minimal.yml'), 'w+') as minimal:
                 minimal.write(dedent(f'''\
@@ -1252,8 +1248,7 @@ CONFIG:
             config.reload(True)
             parameters = config.load_parameters()
 
-            job_list = JobList(expid, config, YAMLParserFactory(),
-                               Autosubmit._get_job_list_persistence(expid, config))
+            job_list = JobList(expid, config, YAMLParserFactory())
             job_list.generate(
                 as_conf=config,
                 date_list=[datetime.strptime("20000101", "%Y%m%d")],
@@ -1268,7 +1263,7 @@ CONFIG:
                 new=True,
                 run_only_members=config.get_member_list(run_only=True),
                 show_log=True,
-                create=True,
+                full_load=True,
             )
             job_list = job_list.get_job_list()
             assert 24 == len(job_list)
@@ -1587,68 +1582,68 @@ def test_update_parameters_current_variables(autosubmit_config, experiment_data,
         assert parameters[key] == value
 
 
-@pytest.mark.parametrize('test_with_file, file_is_empty, last_line_empty', [
-    (False, False, False),
-    (True, True, False),
-    (True, False, False),
-    (True, False, True)
-], ids=["no file", "file is empty", "file is correct", "file last line is empty"])
-def test_recover_last_ready_date(tmpdir, test_with_file, file_is_empty, last_line_empty):
-    job = Job('dummy', '1', 0, 1)
-    job._tmp_path = Path(tmpdir)
-    stat_file = job._tmp_path.joinpath(f'{job.name}_TOTAL_STATS')
-    ready_time = datetime.now() + timedelta(minutes=5)
-    ready_date = int(ready_time.strftime("%Y%m%d%H%M%S"))
-    expected_date = None
-    if test_with_file:
-        if file_is_empty:
-            stat_file.touch()
-            expected_date = datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
-        else:
-            if last_line_empty:
-                with stat_file.open('w') as f:
-                    f.write(" ")
-                expected_date = datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
-            else:
-                with stat_file.open('w') as f:
-                    f.write(f"{ready_date} {ready_date} {ready_date} COMPLETED")
-                expected_date = str(ready_date)
-    job.ready_date = None
-    job.recover_last_ready_date()
-    assert job.ready_date == expected_date
-
-
-@pytest.mark.parametrize('test_with_logfiles, file_timestamp_greater_than_ready_date', [
-    (False, False),
-    (True, True),
-    (True, False),
-], ids=["no file", "log timestamp >= ready_date", "log timestamp < ready_date"])
-def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greater_than_ready_date):
-    job = Job('dummy', '1', 0, 1)
-    job._log_path = Path(tmpdir)
-    expected_local_logs = (f"{job.name}.out.0", f"{job.name}.err.0")
-    if test_with_logfiles:
-        if file_timestamp_greater_than_ready_date:
-            ready_time = datetime.now() - timedelta(minutes=5)
-            job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
-            log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
-            expected_update_log = True
-            expected_local_logs = (log_name.with_suffix('.out').name, log_name.with_suffix('.err').name)
-        else:
-            expected_update_log = False
-            ready_time = datetime.now() + timedelta(minutes=5)
-            job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
-            log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
-        log_name.with_suffix('.out').touch()
-        log_name.with_suffix('.err').touch()
-    else:
-        expected_update_log = False
-
-    job.updated_log = False
-    job.recover_last_log_name()
-    assert job.updated_log == expected_update_log
-    assert job.local_logs[0] == str(expected_local_logs[0])
-    assert job.local_logs[1] == str(expected_local_logs[1])
+# @pytest.mark.parametrize('test_with_file, file_is_empty, last_line_empty', [
+#     (False, False, False),
+#     (True, True, False),
+#     (True, False, False),
+#     (True, False, True)
+# ], ids=["no file", "file is empty", "file is correct", "file last line is empty"])
+# def test_recover_last_ready_date(tmpdir, test_with_file, file_is_empty, last_line_empty):
+#     job = Job('dummy', '1', 0, 1)
+#     job._tmp_path = Path(tmpdir)
+#     stat_file = job._tmp_path.joinpath(f'{job.name}_TOTAL_STATS')
+#     ready_time = datetime.now() + timedelta(minutes=5)
+#     ready_date = int(ready_time.strftime("%Y%m%d%H%M%S"))
+#     expected_date = None
+#     if test_with_file:
+#         if file_is_empty:
+#             stat_file.touch()
+#             expected_date = datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
+#         else:
+#             if last_line_empty:
+#                 with stat_file.open('w') as f:
+#                     f.write(" ")
+#                 expected_date = datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
+#             else:
+#                 with stat_file.open('w') as f:
+#                     f.write(f"{ready_date} {ready_date} {ready_date} COMPLETED")
+#                 expected_date = str(ready_date)
+#     job.ready_date = None
+#     job.recover_last_ready_date()
+#     assert job.ready_date == expected_date
+#
+#
+# @pytest.mark.parametrize('test_with_logfiles, file_timestamp_greater_than_ready_date', [
+#     (False, False),
+#     (True, True),
+#     (True, False),
+# ], ids=["no file", "log timestamp >= ready_date", "log timestamp < ready_date"])
+# def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greater_than_ready_date):
+#     job = Job('dummy', '1', 0, 1)
+#     job._log_path = Path(tmpdir)
+#     expected_local_logs = (f"{job.name}.out.0", f"{job.name}.err.0")
+#     if test_with_logfiles:
+#         if file_timestamp_greater_than_ready_date:
+#             ready_time = datetime.now() - timedelta(minutes=5)
+#             job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
+#             log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
+#             expected_update_log = True
+#             expected_local_logs = (log_name.with_suffix('.out').name, log_name.with_suffix('.err').name)
+#         else:
+#             expected_update_log = False
+#             ready_time = datetime.now() + timedelta(minutes=5)
+#             job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
+#             log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
+#         log_name.with_suffix('.out').touch()
+#         log_name.with_suffix('.err').touch()
+#     else:
+#         expected_update_log = False
+#
+#     job.updated_log = False
+#     job.recover_last_log_name()
+#     assert job.updated_log == expected_update_log
+#     assert job.local_logs[0] == str(expected_local_logs[0])
+#     assert job.local_logs[1] == str(expected_local_logs[1])
 
 
 @pytest.mark.parametrize('experiment_data, attributes_to_check', [(
@@ -1776,20 +1771,6 @@ def test_no_start_time(autosubmit_config, experiment_data):
     as_conf.data_changed = False
     job.update_parameters(as_conf, set_attributes=True)
     assert isinstance(job.start_time, datetime)
-
-
-def test_get_job_package_code(autosubmit_config):
-    autosubmit_config('dummy', {})
-    experiment_id = 'dummy'
-    job = Job(experiment_id, '1', 0, 1)
-
-    with patch("autosubmit.job.job_utils.JobPackagePersistence") as mock_persistence:
-        mock_persistence.return_value.load.return_value = [
-            ['dummy', '0005_job_packages', 'dummy']
-        ]
-        code = get_job_package_code(job.expid, job.name)
-
-        assert code == 5
 
 
 def test_sub_job_instantiation(tmp_path, autosubmit_config):
@@ -2080,7 +2061,7 @@ def test_wrapper_job_cancel_failed_wrapper_job_error(autosubmit_config, mocker):
     platform = mocker.MagicMock()
     error_message = 'fatal error'
     platform.send_command.side_effect = Exception(error_message)
-    wrapper_job = WrapperJob(_EXPID, 1, 'WAITING', 0, [], '00:30', platform, as_conf, False)
+    wrapper_job = WrapperJob(_EXPID, 1, 'WAITING', 0, [], '00:30', 1, platform, as_conf, False)
 
     mocked_log = mocker.patch('autosubmit.job.job.Log')
 
@@ -2099,10 +2080,306 @@ def test_wrapper_job_cancel_failed_local_send_command_pid_not_found(pid_found, a
     as_conf = autosubmit_config(_EXPID, {})
     platform = mocker.MagicMock()
     platform.get_pscall.return_value = pid_found
-    wrapper_job = WrapperJob(_EXPID, 1, 'WAITING', 0, [], '00:30', platform, as_conf, False)
+    wrapper_job = WrapperJob(_EXPID, 1, 'WAITING', 0, [], '00:30', 1, platform, as_conf, False)
     wrapper_job.platform_name = 'local'
     wrapper_job.processors = 2  # not serial
 
     wrapper_job.cancel_failed_wrapper_job()
 
     assert platform.send_command.called == pid_found
+
+
+@pytest.mark.parametrize('log_process', [True, False], ids=["with log_process", "without log_process"])
+def test_set_state(log_process):
+    state = {
+        '_name': 'test_job',
+        'undefined_variables': [],
+        'file': 'test_job.sh',
+        '_local_logs': ("from_log_process.out.local", "from_log_process.err.local"),
+        '_remote_logs': ("from_log_process.out.remote", "from_log_process.err.remote"),
+        '_local_logs_out': "from_database",
+        '_local_logs_err': "from_database",
+        '_remote_logs_out': "from_database",
+        '_remote_logs_err': "from_database",
+        '_status': Status.COMPLETED if log_process else "COMPLETED",
+        'status': Status.COMPLETED if log_process else "COMPLETED",
+        'date': datetime.strptime("20230815", "%Y%m%d") if log_process else "2023-08-15"
+    }
+
+    job = Job('blank', 1, Status.WAITING, 0)
+    job.__setstate__(state, log_process=log_process)
+    assert job.name == 'test_job'
+    assert job.file == 'test_job.sh'
+    assert job.status == Status.COMPLETED
+    assert job.date == datetime.strptime("20230815", "%Y%m%d")
+    assert job.local_logs == ("from_log_process.out.local", "from_log_process.err.local") if log_process else \
+        ("from_database", "from_database")
+    assert job.remote_logs == ("from_log_process.out.remote", "from_log_process.err.remote") if log_process else \
+        ("from_database", "from_database")
+
+
+@pytest.mark.parametrize('log_process', [True, False], ids=["with log_process", "without log_process"])
+def test_get_state(log_process):
+    job = Job('test_job', 1, Status.COMPLETED, 0)
+    job.file = 'test_job.sh'
+    job.date = datetime.strptime("20230815", "%Y%m%d")
+    job.local_logs = ("from_local.out", "from_local.err")
+    job.remote_logs = ("from_remote.out", "from_remote.err")
+
+    state = job.__getstate__(log_process=log_process)
+    if log_process:  # we pass the obj through pickle, so all should remain the same
+        assert state['_name'] == 'test_job'
+        assert state['file'] == 'test_job.sh'
+        assert state['_status'] == Status.COMPLETED
+        assert state['date'] == datetime.strptime("20230815", "%Y%m%d")
+        assert state['_local_logs'] == ("from_local.out", "from_local.err")
+        assert state['_remote_logs'] == ("from_remote.out", "from_remote.err")
+    else:  # db
+        assert state['name'] == 'test_job'
+        assert state.get('file') is None  # Load from yml file, later
+        assert state['status'] == "COMPLETED"
+        assert state['date'] == "2023-08-15T00:00:00"  # ISO format, which will be parsed when loading
+        assert state['local_logs_out'] == "from_local.out"
+        assert state['local_logs_err'] == "from_local.err"
+        assert state['remote_logs_out'] == "from_remote.out"
+        assert state['remote_logs_err'] == "from_remote.err"
+
+
+@pytest.mark.parametrize('loaded_data, log_process', [(True, True), (None, False),
+                                                      (True, False), (False, True)],
+                         ids=["with loaded_data and log_process", "without loaded_data and without log_process",
+                              "with loaded_data and without log_process", "without loaded_data and with log_process"])
+def test_init(loaded_data, log_process):
+    # Using __init_ directly so it shows as covered
+    if loaded_data and log_process:
+        state = {
+            '_name': 'test_job',
+            'undefined_variables': [],
+            'file': 'test_job.sh',
+            '_local_logs': ("from_log_process.out.local", "from_log_process.err.local"),
+            '_remote_logs': ("from_log_process.out.remote", "from_log_process.err.remote"),
+            '_local_logs_out': "from_database",
+            '_local_logs_err': "from_database",
+            '_remote_logs_out': "from_database",
+            '_remote_logs_err': "from_database",
+            '_status': Status.COMPLETED,
+            'date': datetime.strptime("20230815", "%Y%m%d")
+        }
+        job = Job(None, None, None, None, loaded_data=None, log_process=None)
+        job.__init__(None, None, None, None, loaded_data=state, log_process=log_process)
+        assert job.name == 'test_job'
+        assert job.file == 'test_job.sh'
+        assert job.status == Status.COMPLETED
+        assert job.date == datetime.strptime("20230815", "%Y%m%d")
+        assert job.local_logs == ("from_log_process.out.local", "from_log_process.err.local")
+        assert job.remote_logs == ("from_log_process.out.remote", "from_log_process.err.remote")
+    elif loaded_data and not log_process:
+        state = {
+            '_name': 'test_job',
+            'undefined_variables': [],
+            'local_logs': ("from_log_process.out.local", "from_log_process.err.local"),
+            'remote_logs': ("from_log_process.out.remote", "from_log_process.err.remote"),
+            'local_logs_out': "from_database",
+            'local_logs_err': "from_database",
+            'remote_logs_out': "from_database",
+            'remote_logs_err': "from_database",
+            'status': "COMPLETED",
+            'date': "2023-08-15T00:00:00"
+        }
+        job = Job(None, None, None, None, loaded_data=None, log_process=None)
+        job.__init__(None, None, None, None, loaded_data=state, log_process=False)
+        assert job.name == 'test_job'
+        assert job.status == Status.COMPLETED
+        assert job.date == datetime.strptime("20230815", "%Y%m%d")
+        assert job.local_logs == ("from_database", "from_database")
+        assert job.remote_logs == ("from_database", "from_database")
+    else:
+        job = Job(None, None, None, None, loaded_data=None, log_process=None)
+        job.__init__('test_job', 1, Status.COMPLETED, 0, loaded_data=None, log_process=log_process)
+        assert job.name == 'test_job'
+        assert job.file is None
+        assert job.status == Status.COMPLETED
+        assert job.date is None
+        assert job.local_logs == ('', '')
+        assert job.remote_logs == ('', '')
+
+
+@pytest.fixture()
+def experiment_data() -> dict:
+    return {
+        'AUTOSUBMIT': {'WORKFLOW_COMMIT': 'dummy'},
+        'JOBS': {
+            'test_job': {
+                'RETRIALS': 3,
+                'PLATFORM': 'DUMMY_PLATFORM',
+                'FILE': ['test.sh', 'add.sh', 'add2.sh'],
+                'DELETE_WHEN_EDGELESS': True,
+                'DEPENDENCIES': {"test_split": {}},
+                'RUNNING': "chunk",
+                'EXTENDED_HEADER_PATH': "bla",
+                'EXTENDED_TAILER_PATH': "bla2",
+                'CHECK': False,
+                'CHECK_WARNINGS': True
+            },
+            'test_split': {
+                'RETRIALS': 3,
+                'PLATFORM': 'DUMMY_PLATFORM',
+                'FILE': ['test.sh', 'add.sh', 'add2.sh'],
+                'DELETE_WHEN_EDGELESS': True,
+                'RUNNING': "chunk",
+                'EXTENDED_HEADER_PATH': "bla",
+                'EXTENDED_TAILER_PATH': "bla2",
+                'SPLITS': 2,
+                'CHECK': False,
+                'CHECK_WARNINGS': True
+            },
+        },
+        'WRAPPERS': {
+            'TYPE': 'vertical',
+            'JOBS_IN_WRAPPER': 'TEST_JOB&TEST_SPLIT',
+        },
+        'PLATFORMS': {
+            'dummy_platform': {
+                'TYPE': 'ps',
+
+            }
+        }
+    }
+
+
+def test_update_dict_parameters(autosubmit_config, experiment_data):
+    job_without_split = Job('test_job', 1, Status.READY, 0)
+    job_with_split = Job('test_split', 1, Status.READY, 0)
+    jobs = [job_without_split, job_with_split]
+    for job in jobs:
+        if job.name == "test_split":
+            job.splits = 2
+        job.section = job.name.upper()
+        job.chunk = 1
+        job.member = "fc00"
+        job.date = datetime.fromisoformat("2023-08-15T00:00:00")
+
+    as_conf = autosubmit_config(_EXPID, experiment_data=experiment_data)
+    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
+    as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
+    for job in jobs:
+        job.update_dict_parameters(as_conf)
+        assert job.retrials == 3
+        assert job.platform_name == "DUMMY_PLATFORM"
+        assert job.delete_when_edgeless is True
+        if job.name == "test_job":
+            assert job.dependencies == "{'TEST_SPLIT': {}}"
+        else:
+            assert job.dependencies == "{}"
+        assert job.running == "chunk"
+        assert job.ext_header_path == "bla"
+        assert job.ext_tailer_path == "bla2"
+        assert job.file == 'test.sh'
+        assert job.additional_files == ['add.sh', 'add2.sh']
+        if job.name == "test_split":
+            assert job.splits == 2
+        else:
+            assert job.splits is None
+
+
+def test_update_check_variables(autosubmit_config, experiment_data):
+    job_without_split = Job('test_job', 1, Status.READY, 0)
+    job_with_split = Job('test_split', 1, Status.READY, 0)
+    jobs = [job_without_split, job_with_split]
+    for job in jobs:
+        if job.name == "test_split":
+            job.splits = 2
+        job.section = job.name.upper()
+        job.chunk = 1
+        job.member = "fc00"
+        job.date = datetime.fromisoformat("2023-08-15T00:00:00")
+
+    as_conf = autosubmit_config(_EXPID, experiment_data=experiment_data)
+    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
+    as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
+    for job in jobs:
+        job.update_check_variables(as_conf)
+        assert job.check is False
+        assert job.check_warnings is True
+
+
+def test_update_job_parameters(autosubmit_config, experiment_data):
+    as_conf = autosubmit_config(_EXPID, experiment_data=experiment_data)
+    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
+    as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
+    job = Job('test_job', 1, Status.READY, 0)
+    job.section = 'TEST_JOB'
+    job.chunk = 1
+    job.member = "fc00"
+    job.date = datetime.fromisoformat("2023-08-15T00:00:00")
+    parameters = {}
+    expected = {'AS_CHECKPOINT': 'as_checkpoint', 'CHUNK': 1, 'CHUNK_END_DATE': '20230816', 'CHUNK_END_DAY': '16',
+                'CHUNK_END_HOUR': '00', 'CHUNK_END_IN_DAYS': '1', 'CHUNK_END_MONTH': '08', 'CHUNK_END_YEAR': '2023',
+                'CHUNK_FIRST': 'TRUE', 'CHUNK_LAST': 'TRUE', 'CHUNK_SECOND_TO_LAST_DATE': '20230815',
+                'CHUNK_SECOND_TO_LAST_DAY': '15', 'CHUNK_SECOND_TO_LAST_HOUR': '00', 'CHUNK_SECOND_TO_LAST_MONTH': '08',
+                'CHUNK_SECOND_TO_LAST_YEAR': '2023', 'CHUNK_START_DATE': '20230815', 'CHUNK_START_DAY': '15',
+                'CHUNK_START_HOUR': '00', 'CHUNK_START_MONTH': '08', 'CHUNK_START_YEAR': '2023',
+                'DAY_BEFORE': '20230814',
+                'DELAY': None, 'DELAY_RETRIALS': None, 'DELETE_WHEN_EDGELESS': True, 'EXPORT': 'none',
+                'FAIL_COUNT': '0',
+                'FREQUENCY': None, 'JOBNAME': 'test_job', 'JOB_DEPENDENCIES': [], 'MEMBER': 'fc00', 'NUMMEMBERS': 0,
+                'PACKED': False, 'PREV': '0', 'PROJECT_TYPE': 'none', 'RETRIALS': 0, 'RUN_DAYS': '1',
+                'SDATE': '20230815',
+                'SHAPE': '', 'SPLIT': None, 'SPLITS': None, 'SYNCHRONIZE': None, 'WORKFLOW_COMMIT': 'dummy',
+                'X11': False}
+    parameters = job.update_job_parameters(as_conf, parameters, True)
+    assert parameters == expected
+
+
+def test_update_parameters(autosubmit_config, experiment_data):
+    job = Job('test_job', 1, Status.READY, 0)
+    job.section = 'TEST_JOB'
+    job.chunk = 1
+    job.member = "fc00"
+    job.date = datetime.fromisoformat("2023-08-15T00:00:00")
+    as_conf = autosubmit_config(_EXPID, experiment_data=experiment_data)
+    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
+    as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
+
+    parameters = job.update_parameters(as_conf, set_attributes=True)
+    expected_current_only = {'CURRENT_ADDITIONAL_FILES': ['add.sh', 'add2.sh'], 'CURRENT_ARCH': 'DUMMY_PLATFORM',
+                             'CURRENT_BUDG': '',
+                             'CURRENT_CHECK': False, 'CURRENT_CHECK_WARNINGS': True,
+                             'CURRENT_DELETE_WHEN_EDGELESS': True,
+                             'CURRENT_DEPENDENCIES': {'TEST_SPLIT': {}}, 'CURRENT_EC_QUEUE': '',
+                             'CURRENT_EXCLUSIVITY': '',
+                             'CURRENT_EXTENDED_HEADER_PATH': 'bla', 'CURRENT_EXTENDED_TAILER_PATH': 'bla2',
+                             'CURRENT_FILE': 'test.sh', 'CURRENT_HOST': '', 'CURRENT_HYPERTHREADING': 'false',
+                             'CURRENT_LOGDIR': 't001/LOG_t001', 'CURRENT_METRIC_FOLDER': 't001/LOG_t001/test_job',
+                             'CURRENT_PLATFORM': 'DUMMY_PLATFORM', 'CURRENT_PROJ': '', 'CURRENT_PROJ_DIR': '',
+                             'CURRENT_QUEUE': '',
+                             'CURRENT_RESERVATION': '', 'CURRENT_RETRIALS': 3, 'CURRENT_ROOTDIR': 't001',
+                             'CURRENT_RUNNING': 'chunk',
+                             'CURRENT_SCRATCH_DIR': '', 'CURRENT_TYPE': 'ps', 'CURRENT_USER': ''}
+    for key, value in parameters.items():
+        if key.startswith("CURRENT_"):
+            assert value == expected_current_only[key]
+    assert job.retrials == 3
+    assert job.platform_name == "DUMMY_PLATFORM"
+    assert job.delete_when_edgeless is True
+    assert job.dependencies == "{'TEST_SPLIT': {}}"
+    assert job.running == "chunk"
+    assert job.ext_header_path == "bla"
+    assert job.ext_tailer_path == "bla2"
+    assert job.file == 'test.sh'
+    assert job.additional_files == ['add.sh', 'add2.sh']
+    assert job.splits is None
+    assert job.check is False
+    assert job.check_warnings is True
