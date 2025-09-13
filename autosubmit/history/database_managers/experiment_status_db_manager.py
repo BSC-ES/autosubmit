@@ -19,14 +19,12 @@
 
 import os
 import textwrap
-import time
 from typing import Protocol, cast
-from autosubmit.config.basicconfig import BasicConfig
-import autosubmit.history.utils as HUtils
-from .database_manager import DatabaseManager, DEFAULT_LOCAL_ROOT_DIR
-from . import database_models as Models
 
-BasicConfig.read()
+import autosubmit.history.utils as HUtils
+from autosubmit.config.basicconfig import BasicConfig
+from . import database_models as Models
+from .database_manager import DatabaseManager, DEFAULT_LOCAL_ROOT_DIR
 
 
 class ExperimentStatusDbManager(DatabaseManager):

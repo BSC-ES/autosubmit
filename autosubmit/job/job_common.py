@@ -104,10 +104,10 @@ class StatisticsSnippetBash:
     def as_header(scheduler_header, executable):
         if not executable:
             executable = "/bin/bash"
-        return textwrap.dedent("""\
-            #!{0}
+        return textwrap.dedent(f"""\
+            #!{executable}
 
-            """).format(executable) + \
+            """) + \
             scheduler_header + \
             textwrap.dedent("""\
             ###################
@@ -177,10 +177,10 @@ class StatisticsSnippetPython:
             executable = f"/usr/bin/env python{str(self.version)}"
         else:
             executable = executable
-        return textwrap.dedent("""\
-            #!{0}
+        return textwrap.dedent(f"""\
+            #!{executable}
 
-            """).format(executable) + \
+            """) + \
             scheduler_header + \
             textwrap.dedent("""\
             ###################
@@ -249,10 +249,10 @@ class StatisticsSnippetR:
     def as_header(scheduler_header, executable):
         if not executable:
             executable = "/usr/bin/env Rscript"
-        return textwrap.dedent("""\
-            #!{0}
+        return textwrap.dedent(f"""\
+            #!{executable}
 
-            """).format(executable) + \
+            """) + \
             scheduler_header + \
             textwrap.dedent("""\
             ###################
@@ -324,10 +324,10 @@ class StatisticsSnippetEmpty:
     def as_header(scheduler_header, executable):
         if not executable:
             executable = "/bin/bash"
-        return textwrap.dedent("""\
-            #!{0}
+        return textwrap.dedent(f"""\
+            #!{executable}
 
-            """).format(executable) + \
+            """) + \
             scheduler_header
 
     @staticmethod

@@ -21,8 +21,12 @@ from pathlib import Path
 
 import pytest
 
+from autosubmit.log.log import Log
 from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.platform import recover_platform_job_logs_wrapper
 from test.unit.test_job import TestJob, FakeBasicConfig
+
+_EXPID = 't000'
 
 
 @pytest.mark.parametrize(
@@ -82,3 +86,43 @@ def test_local_platform_read_file(tmp_path):
 
     assert platform.get_file_size(path_not_exists) is None
     assert platform.read_file(path_not_exists) is None
+
+
+def test_init_logs_log_process_no_root_dir(mocker, autosubmit_config):
+    """This test ignores the platform, and only tests the log initialization when no root dir configured."""
+    as_conf = autosubmit_config(_EXPID, experiment_data={
+        'CONFIG': {
+            'LOG_RECOVERY_CONSOLE_LEVEL': 'NO_LOG'
+        }
+    })
+
+    platform = mocker.MagicMock()
+    mocker.patch('autosubmit.platforms.platform._exit', return_value=0)
+    recover_platform_job_logs_wrapper(
+        platform, None, None, None, as_conf=as_conf)  # type: ignore
+
+    assert Log.console_handler.level == Log.NO_LOG
+
+
+def test_init_logs_log_process_with_root_dir(mocker, autosubmit_config):
+    """This test ignores the platform, and only tests the log initialization when a root dir is provided."""
+    as_conf = autosubmit_config(_EXPID, experiment_data={
+        'CONFIG': {
+            'LOG_RECOVERY_CONSOLE_LEVEL': 'NO_LOG'
+        }
+    })
+    # TODO: We need to create it first to get a ``BasicConfig``, with Dani's improvement
+    #       that may not be necessary in the future!
+    as_conf.experiment_data['ROOTDIR'] = as_conf.basic_config.expid_dir(as_conf.expid)
+
+    platform = mocker.MagicMock()
+    platform.name = 'parrot'
+
+    mocker.patch('autosubmit.platforms.platform._exit', return_value=0)
+
+    current_number_of_handlers = len(Log.log.handlers)
+
+    recover_platform_job_logs_wrapper(
+        platform, None, None, None, as_conf=as_conf)  # type: ignore
+
+    assert len(Log.log.handlers) == current_number_of_handlers + 2  # + out + err

@@ -63,7 +63,9 @@ class JobPackager(object):
         self.calculate_job_limits(platform)
         self.special_variables = dict()
         self.wrappers_with_error = {}
-
+        self.running_jobs_len = None
+        self.queuing_jobs_len = None
+        self.waiting_jobs_len = None
 
         #todo add default values
         #Wrapper building starts here
@@ -78,15 +80,15 @@ class JobPackager(object):
                 self.jobs_in_wrapper[wrapper_section] = self._as_config.get_wrapper_jobs(wrapper_data)
                 self.extensible_wallclock[wrapper_section] = self._as_config.get_extensible_wallclock(wrapper_data)
         self.wrapper_info = [self.wrapper_type,self.wrapper_policy,self.wrapper_method,self.jobs_in_wrapper,self.extensible_wallclock] # to pass to job_packages
-        Log.debug("Number of jobs available: {0}", self._max_wait_jobs_to_submit)
+        Log.debug(f"Number of jobs available: {self._max_wait_jobs_to_submit}")
         if self.hold:
-            Log.debug("Number of jobs prepared: {0}", len(jobs_list.get_prepared(platform)))
+            Log.debug(f"Number of jobs prepared: {len(jobs_list.get_prepared(platform))}")
             if len(jobs_list.get_prepared(platform)) > 0:
-                Log.debug("Jobs ready for {0}: {1}", self._platform.name, len(jobs_list.get_prepared(platform)))
+                Log.debug(f"Jobs ready for {self._platform.name}: {len(jobs_list.get_prepared(platform))}")
         else:
-            Log.debug("Number of jobs ready: {0}", len(jobs_list.get_ready(platform, hold=False)))
+            Log.debug(f"Number of jobs ready: {len(jobs_list.get_ready(platform, hold=False))}")
             if len(jobs_list.get_ready(platform)) > 0:
-                Log.debug("Jobs ready for {0}: {1}", self._platform.name, len(jobs_list.get_ready(platform)))
+                Log.debug(f"Jobs ready for {self._platform.name}: {len(jobs_list.get_ready(platform))}")
         self._maxTotalProcessors = 0
 
     def compute_weight(self, job_list):
@@ -437,7 +439,7 @@ class JobPackager(object):
         Check if the packages are ready to be built
         :return: List of jobs ready to be built, boolean indicating if packages can't be built for other reasons ( max_total_jobs...)
         """
-        Log.info("Calculating possible ready jobs for {0}".format(self._platform.name))
+        Log.info(f"Calculating possible ready jobs for {self._platform.name}")
         jobs_ready = list()
         if len(self._jobs_list.jobs_to_run_first) > 0:
             jobs_ready = [job for job in self._jobs_list.jobs_to_run_first if
@@ -461,7 +463,7 @@ class JobPackager(object):
                 held_by_id[held_job.id].append(held_job)
             current_held_jobs = len(list(held_by_id.keys()))
             remaining_held_slots = 5 - current_held_jobs
-            Log.debug("there are currently {0} held jobs".format(remaining_held_slots))
+            Log.debug(f"there are currently {remaining_held_slots} held jobs")
             try:
                 while len(sorted_jobs) > remaining_held_slots:
                     del sorted_jobs[-1]
@@ -479,7 +481,7 @@ class JobPackager(object):
         self.calculate_job_limits(self._platform)
         if not (self._max_wait_jobs_to_submit > 0 and self._max_jobs_to_submit > 0):
             # If there is no more space in platform, result is tuple of empty
-            Log.debug('Max jobs to submit reached, waiting for more space in platform {0}'.format(self._platform.name))
+            Log.debug(f'Max jobs to submit reached, waiting for more space in platform {self._platform.name}')
             return jobs_ready,False
         return jobs_ready,True
 
@@ -574,7 +576,7 @@ class JobPackager(object):
             section = self._as_config.experiment_data.get("WRAPPERS", {}).get(self.current_wrapper_section, {}).get("JOBS_IN_WRAPPER", "")
             if not self._platform.allow_wrappers and self.wrapper_type[self.current_wrapper_section] in ['horizontal', 'vertical', 'vertical-horizontal', 'horizontal-vertical']:
                 Log.warning(
-                    "Platform {0} does not allow wrappers, submitting jobs individually".format(self._platform.name))
+                    f"Platform {self._platform.name} does not allow wrappers, submitting jobs individually")
                 for job in jobs:
                     non_wrapped_jobs.append(job)
                 continue
