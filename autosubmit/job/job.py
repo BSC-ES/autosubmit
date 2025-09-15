@@ -1511,7 +1511,7 @@ class Job(object):
         return self.status
 
     @staticmethod
-    def _get_submitter():
+    def _get_submitter(as_conf):
         """
         Returns the submitter corresponding to the communication defined on Autosubmit's config file
         """
