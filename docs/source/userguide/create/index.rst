@@ -2,109 +2,123 @@ Create an Experiment
 ====================
 
 Create new experiment
--------------------------
+---------------------
 
-To create a new experiment, just run the command:
-::
+To create a new experiment, run the following command:
 
-    autosubmit expid -H HPCname -d "Description"
+.. code-block:: bash
 
+    autosubmit expid -H <HPCname> -d "<Description>"
 
-*HPCname* is the name of the main HPC platform for the experiment: it will be the default platform for the tasks.
-*Description* is a brief experiment description.
+Where:
+
+* ``HPCname`` - The name of the main HPC platform for the experiment (will be the default platform for all tasks)
+* ``Description`` - A brief description of the experiment
 
 Options:
 
 .. runcmd:: autosubmit expid -h
 
-Example:
-::
+Examples:
 
+.. code-block:: bash
+
+    # Basic experiment creation
     autosubmit expid --HPC marenostrum4 --description "experiment is about..."
-    autosubmit expid -min -repo https://earth.bsc.es/gitlab/ces/auto-advanced_config_example -b main -conf as_conf -d "minimal config example"
+
+    # Create from repository with minimal configuration
+    autosubmit expid -min -repo https://earth.bsc.es/gitlab/ces/auto-advanced_config_example \
+                     -b main -conf as_conf -d "minimal config example"
+
+    # Create dummy experiment for testing
     autosubmit expid -dm -d "dummy test"
 
+Configuring Default Platforms
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-If there is an autosubmitrc or .autosubmitrc file in your home directory (cd ~), you can setup a default file from where the contents of platforms_<EXPID>.yml should be copied.
+If you have an ``autosubmitrc`` or ``.autosubmitrc`` file in your home directory, you can configure a default platforms file that will be used as a template for new experiments.
 
-In this autosubmitrc or .autosubmitrc file, include the configuration setting custom_platforms:
+Add the following to your autosubmitrc file:
 
-Example:
-::
+.. code-block:: ini
 
-    conf:
-        custom_platforms: /home/Earth/user/custom.yml
+    [conf]
+    custom_platforms = /home/Earth/user/custom.yml
 
-Where the specified path should be complete, as something you would get when executing pwd, and also include the filename of your custom platforms content.
+.. note::
+   The path must be absolute (like the output of ``pwd``) and include the filename of your custom platforms configuration.
 
 Copy another experiment
---------------------------
+-----------------------
 
-This option makes a copy of an existing experiment.
-It registers a new unique identifier and copies all configuration files in the new experiment folder:
-::
+To copy an existing experiment with a new unique identifier:
 
-    autosubmit expid -y <EXPID> -H HPCname -d "Description"
-    autosubmit expid -y <EXPID> -c PATH -H HPCname -d "Description"
+.. code-block:: bash
 
+    # Copy experiment with default configuration
+    autosubmit expid -y <EXPID> -H <HPCname> -d "<Description>"
 
-*HPCname* is the name of the main HPC platform for the experiment: it will be the default platform for the tasks.
-*COPY* is the experiment identifier to copy from.
-*Description* is a brief experiment description.
-*CONFIG* is a folder that exists.
+    # Copy experiment with custom configuration path
+    autosubmit expid -y <EXPID> -c <PATH> -H <HPCname> -d "<Description>"
 
-Example:
-::
+Where:
 
-    autosubmit expid -y <EXPID> -H ithaca -d "experiment is about..."
-    autosubmit expid -y <EXPID> -p "/esarchive/autosubmit/genericFiles/conf" -H marenostrum4 -d "experiment is about..."
+* ``EXPID`` - The experiment identifier to copy from
+* ``HPCname`` - The name of the main HPC platform for the new experiment
+* ``Description`` - A brief description of the new experiment
+* ``PATH`` - (Optional) Path to custom configuration directory
+
+Examples:
+
+.. code-block:: bash
+
+    # Copy experiment to Ithaca platform
+    autosubmit expid -y a0b1 -H ithaca -d "Copy of experiment a0b1"
+
+    # Copy with custom configuration path
+    autosubmit expid -y a0b1 -p "/esarchive/autosubmit/genericFiles/conf" \
+                     -H marenostrum4 -d "Modified copy of a0b1"
 
 .. warning:: You can only copy experiments created with Autosubmit 3.11 or above.
 
-If there is an autosubmitrc or .autosubmitrc file in your home directory (cd ~), you can setup a default file from where the contents of platforms_<EXPID>.yml should be copied.
+.. tip::
+   You can configure default platforms in your ``autosubmitrc`` file:
 
-In this autosubmitrc or .autosubmitrc file, include the configuration setting custom_platforms:
+   .. code-block:: ini
 
-Example:
-::
-
-    conf:
-    custom_platforms: /home/Earth/user/custom.yml
-
-Where the specified path should be complete, as something you would get when executing pwd, and also include the filename of your custom platforms content.
+       [conf]
+       custom_platforms = /home/Earth/user/custom.yml
 
 Create a dummy experiment
---------------------------------
+-------------------------
 
-It is useful to test if Autosubmit is properly configured with a inexpensive experiment. A Dummy experiment will check,
-test, and submit to the HPC platform, as any other experiment would.
+Dummy experiments are useful for testing your Autosubmit configuration without expensive computations. They behave like regular experiments but only submit sleep jobs to the HPC platform.
 
-The job submitted are only sleeps.
+To create a dummy experiment:
 
-This command creates a new experiment with default values, useful for testing:
-::
+.. code-block:: bash
 
-    autosubmit expid -H HPCname -dm -d "Description"
+    autosubmit expid -H <HPCname> -dm -d "<Description>"
 
-*HPCname* is the name of the main HPC platform for the experiment: it will be the default platform for the tasks.
-*Description* is a brief experiment description.
+Where:
+
+* ``HPCname`` - The HPC platform to test
+* ``Description`` - A brief description
 
 Example:
-::
 
-    autosubmit expid -H ithaca -dm -d "experiment is about..."
+.. code-block:: bash
+
+    autosubmit expid -H ithaca -dm -d "Testing Autosubmit configuration"
 
 Create a test case experiment
-------------------------------------
+------------------------------
 
-Test case experiments are special experiments which have a reserved first letter "t" at the expid. They are meant to
-help differentiate testing suits of the automodels from normal runs.
+Test case experiments use a reserved "t" prefix in their experiment ID to distinguish testing suites from production runs. They allow you to create experiments with specific configurations for testing purposes.
 
-This method is to create a test case experiment. It creates a new experiment for a test case with a
-given number of chunks, start date, member and HPC.
+To create a test case experiment:
 
-To create a test case experiment, use the command:
-::
+.. code-block:: bash
 
     autosubmit testcase
 
@@ -113,17 +127,18 @@ Options:
 .. runcmd:: autosubmit testcase -h
 
 Example:
-::
 
-    autosubmit testcase -d "TEST CASE cca-intel auto-ecearth3 layer 0: T511L91-ORCA025L75-LIM3 (cold restart) (a092-a09n)" -H cca-intel -b 3.2.0b_develop -y a09n
+.. code-block:: bash
+
+    autosubmit testcase -d "TEST CASE cca-intel auto-ecearth3 layer 0" \
+                        -H cca-intel -b 3.2.0b_develop -y a09n
 
 .. _create_profiling:
 
-How to profile Autosubmit while creating an experiment
-------------------------------------------------------
+Profiling experiment creation
+------------------------------
 
-Autosubmit offers the possibility to profile the experiment creation process. To enable the profiler, just
-add the ``--profile`` (or ``-p``) flag to your ``autosubmit create`` command, as in the following example:
+You can profile the experiment creation process to analyze performance. To enable profiling, add the ``--profile`` (or ``-p``) flag to your ``autosubmit create`` command:
 
 .. code-block:: bash
 
