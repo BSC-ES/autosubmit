@@ -336,7 +336,7 @@ class PJMPlatform(ParamikoPlatform):
             return status
         return status[0]
 
-    def parse_joblist(self, job_list):
+    def parse_joblist(self, job_list: list[list['Job']]) -> str:
         """
         Convert a list of job_list to job_list_cmd
         :param job_list: list of jobs
@@ -355,6 +355,8 @@ class PJMPlatform(ParamikoPlatform):
             job_list_cmd = job_list_cmd[:-1]
 
         return job_list_cmd
+
+
     def _check_jobid_in_queue(self, ssh_output, job_list_cmd):
         for job in job_list_cmd.split('+'):
             if job not in ssh_output:

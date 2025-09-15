@@ -1511,19 +1511,11 @@ class Job(object):
         return self.status
 
     @staticmethod
-    def _get_submitter(as_conf):
+    def _get_submitter():
         """
         Returns the submitter corresponding to the communication defined on Autosubmit's config file
-
-        :return: submitter
-        :rtype: Submitter
         """
-        #communications_library = as_conf.get_communications_library()
-        # if communications_library == 'paramiko':
         return ParamikoSubmitter()
-        # communications library not known
-        # raise AutosubmitCritical(
-        #    'You have defined a not valid communications library on the configuration file', 7014)
 
     def update_children_status(self):
         children = list(self.children)
@@ -1603,7 +1595,7 @@ class Job(object):
 
         return parameters
 
-    def update_platform_parameters(self, as_conf, parameters):
+    def update_platform_parameters(self, as_conf: AutosubmitConfig, parameters: dict) -> dict:
         if not self.platform:
             submitter = job_utils._get_submitter(as_conf)
             submitter.load_platforms(as_conf)
@@ -1858,7 +1850,7 @@ class Job(object):
         # Increasing according to chunk
         self.wallclock = increase_wallclock_by_chunk(self.wallclock, self.wchunkinc, chunk)
 
-    def update_platform_associated_parameters(self, as_conf, parameters: dict, chunk, set_attributes):
+    def update_platform_associated_parameters(self, as_conf: AutosubmitConfig, parameters: dict, chunk, set_attributes) -> dict:
         if set_attributes:
             self.x11_options = str(parameters.get("CURRENT_X11_OPTIONS", ""))
             self.ec_queue = str(parameters.get("CURRENT_EC_QUEUE", ""))
@@ -1934,7 +1926,7 @@ class Job(object):
 
         return parameters
 
-    def update_wrapper_parameters(self,as_conf, parameters):
+    def update_wrapper_parameters(self,as_conf: AutosubmitConfig, parameters: dict) -> dict:
         wrappers = as_conf.experiment_data.get("WRAPPERS", {})
         if len(wrappers) > 0:
             parameters['WRAPPER'] = as_conf.get_wrapper_type()
@@ -2186,7 +2178,7 @@ class Job(object):
         parameters['X11'] = self.x11
         return parameters
 
-    def update_job_variables_final_values(self, parameters):
+    def update_job_variables_final_values(self, parameters: dict) -> None:
         """ Jobs variables final values based on parameters dict instead of as_conf
             This function is called to handle %CURRENT_% placeholders as they are filled up dynamically for each job
         """
@@ -2265,7 +2257,7 @@ class Job(object):
                 event.set()
         return parameters
 
-    def update_content_extra(self, as_conf, files) -> list[str]:
+    def update_content_extra(self, as_conf: AutosubmitConfig, files: list[str]) -> list[str]:
         additional_templates = []
         for file in files:
             if as_conf.get_project_type().lower() == "none":
@@ -2323,7 +2315,7 @@ class Job(object):
         additional_content = self.update_content_extra(as_conf, self.additional_files)
         return template_content, additional_content
 
-    def get_wrapped_content(self, as_conf, parameters):
+    def get_wrapped_content(self, as_conf: AutosubmitConfig, parameters: dict):
         snippet: 'TemplateSnippet' = get_template_snippet(Language.EMPTY)
         template = f'python $SCRATCH/{self.expid}/LOG_{self.expid}/{self.name}.cmd'
         return self._get_paramiko_template(snippet, template, parameters)
@@ -2353,7 +2345,7 @@ class Job(object):
             return False
 
     @staticmethod
-    def is_a_completed_retrial(fields):
+    def is_a_completed_retrial(fields: dict) -> bool:
         """
         Returns true only if there are 4 fields: submit start finish status, and status equals COMPLETED.
         """
@@ -2463,7 +2455,7 @@ class Job(object):
         return real_name
 
 
-    def create_wrapped_script(self, as_conf, wrapper_tag='wrapped'):
+    def create_wrapped_script(self, as_conf: AutosubmitConfig, wrapper_tag='wrapped') -> str:
         parameters = self.update_parameters(as_conf, set_attributes=False)
         template_content = self.get_wrapped_content(as_conf, parameters)
         for key, value in parameters.items():
@@ -2506,13 +2498,11 @@ class Job(object):
                              "of parameters set, and will be replaced by a blank value: {0}".format(
                                 self.undefined_variables), 5013)
                 if not set(variables).issuperset(set(parameters)):
-                    Log.printlog(
-                        "The following set of variables are not being used in the templates: {0}".format(
-                            str(set(parameters) - set(variables))), 5013)
+                    Log.printlog(f"The following set of variables are not being used in the templates: {str(set(parameters) - set(variables))}", 5013)
 
         return out
 
-    def update_local_logs(self, count=-1, update_submit_time=True) -> None:
+    def update_local_logs(self, count: int = -1, update_submit_time: bool = True) -> None:
         if update_submit_time:
             self.submit_time_timestamp = date2str(datetime.datetime.now(), 'S')
         if count > 0:

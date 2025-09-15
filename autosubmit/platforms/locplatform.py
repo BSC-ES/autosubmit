@@ -20,7 +20,7 @@ import os
 import subprocess
 from pathlib import Path
 from time import sleep
-from typing import Union, TYPE_CHECKING
+from typing import Optional, Union, TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import Log, AutosubmitError
@@ -30,6 +30,7 @@ from autosubmit.platforms.wrappers.wrapper_factory import LocalWrapperFactory
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
+
 
 class LocalPlatform(ParamikoPlatform):
     """
@@ -51,7 +52,7 @@ class LocalPlatform(ParamikoPlatform):
     def get_checkAlljobs_cmd(self, jobs_id):
         pass
 
-    def __init__(self, expid, name, config, auth_password=None):
+    def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
         ParamikoPlatform.__init__(self, expid, name, config, auth_password=auth_password)
         self.cancel_cmd = None
         self.mkdir_cmd = None
@@ -99,7 +100,7 @@ class LocalPlatform(ParamikoPlatform):
     def parse_job_output(self, output):
         return output[0]
 
-    def get_submitted_job_id(self, output, x11 = False):
+    def get_submitted_job_id(self, output, x11=False):
         return output
 
     def get_submit_cmd(self, job_script, job, hold=False, export=""):
@@ -107,7 +108,7 @@ class LocalPlatform(ParamikoPlatform):
             seconds = job.wallclock_in_seconds
         else:
             # TODO for another branch this, it is to add a timeout to the wrapped jobs even if the wallclock is 0, default to 2 days
-            seconds = 60*60*24*2
+            seconds = 60 * 60 * 24 * 2
         if export == "none" or export == "None" or export is None or export == "":
             export = ""
         else:
@@ -131,7 +132,7 @@ class LocalPlatform(ParamikoPlatform):
         if log_recovery_process:
             self.spawn_log_retrieval_process(as_conf)
 
-    def test_connection(self,as_conf):
+    def test_connection(self, as_conf: 'AutosubmitConfig') -> None:
         if not self.connected:
             self.connect(as_conf)
 
@@ -147,10 +148,10 @@ class LocalPlatform(ParamikoPlatform):
         self.connected = True
 
     def check_Alljobs(self, job_list, as_conf, retries=5):
-        for job,prev_job_status in job_list:
+        for job, prev_job_status in job_list:
             self.check_job(job)
 
-    def send_command(self, command, ignore_log=False, x11 = False):
+    def send_command(self, command, ignore_log=False, x11=False) -> bool:
         lang = locale.getlocale()[1]
         if lang is None:
             lang = locale.getdefaultlocale()[1]
@@ -171,8 +172,8 @@ class LocalPlatform(ParamikoPlatform):
         """
         Sends a file to a specified location using a command.
 
-        :param filenames: The name of the file to send.
-        :type filenames: str
+        :param filename: The name of the file to send.
+        :type filename: str
         :param check: Unused in this platform.
         :type check: bool
         :return: True if the file was sent successfully.
@@ -209,7 +210,7 @@ class LocalPlatform(ParamikoPlatform):
             os.chmod(multiple_delete_previous_run, 0o770)
         return ""
 
-    def get_file(self, filename, must_exist=True, relative_path='',ignore_log = False,wrapper_failed=False):
+    def get_file(self, filename, must_exist=True, relative_path='', ignore_log=False, wrapper_failed=False):
         local_path = os.path.join(self.tmp_path, relative_path)
         if not os.path.exists(local_path):
             os.makedirs(local_path)
@@ -219,8 +220,8 @@ class LocalPlatform(ParamikoPlatform):
 
         command = '{0} {1} {2}'.format(self.get_cmd, os.path.join(self.tmp_path, 'LOG_' + self.expid, filename),
                                        file_path)
-        try:        
-            subprocess.check_call(command, stdout=open(os.devnull, 'w'), stderr=open(os.devnull, 'w'), shell=True)                      
+        try:
+            subprocess.check_call(command, stdout=open(os.devnull, 'w'), stderr=open(os.devnull, 'w'), shell=True)
         except subprocess.CalledProcessError:
             if must_exist:
                 raise Exception('File {0} does not exists'.format(filename))
@@ -231,7 +232,8 @@ class LocalPlatform(ParamikoPlatform):
         return True
 
     # Moves .err .out
-    def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 1, max_retries: int = 1) -> bool:
+    def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 1,
+                          max_retries: int = 1) -> bool:
         """
         Checks if a file exists in the platform.
 
@@ -255,12 +257,11 @@ class LocalPlatform(ParamikoPlatform):
         Log.warning("File {0} does not exist".format(src))
         return False
 
-
-    def delete_file(self, filename,del_cmd  = False):
+    def delete_file(self, filename: str, del_cmd: bool = False) -> bool:
         if del_cmd:
-            command = '{0} {1}'.format(self.del_cmd, os.path.join(self.tmp_path,"LOG_"+self.expid, filename))
+            command = '{0} {1}'.format(self.del_cmd, os.path.join(self.tmp_path, "LOG_" + self.expid, filename))
         else:
-            command = '{0} {1}'.format(self.del_cmd, os.path.join(self.tmp_path,"LOG_"+self.expid, filename))
+            command = '{0} {1}'.format(self.del_cmd, os.path.join(self.tmp_path, "LOG_" + self.expid, filename))
             command += ' ; {0} {1}'.format(self.del_cmd, os.path.join(self.tmp_path, filename))
         try:
             subprocess.check_call(command, shell=True)
@@ -268,6 +269,7 @@ class LocalPlatform(ParamikoPlatform):
             Log.debug('Could not remove file {0}'.format(os.path.join(self.tmp_path, filename)))
             return False
         return True
+
     def move_file(self, src, dest, must_exist=False):
         """
         Moves a file on the platform (includes .err and .out)
@@ -282,12 +284,12 @@ class LocalPlatform(ParamikoPlatform):
         path_root = ""
         try:
             path_root = self.get_files_path()
-            os.rename(os.path.join(path_root, src),os.path.join(path_root, dest))
+            os.rename(os.path.join(path_root, src), os.path.join(path_root, dest))
             return True
         except IOError as e:
             if must_exist:
                 raise AutosubmitError("File {0} does not exists".format(
-                    os.path.join(path_root,src)), 6004, str(e))
+                    os.path.join(path_root, src)), 6004, str(e))
             else:
                 Log.debug("File {0} doesn't exists ".format(path_root))
                 return False
@@ -302,10 +304,13 @@ class LocalPlatform(ParamikoPlatform):
                 Log.printlog("Log file couldn't be moved: {0}".format(
                     os.path.join(self.get_files_path(), src)), 5001)
                 return False
+
     def get_ssh_output(self):
         return self._ssh_output
+
     def get_ssh_output_err(self):
         return self._ssh_output_err
+
     def get_logs_files(self, exp_id, remote_logs):
         """
         Overriding the parent's implementation.
