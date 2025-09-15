@@ -1,0 +1,14 @@
+JOBS:
+  SIM:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: INI POST-1
+    WALLCLOCK: 00:15
+    RUNNING: chunk
+    QUEUE: debug
+    SKIPPABLE: TRUE
+
+  POST:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: SIM
+    WALLCLOCK: 00:05
+    RUNNING: member

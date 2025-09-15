@@ -12,11 +12,11 @@ build:
     python: "3.9"
   apt_packages:
     - graphviz
+    - sqlite3
   jobs:
-    post_install:
-      - autosubmit --version
-      - autosubmit configure
-      - autosubmit install
+    build:
+      html:
+        - make html -C ./docs/
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:

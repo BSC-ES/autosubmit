@@ -1,0 +1,25 @@
+JOBS:
+  INI:
+    SCRIPT: 'sleep 0'
+    RUNNING: ONCE
+
+  SIM:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: INI SIM-1
+    RUNNING: ONCE
+
+  ASIM:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: SIM
+    RUNNING: ONCE
+    SPLITS: 3
+
+  POST:
+    SCRIPT: 'sleep 0'
+    RUNNING: ONCE
+    DEPENDENCIES:
+      ASIM:
+        SPLITS_FROM:
+          2,3: # [2:3] is also valid
+            SPLITS_TO: 1,2*,3* # 1,[2:3]* is also valid, you can also specify the step with [2:3:step]
+    SPLITS: 3

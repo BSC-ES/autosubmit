@@ -1,0 +1,24 @@
+JOBS:
+  SIM:
+    RUNNING: chunk
+    QUEUE: debug
+
+  DA:
+    DEPENDENCIES:
+      SIM:
+        MEMBERS_FROM:
+          ALL:
+            MEMBERS_TO: 00,01,02
+    RUNNING: chunk
+    SYNCHRONIZE: member
+
+  REDUCE:
+    DEPENDENCIES: SIM
+    RUNNING: member
+    FREQUENCY: 4
+
+  REDUCE_AN:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: DA
+    RUNNING: chunk
+    SYNCHRONIZE: member

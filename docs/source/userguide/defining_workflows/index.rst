@@ -20,7 +20,6 @@ first one.
 It is important to remember when defining workflows that DEPENDENCIES on autosubmit always refer to jobs that should
 be finished before launching the job that has the DEPENDENCIES attribute.
 
-
 .. code-block:: yaml
 
   JOBS:
@@ -32,15 +31,19 @@ be finished before launching the job that has the DEPENDENCIES attribute.
       DEPENDENCIES: One
 
 
-The resulting workflow can be seen in Figure :numref:`simple`
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: simple.png
+    :name: simple
+    :width: 100%
+    :align: center
+    :alt: simple workflow plot
+    :caption: Example showing a simple workflow with two sequential jobs
 
-.. figure:: fig/simple.png
-   :name: simple
-   :width: 100%
-   :align: center
-   :alt: simple workflow plot
 
-   Example showing a simple workflow with two sequential jobs
+The resulting workflow can be seen in Figure
 
 
 Running jobs once per startdate, member or chunk
@@ -52,6 +55,7 @@ divide member execution on different chunks.
 To set at what level a job has to run you have to use the RUNNING attribute. It has four possible values: once, date,
 member and chunk corresponding to running once, once per startdate, once per member or once per chunk respectively.
 
+
 .. code-block:: yaml
 
     EXPERIMENT:
@@ -62,7 +66,7 @@ member and chunk corresponding to running once, once per startdate, once per mem
       NUMCHUNKS: '2'
       CHUNKINI: ''
       CALENDAR: standard
-    
+
     JOBS:
       ONCE:
           FILE: Once.sh
@@ -83,15 +87,17 @@ member and chunk corresponding to running once, once per startdate, once per mem
           RUNNING: chunk
 
 
-The resulting workflow can be seen in Figure :numref:`running` for a experiment with 2 startdates, 2 members and 2 chunks.
+The resulting workflow can be seen in Figure  for a experiment with 2 startdates, 2 members and 2 chunks.
 
-.. figure:: fig/running.png
-   :name: running
-   :width: 100%
-   :align: center
-   :alt: simple workflow plot
-
-   Example showing how to run jobs once per startdate, member or chunk.
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: running.png
+    :name: running
+    :width: 100%
+    :align: center
+    :alt: Example showing how to run jobs once per startdate, member or chunk.
 
 
 Dependencies
@@ -134,7 +140,7 @@ sim-1 on the DEPENDENCIES attribute. As you can see, you can add as much depende
       RUNNING: chunk
 
 
-The resulting workflow can be seen in Figure :numref:`dprevious`
+The resulting workflow can be seen in Figure `dprevious`
 
 .. warning::
 
@@ -143,13 +149,15 @@ The resulting workflow can be seen in Figure :numref:`dprevious`
    that dependency is redundant with the one on the previous sim
 
 
-.. figure:: fig/dependencies_previous.png
-   :name: dprevious
-   :width: 100%
-   :align: center
-   :alt: simple workflow plot
-
-   Example showing dependencies between sim jobs on different chunks.
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: dependencies_previous.png
+    :name: dependency_previous
+    :width: 100%
+    :align: center
+    :alt: Example showing dependencies between sim jobs on different chunks.
 
 Dependencies between running levels
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -184,15 +192,17 @@ jobs to be finished. That is the case of the postprocess combine dependency on t
         RUNNING: member
 
 
-The resulting workflow can be seen in Figure :numref:`dependencies`
+The resulting workflow can be seen in Figure `dependencies`
 
-.. figure:: fig/dependencies_running.png
-   :name: dependencies
-   :width: 100%
-   :align: center
-   :alt: simple workflow plot
-
-   Example showing dependencies between jobs running at different levels.
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: dependencies_running.png
+    :name: dependencies_running
+    :width: 100%
+    :align: center
+    :alt: Example showing dependencies between jobs running at different levels.
 
 Dependencies rework
 ~~~~~~~~~~~~~~~~~~~
@@ -401,15 +411,17 @@ an integer I for this attribute and the job will run only once for each I iterat
           RUNNING: member
 
 
-The resulting workflow can be seen in Figure :numref:`frequency`
+The resulting workflow can be seen in Figure `frequency`
 
-.. figure:: fig/frequency.png
-   :name: frequency
-   :width: 100%
-   :align: center
-   :alt: simple workflow plot
-
-   Example showing dependencies between jobs running at different frequencies.
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: frequency.png
+    :name: frequency
+    :width: 100%
+    :align: center
+    :caption: Example showing dependencies between jobs running at different frequencies.
 
 Job synchronize
 ~~~~~~~~~~~~~~~
@@ -448,15 +460,17 @@ of synchronization do you want. See the below examples with and without this par
           DEPENDENCIES: SIM
           RUNNING: chunk
 
-The resulting workflow can be seen in Figure :numref:`nosync`
+The resulting workflow can be seen in Figure `nosync`
 
-.. figure:: fig/no-synchronize.png
-   :name: nosync
-   :width: 100%
-   :align: center
-   :alt: simple workflow plot
-
-   Example showing dependencies between chunk jobs running without synchronize.
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: no_synchronize.png
+    :name: no_synchronize
+    :width: 100%
+    :align: center
+    :caption: Example showing dependencies between chunk jobs running without synchronize.
 
 .. code-block:: yaml
 
@@ -466,15 +480,18 @@ The resulting workflow can be seen in Figure :numref:`nosync`
         RUNNING: chunk
         SYNCHRONIZE: member
 
-The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'member' can be seen in Figure :numref:`msynchronize`
+The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'member' can be seen in Figure `msynchronize`
 
-.. figure:: fig/member-synchronize.png
-   :name: msynchronize
-   :width: 100%
-   :align: center
-   :alt: simple workflow plot
 
-   Example showing dependencies between chunk jobs running with member synchronize.
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: synchronize.png
+    :name: synchronize
+    :width: 100%
+    :align: center
+    :alt: Example showing dependencies between chunk jobs running with member synchronize.
 
 .. code-block:: yaml
 
@@ -484,15 +501,19 @@ The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'member' can be s
         RUNNING: chunk
         SYNCHRONIZE: date
 
-The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'date' can be seen in Figure :numref:`dsynchronize`
+The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'date' can be seen in Figure `dsynchronize`
 
-.. figure:: fig/date-synchronize.png
-   :name: dsynchronize
-   :width: 100%
-   :align: center
-   :alt: simple workflow plot
 
-   Example showing dependencies between chunk jobs running with date synchronize.
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: dsynchronize.png
+    :name: dsynchronize
+    :width: 100%
+    :align: center
+    :alt: simple workflow plot
+    :caption: Example showing dependencies between chunk jobs running with date synchronize.
 
 Job split
 ~~~~~~~~~
@@ -507,30 +528,30 @@ There is also an special character '*' that can be used to specify that the spli
 .. code-block:: yaml
 
     JOBS:
-      ini:
-          FILE: ini.sh
-          RUNNING: once
+      INI:
+        FILE: INI.sh
+        RUNNING: ONCE
 
-      sim:
-          FILE: sim.sh
-          DEPENDENCIES: ini sim-1
-          RUNNING: once
+      SIM:
+        FILE: SIM.sh
+        DEPENDENCIES: INI SIM-1
+        RUNNING: ONCE
 
-      asim:
-          FILE: asim.sh
-          DEPENDENCIES: sim
-          RUNNING: once
-          SPLITS: 3
+      ASIM:
+        FILE: ASIM.sh
+        DEPENDENCIES: SIM
+        RUNNING: ONCE
+        SPLITS: 3
 
-      post:
-          FILE: post.sh
-          RUNNING: once
-          DEPENDENCIES:
-              asim:
-                  SPLITS_FROM:
-                      2,3: # [2:3] is also valid
-                          splits_to: 1,2*,3* # 1,[2:3]* is also valid, you can also specify the step with [2:3:step]
-          SPLITS: 3
+      POST:
+        FILE: POST.sh
+        RUNNING: ONCE
+        DEPENDENCIES:
+          ASIM:
+            SPLITS_FROM:
+              2,3: # [2:3] is also valid
+                SPLITS_TO: 1,2*,3* # 1,[2:3]* is also valid, you can also specify the step with [2:3:step]
+        SPLITS: 3
 
 In this example:
 
@@ -539,11 +560,16 @@ Each part will depend on the 1st part of the asim job.
 The 2nd part of the post job will depend on the 2nd part of the asim job.
 The 3rd part of the post job will depend on the 3rd part of the asim job.
 
-.. figure:: fig/splits_job.png
-   :name: splits_job
-   :width: 100%
-   :align: center
-   :alt: splits_job
+
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: splits.png
+    :name: splits
+    :width: 100%
+    :align: center
+    :caption: Example showing dependencies between jobs running at different frequencies.
 
 Example 1: 1-to-1 dependency
 
@@ -563,6 +589,7 @@ Example 1: 1-to-1 dependency
       RUNNING: chunk
       SPLITS: 1
       WALLCLOCK: 00:30
+
     TEST2:
       FILE: TEST2.sh
       DEPENDENCIES:
@@ -575,11 +602,15 @@ Example 1: 1-to-1 dependency
       WALLCLOCK: 00:30
 
 
-.. figure:: fig/splits_1_to_1.png
-   :name: split_1_to_1
-   :width: 100%
-   :align: center
-   :alt: 1-to-1
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: splits_1_to_1.png
+    :name: splits_1_to_1
+    :width: 100%
+    :align: center
+    :caption: Example showing dependencies between jobs running at different frequencies.
 
 Example 2: N-to-1 dependency
 
@@ -590,6 +621,7 @@ Example 2: N-to-1 dependency
       FILE: TEST.sh
       RUNNING: once
       SPLITS: '4'
+
     TEST2:
       FILE: TEST2.sh
       DEPENDENCIES:
@@ -600,11 +632,16 @@ Example 2: N-to-1 dependency
       RUNNING: once
       SPLITS: '2'
 
-.. figure:: fig/splits_n_to_1.png
-   :name: N_to_1
-   :width: 100%
-   :align: center
-   :alt: N_to_1
+
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: splits_n_to_1.png
+    :name: splits_n_to_1
+    :width: 100%
+    :align: center
+    :caption: Example showing dependencies between jobs running at different frequencies.
 
 Example 3: 1-to-N dependency
 
@@ -615,6 +652,7 @@ Example 3: 1-to-N dependency
       FILE: TEST.sh
       RUNNING: once
       SPLITS: '2'
+
     TEST2:
       FILE: TEST2.sh
       DEPENDENCIES:
@@ -625,11 +663,16 @@ Example 3: 1-to-N dependency
       RUNNING: once
       SPLITS: '4'
 
-.. figure:: fig/splits_1_to_n.png
-   :name: 1_to_N
-   :width: 100%
-   :align: center
-   :alt: 1_to_N
+
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: splits_1_to_n.png
+    :name: splits_1_to_n
+    :width: 100%
+    :align: center
+    :caption: Example showing dependencies between jobs running at different frequencies.
 
 Job Splits with calendar
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -721,12 +764,15 @@ Example4: Auto split
       - energy_onshore_2
 
 
-
-.. figure:: fig/splits_auto.png
-   :name: auto
-   :width: 100%
-   :align: center
-   :alt: auto
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: splits_auto.png
+    :name: splits_auto
+    :width: 100%
+    :align: center
+    :caption: Example showing dependencies between jobs running at different frequencies.
 
 Job delay
 ~~~~~~~~~
@@ -765,22 +811,27 @@ an integer N for this attribute and the job will run only after N chunks.
           FILE: asim.sh
           DEPENDENCIES: sim asim-1
           RUNNING: chunk
-          DELAY:  2
+          DELAY: 2
 
       POST:
-          FILE:  post.sh
-          DEPENDENCIES:  sim asim
-          RUNNING:  chunk
+          FILE: post.sh
+          DEPENDENCIES: sim asim
+          RUNNING: chunk
 
-The resulting workflow can be seen in Figure :numref:`delay`
+The resulting workflow can be seen in Figure `delay`
 
-.. figure:: fig/experiment_delay_doc.png
-   :name: delay
-   :width: 100%
-   :align: center
-   :alt: simple workflow with delay option
 
-   Example showing the asim job starting only from chunk 3.
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: delay.png
+    :name: delay
+    :width: 100%
+    :align: center
+    :caption: Example showing the asim job starting only from chunk 3.
+    :alt: simple workflow with delay option
+
 
 Workflow examples:
 ------------------
@@ -793,26 +844,73 @@ Example 1: How to select an specific chunk
 
 .. code-block:: yaml
 
-    JOBS:
-      SIM:
-          FILE: templates/sim.tmpl.sh
-          DEPENDENCIES: INI SIM-1 POST-1 CLEAN-5
-              INI:
-              SIM-1:
-              POST-1:
-                CHUNKS_FROM:
-                  all:
-                      chunks_to: 1
-              CLEAN-5:
-          RUNNING: chunk
-          WALLCLOCK: 0:30
-          PROCESSORS: 768
+    EXPERIMENT:
+      DATELIST: 19600101
+      MEMBERS: "00"
+      CHUNKSIZEUNIT: day
+      CHUNKSIZE: '10'
+      NUMCHUNKS: '10'
+      CALENDAR: standard
 
-.. figure:: fig/select_chunks.png
-   :name: select_chunks
-   :width: 100%
-   :align: center
-   :alt: select_chunks_workflow
+    JOBS:
+      LOCAL_SETUP:
+        FILE: LOCAL_SETUP.sh
+        PLATFORM: LOCAL
+        RUNNING: once
+      REMOTE_SETUP:
+        FILE: REMOTE_SETUP.sh
+        DEPENDENCIES: LOCAL_SETUP
+        WALLCLOCK: 00:05
+        RUNNING: once
+      INI:
+        FILE: INI.sh
+        DEPENDENCIES: REMOTE_SETUP
+        RUNNING: member
+        WALLCLOCK: 00:05
+      SIM:
+        FILE: templates/sim.tmpl.sh
+        DEPENDENCIES:
+          INI:
+          SIM-1:
+          POST-1:
+            CHUNKS_FROM:
+              all:
+                chunks_to: 1
+          CLEAN-5:
+        RUNNING: chunk
+        WALLCLOCK: 0:30
+        PROCESSORS: 768
+      POST:
+        FILE: POST.sh
+        DEPENDENCIES: SIM
+        RUNNING: chunk
+        WALLCLOCK: 00:05
+      CLEAN:
+        FILE: CLEAN.sh
+        DEPENDENCIES: POST
+        RUNNING: chunk
+        WALLCLOCK: 00:05
+      CLEAN_MEMBER:
+        FILE: CLEAN_MEMBER.sh
+        DEPENDENCIES: CLEAN
+        RUNNING: member
+        WALLCLOCK: 00:05
+      CLEAN_EXPERIMENT:
+        FILE: CLEAN_EXPERIMENT.sh
+        DEPENDENCIES: CLEAN_MEMBER
+        RUNNING: member
+        WALLCLOCK: 00:05
+
+
+
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: select_chunks.png
+    :name: select_chunks
+    :width: 100%
+    :align: center
 
 Example 2: SKIPPABLE
 ~~~~~~~~~~~~~~~~~~~~
@@ -833,26 +931,31 @@ In this workflow you can see an illustrated example of ``SKIPPABLE`` parameter u
       CALENDAR: standard
 
     JOBS:
-        SIM:
-            FILE: sim.sh
-            DEPENDENCIES: INI POST-1
-            WALLCLOCK: 00:15
-            RUNNING: chunk
-            QUEUE: debug
-            SKIPPABLE: TRUE
+      SIM:
+        FILE: sim.sh
+        DEPENDENCIES: INI POST-1
+        WALLCLOCK: 00:15
+        RUNNING: chunk
+        QUEUE: debug
+        SKIPPABLE: TRUE
 
-        POST:
-            FILE: post.sh
-            DEPENDENCIES: SIM
-            WALLCLOCK: 00:05
-            RUNNING: member
-            #QUEUE: debug
+      POST:
+        FILE: post.sh
+        DEPENDENCIES: SIM
+        WALLCLOCK: 00:05
+        RUNNING: member
 
-.. figure:: fig/skip.png
-   :name: skip
-   :width: 100%
-   :align: center
-   :alt: skip_workflow
+
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: skip.png
+    :name: skip
+    :width: 100%
+    :align: center
+    :caption: Example showing the asim job starting only from chunk 3.
+    :alt: skip_workflow
 
 Example 3: Weak dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -878,26 +981,32 @@ Weak dependencies, work like this way:
       CALENDAR: standard
 
     JOBS:
-        GET_FILES:
-            FILE: templates/fail.sh
-            RUNNING: chunk
+     GET_FILES:
+       FILE: templates/fail.sh
+       RUNNING: chunk
 
-        IT:
-            FILE: templates/work.sh
-            RUNNING: chunk
-            QUEUE: debug
+     IT:
+       FILE: templates/work.sh
+       RUNNING: chunk
+       QUEUE: debug
 
-        CALC_STATS:
-            FILE: templates/work.sh
-            DEPENDENCIES: IT GET_FILES ?
-            RUNNING: chunk
-            SYNCHRONIZE: member
+     CALC_STATS:
+       FILE: templates/work.sh
+       DEPENDENCIES: IT GET_FILES ?
+       RUNNING: chunk
+       SYNCHRONIZE: member
 
-.. figure:: fig/dashed.png
-   :name: dashed
-   :width: 100%
-   :align: center
-   :alt: dashed_workflow
+
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: dashed.png
+    :name: dashed
+    :width: 100%
+    :align: center
+    :caption: Example showing the asim job starting only from chunk 3.
+    :alt: dashed_workflow
 
 Example 4: Select Member
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -907,10 +1016,12 @@ In this workflow you can see an illustrated example of select member. Using 4 me
 .. code-block:: yaml
 
     EXPERIMENT:
-        DATELIST: 19600101
-        MEMBERS: "00 01 02 03"
-        CHUNKSIZE: 1
-        NUMCHUNKS: 2
+      DATELIST: 19600101
+      MEMBERS: "00 01 02 03"
+      CHUNKSIZE: 1
+      NUMCHUNKS: 2
+      CHUNKINI: ''
+      CALENDAR: standard
 
     JOBS:
         SIM:
@@ -937,11 +1048,17 @@ In this workflow you can see an illustrated example of select member. Using 4 me
             RUNNING: chunk
             SYNCHRONIZE: member
 
-.. figure:: fig/select_members.png
-   :name: select_members
-   :width: 100%
-   :align: center
-   :alt: select_members
+
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: select_members.png
+    :name: select_members
+    :width: 100%
+    :align: center
+    :caption: Example showing the asim job starting only from chunk 3.
+    :alt: select_members
 
 Loops definition
 ~~~~~~~~~~~~~~~~
@@ -1053,8 +1170,14 @@ One can use now the following configuration:
 
 .. warning:: The mutable parameters must be inside the ``FOR`` key.
 
-.. figure:: fig/for.png
-   :name: for
-   :width: 100%
-   :align: center
-   :alt: for
+
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :figure: for.png
+    :name: for
+    :width: 100%
+    :align: center
+    :caption: Example showing the asim job starting only from chunk 3.
+    :alt: for
