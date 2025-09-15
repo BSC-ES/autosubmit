@@ -30,7 +30,7 @@ from contextlib import suppress
 from pathlib import Path
 from threading import Thread
 from time import sleep
-from typing import List, TYPE_CHECKING, Union
+from typing import Optional, Union, TYPE_CHECKING
 
 import Xlib.support.connect as xlib_connect
 import paramiko
@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     # Avoid circular imports
     from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.job.job import Job
+    from autosubmit.platforms.headers import PlatformHeader
 
 
 def threaded(fn):
@@ -111,13 +112,13 @@ class ParamikoPlatform(Platform):
         except Exception as e:
             Log.warning(f"X11 display not found: {e}")
             self.local_x11_display = None
+
     @property
-    def header(self):
+    def header(self) -> 'PlatformHeader':
         """
         Header to add to job for scheduler configuration
 
         :return: header
-        :rtype: object
         """
         return self._header
 
@@ -528,7 +529,7 @@ class ParamikoPlatform(Platform):
         :return: True if successful or file does not exist
         :rtype: bool
         """
-        # TODO: pytests when the slurm container is avaliable
+        # TODO: pytests when the slurm container is available
         remote_file = Path(self.get_files_path()) / filename
         try:
             self._ftpChannel.remove(str(remote_file))
@@ -544,15 +545,15 @@ class ParamikoPlatform(Platform):
                     "Wrong User or invalid .ssh/config. Or invalid user in the definition of PLATFORMS in YAML or public key not set ", 7051, str(e))
 
     def move_file(self, src, dest, must_exist=False):
-        """
-        Moves a file on the platform (includes .err and .out)
+        """Moves a file on the platform (includes .err and .out).
+
         :param src: source name
         :type src: str
         :param dest: destination name
         :param must_exist: ignore if file exist or not
         :type dest: str
         """
-        path_root=""
+        path_root = ""
         try:
             path_root = self.get_files_path()
             src = os.path.join(path_root, src)
@@ -562,24 +563,23 @@ class ParamikoPlatform(Platform):
             except IOError:
                 self._ftpChannel.rename(src,dest)
             return True
-
         except IOError as e:
             if str(e) in "Garbage":
                 raise AutosubmitError(f'File {os.path.join(path_root,src)} does not exists, something went '
                                       f'wrong with the platform', 6004, str(e))
             if must_exist:
                 raise AutosubmitError(f"File {os.path.join(path_root,src)} does not exists", 6004, str(e))
-            else:
-                Log.debug(f"File {path_root} doesn't exists ")
-                return False
+
+            Log.debug(f"File {path_root} doesn't exists ")
         except Exception as e:
             if str(e) in "Garbage":
                 raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exists', 6004, str(e))
             if must_exist:
                 raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exists", 6004, str(e))
-            else:
-                Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
-                return False
+
+            Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
+
+        return False
 
     def submit_job(self, job, script_name, hold=False, export="none"):
         """
@@ -679,9 +679,10 @@ class ParamikoPlatform(Platform):
                     Log.debug(f"Error cancelling job {job.id}: {str(e)}")
         return job_status
 
-    def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
-        """
-        Checks job running status
+    def check_job(
+            self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False
+    ) -> Optional[int]:
+        """Checks job running status, returning the latest status if ``submit_hold_check``, ``None`` otherwise.
 
         :param is_wrapper:
         :param submit_hold_check:
@@ -693,8 +694,7 @@ class ParamikoPlatform(Platform):
         :param default_status: status to assign if it can be retrieved from the platform
         :type default_status: autosubmit.job.job_common.Status
         :return: current job status
-        :rtype: autosubmit.job.job_common.Status
-
+        :rtype: The job status or ``None`` if ``submit_hold_check`` is ``False``.
         """
         for event in job.platform.worker_events:  # keep alive log retrieval workers.
             if not event.is_set():
@@ -702,8 +702,7 @@ class ParamikoPlatform(Platform):
         job_id = job.id
         job_status = Status.UNKNOWN
         if type(job_id) is not int and type(job_id) is not str:
-            Log.error(
-                'check_job() The job id ({0}) is not an integer neither a string.', job_id)
+            Log.error(f'check_job() The job id ({job_id}) is not an integer neither a string.')
             job.new_status = job_status
         sleep_time = 5
         sleep(2)
@@ -740,7 +739,7 @@ class ParamikoPlatform(Platform):
                 job_status = Status.RUNNING
                 if not is_wrapper:
                     if job.status != Status.RUNNING:
-                        job.start_time = datetime.datetime.now() # URi: start time
+                        job.start_time = datetime.datetime.now()  # URi: start time
                     if job.start_time is not None and str(job.wrapper_type).lower() == "none":
                         wallclock = job.wallclock
                         if job.wallclock == "00:00" or job.wallclock is None:
@@ -764,7 +763,7 @@ class ParamikoPlatform(Platform):
 
         if job_status in [Status.FAILED, Status.COMPLETED, Status.UNKNOWN]:
             job.updated_log = False
-            if not job.start_time_timestamp: # QUEUING -> COMPLETED ( under safetytime )
+            if not job.start_time_timestamp:  # QUEUING -> COMPLETED ( under safetytime )
                 job.start_time_timestamp = int(time.time())
             # Estimate Time for failed jobs, as they won't have the timestamp in the stat file
             job.finish_time_timestamp = int(time.time())
@@ -772,10 +771,14 @@ class ParamikoPlatform(Platform):
             # backup for start time in case that the stat file is not found
             job.start_time_timestamp = int(time.time())
 
+        # FIXME: It's strange that this argument is passed to this function, but used only here,
+        #        to decide whether the job status is returned or not. It sounds safe to always
+        #        return the status, simplifying code, tests, docs, maintenance in general...
         if submit_hold_check:
             return job_status
-        else:
-            job.new_status = job_status
+
+        job.new_status = job_status
+        return None
 
     def _check_jobid_in_queue(self, ssh_output, job_list_cmd):
         """
@@ -787,7 +790,8 @@ class ParamikoPlatform(Platform):
             if job not in ssh_output:
                 return False
         return True
-    def parse_joblist(self, job_list: List[List['Job']]):
+
+    def parse_joblist(self, job_list: list[list['Job']]):
         """
         Convert a list of job_list to job_list_cmd
 
@@ -808,7 +812,7 @@ class ParamikoPlatform(Platform):
 
         return job_list_cmd
 
-    def check_Alljobs(self, job_list: List[List['Job']], as_conf, retries=5):
+    def check_Alljobs(self, job_list: list[list['Job']], as_conf, retries=5):
         """
         Checks jobs running status
 
@@ -990,12 +994,12 @@ class ParamikoPlatform(Platform):
         return NotImplementedError
 
     def x11_handler(self, channel, xxx_todo_changeme):
-        '''handler for incoming x11 connections
+        """handler for incoming x11 connections
         for each x11 incoming connection,
         - get a connection to the local display
         - maintain bidirectional map of remote x11 channel to local x11 channel
         - add the descriptors to the poller
-        - queue the channel (use transport.accept())'''
+        - queue the channel (use transport.accept())"""
         (src_addr, src_port) = xxx_todo_changeme
         x11_chanfd = channel.fileno()
         local_x11_socket = xlib_connect.get_socket(*self.local_x11_display[:4])
@@ -1383,14 +1387,13 @@ class ParamikoPlatform(Platform):
         """
         raise NotImplementedError
 
-    def get_header(self, job, parameters):
+    def get_header(self, job: 'Job', parameters: dict) -> str:
         """
         Gets header to be used by the job
 
-        :param job: job
-        :type job: Job
-        :return: header to use
-        :rtype: str
+        :param job: The job.
+        :param parameters: Parameters dictionary.
+        :return: Header to use for the job.
         """
         if not job.packed or str(job.wrapper_type).lower() != "vertical":
             out_filename = f"{job.name}.cmd.out.{job.fail_count}"

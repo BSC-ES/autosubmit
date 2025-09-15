@@ -18,8 +18,8 @@
 """Integration tests for the Slurm platform."""
 
 import pytest
-from autosubmit.config.configcommon import AutosubmitConfig
 
+from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from test.conftest import AutosubmitExperimentFixture
 

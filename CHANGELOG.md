@@ -3,6 +3,7 @@
 **Bug fixes:**
 
 - Fixed issue with the verification of dirty Git local repositories in operational experiments #2446
+- Fixed "Unexpected error: 'list' object has no attribute 'status'" when running experiments #2463
 
 **Enhancements:**
 

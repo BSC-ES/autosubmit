@@ -19,7 +19,6 @@
 
 import os
 import textwrap
-import time
 from typing import Protocol, cast
 from autosubmit.config.basicconfig import BasicConfig
 import autosubmit.history.utils as HUtils
@@ -55,14 +54,6 @@ class ExperimentStatusDbManager(DatabaseManager):
             );'''
         )
         self.execute_statement_on_dbfile(self._as_times_file_path, create_table_query)
-
-    def print_current_table(self):
-        for experiment in self._get_experiment_status_content():
-            print(experiment)
-        if self.current_experiment_status_row:
-            print(("Current Row:\n\t" + self.current_experiment_status_row.name + "\n\t" +
-                   str(self.current_experiment_status_row.exp_id) +
-                   "\n\t" + self.current_experiment_status_row.status))
 
     def set_existing_experiment_status_as_running(self, expid):
         """ Set the experiment_status row as running. """
@@ -144,8 +135,6 @@ class ExperimentStatusDbManager(DatabaseManager):
 
 
 class ExperimentStatusDatabaseManager(Protocol):
-    def print_current_table(self): ...
-
     def is_running(self, time_condition=600): ...
 
     def set_existing_experiment_status_as_running(self, expid): ...

@@ -1,19 +1,17 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -30,21 +28,24 @@ class WrapperDirector:
     """
     def __init__(self):
         self._builder = None
+
     def construct(self, builder):
         self._builder = builder
 
         header = self._builder.build_header()
         job_thread = self._builder.build_job_thread()
-        #if "bash" not in header[0:15]:
+        # if "bash" not in header[0:15]:
 
         main = self._builder.build_main()
-        #else:
+        # else:
         #    nodes,main = self._builder.build_main() #What to do with nodes?
         # change to WrapperScript object
         wrapper_script = header + job_thread + main
         wrapper_script = wrapper_script.replace("_NEWLINE_", '\\n')
 
         return wrapper_script
+
+
 class WrapperBuilder(object):
     def __init__(self, **kwargs):
         if "retrials" in list(kwargs.keys()):
@@ -68,16 +69,21 @@ class WrapperBuilder(object):
 
     def build_imports(self):
         pass
+
     def build_job_thread(self):
         pass
     # hybrids
+
     def build_joblist_thread(self, **kwargs):
         pass
     # horizontal and hybrids
+
     def build_nodes_list(self):
         pass
+
     def build_machinefiles(self):
         pass
+
     def get_machinefile_function(self):
         machinefile_function = ""
         if 'MACHINEFILES' in self.jobs_resources and self.jobs_resources['MACHINEFILES']:
@@ -90,22 +96,31 @@ class WrapperBuilder(object):
             else:
                 return self.build_machinefiles_standard()
         return machinefile_function
+
     def build_machinefiles_standard(self):
         pass
+
     def build_machinefiles_components(self):
         pass
+
     def build_machinefiles_components_alternate(self):
         pass
+
     def build_sequential_threads_launcher(self, **kwargs):
         pass
+
     def build_parallel_threads_launcher(self, **kwargs):
         pass
+
     # all should override -> abstract!
     def build_main(self):
         pass
+
     def _indent(self, text, amount, ch=' '):
         padding = amount * ch
         return ''.join(padding + line for line in text.splitlines(True))
+
+
 class PythonWrapperBuilder(WrapperBuilder):
     def get_random_alphanumeric_string(self,letters_count, digits_count):
         sample_str = ''.join((random.choice(string.ascii_letters) for i in range(letters_count)))
@@ -354,6 +369,7 @@ for i in range(len(pid_list)):
             print(datetime.now(), "The job ", pid.template," has FAILED")
                     """).format(jobs_list, self.exit_thread, '\n'.ljust(13)), 4)
         return parallel_threads_launcher
+
     def build_parallel_threads_launcher_horizontal(self, jobs_list, thread, footer=True):
         parallel_threads_launcher = textwrap.dedent("""
 pid_list = []
