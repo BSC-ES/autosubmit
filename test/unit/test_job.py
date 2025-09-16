@@ -44,6 +44,7 @@ from autosubmit.job.job_utils import get_job_package_code, SubJob, SubJobManager
 from autosubmit.job.template import Language
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
