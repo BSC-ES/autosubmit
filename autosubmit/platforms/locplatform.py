@@ -41,16 +41,16 @@ class LocalPlatform(ParamikoPlatform):
     """
 
     def submit_Script(self, hold=False):
-        pass
+        pass  # pragma: no cover
 
     def parse_Alljobs_output(self, output, job_id):
-        pass
+        pass  # pragma: no cover
 
     def parse_queue_reason(self, output, job_id):
-        pass
+        pass  # pragma: no cover
 
     def get_checkAlljobs_cmd(self, jobs_id):
-        pass
+        pass  # pragma: no cover
 
     def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
         ParamikoPlatform.__init__(self, expid, name, config, auth_password=auth_password)

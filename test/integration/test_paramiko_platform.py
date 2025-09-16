@@ -104,7 +104,7 @@ def exp_platform_server(autosubmit_exp, ssh_server: 'DockerContainer') -> Experi
     #       partially by a submitter (i.e., they are tightly coupled, which makes it hard
     #       to maintain and test).
     submitter = ParamikoSubmitter()
-    submitter.load_platforms(asconf=exp.as_conf, retries=0)
+    submitter.load_platforms(as_conf=exp.as_conf)
 
     ps_platform: 'PsPlatform' = submitter.platforms[_PLATFORM_NAME]
 

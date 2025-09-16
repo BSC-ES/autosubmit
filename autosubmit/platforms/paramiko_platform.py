@@ -673,7 +673,7 @@ class ParamikoPlatform(Platform):
         :return: job id for the submitted job
         :rtype: int
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def get_estimated_queue_time_cmd(self, job_id):
         """
@@ -683,7 +683,7 @@ class ParamikoPlatform(Platform):
         :param job_id: str
         :return: command to get estimated queue time
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def parse_estimated_time(self, output):
         """
@@ -694,7 +694,7 @@ class ParamikoPlatform(Platform):
         :return: estimated queue time
         :rtype:
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def job_is_over_wallclock(self, job, job_status, cancel=False):
         if job.is_over_wallclock():
@@ -983,7 +983,7 @@ class ParamikoPlatform(Platform):
         for the reason for queueing cancellation, or if the job is held, and update
         the ``job`` status appropriately.
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def get_checkjob_cmd(self, job_id):
         """
@@ -994,7 +994,7 @@ class ParamikoPlatform(Platform):
         :return: command to check job status
         :rtype: str
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def get_checkAlljobs_cmd(self, jobs_id):
         """
@@ -1005,7 +1005,7 @@ class ParamikoPlatform(Platform):
         :return: command to check job status
         :rtype: str
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def get_jobid_by_jobname_cmd(self, job_name: str) -> str:
         """
@@ -1014,7 +1014,7 @@ class ParamikoPlatform(Platform):
         :param job_name:
         :return: str
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def get_queue_status_cmd(self, job_name):
         """
@@ -1022,7 +1022,7 @@ class ParamikoPlatform(Platform):
 
         :return: str
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def x11_handler(self, channel, xxx_todo_changeme):
         """Handler for incoming x11 connections.
@@ -1301,7 +1301,7 @@ class ParamikoPlatform(Platform):
         :return: job status
         :rtype: str
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def parse_Alljobs_output(self, output, job_id):
         """
@@ -1313,13 +1313,13 @@ class ParamikoPlatform(Platform):
         :return: job status
         :rtype: str
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def generate_submit_script(self):
-        pass
+        pass  # pragma: no cover
 
     def get_submit_script(self):
-        pass
+        pass  # pragma: no cover
 
     def get_submit_cmd(self, job_script, job, hold=False, export=""):
         """
@@ -1335,7 +1335,7 @@ class ParamikoPlatform(Platform):
         :return: command to submit job to platforms
         :rtype: str
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def get_mkdir_cmd(self):
         """
@@ -1344,10 +1344,10 @@ class ParamikoPlatform(Platform):
         :return: command to create directories on HPC
         :rtype: str
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def parse_queue_reason(self, output, job_id):
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def get_ssh_output(self):
         """
@@ -1421,7 +1421,7 @@ class ParamikoPlatform(Platform):
         :return: job id
         :rtype: str
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def get_header(self, job: 'Job', parameters: dict) -> str:
         """Gets the header to be used by the job.

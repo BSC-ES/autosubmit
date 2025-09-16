@@ -43,16 +43,16 @@ class EcPlatform(ParamikoPlatform):
     """
 
     def parse_Alljobs_output(self, output, job_id):
-        pass
+        pass  # pragma: no cover
 
     def parse_queue_reason(self, output, job_id):
-        pass
+        pass  # pragma: no cover
 
     def get_checkAlljobs_cmd(self, jobs_id):
-        pass
+        pass  # pragma: no cover
 
     def submit_Script(self, hold=False):
-        pass
+        pass  # pragma: no cover
 
     def __init__(self, expid, name, config, scheduler):
         ParamikoPlatform.__init__(self, expid, name, config)

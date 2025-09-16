@@ -595,7 +595,7 @@ class Platform(object):
         :param filename: The name of the file to send.
         :param check: Whether the platform must perform tests (e.g. for permission).
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def move_file(self, src, dest):
         """
@@ -606,7 +606,7 @@ class Platform(object):
         :param dest: destination name
         :type dest: str
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def get_file(self, filename, must_exist=True, relative_path='', ignore_log=False, wrapper_failed=False):
         """
@@ -623,7 +623,7 @@ class Platform(object):
         :return: True if file is copied successfully, false otherwise
         :rtype: bool
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def get_files(self, files, must_exist=True, relative_path=''):
         """
@@ -650,7 +650,7 @@ class Platform(object):
         :return: True if successful or file does not exist
         :rtype: bool
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     # Executed when calling from Job
     def get_logs_files(self, exp_id, remote_logs):
@@ -805,7 +805,7 @@ class Platform(object):
         :return: job id for the submitted job
         :rtype: int
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def check_Alljobs(self, job_list, as_conf, retries=5):
         for job, job_prev_status in job_list:
@@ -824,7 +824,7 @@ class Platform(object):
         :return: current job status
         :rtype: autosubmit.job.job_common.Status
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def closeConnection(self):
         return
@@ -869,11 +869,11 @@ class Platform(object):
 
     def generate_submit_script(self) -> None:
         """Opens Submit script file."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def submit_script(self, hold: bool = False) -> Union[list[str], str]:
         """Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def add_job_to_log_recover(self, job):
         if job.id and int(job.id) != 0:
@@ -891,7 +891,7 @@ class Platform(object):
         :param log_recovery_process: Specifies if the call is made from the log retrieval process.
         :return: None
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def restore_connection(self, as_conf: 'AutosubmitConfig', log_recovery_process: bool = False) -> None:
         """
@@ -902,7 +902,7 @@ class Platform(object):
         :param log_recovery_process: Indicates that the call is made from the log retrieval process.
         :type log_recovery_process: bool
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def clean_log_recovery_process(self) -> None:
         """
@@ -1145,14 +1145,14 @@ class Platform(object):
             0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
 
     def create_a_new_copy(self):
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def get_file_size(self, src: str) -> Union[int, None]:
         """
         Get file size in bytes
         :param src: file path
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
         """
@@ -1160,4 +1160,4 @@ class Platform(object):
         :param src: file path
         :param max_size: maximum size to read
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
