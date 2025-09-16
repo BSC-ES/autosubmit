@@ -72,19 +72,19 @@ class WrapperFactory(object):
         return wrapper_cmd
 
     def vertical_wrapper(self, **kwargs):
-        raise NotImplemented(self.exception)
+        raise NotImplemented(self.exception)  # pragma: no cover
 
     def horizontal_wrapper(self, **kwargs):
-        raise NotImplemented(self.exception)
+        raise NotImplemented(self.exception)  # pragma: no cover
 
     def hybrid_wrapper_horizontal_vertical(self, **kwargs):
-        raise NotImplemented(self.exception)
+        raise NotImplemented(self.exception)  # pragma: no cover
 
     def hybrid_wrapper_vertical_horizontal(self, **kwargs):
-        raise NotImplemented(self.exception)
+        raise NotImplemented(self.exception)  # pragma: no cover
 
     def header_directives(self, **kwargs):
-        pass
+        pass  # pragma: no cover
 
     def allocated_nodes(self):
         return ''
@@ -124,21 +124,28 @@ class WrapperFactory(object):
     def reservation_directive(self, reservation):
         return '#'
     def dependency_directive(self, dependency):
-        raise NotImplemented(self.exception)
+        raise NotImplemented(self.exception)  # pragma: no cover
+
     def queue_directive(self, queue):
-        raise NotImplemented(self.exception)
+        raise NotImplemented(self.exception)  # pragma: no cover
+
     def processors_directive(self, processors):
-        raise NotImplemented(self.exception)
+        raise NotImplemented(self.exception)  # pragma: no cover
+
     def nodes_directive(self, nodes):
-        raise NotImplemented(self.exception)
+        raise NotImplemented(self.exception)  # pragma: no cover
+
     def tasks_directive(self, tasks):
-        raise NotImplemented(self.exception)
+        raise NotImplemented(self.exception)  # pragma: no cover
+
     def partition_directive(self, partition):
-        raise NotImplemented(self.exception)
+        raise NotImplemented(self.exception)  # pragma: no cover
+
     def exclusive_directive(self, exclusive):
-        raise NotImplemented(self.exception)
+        raise NotImplemented(self.exception)  # pragma: no cover
+
     def threads_directive(self, threads):
-        raise NotImplemented(self.exception)
+        raise NotImplemented(self.exception)  # pragma: no cover
 
 
 class LocalWrapperFactory(WrapperFactory):

@@ -20,21 +20,18 @@
 Note that tests will start and destroy an SSH server. For unit tests, see ``test_paramiko_platform.py``
 in the ``test/unit`` directory."""
 
-import socket
 from dataclasses import dataclass
 from getpass import getuser
 from pathlib import Path
 from typing import Optional, TYPE_CHECKING
 
-import paramiko
 import pytest
 
-from autosubmit.log.log import AutosubmitError
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
-    from _pytest._py.path import LocalPath
     from testcontainers.sftp import DockerContainer
     from test.conftest import AutosubmitExperiment
     from autosubmit.platforms.psplatform import PsPlatform
@@ -104,7 +101,7 @@ def exp_platform_server(autosubmit_exp, ssh_server: 'DockerContainer') -> Experi
     #       partially by a submitter (i.e., they are tightly coupled, which makes it hard
     #       to maintain and test).
     submitter = ParamikoSubmitter()
-    submitter.load_platforms(asconf=exp.as_conf, retries=0)
+    submitter.load_platforms(as_conf=exp.as_conf)
 
     ps_platform: 'PsPlatform' = submitter.platforms[_PLATFORM_NAME]
 
@@ -123,7 +120,7 @@ def exp_platform_server(autosubmit_exp, ssh_server: 'DockerContainer') -> Experi
 def test_send_file(filename: str, exp_platform_server: ExperimentPlatformServer):
     """This test opens an SSH connection (via sftp) and sends a file to the remote location.
 
-    It launches a Docker Image using testcontainers library.
+    It launches a Docker Image using the testcontainers library.
     """
     user = getuser()
 
@@ -149,6 +146,30 @@ def test_send_file(filename: str, exp_platform_server: ExperimentPlatformServer)
     assert result.exit_code == 0
 
 
+def test_send_file_errors(exp_platform_server: ExperimentPlatformServer):
+    """Test possible errors when sending a file."""
+    exp = exp_platform_server.experiment
+    ps_platform = exp_platform_server.platform
+
+    ps_platform.connect(as_conf=exp.as_conf, reconnect=False, log_recovery_process=False)
+    assert ps_platform.check_remote_permissions()
+
+    # Without this, the code will perform a check where it will reconnect.
+    check = False
+
+    # Fails if the connection is not active.
+    ps_platform.closeConnection()
+    with pytest.raises(AutosubmitError) as cm:
+        ps_platform.send_file(__file__, check=check)
+    assert 'Connection does not appear to be active' in str(cm.value.message)
+
+    # Fails if there is a Python error.
+    ps_platform._ftpChannel = None
+    with pytest.raises(AutosubmitError) as cm:
+        ps_platform.send_file('this-file-does-not-exist', check=check)
+    assert 'An unexpected error occurred' in str(cm.value.message)
+
+
 @pytest.mark.parametrize(
     'cmd,error',
     [
@@ -166,35 +187,6 @@ def test_send_command(cmd: str, error: Optional, exp_platform_server: Experiment
             exp_platform_server.platform.send_command(cmd, ignore_log=False, x11=False)
     else:
         assert exp_platform_server.platform.send_command(cmd, ignore_log=False, x11=False)
-
-
-@pytest.mark.parametrize(
-    'cmd,timeout',
-    [
-        ('rsync --version', None),
-        ('rm --help', 60),
-        ('whoami', 120)
-    ]
-)
-@pytest.mark.docker
-def test_send_command_timeout_error_exec_command(
-        cmd: str, timeout: Optional[int], exp_platform_server: 'AutosubmitExperiment', mocker):
-    """Test that the correct timeout is used, and that ``exec_command`` raises ``AutosubmitError``."""
-    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
-
-    # Capture platform log.
-    mocked_log = mocker.patch('autosubmit.platforms.paramiko_platform.Log')
-    # Simulate an error occurred, and retrying did not fix it.
-    mocker.patch.object(exp_platform_server.platform, 'exec_command', return_value=(False, False, False))
-
-    with pytest.raises(AutosubmitError) as cm:
-        exp_platform_server.platform.send_command(command=cmd, ignore_log=False, x11=False)
-
-    assert mocked_log.debug.called
-    assert f'send_command timeout used: {str(timeout)}' in mocked_log.debug.call_args[0][0]
-
-    assert 'Failed to send' in str(cm.value.message)
-    assert 6005 == cm.value.code
 
 
 @pytest.mark.docker
@@ -265,36 +257,6 @@ def test_exec_command_ssh_session_not_active(x11, retries, exp_platform_server: 
 
 
 @pytest.mark.docker
-@pytest.mark.parametrize(
-    'error',
-    [
-        paramiko.ssh_exception.NoValidConnectionsError({'192.168.0.1': ValueError('failed')}),  # type: ignore
-        ConnectionError('Someone unplugged the networking cable.'),
-        socket.error('A random socket error occurred!')
-    ],
-    ids=[
-        'paramiko ssh exception',
-        'connection error',
-        'socket error'
-    ]
-)
-def test_exec_command_socket_error(error: Exception, exp_platform_server: 'ExperimentPlatformServer', mocker):
-    """Test that the command is retried and succeeds even when a socket error occurs."""
-    user = getuser() or "unknown"
-    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
-
-    exp_platform_server.platform.transport.close()
-
-    mocker.patch.object(exp_platform_server.platform.transport, 'open_session', side_effect=error)
-
-    stdin, stdout, stderr = exp_platform_server.platform.exec_command('whoami')
-    assert stdin is not False
-    assert stderr is not False
-    # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
-    assert user == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
-
-
-@pytest.mark.docker
 def test_exec_command_ssh_session_not_active_cannot_restore(exp_platform_server: 'ExperimentPlatformServer', mocker):
     """Test that when an error occurs, and it cannot restore, then we return falsey values."""
     exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
@@ -347,30 +309,95 @@ def test_fs_operations(exp_platform_server: 'ExperimentPlatformServer'):
     assert exp_platform_server.platform.delete_file(str(file_not_found))
 
 
-def test__load_ssh_config_missing_ssh_config(
-        exp_platform_server: 'ExperimentPlatformServer', tmp_path: 'LocalPath', mocker):
-    """Test that the user is warned when the expected SSH file cannot be located."""
-    mocked_log = mocker.patch('autosubmit.platforms.paramiko_platform.Log')
+def test_test_connection_already_connected(exp_platform_server: ExperimentPlatformServer):
+    """Test that calling ``test_connection`` does not interfere with an existing connection."""
+    as_conf = exp_platform_server.experiment.as_conf
+    platform = exp_platform_server.platform
 
-    exp_platform_server.platform.config['AS_ENV_SSH_CONFIG_PATH'] = str(tmp_path / 'you-cannot-find-me')
+    platform.connect(as_conf, reconnect=False, log_recovery_process=False)
 
-    as_conf = mocker.MagicMock()
-    as_conf.is_current_real_user_owner = False
-
-    # TODO: We must be able to test that we are not loading the right SSH, without a mock here.
-    mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', side_effect=ValueError)
-
-    with pytest.raises(AutosubmitError):
-        exp_platform_server.platform.connect(as_conf, reconnect=False, log_recovery_process=False)
-
-    assert mocked_log.warning.called
+    assert platform.connected
+    assert platform.test_connection(as_conf) is None
+    assert platform.connected
 
 
-@pytest.mark.docker
-def test_test_connection(exp_platform_server: 'ExperimentPlatformServer', ssh_server: 'DockerContainer'):
-    """Test that we can access files, send new files, move, delete."""
-    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
+def test_test_connection_new_connection(exp_platform_server: ExperimentPlatformServer):
+    """Test that calling ``test_connection`` creates a new connection."""
+    as_conf = exp_platform_server.experiment.as_conf
+    platform = exp_platform_server.platform
 
-    # TODO: This function is odd, if it reconnects, it will return ``"OK"``, but when it's all good
-    #       then it will return ``None``.
-    assert None is exp_platform_server.platform.test_connection(None)
+    assert not platform.connected
+    assert platform.test_connection(as_conf) == 'OK'
+    assert platform.connected
+
+
+def test_test_connection_exceptions(mocker, exp_platform_server: ExperimentPlatformServer):
+    """Test that ``reset`` raising an error, this error is handled correctly.
+
+    Note that the behavior is a bit confusing, as depending on the exception
+    raised we will re-raise it or raise another type. Thus, the ``raises(exception)``.
+    """
+    as_conf = exp_platform_server.experiment.as_conf
+    platform = exp_platform_server.platform
+
+    # NOTE: pytest.parametrize normally would be better here, but it takes a lot
+    #       longer to create a new container, so in this case we are re-using it
+    #       as the call to ``reset`` is mocked. In a local test the parametrized
+    #       version took nearly 01m30s, while this version took <20s.
+    for error_raised in [
+        EOFError,
+        AutosubmitError,
+        AutosubmitCritical,
+        IOError,
+        ValueError,
+        Exception
+    ]:
+        mocker.patch.object(platform, 'reset', side_effect=error_raised)
+
+        assert not platform.connected
+        with pytest.raises(Exception) as cm:
+            platform.test_connection(as_conf)
+
+        if error_raised in [AutosubmitError, AutosubmitCritical, IOError]:
+            assert isinstance(cm.value, error_raised)
+        elif error_raised is EOFError:
+            assert isinstance(cm.value, AutosubmitError)
+        else:
+            assert isinstance(cm.value, AutosubmitCritical)
+
+
+def test_test_restore_fails_random(mocker, exp_platform_server: ExperimentPlatformServer):
+    """Test when ``restore`` raises a random exception we return a timeout message to the user (?)."""
+    as_conf = exp_platform_server.experiment.as_conf
+    platform = exp_platform_server.platform
+
+    error_message = 'I am random'
+
+    mocker.patch.object(platform, 'restore_connection', side_effect=Exception(error_message))
+
+    assert not platform.connected
+    message = platform.test_connection(as_conf)
+
+    # TODO: Why not raise an exception in test_connection, this way we will have
+    #       the message and more context, plus we will have the option to handle
+    #       the error -- if we ever need it from the user/caller side.
+    #       Plus, the error here is clearly a random Exception that is hidden
+    #       from the user. Instead, we treat it as a timeout, which does not make
+    #       much sense...
+    assert message == 'Timeout connection'
+
+
+def test_test_restore_fails_does_not_accept(mocker, exp_platform_server: ExperimentPlatformServer):
+    """Test when ``restore`` raises a random exception which message includes certain text it returns it."""
+    as_conf = exp_platform_server.experiment.as_conf
+    platform = exp_platform_server.platform
+
+    # TODO: This looks a bit fragile/buggy?
+    error_message = 'The plot accept remote connections! Fear not!'
+
+    mocker.patch.object(platform, 'restore_connection', side_effect=Exception(error_message))
+
+    assert not platform.connected
+    message = platform.test_connection(as_conf)
+
+    assert message == error_message

@@ -470,7 +470,6 @@ class JobPackager(object):
                     if job.distance_weight > 3:
                         sorted_jobs.remove(job)
                 jobs_ready = sorted_jobs
-                pass
             except IndexError:
                 pass
         if len(jobs_ready) == 0:
@@ -867,7 +866,7 @@ class JobPackagerVertical(object):
         return self.jobs_list
 
     def get_wrappable_child(self, job):
-        pass
+        pass  # pragma: no cover
 
     def _is_wrappable(self, job):
         """
