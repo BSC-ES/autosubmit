@@ -1,0 +1,17 @@
+JOBS:
+  TEST:
+    SCRIPT: 'sleep 0'
+    RUNNING: chunk
+    SPLITS: 1
+    WALLCLOCK: 00:01
+
+  TEST2:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES:
+      TEST:
+        SPLITS_FROM:
+          all:
+            SPLITS_TO: '[1:auto]*\1'
+    RUNNING: chunk
+    SPLITS: 1
+    WALLCLOCK: 00:01

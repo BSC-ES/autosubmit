@@ -1,0 +1,72 @@
+JOBS:
+  LOCAL_SETUP:
+    FILE: local_setup.sh
+    RUNNING: once
+    NOTIFY_ON: COMPLETED
+  LOCAL_SEND_SOURCE:
+    FILE: local_send_source.sh
+    DEPENDENCIES: LOCAL_SETUP
+    RUNNING: once
+    NOTIFY_ON: FAILED
+  LOCAL_SEND_STATIC:
+    FILE: local_send_static.sh
+    DEPENDENCIES: LOCAL_SETUP
+    RUNNING: once
+    NOTIFY_ON: FAILED
+  REMOTE_COMPILE:
+    FILE: compile.sh
+    DEPENDENCIES: LOCAL_SEND_SOURCE
+    RUNNING: once
+    PROCESSORS: '1'
+    WALLCLOCK: 00:01
+    NOTIFY_ON: COMPLETED
+  SIM:
+    FILE: sim.sh
+    DEPENDENCIES:
+      LOCAL_SEND_STATIC:
+      REMOTE_COMPILE:
+      SIM-1:
+      DA-1:
+    RUNNING: chunk
+    PROCESSORS: '1'
+    WALLCLOCK: 00:01
+    NOTIFY_ON: FAILED
+  LOCAL_SEND_INITIAL_DA:
+    FILE: local_send_initial_DA.sh
+    DEPENDENCIES: LOCAL_SETUP LOCAL_SEND_INITIAL_DA-1
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    DELAY: '0'
+  COMPILE_DA:
+    FILE: compile_da.sh
+    DEPENDENCIES: LOCAL_SEND_SOURCE
+    RUNNING: once
+    WALLCLOCK: 00:20
+    NOTIFY_ON: FAILED
+  DA:
+    FILE: da.sh
+    DEPENDENCIES:
+      SIM:
+      LOCAL_SEND_INITIAL_DA:
+        CHUNKS_TO: "all"
+        DATES_TO: "all"
+        MEMBERS_TO: "all"
+      COMPILE_DA:
+      DA:
+        DATES_FROM:
+          "20120201":
+            CHUNKS_FROM:
+              1:
+                DATES_TO: "20120101"
+                CHUNKS_TO: "1"
+    RUNNING: chunk
+    SYNCHRONIZE: member
+    DELAY: '0'
+    PROCESSORS: '1'
+    WALLCLOCK: 00:01
+    NOTIFY_ON: FAILED
+
+WRAPPERS:
+    WRAPPER_SIMDA:
+      TYPE: "horizontal-vertical"
+      JOBS_IN_WRAPPER: "SIM&DA"

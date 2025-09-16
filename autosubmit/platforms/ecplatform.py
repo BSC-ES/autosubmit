@@ -216,7 +216,7 @@ class EcPlatform(ParamikoPlatform):
         except Exception as e:
             return False
 
-    def send_command(self, command, ignore_log=False, x11 = False):
+    def send_command(self, command, ignore_log=False, x11 = False) -> bool:
         lang = locale.getlocale()[1] or locale.getdefaultlocale()[1] or 'UTF-8'
         err_message = 'command not executed'
         for _ in range(3):
@@ -302,7 +302,7 @@ class EcPlatform(ParamikoPlatform):
             Log.printlog("Log file don't recovered {0}".format(filename), 6004)
         return process_ok
 
-    def delete_file(self, filename):
+    def delete_file(self, filename: str) -> bool:
         command = '{0} {1}:{2}'.format(self.del_cmd, self.host, os.path.join(self.get_files_path(), filename))
         try:
             FNULL = open(os.devnull, 'w')

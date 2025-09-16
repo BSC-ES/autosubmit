@@ -38,7 +38,7 @@ from paramiko.agent import Agent
 from paramiko.ssh_exception import (SSHException)
 
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_common import Type
+from autosubmit.job.template import Language
 from autosubmit.log.log import AutosubmitError, AutosubmitCritical, Log
 from autosubmit.platforms.platform import Platform
 
@@ -73,7 +73,7 @@ def _create_ssh_client() -> paramiko.SSHClient:
 class ParamikoPlatform(Platform):
     """Class to manage the connections to the different platforms with the Paramiko library."""
 
-    def __init__(self, expid, name, config, auth_password: Optional[Union[str, list[str]]] = None):
+    def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
         """An SSH-enabled platform, that uses the Paramiko library.
 
         :param expid: Experiment ID.
@@ -158,7 +158,8 @@ class ParamikoPlatform(Platform):
             Log.warning(f"X11 display not found: {e}")
             self.local_x11_display = None
 
-    def test_connection(self, as_conf: 'AutosubmitConfig'):
+            
+    def test_connection(self, as_conf: 'AutosubmitConfig') -> str:
         """
         Test if the connection is still alive, reconnect if not.
         """
@@ -189,6 +190,7 @@ class ParamikoPlatform(Platform):
         except Exception as e:
             self.connected = False
             raise AutosubmitCritical(str(e), 7051)
+            
 
     def restore_connection(self, as_conf: Optional['AutosubmitConfig'], log_recovery_process: bool = False) -> None:
         """
@@ -231,7 +233,7 @@ class ParamikoPlatform(Platform):
         except Exception as e:
             raise AutosubmitCritical(f'Unknown error connection to platform {self.name}: {str(e)}', 7050, str(e))
 
-    def agent_auth(self, port):
+    def agent_auth(self, port: int) -> bool:
         """
         Attempt to authenticate to the given SSH server using the most common authentication methods available.
             This will always try to use the SSH agent first, and will fall back to using the others methods if
@@ -277,7 +279,7 @@ class ParamikoPlatform(Platform):
                     answers.append(twofactor_nonpush)
         return tuple(answers)
 
-    def map_user_config_file(self, as_conf) -> None:
+    def map_user_config_file(self, as_conf: 'AutosubmitConfig') -> None:
         """
         Maps the shared account user ssh config file to the current user config file.
         Defaults to ~/.ssh/config if the mapped file does not exist.
@@ -441,6 +443,7 @@ class ParamikoPlatform(Platform):
         return None
 
     def remove_multiple_files(self, filenames):
+        # command = "rm"
         log_dir = os.path.join(self.tmp_path, f'LOG_{self.expid}')
         multiple_delete_previous_run = os.path.join(
             log_dir, "multiple_delete_previous_run.sh")
@@ -525,7 +528,7 @@ class ParamikoPlatform(Platform):
                     Log.printlog(f"Log file couldn't be retrieved: {filename}", 5000)
                 return False
 
-    def delete_file(self, filename):
+    def delete_file(self, filename: str) -> None:
         """
         Deletes a file from this platform
 
@@ -573,10 +576,10 @@ class ParamikoPlatform(Platform):
 
         except IOError as e:
             if str(e) in "Garbage":
-                raise AutosubmitError(f'File {os.path.join(path_root,src)} does not exists, something went '
+                raise AutosubmitError(f'File {os.path.join(path_root, src)} does not exists, something went '
                                       f'wrong with the platform', 6004, str(e))
             if must_exist:
-                raise AutosubmitError(f"File {os.path.join(path_root,src)} does not exists", 6004, str(e))
+                raise AutosubmitError(f"File {os.path.join(path_root, src)} does not exists", 6004, str(e))
             else:
                 Log.debug(f"File {path_root} doesn't exists ")
                 return False
@@ -616,8 +619,8 @@ class ParamikoPlatform(Platform):
             x11 = False if job is None else job.x11
             job_id = self.get_submitted_job_id(self.get_ssh_output(), x11)
             if job:
-                Log.result(f"Job: {job.name} submitted with job_id: {str(job_id).strip()} and workflow commit: "
-                           f"{job.workflow_commit}")
+                Log.result(
+                    f"Job: {job.name} submitted with job_id: {str(job_id).strip()} and workflow commit: {job.workflow_commit}")
             return int(job_id)
         else:
             return None
@@ -797,8 +800,9 @@ class ParamikoPlatform(Platform):
                 return False
         return True
 
-    def parse_joblist(self, job_list: List[List['Job']]):
-        """Convert a list of job_list to job_list_cmd.
+    def parse_joblist(self, job_list: list[list['Job']]) -> str:
+        """
+        Convert a list of job_list to job_list_cmd
 
         :param job_list: list of jobs
         :type job_list: list
@@ -811,7 +815,7 @@ class ParamikoPlatform(Platform):
                 job_str = "0"
             else:
                 job_str = str(job.id)
-            job_list_cmd += job_str+","
+            job_list_cmd += job_str + ","
         if job_list_cmd[-1] == ",":
             job_list_cmd = job_list_cmd[:-1]
 
@@ -830,6 +834,7 @@ class ParamikoPlatform(Platform):
         :return: current job status
         :rtype: autosubmit.job.job_common.Status
         """
+        as_conf.get_copy_remote_logs()
         job_list_cmd = self.parse_joblist(job_list)
         cmd = self.get_check_all_jobs_cmd(job_list_cmd)
         sleep_time = 5
@@ -928,6 +933,7 @@ class ParamikoPlatform(Platform):
         :type retries: int
         :return: job id
         """
+        # sleep(5)
         job_ids = ""
         cmd = self.get_jobid_by_jobname_cmd(job_name)
         self.send_command(cmd)
@@ -956,7 +962,8 @@ class ParamikoPlatform(Platform):
         raise NotImplementedError
 
     def get_check_job_cmd(self, job_id: str) -> str:
-        """Returns command to check job status on remote platforms.
+        """
+        Returns command to check job status on remote platforms
 
         :param job_id: id of job to check
         :return: command to check job status
@@ -1116,7 +1123,7 @@ class ParamikoPlatform(Platform):
         thread.start()
         return thread
 
-    def send_command(self, command, ignore_log=False, x11=False):
+    def send_command(self, command, ignore_log=False, x11=False) -> bool:
         """
         Sends given command to HPC
 
@@ -1207,7 +1214,6 @@ class ParamikoPlatform(Platform):
                     self._ssh_output += s.decode(lang)
             for error_line_case in stderr_readlines:
                 self._ssh_output_err += error_line_case.decode(lang)
-
                 error_line = error_line_case.lower().decode(lang)
                 # TODO: To be simplified in the future in a function and using in.
                 #        The errors should be inside the class of the platform not here
@@ -1222,42 +1228,20 @@ class ParamikoPlatform(Platform):
                         7052,
                         self._ssh_output_err
                     )
-                elif error_line.find("syntax error") != -1:
+                elif errorLine.find("syntax error") != -1:
                     raise AutosubmitCritical("Syntax error", 7052, self._ssh_output_err)
-                elif (
-                        error_line.find("refused") != -1
-                        or error_line.find("slurm_persist_conn_open_without_init") != -1
-                        or error_line.find("slurmdbd") != -1
-                        or error_line.find("submission failed") != -1
-                        or error_line.find("git clone") != -1
-                        or error_line.find("sbatch: error: ") != -1
-                        or error_line.find("not submitted") != -1
-                        or error_line.find("invalid") != -1
-                        or "[ERR.] PJM".lower() in error_line
-                ):
-                    # TODO: if conditions above and below could be simplified?
-                    if (
-                            "salloc: error" in error_line
-                            or "salloc: unrecognized option" in error_line
-                            or "[ERR.] PJM".lower() in error_line
-                            or (
-                                self._submit_command_name == "sbatch"
-                                and (
-                                        error_line.find("policy") != -1
-                                        or error_line.find("invalid") != -1)
-                                )
-                            or (
-                                self._submit_command_name == "sbatch"
-                                and error_line.find("argument") != -1
-                            )
-                            or (
-                                self._submit_command_name == "bsub"
-                                and error_line.find("job not submitted") != -1
-                            )
-                            or self._submit_command_name == "ecaccess-job-submit"
-                            or self._submit_command_name == "qsub "
-                    ):
-                        raise AutosubmitError(error_line, 7014, "Bad Parameters.")
+                elif errorLine.find("refused") != -1 or errorLine.find(
+                        "slurm_persist_conn_open_without_init") != -1 or errorLine.find(
+                        "slurmdbd") != -1 or errorLine.find("submission failed") != -1 or errorLine.find(
+                        "git clone") != -1 or errorLine.find("sbatch: error: ") != -1 or errorLine.find(
+                        "not submitted") != -1 or errorLine.find("invalid") != -1 or "[ERR.] PJM".lower() in errorLine:
+                    if "salloc: error" in errorLine or "salloc: unrecognized option" in errorLine or "[ERR.] PJM".lower() in errorLine or (
+                            self._submit_command_name == "sbatch" and (
+                            errorLine.find("policy") != -1 or errorLine.find("invalid") != -1)) or (
+                            self._submit_command_name == "sbatch" and errorLine.find("argument") != -1) or (
+                            self._submit_command_name == "bsub" and errorLine.find(
+                            "job not submitted") != -1) or self._submit_command_name == "ecaccess-job-submit" or self._submit_command_name == "qsub ":
+                        raise AutosubmitError(errorLine, 7014, "Bad Parameters.")
                     raise AutosubmitError(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6005)
             if not ignore_log:
                 if len(stderr_readlines) > 0:
@@ -1341,6 +1325,7 @@ class ParamikoPlatform(Platform):
         :return: output from last command
         :rtype: str
         """
+
         if self._ssh_output is None or not self._ssh_output:
             self._ssh_output = ""
         return self._ssh_output
@@ -1352,30 +1337,23 @@ class ParamikoPlatform(Platform):
         """
         Gets execution command for given job
 
-        :param timeout:
-        :param export:
-        :param job: job
-        :type job: Job
         :param job_script: script to run
-        :type job_script: str
+        :param job: job
+        :param export:
+        :param timeout:
         :return: command to execute script
-        :rtype: str
         """
-        if job:  # If job is None, it is a wrapper. ( 0 clarity there, to be improved in a rework TODO )
-            executable = ''
-            if job.type == Type.BASH:
-                executable = 'bash'
-            elif job.type == Type.PYTHON:
-                executable = 'python3'
-            elif job.type == Type.PYTHON2:
-                executable = 'python2'
-            elif job.type == Type.R:
-                executable = 'Rscript'
+        
+        # If job is None, it is a wrapper. ( 0 clarity there, to be improved in a rework TODO )
+        if job:
             if job.executable != '':
                 executable = ''  # Alternative: use job.executable with substituted placeholders
-            remote_logs = (job.script_name + ".out."+str(job.fail_count), job.script_name + ".err."+str(job.fail_count))
+            else:
+                executable = Language.get_executable(job.type)
+            remote_logs = (job.script_name + ".out." + str(job.fail_count),
+                           job.script_name + ".err." + str(job.fail_count))
         else:
-            executable = 'python3'  # wrappers are always python3
+            executable = Language.get_executable(Language.EMPTY)  # wrappers are always python3
             remote_logs = (f"{job_script}.out", f"{job_script}.err")
 
         if timeout < 1:
@@ -1403,7 +1381,8 @@ class ParamikoPlatform(Platform):
         return f'nohup kill -0 {job_id} > /dev/null 2>&1; echo $?'
 
     def get_submitted_job_id(self, output: str, x11: bool = False) -> Union[list[int], int]:
-        """Parses submit command output to extract job id.
+        """
+        Parses submit command output to extract job id
 
         :param x11:
         :param output: output to parse

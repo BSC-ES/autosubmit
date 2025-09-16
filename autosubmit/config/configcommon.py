@@ -1211,18 +1211,18 @@ class AutosubmitConfig(object):
         try:
             self.reload(force_load)
         except IOError as e:
-            raise AutosubmitError(
-                "I/O Issues con config files", 6016, str(e))
+            raise AutosubmitError("I/O Issues with config files", 6016, str(e))
         except (AutosubmitCritical, AutosubmitError):
             raise
-        except BaseException as e:
+        except Exception as e:
             raise AutosubmitCritical("Unknown issue while checking the configuration files (check_conf_files)", 7040,
                                      str(e))
         # Annotates all errors found in the configuration files in dictionaries self.warn_config and self.wrong_config.
         self.check_mandatory_parameters(no_log=no_log)
         # End of checkers.
         self.validate_config(running_time)
-        # This Try/Except is in charge of  print all the info gathered by all the checkers and stop the program if any critical error is found.
+        # This Try/Except is in charge of  print all the info gathered by all the
+        # checkers and stop the program if any critical error is found.
         try:
             if not no_log:
                 result = self.show_messages()
@@ -1588,8 +1588,11 @@ class AutosubmitConfig(object):
                     continue
                 if platform_name == "":
                     platform_name = self.get_platform().upper()
-                if platform_name == "LOCAL":
-                    continue
+                if platform_name == 'LOCAL':
+                    raise AutosubmitCritical(
+                        'The LOCAL platform does not support wrappers. '
+                        f'Please use another platform for your jobs: {str(jobs_in_wrapper)}.')
+
                 if not self.is_valid_jobs_in_wrapper(wrapper_values):
                     self.wrong_config["WRAPPERS"] += [[wrapper_name,
                                                        "JOBS_IN_WRAPPER contains non-defined jobs.  parameter is invalid"]]
@@ -2799,8 +2802,6 @@ class AutosubmitConfig(object):
                     parser.data = {}
             else:
                 parser.data = {}
-            # else:
-            # Log.warning( "{0} was not found. Some variables might be missing. If your experiment does not need a proj file, you can ignore this message.", file_path)
         else:
             # This block may rise an exception but all its callers handle it
             try:

@@ -33,9 +33,26 @@ if TYPE_CHECKING:
 
 
 class LocalPlatform(ParamikoPlatform):
+    """
+    Class to manage jobs to localhost
+
+    :param expid: experiment's identifier
+    :type expid: str
+    """
+
+    def submit_Script(self, hold=False):
+        pass
+
+    def parse_Alljobs_output(self, output, job_id):
+        pass
+
+    def parse_queue_reason(self, output, job_id):
+        pass
+
+class LocalPlatform(ParamikoPlatform):
     """Class to manage jobs to localhost."""
 
-    def __init__(self, expid, name, config, auth_password: Optional[Union[str, list[str]]] = None):
+    def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
         ParamikoPlatform.__init__(self, expid, name, config, auth_password=auth_password)
         self.cancel_cmd = None
         self.mkdir_cmd = None
@@ -100,9 +117,8 @@ class LocalPlatform(ParamikoPlatform):
         if job:  # Not intuitive at all, but if it is not a job, it is a wrapper
             seconds = job.wallclock_in_seconds
         else:
-            # TODO: for another branch this, it is to add a timeout to the wrapped jobs even if the wallclock is 0,
-            #       default to 2 days.
-            seconds = 60*60*24*2
+            # TODO for another branch this, it is to add a timeout to the wrapped jobs even if the wallclock is 0, default to 2 days
+            seconds = 60 * 60 * 24 * 2
         if export == "none" or export == "None" or export is None or export == "":
             export = ""
         else:
@@ -126,7 +142,7 @@ class LocalPlatform(ParamikoPlatform):
         if log_recovery_process:
             self.spawn_log_retrieval_process(as_conf)
 
-    def test_connection(self, as_conf):
+    def test_connection(self, as_conf: 'AutosubmitConfig') -> None:
         if not self.connected:
             self.connect(as_conf)
 
@@ -145,7 +161,8 @@ class LocalPlatform(ParamikoPlatform):
         for job, prev_job_status in job_list:
             self.check_job(job)
 
-    def send_command(self, command, ignore_log=False, x11=False):
+    def send_command(self, command, ignore_log=False, x11=False) -> bool:
+
         lang = locale.getlocale()[1]
         if lang is None:
             lang = locale.getdefaultlocale()[1]
@@ -211,7 +228,6 @@ class LocalPlatform(ParamikoPlatform):
         file_path = os.path.join(local_path, filename)
         if os.path.exists(file_path):
             os.remove(file_path)
-
         command = f'{self.get_cmd} {os.path.join(self.tmp_path, f"LOG_{self.expid}", filename)} {file_path}'
         try:
             subprocess.check_call(command, stdout=open(os.devnull, 'w'), stderr=open(os.devnull, 'w'), shell=True)

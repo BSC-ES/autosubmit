@@ -1,19 +1,19 @@
 DEFAULT:
   EXPID: t03g
-  HPCARCH: local
+  HPCARCH: TEST_SLURM
   CUSTOM_CONFIG: hidden
 JOBS:
   INI:
     DEPENDENCIES:
       REMOTE_SETUP: {}
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: member
     WALLCLOCK: 00:30
     CHECK: on_submission
   LOCAL_SETUP:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: once
     CHECK: on_submission
     DEPENDENCIES: {}
@@ -21,7 +21,7 @@ JOBS:
     DEPENDENCIES:
       SYNCHRONIZE: {}
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: once
     WALLCLOCK: 03:30
     CHECK: on_submission
@@ -31,7 +31,7 @@ JOBS:
       SIM-1: {}
       DQC_BASIC-10: {}
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     WALLCLOCK: 00:30
     RUNNING: chunk
     CHECK: on_submission
@@ -40,7 +40,7 @@ JOBS:
     DEPENDENCIES:
       LOCAL_SETUP: {}
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: once
     CHECK: on_submission
   DQC_BASIC:
@@ -48,7 +48,7 @@ JOBS:
     WALLCLOCK: 00:30
     NODES: 1
     PARTITION: '%CURRENT_APP_PARTITION%'
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     PROCESSORS: 1
     TASKS: 1
     THREADS: 16
@@ -66,7 +66,7 @@ JOBS:
     WALLCLOCK: 00:30
     NODES: 1
     PARTITION: '%CURRENT_APP_PARTITION%'
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     PROCESSORS: 1
     TASKS: 1
     THREADS: 16
@@ -89,7 +89,7 @@ JOBS:
     PARTITION: '%CURRENT_APP_PARTITION%'
     TASKS: 0
     THREADS: 1
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     EXCLUSIVE: 'True'
     RUNNING: chunk
     WALLCLOCK: 00:30
@@ -104,7 +104,7 @@ JOBS:
     TASKS: 0
     THREADS: 1
     PARTITION: '%CURRENT_APP_PARTITION%'
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     EXCLUSIVE: 'True'
     RUNNING: chunk
     WALLCLOCK: 00:30
@@ -114,14 +114,14 @@ JOBS:
     DEPENDENCIES:
       AQUA_ANALYSIS: {}
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: chunk
     WALLCLOCK: 02:00
     FREQUENCY: 1
     CATALOG_NAME: mn5-phase2
   CLEAN:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       SIM: {}
     RUNNING: chunk
@@ -146,3 +146,16 @@ GIT:
   PROJECT_COMMIT: ''
   PROJECT_SUBMODULES: aqua catalog ifs-nemo dvc-cache-de340 gsv_interface data-portfolio
   FETCH_SINGLE_BRANCH: true
+PLATFORMS:
+  TEST_SLURM:
+    ADD_PROJECT_TO_HOST: false
+    HOST: localDocker
+    MAX_WALLCLOCK: 48:00
+    PROJECT: group
+    QUEUE: debug
+    SCRATCH_DIR: /tmp/scratch/
+    TEMP_DIR: ''
+    TYPE: slurm
+    USER: root
+    MAX_PROCESSORS: 10
+    PROCESSORS_PER_NODE: 10

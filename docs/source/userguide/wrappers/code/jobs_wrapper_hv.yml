@@ -1,0 +1,12 @@
+JOBS:
+    SIM:
+      SCRIPT: 'sleep 0'
+      RUNNING: chunk
+      QUEUE: debug
+      DEPENDENCIES: SIM-1
+      WALLCLOCK: 00:01
+
+WRAPPERS:
+    WRAPPER_HV:
+      TYPE: "horizontal-vertical"
+      JOBS_IN_WRAPPER: "SIM&SIM2"

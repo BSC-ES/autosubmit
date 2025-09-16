@@ -1,0 +1,18 @@
+JOBS:
+  ONCE:
+    SCRIPT: 'sleep 0'
+
+  DATE:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: once
+    RUNNING: date
+
+  MEMBER:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: date
+    RUNNING: member
+
+  CHUNCK:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: member
+    RUNNING: chunk

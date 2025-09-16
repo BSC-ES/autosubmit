@@ -2537,10 +2537,9 @@ class Autosubmit:
                         ssh_config_issues += message + ".Please, the eccert expiration date"
                     else:
                         ssh_config_issues += message + (f" this is an PARAMIKO SSHEXCEPTION: indicates that there is "
-                                                        f"something incompatible in the ssh_config for host: "
-                                                        f"{platform.host}\n maybe you need to contact your sysadmin")
+                                                        f"something incompatible in the ssh_config for host:{platform.host}\n maybe"
+                                                        f" you need to contact your sysadmin")
             except Exception as e:
-                Log.debug(f'Unexpected error testing platform connection: {str(e)}')
                 try:
                     if mail_notify:
                         email = as_conf.get_mails_to()
@@ -2581,19 +2580,25 @@ class Autosubmit:
                                          7010, issues + "\n" + ssh_config_issues)
 
     @staticmethod
-    def submit_ready_jobs(as_conf: AutosubmitConfig, job_list: JobList, platforms_to_test: list[Platform],
+    def submit_ready_jobs(as_conf: AutosubmitConfig, job_list: JobList, platforms_to_test: set[Platform],
                           packages_persistence: JobPackagePersistence, inspect=False,
                           only_wrappers=False, hold=False) -> bool:
         """Gets READY jobs and send them to the platforms if there is available space on the queues.
 
-        :param hold:
-        :param as_conf: autosubmit config object \n
-        :param job_list: job list to check  \n
-        :param platforms_to_test: platforms used  \n
-        :param packages_persistence: Handles database per experiment. \n
-        :param inspect: True if coming from generate_scripts_andor_wrappers(). \n
-        :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw. \n
-        :return: True if at least one job was submitted, False otherwise \n
+        :param hold: 
+        :param as_conf: autosubmit config object
+        :type as_conf: AutosubmitConfig object
+        :param job_list: job list to check
+        :type job_list: JobList object
+        :param platforms_to_test: platforms used
+        :type platforms_to_test: set of Platform Objects, e.g. SgePlatform(), SlurmPlatform().
+        :param packages_persistence: Handles database per experiment.
+        :type packages_persistence: JobPackagePersistence object
+        :param inspect: True if coming from generate_scripts_andor_wrappers().
+        :type inspect: Boolean
+        :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw.
+        :type only_wrappers: Boolean
+        :return: True if at least one job was submitted, False otherwise
         """
         save_1 = False
         save_2 = False
@@ -2611,7 +2616,7 @@ class Autosubmit:
                 packages_to_submit = packager.build_packages()
                 save_1, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = (
                     platform.submit_ready_jobs(as_conf, job_list, packages_persistence, packages_to_submit,
-                                               inspect=inspect, only_wrappers=only_wrappers, hold=hold)
+                                               inspect, only_wrappers, hold)
                 )
                 wrapper_errors.update(packager.wrappers_with_error)
                 # Jobs that are being retrieved in batch. Right now, only available for slurm platforms.
@@ -2619,7 +2624,7 @@ class Autosubmit:
                 if not inspect and len(valid_packages_to_submit) > 0:
                     job_list.save()
                 save_2 = False
-                if platform.type.lower() in [ "slurm" , "pjm" ] and not inspect and not only_wrappers:
+                if platform.type.lower() in ["slurm", "pjm"] and not inspect and not only_wrappers:
                     # Process the script generated in submit_ready_jobs
                     save_2, valid_packages_to_submit = platform.process_batch_ready_jobs(valid_packages_to_submit,
                                                                                          failed_packages,
@@ -2639,11 +2644,7 @@ class Autosubmit:
                     err_msg += f"wrapped_jobs:{wrapper} in {wrapper_errors[wrapper]}\n"
                 raise AutosubmitCritical(err_msg, 7014)
             return save_1 or save_2
-        except AutosubmitError as e:
-            raise
-        except AutosubmitCritical as e:
-            raise
-        except BaseException as e:
+        except Exception:
             raise
 
     @staticmethod
@@ -3497,11 +3498,7 @@ class Autosubmit:
                     Log.error("Not a valid path. You must include '~/' at the beginning.")
             local_root_path = Path(local_root_path).expanduser().resolve()
 
-            # if not os.path.exists(local_root_path):
             Path(local_root_path).mkdir(parents=True, exist_ok=True)
-            # Log.error("Local Root path does not exist.")
-            # return False
-            # else:
             global_logs_path = local_root_path / 'logs'
             structures_path = local_root_path / 'metadata/structures'
             historicdb_path = local_root_path / 'metadata/data'
@@ -3551,8 +3548,6 @@ class Autosubmit:
                     parser.set("historiclog", "path", str(historiclog_path))
                     parser.add_section("autosubmitapi")
                     parser.set("autosubmitapi", "url", autosubmitapi_url)
-                    # parser.add_section("hosts")
-                    # parser.set("hosts", "whitelist", " localhost # Add your machine names")
                     parser.write(config_file)
                     Log.result(f"Configuration file written successfully: \n\t{rc_path}")
                     Path(local_root_path).mkdir(parents=True, exist_ok=True)

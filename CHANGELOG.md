@@ -19,6 +19,7 @@
 - Added `--force` flag to `autosubmit pklfix` command, and `--yes` flag to `autosubmit stop` to
   automatically answer yes to prompts #2569
 - Improvement of error message when `LOCAL` project location is a file, not a directory #1972 #1254
+- Removed the code for wrappers with local platform that were create only for tests #2522
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 

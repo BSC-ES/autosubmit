@@ -33,27 +33,14 @@ When using multiple wrappers or 2-dim wrappers is essential to define the `JOBS_
 
 .. code-block:: YAML
 
-    WRAPPERS:
-      WRAPPER_H:
-        TYPE: "horizontal"
-        JOBS_IN_WRAPPER: "SIM"
-      WRAPPER_V:
-        TYPE: "vertical"
-        JOBS_IN_WRAPPER: "SIM2"
-      WRAPPER_VH:
-        TYPE: "vertical-horizontal"
-        JOBS_IN_WRAPPER: "SIM3 SIM4"
-      WRAPPER_HV:
-        TYPE: "horizontal-vertical"
-        JOBS_IN_WRAPPER: "SIM5 SIM6"
-
-    experiment:
+    EXPERIMENT:
       DATELIST: 20220101
       MEMBERS: "fc0 fc1"
       CHUNKSIZEUNIT: day
       CHUNKSIZE: '1'
       NUMCHUNKS: '4'
       CALENDAR: standard
+
     JOBS:
         SIM:
           FILE: sim.sh
@@ -92,10 +79,31 @@ When using multiple wrappers or 2-dim wrappers is essential to define the `JOBS_
           DEPENDENCIES: SIM6-1
           WALLCLOCK: 00:15
 
-.. figure:: fig/wrapper_all.png
-   :name: wrapper all
-   :align: center
-   :alt: wrapper all
+    WRAPPERS:
+      WRAPPER_H:
+        TYPE: "horizontal"
+        JOBS_IN_WRAPPER: "SIM"
+      WRAPPER_V:
+        TYPE: "vertical"
+        JOBS_IN_WRAPPER: "SIM2"
+      WRAPPER_VH:
+        TYPE: "vertical-horizontal"
+        JOBS_IN_WRAPPER: "SIM3 SIM4"
+      WRAPPER_HV:
+        TYPE: "horizontal-vertical"
+        JOBS_IN_WRAPPER: "SIM5&SIM6"
+
+
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :args: -cw
+    :figure: wrapper_all.png
+    :name: wrapper_all
+    :width: 100%
+    :align: center
+    :alt: wrapper all
 
 .. important:: Autosubmit will not wrap tasks with external and non-fulfilled dependencies.
 
@@ -301,15 +309,31 @@ Autosubmit supports wrapping together vertically jobs of different types.
 
 .. code-block:: YAML
 
-  WRAPPERS:
-    WRAPPER_V:
-      TYPE: "vertical"
-      JOBS_IN_WRAPPER: "SIM"
+  JOBS:
+    SIM:
+      FILE: sim.sh
+      RUNNING: chunk
+      QUEUE: debug
+      DEPENDENCIES: SIM-1
+      WALLCLOCK: 00:15
 
-.. figure:: fig/wrapper_v.png
-   :name: wrapper vertical
-   :align: center
-   :alt: wrapper vertical
+    WRAPPERS:
+      WRAPPER_V:
+        TYPE: "vertical"
+        JOBS_IN_WRAPPER: "SIM"
+
+
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :args: -cw
+    :figure: wrapper_v.png
+    :name: wrapper_v
+    :width: 100%
+    :align: center
+    :alt: wrapper vertical
+
 
 .. _Horizontal:
 
@@ -326,10 +350,16 @@ Horizontal wrappers are suited for jobs that must run parallel (e.x. members of 
       JOBS_IN_WRAPPER: "SIM"
 
 
-.. figure:: fig/wrapper_h.png
-   :name: wrapper horizontal
-   :align: center
-   :alt: wrapper horizontal
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :args: -cw
+    :figure: wrapper_h.png
+    :name: wrapper_h
+    :width: 100%
+    :align: center
+    :alt: wrapper horizontal
 
 
 .. _Vertical-horizontal:
@@ -339,11 +369,16 @@ Vertical-horizontal wrapper
 
 The vertical-horizontal wrapper allows bundling together a vertical sequence of tasks independent of the horizontal ones. Therefore, all horizontal tasks do not need to finish to progress to the next horizontal level.
 
-.. figure:: fig/wrapper_vh.png
-   :name: wrapper vertical-horizontal
-   :align: center
-   :alt: wrapper vertical-horizontal
-
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :args: -cw
+    :figure: wrapper_vh.png
+    :name: wrapper_vh
+    :width: 100%
+    :align: center
+    :alt: wrapper vertical-horizontal
 
 .. _Horizontal-vertical:
 
@@ -352,12 +387,16 @@ Horizontal-vertical wrapper
 
 The horizontal-vertical wrapper allows bundling together tasks that could run simultaneously but need to communicate before progressing to the next horizontal level.
 
-
-.. figure:: fig/wrapper_hv.png
-   :name: wrapper horizontal-vertical
-   :align: center
-   :alt: wrapper horizontal-vertical
-
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :args: -cw
+    :figure: wrapper_hv.png
+    :name: wrapper_hv
+    :width: 100%
+    :align: center
+    :alt: wrapper horizontal-vertical
 
 
 Advanced example: Set-up an crossdate wrapper
@@ -367,84 +406,86 @@ Considering the following configuration:
 
 .. code-block:: yaml
 
-    experiment:
-      DATELIST: 20120101 20120201
+    EXPERIMENT:
+      DATELIST: "20120101 20120201"
       MEMBERS: "000 001"
       CHUNKSIZEUNIT: day
       CHUNKSIZE: '1'
       NUMCHUNKS: '3'
 
     JOBS:
-      LOCAL_SETUP:
-        FILE: templates/local_setup.sh
-        PLATFORM: marenostrum_archive
-        RUNNING: once
-        NOTIFY_ON: COMPLETED
-      LOCAL_SEND_SOURCE:
-        FILE: templates/01_local_send_source.sh
-        PLATFORM: marenostrum_archive
-        DEPENDENCIES: LOCAL_SETUP
-        RUNNING: once
-        NOTIFY_ON: FAILED
-      LOCAL_SEND_STATIC:
-        FILE: templates/01b_local_send_static.sh
-        PLATFORM: marenostrum_archive
-        DEPENDENCIES: LOCAL_SETUP
-        RUNNING: once
-        NOTIFY_ON: FAILED
-      REMOTE_COMPILE:
-        FILE: templates/02_compile.sh
-        DEPENDENCIES: LOCAL_SEND_SOURCE
-        RUNNING: once
-        PROCESSORS: '4'
-        WALLCLOCK: 00:50
-        NOTIFY_ON: COMPLETED
-      SIM:
-        FILE: templates/05b_sim.sh
-        DEPENDENCIES:
-          LOCAL_SEND_STATIC:
-          REMOTE_COMPILE:
-          SIM-1:
-          DA-1:
-        RUNNING: chunk
-        PROCESSORS: '68'
-        WALLCLOCK: 00:12
-        NOTIFY_ON: FAILED
-      LOCAL_SEND_INITIAL_DA:
-        FILE: templates/00b_local_send_initial_DA.sh
-        PLATFORM: marenostrum_archive
-        DEPENDENCIES: LOCAL_SETUP LOCAL_SEND_INITIAL_DA-1
-        RUNNING: chunk
-        SYNCHRONIZE: member
-        DELAY: '0'
-      COMPILE_DA:
-        FILE: templates/02b_compile_da.sh
-        DEPENDENCIES: LOCAL_SEND_SOURCE
-        RUNNING: once
-        WALLCLOCK: 00:20
-        NOTIFY_ON: FAILED
-      DA:
-        FILE: templates/05c_da.sh
-        DEPENDENCIES:
-          SIM:
-          LOCAL_SEND_INITIAL_DA:
-            CHUNKS_TO: "all"
-            DATES_TO: "all"
-            MEMBERS_TO: "all"
-          COMPILE_DA:
-          DA:
-            DATES_FROM:
-              "20120201":
-                CHUNKS_FROM:
-                  1:
-                    DATES_TO: "20120101"
-                    CHUNKS_TO: "1"
-        RUNNING: chunk
-        SYNCHRONIZE: member
-        DELAY: '0'
-        WALLCLOCK: 00:12
-        PROCESSORS: '256'
-        NOTIFY_ON: FAILED
+    LOCAL_SETUP:
+      FILE: local_setup.sh
+      RUNNING: once
+      NOTIFY_ON: COMPLETED
+    LOCAL_SEND_SOURCE:
+      FILE: local_send_source.sh
+      DEPENDENCIES: LOCAL_SETUP
+      RUNNING: once
+      NOTIFY_ON: FAILED
+    LOCAL_SEND_STATIC:
+      FILE: local_send_static.sh
+      DEPENDENCIES: LOCAL_SETUP
+      RUNNING: once
+      NOTIFY_ON: FAILED
+    REMOTE_COMPILE:
+      FILE: compile.sh
+      DEPENDENCIES: LOCAL_SEND_SOURCE
+      RUNNING: once
+      PROCESSORS: '4'
+      WALLCLOCK: 00:50
+      NOTIFY_ON: COMPLETED
+    SIM:
+      FILE: sim.sh
+      DEPENDENCIES:
+        LOCAL_SEND_STATIC:
+        REMOTE_COMPILE:
+        SIM-1:
+        DA-1:
+      RUNNING: chunk
+      PROCESSORS: '68'
+      WALLCLOCK: 00:12
+      NOTIFY_ON: FAILED
+    LOCAL_SEND_INITIAL_DA:
+      FILE: local_send_initial_DA.sh
+      DEPENDENCIES: LOCAL_SETUP LOCAL_SEND_INITIAL_DA-1
+      RUNNING: chunk
+      SYNCHRONIZE: member
+      DELAY: '0'
+    COMPILE_DA:
+      FILE: compile_da.sh
+      DEPENDENCIES: LOCAL_SEND_SOURCE
+      RUNNING: once
+      WALLCLOCK: 00:20
+      NOTIFY_ON: FAILED
+    DA:
+      FILE: da.sh
+      DEPENDENCIES:
+        SIM:
+        LOCAL_SEND_INITIAL_DA:
+          CHUNKS_TO: "all"
+          DATES_TO: "all"
+          MEMBERS_TO: "all"
+        COMPILE_DA:
+        DA:
+          DATES_FROM:
+            "20120201":
+              CHUNKS_FROM:
+                1:
+                  DATES_TO: "20120101"
+                  CHUNKS_TO: "1"
+      RUNNING: chunk
+      SYNCHRONIZE: member
+      DELAY: '0'
+      WALLCLOCK: 00:12
+      PROCESSORS: '256'
+      NOTIFY_ON: FAILED
+
+    WRAPPERS:
+      WRAPPER_SIMDA:
+        TYPE: "horizontal-vertical"
+        JOBS_IN_WRAPPER: "SIM DA"
+
 
 
 .. code-block:: yaml
@@ -454,7 +495,13 @@ Considering the following configuration:
         TYPE: "horizontal-vertical"
         JOBS_IN_WRAPPER: "SIM DA"
 
-.. figure:: fig/monarch-da.png
-   :name: crossdate-example
-   :align: center
-   :alt: crossdate-example
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :args: -cw
+    :figure: monarch_da.png
+    :name: monarch_da
+    :width: 100%
+    :align: center
+    :alt: crossdate-example

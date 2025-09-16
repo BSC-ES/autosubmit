@@ -1,0 +1,48 @@
+JOBS:
+  LOCAL_SETUP:
+    SCRIPT: 'sleep 0'
+    PLATFORM: LOCAL
+    RUNNING: once
+  REMOTE_SETUP:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: LOCAL_SETUP
+    WALLCLOCK: 00:01
+    RUNNING: once
+  INI:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: REMOTE_SETUP
+    RUNNING: member
+    WALLCLOCK: 00:01
+  SIM:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES:
+      INI:
+      SIM-1:
+      POST-1:
+        CHUNKS_FROM:
+          all:
+            chunks_to: 1
+      CLEAN-5:
+    RUNNING: chunk
+    PROCESSORS: '1'
+    WALLCLOCK: 00:01
+  POST:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: SIM
+    RUNNING: chunk
+    WALLCLOCK: 00:01
+  CLEAN:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: POST
+    RUNNING: chunk
+    WALLCLOCK: 00:01
+  CLEAN_MEMBER:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: CLEAN
+    RUNNING: member
+    WALLCLOCK: 00:01
+  CLEAN_EXPERIMENT:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: CLEAN_MEMBER
+    RUNNING: member
+    WALLCLOCK: 00:01

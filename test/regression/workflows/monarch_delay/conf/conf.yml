@@ -1,18 +1,18 @@
 DEFAULT:
   EXPID: t0ij
-  HPCARCH: local
+  HPCARCH: TEST_SLURM
 JOBS:
   LOCAL_SETUP:
     FILE: hidden
     TYPE: python
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: once
     NOTIFY_ON:
       - FAILED
     DEPENDENCIES: { }
   LOCAL_SEND_INITIAL:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: { }
     RUNNING: chunk
@@ -20,7 +20,7 @@ JOBS:
       - FAILED
   LOCAL_SEND_SOURCE:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: { }
     RUNNING: once
@@ -28,7 +28,7 @@ JOBS:
       - FAILED
   LOCAL_SEND_STATIC:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: { }
     RUNNING: once
@@ -36,11 +36,11 @@ JOBS:
     FILE: hidden
     DEPENDENCIES:
       LOCAL_SEND_SOURCE: { }
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: once
   LOCAL_SEND_EMISSIONS:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: { }
       LOCAL_SEND_EMISSIONS-1: { }
@@ -51,7 +51,7 @@ JOBS:
       - FAILED
   LOCAL_SEND_CHEM:
     FILE: hidden
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     DEPENDENCIES:
       LOCAL_SETUP: { }
       LOCAL_SEND_CHEM-1: { }
@@ -137,7 +137,7 @@ JOBS:
     DEPENDENCIES:
       POSTPROC: { }
       ARCHIVE-1: { }
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: chunk
     WALLCLOCK: 00:30
     NOTIFY_ON:
@@ -147,7 +147,7 @@ JOBS:
     DEPENDENCIES:
       POSTPROC+1: { }
       ARCHIVE: { }
-    PLATFORM: local
+    PLATFORM: TEST_SLURM
     RUNNING: chunk
     WALLCLOCK: 00:10
     NOTIFY_ON:
@@ -170,3 +170,16 @@ GIT:
   PROJECT_SUBMODULES: ''
   PROJECT_SUBMODULES_DEPTH: '1'
   FETCH_SINGLE_BRANCH: 'true'
+PLATFORMS:
+  TEST_SLURM:
+    ADD_PROJECT_TO_HOST: false
+    HOST: localDocker
+    MAX_WALLCLOCK: 48:00
+    PROJECT: group
+    QUEUE: debug
+    SCRATCH_DIR: /tmp/scratch/
+    TEMP_DIR: ''
+    TYPE: slurm
+    USER: root
+    MAX_PROCESSORS: 10
+    PROCESSORS_PER_NODE: 10

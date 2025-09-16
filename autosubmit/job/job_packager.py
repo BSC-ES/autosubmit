@@ -25,9 +25,10 @@ from typing import List
 from bscearth.utils.date import sum_str_hours
 
 from autosubmit.job.job import Job
-from autosubmit.job.job_common import Status, Type
+from autosubmit.job.job_common import Status
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal, \
     JobPackageSimpleWrapped, JobPackageHorizontalVertical, JobPackageVerticalHorizontal, JobPackageBase
+from autosubmit.job.template import Language
 from autosubmit.log.log import Log, AutosubmitCritical
 
 
@@ -251,7 +252,7 @@ class JobPackager(object):
                         if max_jobs_to_submit == 0:
                             break
                         if job.status == Status.READY:
-                            if job.type == Type.PYTHON and not self._platform.allow_python_jobs:
+                            if job.type in [Language.PYTHON3, Language.PYTHON, Language.PYTHON2] and not self._platform.allow_python_jobs:
                                 package = JobPackageSimpleWrapped([job])
                             else:
                                 package = JobPackageSimple([job])
@@ -341,7 +342,7 @@ class JobPackager(object):
                 Log.printlog("Wrapper policy is set to mixed, there is a failed job that will be sent sequential")
                 error = False
                 package = JobPackageSimpleWrapped(
-                    [job]) if job.type == Type.PYTHON and not self._platform.allow_python_jobs else JobPackageSimple(
+                    [job]) if job.type in [Language.PYTHON3, Language.PYTHON, Language.PYTHON2] and not self._platform.allow_python_jobs else JobPackageSimple(
                     [job])
                 packages_to_submit.append(package)
                 max_jobs_to_submit -= 1
@@ -368,7 +369,7 @@ class JobPackager(object):
                 break
             if job.status == Status.READY:
                 package = JobPackageSimpleWrapped(
-                    [job]) if job.type == Type.PYTHON and not self._platform.allow_python_jobs else JobPackageSimple(
+                    [job]) if job.type in [Language.PYTHON3, Language.PYTHON, Language.PYTHON2] and not self._platform.allow_python_jobs else JobPackageSimple(
                     [job])
                 packages_to_submit.append(package)
                 max_jobs_to_submit -= 1
@@ -619,10 +620,10 @@ class JobPackager(object):
                     continue
             elif max_jobs_to_submit == 0:
                 break
-            if len(self._jobs_list.jobs_to_run_first) > 0: # if user wants to run first some jobs, submit them first
+            if len(self._jobs_list.jobs_to_run_first) > 0:  # if user wants to run first some jobs, submit them first
                 if job not in self._jobs_list.jobs_to_run_first:
                     continue
-            if job.type == Type.PYTHON and not self._platform.allow_python_jobs:
+            if job.type in [Language.PYTHON3, Language.PYTHON, Language.PYTHON2] and not self._platform.allow_python_jobs:
                 package = JobPackageSimpleWrapped([job])
             else:
                 package = JobPackageSimple([job])
@@ -630,7 +631,6 @@ class JobPackager(object):
             max_jobs_to_submit = max_jobs_to_submit - 1
             if job.section in section_jobs_to_submit:
                 section_jobs_to_submit[job.section] = section_jobs_to_submit[job.section] - 1
-
 
         for package in packages_to_submit:
             self.max_jobs = self.max_jobs - 1

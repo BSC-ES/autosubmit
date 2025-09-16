@@ -36,17 +36,18 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
-from autosubmit.job.job_common import StatisticsSnippetBash, StatisticsSnippetPython
-from autosubmit.job.job_common import StatisticsSnippetR, StatisticsSnippetEmpty
-from autosubmit.job.job_common import Status, Type, increase_wallclock_by_chunk
+from autosubmit.job import job_utils
+from autosubmit.job.job_common import Status, increase_wallclock_by_chunk
 from autosubmit.job.job_utils import get_job_package_code, get_split_size_unit, get_split_size
 from autosubmit.job.metrics_processor import UserMetricProcessor
+from autosubmit.job.template import get_template_snippet, Language
 from autosubmit.log.log import Log, AutosubmitCritical
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
 if TYPE_CHECKING:
     from autosubmit.platforms.platform import Platform
+    from autosubmit.job.template import TemplateSnippet
 
 Log.get_logger("Autosubmit")
 
@@ -220,7 +221,7 @@ class Job(object):
         self._name = name
         self._long_name = None
         self.date_format = ''
-        self.type = Type.BASH
+        self.type = Language.BASH
         self.undefined_variables = None
         self.log_retries = 5
         self.id = job_id
@@ -248,7 +249,7 @@ class Job(object):
         self.check = 'true'
         self.check_warnings = False
         self.packed = False
-        self.hold = False # type: bool
+        self.hold = False  # type: bool
         self.distance_weight = 0
         self.level = 0
         self._export = "none"
@@ -459,12 +460,7 @@ class Job(object):
     @autosubmit_parameter(name='checkpoint')
     def checkpoint(self):
         """Generates a checkpoint step for this job based on job.type."""
-        if self.type == Type.PYTHON:
-            return "checkpoint()"
-        elif self.type == Type.R:
-            return "checkpoint()"
-        else:  # bash
-            return "as_checkpoint"
+        return self.type.checkpoint
 
     def get_checkpoint_files(self):
         """
@@ -720,10 +716,9 @@ class Job(object):
         try:
             # find the absolute path
             script_file = open(os.path.join(as_conf.get_project_dir(), script_path), 'r')
-        except Exception as e:  # log
+        except Exception as e:
             # We stop Autosubmit if we don't find the script
             raise AutosubmitCritical(f"Extended {error_message_type} script: failed to fetch {str(e)} \n", 7014)
-
         for line in script_file:
             if line[:2] != "#!":
                 script += line
@@ -731,17 +726,17 @@ class Job(object):
                 found_hashbang = True
                 # check if the type of the script matches the one in the extended
                 if "bash" in line:
-                    if self.type != Type.BASH:
+                    if self.type != Language.BASH:
                         raise AutosubmitCritical(
                             f"Extended {error_message_type} script: script {script_name} seems Bash but job {self.script_name} isn't\n",
                             7011)
                 elif "Rscript" in line:
-                    if self.type != Type.R:
+                    if self.type != Language.R:
                         raise AutosubmitCritical(
                             f"Extended {error_message_type} script: script {script_name} seems Rscript but job {self.script_name} isn't\n",
                             7011)
                 elif "python" in line:
-                    if self.type not in (Type.PYTHON, Type.PYTHON2, Type.PYTHON3):
+                    if self.type not in (Language.PYTHON2, Language.PYTHON3, Language.PYTHON):
                         raise AutosubmitCritical(
                             f"Extended {error_message_type} script: script {script_name} seems Python but job {self.script_name} isn't\n",
                             7011)
@@ -1496,6 +1491,13 @@ class Job(object):
 
         return self.status
 
+    @staticmethod
+    def _get_submitter(as_conf):
+        """
+        Returns the submitter corresponding to the communication defined on Autosubmit's config file
+        """
+        return ParamikoSubmitter()
+
     def update_children_status(self):
         children = list(self.children)
         for child in children:
@@ -1574,7 +1576,7 @@ class Job(object):
 
         return parameters
 
-    def update_platform_parameters(self, as_conf, parameters):
+    def update_platform_parameters(self, as_conf: AutosubmitConfig, parameters: dict) -> dict:
         if not self.platform:
             submitter = ParamikoSubmitter(as_conf=as_conf)
             if not self.platform_name:
@@ -1602,7 +1604,6 @@ class Job(object):
 
         :return:
         """
-        hetsize = 0
         if type(self.processors) is list:
             hetsize = (len(self.processors))
         else:
@@ -1820,15 +1821,16 @@ class Job(object):
         if self.het['HETSIZE'] == 1:
             self.het = dict()
         if not self.wallclock:
-            if job_platform.type.lower() not in ['ps', "local"]:
-                self.wallclock = "01:59"
-            elif job_platform.type.lower() in ['ps', 'local']:
+            # FIXME: Wouldn't it be better/safer to check the instance type?
+            #        Note, too, that ps and slurm platforms do not have ``.type``?
+            if job_platform.type.lower() in ['ps', 'local']:
                 self.wallclock = "00:00"
+            else:
+                self.wallclock = "01:59"
         # Increasing according to chunk
-        self.wallclock = increase_wallclock_by_chunk(
-            self.wallclock, self.wchunkinc, chunk)
+        self.wallclock = increase_wallclock_by_chunk(self.wallclock, self.wchunkinc, chunk)
 
-    def update_platform_associated_parameters(self, as_conf, parameters: dict, chunk, set_attributes):
+    def update_platform_associated_parameters(self, as_conf: AutosubmitConfig, parameters: dict, chunk, set_attributes) -> dict:
         if set_attributes:
             self.x11_options = str(parameters.get("CURRENT_X11_OPTIONS", ""))
             self.ec_queue = str(parameters.get("CURRENT_EC_QUEUE", ""))
@@ -1903,7 +1905,7 @@ class Job(object):
 
         return parameters
 
-    def update_wrapper_parameters(self,as_conf, parameters):
+    def update_wrapper_parameters(self,as_conf: AutosubmitConfig, parameters: dict) -> dict:
         wrappers = as_conf.experiment_data.get("WRAPPERS", {})
         if len(wrappers) > 0:
             parameters['WRAPPER'] = as_conf.get_wrapper_type()
@@ -1927,7 +1929,7 @@ class Job(object):
                 as_conf.get_extensible_wallclock(as_conf.experiment_data["WRAPPERS"].get(wrapper_section)))
         return parameters
 
-    def update_dict_parameters(self, as_conf):
+    def update_dict_parameters(self, as_conf: AutosubmitConfig) -> None:
         self.retrials = as_conf.jobs_data.get(self.section, {}).get("RETRIALS",
                                                                     as_conf.experiment_data.get("CONFIG", {}).get(
                                                                         "RETRIALS", 0))
@@ -1952,22 +1954,16 @@ class Job(object):
         self.additional_files = as_conf.jobs_data.get(self.section, {}).get("ADDITIONAL_FILES", [])
 
         type_ = str(as_conf.jobs_data.get(self.section, {}).get("TYPE", "bash")).lower()
-        if type_ == "bash":
-            self.type = Type.BASH
-        elif type_ == "python" or type_ == "python3":
-            self.type = Type.PYTHON
-        elif type_ == "r":
-            self.type = Type.R
-        elif type_ == "python2":
-            self.type = Type.PYTHON2
-        else:
-            self.type = Type.BASH
+        try:
+            self.type = Language[type_.upper()]
+        except KeyError:
+            self.type = Language.BASH
         self.ext_header_path = as_conf.jobs_data.get(self.section, {}).get('EXTENDED_HEADER_PATH', None)
         self.ext_tailer_path = as_conf.jobs_data.get(self.section, {}).get('EXTENDED_TAILER_PATH', None)
         if self.platform_name:
             self.platform_name = self.platform_name.upper()
 
-    def update_check_variables(self, as_conf):
+    def update_check_variables(self, as_conf: AutosubmitConfig) -> None:
         job_data = as_conf.jobs_data.get(self.section, {})
         job_platform_name = job_data.get("PLATFORM", as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", None))
         job_platform = job_data.get("PLATFORMS", {}).get(job_platform_name, {})
@@ -2120,7 +2116,7 @@ class Job(object):
                 parameters['CHUNK_LAST'] = 'FALSE'
         return parameters
 
-    def update_job_parameters(self, as_conf, parameters, set_attributes):
+    def update_job_parameters(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> dict:
         if set_attributes:
             if self.splits == "auto":
                 self.splits = parameters.get("CURRENT_SPLITS", None)
@@ -2161,7 +2157,7 @@ class Job(object):
         parameters['X11'] = self.x11
         return parameters
 
-    def update_job_variables_final_values(self, parameters):
+    def update_job_variables_final_values(self, parameters: dict) -> None:
         """ Jobs variables final values based on parameters dict instead of as_conf
             This function is called to handle %CURRENT_% placeholders as they are filled up dynamically for each job
         """
@@ -2240,8 +2236,7 @@ class Job(object):
                 event.set()
         return parameters
 
-
-    def update_content_extra(self,as_conf,files):
+    def update_content_extra(self, as_conf: AutosubmitConfig, files: list[str]) -> list[str]:
         additional_templates = []
         for file in files:
             if as_conf.get_project_type().lower() == "none":
@@ -2251,14 +2246,12 @@ class Job(object):
             additional_templates += [template]
         return additional_templates
 
-    def update_content(self, as_conf, parameters):
-        """
-        Create the script content to be run for the job
+    def update_content(self, as_conf: AutosubmitConfig, parameters: dict) -> tuple[str, list[str]]:
+        """Create the script content to be run for the job.
 
-        :param as_conf: Autosubmit configuration object
-        :type as_conf: AutosubmitConfig
-        :return: script code
-        :rtype: str
+        :param as_conf: Autosubmit configuration.
+        :param parameters: Parameters dictionary.
+        :return: A tuple with the job script template and a list with the additional file names.
         """
         if self.script:
             if self.file:
@@ -2270,65 +2263,47 @@ class Job(object):
                     template_file = open(os.path.join(as_conf.get_project_dir(), self.file), 'r')
                     template = ''
                     if as_conf.get_remote_dependencies() == "true":
-                        if self.type == Type.BASH:
+                        if self.type == Language.BASH:
                             template = 'sleep 5' + "\n"
-                        elif self.type == Type.PYTHON2:
+                        elif self.type == Language.PYTHON2:
                             template = 'time.sleep(5)' + "\n"
-                        elif self.type == Type.PYTHON3 or self.type == Type.PYTHON:
+                        elif self.type == Language.PYTHON3 or self.type == Language.PYTHON:
                             template = 'time.sleep(5)' + "\n"
-                        elif self.type == Type.R:
+                        elif self.type == Language.R:
                             template = 'Sys.sleep(5)' + "\n"
                     template += template_file.read()
                     template_file.close()
                 else:
-                    if self.type == Type.BASH:
+                    if self.type == Language.BASH:
                         template = 'sleep 5'
-                    elif self.type == Type.PYTHON2:
+                    elif self.type == Language.PYTHON2:
                         template = 'time.sleep(5)' + "\n"
-                    elif self.type == Type.PYTHON3 or self.type == Type.PYTHON:
+                    elif self.type == Language.PYTHON3 or self.type == Language.PYTHON:
                         template = 'time.sleep(5)' + "\n"
-                    elif self.type == Type.R:
+                    elif self.type == Language.R:
                         template = 'Sys.sleep(5)'
                     else:
                         template = ''
             except Exception as e:
+                Log.warning(f'Failed to create the template script {self.file}: {str(e)}')
                 template = ''
 
-        if self.type == Type.BASH:
-            snippet = StatisticsSnippetBash
-        elif self.type == Type.PYTHON or self.type == Type.PYTHON3:
-            snippet = StatisticsSnippetPython("3")
-        elif self.type == Type.PYTHON2:
-            snippet = StatisticsSnippetPython("2")
-        elif self.type == Type.R:
-            snippet = StatisticsSnippetR
-        else:
-            raise Exception(f'Job type {self.type} not supported')
-        template_content = self._get_template_content(as_conf, snippet, template, parameters)
+        snippet = get_template_snippet(self.type)
+
+        template_content = self._get_paramiko_template(snippet, template, parameters)
         additional_content = self.update_content_extra(as_conf, self.additional_files)
-        return template_content,additional_content
+        return template_content, additional_content
 
-    def get_wrapped_content(self, as_conf, parameters):
-        snippet = StatisticsSnippetEmpty
-        template = f'python $SCRATCH/{self.name}/LOG_{self.name}/{self.expid}.cmd'
-        template_content = self._get_template_content(
-            as_conf, snippet, template, parameters)
-        return template_content
-
-    def _get_template_content(self, as_conf, snippet, template, parameters):
-        #communications_library = as_conf.get_communications_library()
-        # if communications_library == 'paramiko':
+    def get_wrapped_content(self, as_conf: AutosubmitConfig, parameters: dict):
+        snippet: 'TemplateSnippet' = get_template_snippet(Language.EMPTY)
+        template = f'python $SCRATCH/{self.expid}/LOG_{self.expid}/{self.name}.cmd'
         return self._get_paramiko_template(snippet, template, parameters)
-        # else:
-        #    raise AutosubmitCritical(
-        #        "Job {0} does not have a correct template// template not found".format(self.name), 7014)
 
-    def _get_paramiko_template(self, snippet, template, parameters):
+    def _get_paramiko_template(self, snippet: 'TemplateSnippet', template, parameters) -> str:
         current_platform = self._platform
         return ''.join([
-            snippet.as_header(
-                current_platform.get_header(self, parameters), self.executable),
-            template,
+            snippet.as_header(current_platform.get_header(self, parameters), self.executable),
+            snippet.as_body(template),
             snippet.as_tailer()
         ])
 
@@ -2349,7 +2324,7 @@ class Job(object):
             return False
 
     @staticmethod
-    def is_a_completed_retrial(fields):
+    def is_a_completed_retrial(fields: dict) -> bool:
         """
         Returns true only if there are 4 fields: submit start finish status, and status equals COMPLETED.
         """
@@ -2459,7 +2434,7 @@ class Job(object):
         return real_name
 
 
-    def create_wrapped_script(self, as_conf, wrapper_tag='wrapped'):
+    def create_wrapped_script(self, as_conf: AutosubmitConfig, wrapper_tag='wrapped') -> str:
         parameters = self.update_parameters(as_conf, set_attributes=False)
         template_content = self.get_wrapped_content(as_conf, parameters)
         for key, value in parameters.items():
@@ -2475,46 +2450,38 @@ class Job(object):
         os.chmod(os.path.join(self._tmp_path, script_name), 0o755)
         return script_name
 
-    def check_script(self, as_conf, show_logs="false"):
-        """
-        Checks if script is well-formed
+    def check_script(self, as_conf: AutosubmitConfig, show_logs="false") -> bool:
+        """Checks if the script is well-formed.
 
-        :param parameters: script parameters
-        :type parameters: dict
-        :param as_conf: configuration file
-        :type as_conf: AutosubmitConfig
-        :param show_logs: Display output
-        :type show_logs: Bool
-        :return: true if not problem has been detected, false otherwise
-        :rtype: bool
+        :param as_conf: Autosubmit configuration.
+        :param show_logs: Whether to display logs or not.
+        :return: Returns ``True`` if the script is well-formed, otherwise returns ``False``.
         """
-
-        out = False
         parameters = self.update_parameters(as_conf, set_attributes=False)
         template_content, additional_templates = self.update_content(as_conf, parameters)
-        if template_content is not False:
-            variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content,flags=re.IGNORECASE)
-            variables = [variable[1:-1] for variable in variables]
-            variables = [variable for variable in variables if variable not in as_conf.default_parameters]
-            for template in additional_templates:
-                variables_tmp = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template,flags=re.IGNORECASE)
-                variables_tmp = [variable[1:-1] for variable in variables_tmp]
-                variables_tmp = [variable for variable in variables_tmp if variable not in as_conf.default_parameters]
-                variables.extend(variables_tmp)
+        variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content,flags=re.IGNORECASE)
+        variables = [variable[1:-1] for variable in variables]
+        variables = [variable for variable in variables if variable not in as_conf.default_parameters]
+        for template in additional_templates:
+            variables_tmp = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template,flags=re.IGNORECASE)
+            variables_tmp = [variable[1:-1] for variable in variables_tmp]
+            variables_tmp = [variable for variable in variables_tmp if variable not in as_conf.default_parameters]
+            variables.extend(variables_tmp)
 
-            out = set(parameters).issuperset(set(variables))
-            # Check if the variables in the templates are defined in the configurations
-            if not out:
-                self.undefined_variables = set(variables) - set(parameters)
-                if str(show_logs).lower() != "false":
-                    Log.printlog(f"The following set of variables to be substituted in template script is not part of parameters set, and will be replaced by a blank value: {self.undefined_variables}", 5013)
-                    if not set(variables).issuperset(set(parameters)):
-                        Log.printlog(
-                            f"The following set of variables are not being used in the templates: {str(set(parameters) - set(variables))}", 5013)
+        out = set(parameters).issuperset(set(variables))
+        # Check if the variables in the templates are defined in the configurations
+        if not out:
+            self.undefined_variables = set(variables) - set(parameters)
+            if str(show_logs).lower() != "false":
+                Log.printlog("The following set of variables to be substituted in template script is not part "
+                             "of parameters set, and will be replaced by a blank value: {0}".format(
+                                self.undefined_variables), 5013)
+                if not set(variables).issuperset(set(parameters)):
+                    Log.printlog(f"The following set of variables are not being used in the templates: {str(set(parameters) - set(variables))}", 5013)
 
         return out
 
-    def update_local_logs(self, count=-1, update_submit_time=True):
+    def update_local_logs(self, count: int = -1, update_submit_time: bool = True) -> None:
         if update_submit_time:
             self.submit_time_timestamp = date2str(datetime.datetime.now(), 'S')
         if count > 0:
@@ -2524,11 +2491,12 @@ class Job(object):
             self.local_logs = (f"{self.name}.{self.submit_time_timestamp}.out",
                                f"{self.name}.{self.submit_time_timestamp}.err")
 
-    def write_submit_time(self):
+    def write_submit_time(self) -> None:
+        """Writes submit date and time to the ``TOTAL_STATS`` file.
+
+        It doesn't write if hold is True.
         """
-        Writes submit date and time to TOTAL_STATS file. It doesn't write if hold is True.
-        """
-        data_time = ["",int(datetime.datetime.strptime(self.submit_time_timestamp, "%Y%m%d%H%M%S").timestamp())]
+        data_time = ["", int(datetime.datetime.strptime(self.submit_time_timestamp, "%Y%m%d%H%M%S").timestamp())]
         path = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
         if os.path.exists(path):
             with open(path, 'a') as f:
@@ -2982,13 +2950,9 @@ class WrapperJob(Job):
                 os.chmod(log_dir, 0o770)
             open(multiple_checker_inner_jobs, 'w+').write(command)
             os.chmod(multiple_checker_inner_jobs, 0o770)
-            if self.platform.name != "local":  # already "sent"...
-                self._platform.send_file(multiple_checker_inner_jobs, False)
-                command = (f"cd {self._platform.get_files_path()}; "
-                           f"{os.path.join(self._platform.get_files_path(), 'inner_jobs_checker.sh')}")
-            else:
-                command = f"cd {self._platform.get_files_path()}; ./inner_jobs_checker.sh; cd {os.getcwd()}"
-            #
+            self._platform.send_file(multiple_checker_inner_jobs, False)
+            command = (f"cd {self._platform.get_files_path()}; "
+                       f"{os.path.join(self._platform.get_files_path(), 'inner_jobs_checker.sh')}")
             wait = 2
             retries = 5
             over_wallclock = False
@@ -3080,13 +3044,8 @@ class WrapperJob(Job):
         If not on these status and it is a vertical wrapper it will set the fail_count to the number of retrials.
         """
         try:
-            if self.platform_name == "local":
-                # Check if the job is still running to avoid a misleading message in the logs
-                if self.platform.get_pscall(self.id):
-                    self._platform.send_command(self._platform.cancel_cmd + " " + str(self.id))
-            else:
-                Log.warning(f"Wrapper {self.name} failed, cancelling it")
-                self._platform.send_command(self._platform.cancel_cmd + " " + str(self.id))
+            Log.warning(f"Wrapper {self.name} failed, cancelling it")
+            self._platform.send_command(self._platform.cancel_cmd + " " + str(self.id))
         except Exception as e:
             Log.info(f'Job with {self.id} was finished before canceling it: {str(e)}')
         self._check_running_jobs()

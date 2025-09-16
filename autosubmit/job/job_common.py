@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import datetime
-import textwrap
 
 
 class Status:
@@ -75,7 +74,6 @@ class bcolors:
     SUSPENDED = '\033[31;1m'
     CODE_TO_COLOR = {-3: SUSPENDED, -2: UNKNOWN, -1: FAILED, 0: WAITING, 1: READY,
                      2: SUBMITTED, 3: QUEUING, 4: RUNNING, 5: COMPLETED, 6: HELD, 7: PREPARED, 8: SKIPPED, 9: DELAYED}
-
 
 class Type:
     """
@@ -365,7 +363,6 @@ def parse_output_number(string_number):
             number = 0.0
             pass
     return number
-
 
 def increase_wallclock_by_chunk(current, increase, chunk):
     """

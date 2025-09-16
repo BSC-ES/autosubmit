@@ -1,0 +1,6 @@
+JOBS:
+  ONE:
+      SCRIPT: 'sleep 0'
+  TWO:
+      SCRIPT: 'sleep 0'
+      DEPENDENCIES: One
