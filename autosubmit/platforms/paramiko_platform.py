@@ -30,7 +30,7 @@ from contextlib import suppress
 from pathlib import Path
 from threading import Thread
 from time import sleep
-from typing import Optional, Union, TYPE_CHECKING
+from typing import Optional, Union, TYPE_CHECKING, List
 
 import Xlib.support.connect as xlib_connect
 import paramiko
