@@ -50,7 +50,7 @@ dependencies = [
     "networkx<=3.2.1",
     "portalocker<=3.2.0",
     "paramiko>=3.5.0",
-    "pyparsing==3.2.3",
+    "pyparsing==3.2.4",
     "matplotlib<=3.9.4",
     "typing_extensions==4.*",
     "psutil<=7.0.0",
@@ -84,7 +84,7 @@ tests = [
     "pytest>=8.2,<8.5",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.12.12",
+    "ruff==0.13.0",
     "pytest-xdist",
     "testcontainers"
 ]
