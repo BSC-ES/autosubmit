@@ -1594,6 +1594,11 @@ class AutosubmitConfig(object):
                     continue
                 if platform_name == "":
                     platform_name = self.get_platform().upper()
+                if platform_name == 'LOCAL':
+                    raise AutosubmitCritical(
+                        'The LOCAL platform does not support wrappers. '
+                        f'Please use another platform for your jobs: {str(jobs_in_wrapper)}.')
+
                 if not self.is_valid_jobs_in_wrapper(wrapper_values):
                     self.wrong_config["WRAPPERS"] += [[wrapper_name,
                                                        "JOBS_IN_WRAPPER contains non-defined jobs.  parameter is invalid"]]

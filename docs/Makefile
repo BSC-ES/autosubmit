@@ -67,6 +67,9 @@ as_setup: .EXPORT_ALL_VARIABLES
 	@echo "Autosubmit installed!"
 	autosubmit -lc DEBUG expid -dm -H "local" -d "Tutorial"
 	@echo "Autosubmit Experiment Created!"
+	@echo "Autosubmit Adding a New Platform!"
+	cat platform.yml >> $(AUTOSUBMIT_DIRECTORY)/autosubmit/a000/conf/platforms_a000.yml
+	@echo "Autosubmit Platform Created!"
 
 
 # Automatically call Autosubmit's setup target.

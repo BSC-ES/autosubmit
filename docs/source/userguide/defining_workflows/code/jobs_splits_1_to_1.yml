@@ -3,7 +3,7 @@ JOBS:
     SCRIPT: 'sleep 0'
     RUNNING: chunk
     SPLITS: 1
-    WALLCLOCK: 00:30
+    WALLCLOCK: 00:01
 
   TEST2:
     SCRIPT: 'sleep 0'
@@ -14,4 +14,4 @@ JOBS:
             SPLITS_TO: '[1:auto]*\1'
     RUNNING: chunk
     SPLITS: 1
-    WALLCLOCK: 00:30
+    WALLCLOCK: 00:01

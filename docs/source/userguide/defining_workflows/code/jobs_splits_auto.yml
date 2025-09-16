@@ -19,7 +19,7 @@ JOBS:
       SPLITS: '1'
     PLATFORM: 'local'
     RUNNING: chunk
-    WALLCLOCK: 00:05
+    WALLCLOCK: 00:01
   DN:
     DEPENDENCIES:
       APP_ENERGY_ONSHORE-1:
@@ -32,7 +32,7 @@ JOBS:
     PLATFORM: 'local'
     RUNNING: chunk
     SPLITS: auto
-    WALLCLOCK: 00:05
+    WALLCLOCK: 00:01
   OPA:
     CHECK: on_submission
     SCRIPT: 'sleep 0'
@@ -58,7 +58,7 @@ JOBS:
       SPLITS: '[auto, auto]'
     PLATFORM: 'local'
     RUNNING: chunk
-    WALLCLOCK: 00:05
+    WALLCLOCK: 00:01
 RUN:
   APP_NAMES:
   - ENERGY_ONSHORE
