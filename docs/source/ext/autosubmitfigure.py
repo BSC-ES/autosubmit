@@ -62,6 +62,8 @@ class AutosubmitFigureDirective(SphinxDirective):
 
         command: str = ' '.join([
             'autosubmit',
+            '-lc',
+            'DEBUG',
             self.options.get('command'),
             self.options.get('expid'),
             '--hide',
