@@ -488,10 +488,10 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
-                'MAX_WALLCLOCK': '48:00',
+                'HOST': '127.0.0.1',
+                'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
-                'QUEUE': 'debug',
+                'QUEUE': 'gp_debug',
                 'SCRATCH_DIR': '/tmp/scratch/',
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
@@ -572,7 +572,7 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
                 'NOTIFY_ON': 'FAILED',
             },
             'DA': {
-                'SCRIPT': 'echo "0"',
+                'SCRIPT': 'sleep 0',
                 'DEPENDENCIES': {
                     'SIM': {},
                     'LOCAL_SEND_INITIAL_DA': {
@@ -606,10 +606,10 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
-                'MAX_WALLCLOCK': '48:00',
+                'HOST': '127.0.0.1',
+                'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
-                'QUEUE': 'debug',
+                'QUEUE': 'gp_debug',
                 'SCRATCH_DIR': '/tmp/scratch/',
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
@@ -630,11 +630,11 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
     'Complex Wrapper vertical-horizontal',
     'Complex Wrapper horizontal-vertical',
 ])
-def test_run_all_wrappers_workflow_slurm_complex(autosubmit_exp: AutosubmitExperimentFixture, experiment_data):
+def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubmit_exp: 'AutosubmitExperimentFixture',
+                                                 slurm_server: 'DockerContainer'):
     """Runs a simple Bash script using Slurm."""
-
     exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, wrapper=True)
-    _create_slurm_platform(exp.as_conf)
+    _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.as_conf.experiment_data = {
         'EXPERIMENT': {
@@ -649,4 +649,4 @@ def test_run_all_wrappers_workflow_slurm_complex(autosubmit_exp: AutosubmitExper
     }
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
-    assert 0 == exp.autosubmit.run_experiment(_EXPID)
+    assert 0 == exp.autosubmit.run_experiment(exp.expid)
