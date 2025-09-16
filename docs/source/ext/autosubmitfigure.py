@@ -186,10 +186,11 @@ def _move_latest_image(experiment_plot_path: Path, target_path: Path, figure_nam
     :param target_path: Path where we will move the latest image produced with the ``runcmd`` directive to.
     :param figure_name: The name of the image used in our documentation.
     """
-    latest_image = max([png for png in experiment_plot_path.glob('*.png')], key=lambda f: f.stat().st_ctime)
-    if not latest_image:
+    images = [png for png in experiment_plot_path.glob('*.png')]
+    if not images:
         logger.warning(f'Could not find latest image in {experiment_plot_path}')
         return
+    latest_image = max([png for png in experiment_plot_path.glob('*.png')], key=lambda f: f.stat().st_ctime)
     if figure_name.startswith('/'):
         figure_name = figure_name[1:]
     path_to = target_path / figure_name
