@@ -28,6 +28,7 @@ import pwd
 import sqlite3
 from pathlib import Path
 from textwrap import dedent
+from typing import TYPE_CHECKING, Any, Callable
 
 import pytest
 from threading import Thread

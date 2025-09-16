@@ -40,7 +40,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_utils import SubJob, SubJobManager
 from autosubmit.job.job_utils import calendar_chunk_section
-from autosubmit.job.job_utils import get_job_package_code, SubJob, SubJobManager
+from autosubmit.job.job_utils import  SubJob, SubJobManager
 from autosubmit.job.template import Language
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.locplatform import LocalPlatform
@@ -2129,6 +2129,7 @@ def test_checkpoint(job_language: Language):
     job.type = job_language
     assert job.checkpoint == job_language.checkpoint
 
+
 @pytest.mark.parametrize(
     'pid_found',
     [True, False]
@@ -2145,6 +2146,7 @@ def test_wrapper_job_cancel_failed_local_send_command_pid_not_found(pid_found, a
     wrapper_job.cancel_failed_wrapper_job()
 
     assert platform.send_command.called == pid_found
+
 
 @pytest.mark.parametrize(
     'wallclock,platform_name,expected_wallclock',

@@ -37,7 +37,7 @@ from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job import job_utils
-from autosubmit.job.job_common import StatisticsSnippetBash, StatisticsSnippetPython, StatisticsSnippetR, StatisticsSnippetEmpty ,  Status, Type, increase_wallclock_by_chunk
+from autosubmit.job.job_common import  Status, increase_wallclock_by_chunk
 from autosubmit.job.job_utils import get_split_size_unit, get_split_size
 from autosubmit.job.metrics_processor import UserMetricProcessor
 from autosubmit.job.template import get_template_snippet, Language
