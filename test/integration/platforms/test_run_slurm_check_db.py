@@ -33,6 +33,9 @@ from typing import TYPE_CHECKING, Any, Callable
 import pytest
 from threading import Thread
 from time import sleep
+
+from autosubmit.config.basicconfig import BasicConfig
+
 if TYPE_CHECKING:
     from testcontainers.core.container import DockerContainer
     from test.conftest import AutosubmitExperiment
