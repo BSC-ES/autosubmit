@@ -134,6 +134,7 @@ class Job(object):
         '_platform', '_queue', '_partition', 'retry_delay', '_section',
         '_wallclock', 'wchunkinc', '_tasks', '_nodes',
         '_threads', '_processors', '_memory', '_memory_per_task', '_chunk',
+        '_chunk_length', '_chunk_unit',
         '_member', 'date', 'date_split', '_splits', '_split', '_delay',
         '_frequency', '_synchronize', 'skippable', 'repacked', '_long_name',
         'date_format', 'type', '_name',
@@ -208,6 +209,8 @@ class Job(object):
         self._memory = None
         self._memory_per_task = None
         self._chunk = None
+        self._chunk_length = None
+        self._chunk_unit = None
         self._member = None
         self.date = None
         self.date_split = None
@@ -493,6 +496,26 @@ class Job(object):
     @chunk.setter
     def chunk(self, value):
         self._chunk = value
+
+    @property
+    @autosubmit_parameter(name='chunk_length')
+    def chunk_length(self):
+        """Length of the chunk."""
+        return self._chunk_length
+
+    @chunk_length.setter
+    def chunk_length(self, value):
+        self._chunk_length = value
+    
+    @property
+    @autosubmit_parameter(name='chunk_unit')
+    def chunk_unit(self):
+        """Unit of the chunk."""
+        return self._chunk_unit
+    
+    @chunk_unit.setter
+    def chunk_unit(self, value):
+        self._chunk_unit = value
 
     @property
     @autosubmit_parameter(name='split')
@@ -2083,14 +2106,14 @@ class Job(object):
 
             parameters['CHUNK'] = chunk
             total_chunk = int(parameters.get('EXPERIMENT.NUMCHUNKS', 1))
-            chunk_length = int(parameters.get('EXPERIMENT.CHUNKSIZE', 1))
-            chunk_unit = str(parameters.get('EXPERIMENT.CHUNKSIZEUNIT', "day")).lower()
+            self.chunk_length = int(parameters.get('EXPERIMENT.CHUNKSIZE', 1))
+            self.chunk_unit = str(parameters.get('EXPERIMENT.CHUNKSIZEUNIT', "day")).lower()
             cal = str(parameters.get('EXPERIMENT.CALENDAR', "")).lower()
             chunk_start = chunk_start_date(
-                self.date, chunk, chunk_length, chunk_unit, cal)
+                self.date, chunk, self.chunk_length, self.chunk_unit, cal)
             chunk_end = chunk_end_date(
-                chunk_start, chunk_length, chunk_unit, cal)
-            if chunk_unit == 'hour':
+                chunk_start, self.chunk_length, self.chunk_unit, cal)
+            if self.chunk_unit == 'hour':
                 chunk_end_1 = chunk_end
             else:
                 chunk_end_1 = previous_day(chunk_end, cal)
@@ -2709,7 +2732,6 @@ class Job(object):
                 else:  # Default to last mod time
                     self.ready_date = datetime.datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
                     Log.debug(f"Failed to recover ready date for the job {self.name}")
-
 
 class WrapperJob(Job):
     """Defines a wrapper from a package.
