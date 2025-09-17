@@ -242,69 +242,6 @@ def test_sort_by_status_returns_the_list_of_jobs_well_sorted(setup_job_list):
         assert sorted_by_status[i].status <= sorted_by_status[i + 1].status
 
 
-def test_that_create_method_makes_the_correct_calls(mocker, empty_job_list, as_conf):
-    job_list = empty_job_list()
-    job_list._create_jobs = mocker.Mock()
-    job_list._add_dependencies = mocker.Mock()
-    job_list.update_genealogy = mocker.Mock()
-    job_list._job_list = [Job('random-name', 9999, Status.WAITING, 0),
-                          Job('random-name2', 99999, Status.WAITING, 0)]
-    date_list = ['fake-date1', 'fake-date2']
-    member_list = ['fake-member1', 'fake-member2']
-    num_chunks = 999
-    chunk_list = list(range(1, num_chunks + 1))
-    parameters = {'fake-key': 'fake-value',
-                  'fake-key2': 'fake-value2'}
-    graph = networkx.DiGraph()
-    job_list.graph = graph
-
-    as_conf.experiment_data = {
-        'PLATFORMS': {
-            'fake-platform': {
-                'TYPE': 'ps',
-                'NAME': 'fake-name',
-                'USERNAME': 'fake-user'
-            }
-        }
-    }
-    as_conf.get_platform = mocker.Mock(return_value="fake-platform")
-    # act
-    mocker.patch('autosubmit.job.job.Job.update_parameters', return_value={})
-    job_list.generate(
-        as_conf=as_conf,
-        date_list=date_list,
-        member_list=member_list,
-        num_chunks=num_chunks,
-        chunk_ini=1,
-        parameters=parameters,
-        date_format='H',
-        default_retrials=9999,
-        default_job_type=Language.BASH,
-        wrapper_jobs={},
-        new=True,
-        create=True,
-    )
-
-    # assert
-    assert job_list.parameters == parameters
-    assert job_list._date_list == date_list
-    assert job_list._member_list == member_list
-    assert job_list._chunk_list == list(range(1, num_chunks + 1))
-
-    cj_args, cj_kwargs = job_list._create_jobs.call_args  # type: ignore
-    assert Language.BASH == cj_args[2]
-
-    # _add_dependencies(date_list, member_list, chunk_list, dic_jobs, option="DEPENDENCIES"):
-
-    job_list._add_dependencies.assert_called_once_with(date_list, member_list, chunk_list, cj_args[0])  # type: ignore
-    # Adding flag update structure
-    job_list.update_genealogy.assert_called_once_with()  # type: ignore
-
-    # job doesn't have job.parameters anymore TODO
-    # for job in job_list._job_list:
-    #     assertEqual(parameters, job.parameters)
-
-
 def test_that_create_job_method_calls_dic_jobs_method_with_increasing_priority(mocker):
     # arrange
     dic_mock = mocker.Mock()

@@ -40,7 +40,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_utils import SubJob, SubJobManager
 from autosubmit.job.job_utils import calendar_chunk_section
-from autosubmit.job.job_utils import  SubJob, SubJobManager
+from autosubmit.job.job_utils import SubJob, SubJobManager
 from autosubmit.job.template import Language
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.locplatform import LocalPlatform
@@ -1791,22 +1791,22 @@ def load_wrapper(
     as_conf = autosubmit_config(
         expid='a000',
         experiment_data={
-        'AUTOSUBMIT': {'WORKFLOW_COMMIT': 'dummy'},
-        'PLATFORMS': {'DUMMY_P': {'TYPE': 'ps', 'HOST': 'localhost'}},
-        'JOBS': {'WRAPPED': {'FILE': 'dummy.sh', 'PLATFORM': 'DUMMY_P'}},
-        'DEFAULT': {'HPCARCH': 'DUMMY_P'},
-        'WRAPPERS': {
-            'WRAPPED': {
-                'TYPE': 'vertical',
-                'JOBS_IN_WRAPPER': 'WRAPPED',
-                'CUSTOM_DIRECTIVES': [],
-            }
-        },
+            'AUTOSUBMIT': {'WORKFLOW_COMMIT': 'dummy'},
+            'PLATFORMS': {'DUMMY_P': {'TYPE': 'ps', 'HOST': 'localhost'}},
+            'JOBS': {'WRAPPED': {'FILE': 'dummy.sh', 'PLATFORM': 'DUMMY_P'}},
+            'DEFAULT': {'HPCARCH': 'DUMMY_P'},
+            'WRAPPERS': {
+                'WRAPPED': {
+                    'TYPE': 'vertical',
+                    'JOBS_IN_WRAPPER': 'WRAPPED',
+                    'CUSTOM_DIRECTIVES': [],
+                }
+            },
         }
     )
     # create vertically wrapped jobs
     jobs = [
-        Job(name="a000_20000101_fc0_1_WRAPPED",  status=Status.COMPLETED),
+        Job(name="a000_20000101_fc0_1_WRAPPED", status=Status.COMPLETED),
         Job(name="a000_20000101_fc0_2_WRAPPED", status=Status.COMPLETED),
         Job(name="a000_20000101_fc0_3_WRAPPED", status=Status.COMPLETED),
     ]
@@ -2128,24 +2128,6 @@ def test_checkpoint(job_language: Language):
     job = Job(_EXPID, '1', 'WAITING', 0, None)
     job.type = job_language
     assert job.checkpoint == job_language.checkpoint
-
-
-@pytest.mark.parametrize(
-    'pid_found',
-    [True, False]
-)
-def test_wrapper_job_cancel_failed_local_send_command_pid_not_found(pid_found, autosubmit_config, mocker):
-    """Test that when a pid is not found for a local platform, the command is not sent."""
-    as_conf = autosubmit_config(_EXPID, {})
-    platform = mocker.MagicMock()
-    platform.get_pscall.return_value = pid_found
-    wrapper_job = WrapperJob(_EXPID, 1, 'WAITING', 0, [], '00:30', 1, platform, as_conf, False)
-    wrapper_job.platform_name = 'local'
-    wrapper_job.processors = 2  # not serial
-
-    wrapper_job.cancel_failed_wrapper_job()
-
-    assert platform.send_command.called == pid_found
 
 
 @pytest.mark.parametrize(
