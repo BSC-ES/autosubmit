@@ -1080,8 +1080,8 @@ class Platform(object):
             try:
                 from autosubmit.job.job import Job
                 job = Job(loaded_data=self.recovery_queue.get(timeout=1), log_process=True)
-                if job.local_logs[0]:
-                    Log.debug(f"{identifier} (Retry) Job '{job.name}' has no local log file name")
+                if not job.local_logs[0]:
+                    Log.debug(f"{identifier} Job '{job.name}_{job.fail_count}' has no local log file name")
                     job.update_local_logs(update_submit_time=False)
                 job.platform_name = self.name  # Change the original platform to this process platform.
                 job.platform = self

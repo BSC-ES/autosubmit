@@ -1248,18 +1248,19 @@ class Job(object):
 
     def retrieve_external_retrials_logfiles(self):
         log_recovered = False
-        self.remote_logs = self.get_new_remotelog_name()
-        if not self.remote_logs:
-            self.log_recovered = False
-        else:
-            if self.check_remote_log_exists():
-                try:
+        try:
+            self.remote_logs = self.get_new_remotelog_name()
+            if not self.remote_logs:
+                self.log_recovered = False
+            else:
+                if self.check_remote_log_exists():
                     self.synchronize_logs(self.platform, self.remote_logs, self.local_logs)
                     remote_logs = copy.deepcopy(self.local_logs)
                     self.platform.get_logs_files(self.expid, remote_logs)
                     log_recovered = True
-                except BaseException:
-                    log_recovered = False
+        except BaseException as e:
+            log_recovered = False
+
         return log_recovered
 
     def retrieve_internal_retrials_logfiles(self) -> Tuple[int, bool]:
