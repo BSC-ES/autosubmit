@@ -33,23 +33,6 @@ if TYPE_CHECKING:
 
 
 class LocalPlatform(ParamikoPlatform):
-    """
-    Class to manage jobs to localhost
-
-    :param expid: experiment's identifier
-    :type expid: str
-    """
-
-    def submit_Script(self, hold=False):
-        pass
-
-    def parse_Alljobs_output(self, output, job_id):
-        pass
-
-    def parse_queue_reason(self, output, job_id):
-        pass
-
-class LocalPlatform(ParamikoPlatform):
     """Class to manage jobs to localhost."""
 
     def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
@@ -196,7 +179,8 @@ class LocalPlatform(ParamikoPlatform):
         try:
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError:
-            Log.error(f'Could not send file {os.path.join(self.tmp_path, filename)} to {os.path.join(self.tmp_path, f"LOG_{self.expid}", filename)}')
+            Log.error(
+                f'Could not send file {os.path.join(self.tmp_path, filename)} to {os.path.join(self.tmp_path, f"LOG_{self.expid}", filename)}')
             raise
         return True
 
@@ -268,9 +252,9 @@ class LocalPlatform(ParamikoPlatform):
 
     def delete_file(self, filename, del_cmd=False):
         if del_cmd:
-            command = f'{self.del_cmd} {os.path.join(self.tmp_path, "LOG_"+self.expid, filename)}'
+            command = f'{self.del_cmd} {os.path.join(self.tmp_path, "LOG_" + self.expid, filename)}'
         else:
-            command = f'{self.del_cmd} {os.path.join(self.tmp_path, "LOG_"+self.expid, filename)}'
+            command = f'{self.del_cmd} {os.path.join(self.tmp_path, "LOG_" + self.expid, filename)}'
             command += f' ; {self.del_cmd} {os.path.join(self.tmp_path, filename)}'
         try:
             subprocess.check_call(command, shell=True)
