@@ -2749,7 +2749,7 @@ class AutosubmitConfig(object):
          """
         wrapper = self.experiment_data.get("WRAPPERS", {})
 
-        return wrapper.get("CHECK_TIME_WRAPPER", self.get_safetysleeptime())
+        return wrapper.get("CHECK_TIME_WRAPPER", 0)
 
     def get_wrapper_machinefiles(self, wrapper=None) -> str:
         """Returns the strategy for creating the machinefiles in wrapper jobs.

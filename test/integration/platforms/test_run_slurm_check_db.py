@@ -78,6 +78,9 @@ def as_exp(autosubmit_exp, tmp_path: Path) -> Any:
             'WORKFLOW_COMMIT': 'dummy_commit',
             'LOCAL_ROOT_DIR': str(tmp_path)  # Override root dir to tmp_path
         },
+        'CONFIG': {
+            "SAFETYSLEEPTIME": 0,
+        },
         'PLATFORMS': {
             'TEST_SLURM': {
                 'TYPE': 'slurm',
@@ -505,7 +508,7 @@ wrappers:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal-vertical
 
-"""), (2 + 1) * 1, "COMPLETED", "horizontal-vertical"),
+"""), 2 * 1, "COMPLETED", "horizontal-vertical"),
 
     # wrappers H-V
     (dedent("""\
@@ -528,7 +531,7 @@ wrappers:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal-vertical
 
-"""), (2) * 2, "FAILED", "horizontal-vertical"),
+"""), 2 * 3, "FAILED", "horizontal-vertical"),
 
     # wrappers V-H
     (dedent("""\
@@ -551,7 +554,7 @@ wrappers:
         JOBS_IN_WRAPPER: job
         TYPE: vertical-horizontal
 
-"""), (2 + 1) * 1, "COMPLETED", "vertical-horizontal"),
+"""), 2 * 1, "COMPLETED", "vertical-horizontal"),
 
 # wrappers V-H
     (dedent("""\
@@ -574,7 +577,7 @@ wrappers:
         JOBS_IN_WRAPPER: job
         TYPE: vertical-horizontal
 
-"""), 2 * 2, "FAILED", "vertical-horizontal"),
+"""), 2 * 3, "FAILED", "vertical-horizontal"),
 
     # wrappers H
     (dedent("""\
@@ -619,7 +622,7 @@ wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal
-"""), 2 * 2, "FAILED", "horizontal"),
+"""), 2 * 3, "FAILED", "horizontal"),
 
 ], ids=["Success", "Success with wrapper (vertical_wrapper)", "Failure", "Failure with wrapper (vertical_wrapper)",
         "Success with wrapper (horizontal-vertical)", "Failure with wrapper (horizontal-vertical)",
@@ -712,6 +715,7 @@ def test_run_uninterrupted(
         wrapper2:
             JOBS_IN_WRAPPER: job2
             TYPE: vertical
+
     """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
 
     # Failure
@@ -746,7 +750,9 @@ def test_run_uninterrupted(
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
+
     """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
+
     # wrappers H-V
     (dedent("""\
 EXPERIMENT:
@@ -761,12 +767,13 @@ JOBS:
         DEPENDENCIES: job-1
         RUNNING: chunk
         wallclock: 00:10
-        retrials: 2
+        PROCESSORS: 1
 wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal-vertical
-"""), (2 + 1) * 1, "COMPLETED", "horizontal-vertical"),
+
+"""), 2 * 1, "COMPLETED", "horizontal-vertical"),
 
     # wrappers H-V
     (dedent("""\
@@ -783,11 +790,13 @@ JOBS:
         RUNNING: chunk
         wallclock: 00:10
         retrials: 2
+        PROCESSORS: 1
 wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal-vertical
-"""), (2 + 1) * 1, "FAILED", "horizontal-vertical"),
+
+"""), 2 * 3, "FAILED", "horizontal-vertical"),
 
     # wrappers V-H
     (dedent("""\
@@ -804,11 +813,13 @@ JOBS:
         RUNNING: chunk
         wallclock: 00:10
         retrials: 2
+        PROCESSORS: 1
 wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: vertical-horizontal
-"""), (2 + 1) * 1, "COMPLETED", "vertical-horizontal"),
+
+"""), 2 * 1, "COMPLETED", "vertical-horizontal"),
 
     # wrappers V-H
     (dedent("""\
@@ -825,11 +836,13 @@ JOBS:
         RUNNING: chunk
         wallclock: 00:10
         retrials: 2
+        PROCESSORS: 1
 wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: vertical-horizontal
-"""), (2 + 1) * 1, "FAILED", "vertical-horizontal"),
+
+"""), 2 * 3, "FAILED", "vertical-horizontal"),
 
     # wrappers H
     (dedent("""\
@@ -845,12 +858,14 @@ JOBS:
         DEPENDENCIES: job-1
         RUNNING: chunk
         wallclock: 00:10
-        retrials: 2
+        PROCESSORS: 1
+
 wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal
-"""), (2 + 1) * 1, "COMPLETED", "horizontal"),
+
+"""), 2, "COMPLETED", "horizontal"),
 
     # wrappers H
     (dedent("""\
@@ -862,6 +877,7 @@ JOBS:
         SCRIPT: |
             sleep 2
             f_echo "Hello World"
+        PROCESSORS: 1
         PLATFORM: TEST_SLURM
         DEPENDENCIES: job-1
         RUNNING: chunk
@@ -871,7 +887,8 @@ wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal
-"""), (2 + 1) * 1, "FAILED", "horizontal"),
+"""), 2 * 3, "FAILED", "horizontal"),
+
 ], ids=["Success", "Success with wrapper (vertical_wrapper)", "Failure", "Failure with wrapper (vertical_wrapper)",
         "Success with wrapper (horizontal-vertical)", "Failure with wrapper (horizontal-vertical)",
         "Success with wrapper (vertical-horizontal)", "Failure with wrapper (vertical-horizontal)",
