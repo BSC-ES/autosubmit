@@ -67,8 +67,10 @@ class PsPlatform(ParamikoPlatform):
         self.put_cmd = "scp"
         self.get_cmd = "scp"
         self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
-        self.remove_checker = "rm -rf " + os.path.join(self.scratch, self.project_dir, self.user, "ps_permission_checker_azxbyc")
-        self.mkdir_checker = "mkdir -p " + os.path.join(self.scratch, self.project_dir, self.user, "ps_permission_checker_azxbyc")
+        self.remove_checker = "rm -rf " + os.path.join(self.scratch, self.project_dir, self.user,
+                                                       "ps_permission_checker_azxbyc")
+        self.mkdir_checker = "mkdir -p " + os.path.join(self.scratch, self.project_dir, self.user,
+                                                        "ps_permission_checker_azxbyc")
 
     def get_checkhost_cmd(self):
         return self._checkhost_cmd

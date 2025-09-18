@@ -206,16 +206,16 @@ class JobPackageBase(object):
             raise
         except BaseException:
             raise
-        try:
-            if not only_generate:
-                Log.debug("Sending Files")
-                self._send_files()
-                Log.debug("Submitting")
-                self._do_submission(hold=hold)
-        except AutosubmitCritical:
-            raise
-        except BaseException as e:
-            raise AutosubmitCritical(f"Error while submitting jobs: {e}", 7013)
+        # try:
+        if not only_generate:
+            Log.debug("Sending Files")
+            self._send_files()
+            Log.debug("Submitting")
+            self._do_submission(hold=hold)
+        # except AutosubmitCritical:
+        #     raise
+        # except BaseException as e:
+        #     raise AutosubmitCritical(f"Error while submitting jobs: {e}", 7013)
 
     def _create_scripts(self, configuration: 'AutosubmitConfig'):
         raise Exception('Not implemented')
@@ -389,7 +389,7 @@ class JobPackageArray(JobPackageBase):
 
         if package_id is None or not package_id:  # platforms with a submit.cmd
             return
-          
+
         for i in range(0, len(self.jobs)):  # platforms without a submit.cmd
             LLog.info(f"{self.jobs[i].name} submitted")
             self.jobs[i].id = str(package_id) + f'[{i}]'

@@ -230,7 +230,7 @@ class SlurmPlatform(ParamikoPlatform):
                                 retries = retries - 1
                             if not can_continue:
                                 package.jobs[0].platform.send_command(
-                                    package.jobs[0].platform.cancel_cmd+f" {current_package_id}")
+                                    package.jobs[0].platform.cancel_cmd + f" {current_package_id}")
                                 jobid_index += 1
                                 continue
                             if not self.hold_job(package.jobs[0]):

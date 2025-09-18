@@ -285,7 +285,7 @@ class JobList(object):
                     self._ordered_jobs_by_date_member[wrapper_section] = {}
             except BaseException as e:
                 raise AutosubmitCritical(f"Some section jobs of the wrapper:{wrapper_section} are missing from your "
-                    "JOBS definition in YAML", 7014, str(e))
+                                         "JOBS definition in YAML", 7014, str(e))
         # divide job_list per platform name
         job_list_per_platform = self.split_by_platform()
         submitter = ParamikoSubmitter(as_conf=as_conf)
@@ -918,7 +918,7 @@ class JobList(object):
             self.jobs_edges["ALL"] = set()
         self.jobs_edges["ALL"].add(job)
 
-    def add_special_conditions(self, job, special_conditions, filters_to_apply, parent):
+    def add_special_conditions(self, job: Job, special_conditions: dict, filters_to_apply: dict, parent: Job) -> None:
         """
         Add special conditions to the job edge
         :param job: Job
@@ -936,7 +936,7 @@ class JobList(object):
             self._add_edges_map_info(job, special_conditions["STATUS"])  # job_list map
             job.add_edge_info(parent, special_conditions)  # this job
 
-    def _apply_jobs_edge_info(self, job, dependencies):
+    def _apply_jobs_edge_info(self, job: Job, dependencies: dict) -> None:
         # prune first
         job.edge_info = {}
         # get dependency that has special conditions set
@@ -972,7 +972,7 @@ class JobList(object):
                 self.add_special_conditions(job, special_conditions,
                                             filters_to_apply_by_section[key], parent)
 
-    def find_current_section(self, job_section, section, dic_jobs, distance, visited_section=[]):
+    def find_current_section(self, job_section, section, dic_jobs, distance, visited_section):
         sections = dic_jobs.as_conf.jobs_data[section].get("DEPENDENCIES", {}).keys()
         if len(sections) == 0:
             return distance
@@ -1433,7 +1433,6 @@ class JobList(object):
 
         return problematic_dependencies
 
-
     @staticmethod
     def _calculate_dependency_metadata(chunk, chunk_list, member, member_list, date,
                                        date_list, dependency):
@@ -1626,7 +1625,7 @@ class JobList(object):
                         jobs_to_sort = sorted(jobs_to_sort, key=lambda k: (
                             k.name.split('_')[1], (k.name.split('_')[2]), (int(k.name.split('_')[3])
                                                                            if len(
-                                k.name.split('_')) == 5 else num_chunks + 1)))
+                            k.name.split('_')) == 5 else num_chunks + 1)))
 
                         # Bringing back original job if identified
                         for idx in range(0, len(jobs_to_sort)):
@@ -1912,8 +1911,8 @@ class JobList(object):
         """
         unsubmitted = [job for job in self._job_list if (platform is None or
                                                          job.platform.name == platform.name) and (
-                                   job.status != Status.SUBMITTED and
-                                   job.status != Status.QUEUING and job.status != Status.RUNNING)]
+                               job.status != Status.SUBMITTED and
+                               job.status != Status.QUEUING and job.status != Status.RUNNING)]
 
         if wrapper:
             return [job for job in unsubmitted if job.packed is False]
@@ -2061,9 +2060,9 @@ class JobList(object):
                                                                re.search(
                                                                    "(^|[^0-9a-z_])" + str(job.chunk) + "([^a-z0-9_]|$)",
                                                                    section_chunks) is not None) and (
-                                              section_members == "" or
-                                              re.search("(^|[^0-9a-z_])" + str(job.member) + "([^a-z0-9_]|$)",
-                                                        section_members.lower()) is not None)]
+                                          section_members == "" or
+                                          re.search("(^|[^0-9a-z_])" + str(job.member) + "([^a-z0-9_]|$)",
+                                                    section_members.lower()) is not None)]
                 ultimate_jobs_list.extend(jobs_final)
         # Duplicates out
         ultimate_jobs_list = list(set(ultimate_jobs_list))
@@ -3022,7 +3021,8 @@ class JobList(object):
             self.update_genealogy()
         del self._dic_jobs
 
-    def print_with_status(self, status_change: Optional[dict[Any, Any]] = None, nocolor=False, existing_list=None) -> str:
+    def print_with_status(self, status_change: Optional[dict[Any, Any]] = None, nocolor=False,
+                          existing_list=None) -> str:
         """
         Returns the string representation of the dependency tree of the Job List
 
@@ -3040,7 +3040,7 @@ class JobList(object):
         all_jobs = self.get_all() if existing_list is None else existing_list
         # Header
         result = (bcolors.BOLD if nocolor is False else '') + \
-            "## String representation of Job List [" + str(len(all_jobs)) + "] "
+                 "## String representation of Job List [" + str(len(all_jobs)) + "] "
         if status_change is not None and len(str(status_change)) > 0:
             result += ("with " + (bcolors.OKGREEN if nocolor is False else '') +
                        str(len(list(status_change.keys()))) + " Change(s) ##" +

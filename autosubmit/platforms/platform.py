@@ -39,6 +39,7 @@ from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.job.job_packages import JobPackageBase
+    from autosubmit.job.job import Job
     from autosubmit.job.job_list import JobList
     from autosubmit.job.job_package_persistence import JobPackagePersistence
 
@@ -203,7 +204,7 @@ class Platform:
         if not self.two_factor_auth:
             self.pw = None
         elif auth_password is not None and self.two_factor_auth:
-            if type(auth_password) is list:
+            if isinstance(auth_password, list):
                 self.pw = auth_password[0]
             else:
                 self.pw = auth_password
@@ -742,7 +743,7 @@ class Platform:
         if self.check_file_exists(filename):
             self.delete_file(filename)
 
-    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3):
+    def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3):
         return True
 
     def get_stat_file(self, job, count=-1):
@@ -777,7 +778,7 @@ class Platform:
             path = Path(self.remote_log_dir)
         return str(path)
 
-    def submit_job(self, job, script_name, hold=False, export="none"):
+    def submit_job(self, job: 'Job', script_name: str, hold: bool = False, export: str = "none"):
         """Submit a job from a given job object.
 
         :param job: job object
@@ -793,11 +794,12 @@ class Platform:
         """
         raise NotImplementedError
 
-    def check_all_jobs(self, job_list, as_conf, retries=5):
+    def check_all_jobs(self, job_list: list['Job'], as_conf:'AutosubmitConfig', retries: int = 5):
         for job, job_prev_status in job_list:
             self.check_job(job)
 
-    def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
+    def check_job(self, job: 'Job', default_status: str = Status.COMPLETED, retries:int = 5,
+                  submit_hold_check: bool = False, is_wrapper: bool = False):
         """Checks job running status.
 
         :param is_wrapper:
@@ -856,7 +858,6 @@ class Platform:
         # type: () -> None
         """ Opens Submit script file """
         raise NotImplementedError
-
 
     def submit_script(self, hold: bool = False) -> Union[list[str], str]:
         """
