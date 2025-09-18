@@ -120,6 +120,29 @@ class LocalPlatform(ParamikoPlatform):
     def get_checkjob_cmd(self, job_id):
         return self.get_pscall(job_id)
 
+    def write_jobid(self, jobid: str, complete_path: str) -> None:
+        try:
+            lang = locale.getlocale()[1]
+            if lang is None:
+                lang = locale.getdefaultlocale()[1]
+                if lang is None:
+                    lang = 'UTF-8'
+            title_job = b"[INFO] JOBID=" + str(jobid).encode(lang)
+            if os.path.exists(complete_path):
+                file_type = complete_path[-3:]
+                if file_type == "out" or file_type == "err":
+                    with open(complete_path, "rb+") as f:
+                        # Reading into memory (Potentially slow)
+                        first_line = f.readline()
+                        # Not rewrite
+                        if not first_line.startswith(b'[INFO] JOBID='):
+                            content = f.read()
+                            f.seek(0, 0)
+                            f.write(title_job + b"\n\n" + first_line + content)
+                        f.close()
+        except Exception as exc:
+            Log.error("Writing Job Id Failed : " + str(exc))
+
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """
         Establishes an SSH connection to the host.
@@ -312,21 +335,10 @@ class LocalPlatform(ParamikoPlatform):
     def get_ssh_output_err(self):
         return self._ssh_output_err
 
-    def get_logs_files(self, exp_id, remote_logs):
+    def get_logs_files(self, exp_id: str, remote_logs: tuple[str, str]) -> None:
         """
-        Overriding the parent's implementation.
         Do nothing because the log files are already in the local platform (redundancy).
-
-        :param exp_id: experiment id
-        :type exp_id: str
-        :param remote_logs: names of the log files
-        :type remote_logs: (str, str)
         """
-        (job_out_filename, job_err_filename) = remote_logs
-        if self.compress_remote_logs:
-            full_dir = Path(self.tmp_path).joinpath(f"LOG_{self.expid}")
-            self.compress_file(str(full_dir.joinpath(job_out_filename)))
-            self.compress_file(str(full_dir.joinpath(job_err_filename)))
         return
 
     def check_completed_files(self, sections: str = None) -> str:
@@ -386,9 +398,11 @@ class LocalPlatform(ParamikoPlatform):
             else:
                 output = log_utils.compress_gzip(file_path, keep_input=False)
 
-            # TODO: Keep the file name
-            # Path(output).rename(file_path)
+            # Keep the file name
+            Path(output).rename(file_path)
 
             Log.debug(f"File {file_path} compressed")
         except Exception as exc:
             Log.error(f"Error compressing file {file_path}: {exc}")
+
+        return file_path
