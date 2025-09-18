@@ -2518,6 +2518,13 @@ class JobList(object):
         """
 
         for name, jobs in list(self.packages_dict.items()):
+            # Corner case, "wrapper" setting added while jobs are in ready/waiting state as a single job (horizontal wrapper)
+            if all(job.status in [Status.READY, Status.WAITING] for job in jobs):
+                self.packages_dict.pop(name, None)
+                wrapper_id = jobs[0].id
+                if wrapper_id:
+                    self.job_package_map.pop(int(wrapper_id), None)
+                continue
             new_jobs = []
             wrapper_id = int(jobs[0].id)
             for job in (job for job in jobs):

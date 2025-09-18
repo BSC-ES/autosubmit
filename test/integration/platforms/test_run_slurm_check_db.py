@@ -499,7 +499,6 @@ JOBS:
         DEPENDENCIES: job-1
         RUNNING: chunk
         wallclock: 00:10
-        retrials: 2
         PROCESSORS: 1
 wrappers:
     wrapper:
@@ -529,7 +528,7 @@ wrappers:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal-vertical
 
-"""), (2 + 1) * 1, "FAILED", "horizontal-vertical"),
+"""), (2) * 2, "FAILED", "horizontal-vertical"),
 
     # wrappers V-H
     (dedent("""\
@@ -575,7 +574,7 @@ wrappers:
         JOBS_IN_WRAPPER: job
         TYPE: vertical-horizontal
 
-"""), (2 + 1) * 1, "FAILED", "vertical-horizontal"),
+"""), 2 * 2, "FAILED", "vertical-horizontal"),
 
     # wrappers H
     (dedent("""\
@@ -591,7 +590,6 @@ JOBS:
         DEPENDENCIES: job-1
         RUNNING: chunk
         wallclock: 00:10
-        retrials: 2
         PROCESSORS: 1
 
 wrappers:
@@ -599,7 +597,7 @@ wrappers:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal
 
-"""), (2 + 1) * 1, "COMPLETED", "horizontal"),
+"""), 2, "COMPLETED", "horizontal"),
 
     # wrappers H
     (dedent("""\
@@ -621,7 +619,7 @@ wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal
-"""), (2 + 1) * 1, "FAILED", "horizontal"),
+"""), 2 * 2, "FAILED", "horizontal"),
 
 ], ids=["Success", "Success with wrapper (vertical_wrapper)", "Failure", "Failure with wrapper (vertical_wrapper)",
         "Success with wrapper (horizontal-vertical)", "Failure with wrapper (horizontal-vertical)",
@@ -749,136 +747,135 @@ def test_run_uninterrupted(
             JOBS_IN_WRAPPER: job
             TYPE: vertical
     """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
-#     # wrappers H-V
-#     (dedent("""\
-# EXPERIMENT:
-#     NUMCHUNKS: '2'
-#     MEMBERS: fc0 fc1
-# JOBS:
-#     job:
-#         SCRIPT: |
-#             sleep 2
-#             echo "Hello World"
-#         PLATFORM: TEST_SLURM
-#         DEPENDENCIES: job-1
-#         RUNNING: chunk
-#         wallclock: 00:10
-#         retrials: 2
-# wrappers:
-#     wrapper:
-#         JOBS_IN_WRAPPER: job
-#         TYPE: horizontal-vertical
-# """), (2 + 1) * 1, "COMPLETED", "horizontal-vertical"),
-#
-#     # wrappers H-V
-#     (dedent("""\
-# EXPERIMENT:
-#     NUMCHUNKS: '2'
-#     MEMBERS: fc0 fc1
-# JOBS:
-#     job:
-#         SCRIPT: |
-#             sleep 2
-#             f_echo "Hello World with id=FAILED + wrappers"
-#         PLATFORM: TEST_SLURM
-#         DEPENDENCIES: job-1
-#         RUNNING: chunk
-#         wallclock: 00:10
-#         retrials: 2
-# wrappers:
-#     wrapper:
-#         JOBS_IN_WRAPPER: job
-#         TYPE: horizontal-vertical
-# """), (2 + 1) * 1, "FAILED", "horizontal-vertical"),
-#
-#     # wrappers V-H
-#     (dedent("""\
-# EXPERIMENT:
-#     NUMCHUNKS: '2'
-#     MEMBERS: fc0 fc1
-# JOBS:
-#     job:
-#         SCRIPT: |
-#             sleep 2
-#             echo "Hello World"
-#         PLATFORM: TEST_SLURM
-#         DEPENDENCIES: job-1
-#         RUNNING: chunk
-#         wallclock: 00:10
-#         retrials: 2
-# wrappers:
-#     wrapper:
-#         JOBS_IN_WRAPPER: job
-#         TYPE: vertical-horizontal
-# """), (2 + 1) * 1, "COMPLETED", "vertical-horizontal"),
-#
-#     # wrappers V-H
-#     (dedent("""\
-# EXPERIMENT:
-#     NUMCHUNKS: '2'
-#     MEMBERS: fc0 fc1
-# JOBS:
-#     job:
-#         SCRIPT: |
-#             sleep 2
-#             d_echo "Hello World"
-#         PLATFORM: TEST_SLURM
-#         DEPENDENCIES: job-1
-#         RUNNING: chunk
-#         wallclock: 00:10
-#         retrials: 2
-# wrappers:
-#     wrapper:
-#         JOBS_IN_WRAPPER: job
-#         TYPE: vertical-horizontal
-# """), (2 + 1) * 1, "FAILED", "vertical-horizontal"),
-#
-#     # wrappers H
-#     (dedent("""\
-# EXPERIMENT:
-#     NUMCHUNKS: '1'
-#     MEMBERS: fc0 fc1
-# JOBS:
-#     job:
-#         SCRIPT: |
-#             sleep 2
-#             echo "Hello World"
-#         PLATFORM: TEST_SLURM
-#         DEPENDENCIES: job-1
-#         RUNNING: chunk
-#         wallclock: 00:10
-#         retrials: 2
-# wrappers:
-#     wrapper:
-#         JOBS_IN_WRAPPER: job
-#         TYPE: horizontal
-# """), (2 + 1) * 1, "COMPLETED", "horizontal"),
-#
-#     # wrappers H
-#     (dedent("""\
-# EXPERIMENT:
-#     NUMCHUNKS: '1'
-#     MEMBERS: fc0 fc1
-# JOBS:
-#     job:
-#         SCRIPT: |
-#             sleep 2
-#             f_echo "Hello World"
-#         PLATFORM: TEST_SLURM
-#         DEPENDENCIES: job-1
-#         RUNNING: chunk
-#         wallclock: 00:10
-#         retrials: 2
-# wrappers:
-#     wrapper:
-#         JOBS_IN_WRAPPER: job
-#         TYPE: horizontal
-# """), (2 + 1) * 1, "FAILED", "horizontal"),
- ] , ids=["Success", "Success with wrapper (vertical_wrapper)", "Failure", "Failure with wrapper (vertical_wrapper)"]
-# ], ids=["Success", "Success with wrapper (vertical_wrapper)", "Failure", "Failure with wrapper (vertical_wrapper)",
-#         "Success with wrapper (horizontal-vertical)", "Failure with wrapper (horizontal-vertical)",
-#         "Success with wrapper (vertical-horizontal)", "Failure with wrapper (vertical-horizontal)",
-#         "Success with wrapper (horizontal)", "Failure with wrapper (horizontal)"])
+    # wrappers H-V
+    (dedent("""\
+EXPERIMENT:
+    NUMCHUNKS: '2'
+    MEMBERS: fc0 fc1
+JOBS:
+    job:
+        SCRIPT: |
+            sleep 2
+            echo "Hello World"
+        PLATFORM: TEST_SLURM
+        DEPENDENCIES: job-1
+        RUNNING: chunk
+        wallclock: 00:10
+        retrials: 2
+wrappers:
+    wrapper:
+        JOBS_IN_WRAPPER: job
+        TYPE: horizontal-vertical
+"""), (2 + 1) * 1, "COMPLETED", "horizontal-vertical"),
+
+    # wrappers H-V
+    (dedent("""\
+EXPERIMENT:
+    NUMCHUNKS: '2'
+    MEMBERS: fc0 fc1
+JOBS:
+    job:
+        SCRIPT: |
+            sleep 2
+            f_echo "Hello World with id=FAILED + wrappers"
+        PLATFORM: TEST_SLURM
+        DEPENDENCIES: job-1
+        RUNNING: chunk
+        wallclock: 00:10
+        retrials: 2
+wrappers:
+    wrapper:
+        JOBS_IN_WRAPPER: job
+        TYPE: horizontal-vertical
+"""), (2 + 1) * 1, "FAILED", "horizontal-vertical"),
+
+    # wrappers V-H
+    (dedent("""\
+EXPERIMENT:
+    NUMCHUNKS: '2'
+    MEMBERS: fc0 fc1
+JOBS:
+    job:
+        SCRIPT: |
+            sleep 2
+            echo "Hello World"
+        PLATFORM: TEST_SLURM
+        DEPENDENCIES: job-1
+        RUNNING: chunk
+        wallclock: 00:10
+        retrials: 2
+wrappers:
+    wrapper:
+        JOBS_IN_WRAPPER: job
+        TYPE: vertical-horizontal
+"""), (2 + 1) * 1, "COMPLETED", "vertical-horizontal"),
+
+    # wrappers V-H
+    (dedent("""\
+EXPERIMENT:
+    NUMCHUNKS: '2'
+    MEMBERS: fc0 fc1
+JOBS:
+    job:
+        SCRIPT: |
+            sleep 2
+            d_echo "Hello World"
+        PLATFORM: TEST_SLURM
+        DEPENDENCIES: job-1
+        RUNNING: chunk
+        wallclock: 00:10
+        retrials: 2
+wrappers:
+    wrapper:
+        JOBS_IN_WRAPPER: job
+        TYPE: vertical-horizontal
+"""), (2 + 1) * 1, "FAILED", "vertical-horizontal"),
+
+    # wrappers H
+    (dedent("""\
+EXPERIMENT:
+    NUMCHUNKS: '1'
+    MEMBERS: fc0 fc1
+JOBS:
+    job:
+        SCRIPT: |
+            sleep 2
+            echo "Hello World"
+        PLATFORM: TEST_SLURM
+        DEPENDENCIES: job-1
+        RUNNING: chunk
+        wallclock: 00:10
+        retrials: 2
+wrappers:
+    wrapper:
+        JOBS_IN_WRAPPER: job
+        TYPE: horizontal
+"""), (2 + 1) * 1, "COMPLETED", "horizontal"),
+
+    # wrappers H
+    (dedent("""\
+EXPERIMENT:
+    NUMCHUNKS: '1'
+    MEMBERS: fc0 fc1
+JOBS:
+    job:
+        SCRIPT: |
+            sleep 2
+            f_echo "Hello World"
+        PLATFORM: TEST_SLURM
+        DEPENDENCIES: job-1
+        RUNNING: chunk
+        wallclock: 00:10
+        retrials: 2
+wrappers:
+    wrapper:
+        JOBS_IN_WRAPPER: job
+        TYPE: horizontal
+"""), (2 + 1) * 1, "FAILED", "horizontal"),
+], ids=["Success", "Success with wrapper (vertical_wrapper)", "Failure", "Failure with wrapper (vertical_wrapper)",
+        "Success with wrapper (horizontal-vertical)", "Failure with wrapper (horizontal-vertical)",
+        "Success with wrapper (vertical-horizontal)", "Failure with wrapper (vertical-horizontal)",
+        "Success with wrapper (horizontal)", "Failure with wrapper (horizontal)"])
 def test_run_interrupted(
         jobs_data: str,
         expected_db_entries: int,
