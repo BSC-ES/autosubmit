@@ -35,9 +35,9 @@ class DbManager(object):
         if is_new:
             self._initialize_database()
     def backup(self):
-        pass
+        pass  # pragma: no cover
     def restore(self):
-        pass
+        pass  # pragma: no cover
 
     def disconnect(self):
         """
