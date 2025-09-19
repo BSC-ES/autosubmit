@@ -1,18 +1,17 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -24,11 +23,11 @@ from shutil import copy2
 import pytest
 
 import autosubmit.history.utils as HUtils
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.database_managers.experiment_history_db_manager import ExperimentHistoryDbManager
 from autosubmit.history.database_managers.experiment_status_db_manager import ExperimentStatusDbManager
-from autosubmit.config.basicconfig import BasicConfig
 
 EXPID_TT00_SOURCE = "test_database.db~"
 EXPID_TT01_SOURCE = "test_database_no_run.db~"
@@ -253,3 +252,14 @@ class TestExperimentHistoryDbManager:
     def test_if_database_exists(self):
         exp_manager = ExperimentHistoryDbManager("0000")
         assert exp_manager.my_database_exists() is False
+
+
+def test_create_path_if_not_exists(tmp_path):
+    new_path = tmp_path / 'new_dir'
+    assert not new_path.exists()
+    created = HUtils.create_path_if_not_exists(str(new_path))
+    assert created
+    assert new_path.exists()
+    created = HUtils.create_path_if_not_exists(str(new_path))
+    assert not created
+    assert new_path.exists()

@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 _SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
 _SSH_DOCKER_PASSWORD = 'password'
 
-_SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1'
+_SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1-dani'
 
 
 class MakeSSHClientFixture(Protocol):
@@ -184,24 +184,23 @@ def slurm_server(mocker, tmp_path: 'LocalPath', make_ssh_client: MakeSSHClientFi
 
     docker_args = {
         'cgroupns': 'host',
-        'privileged': True
+        'privileged': True,
+        'remove': True,
     }
 
     docker_container = DockerContainer(
             image=_SLURM_DOCKER_IMAGE,
-            remove=True,
             hostname='slurmctld',
-            name=container_name,
             **docker_args
     )
 
     # TODO: GH needs --volume /sys/fs/cgroup:/sys/fs/cgroup:rw
     if 'GITHUB_ACTION' in os.environ:
         docker_container = docker_container.with_volume_mapping('/sys/fs/cgroup', '/sys/fs/cgroup', mode='rw')
-
     with docker_container \
             .with_env('TZ', 'Etc/UTC') \
-            .with_bind_ports(2222, ssh_port) as container:
+            .with_bind_ports(2222, ssh_port) \
+            .with_name(container_name) as container:
         # TODO: or maybe wait for 'debug:  sched: Running job scheduler for full queue.'?
         wait_for_logs(container, 'No fed_mgr state file')
 

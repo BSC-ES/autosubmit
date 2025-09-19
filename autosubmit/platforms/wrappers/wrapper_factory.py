@@ -52,6 +52,7 @@ class WrapperFactory(object):
             kwargs['reservation'] = self.reservation(wrapper_data.reservation)
 
         kwargs["executable"] = wrapper_data.executable
+        kwargs["fail_count"] = wrapper_data.jobs[0].fail_count
 
         kwargs['header_directive'] = self.header_directives(**kwargs)
         wrapper_cmd = self.wrapper_director.construct(wrapper_builder(**kwargs))
@@ -308,5 +309,3 @@ class EcWrapperFactory(WrapperFactory):
 
     def dependency_directive(self, dependency):
         return '#PBS -v depend=afterok:{0}'.format(dependency)
-
-
