@@ -885,6 +885,10 @@ class Autosubmit:
     @staticmethod
     def _init_logs(args, console_level='INFO', log_level='DEBUG', expid='None'):
         Log.set_console_level(console_level)
+        exp_path = None
+        tmp_path = None
+        aslogs_path = None
+        as_conf = None
         owner = False
         if args.command != "configure":
             if not BasicConfig.CONFIG_FILE_FOUND:
@@ -955,6 +959,7 @@ class Autosubmit:
             else:
                 expids = expid.split(" ")
             expids = [x.strip() for x in expids]
+
             for expid in expids:
                 exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
                 tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -981,46 +986,8 @@ class Autosubmit:
                 # delete is treated differently
                 owner, eadmin, current_owner = Autosubmit._check_ownership_and_set_last_command(as_conf, expid,
                                                                                                 args.command)
-            if not os.path.exists(tmp_path):
-                os.mkdir(tmp_path)
-            if not os.path.exists(aslogs_path):
-                os.mkdir(aslogs_path)
-            if args.command == "stop":
-                exp_id = "_".join(expids)
-                Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                          args.command + exp_id + '.log'), "out", log_level)
-                Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                          args.command + exp_id + '_err.log'), "err")
-            else:
-                if owner:
-                    os.chmod(tmp_path, 0o775)
-                    with suppress(PermissionError, FileNotFoundError, Exception):  # for -txt option
-                        os.chmod(f'{exp_path}/status', 0o775)
 
-                    Log.set_file(os.path.join(aslogs_path, args.command + '.log'), "out", log_level)
-                    Log.set_file(os.path.join(aslogs_path, args.command + '_err.log'), "err")
-                    if args.command in ["run"]:
-                        if os.path.exists(os.path.join(aslogs_path, 'jobs_active_status.log')):
-                            os.remove(os.path.join(aslogs_path, 'jobs_active_status.log'))
-                        if os.path.exists(os.path.join(aslogs_path, 'jobs_failed_status.log')):
-                            os.remove(os.path.join(aslogs_path, 'jobs_failed_status.log'))
-                            Log.set_file(os.path.join(aslogs_path, 'jobs_active_status.log'), "status")
-                            Log.set_file(os.path.join(aslogs_path, 'jobs_failed_status.log'), "status_failed")
-                else:
-                    st = os.stat(tmp_path)
-                    oct_perm = str(oct(st.st_mode))[-3:]
-                    if int(oct_perm[1]) in [6, 7] or int(oct_perm[2]) in [6, 7]:
-                        Log.set_file(os.path.join(tmp_path, args.command + '.log'), "out", log_level)
-                        Log.set_file(os.path.join(tmp_path, args.command + '_err.log'), "err")
-                    else:
-                        Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                                  args.command + expid + '.log'), "out", log_level)
-                        Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                                  args.command + expid + '_err.log'), "err")
-                        Log.printlog(f"Permissions of {tmp_path} are {oct_perm}. The log is being written in the "
-                                     f"{BasicConfig.GLOBAL_LOG_DIR} path instead of {oct_perm}. "
-                                     f"Please tell to the owner to fix the permissions")
-            Log.file_path = tmp_path
+            Autosubmit._setup_log_files(args.command, expids, expid, owner, tmp_path, aslogs_path, exp_path, log_level, console_level)
             if owner:
                 if "update_version" in args:
                     force_update_version = args.update_version
@@ -1078,6 +1045,78 @@ class Autosubmit:
             Autosubmit._check_folders(expid, as_conf)
         Log.info(
             "Autosubmit is running with {0}", Autosubmit.autosubmit_version)
+
+    @staticmethod
+    def _setup_log_files(
+            command: str,
+            expids: list[str],
+            expid: str,
+            owner: bool,
+            tmp_path: str,
+            aslogs_path: str,
+            exp_path: str,
+            log_level: str,
+            console_level: str = 'DEBUG'
+    ) -> None:
+        """
+        Set up log files and permissions for the given command and experiment.
+
+        :param command: Name of the command being executed.
+        :type command: str
+        :param expids: List of experiment IDs.
+        :type expids: list[str]
+        :param expid: Experiment ID.
+        :type expid: str
+        :param owner: Whether the current user is the owner.
+        :type owner: bool
+        :param tmp_path: Path to the temporary directory.
+        :type tmp_path: str
+        :param aslogs_path: Path to the autosubmit logs directory.
+        :type aslogs_path: str
+        :param exp_path: Path to the experiment directory.
+        :type exp_path: str
+        :param log_level: Log level for file output.
+        :type log_level: str
+        """
+        Log.set_console_level(console_level)
+        Path(tmp_path).mkdir(mode=0o775, exist_ok=True)
+        Path(aslogs_path).mkdir(mode=0o775, exist_ok=True)
+        if command == "stop":
+            exp_id = "_".join(expids)
+            Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
+                                      command + exp_id + '.log'), "out", log_level)
+            Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
+                                      command + exp_id + '_err.log'), "err")
+        else:
+            if owner:
+                os.chmod(tmp_path, 0o775)
+                with suppress(PermissionError, FileNotFoundError, Exception):
+                    os.chmod(f'{exp_path}/status', 0o775)
+                Log.set_file(os.path.join(aslogs_path, command + '.log'), "out", log_level)
+                Log.set_file(os.path.join(aslogs_path, command + '_err.log'), "err")
+                if command == "run":
+                    if os.path.exists(os.path.join(aslogs_path, 'jobs_active_status.log')):
+                        os.remove(os.path.join(aslogs_path, 'jobs_active_status.log'))
+                    if os.path.exists(os.path.join(aslogs_path, 'jobs_failed_status.log')):
+                        os.remove(os.path.join(aslogs_path, 'jobs_failed_status.log'))
+                        Log.set_file(os.path.join(aslogs_path, 'jobs_active_status.log'), "status")
+                        Log.set_file(os.path.join(aslogs_path, 'jobs_failed_status.log'), "status_failed")
+            else:
+                st = os.stat(tmp_path)
+                oct_perm = str(oct(st.st_mode))[-3:]
+                if int(oct_perm[1]) in [6, 7] or int(oct_perm[2]) in [6, 7]:
+                    Log.set_file(os.path.join(tmp_path, command + '.log'), "out", log_level)
+                    Log.set_file(os.path.join(tmp_path, command + '_err.log'), "err")
+                else:
+                    Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
+                                              args.command + expid + '.log'), "out", log_level)
+                    Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
+                                              args.command + expid + '_err.log'), "err")
+                    Log.printlog(f"Permissions of {tmp_path} are {oct_perm}. The log is being written in the "
+                                 f"{BasicConfig.GLOBAL_LOG_DIR} path instead of {oct_perm}. "
+                                 f"Please tell to the owner to fix the permissions")
+        Log.file_path = tmp_path
+
 
     @staticmethod
     def _check_ownership_and_set_last_command(as_conf, expid, command):

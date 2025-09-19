@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 _SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
 _SSH_DOCKER_PASSWORD = 'password'
 
-_SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1'
+_SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1-dani'
 
 
 class MakeSSHClientFixture(Protocol):
@@ -184,12 +184,12 @@ def slurm_server(mocker, tmp_path: 'LocalPath', make_ssh_client: MakeSSHClientFi
 
     docker_args = {
         'cgroupns': 'host',
-        'privileged': True
+        'privileged': True,
+        'remove': True,
     }
 
     docker_container = DockerContainer(
             image=_SLURM_DOCKER_IMAGE,
-            remove=True,
             hostname='slurmctld',
             **docker_args
     )
