@@ -1248,7 +1248,13 @@ class Job(object):
             err_exist = False
         return out_exist or err_exist
 
-    def _retrieve_logfiles(self):
+    def _sync_retrieve_logfiles(self):
+        """
+        Synchronizes the log files.
+        It prepares the log files to be retrieved by writing the jobid to them
+        and compressing them if enabled. Then, it retrieves the log files
+        from the platform.
+        """
         self.synchronize_logs(self.platform, self.remote_logs, self.local_logs)
         remote_logs = copy.deepcopy(self.local_logs)
 
@@ -1272,6 +1278,7 @@ class Job(object):
             if self.platform.compress_remote_logs:
                 self.platform.compress_file(str(log_full_path))
 
+        # Retrieve remote logs
         self.platform.get_logs_files(self.expid, remote_logs)
 
 
@@ -1283,7 +1290,7 @@ class Job(object):
         else:
             if self.check_remote_log_exists():
                 try:
-                    self._retrieve_logfiles()
+                    self._sync_retrieve_logfiles()
                     log_recovered = True
                 except BaseException:
                     log_recovered = False
@@ -1308,7 +1315,7 @@ class Job(object):
                 backup_log = copy.copy(self.remote_logs)
                 self.remote_logs = self.get_new_remotelog_name(i)
                 if self.check_remote_log_exists():
-                    self._retrieve_logfiles()
+                    self._sync_retrieve_logfiles()
                     log_recovered = True
                     last_retrial = i
                 else:
@@ -1376,27 +1383,6 @@ class Job(object):
                 Log.result(
                     f"{self.platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{self.fail_count}'.")
         self.log_recovered = log_recovered
-
-        # Compress in case remote log compression is enabled
-        # try:
-        #     if self.platform.compress_remote_logs:
-        #         Log.debug("Compressing remote logs in local")
-        #         for local_log in self.local_logs:
-        #             dir_path = os.path.join(self._tmp_path, "LOG_" + str(self.expid))
-        #             log_utils.compress_xz(
-        #                 os.path.join(dir_path, local_log),
-        #                 output_path=os.path.join(dir_path, local_log), # Same name due to further verification
-        #                 preset=9,
-        #                 extreme=True,
-        #                 keep_input=False
-        #             )
-        #     else:
-        #         Log.debug(
-        #             "Remote log compression is disabled, keeping uncompressed logs"
-        #         )
-        # except Exception as exc:
-        #     Log.warning("Failed to compress remote log. Keeping uncompressed logs.")
-        #     Log.debug(f"Exception: {exc}")
 
     def _max_possible_wallclock(self):
         if self.platform and self.platform.max_wallclock:
@@ -2688,7 +2674,9 @@ class Job(object):
                 return True
         return False
 
-    def synchronize_logs(self, platform: 'Platform', remote_logs, local_logs, last = True):            
+    def synchronize_logs(
+        self, platform: "Platform", remote_logs, local_logs, last=True
+    ):
         platform.move_file(remote_logs[0], local_logs[0], True)  # .out
         platform.move_file(remote_logs[1], local_logs[1], True)  # .err
         if last and local_logs[0] != "":
