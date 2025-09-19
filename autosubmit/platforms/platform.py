@@ -35,7 +35,6 @@ import setproctitle
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
-from autosubmit.context import get_current_context
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -235,12 +234,6 @@ class Platform(object):
             .get(self.name.upper(), {})
             .get("COMPRESS_REMOTE_LOGS", False)
         )
-        try:
-            context = get_current_context()
-            if context:
-                self.compress_remote_logs = context.compress_remote_logs
-        except Exception as exc:
-            Log.warning("Could not get configuration for context for remote log compression: {0}", exc)
         self.remote_logs_compress_type = (
             self.config.get("PLATFORMS", {})
             .get(self.name.upper(), {})

@@ -96,18 +96,3 @@ def test_autosubmit_compresslogs_option(autosubmit_exp, mocker, compression_type
         and any(f.name.endswith(f"_create.log.{extension}") for f in aslogs_files)
         and any(f.name.endswith(f"_create_err.log.{extension}") for f in aslogs_files)
     )
-
-
-def test_autosubmit_compresslogs_remote(autosubmit_exp, mocker):
-    exp = autosubmit_exp(_EXPID, experiment_data={})
-
-    cmd = [
-        "autosubmit",
-        "run",
-        "--compress_remote_logs",
-        _EXPID,
-    ]
-
-    mocker.patch("sys.argv", cmd)
-
-    main()
