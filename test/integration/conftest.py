@@ -25,7 +25,7 @@ from pathlib import Path
 from pwd import getpwnam
 from subprocess import check_output
 from tempfile import TemporaryDirectory
-from typing import Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING
+from typing import Generator, Union, Iterator, Optional, TYPE_CHECKING, Callable
 
 import paramiko
 import pytest
@@ -47,7 +47,7 @@ _SSH_DOCKER_PASSWORD = 'password'
 _SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1'
 
 
-class MakeSSHClientFixture(Protocol):
+class MakeSSHClientFixture():
     def __call__(
             self,
             ssh_port: int,
@@ -56,8 +56,8 @@ class MakeSSHClientFixture(Protocol):
         ...
 
 
-@pytest.fixture
-def make_ssh_client() -> MakeSSHClientFixture:
+pytest.fixture
+def make_ssh_client() -> Callable[[int, Optional[str]], paramiko.SSHClient]:
     """Creates the SSH client
 
     It modifies the list of arguments so that the port is always
@@ -69,7 +69,7 @@ def make_ssh_client() -> MakeSSHClientFixture:
     :return: A normal Paramiko SSH Client, but that used the Docker SSH port and password to connect.
     """
 
-    def _make_ssh_client(ssh_port: int, password: Optional[str], key: Union['Path', str]) -> paramiko.SSHClient:
+    def _make_ssh_client(ssh_port: int, password: Optional[str]) -> paramiko.SSHClient:
         ssh_client = _create_ssh_client()
 
         orig_ssh_client_connect = ssh_client.connect
@@ -92,9 +92,6 @@ def make_ssh_client() -> MakeSSHClientFixture:
                 # tuple to list, and then replace the port...
                 args = [x for x in args]
                 args[1] = ssh_port
-
-            if key is not None:
-                kwargs['key_filename'] = str(key)
 
             ssh_timeout = 180  # 3 minutes
             for timeout in ['banner_timeout', 'auth_timeout', 'channel_timeout']:
@@ -171,7 +168,7 @@ def ssh_server(mocker, tmp_path, make_ssh_client, request):
             .with_bind_ports(2222, ssh_port) as container:
         wait_for_logs(container, 'sshd is listening on port 2222')
 
-        ssh_client = make_ssh_client(ssh_port, _SSH_DOCKER_PASSWORD, None)
+        ssh_client = make_ssh_client(ssh_port, _SSH_DOCKER_PASSWORD)
         mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
 
         yield container
@@ -222,7 +219,7 @@ def slurm_server(mocker, tmp_path: 'LocalPath', make_ssh_client: MakeSSHClientFi
         )
         Path(ssh_key).chmod(0o600)
 
-        ssh_client = make_ssh_client(ssh_port, password=None, key=ssh_key)
+        ssh_client = make_ssh_client(ssh_port, password=None)
         mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
 
         # Pytest does NOT patch when using spawn context.
