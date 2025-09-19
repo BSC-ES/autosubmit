@@ -34,6 +34,7 @@ import pytest
 from threading import Thread
 from time import sleep
 
+from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 
 if TYPE_CHECKING:
@@ -636,9 +637,24 @@ def test_run_uninterrupted(
         wrapper_type,
         slurm_server: 'DockerContainer'
 ):
+
     as_conf = as_exp.as_conf
     log_dir = _init_run(as_exp, jobs_data)
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
+    tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+    aslogs_path = Path(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
 
+    as_exp.autosubmit._setup_log_files(
+        command="run",
+        expids=None,
+        expid=as_exp.expid,
+        owner=True,
+        tmp_path=tmp_path,
+        aslogs_path=aslogs_path,
+        exp_path=exp_path,
+        log_level="DEBUG",
+        console_level="DEBUG"
+    )
     # Run the experiment
     exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
     _assert_exit_code(final_status, exit_code)

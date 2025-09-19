@@ -237,6 +237,7 @@ class JobList(object):
         """
         Creates all jobs needed for the current workflow.
         """
+        Log.info("Generating the workflow...")
         self._initialize_workflow_parameters(
             as_conf, date_list, member_list, num_chunks, chunk_ini, parameters, date_format, default_retrials
         )
@@ -248,16 +249,19 @@ class JobList(object):
             changes = self._load_graph(full_load, load_failed_jobs=check_failed_jobs)
 
         if changes or not self.run_mode:
+            Log.info("Checking for new jobs...")
             self._create_and_add_jobs(show_log, default_job_type, date_list, member_list)
 
         if changes or new:
+            Log.info("Initializing new jobs...")
             self._initialize_new_jobs(changes, new)
 
         if changes or not self.run_mode:
-            self._save_workflow_state(wrapper_jobs, as_conf, full_load, new)
+            Log.info("Saving the workflow state...")
+            self._save_workflow_state(as_conf, full_load, new)
 
         if self.run_mode:
-            self.clear()
+            Log.info("Detecting changes in the workflow...")
             changes = self._load_graph(full_load, load_failed_jobs=check_failed_jobs)
             if changes:
                 raise AutosubmitCritical(
@@ -265,7 +269,7 @@ class JobList(object):
                     "Please recreate the workflow with the new changes.",
                     7015
                 )
-
+        Log.info("Workflow generation completed.")
     def clear(self) -> None:
         self.graph.clear()
         self.graph.clear_edges()
@@ -554,13 +558,17 @@ class JobList(object):
         return {child_name: self.graph.edges[job_name, child_name] for child_name in names}
 
     def _save_workflow_state(
-            self, wrapper_jobs: Dict[str, Any], as_conf: AutosubmitConfig, create: bool, new: bool
+            self, as_conf: AutosubmitConfig, create: bool, new: bool
     ) -> None:
+        Log.info("Saving jobs...")
         self.save_jobs()
+        Log.info("Saving edges...")
         self.save_edges()
+        Log.info("Saving sections...")
         self.save_sections()
         for job in self.job_list:
             self._assign_platforms(as_conf, job, create, new)
+        Log.info("Save completed.")
 
     def build_sections_data_to_store(self) -> List[Dict[str, Any]]:
         """
