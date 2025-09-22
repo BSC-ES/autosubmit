@@ -276,14 +276,13 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[s
                     "finish>=previous_submit": check_finish_previous_submit_retry,
                 }
 
-                db_check_job[i]["empty_fields"] = " ".join(
+                db_check_job[i]["empty_fields"] = "".join(
                     {
                         str(k): v
                         for k, v in row_dict.items()
                         if k not in excluded_keys and v == ""
                     }.keys()
                 )
-
                 previous_retry_row = row_dict
     _print_db_results(db_check_list, rows_as_dicts, run_tmpdir)
     return db_check_list
@@ -404,6 +403,18 @@ def _modify_jobs_data(as_exp, jobs_data) -> Path:
 
 
 # -- Tests
+worker_ids = [f"popen-gw{i}: {desc}" for i, desc in enumerate([
+    "Success",
+    "Success with wrapper (vertical_wrapper)",
+    "Failure",
+    "Failure with wrapper (vertical_wrapper)",
+    "Success with wrapper (horizontal-vertical)",
+    "Failure with wrapper (horizontal-vertical)",
+    "Success with wrapper (vertical-horizontal)",
+    "Failure with wrapper (vertical-horizontal)",
+    "Success with wrapper (horizontal)",
+    "Failure with wrapper (horizontal)"
+])]
 
 @pytest.mark.slurm
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
@@ -448,10 +459,13 @@ def _modify_jobs_data(as_exp, jobs_data) -> Path:
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
+            POLICY: strict
+    
         wrapper2:
             JOBS_IN_WRAPPER: job2
             TYPE: vertical
-            
+            POLICY: strict
+
     """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
 
     # Failure
@@ -486,6 +500,7 @@ def _modify_jobs_data(as_exp, jobs_data) -> Path:
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
+            POLICY: strict
 
     """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
 
@@ -508,8 +523,9 @@ wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal-vertical
+        POLICY: strict
 
-"""), 2 * 1, "COMPLETED", "horizontal-vertical"),
+"""), 4 * 1, "COMPLETED", "horizontal-vertical"),
 
     # wrappers H-V
     (dedent("""\
@@ -531,6 +547,7 @@ wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal-vertical
+        POLICY: strict
 
 """), 2 * 3, "FAILED", "horizontal-vertical"),
 
@@ -548,16 +565,16 @@ JOBS:
         DEPENDENCIES: job-1
         RUNNING: chunk
         wallclock: 00:10
-        retrials: 2
         PROCESSORS: 1
 wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: vertical-horizontal
+        POLICY: strict
 
-"""), 2 * 1, "COMPLETED", "vertical-horizontal"),
+"""), 4 * 1, "COMPLETED", "vertical-horizontal"),
 
-# wrappers V-H
+    # wrappers V-H
     (dedent("""\
 EXPERIMENT:
     NUMCHUNKS: '2'
@@ -577,6 +594,7 @@ wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: vertical-horizontal
+        POLICY: strict
 
 """), 2 * 3, "FAILED", "vertical-horizontal"),
 
@@ -595,12 +613,11 @@ JOBS:
         RUNNING: chunk
         wallclock: 00:10
         PROCESSORS: 1
-
 wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal
-
+        POLICY: STRICT
 """), 2, "COMPLETED", "horizontal"),
 
     # wrappers H
@@ -623,8 +640,9 @@ wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal
-"""), 2 * 3, "FAILED", "horizontal"),
+        POLICY: STRICT
 
+"""), 2 * 3, "FAILED", "horizontal"),
 ], ids=["Success", "Success with wrapper (vertical_wrapper)", "Failure", "Failure with wrapper (vertical_wrapper)",
         "Success with wrapper (horizontal-vertical)", "Failure with wrapper (horizontal-vertical)",
         "Success with wrapper (vertical-horizontal)", "Failure with wrapper (vertical-horizontal)",
@@ -637,7 +655,6 @@ def test_run_uninterrupted(
         wrapper_type,
         slurm_server: 'DockerContainer'
 ):
-
     as_conf = as_exp.as_conf
     log_dir = _init_run(as_exp, jobs_data)
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
@@ -728,9 +745,11 @@ def test_run_uninterrupted(
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
+            POLICY: STRICT
         wrapper2:
             JOBS_IN_WRAPPER: job2
             TYPE: vertical
+            POLICY: STRICT
 
     """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
 
@@ -762,10 +781,11 @@ def test_run_uninterrupted(
             RUNNING: chunk
             wallclock: 00:10
             retrials: 2
-    wrappers:
-        wrapper:
-            JOBS_IN_WRAPPER: job
-            TYPE: vertical
+wrappers:
+    wrapper:
+        JOBS_IN_WRAPPER: job
+        TYPE: vertical
+        POLICY: STRICT
 
     """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
 
@@ -788,6 +808,7 @@ wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal-vertical
+        POLICY: STRICT
 
 """), 2 * 1, "COMPLETED", "horizontal-vertical"),
 
@@ -811,6 +832,7 @@ wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal-vertical
+        POLICY: STRICT
 
 """), 2 * 3, "FAILED", "horizontal-vertical"),
 
@@ -834,6 +856,7 @@ wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: vertical-horizontal
+        POLICY: STRICT
 
 """), 2 * 1, "COMPLETED", "vertical-horizontal"),
 
@@ -857,6 +880,7 @@ wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: vertical-horizontal
+        POLICY: STRICT
 
 """), 2 * 3, "FAILED", "vertical-horizontal"),
 
@@ -880,6 +904,7 @@ wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal
+        POLICY: STRICT
 
 """), 2, "COMPLETED", "horizontal"),
 
@@ -903,6 +928,7 @@ wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal
+        POLICY: STRICT
 """), 2 * 3, "FAILED", "horizontal"),
 
 ], ids=["Success", "Success with wrapper (vertical_wrapper)", "Failure", "Failure with wrapper (vertical_wrapper)",

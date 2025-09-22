@@ -705,6 +705,19 @@ class ParamikoPlatform(Platform):
         job_names = [Path(file).name.replace('_COMPLETED', '') for file in completed_files]
         return job_names
 
+    def delete_failed_and_completed_names(self, job_names: list[str]) -> None:
+        """
+        Deletes the COMPLETED and FAILED files for the given job names from the remote log directory.
+
+        :param job_names: List of job names whose COMPLETED and FAILED files should be deleted
+        :type job_names: List[str]
+        """
+        if self.expid in str(self.remote_log_dir): # Ensure we are in the right experiment
+            job_name_str = ' -o -name '.join([f"'{name}_COMPLETED' -o -name '{name}_FAILED'" for name in job_names])
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( -name {job_name_str} \\) -type f -delete"
+            self.send_command(cmd)
+
+
     def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
         """
         Checks job running status

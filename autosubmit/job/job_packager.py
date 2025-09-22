@@ -610,7 +610,6 @@ class JobPackager(object):
                 section_list = section.split(" ")
             wrapper_limits = self.calculate_wrapper_bounds(section_list)
             current_info = list()
-            built_packages_tmp = list()
             for param in self.wrapper_info:
                 current_info.append(param[self.current_wrapper_section])
             current_info.append(self._as_config)
@@ -621,8 +620,7 @@ class JobPackager(object):
                 built_packages_tmp = self._build_horizontal_packages(jobs, wrapper_limits, section,
                                                                      wrapper_info=current_info)
             elif self.wrapper_type[self.current_wrapper_section] in ['vertical-horizontal', 'horizontal-vertical']:
-                built_packages_tmp.append(
-                    self._build_hybrid_package(jobs, wrapper_limits, section, wrapper_info=current_info))
+                built_packages_tmp = [self._build_hybrid_package(jobs, wrapper_limits, section, wrapper_info=current_info)]
             else:
                 built_packages_tmp = self._build_vertical_packages(jobs, wrapper_limits, wrapper_info=current_info)
             self._propagate_inner_jobs_ready_date(built_packages_tmp)
@@ -830,7 +828,9 @@ class JobPackager(object):
                                                 self._platform.max_wallclock,
                                                 wrapper_info=self.wrapper_info).build_vertical_package(job,
                                                                                                        wrapper_info)
-            current_package.append(list(set(job_list)))
+            unique_elements = set()
+            current_package.append([ x for x in job_list if not (x in unique_elements or unique_elements.add(x))])
+            del unique_elements
 
         for job in current_package[-1]:
             total_wallclock = sum_str_hours(total_wallclock, job.wallclock)

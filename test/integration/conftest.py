@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 _SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
 _SSH_DOCKER_PASSWORD = 'password'
 
-_SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1-dani'
+_SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1'
 
 
 class MakeSSHClientFixture(Protocol):

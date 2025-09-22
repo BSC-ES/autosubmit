@@ -3061,9 +3061,8 @@ class WrapperJob(Job):
                              job.status == Status.READY or job.status == Status.SUBMITTED or job.status == Status.QUEUING]
         self.inner_jobs_running = list()
         for job in running_jobs:
-            if job.platform.check_file_exists('{0}_FAILED'.format(job.name), wrapper_failed=True, max_retries=2):
-                if job.platform.get_file('{0}_FAILED'.format(job.name), False, wrapper_failed=True):
-                    self._check_finished_job(job, True)
+            if job.platform.check_file_exists(f"{job.name}_FAILED", wrapper_failed=True, max_retries=2):
+                self._check_finished_job(job, True)
             else:
                 if job in real_running:
                     self.inner_jobs_running.append(job)
@@ -3084,11 +3083,13 @@ class WrapperJob(Job):
         for job in self.inner_jobs_running:
             job.status = Status.FAILED
         for job in self.job_list:
-            if job.status not in [Status.COMPLETED, Status.FAILED]:
-                job.status = Status.WAITING
-            else:
-                if job.wrapper_type == "vertical":  # job is being retrieved internally by the wrapper
+            if job.platform.check_file_exists('{0}_FAILED'.format(job.name), wrapper_failed=True, max_retries=2):
+                if job.wrapper_type == "vertical":
                     job.fail_count = job.retrials
+                else:
+                    job.status = Status.FAILED
+            else:
+                job.status = Status.WAITING
 
     def _is_over_wallclock(self, start_time: str, wallclock: str) -> bool:
         """This calculates if the job is over its wallclock time, which indicates that a jobs is running for too long.

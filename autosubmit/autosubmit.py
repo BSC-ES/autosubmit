@@ -2723,14 +2723,18 @@ class Autosubmit:
                 # Jobs that are being retrieved in batch. Right now, only available for slurm platforms.
 
                 if not inspect and len(valid_packages_to_submit) > 0:
+                    for p in valid_packages_to_submit:
+                        p.platform.delete_failed_and_completed_names([ job.name for job in p.jobs ])
                     job_list.save_jobs()
                 save_2 = False
                 if platform.type.lower() in ["slurm", "pjm"] and not inspect and not only_wrappers:
                     # Process the script generated in submit_ready_jobs
                     save_2, valid_packages_to_submit = platform.process_batch_ready_jobs(valid_packages_to_submit,
-                                                                                         failed_packages,
+                                                                                          failed_packages,
                                                                                          error_message="", hold=hold)
                     if not inspect and len(valid_packages_to_submit) > 0:
+                        for p in valid_packages_to_submit:
+                            p.platform.delete_failed_and_completed_names([job.name for job in p.jobs])
                         job_list.save_jobs()
                 # Save wrappers(jobs that has the same id) to be visualized and checked in other parts of the code
                 job_list.save_wrappers(valid_packages_to_submit, failed_packages, as_conf,
