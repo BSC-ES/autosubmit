@@ -87,3 +87,4 @@ def test_run_command(autosubmit_exp: Callable, autosubmit: Autosubmit, mocker, c
     mocker.patch('sys.argv', command)
     _, args = autosubmit.parse_args()
     autosubmit.run_command(args=args)
+    # autosubmit._init_logs(args, expid=_EXPIDS)

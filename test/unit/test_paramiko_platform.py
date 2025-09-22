@@ -66,7 +66,7 @@ def ps_platform(tmpdir):
         }
     }
     platform = PsPlatform(expid='a000', name='local-ps', config=config)
-    platform.host = '127.0.0.1'
+    platform.host = 'localDocker'
     platform.user = tmpdir.owner
     platform.root_dir = Path(tmpdir) / "remote"
     platform.root_dir.mkdir(parents=True, exist_ok=True)
