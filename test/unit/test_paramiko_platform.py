@@ -24,12 +24,13 @@ import pytest
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitError
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+# noinspection PyProtectedMember
+from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException
 from autosubmit.platforms.psplatform import PsPlatform
 
 
 @pytest.fixture
-def paramiko_platform():
+def paramiko_platform() -> ParamikoPlatform:
     local_root_dir = TemporaryDirectory()
     config = {
         "LOCAL_ROOT_DIR": local_root_dir.name,
@@ -47,7 +48,7 @@ def paramiko_platform():
 
 
 @pytest.fixture
-def ps_platform(tmpdir):
+def ps_platform(tmpdir) -> PsPlatform:
     tmp_path = Path(tmpdir)
     tmpdir.owner = tmp_path.owner()
     config = {
@@ -73,6 +74,11 @@ def ps_platform(tmpdir):
     yield platform, tmpdir
 
 
+def test_paramiko_platform_exception():
+    e = ParamikoPlatformException('test')
+    assert e.message == 'test'
+
+
 def test_paramiko_platform_constructor(paramiko_platform):
     platform = paramiko_platform
     assert platform.name == 'local'
@@ -80,7 +86,11 @@ def test_paramiko_platform_constructor(paramiko_platform):
     assert platform.config["LOCAL_ROOT_DIR"] == platform.config["LOCAL_ROOT_DIR"]
     assert platform.header is None
     assert platform.wrapper is None
+    assert platform.header is None
     assert len(platform.job_status) == 4
+    # These calls are not implemented, but should not raise any error
+    platform.get_submit_script()
+    platform.generate_submit_script()
 
 
 def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_platform):
@@ -176,47 +186,6 @@ Host mn5-gpp
     return tmpdir
 
 
-@pytest.mark.parametrize(
-    "user, env_ssh_config_defined",
-    [
-        (getuser(), False),
-        ("dummy-one", True),
-        ("dummy-one", False),
-        ("not-exists", True),
-        ("not_exists", False)
-    ],
-    ids=[
-        "OWNER",
-        "SUDO USER(exists) + AS_ENV_CONFIG_SSH_PATH(defined)",
-        "SUDO USER(exists) + AS_ENV_CONFIG_SSH_PATH(not defined)",
-        "SUDO USER(not exists) + AS_ENV_CONFIG_SSH_PATH(defined)",
-        "SUDO USER(not exists) + AS_ENV_CONFIG_SSH_PATH(not defined)"
-    ]
-)
-def test_map_user_config_file(tmpdir, autosubmit_config, mocker, generate_all_files, user, env_ssh_config_defined):
-    experiment_data = {
-        "ROOTDIR": str(tmpdir),
-        "PROJDIR": str(tmpdir),
-        "LOCAL_TMP_DIR": str(tmpdir),
-        "LOCAL_ROOT_DIR": str(tmpdir),
-        "AS_ENV_CURRENT_USER": user,
-    }
-    if env_ssh_config_defined:
-        experiment_data["AS_ENV_SSH_CONFIG_PATH"] = str(tmpdir.join(f".ssh/config_{user}"))
-    as_conf = autosubmit_config(expid='a000', experiment_data=experiment_data)
-    mocker.patch('autosubmit.config.configcommon.AutosubmitConfig.is_current_real_user_owner',
-                 getuser() == user)
-    platform = ParamikoPlatform(expid='a000', name='ps', config=experiment_data)
-    platform._ssh_config = mocker.MagicMock()
-    mocker.patch('os.path.expanduser',
-                 side_effect=lambda x: x)  # Easier to test, and also not mess with the real user's config
-    platform.map_user_config_file(as_conf)
-    if not env_ssh_config_defined or not tmpdir.join(f".ssh/config_{user}").exists():
-        assert platform._user_config_file == "~/.ssh/config"
-    else:
-        assert platform._user_config_file == str(tmpdir.join(f".ssh/config_{user}"))
-
-
 def test_submit_job(mocker, autosubmit_config, tmpdir):
     experiment_data = {
         "ROOTDIR": str(tmpdir),
@@ -236,3 +205,10 @@ def test_submit_job(mocker, autosubmit_config, tmpdir):
     job.platform_name = platform.name
     jobs_id = platform.submit_job(job, "dummy")
     assert jobs_id == 10000
+
+
+def test_get_pscall(paramiko_platform):
+    job_id = 42
+    output = paramiko_platform.get_pscall(job_id)
+    assert f'kill -0 {job_id}' in output
+

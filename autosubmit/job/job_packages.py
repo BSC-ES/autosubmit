@@ -134,7 +134,7 @@ class JobPackageBase(object):
             self._job_scripts[jobs[i].name] = jobs[i].create_script(configuration)
 
     def _create_common_script(self, filename: str = ""):
-        pass
+        pass  # pragma: no cover
 
     def submit_unthreaded(self, configuration: 'AutosubmitConfig', only_generate: bool = False):
         """
@@ -225,7 +225,7 @@ class JobPackageBase(object):
 
     def _do_submission(self, job_scripts=None, hold: bool = False):
         """ Submit package to the platform. """
-        pass
+        pass  # pragma: no cover
 
     def process_jobs_to_submit(self, job_id: str, hold: bool = False) -> None:
         for i, job in enumerate(self.jobs):
@@ -664,7 +664,7 @@ class JobPackageThread(JobPackageBase):
             self.jobs[i].wrapper_name = self.name
 
     def _common_script_content(self) -> str:
-        pass
+        pass  # pragma: no cover
 
 
 class JobPackageThreadWrapped(JobPackageThread):
