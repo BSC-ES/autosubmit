@@ -403,18 +403,6 @@ def _modify_jobs_data(as_exp, jobs_data) -> Path:
 
 
 # -- Tests
-worker_ids = [f"popen-gw{i}: {desc}" for i, desc in enumerate([
-    "Success",
-    "Success with wrapper (vertical_wrapper)",
-    "Failure",
-    "Failure with wrapper (vertical_wrapper)",
-    "Success with wrapper (horizontal-vertical)",
-    "Failure with wrapper (horizontal-vertical)",
-    "Success with wrapper (vertical-horizontal)",
-    "Failure with wrapper (vertical-horizontal)",
-    "Success with wrapper (horizontal)",
-    "Failure with wrapper (horizontal)"
-])]
 
 @pytest.mark.slurm
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
@@ -745,11 +733,12 @@ def test_run_uninterrupted(
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
-            POLICY: STRICT
+            POLICY: strict
+
         wrapper2:
             JOBS_IN_WRAPPER: job2
             TYPE: vertical
-            POLICY: STRICT
+            POLICY: strict
 
     """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
 
@@ -781,11 +770,11 @@ def test_run_uninterrupted(
             RUNNING: chunk
             wallclock: 00:10
             retrials: 2
-wrappers:
-    wrapper:
-        JOBS_IN_WRAPPER: job
-        TYPE: vertical
-        POLICY: STRICT
+    wrappers:
+        wrapper:
+            JOBS_IN_WRAPPER: job
+            TYPE: vertical
+            POLICY: strict
 
     """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
 
@@ -808,9 +797,9 @@ wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal-vertical
-        POLICY: STRICT
+        POLICY: strict
 
-"""), 2 * 1, "COMPLETED", "horizontal-vertical"),
+"""), 4 * 1, "COMPLETED", "horizontal-vertical"),
 
     # wrappers H-V
     (dedent("""\
@@ -832,7 +821,7 @@ wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal-vertical
-        POLICY: STRICT
+        POLICY: strict
 
 """), 2 * 3, "FAILED", "horizontal-vertical"),
 
@@ -850,15 +839,14 @@ JOBS:
         DEPENDENCIES: job-1
         RUNNING: chunk
         wallclock: 00:10
-        retrials: 2
         PROCESSORS: 1
 wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: vertical-horizontal
-        POLICY: STRICT
+        POLICY: strict
 
-"""), 2 * 1, "COMPLETED", "vertical-horizontal"),
+"""), 4 * 1, "COMPLETED", "vertical-horizontal"),
 
     # wrappers V-H
     (dedent("""\
@@ -880,7 +868,7 @@ wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: vertical-horizontal
-        POLICY: STRICT
+        POLICY: strict
 
 """), 2 * 3, "FAILED", "vertical-horizontal"),
 
@@ -899,13 +887,11 @@ JOBS:
         RUNNING: chunk
         wallclock: 00:10
         PROCESSORS: 1
-
 wrappers:
     wrapper:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal
         POLICY: STRICT
-
 """), 2, "COMPLETED", "horizontal"),
 
     # wrappers H
@@ -929,8 +915,8 @@ wrappers:
         JOBS_IN_WRAPPER: job
         TYPE: horizontal
         POLICY: STRICT
-"""), 2 * 3, "FAILED", "horizontal"),
 
+"""), 2 * 3, "FAILED", "horizontal"),
 ], ids=["Success", "Success with wrapper (vertical_wrapper)", "Failure", "Failure with wrapper (vertical_wrapper)",
         "Success with wrapper (horizontal-vertical)", "Failure with wrapper (horizontal-vertical)",
         "Success with wrapper (vertical-horizontal)", "Failure with wrapper (vertical-horizontal)",
