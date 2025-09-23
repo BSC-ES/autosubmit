@@ -165,7 +165,7 @@ def test_git_submodules_dirty(
         expid: str,
         expected: ContextManager,
         autosubmit_exp: Callable,
-        git_server: Generator[Tuple[DockerContainer, Path, str], None, None],
+        git_server: Generator[tuple[DockerContainer, Path, str], None, None],
         tmp_path
 ) -> None:
     """Tests that Autosubmit detects dirty local Git submodules, especially with operational experiments.
@@ -232,7 +232,7 @@ def test_git_operational_experiment_toggle_flag(
         git_operational_check_enabled: bool,
         expected: Union[int, Exception],
         autosubmit_exp: Callable,
-        git_server: Generator[Tuple[DockerContainer, Path, str], None, None],
+        git_server: Generator[tuple[DockerContainer, Path, str], None, None],
         tmp_path,
         mocker,
         autosubmit
@@ -326,7 +326,7 @@ def test_clean_git_not_a_git_repo(autosubmit_config, mocker):
 def test_clean_git_not_committed(
         tmp_path,
         autosubmit_exp,
-        git_server: Generator[Tuple[DockerContainer, Path, str], None, None]
+        git_server: Generator[tuple[DockerContainer, Path, str], None, None]
 ):
     """Test that cleaning Git fails when the project directory has new files not committed yet."""
     _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str
@@ -355,7 +355,7 @@ def test_clean_git_not_committed(
 def test_clean_git_not_pushed(
         tmp_path,
         autosubmit_exp,
-        git_server: Generator[Tuple[DockerContainer, Path, str], None, None]
+        git_server: Generator[tuple[DockerContainer, Path, str], None, None]
 ):
     """Test that cleaning Git fails when the project directory has staged changed not pushed."""
     _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str
@@ -386,7 +386,7 @@ def test_clean_git(
         tmp_path,
         autosubmit_exp,
         mocker,
-        git_server: Generator[Tuple[DockerContainer, Path, str], None, None]
+        git_server: Generator[tuple[DockerContainer, Path, str], None, None]
 ):
     """Test that cleaning Git fails when the project commit cannot be recorded."""
     _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str

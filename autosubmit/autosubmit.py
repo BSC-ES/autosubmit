@@ -82,6 +82,7 @@ from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 
+
 dialog = None
 
 """Main module for autosubmit. Only contains an interface class to all functionality implemented on autosubmit."""
@@ -2656,11 +2657,11 @@ class Autosubmit:
                                              7014)
         try:
             for platform in platforms_to_test:
-                packager = JobPackager(as_conf, platform, job_list, hold=hold)
+                packager = JobPackager(as_conf, platform, job_list)
                 packages_to_submit = packager.build_packages()
                 save_1, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = (
                     platform.submit_ready_jobs(as_conf, job_list, packages_persistence, packages_to_submit,
-                                               inspect, only_wrappers, hold)
+                                               inspect=inspect, only_wrappers=only_wrappers)
                 )
                 wrapper_errors.update(packager.wrappers_with_error)
                 # Jobs that are being retrieved in batch. Right now, only available for slurm platforms.
@@ -2672,7 +2673,7 @@ class Autosubmit:
                     # Process the script generated in submit_ready_jobs
                     save_2, valid_packages_to_submit = platform.process_batch_ready_jobs(valid_packages_to_submit,
                                                                                          failed_packages,
-                                                                                         error_message="", hold=hold)
+                                                                                         error_message="")
                     if not inspect and len(valid_packages_to_submit) > 0:
                         job_list.save()
                 # Save wrappers(jobs that has the same id) to be visualized and checked in other parts of the code

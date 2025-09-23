@@ -335,7 +335,7 @@ def _init_run(as_exp, jobs_data) -> Path:
 
 @pytest.mark.xdist_group('slurm')
 @pytest.mark.slurm
-@pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
+@pytest.mark.parametrize("jobs_data,expected_db_entries,final_status", [
     # Success
     (dedent("""\
     EXPERIMENT:
@@ -361,7 +361,7 @@ def _init_run(as_exp, jobs_data) -> Path:
             USER: 'root'
             MAX_PROCESSORS: 1
             PROCESSORS_PER_NODE: 1
-    """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
+    """), 3, "COMPLETED"),  # No wrappers, simple type
 
     # Success wrapper
     (dedent("""\
@@ -381,7 +381,7 @@ def _init_run(as_exp, jobs_data) -> Path:
             SCRIPT: |
                 echo "Hello World with id=Success + wrappers"
                 sleep 1
-            DEPENDENCIES: JOB2-1
+            DEPENDENCIES: job2-1
             PLATFORM: TEST_SLURM
             RUNNING: CHUNK
             WALLCLOCK: 00:01
@@ -406,7 +406,7 @@ def _init_run(as_exp, jobs_data) -> Path:
             USER: 'root'
             MAX_PROCESSORS: 1
             PROCESSORS_PER_NODE: 1
-    """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
+    """), 4, "COMPLETED"),  # Wrappers present, vertical type
 
     # Failure
     (dedent("""\
@@ -434,7 +434,7 @@ def _init_run(as_exp, jobs_data) -> Path:
             USER: 'root'
             MAX_PROCESSORS: 1
             PROCESSORS_PER_NODE: 1
-    """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
+    """), (2 + 1) * 2, "FAILED"),  # No wrappers, simple type
 
     # Failure wrappers
     (dedent("""\
@@ -465,14 +465,13 @@ def _init_run(as_exp, jobs_data) -> Path:
             USER: 'root'
             MAX_PROCESSORS: 1
             PROCESSORS_PER_NODE: 1
-    """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
+    """), (2 + 1) * 1, "FAILED"),  # Wrappers present, vertical type
 ], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
 def test_run_uninterrupted(
         as_exp,
         jobs_data,
         expected_db_entries,
         final_status,
-        wrapper_type,
         make_ssh_client,
         mocker
 ):
@@ -515,7 +514,7 @@ def test_run_uninterrupted(
 
 @pytest.mark.xdist_group('slurm')
 @pytest.mark.slurm
-@pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
+@pytest.mark.parametrize("jobs_data,expected_db_entries,final_status", [
     # Success
     (dedent("""\
     EXPERIMENT:
@@ -539,7 +538,7 @@ def test_run_uninterrupted(
             TEMP_DIR: ''
             TYPE: 'slurm'
             USER: 'root'
-    """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
+    """), 3, "COMPLETED"),  # No wrappers, simple type
 
     # Success wrapper
     (dedent("""\
@@ -562,7 +561,7 @@ def test_run_uninterrupted(
             DEPENDENCIES: JOB2-1
             PLATFORM: TEST_SLURM
             RUNNING: CHUNK
-            wallclock: 00:01
+            WALLCLOCK: 00:01
 
     WRAPPERS:
         WRAPPER:
@@ -583,7 +582,7 @@ def test_run_uninterrupted(
             TEMP_DIR: ''
             TYPE: 'slurm'
             USER: 'root'
-    """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
+    """), 4, "COMPLETED"),  # Wrappers present, vertical type
 
     # Failure
     (dedent("""\
@@ -597,7 +596,7 @@ def test_run_uninterrupted(
             PLATFORM: TEST_SLURM
             RUNNING: CHUNK
             WALLCLOCK: 00:01
-            retrials: 2  # In local, it started to fail at 18 retrials.
+            RETRIALS: 2  # In local, it started to fail at 18 retrials.
     PLATFORMS:
         TEST_SLURM:
             ADD_PROJECT_TO_HOST: 'False'
@@ -609,7 +608,7 @@ def test_run_uninterrupted(
             TEMP_DIR: ''
             TYPE: 'slurm'
             USER: 'root'
-    """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
+    """), (2 + 1) * 2, "FAILED"),  # No wrappers, simple type
 
     # Failure wrappers
     (dedent("""\
@@ -619,13 +618,13 @@ def test_run_uninterrupted(
                 sleep 2
                 d_echo "Hello World with id=FAILED + wrappers"
             PLATFORM: TEST_SLURM
-            DEPENDENCIES: job-1
+            DEPENDENCIES: JOB-1
             RUNNING: CHUNK
             WALLCLOCK: 00:10
             RETRIALS: 2
     WRAPPERS:
         WRAPPER:
-            JOBS_IN_WRAPPER: job
+            JOBS_IN_WRAPPER: JOB
             TYPE: vertical
     PLATFORMS:
         TEST_SLURM:
@@ -638,14 +637,13 @@ def test_run_uninterrupted(
             TEMP_DIR: ''
             TYPE: 'slurm'
             USER: 'root'
-    """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
+    """), (2 + 1) * 1, "FAILED"),  # Wrappers present, vertical type
 ], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
 def test_run_interrupted(
         jobs_data: str,
         expected_db_entries: int,
         final_status: str,
-        wrapper_type: str,
-        as_exp: 'AutosubmitExperimentFixture',
+        as_exp,
         make_ssh_client,
         mocker
 ):

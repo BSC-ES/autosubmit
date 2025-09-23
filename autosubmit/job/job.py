@@ -36,8 +36,9 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
-from autosubmit.job import job_utils
-from autosubmit.job.job_common import Status, increase_wallclock_by_chunk
+from autosubmit.job.job_common import StatisticsSnippetBash, StatisticsSnippetPython
+from autosubmit.job.job_common import StatisticsSnippetR, StatisticsSnippetEmpty
+from autosubmit.job.job_common import Status, Type, increase_wallclock_by_chunk
 from autosubmit.job.job_utils import get_job_package_code, get_split_size_unit, get_split_size
 from autosubmit.job.metrics_processor import UserMetricProcessor
 from autosubmit.job.template import get_template_snippet, Language
@@ -248,7 +249,7 @@ class Job(object):
         self.check = 'true'
         self.check_warnings = False
         self.packed = False
-        self.hold = False  # type: bool
+        self.hold = False # type: bool
         self.distance_weight = 0
         self.level = 0
         self._export = "none"
@@ -2738,7 +2739,7 @@ class WrapperJob(Job):
             priority: int,
             job_list: List[Job],
             total_wallclock: str,
-            platform: "Platform",
+            platform: 'ParamikoPlatform',
             as_config: AutosubmitConfig,
             hold: bool,
     ):
@@ -3083,8 +3084,13 @@ class WrapperJob(Job):
         If not on these status and it is a vertical wrapper it will set the fail_count to the number of retrials.
         """
         try:
-            Log.warning(f"Wrapper {self.name} failed, cancelling it")
-            self._platform.send_command(self._platform.cancel_cmd + " " + str(self.id))
+            if self.platform_name == "local":
+                # Check if the job is still running to avoid a misleading message in the logs
+                if self.platform.get_pscall(self.id):
+                    self._platform.send_command(self._platform.cancel_cmd + " " + str(self.id))
+            else:
+                Log.warning(f"Wrapper {self.name} failed, cancelling it")
+                self._platform.send_command(self._platform.cancel_cmd + " " + str(self.id))
         except Exception as e:
             Log.info(f'Job with {self.id} was finished before canceling it: {str(e)}')
         self._check_running_jobs()

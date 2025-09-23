@@ -204,3 +204,4 @@ class ParamikoSubmitter:
 
         if raise_message != "":
             raise AutosubmitError(raise_message)
+        return None

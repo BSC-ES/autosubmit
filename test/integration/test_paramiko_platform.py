@@ -35,11 +35,11 @@ _EXPID = 't000'
 
 
 @pytest.mark.docker
-@pytest.mark.parametrize('filename, check', [
-    ('test1', True),
-    ('sub/test2', True)
+@pytest.mark.parametrize('filename', [
+    'test1',
+    'sub/test2'
 ], ids=['filename', 'filename_long_path'])
-def test_send_file(filename: str, check: bool, autosubmit_exp, ssh_server):
+def test_send_file(filename: str, autosubmit_exp, ssh_server):
     """This test opens an SSH connection (via sftp) and sends a file to the remote location.
 
     It launches a Docker Image using the testcontainers library.
