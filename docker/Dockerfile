@@ -188,8 +188,7 @@ RUN chown -R "${MAMBA_USER}:${MAMBA_USER}" "/home/${MAMBA_USER}/" && \
 
 COPY <<EOF /usr/local/bin/entrypoint.sh
 #!/bin/bash
-
-export USER=\$(whoami)
+export USER=$(whoami)
 sudo service ssh restart
 exec "\$@"
 EOF
