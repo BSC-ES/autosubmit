@@ -55,7 +55,7 @@ class MakeSSHClientFixture(Protocol):
         ...
 
 @pytest.fixture
-def make_ssh_client() -> Callable[[int, Optional[str]], paramiko.SSHClient]:
+def make_ssh_client() -> MakeSSHClientFixture:
     """Creates the SSH client
 
     It modifies the list of arguments so that the port is always
@@ -67,7 +67,7 @@ def make_ssh_client() -> Callable[[int, Optional[str]], paramiko.SSHClient]:
     :return: A normal Paramiko SSH Client, but that used the Docker SSH port and password to connect.
     """
 
-    def _make_ssh_client(ssh_port: int, password: Optional[str]) -> paramiko.SSHClient:
+    def _make_ssh_client(ssh_port: int, password: Optional[str], key: Union['Path', str]) -> paramiko.SSHClient:
         ssh_client = _create_ssh_client()
 
         orig_ssh_client_connect = ssh_client.connect
@@ -166,7 +166,7 @@ def ssh_server(mocker, tmp_path, make_ssh_client, request):
             .with_bind_ports(2222, ssh_port) as container:
         wait_for_logs(container, 'sshd is listening on port 2222')
 
-        ssh_client = make_ssh_client(ssh_port, _SSH_DOCKER_PASSWORD)
+        ssh_client = make_ssh_client(ssh_port, password=None, key=None)
         mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
 
         yield container

@@ -27,6 +27,8 @@ all the grouped tests to the same worker,
 """
 
 import pytest
+from testcontainers.core.container import DockerContainer
+
 from autosubmit.config.configcommon import AutosubmitConfig
 
 from autosubmit.platforms.slurmplatform import SlurmPlatform
@@ -41,7 +43,10 @@ def _create_slurm_platform(expid: str, as_conf: AutosubmitConfig):
 
 @pytest.mark.xdist_group('slurm')
 @pytest.mark.slurm
-def test_create_platform_slurm(autosubmit_exp):
+def test_create_platform_slurm(
+        autosubmit_exp,
+        slurm_server: 'DockerContainer',
+):
     """Test the Slurm platform object creation."""
     exp = autosubmit_exp('t000', experiment_data={
         'JOBS': {
@@ -133,7 +138,11 @@ def test_create_platform_slurm(autosubmit_exp):
     'Simple Workflow',
     'Dependency Workflow',
 ])
-def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, experiment_data):
+def test_run_simple_workflow_slurm(
+        autosubmit_exp: AutosubmitExperimentFixture,
+        experiment_data,
+        slurm_server: 'DockerContainer'
+):
     """Runs a simple Bash script using Slurm."""
     exp = autosubmit_exp('t001', experiment_data=experiment_data)
     _create_slurm_platform(exp.expid, exp.as_conf)
@@ -591,17 +600,11 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
     'Complex Wrapper horizontal-vertical',
 ])
 def test_run_all_wrappers_workflow_slurm(
-        autosubmit_exp: AutosubmitExperimentFixture,
         experiment_data: dict,
-        make_ssh_client,
-        mocker
+        slurm_server: 'DockerContainer',
+        autosubmit_exp: AutosubmitExperimentFixture
 ):
     """Runs a simple Bash script using Slurm."""
-
-    # 2222 is the SSH port used in the GitHub service, see GH Actions configuration;
-    # for running locally you must launch the container with this port too.
-    ssh_client = make_ssh_client(2222, None)
-    mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
 
     exp = autosubmit_exp('t002', experiment_data=experiment_data, wrapper=True)
     _create_slurm_platform(exp.expid, exp.as_conf)

@@ -472,12 +472,8 @@ def test_run_uninterrupted(
         jobs_data,
         expected_db_entries,
         final_status,
-        make_ssh_client,
-        mocker
+        slurm_server: 'DockerContainer'
 ):
-
-    ssh_client = make_ssh_client(2222, None)
-    mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
 
     as_conf = as_exp.as_conf
     log_dir = _init_run(as_exp, jobs_data)
@@ -644,12 +640,8 @@ def test_run_interrupted(
         expected_db_entries: int,
         final_status: str,
         as_exp,
-        make_ssh_client,
-        mocker
+        slurm_server: 'DockerContainer'
 ):
-
-    ssh_client = make_ssh_client(2222, None)
-    mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
 
     as_conf = as_exp.as_conf
     log_dir = _init_run(as_exp, jobs_data)
