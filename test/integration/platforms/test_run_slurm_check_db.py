@@ -649,6 +649,7 @@ def test_run_uninterrupted(
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
     aslogs_path = Path(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
 
+
     as_exp.autosubmit._setup_log_files(
         command="run",
         expids=None,

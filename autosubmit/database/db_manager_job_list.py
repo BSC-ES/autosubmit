@@ -463,3 +463,18 @@ class JobsDbManager(DbManager):
         self.create_table(wrapper_info_table.name)
         self.delete_all(innerjobs_table.name)
         self.delete_all(wrapper_info_table.name)
+
+    def update_wrapper_status(self, packages) -> None:
+        """
+        Update the status of wrapper jobs in the database.
+
+        :param packages: WrapperJob object containing package information.
+        :type packages: WrapperJob
+        """
+        wrapper_info_table: Table = get_table_from_name(schema=self.schema, table_name=WrapperInfoTable.name)
+        self.create_table(wrapper_info_table.name)
+
+        for package in packages:
+            where = {'id': package['id']}
+            values = {'status': package['status']}
+            self.update_where(wrapper_info_table.name, where, values)

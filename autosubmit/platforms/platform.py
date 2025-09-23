@@ -390,8 +390,7 @@ class Platform(object):
         save = False
         failed_packages = list()
         error_message = ""
-        if not inspect:
-            job_list.save_jobs()
+
         if not hold:
             Log.debug("\nJobs ready for {1}: {0}", len(
                 job_list.get_ready(self, hold=hold)), self.name)
@@ -416,8 +415,6 @@ class Platform(object):
                 try:
                     package.submit(as_conf, job_list.parameters, inspect or only_wrappers, hold=hold)
                     save = True
-                    if not inspect:
-                        job_list.save_jobs()
                     if package.x11 != "true":
                         valid_packages_to_submit.append(package)
                 except (IOError, OSError):

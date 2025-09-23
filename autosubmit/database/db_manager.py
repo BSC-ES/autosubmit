@@ -284,3 +284,14 @@ class DbManager:
                 self.restore_path.chmod(0o660)
             except subprocess.CalledProcessError as e:
                 Log.warning(f"Error restoring database: {e}")
+
+    def update_where(self, table_name: str, values: dict[str, Any], where: dict[str, Any]) -> int:
+        table = get_table_from_name(schema=self.schema, table_name=table_name)
+        query = table.update()
+        for key, value in where.items():
+            query = query.where(getattr(table.c, key) == value)
+        query = query.values(**values)
+        with self.engine.connect() as conn:
+            result = conn.execute(query)
+            conn.commit()
+        return cast(int, result.rowcount)

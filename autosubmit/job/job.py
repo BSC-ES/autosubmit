@@ -2792,48 +2792,31 @@ class WrapperJob(Job):
         self.status = status
 
         Log.debug('Checking inner jobs status')
-        if self.status in [Status.HELD, Status.QUEUING]:  # If WRAPPER is QUEUED OR HELD
-            # This will update the inner jobs to QUEUE or HELD (normal behaviour) or WAITING ( if they fail to be held)
-            self._check_inner_jobs_queue(prev_status)
-        elif self.status == Status.RUNNING:  # If wrapper is running
-            # Log.info("Wrapper {0} is {1}".format(self.name, Status().VALUE_TO_KEY[self.status]))
-            # This will update the status from submitted or hold to running (if safety timer is high enough or queue is fast enough)
-            if prev_status in [Status.SUBMITTED]:
-                for job in self.job_list:
-                    job.status = Status.QUEUING
-            self._check_running_jobs()  # Check and update inner_jobs status that are eligible
+        self._check_running_jobs()  # Check and update inner_jobs status that are eligible
         # Completed wrapper will always come from check function.
-        elif self.status == Status.COMPLETED:
-            self._check_running_jobs()  # Check and update inner_jobs status that are eligible
+        if self.status == Status.COMPLETED:
             self.check_inner_jobs_completed(self.job_list)
 
         # Fail can come from check function or running/completed checkers.
         if self.status in [Status.FAILED, Status.UNKNOWN]:
-            self.status = Status.FAILED
-            if self.prev_status in [Status.SUBMITTED, Status.QUEUING]:
-                self.update_failed_jobs(True)  # check false ready jobs
-            elif self.prev_status in [Status.FAILED, Status.UNKNOWN]:
-                self.failed = True
-                self._check_running_jobs()
+            self.update_failed_jobs(True)  # check false ready jobs
             if len(self.inner_jobs_running) > 0:
                 still_running = True
-                if not self.failed:
-                    if self._platform.check_file_exists('WRAPPER_FAILED', wrapper_failed=True):
-                        for job in self.inner_jobs_running:
-                            if job.platform.check_file_exists('{0}_FAILED'.format(job.name), wrapper_failed=True):
-                                Log.info(
-                                    "Wrapper {0} Failed, checking inner_jobs...".format(self.name))
-                                self.failed = True
-                                self._platform.delete_file('WRAPPER_FAILED')
-                                break
-                if self.failed:
-                    self.update_failed_jobs()
-                    if len(self.inner_jobs_running) <= 0:
-                        still_running = False
+                Log.info(f"Wrapper {self.name} Failed, checking inner_jobs...")
+                for job in self.inner_jobs_running:
+                    failed_file = f"{job.name}_FAILED"
+                    if job.platform.check_file_exists(failed_file, wrapper_failed=True):
+                        self.failed = True
+                        self._platform.delete_file(failed_file)
+                        job.status = Status.FAILED
+                        job.update_status(self.as_config, failed_file=True)
+                    else:
+                        job.status = Status.WAITING
             else:
                 still_running = False
             if not still_running:
                 self.cancel_failed_wrapper_job()
+
 
     def check_inner_jobs_completed(self, jobs: List[Job]) -> None:
         """Will get all the jobs that the status are not completed and check if it was completed or not.

@@ -2551,7 +2551,6 @@ class JobList(object):
         """
         for job in self.job_list:
             self.update_parents_edge_completeness(job)
-
         self._load_graph(full_load=False)
         for job in self.job_list:
             if not job.platform:
@@ -4048,3 +4047,14 @@ class JobList(object):
                     job.ready_date = datetime.datetime.fromtimestamp(jobs_data[job.name]["start"]).strftime('%Y%m%d%H%M%S')
                     # TODO: (new feature, another PR) If not last, update_log must be False so it can be recovered on the next autosubmit run ( check the run_id of all jobs somehow)
                     job.updated_log = True
+
+    def update_db_wrappers(self):
+        """
+        Update the wrapper jobs in the database with the current status of the wrapper jobs in memory.
+        """
+        if self.job_package_map:
+            wrappers = []
+            for wrapper_job in self.job_package_map.values():
+                wrappers.append(self._wrapper_job_dict(wrapper_job)[0])
+            if wrappers:
+                self.dbmanager.update_wrapper_status(wrappers)

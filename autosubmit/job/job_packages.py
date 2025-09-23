@@ -14,8 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
-
+import copy
 import datetime
 import json
 import locale
@@ -231,7 +230,7 @@ class JobPackageBase(object):
     def process_jobs_to_submit(self, job_id: str, hold: bool = False) -> None:
         for i, job in enumerate(self.jobs):
             job.hold = hold
-            job.id = str(job_id)
+            job.id = copy.copy(str(job_id))
             job.status = Status.SUBMITTED
             Log.result(
                 f"Job: {job.name} submitted with job_id: {job.id.strip()} and workflow commit: {job.workflow_commit}")

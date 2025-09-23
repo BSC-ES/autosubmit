@@ -1979,12 +1979,13 @@ class Autosubmit:
             # New status will be saved and inner_jobs will be checked.
             wrapper_job.check_status(
                 wrapper_job.new_status)
-            # Erase from packages if the wrapper failed to be queued ( Hold Admin bug )
-            if wrapper_job.status == Status.WAITING:
+            job_list.update_db_wrappers()
+
+            if wrapper_job.status in [Status.FAILED, Status.WAITING, Status.COMPLETED]:
                 job_list.job_package_map.pop(
                     wrapper_id, None)
                 job_list.packages_dict.pop(
-                    wrapper_id, None)
+                    wrapper_job.name, None)
             save = True
         return wrapper_job, save
 
@@ -2711,6 +2712,7 @@ class Autosubmit:
             for platform in platforms_to_test:
                 packager = JobPackager(as_conf, platform, job_list, hold=hold)
                 packages_to_submit = packager.build_packages()
+
                 save_1, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = platform.submit_ready_jobs(
                     as_conf,
                     job_list,
@@ -2719,26 +2721,22 @@ class Autosubmit:
                     inspect=inspect,
                     only_wrappers=only_wrappers,
                     hold=hold)
+                if not inspect:
+                    for p in valid_packages_to_submit:
+                        p.platform.delete_failed_and_completed_names([job.name for job in p.jobs])
                 wrapper_errors.update(packager.wrappers_with_error)
                 # Jobs that are being retrieved in batch. Right now, only available for slurm platforms.
-
-                if not inspect and len(valid_packages_to_submit) > 0:
-                    for p in valid_packages_to_submit:
-                        p.platform.delete_failed_and_completed_names([ job.name for job in p.jobs ])
-                    job_list.save_jobs()
                 save_2 = False
                 if platform.type.lower() in ["slurm", "pjm"] and not inspect and not only_wrappers:
                     # Process the script generated in submit_ready_jobs
                     save_2, valid_packages_to_submit = platform.process_batch_ready_jobs(valid_packages_to_submit,
                                                                                           failed_packages,
                                                                                          error_message="", hold=hold)
-                    if not inspect and len(valid_packages_to_submit) > 0:
-                        for p in valid_packages_to_submit:
-                            p.platform.delete_failed_and_completed_names([job.name for job in p.jobs])
-                        job_list.save_jobs()
-                # Save wrappers(jobs that has the same id) to be visualized and checked in other parts of the code
-                job_list.save_wrappers(valid_packages_to_submit, failed_packages, as_conf,
-                                       hold=hold, preview=(inspect or only_wrappers))
+
+                if not inspect:
+                    job_list.save_jobs()
+                    job_list.save_wrappers(valid_packages_to_submit, failed_packages, as_conf,
+                                           hold=hold, preview=(inspect or only_wrappers))
                 if error_message != "":
                     raise AutosubmitCritical(f"Submission Failed due wrong configuration:{error_message}", 7014)
 
