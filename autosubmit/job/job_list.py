@@ -3047,8 +3047,27 @@ class JobList(object):
             self.update_parents_edge_completeness(job)
             job.set_ready_date()
         self.update_two_step_jobs()
+
         Log.debug('Update finished')
         return save
+
+
+    def is_wrapper_still_running(self, job: Job) -> bool:
+        """
+        Check if the wrapper job for a given job is still running.
+
+        :param job: The job to check.
+        :type job: Job
+        :return: True if the wrapper job is still running, False otherwise.
+        :rtype: bool
+        """
+        job.packed = False
+        if not job.id:
+            pass
+        if self.packages_id and job.id in self.packages_id:
+            job.packed = True
+        return job.packed
+
 
     def update_parents_edge_completeness(self, job: Job) -> None:
         """
@@ -3087,7 +3106,7 @@ class JobList(object):
         :rtype: bool
         """
         save = False
-        for job in self.get_failed():
+        for job in (job for job in self.get_failed() if not self.is_wrapper_still_running(job)):
             if as_conf.jobs_data[job.section].get("RETRIALS", None) is None:
                 retrials = int(as_conf.get_retrials())
             else:

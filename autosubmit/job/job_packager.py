@@ -277,7 +277,6 @@ class JobPackager(object):
                     wrapper_limits["min_h"] and not failed_innerjobs:
                 for job in p.jobs:
                     job.wrapper_type = p.wrapper_type
-                    job.packed = True
                 packages_to_submit.append(p)
                 max_jobs_to_submit = max_jobs_to_submit - 1
             else:
@@ -639,7 +638,6 @@ class JobPackager(object):
         # Now, prepare the packages for non-wrapper jobs
         for job in non_wrapped_jobs:
             job.wrapper_type = "Simple"
-            job.packed = False
             if job.section in section_jobs_to_submit:
                 if section_jobs_to_submit[job.section] == 0:
                     continue

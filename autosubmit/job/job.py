@@ -3063,8 +3063,6 @@ class WrapperJob(Job):
         except Exception as e:
             Log.info(f'Job with {self.id} was finished before canceling it: {str(e)}')
         self._check_running_jobs()
-        for job in self.inner_jobs_running:
-            job.status = Status.FAILED
         for job in self.job_list:
             if job.platform.check_file_exists('{0}_FAILED'.format(job.name), wrapper_failed=True, max_retries=2):
                 if job.wrapper_type == "vertical":
