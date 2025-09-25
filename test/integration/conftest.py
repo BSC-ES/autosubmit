@@ -20,17 +20,16 @@ import multiprocessing
 import os
 import uuid
 from getpass import getuser
+from pathlib import Path
 from pwd import getpwnam
-from random import randrange
 from subprocess import check_output
 from tempfile import TemporaryDirectory
-from typing import Callable, Iterator, TYPE_CHECKING, Optional, Protocol, Union, Generator
+from typing import Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING
 
 import paramiko
 import pytest
-from pathlib import Path
+from testcontainers.core.container import DockerContainer
 from testcontainers.core.waiting_utils import wait_for_logs
-from testcontainers.sftp import DockerContainer
 
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 # noinspection PyProtectedMember
@@ -44,7 +43,7 @@ if TYPE_CHECKING:
 _SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
 _SSH_DOCKER_PASSWORD = 'password'
 
-_SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1'
+_SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1-slim'
 
 class MakeSSHClientFixture(Protocol):
     def __call__(
@@ -90,6 +89,9 @@ def make_ssh_client() -> MakeSSHClientFixture:
                 # tuple to list, and then replace the port...
                 args = [x for x in args]
                 args[1] = ssh_port
+
+            if key is not None:
+                kwargs['key_filename'] = str(key)
 
             ssh_timeout = 180  # 3 minutes
             for timeout in ['banner_timeout', 'auth_timeout', 'channel_timeout']:
@@ -147,7 +149,7 @@ def git_server(tmp_path) -> Generator[tuple[DockerContainer, Path, str], None, N
 
 @pytest.fixture()
 def ssh_server(mocker, tmp_path, make_ssh_client, request):
-    ssh_port = randrange(2000, 4000)
+    ssh_port = get_free_port()
 
     user = getuser() or "unknown"
     user_pw = getpwnam(user)
@@ -166,7 +168,7 @@ def ssh_server(mocker, tmp_path, make_ssh_client, request):
             .with_bind_ports(2222, ssh_port) as container:
         wait_for_logs(container, 'sshd is listening on port 2222')
 
-        ssh_client = make_ssh_client(ssh_port, password=None, key=None)
+        ssh_client = make_ssh_client(ssh_port, _SSH_DOCKER_PASSWORD, None)
         mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
 
         yield container

@@ -58,6 +58,6 @@ def test_pklfix_bypass_prompt_confirmation(
     )
     mock_user_yes_no_query.return_value = False
 
-    assert main() is None
+    assert main() is 0
 
     assert mock_user_yes_no_query.call_count == (0 if force else 1)

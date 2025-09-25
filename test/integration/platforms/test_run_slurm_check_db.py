@@ -351,7 +351,7 @@ def _init_run(as_exp, jobs_data) -> Path:
     PLATFORMS:
         TEST_SLURM:
             ADD_PROJECT_TO_HOST: False
-            HOST: 'localDocker'
+            HOST: '127.0.0.1'
             MAX_WALLCLOCK: '00:03'
             PROJECT: 'group'
             QUEUE: 'gp_debug'
@@ -396,7 +396,7 @@ def _init_run(as_exp, jobs_data) -> Path:
     PLATFORMS:
         TEST_SLURM:
             ADD_PROJECT_TO_HOST: False
-            HOST: 'localDocker'
+            HOST: '127.0.0.1'
             MAX_WALLCLOCK: '00:03'
             PROJECT: 'group'
             QUEUE: 'gp_debug'
@@ -424,7 +424,7 @@ def _init_run(as_exp, jobs_data) -> Path:
     PLATFORMS:
         TEST_SLURM:
             ADD_PROJECT_TO_HOST: False
-            HOST: 'localDocker'
+            HOST: '127.0.0.1'
             MAX_WALLCLOCK: '00:03'
             PROJECT: 'group'
             QUEUE: 'gp_debug'
@@ -455,7 +455,7 @@ def _init_run(as_exp, jobs_data) -> Path:
     PLATFORMS:
         TEST_SLURM:
             ADD_PROJECT_TO_HOST: False
-            HOST: 'localDocker'
+            HOST: '127.0.0.1'
             MAX_WALLCLOCK: '00:03'
             PROJECT: 'group'
             QUEUE: 'gp_debug'
@@ -526,7 +526,7 @@ def test_run_uninterrupted(
     PLATFORMS:
         TEST_SLURM:
             ADD_PROJECT_TO_HOST: 'False'
-            HOST: 'localDocker'
+            HOST: '127.0.0.1'
             MAX_WALLCLOCK: '00:03'
             PROJECT: 'group'
             QUEUE: 'gp_debug'
@@ -570,7 +570,7 @@ def test_run_uninterrupted(
     PLATFORMS:
         TEST_SLURM:
             ADD_PROJECT_TO_HOST: 'False'
-            HOST: 'localDocker'
+            HOST: '127.0.0.1'
             MAX_WALLCLOCK: '00:03'
             PROJECT: 'group'
             QUEUE: 'gp_debug'
@@ -596,7 +596,7 @@ def test_run_uninterrupted(
     PLATFORMS:
         TEST_SLURM:
             ADD_PROJECT_TO_HOST: 'False'
-            HOST: 'localDocker'
+            HOST: '127.0.0.1'
             MAX_WALLCLOCK: '00:03'
             PROJECT: 'group'
             QUEUE: 'gp_debug'
@@ -625,7 +625,7 @@ def test_run_uninterrupted(
     PLATFORMS:
         TEST_SLURM:
             ADD_PROJECT_TO_HOST: 'False'
-            HOST: 'localDocker'
+            HOST: '127.0.0.1'
             MAX_WALLCLOCK: '00:10'
             PROJECT: 'group'
             QUEUE: 'gp_debug'

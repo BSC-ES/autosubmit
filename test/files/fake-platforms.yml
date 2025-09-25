@@ -64,7 +64,7 @@ PLATFORMS:
     SCRATCH_DIR: /esarchive/scratch
   TEST_SLURM:
     ADD_PROJECT_TO_HOST: False
-    HOST: 'localDocker'
+    HOST: '127.0.0.1'
     MAX_WALLCLOCK: '01:00'
     PROJECT: 'group'
     QUEUE: 'gp_debug'

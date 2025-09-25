@@ -32,33 +32,33 @@ _EXPIDS = 'z000'
         # ['autosubmit', 'configure', ''],
         # ['autosubmit', 'install', ''],
         # ['autosubmit', '-lc', 'ERROR', '-lf', 'WARNING', 'run', _EXPIDS],
-        ['autosubmit', 'expid', '-dm', '-H', 'local', '-d', 'Tutorial'],
-        ['autosubmit', 'delete', _EXPIDS],
-        ['autosubmit', 'monitor', _EXPIDS, '--hide', '--notransitive'],
-        ['autosubmit', 'stats', _EXPIDS],
-        ['autosubmit', 'clean', _EXPIDS],
+        ['autosubmit', 'expid', '-dm', '-H', 'local', '-d', 'Tutorial'], # True
+        ['autosubmit', 'delete', _EXPIDS], # True
+        ['autosubmit', 'monitor', _EXPIDS, '--hide', '--notransitive'], # True
+        ['autosubmit', 'stats', _EXPIDS], # True
+        ['autosubmit', 'clean', _EXPIDS], # True
         # ['autosubmit', 'recovery', _EXPIDS],
         # ['autosubmit', 'check', _EXPIDS, '--notransitive'],
-        ['autosubmit', 'inspect', _EXPIDS, '--notransitive'],
-        ['autosubmit', 'report', _EXPIDS],
+        ['autosubmit', 'inspect', _EXPIDS, '--notransitive'], # True
+        ['autosubmit', 'report', _EXPIDS], # True
         # ['autosubmit', 'describe', _EXPIDS],
-        ['autosubmit', 'migrate', '-fs', 'Any', _EXPIDS],
-        ['autosubmit', 'create', _EXPIDS, '--hide'],
+        ['autosubmit', 'migrate', '-fs', 'Any', _EXPIDS], # None
+        ['autosubmit', 'create', _EXPIDS, '--hide'], # 0
         # ['autosubmit', 'configure', _EXPIDS],
         # ['autosubmit', 'install', _EXPIDS],
         # ['autosubmit', 'setstatus', _EXPIDS],
-        ['autosubmit', 'testcase', '-dm', '-H', 'local', '-d', 'Tutorial', '-c', '1', '-m', 'fc0', '-s', '19651101'],
-        ['autosubmit', 'refresh', _EXPIDS],
-        ['autosubmit', 'updateversion', _EXPIDS],
-        ['autosubmit', 'upgrade', _EXPIDS],
+        ['autosubmit', 'testcase', '-dm', '-H', 'local', '-d', 'Tutorial', '-c', '1', '-m', 'fc0', '-s', '19651101'], # True
+        ['autosubmit', 'refresh', _EXPIDS], # True
+        ['autosubmit', 'updateversion', _EXPIDS], # True
+        ['autosubmit', 'upgrade', _EXPIDS], # None
         # ['autosubmit', 'provenance', _EXPIDS, '--rocrate'],
-        ['autosubmit', 'archive', _EXPIDS],
-        ['autosubmit', 'readme'],
-        ['autosubmit', 'changelog'],
-        ['autosubmit', 'dbfix', _EXPIDS],
-        ['autosubmit', 'pklfix', _EXPIDS],
-        ['autosubmit', 'updatedescrip', _EXPIDS, 'description'],
-        ['autosubmit', 'cat-log', _EXPIDS],
+        ['autosubmit', 'archive', _EXPIDS], # True
+        ['autosubmit', 'readme'], # True
+        ['autosubmit', 'changelog'], # True
+        ['autosubmit', 'dbfix', _EXPIDS], # None
+        ['autosubmit', 'pklfix', _EXPIDS], # None
+        ['autosubmit', 'updatedescrip', _EXPIDS, 'description'], # True
+        ['autosubmit', 'cat-log', _EXPIDS], # True
         # ['autosubmit', 'stop', _EXPIDS]
     ],
     ids=['expid', 'delete', 'monitor', 'stats', 'clean', 'inspect', 'report', 'migrate', 'create',
@@ -86,5 +86,8 @@ def test_run_command(autosubmit_exp: Callable, autosubmit: Autosubmit, mocker, c
 
     mocker.patch('sys.argv', command)
     _, args = autosubmit.parse_args()
-    autosubmit.run_command(args=args)
-    # autosubmit._init_logs(args, expid=_EXPIDS)
+    as_command_return = autosubmit.run_command(args=args)
+    if 'create' not in command:
+        assert as_command_return
+    else:
+        assert as_command_return == 0

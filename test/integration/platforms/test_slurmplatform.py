@@ -59,7 +59,7 @@ def test_create_platform_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -91,7 +91,7 @@ def test_create_platform_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -121,7 +121,7 @@ def test_create_platform_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -191,7 +191,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -228,7 +228,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -265,7 +265,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -302,7 +302,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -339,7 +339,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -452,7 +452,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -570,7 +570,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',

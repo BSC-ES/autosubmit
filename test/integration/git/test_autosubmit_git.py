@@ -41,9 +41,9 @@ def _get_experiment_data(tmp_path) -> dict:
 
     return {
         'PLATFORMS': {
-            'PYTEST-PS': {
+            'pytest-ps': {
                 'TYPE': 'ps',
-                'HOST': 'localDocker',
+                'HOST': '127.0.0.1',
                 'USER': _user,
                 'PROJECT': 'whatever',
                 'SCRATCH': str(tmp_path / 'scratch'),

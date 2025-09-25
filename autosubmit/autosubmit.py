@@ -44,6 +44,7 @@ from typing import Any, Optional, Union, TYPE_CHECKING
 from bscearth.utils.date import date2str
 from portalocker import Lock
 from portalocker.exceptions import BaseLockException
+from pycparser.c_ast import Return
 from pyparsing import nestedExpr
 from ruamel.yaml import YAML
 
@@ -155,7 +156,7 @@ class Autosubmit:
 
     version_path = os.path.join(script_dir, 'VERSION')
     readme_path = os.path.join(script_dir, 'README.md')
-    changes_path = os.path.join(script_dir, 'CHANGELOG')
+    changes_path = os.path.join(script_dir, 'CHANGELOG.md')
     if os.path.isfile(version_path):
         with open(version_path) as f:
             autosubmit_version = f.read().strip()
@@ -3193,7 +3194,7 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def migrate(experiment_id: str, offer: bool, pickup: bool, only_remote: bool) -> None:
+    def migrate(experiment_id: str, offer: bool, pickup: bool, only_remote: bool) -> bool:
         """
         Migrates experiment files from current to other user.
         It takes mapping information for new user from config files.
@@ -3229,6 +3230,7 @@ class Autosubmit:
                     Log.info("Local files/dirs have been successfully picked up")
             migrate.migrate_pickup()
             migrate.migrate_pickup_jobdata()
+        return True
 
     @staticmethod
     def check(experiment_id: str) -> bool:
@@ -3267,7 +3269,7 @@ class Autosubmit:
 
     @staticmethod
     def report(expid: str, template_file_path="", show_all_parameters=False, folder_path="",
-               placeholders=False) -> None:
+               placeholders=False) -> bool:
         """Show report for specified experiment.
 
         :param expid: experiment identifier
@@ -3385,9 +3387,11 @@ class Autosubmit:
                     os.chmod(os.path.join(tmp_path, report), 0o755)
                     template_file.close()
                     Log.result(f"Report {report} has been created on {os.path.join(tmp_path, report)}")
+                    return True
                 else:
                     raise AutosubmitCritical(
                         f"Template {template_file_path} doesn't exists ", 7014)
+            return True
         except AutosubmitError as e:
             raise
         except AutosubmitCritical as e:
@@ -3965,7 +3969,7 @@ class Autosubmit:
         return warn, substituted
 
     @staticmethod
-    def upgrade_scripts(expid, files=""):
+    def upgrade_scripts(expid: str, files="") -> bool:
         def get_files(root_dir_, extensions, files=""):
             all_files = []
             if len(files) > 0:
@@ -3997,6 +4001,7 @@ class Autosubmit:
                         AutosubmitConfig.ini_to_yaml(f.parent, Path(f))
                     except BaseException:
                         Log.warning(f"Couldn't convert conf file to yml: {f.parent}")
+                        return False
 
             # Converts all ini into yaml
             Log.info("Converting all .conf files into .yml.")
@@ -4006,12 +4011,13 @@ class Autosubmit:
                         AutosubmitConfig.ini_to_yaml(Path(f).parent, Path(f))
                     except Exception as e:
                         Log.warning(f"Couldn't convert conf file to yml: {Path(f).parent}")
+                        return False
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             as_conf.reload(force_load=True)
             # Load current variables
             as_conf.check_conf_files()
             # Load current parameters ( this doesn't read job parameters)
-            parameters = as_conf.load_parameters()
+            as_conf.load_parameters()
 
         except (AutosubmitError, AutosubmitCritical):
             raise
@@ -4031,9 +4037,7 @@ class Autosubmit:
                     substituted += f"Variables changed for: {template_path.name}\n{s}\n"
             except BaseException as e:
                 Log.printlog(f"Couldn't read {template_path} template.\ntrace:{str(e)}")
-        if substituted == "" and warn == "":
-            pass
-        else:
+        if substituted != "" and warn != "":
             Log.result(substituted)
             Log.result(warn)
         # Update templates
@@ -4060,9 +4064,10 @@ class Autosubmit:
                  f"{Autosubmit.autosubmit_version}")
         as_conf.set_version(Autosubmit.autosubmit_version)
         update_experiment_descrip_version(expid, version=Autosubmit.autosubmit_version)
+        return True
 
     @staticmethod
-    def pkl_fix(expid, force: bool = False):
+    def pkl_fix(expid: str, force: bool = False) -> bool:
         """
         Tries to find a backup of the pkl file and restores it. Verifies that autosubmit is not running on this experiment.
 
@@ -4094,7 +4099,6 @@ class Autosubmit:
                         Log.info(
                             f"The backup file {backup_pkl_path} is empty. Pkl restore operation stopped."
                             f" No changes have been made.")
-                        return
                     if os.path.exists(current_pkl_path):
                         # Pkl file exists
                         Log.info(f"Current pkl file {current_pkl_path} found.")
@@ -4107,7 +4111,6 @@ class Autosubmit:
                                 # The user chooses not to continue. Operation stopped.
                                 Log.info(
                                     "Pkl restore operation stopped. No changes have been made.")
-                                return
                             # File not empty: Archive
                             archive_pkl_name = os.path.join(pkl_folder_path,
                                                             f"{datetime.datetime.today().strftime('%d%m%Y%H%M%S')}"
@@ -4132,6 +4135,7 @@ class Autosubmit:
                 else:
                     Log.info(
                         "Backup file not found. Pkl restore operation stopped. No changes have been made.")
+                return True
         except AutosubmitCritical as e:
             raise AutosubmitCritical(e.message, e.code, e.trace)
 
@@ -4148,7 +4152,7 @@ class Autosubmit:
             Log.debug("Jobs_data database backup failed.")
 
     @staticmethod
-    def database_fix(expid):
+    def database_fix(expid: str) -> bool:
         """
         Database methods. Performs a sql dump of the database and restores it.
 
@@ -4176,6 +4180,7 @@ class Autosubmit:
                 Log.info("Restoring from sql")
                 os.popen(bash_command).read()
                 exp_history.initialize_database()
+                return True
 
             except Exception:
                 Log.warning("It was not possible to restore the jobs_data.db file... , a new blank db will be created")
@@ -4184,8 +4189,10 @@ class Autosubmit:
                 exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                                 historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
                 exp_history.initialize_database()
+                return False
         except Exception as exp:
             Log.critical(str(exp))
+            return False
 
     @staticmethod
     def rocrate(expid: str, path: Path) -> bool:
