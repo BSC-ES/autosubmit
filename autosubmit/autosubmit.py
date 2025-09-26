@@ -5840,7 +5840,7 @@ class Autosubmit:
 
     @staticmethod
     def stop(expids: str, force=False, all_expids=False, force_all=False, cancel=False,
-             current_status="", status="FAILED", force_yes=False) -> None:
+             current_status="", status="FAILED", force_yes=False) -> bool:
         """The stop command allows users to stop the desired experiments.
 
         :param expids: expids to stop
@@ -5914,3 +5914,4 @@ class Autosubmit:
             if cancel:
                 job_list, _, _, _, _, _, _, _ = Autosubmit.prepare_run(expid, check_scripts=False)
                 cancel_jobs(job_list, active_jobs_filter=current_status, target_status=status)
+        return True

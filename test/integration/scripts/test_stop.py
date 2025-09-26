@@ -41,6 +41,6 @@ def test_stop_bypass_prompt_confirmation(
     mock_input = mocker.patch("builtins.input")
     mock_input.return_value = "no"
 
-    assert main() is None
+    assert main() is 0
 
     assert mock_input.call_count == (0 if force_yes else 1)
