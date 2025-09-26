@@ -208,10 +208,10 @@ class SlurmPlatform(ParamikoPlatform):
                     sleep(10)
                 jobid_index = 0
                 for package in valid_packages_to_submit:
-                    current_package_id = str(jobs_id[jobid_index])
+                    current_package_id = int(jobs_id[jobid_index])
                     if hold:
                         retries = 5
-                        package.jobs[0].id = current_package_id
+                        package.jobs[0].id = int(current_package_id)
                         try:
                             can_continue = True
                             while can_continue and retries > 0:

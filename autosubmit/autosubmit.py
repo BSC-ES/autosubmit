@@ -1748,7 +1748,7 @@ class Autosubmit:
             job_list.clear_wrappers_db(preview=True)
 
             job_list.packages_dict = {}
-            job_list.packages_id = {}
+            job_list.job_package_map = {}
 
             Log.debug("Length of the jobs list: {0}", len(job_list))
 
@@ -1951,6 +1951,7 @@ class Autosubmit:
 
     @staticmethod
     def manage_wrapper_job(as_conf, job_list, platform, wrapper_id, save=False):
+        save = False
         check_wrapper_jobs_sleeptime = as_conf.get_wrapper_check_time()
         Log.debug(f'WRAPPER CHECK TIME = {check_wrapper_jobs_sleeptime}')
         # Setting prev_status as an easy way to check status change for inner jobs
@@ -1977,16 +1978,19 @@ class Autosubmit:
                     "Wrapper is in Unknown Status couldn't get wrapper parameters", 7050)
 
             # New status will be saved and inner_jobs will be checked.
-            wrapper_job.check_status(
-                wrapper_job.new_status)
-            job_list.update_db_wrappers()
-
-            if wrapper_job.status in [Status.FAILED, Status.WAITING, Status.COMPLETED]:
+            save |= wrapper_job.check_status(wrapper_job.new_status)
+            if wrapper_job.status != wrapper_job.new_status:
+                Log.info('Wrapper job ' + wrapper_job.name + ' changed from ' + str(
+                    Status.VALUE_TO_KEY[wrapper_job.new_status]) + ' to status ' + str(
+                    Status.VALUE_TO_KEY[wrapper_job.status]))
+            if save:
+                job_list.update_db_wrappers()
+                job_list.save_jobs()
+            if wrapper_job.status in [Status.FAILED, Status.COMPLETED]:
                 job_list.job_package_map.pop(
                     wrapper_id, None)
                 job_list.packages_dict.pop(
                     wrapper_job.name, None)
-            save = True
         return wrapper_job, save
 
     @staticmethod
@@ -2231,7 +2235,6 @@ class Autosubmit:
         if as_conf.experiment_data.get("WRAPPERS", None) is not None:
             Log.debug("Processing job packages")
             job_list.load_wrappers()
-            job_list.check_wrapper_stored_status()
         if recover:
             Log.info("Recovering wrappers... Done")
 

@@ -676,7 +676,8 @@ class ParamikoPlatform(Platform):
         if job.is_over_wallclock():
             try:
                 job.platform.get_completed_files(job.name)
-                job_status = job.check_completion(over_wallclock=True)
+                job.check_completion()
+                job_status = job.new_status
             except Exception as e:
                 job_status = Status.FAILED
                 Log.debug(f"Unexpected error checking completed files for a job over wallclock: {str(e)}")
@@ -690,19 +691,44 @@ class ParamikoPlatform(Platform):
                     Log.debug(f"Error cancelling job {job.id}: {str(e)}")
         return job_status
 
-    def get_completed_job_names(self) -> List[str]:
+    def get_completed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
         """
         Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
 
-        :return: List of job names with COMPLETED files
+        :param job_names: If provided, filters the results to include only these job names.
+        :type job_names: Optional[List[str]]
+        :return: List of job names with COMPLETED files.
         :rtype: List[str]
         """
-        # TODO: After log compression from @luiggi, this method should be updated to handle compressed files.
-        cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_COMPLETED' -type f"
+        if not job_names:
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_COMPLETED' -type f"
+        else:
+            patterns = ' -o '.join([f"-name '{name}_COMPLETED'" for name in job_names])
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {patterns} \\) -type f"
         self.send_command(cmd)
         output = self.get_ssh_output()
         completed_files = output.strip().split('\n') if output else []
         job_names = [Path(file).name.replace('_COMPLETED', '') for file in completed_files]
+        return job_names
+
+    def get_failed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+        """
+        Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
+
+        :param job_names: If provided, filters the results to include only these job names.
+        :type job_names: Optional[List[str]]
+        :return: List of job names with COMPLETED files.
+        :rtype: List[str]
+        """
+        if not job_names:
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_FAILED' -type f"
+        else:
+            patterns = ' -o '.join([f"-name '{name}_FAILED'" for name in job_names])
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {patterns} \\) -type f"
+        self.send_command(cmd)
+        output = self.get_ssh_output()
+        completed_files = output.strip().split('\n') if output else []
+        job_names = [Path(file).name.replace('_FAILED', '') for file in completed_files]
         return job_names
 
     def delete_failed_and_completed_names(self, job_names: list[str]) -> None:
@@ -761,19 +787,7 @@ class ParamikoPlatform(Platform):
                 self.get_ssh_output()).strip("\n")
             # URi: define status list in HPC Queue Class
             if job_status in self.job_status['COMPLETED'] or retries == 0:
-                # The Local platform has only 0 or 1, so it necessary to look for the completed file.
-                if self.type == "local":
-                    if not job.is_wrapper:
-                        # Not sure why it is called over_wallclock but is the only way to return a value
-                        job_status = job.check_completion(over_wallclock=True)
-                    else:
-                        # wrapper has a different file name
-                        if Path(f"{self.remote_log_dir}/WRAPPER_FAILED").exists():
-                            job_status = Status.FAILED
-                        else:
-                            job_status = Status.COMPLETED
-                else:
-                    job_status = Status.COMPLETED
+                job_status = Status.COMPLETED
 
             elif job_status in self.job_status['RUNNING']:
                 job_status = Status.RUNNING

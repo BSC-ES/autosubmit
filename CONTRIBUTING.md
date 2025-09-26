@@ -93,7 +93,7 @@ locally for the tests marked with `slurm`. This step is optional as each test
 launches the container in an isolated manner.
 
 ```bash
-$ docker pull autosubmit/slurm-openssh-container:25-05-0-1-dani
+$ docker pull autosubmit/slurm-openssh-container:25-05-0-1
 ```
 
 ```bash

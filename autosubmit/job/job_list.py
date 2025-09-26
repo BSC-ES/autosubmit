@@ -72,7 +72,6 @@ class JobList(object):
         self._dic_jobs = dict()
         self.packages_dict = dict()
         self._ordered_jobs_by_date_member = dict()
-        self.packages_id = dict()
         self.job_package_map = dict()
         self.sections_checked = set()
         self._run_members = None
@@ -2527,21 +2526,20 @@ class JobList(object):
 
         for name, jobs in list(self.packages_dict.items()):
             new_jobs = []
-            wrapper_id = None
-            for job in jobs: # TODO quick fix this shouldn't be neccesary but job[0] has no id sometimes
-                if job.id:
-                    wrapper_id = int(job.id)
-                    break
-            for job in (job for job in jobs):
-                job_ref = self.get_job_by_name(job.name)
-                if job_ref:
-                    new_jobs.append(job_ref)
-            if len(new_jobs) == 0:
-                self.packages_dict.pop(name, None)
-                self.job_package_map.pop(wrapper_id, None)
+            wrapper_id = int(jobs[0].id)
+            if wrapper_id in self.job_package_map:
+                for job in (job for job in jobs):
+                    job_ref = self.get_job_by_name(job.name)
+                    if job_ref:
+                        new_jobs.append(job_ref)
+                if len(new_jobs) == 0:
+                    self.packages_dict.pop(name, None)
+                    self.job_package_map.pop(wrapper_id, None)
+                else:
+                    self.packages_dict[name] = new_jobs
+                    self.job_package_map[wrapper_id].job_list = new_jobs
             else:
-                self.packages_dict[name] = new_jobs
-                self.job_package_map[wrapper_id].job_list = new_jobs
+                raise AutosubmitCritical(f"Wrapper job with id {wrapper_id} not found in job_package_map", 7001)
 
     def continue_run(self):
         """
@@ -2555,7 +2553,6 @@ class JobList(object):
         for job in self.job_list:
             if not job.platform:
                 self._assign_platforms(self._as_conf, job, create=False, new=False)
-            # if job.status not in (self._IN_SCHEDULER + self._FINAL_STATUSES):
             if not job.updated:
                 job.update_parameters(self._as_conf, set_attributes=True, reset_logs=False if job.status in (
                         self._IN_SCHEDULER + self._FINAL_STATUSES) else True)
@@ -2600,7 +2597,9 @@ class JobList(object):
 
         active = (self.get_in_queue(platform) + self.get_ready(
             platform=platform, hold=True) + self.get_ready(platform=platform, hold=False) +
-                  self.get_delayed(platform=platform))
+                  self.get_delayed(platform=platform) + [ failed_job for failed_job in self.get_failed(platform=platform)
+                                                          if failed_job.fail_count < failed_job.retrials])
+
         tmp = [job for job in active if job.hold and not (job.status ==
                                                           Status.SUBMITTED or job.status == Status.READY or job.status == Status.DELAYED)]
         if len(tmp) == len(active):  # IF only held jobs left without dependencies satisfied
@@ -3062,9 +3061,7 @@ class JobList(object):
         :rtype: bool
         """
         job.packed = False
-        if not job.id:
-            pass
-        if self.packages_id and job.id in self.packages_id:
+        if self.job_package_map and int(job.id) in self.job_package_map:
             job.packed = True
         return job.packed
 
@@ -4060,7 +4057,7 @@ class JobList(object):
             jobs_data = exp_history.manager.get_jobs_data(job_names)  # This gets only the last row
             for job in self.get_job_list():
                 if job.name in jobs_data:
-                    job.id = jobs_data[job.name]["job_id"]
+                    job.id = int(jobs_data[job.name]["job_id"])
                     job.local_logs = jobs_data[job.name]["out"]
                     job.remote_logs = jobs_data[job.name]["err"]
                     job.ready_date = datetime.datetime.fromtimestamp(jobs_data[job.name]["start"]).strftime('%Y%m%d%H%M%S')

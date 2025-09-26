@@ -128,7 +128,6 @@ class CopyQueue(Queue):
         super().put(job.__getstate__(log_process=True), block, timeout)
 
 
-
 class Platform(object):
     """
     Class to manage the connections to the different platforms.
@@ -390,7 +389,8 @@ class Platform(object):
         save = False
         failed_packages = list()
         error_message = ""
-
+        if not inspect:
+            job_list.save_jobs()
         if not hold:
             Log.debug("\nJobs ready for {1}: {0}", len(
                 job_list.get_ready(self, hold=hold)), self.name)
@@ -1165,5 +1165,45 @@ class Platform(object):
         Read file content as bytes. If max_size is set, only the first max_size bytes are read.
         :param src: file path
         :param max_size: maximum size to read
+        """
+        raise NotImplementedError
+
+    def get_remote_log_dir(self) -> str:
+        """
+        Get the variable remote_log_dir that stores the directory of the Log of the experiment.
+
+        :return: The remote_log_dir variable.
+        :rtype: str
+        """
+        raise NotImplementedError
+
+    def get_completed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+        """
+        Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
+
+        :param job_names: If provided, filters the results to include only these job names.
+        :type job_names: Optional[List[str]]
+        :return: List of job names with COMPLETED files.
+        :rtype: List[str]
+        """
+        raise NotImplementedError
+
+    def get_failed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+        """
+        Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
+
+        :param job_names: If provided, filters the results to include only these job names.
+        :type job_names: Optional[List[str]]
+        :return: List of job names with COMPLETED files.
+        :rtype: List[str]
+        """
+        raise NotImplementedError
+
+    def delete_failed_and_completed_names(self, job_names: list[str]) -> None:
+        """
+        Deletes the COMPLETED and FAILED files for the given job names from the remote log directory.
+
+        :param job_names: List of job names whose COMPLETED and FAILED files should be deleted
+        :type job_names: List[str]
         """
         raise NotImplementedError
