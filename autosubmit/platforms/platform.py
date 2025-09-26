@@ -16,8 +16,8 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import atexit
-import locale
 import multiprocessing
+from multiprocessing.context import SpawnContext
 import os
 import queue  # only for the exception
 import time
@@ -51,7 +51,7 @@ def _init_logs_log_process(as_conf, platform_name):
 
 
 def recover_platform_job_logs_wrapper(
-        platform: Any,
+        platform: 'Platform',
         recovery_queue: Queue,
         worker_event: Event,
         cleanup_event: Event,
@@ -229,6 +229,17 @@ class Platform(object):
             log_queue_size = int(platform_total_jobs) * 2
         self.log_queue_size = log_queue_size
         self.remote_log_dir = None
+        self.compress_remote_logs = (
+            self.config.get("PLATFORMS", {})
+            .get(self.name.upper(), {})
+            .get("COMPRESS_REMOTE_LOGS", False)
+        )
+        self.remote_logs_compress_type = (
+            self.config.get("PLATFORMS", {})
+            .get(self.name.upper(), {})
+            .get("REMOTE_LOGS_COMPRESS_TYPE")
+            or "gzip"
+        )
 
     @classmethod
     def update_workers(cls, event_worker):
@@ -653,7 +664,7 @@ class Platform(object):
         raise NotImplementedError
 
     # Executed when calling from Job
-    def get_logs_files(self, exp_id, remote_logs):
+    def get_logs_files(self, exp_id: str, remote_logs: tuple[str, str]) -> None:
         """
         Get the given LOGS files
 
@@ -662,8 +673,7 @@ class Platform(object):
         :param remote_logs: names of the log files
         :type remote_logs: (str, str)
         """
-        (job_out_filename, job_err_filename) = remote_logs
-        self.get_files([job_out_filename, job_err_filename], False, 'LOG_{0}'.format(exp_id))
+        return NotImplementedError
 
     def get_checkpoint_files(self, job):
         """
@@ -829,44 +839,16 @@ class Platform(object):
     def closeConnection(self):
         return
 
-    def write_jobid(self, jobid, complete_path):
+    def write_jobid(self, jobid: str, complete_path: str) -> None:
         """
-        Writes Job id in an out file.
+        Writes Job id in an out/err file.
 
         :param jobid: job id
         :type jobid: str
         :param complete_path: complete path to the file, includes filename
         :type complete_path: str
-        :return: Modifies file and returns True, False if file could not be modified
-        :rtype: Boolean
         """
-        try:
-            lang = locale.getlocale()[1]
-            if lang is None:
-                lang = locale.getdefaultlocale()[1]
-                if lang is None:
-                    lang = 'UTF-8'
-            title_job = b"[INFO] JOBID=" + str(jobid).encode(lang)
-            if os.path.exists(complete_path):
-                file_type = complete_path[-3:]
-                if file_type == "out" or file_type == "err":
-                    with open(complete_path, "rb+") as f:
-                        # Reading into memory (Potentially slow)
-                        first_line = f.readline()
-                        # Not rewrite
-                        if not first_line.startswith(b'[INFO] JOBID='):
-                            content = f.read()
-                            # Write again (Potentially slow)
-                            # start = time()
-                            # Log.info("Attempting job identification of " + str(jobid))
-                            f.seek(0, 0)
-                            f.write(title_job + b"\n\n" + first_line + content)
-                        f.close()
-                        # finish = time()
-                        # Log.info("Job correctly identified in " + str(finish - start) + " seconds")
-
-        except Exception as ex:
-            Log.error("Writing Job Id Failed : " + str(ex))
+        return NotImplementedError
 
     def generate_submit_script(self):
         # type: () -> None
@@ -958,7 +940,7 @@ class Platform(object):
             if not isinstance(self.config[key], dict) or key in ["PLATFORMS", "EXPERIMENT", "DEFAULT", "CONFIG"]:
                 platform.config[key] = self.config[key]
 
-    def prepare_process(self, ctx):
+    def prepare_process(self, ctx) -> 'Platform':
         new_platform = self.create_a_new_copy()
         self.work_event = ctx.Event()
         self.cleanup_event = ctx.Event()
@@ -973,7 +955,7 @@ class Platform(object):
         atexit.register(self.closeConnection)
         return new_platform
 
-    def create_new_process(self, ctx, new_platform, as_conf) -> None:
+    def create_new_process(self, ctx: SpawnContext, new_platform: 'Platform', as_conf) -> None:
         self.log_recovery_process = ctx.Process(
             target=recover_platform_job_logs_wrapper,
             args=(new_platform, self.recovery_queue, self.work_event, self.cleanup_event, as_conf),
@@ -1165,5 +1147,13 @@ class Platform(object):
         Read file content as bytes. If max_size is set, only the first max_size bytes are read.
         :param src: file path
         :param max_size: maximum size to read
+        """
+        raise NotImplementedError
+
+    def compress_file(self, file_path: str) -> str:
+        """
+        Compress a file.
+        :param file_path: file path
+        :return: path to the compressed file
         """
         raise NotImplementedError
