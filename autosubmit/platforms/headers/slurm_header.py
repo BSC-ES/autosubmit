@@ -19,17 +19,18 @@
 
 import textwrap
 
-
 class SlurmHeader(object):
     """Class to handle the SLURM headers of a job"""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_queue_directive(self, job, parameters, het=-1):
+    def get_queue_directive(self, job: 'Job', parameters, het=-1):
         """
         Returns queue directive for the specified job
 
         :param job: job to create queue directive for
         :type job: Job
+        :param parameters:
+        :param het:
         :return: queue directive
         :rtype: str
         """
@@ -42,12 +43,13 @@ class SlurmHeader(object):
                 return "SBATCH --qos={0}".format(parameters['CURRENT_QUEUE'])
         return ""
 
-    def get_proccesors_directive(self, job, parameters, het=-1):
+    def get_processors_directive(self, job: 'Job', het: int = -1) -> str:
         """
         Returns processors directive for the specified job
 
         :param job: job to create processors directive for
         :type job: Job
+        :param het:
         :return: processors directive
         :rtype: str
         """
@@ -70,12 +72,13 @@ class SlurmHeader(object):
         else:
             return "SBATCH -n {0}".format(job.processors)
 
-    def get_partition_directive(self, job, parameters, het=-1):
+    def get_partition_directive(self, job: 'Job', het: int = -1) -> str:
         """
         Returns partition directive for the specified job
 
         :param job: job to create partition directive for
         :type job: Job
+        :param het:
         :return: partition directive
         :rtype: str
         """
@@ -88,12 +91,15 @@ class SlurmHeader(object):
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_account_directive(self, job, parameters, het=-1):
+    def get_account_directive(self, job: 'Job', parameters, het=-1) -> str:
         """
         Returns account directive for the specified job
 
         :param job: job to create account directive for
         :type job: Job
+        :param parameters:
+        :param het:
+        :type het: dict
         :return: account directive
         :rtype: str
         """
@@ -105,12 +111,14 @@ class SlurmHeader(object):
                 return "SBATCH -A {0}".format(parameters['CURRENT_PROJ'])
         return ""
 
-    def get_exclusive_directive(self, job, parameters, het=-1):
+    def get_exclusive_directive(self, job: 'Job', parameters, het=-1) -> str:
         """
         Returns account directive for the specified job
 
         :param job: job to create account directive for
         :type job: Job
+        :param parameters:
+        :param het:
         :return: account directive
         :rtype: str
         """
@@ -122,11 +130,13 @@ class SlurmHeader(object):
                 return "SBATCH --exclusive"
         return ""
 
-    def get_nodes_directive(self, job, parameters, het=-1):
+    def get_nodes_directive(self, job: 'Job', parameters, het=-1) -> str:
         """
         Returns nodes directive for the specified job
         :param job: job to create nodes directive for
         :type job: Job
+        :param parameters:
+        :param het:
         :return: nodes directive
         :rtype: str
         """
@@ -139,12 +149,14 @@ class SlurmHeader(object):
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_memory_directive(self, job, parameters, het=-1):
+    def get_memory_directive(self, job: 'Job', parameters, het=-1):
         """
         Returns memory directive for the specified job
 
         :param job: job to create memory directive for
         :type job: Job
+        :param parameters:
+        :param het:
         :return: memory directive
         :rtype: str
         """
@@ -157,12 +169,14 @@ class SlurmHeader(object):
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_memory_per_task_directive(self, job, parameters, het=-1):
+    def get_memory_per_task_directive(self, job: 'Job', parameters, het=-1):
         """
         Returns memory per task directive for the specified job
 
         :param job: job to create memory per task directive for
         :type job: Job
+        :param parameters:
+        :param het:
         :return: memory per task directive
         :rtype: str
         """
@@ -174,12 +188,14 @@ class SlurmHeader(object):
                 return "SBATCH --mem-per-cpu={0}".format(parameters['MEMORY_PER_TASK'])
         return ""
 
-    def get_threads_per_task(self, job, parameters, het=-1):
+    def get_threads_per_task(self, job: 'Job', parameters, het=-1):
         """
         Returns threads per task directive for the specified job
 
         :param job: job to create threads per task directive for
         :type job: Job
+        :param parameters:
+        :param het:
         :return: threads per task directive
         :rtype: str
         """
@@ -194,10 +210,11 @@ class SlurmHeader(object):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
 
-    def get_reservation_directive(self, job, parameters, het=-1):
+    def get_reservation_directive(self, job: 'Job', parameters, het=-1):
         """
         Returns reservation directive for the specified job
         :param job:
+        :param parameters:
         :param het:
         :return:
         """
@@ -210,12 +227,14 @@ class SlurmHeader(object):
                 return "SBATCH --reservation={0}".format(parameters['RESERVATION'])
         return ""
 
-    def get_custom_directives(self, job, parameters, het=-1):
+    def get_custom_directives(self, job: 'Job', parameters, het=-1) -> str:
         """
         Returns custom directives for the specified job
 
         :param job: job to create custom directive for
         :type job: Job
+        :param parameters:
+        :param het:
         :return: custom directives
         :rtype: str
         """
@@ -228,12 +247,14 @@ class SlurmHeader(object):
                 return '\n'.join(str(s) for s in parameters['CUSTOM_DIRECTIVES'])
         return ""
 
-    def get_tasks_per_node(self, job, parameters, het=-1):
+    def get_tasks_per_node(self, job: 'Job', parameters, het=-1) -> str:
         """
         Returns memory per task directive for the specified job
 
         :param job: job to create tasks per node directive for
         :type job: Job
+        :param parameters:
+        :param het:
         :return: tasks per node directive
         :rtype: str
         """
@@ -352,7 +373,7 @@ class SlurmHeader(object):
             header = header.replace(
                 f'%NODES_DIRECTIVE_{components}%', self.get_nodes_directive(wr_job, components))
             header = header.replace(
-                f'%NUMPROC_DIRECTIVE_{components}%', self.get_proccesors_directive(wr_job, components))
+                f'%NUMPROC_DIRECTIVE_{components}%', self.get_processors_directive(wr_job, components))
             header = header.replace(
                 f'%RESERVATION_DIRECTIVE_{components}%', self.get_reservation_directive(wr_job, components))
             header = header.replace(
@@ -363,7 +384,7 @@ class SlurmHeader(object):
 
         return header
 
-    def calculate_het_header(self, job, parameters):
+    def calculate_het_header(self, job: 'Job', parameters: dict):
         header = self.hetjob_common_header(hetsize=job.het["HETSIZE"])
         header = header.replace("%TASKTYPE%", job.section)
         header = header.replace("%DEFAULT.EXPID%", job.expid)
@@ -380,7 +401,7 @@ class SlurmHeader(object):
             header = header.replace(
                 f'%QUEUE_DIRECTIVE_{components}%', self.get_queue_directive(job, parameters, components))
             header = header.replace(
-                f'%PARTITION_DIRECTIVE_{components}%', self.get_partition_directive(job, parameters, components))
+                f'%PARTITION_DIRECTIVE_{components}%', self.get_partition_directive(job, components))
             header = header.replace(
                 f'%ACCOUNT_DIRECTIVE_{components}%', self.get_account_directive(job, parameters, components))
             header = header.replace(
@@ -393,7 +414,7 @@ class SlurmHeader(object):
             header = header.replace(
                 f'%NODES_DIRECTIVE_{components}%', self.get_nodes_directive(job, parameters, components))
             header = header.replace(
-                f'%NUMPROC_DIRECTIVE_{components}%', self.get_proccesors_directive(job, parameters, components))
+                f'%NUMPROC_DIRECTIVE_{components}%', self.get_processors_directive(job, components))
             header = header.replace(
                 f'%RESERVATION_DIRECTIVE_{components}%', self.get_reservation_directive(job, parameters, components))
             header = header.replace(

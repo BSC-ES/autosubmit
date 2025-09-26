@@ -39,35 +39,34 @@ from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.job.job_packages import JobPackageBase
+    from autosubmit.job.job import Job
+    from autosubmit.job.job_list import JobList
+    from autosubmit.job.job_package_persistence import JobPackagePersistence
 
 
-def _init_logs_log_process(as_conf, platform_name):
+def _init_logs_log_process(as_conf: 'AutosubmitConfig', platform_name: str) -> None:
     Log.set_console_level(as_conf.experiment_data.get("LOG_RECOVERY_CONSOLE_LEVEL", "DEBUG"))
     if as_conf.experiment_data["ROOTDIR"]:
         aslogs_path = Path(as_conf.experiment_data["ROOTDIR"], "tmp/ASLOGS")
-        Log.set_file(aslogs_path.joinpath(f'{platform_name.lower()}_log_recovery.log'), "out",
-                     as_conf.experiment_data.get("LOG_RECOVERY_FILE_LEVEL", "EVERYTHING"))
-        Log.set_file(aslogs_path.joinpath(f'{platform_name.lower()}_log_recovery_err.log'), "err")
+        Log.set_file(
+            str(aslogs_path / f'{platform_name.lower()}_log_recovery.log'), "out",
+            as_conf.experiment_data.get("LOG_RECOVERY_FILE_LEVEL", "EVERYTHING"))
+        Log.set_file(str(aslogs_path / f'{platform_name.lower()}_log_recovery_err.log'), "err")
 
 
 def recover_platform_job_logs_wrapper(
-        platform: Any,
+        platform: 'Platform',
         recovery_queue: Queue,
         worker_event: Event,
         cleanup_event: Event,
         as_conf: 'AutosubmitConfig'
 ) -> None:
-    """
-    Wrapper function to recover platform job logs.
+    """Wrapper function to recover platform job logs.
 
     :param platform: The platform object responsible for managing the connection and job recovery.
-    :type platform: Any
     :param recovery_queue: A multiprocessing queue used to store jobs for recovery.
-    :type recovery_queue: multiprocessing.Queue
     :param worker_event: An event to signal work availability.
-    :type worker_event: multiprocessing.Event
     :param cleanup_event: An event to signal cleanup operations.
-    :type cleanup_event: multiprocessing.Event
     :param as_conf: The Autosubmit configuration object containing experiment data.
     :type as_conf: AutosubmitConfig
     :return: None
@@ -88,8 +87,9 @@ def recover_platform_job_logs_wrapper(
     }
     _init_logs_log_process(as_conf, platform.name)
     platform.recover_platform_job_logs(as_conf)
-    _exit(
-        0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
+    # Exit userspace after manually closing ssh sockets, recommended for child processes,
+    # the queue() and shared signals should be in charge of the main process.
+    _exit(0)
 
 
 class CopyQueue(Queue):
@@ -128,7 +128,7 @@ class CopyQueue(Queue):
         super().put(job.__getstate__(), block, timeout)
 
 
-class Platform(object):
+class Platform:
     """
     Class to manage the connections to the different platforms.
     """
@@ -204,14 +204,14 @@ class Platform(object):
         if not self.two_factor_auth:
             self.pw = None
         elif auth_password is not None and self.two_factor_auth:
-            if type(auth_password) == list:
+            if isinstance(auth_password, list):
                 self.pw = auth_password[0]
             else:
                 self.pw = auth_password
         else:
             self.pw = None
         self.max_waiting_jobs = 20
-        self.recovery_queue = None
+        self.recovery_queue: Optional[Queue] = None
         self.work_event = None
         self.cleanup_event = None
         self.log_retrieval_process_active = False
@@ -364,11 +364,11 @@ class Platform(object):
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
 
-    def submit_ready_jobs(self, as_conf, job_list, packages_persistence, packages_to_submit,
+    def submit_ready_jobs(self, as_conf: 'AutosubmitConfig', job_list: 'JobList',
+                          packages_persistence: 'JobPackagePersistence', packages_to_submit: list['JobPackageBase'],
                           inspect=False, only_wrappers=False, hold=False):
 
-        """
-        Gets READY jobs and send them to the platforms if there is available space on the queues
+        """Gets READY jobs and send them to the platforms if there is available space on the queues.
 
         :param hold:
         :param packages_to_submit:
@@ -392,11 +392,9 @@ class Platform(object):
         if not inspect:
             job_list.save()
         if not hold:
-            Log.debug("\nJobs ready for {1}: {0}", len(
-                job_list.get_ready(self, hold=hold)), self.name)
+            Log.debug(f"\nJobs ready for {self.name}: {len(job_list.get_ready(self, hold=hold))}")
         else:
-            Log.debug("\nJobs prepared for {1}: {0}", len(
-                job_list.get_prepared(self)), self.name)
+            Log.debug(f"\nJobs prepared for {self.name}: {len(job_list.get_prepared(self))}")
         if not inspect:
             self.generate_submit_script()
         valid_packages_to_submit: list['JobPackageBase'] = []
@@ -446,11 +444,9 @@ class Platform(object):
                                 if job_tmp.section not in error_msg:
                                     error_msg += job_tmp.section + "&"
                             if e.message.lower().find("bad parameters") != -1:
-                                error_message += "\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {0}".format(
-                                    error_msg[:-1])
+                                error_message += f"\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {error_msg[:-1]}"
                             else:
-                                error_message += "\ncheck that {1} platform has set the correct scheduler. Sections that could be affected: {0}".format(
-                                    error_msg[:-1], self.name)
+                                error_message += f"\ncheck that {self.name} platform has set the correct scheduler. Sections that could be affected: {error_msg[:-1]}"
                     except AutosubmitCritical:
                         raise
                     except Exception:
@@ -567,27 +563,26 @@ class Platform(object):
         :param as_conf: autosubmit config object
         :type as_conf: AutosubmitConfig object
         """
-        prefix = 'HPC'
 
-        as_conf.experiment_data['{0}ARCH'.format(prefix)] = self.name
-        as_conf.experiment_data['{0}HOST'.format(prefix)] = self.host
-        as_conf.experiment_data['{0}QUEUE'.format(prefix)] = self.queue
-        as_conf.experiment_data['{0}EC_QUEUE'.format(prefix)] = self.ec_queue
-        as_conf.experiment_data['{0}PARTITION'.format(prefix)] = self.partition
+        as_conf.experiment_data['HPCARCH'] = self.name
+        as_conf.experiment_data['HPCHOST'] = self.host
+        as_conf.experiment_data['HPCQUEUE'] = self.queue
+        as_conf.experiment_data['HPCEC_QUEUE'] = self.ec_queue
+        as_conf.experiment_data['HPCPARTITION'] = self.partition
 
-        as_conf.experiment_data['{0}USER'.format(prefix)] = self.user
-        as_conf.experiment_data['{0}PROJ'.format(prefix)] = self.project
-        as_conf.experiment_data['{0}BUDG'.format(prefix)] = self.budget
-        as_conf.experiment_data['{0}RESERVATION'.format(prefix)] = self.reservation
-        as_conf.experiment_data['{0}EXCLUSIVITY'.format(prefix)] = self.exclusivity
-        as_conf.experiment_data['{0}TYPE'.format(prefix)] = self.type
-        as_conf.experiment_data['{0}SCRATCH_DIR'.format(prefix)] = self.scratch
-        as_conf.experiment_data['{0}TEMP_DIR'.format(prefix)] = self.temp_dir
+        as_conf.experiment_data['HPCUSER'] = self.user
+        as_conf.experiment_data['HPCPROJ'] = self.project
+        as_conf.experiment_data['HPCBUDG'] = self.budget
+        as_conf.experiment_data['HPCRESERVATION'] = self.reservation
+        as_conf.experiment_data['HPCEXCLUSIVITY'] = self.exclusivity
+        as_conf.experiment_data['HPCTYPE'] = self.type
+        as_conf.experiment_data['HPCSCRATCH_DIR'] = self.scratch
+        as_conf.experiment_data['HPCTEMP_DIR'] = self.temp_dir
         if self.temp_dir is None:
             self.temp_dir = ''
-        as_conf.experiment_data['{0}ROOTDIR'.format(prefix)] = self.root_dir
+        as_conf.experiment_data['HPCROOTDIR'] = self.root_dir
 
-        as_conf.experiment_data['{0}LOGDIR'.format(prefix)] = self.get_files_path()
+        as_conf.experiment_data['HPCLOGDIR'] = self.get_files_path()
 
     def send_file(self, filename: str, check=True) -> bool:
         """Sends a local file to the platform
@@ -663,7 +658,7 @@ class Platform(object):
         :type remote_logs: (str, str)
         """
         (job_out_filename, job_err_filename) = remote_logs
-        self.get_files([job_out_filename, job_err_filename], False, 'LOG_{0}'.format(exp_id))
+        self.get_files([job_out_filename, job_err_filename], False, f'LOG_{exp_id}')
 
     def get_checkpoint_files(self, job):
         """
@@ -671,8 +666,6 @@ class Platform(object):
 
         :param job: Get the checkpoint files
         :type job: Job
-        :param max_step: max step possible
-        :type max_step: int
         """
         if not job.current_checkpoint_step:
             job.current_checkpoint_step = 0
@@ -703,16 +696,14 @@ class Platform(object):
         if recovery:
             retries = 5
             for i in range(retries):
-                if self.get_file('{0}_COMPLETED'.format(job_name), False, ignore_log=recovery):
+                if self.get_file(f'{job_name}_COMPLETED', False, ignore_log=recovery):
                     return True
             return False
-        if self.check_file_exists('{0}_COMPLETED'.format(job_name), wrapper_failed=wrapper_failed):
-            if self.get_file('{0}_COMPLETED'.format(job_name), True, wrapper_failed=wrapper_failed):
-                return True
-            else:
-                return False
-        else:
-            return False
+
+        if self.check_file_exists(f'{job_name}_COMPLETED', wrapper_failed=wrapper_failed):
+            return self.get_file(f'{job_name}_COMPLETED', True, wrapper_failed=wrapper_failed)
+
+        return False
 
     def remove_stat_file(self, job: Any) -> bool:
         """
@@ -739,25 +730,23 @@ class Platform(object):
         """
         filename = job_name + '_COMPLETED'
         if self.delete_file(filename):
-            Log.debug('{0} been removed', filename)
+            Log.debug(f'{filename} been removed')
             return True
         return False
 
     def remove_checkpoint_file(self, filename):
-        """
-        Removes *CHECKPOINT* files from remote
+        """Removes *CHECKPOINT* files from remote.
 
-        :param job_name: name of job to check
+        :param filename: file name to delete.
         :return: True if successful, False otherwise
         """
         if self.check_file_exists(filename):
             self.delete_file(filename)
 
-    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3):
+    def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3):
         return True
 
     def get_stat_file(self, job, count=-1):
-
         if count == -1:  # No internal retrials
             filename = f"{job.stat_file}{job.fail_count}"
         else:
@@ -778,8 +767,7 @@ class Platform(object):
 
     @autosubmit_parameter(name='current_logdir')
     def get_files_path(self):
-        """
-        The platform's LOG directory.
+        """The platform's LOG directory.
 
         :return: platform's LOG directory
         :rtype: str
@@ -790,9 +778,8 @@ class Platform(object):
             path = Path(self.remote_log_dir)
         return str(path)
 
-    def submit_job(self, job, script_name, hold=False, export="none"):
-        """
-        Submit a job from a given job object.
+    def submit_job(self, job: 'Job', script_name: str, hold: bool = False, export: str = "none"):
+        """Submit a job from a given job object.
 
         :param job: job object
         :type job: autosubmit.job.job.Job
@@ -807,13 +794,13 @@ class Platform(object):
         """
         raise NotImplementedError
 
-    def check_Alljobs(self, job_list, as_conf, retries=5):
+    def check_all_jobs(self, job_list: list['Job'], as_conf:'AutosubmitConfig', retries: int = 5):
         for job, job_prev_status in job_list:
             self.check_job(job)
 
-    def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
-        """
-        Checks job running status
+    def check_job(self, job: 'Job', default_status: str = Status.COMPLETED, retries:int = 5,
+                  submit_hold_check: bool = False, is_wrapper: bool = False):
+        """Checks job running status.
 
         :param is_wrapper:
         :param submit_hold_check:
@@ -826,12 +813,11 @@ class Platform(object):
         """
         raise NotImplementedError
 
-    def closeConnection(self):
+    def close_connection(self):
         return
 
     def write_jobid(self, jobid, complete_path):
-        """
-        Writes Job id in an out file.
+        """Writes Job id in an out file.
 
         :param jobid: job id
         :type jobid: str
@@ -970,7 +956,7 @@ class Platform(object):
         self.recovery_queue = CopyQueue(ctx=ctx)
         # Cleanup will be automatically prompt on control + c or a normal exit
         atexit.register(self.send_cleanup_signal)
-        atexit.register(self.closeConnection)
+        atexit.register(self.close_connection)
         return new_platform
 
     def create_new_process(self, ctx, new_platform, as_conf) -> None:
@@ -1052,13 +1038,10 @@ class Platform(object):
         return process_log
 
     def wait_until_timeout(self, timeout: int = 60) -> bool:
-        """
-        Waits until the timeout is reached or any signal is set to process logs.
+        """Waits until the timeout is reached or any signal is set to process logs.
 
-        :param sleep_time: Maximum time to wait in seconds. Defaults to 60.
-        :type sleep_time: int
+        :param timeout: Maximum time to wait in seconds. Defaults to 60.
         :return: True if there is work to process, False otherwise.
-        :rtype: bool
         """
         process_log = False
         for _ in range(timeout, 0, -1):
@@ -1105,11 +1088,12 @@ class Platform(object):
             try:
                 job.retrieve_logfiles(raise_error=True)
                 job._log_recovery_retries += 1
-            except:
+            except Exception as e:
                 if job._log_recovery_retries < 5:
                     jobs_pending_to_process.add(job)
                 Log.warning(
-                    f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry '{job.fail_count}'.")
+                    f"{identifier} (Retry) Failed to recover log for job '{job.name}' "
+                    f"and retry '{job.fail_count}': {str(e)}")
             Log.result(
                 f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
         if len(jobs_pending_to_process) > 0:
@@ -1144,11 +1128,12 @@ class Platform(object):
             Log.debug(traceback.format_exc())
 
         with suppress(Exception):
-            self.closeConnection()
+            self.close_connection()
 
         Log.info(f"{identifier} Exiting.")
-        _exit(
-            0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
+        # Exit userspace after manually closing ssh sockets, recommended for child processes,
+        # the queue() and shared signals should be in charge of the main process.
+        _exit(0)
 
     def create_a_new_copy(self):
         raise NotImplementedError

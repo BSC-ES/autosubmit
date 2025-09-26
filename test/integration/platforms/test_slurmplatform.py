@@ -15,20 +15,24 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Integration tests for the Slurm platform."""
+"""Integration tests for the Slurm platform.
 
-from typing import TYPE_CHECKING
+As these tests use a GitHub Actions service with limited capacity for running jobs,
+we limit in pytest how many tests we run in parallel to avoid the service becoming
+unresponsive (which likely explains our banner timeout messages before, as probably
+it was busy churning the previous messages and Slurm jobs).
+
+This is done by assigning the tests the group "slurm". This forces pytest to send
+all the grouped tests to the same worker,
+"""
 
 import pytest
+from testcontainers.core.container import DockerContainer
 
 from autosubmit.config.configcommon import AutosubmitConfig
+
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from test.conftest import AutosubmitExperimentFixture
-
-if TYPE_CHECKING:
-    from testcontainers.core.container import DockerContainer
-
-_EXPID = 't001'
 
 _PLATFORM_NAME = 'TEST_SLURM'
 
@@ -37,9 +41,14 @@ def _create_slurm_platform(expid: str, as_conf: AutosubmitConfig):
     return SlurmPlatform(expid, _PLATFORM_NAME, config=as_conf.experiment_data, auth_password=None)
 
 
-def test_create_platform_slurm(autosubmit_exp):
+@pytest.mark.xdist_group('slurm')
+@pytest.mark.slurm
+def test_create_platform_slurm(
+        autosubmit_exp,
+        slurm_server: 'DockerContainer',
+):
     """Test the Slurm platform object creation."""
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp('t000', experiment_data={
         'JOBS': {
             'SIM': {
                 'PLATFORM': _PLATFORM_NAME,
@@ -58,6 +67,8 @@ def test_create_platform_slurm(autosubmit_exp):
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             }
         }
     })
@@ -66,6 +77,7 @@ def test_create_platform_slurm(autosubmit_exp):
     # TODO: add more assertion statements...
 
 
+@pytest.mark.xdist_group('slurm')
 @pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     {
@@ -87,6 +99,8 @@ def test_create_platform_slurm(autosubmit_exp):
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
     },
@@ -95,12 +109,12 @@ def test_create_platform_slurm(autosubmit_exp):
             'SIM': {
                 'PLATFORM': _PLATFORM_NAME,
                 'RUNNING': 'chunk',
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
             },
             'SIM_2': {
                 'PLATFORM': _PLATFORM_NAME,
                 'RUNNING': 'chunk',
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
                 'DEPENDENCIES': 'SIM',
             },
         },
@@ -115,6 +129,8 @@ def test_create_platform_slurm(autosubmit_exp):
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
     },
@@ -122,30 +138,29 @@ def test_create_platform_slurm(autosubmit_exp):
     'Simple Workflow',
     'Dependency Workflow',
 ])
-def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, experiment_data: dict,
-                                   slurm_server: 'DockerContainer'):
+def test_run_simple_workflow_slurm(
+        autosubmit_exp: AutosubmitExperimentFixture,
+        experiment_data,
+        slurm_server: 'DockerContainer'
+):
     """Runs a simple Bash script using Slurm."""
-    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
+    exp = autosubmit_exp('t001', experiment_data=experiment_data)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 
+@pytest.mark.xdist_group('slurm')
 @pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
-    # Vertical Wrapper Workflow
     {
-        'DEFAULT': {
-            'EXPID': _EXPID,
-            'HPCARCH': _PLATFORM_NAME,
-        },
         'JOBS': {
             'SIM': {
                 'DEPENDENCIES': {
                     'SIM-1': {}
                 },
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -155,7 +170,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
                 'DEPENDENCIES': {
                     'SIM',
                 },
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -166,7 +181,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
                     'SIM',
                     'POST',
                 },
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'once',
                 'CHECK': 'on_submission',
@@ -177,15 +192,15 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
                 'HOST': '127.0.0.1',
-                'MAX_WALLCLOCK': '02:00',
+                'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
                 'SCRATCH_DIR': '/tmp/scratch/',
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
-                'MAX_PROCESSORS': 10,
-                'PROCESSORS_PER_NODE': 10,
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
         'WRAPPERS': {
@@ -196,18 +211,13 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
             }
         },
     },
-    # Wrapper Vertical
     {
-        'DEFAULT': {
-            'EXPID': _EXPID,
-            'HPCARCH': _PLATFORM_NAME,
-        },
         'JOBS': {
-            'SIM_V': {
+            'SIMV': {
                 'DEPENDENCIES': {
-                    'SIM_V-1': {}
+                    'SIMV-1': {}
                 },
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -226,30 +236,25 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
-                'MAX_PROCESSORS': 10,
-                'PROCESSORS_PER_NODE': 10,
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
         'WRAPPERS': {
-            'WRAPPER_V': {
+            'WRAPPERV': {
                 'TYPE': 'vertical',
-                'JOBS_IN_WRAPPER': 'SIM_V',
+                'JOBS_IN_WRAPPER': 'SIMV',
                 'RETRIALS': 0,
             },
         },
     },
-    # Wrapper Horizontal
     {
-        'DEFAULT': {
-            'EXPID': _EXPID,
-            'HPCARCH': _PLATFORM_NAME,
-        },
         'JOBS': {
-            'SIM_H': {
+            'SIMH': {
                 'DEPENDENCIES': {
-                    'SIM_H-1': {}
+                    'SIMH-1': {}
                 },
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -268,30 +273,25 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
-                'MAX_PROCESSORS': 10,
-                'PROCESSORS_PER_NODE': 10,
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
         'WRAPPERS': {
-            'WRAPPER_H': {
+            'WRAPPERH': {
                 'TYPE': 'horizontal',
-                'JOBS_IN_WRAPPER': 'SIM_H',
+                'JOBS_IN_WRAPPER': 'SIMH',
                 'RETRIALS': 0,
             },
         },
     },
-    # Wrapper Horizontal-vertical
     {
-        'DEFAULT': {
-            'EXPID': _EXPID,
-            'HPCARCH': _PLATFORM_NAME,
-        },
         'JOBS': {
-            'SIM_H_V': {
+            'SIMHV': {
                 'DEPENDENCIES': {
-                    'SIM_H_V-1': {}
+                    'SIMHV-1': {}
                 },
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -310,30 +310,25 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
-                'MAX_PROCESSORS': 10,
-                'PROCESSORS_PER_NODE': 10,
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
         'WRAPPERS': {
-            'WRAPPER_H_V': {
+            'WRAPPERHV': {
                 'TYPE': 'horizontal-vertical',
-                'JOBS_IN_WRAPPER': 'SIM_H_V',
+                'JOBS_IN_WRAPPER': 'SIMHV',
                 'RETRIALS': 0,
             },
         },
     },
-    # Wrapper Vertical-horizontal
     {
-        'DEFAULT': {
-            'EXPID': _EXPID,
-            'HPCARCH': _PLATFORM_NAME,
-        },
         'JOBS': {
-            'SIM_V_H': {
+            'SIMVH': {
                 'DEPENDENCIES': {
-                    'SIM_V_H-1': {},
+                    'SIMVH-1': {},
                 },
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -352,49 +347,18 @@ def test_run_simple_workflow_slurm(autosubmit_exp: AutosubmitExperimentFixture, 
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
-                'MAX_PROCESSORS': 10,
-                'PROCESSORS_PER_NODE': 10,
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
         'WRAPPERS': {
-            'WRAPPER_V_H': {
+            'WRAPPERVH': {
                 'TYPE': 'vertical-horizontal',
-                'JOBS_IN_WRAPPER': 'SIM_V_H',
+                'JOBS_IN_WRAPPER': 'SIMVH',
                 'RETRIALS': 0,
             },
         },
     },
-], ids=[
-    'Vertical Wrapper Workflow',
-    'Wrapper Vertical',
-    'Wrapper Horizontal',
-    'Wrapper Horizontal-vertical',
-    'Wrapper Vertical-horizontal',
-])
-def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: AutosubmitExperimentFixture,
-                                         slurm_server: 'DockerContainer'):
-    """Runs a simple Bash script using Slurm."""
-    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, wrapper=True)
-    _create_slurm_platform(exp.expid, exp.as_conf)
-
-    exp.as_conf.experiment_data = {
-        'EXPERIMENT': {
-            'DATELIST': '20000101',
-            'MEMBERS': 'fc0 fc1',
-            'CHUNKSIZEUNIT': 'day',
-            'CHUNKSIZE': 1,
-            'NUMCHUNKS': '2',
-            'CHUNKINI': '',
-            'CALENDAR': 'standard',
-        }
-    }
-
-    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
-    assert 0 == exp.autosubmit.run_experiment(exp.expid)
-
-
-@pytest.mark.slurm
-@pytest.mark.parametrize('experiment_data', [
     {
         'JOBS': {
             'LOCAL_SETUP': {
@@ -496,8 +460,8 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
-                'MAX_PROCESSORS': 10,
-                'PROCESSORS_PER_NODE': 10,
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
         'WRAPPERS': {
@@ -614,8 +578,8 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
-                'MAX_PROCESSORS': 10,
-                'PROCESSORS_PER_NODE': 10,
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
         'WRAPPERS': {
@@ -627,22 +591,31 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
         },
     }
 ], ids=[
+    'Vertical Wrapper Workflow',
+    'Wrapper Vertical',
+    'Wrapper Horizontal',
+    'Wrapper Horizontal-vertical',
+    'Wrapper Vertical-horizontal',
     'Complex Wrapper vertical-horizontal',
     'Complex Wrapper horizontal-vertical',
 ])
-def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubmit_exp: 'AutosubmitExperimentFixture',
-                                                 slurm_server: 'DockerContainer'):
+def test_run_all_wrappers_workflow_slurm(
+        experiment_data: dict,
+        slurm_server: 'DockerContainer',
+        autosubmit_exp: AutosubmitExperimentFixture
+):
     """Runs a simple Bash script using Slurm."""
-    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, wrapper=True)
+
+    exp = autosubmit_exp('t002', experiment_data=experiment_data, wrapper=True)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.as_conf.experiment_data = {
         'EXPERIMENT': {
-            'DATELIST': '20120101 20120201',
-            'MEMBERS': '000 001',
+            'DATELIST': '20000101',
+            'MEMBERS': 'fc0 fc1',
             'CHUNKSIZEUNIT': 'day',
-            'CHUNKSIZE': '1',
-            'NUMCHUNKS': '3',
+            'CHUNKSIZE': 1,
+            'NUMCHUNKS': '2',
             'CHUNKINI': '',
             'CALENDAR': 'standard',
         }

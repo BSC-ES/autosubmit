@@ -105,7 +105,7 @@ def test_run_command_describe(autosubmit_exp: Callable, autosubmit, mocker):
         _EXPIDS[0],
         experiment_data={
             'DEFAULT': {
-                'HPCARCH': 'ARM'
+                'HPCARCH': 'TEST_SLURM'
             },
             **fake_jobs,
             **fake_platforms

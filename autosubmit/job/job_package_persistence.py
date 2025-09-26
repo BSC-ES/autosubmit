@@ -28,11 +28,6 @@ class JobPackagePersistence(object):
     Class that handles packages workflow.
 
     Create Packages Table, Wrappers Table.
-
-    :param persistence_path: Path to the persistence folder pkl. \n
-    :type persistence_path: String \n
-    :param persistence_file: Name of the persistence pkl file. \n
-    :type persistence_file: String
     """
 
     VERSION = 1

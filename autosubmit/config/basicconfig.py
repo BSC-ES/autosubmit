@@ -15,14 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-try:
-    # noinspection PyCompatibility
-    from configparser import SafeConfigParser
-except ImportError:
-    # noinspection PyCompatibility
-    from configparser import ConfigParser as SafeConfigParser
 import inspect
 import os
+from configparser import ConfigParser
 from pathlib import Path
 
 
@@ -34,7 +29,7 @@ class BasicConfig:
     def __init__(self):
         pass
 
-    def props(self):
+    def props(self) -> dict:
         pr = {}
         for name in dir(self):
             value = getattr(self, name)
@@ -111,8 +106,7 @@ class BasicConfig:
             return
         else:
             BasicConfig.CONFIG_FILE_FOUND = True
-        # print('Reading config from ' + file_path)
-        parser = SafeConfigParser()
+        parser = ConfigParser()
         parser.optionxform = str
         parser.read(file_path)
 
@@ -120,6 +114,10 @@ class BasicConfig:
             BasicConfig.DB_DIR = parser.get('database', 'path')
         if parser.has_option('database', 'filename'):
             BasicConfig.DB_FILE = parser.get('database', 'filename')
+        if parser.has_option('database', 'backend'):
+            BasicConfig.DATABASE_BACKEND = parser.get('database', 'backend')
+        if parser.has_option('database', 'connection_url'):
+            BasicConfig.DATABASE_CONN_URL = parser.get('database', 'connection_url')
         if parser.has_option('local', 'path'):
             BasicConfig.LOCAL_ROOT_DIR = parser.get('local', 'path')
         if parser.has_option('conf', 'platforms'):
@@ -136,7 +134,6 @@ class BasicConfig:
             BasicConfig.MAIL_FROM = parser.get('mail', 'mail_from')
         if parser.has_option('hosts', 'authorized'):
             list_command_allowed = parser.get('hosts', 'authorized')
-
             list_command_allowed = list_command_allowed.split('] ')
             i = 0
             for _ in list_command_allowed:
@@ -192,10 +189,6 @@ class BasicConfig:
         if parser.has_option('autosubmitapi', 'url'):
             BasicConfig.AUTOSUBMIT_API_URL = parser.get(
                 'autosubmitapi', 'url')
-        if parser.has_option('database', 'backend'):
-            BasicConfig.DATABASE_BACKEND = parser.get('database', 'backend')
-        if parser.has_option('database', 'connection_url'):
-            BasicConfig.DATABASE_CONN_URL = parser.get('database', 'connection_url')
         if parser.has_option('config', 'log_recovery_timeout'):
             BasicConfig.LOG_RECOVERY_TIMEOUT = int(parser.get('config', 'log_recovery_timeout'))
 

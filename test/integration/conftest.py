@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Fixtures for integration tests."""
-
 import multiprocessing
 import os
 import uuid
@@ -46,7 +45,6 @@ _SSH_DOCKER_PASSWORD = 'password'
 
 _SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1'
 
-
 class MakeSSHClientFixture(Protocol):
     def __call__(
             self,
@@ -54,7 +52,6 @@ class MakeSSHClientFixture(Protocol):
             password: Optional[str],
             key: Optional[Union['Path', str]]) -> paramiko.SSHClient:
         ...
-
 
 @pytest.fixture
 def make_ssh_client() -> MakeSSHClientFixture:
@@ -176,7 +173,6 @@ def ssh_server(mocker, tmp_path, make_ssh_client, request):
 
         yield container
 
-
 @pytest.fixture()
 def slurm_server(mocker, tmp_path: 'LocalPath', make_ssh_client: MakeSSHClientFixture, request):
     ssh_port = get_free_port()
@@ -188,11 +184,11 @@ def slurm_server(mocker, tmp_path: 'LocalPath', make_ssh_client: MakeSSHClientFi
     }
 
     docker_container = DockerContainer(
-            image=_SLURM_DOCKER_IMAGE,
-            remove=True,
-            hostname='slurmctld',
-            name=container_name,
-            **docker_args
+        image=_SLURM_DOCKER_IMAGE,
+        remove=True,
+        hostname='slurmctld',
+        name=container_name,
+        **docker_args
     )
 
     # TODO: GH needs --volume /sys/fs/cgroup:/sys/fs/cgroup:rw

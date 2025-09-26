@@ -279,12 +279,12 @@ def _get_experiment_data(tmp_path):
 
     return {
         'PLATFORMS': {
-            'pytest-ps': {
-                'type': 'ps',
-                'host': '127.0.0.1',
-                'user': _user,
-                'project': 'whatever',
-                'scratch': str(tmp_path / 'scratch'),
+            'PYTEST-PS': {
+                'TYPE': 'ps',
+                'HOST': 'localDocker',
+                'USER': _user,
+                'PROJECT': 'whatever',
+                'SCRATCH': str(tmp_path / 'scratch'),
                 'DISABLE_RECOVERY_THREADS': 'True'
             }
         },
