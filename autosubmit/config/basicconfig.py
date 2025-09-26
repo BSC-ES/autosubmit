@@ -114,6 +114,10 @@ class BasicConfig:
             BasicConfig.DB_DIR = parser.get('database', 'path')
         if parser.has_option('database', 'filename'):
             BasicConfig.DB_FILE = parser.get('database', 'filename')
+        if parser.has_option('database', 'backend'):
+            BasicConfig.DATABASE_BACKEND = parser.get('database', 'backend')
+        if parser.has_option('database', 'connection_url'):
+            BasicConfig.DATABASE_CONN_URL = parser.get('database', 'connection_url')
         if parser.has_option('local', 'path'):
             BasicConfig.LOCAL_ROOT_DIR = parser.get('local', 'path')
         if parser.has_option('conf', 'platforms'):
@@ -185,10 +189,6 @@ class BasicConfig:
         if parser.has_option('autosubmitapi', 'url'):
             BasicConfig.AUTOSUBMIT_API_URL = parser.get(
                 'autosubmitapi', 'url')
-        if parser.has_option('database', 'backend'):
-            BasicConfig.DATABASE_BACKEND = parser.get('database', 'backend')
-        if parser.has_option('database', 'connection_url'):
-            BasicConfig.DATABASE_CONN_URL = parser.get('database', 'connection_url')
         if parser.has_option('config', 'log_recovery_timeout'):
             BasicConfig.LOG_RECOVERY_TIMEOUT = int(parser.get('config', 'log_recovery_timeout'))
 
