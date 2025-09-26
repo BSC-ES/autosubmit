@@ -14,7 +14,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
 try:
     # noinspection PyCompatibility
     from configparser import SafeConfigParser
@@ -222,4 +221,28 @@ class BasicConfig:
             # Check if the environment variable is defined
 
         BasicConfig._update_config()
+        return
+
+    @staticmethod
+    def generate_dirs():
+        """
+        Generates the directory structure needed for Autosubmit operation
+        """
+        Path(BasicConfig.DB_DIR).mkdir(parents=True, exist_ok=True)
+        Path(BasicConfig.LOCAL_ROOT_DIR).mkdir(parents=True, exist_ok=True)
+        Path(BasicConfig.STRUCTURES_DIR).mkdir(parents=True, exist_ok=True)
+        Path(BasicConfig.GLOBAL_LOG_DIR).mkdir(parents=True, exist_ok=True)
+        Path(BasicConfig.DEFAULT_OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+        Path(BasicConfig.JOBDATA_DIR).mkdir(parents=True, exist_ok=True)
+        Path(BasicConfig.HISTORICAL_LOG_DIR).mkdir(parents=True, exist_ok=True)
+
+        os.chmod(BasicConfig.DB_DIR, 0o770)
+        os.chmod(BasicConfig.LOCAL_ROOT_DIR, 0o770)
+        os.chmod(BasicConfig.STRUCTURES_DIR, 0o770)
+        os.chmod(BasicConfig.GLOBAL_LOG_DIR, 0o770)
+        os.chmod(BasicConfig.DEFAULT_OUTPUT_DIR, 0o770)
+        os.chmod(BasicConfig.JOBDATA_DIR, 0o770)
+        os.chmod(BasicConfig.HISTORICAL_LOG_DIR, 0o770)
+
+        # Local experiment directories are created when needed
         return

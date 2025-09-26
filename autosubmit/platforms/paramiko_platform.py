@@ -30,7 +30,7 @@ from contextlib import suppress
 from pathlib import Path
 from threading import Thread
 from time import sleep
-from typing import Optional, Union, TYPE_CHECKING
+from typing import Optional, Union, TYPE_CHECKING, List
 
 import Xlib.support.connect as xlib_connect
 import paramiko
@@ -457,6 +457,14 @@ class ParamikoPlatform(Platform):
         return ""
 
     def send_file(self, filename, check=True) -> bool:
+        """
+        Sends a local file to the platform
+        :param check:
+        :param filename: name of the file to send
+        :type filename: str
+        """
+        local_path = None
+        remote_path = None
         if check:
             self.check_remote_log_dir()
             self.delete_file(filename)
@@ -468,8 +476,8 @@ class ParamikoPlatform(Platform):
             self._ftpChannel.chmod(remote_path, os.stat(local_path).st_mode)
             return True
         except IOError as e:
-            raise AutosubmitError(f'Can not send file {os.path.join(self.tmp_path, filename)} to '
-                                  f'{os.path.join(self.get_files_path(), filename)}', 6004, str(e))
+            raise AutosubmitError(f'Can not send file {local_path} to '
+                                  f'{remote_path}', 6004, str(e))
         except Exception as e:
             raise AutosubmitError(f'Failed to send file, the SSH connection may be inactive: {str(e)}', 6004)
 
@@ -668,7 +676,8 @@ class ParamikoPlatform(Platform):
         if job.is_over_wallclock():
             try:
                 job.platform.get_completed_files(job.name)
-                job_status = job.check_completion(over_wallclock=True)
+                job.check_completion()
+                job_status = job.new_status
             except Exception as e:
                 job_status = Status.FAILED
                 Log.debug(f"Unexpected error checking completed files for a job over wallclock: {str(e)}")
@@ -681,6 +690,59 @@ class ParamikoPlatform(Platform):
                 except Exception as e:
                     Log.debug(f"Error cancelling job {job.id}: {str(e)}")
         return job_status
+
+    def get_completed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+        """
+        Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
+
+        :param job_names: If provided, filters the results to include only these job names.
+        :type job_names: Optional[List[str]]
+        :return: List of job names with COMPLETED files.
+        :rtype: List[str]
+        """
+        if not job_names:
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_COMPLETED' -type f"
+        else:
+            patterns = ' -o '.join([f"-name '{name}_COMPLETED'" for name in job_names])
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {patterns} \\) -type f"
+        self.send_command(cmd)
+        output = self.get_ssh_output()
+        completed_files = output.strip().split('\n') if output else []
+        job_names = [Path(file).name.replace('_COMPLETED', '') for file in completed_files]
+        return job_names
+
+    def get_failed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+        """
+        Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
+
+        :param job_names: If provided, filters the results to include only these job names.
+        :type job_names: Optional[List[str]]
+        :return: List of job names with COMPLETED files.
+        :rtype: List[str]
+        """
+        if not job_names:
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_FAILED' -type f"
+        else:
+            patterns = ' -o '.join([f"-name '{name}_FAILED'" for name in job_names])
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {patterns} \\) -type f"
+        self.send_command(cmd)
+        output = self.get_ssh_output()
+        completed_files = output.strip().split('\n') if output else []
+        job_names = [Path(file).name.replace('_FAILED', '') for file in completed_files]
+        return job_names
+
+    def delete_failed_and_completed_names(self, job_names: list[str]) -> None:
+        """
+        Deletes the COMPLETED and FAILED files for the given job names from the remote log directory.
+
+        :param job_names: List of job names whose COMPLETED and FAILED files should be deleted
+        :type job_names: List[str]
+        """
+        if self.expid in str(self.remote_log_dir): # Ensure we are in the right experiment
+            job_name_str = ' -o -name '.join([f"'{name}_COMPLETED' -o -name '{name}_FAILED'" for name in job_names])
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( -name {job_name_str} \\) -type f -delete"
+            self.send_command(cmd)
+
 
     def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
         """
@@ -725,19 +787,7 @@ class ParamikoPlatform(Platform):
                 self.get_ssh_output()).strip("\n")
             # URi: define status list in HPC Queue Class
             if job_status in self.job_status['COMPLETED'] or retries == 0:
-                # The Local platform has only 0 or 1, so it necessary to look for the completed file.
-                if self.type == "local":
-                    if not job.is_wrapper:
-                        # Not sure why it is called over_wallclock but is the only way to return a value
-                        job_status = job.check_completion(over_wallclock=True)
-                    else:
-                        # wrapper has a different file name
-                        if Path(f"{self.remote_log_dir}/WRAPPER_FAILED").exists():
-                            job_status = Status.FAILED
-                        else:
-                            job_status = Status.COMPLETED
-                else:
-                    job_status = Status.COMPLETED
+                job_status = Status.COMPLETED
 
             elif job_status in self.job_status['RUNNING']:
                 job_status = Status.RUNNING

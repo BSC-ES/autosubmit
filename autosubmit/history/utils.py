@@ -62,6 +62,14 @@ def create_file_with_full_permissions(path: str) -> None:
     os.open(path, os.O_WRONLY | os.O_CREAT, 0o777)
 
 
+def create_path_if_not_exists(path):
+    # type : (str) -> bool
+    if not os.path.exists(path):
+        os.makedirs(path)
+        return True
+    return False
+
+
 class SupportedStatus:
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
