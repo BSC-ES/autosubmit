@@ -201,7 +201,13 @@ class Log:
         logging.getLogger(name)
 
     @staticmethod
-    def set_file(file_path: str, type='out', level="WARNING") -> None:
+    def set_file(
+        file_path: str,
+        type="out",
+        level="WARNING",
+        max_retries: int = 3,
+        timeout: int = 5,
+    ) -> None:
         """Configure the file to store the log.
 
         If another file was specified earlier, new messages will only go to the new file.
@@ -225,9 +231,7 @@ class Log:
 
         level = levels.get(str(level).upper(), "DEBUG")
 
-        max_retries = 3
-        retries = 1
-        timeout = 5
+        retries = 0
 
         while not os.path.exists(file_path) and retries < max_retries:
             try:
@@ -272,6 +276,11 @@ class Log:
                     Log.log.addHandler(status_file_handler)
                 os.chmod(file_path, 509)
             except Exception:  # retry again
+                retries += 1
+                if retries >= max_retries:
+                    raise AutosubmitCritical(
+                        message=f"Could not create log file {file_path} after {max_retries} attempts"
+                    )
                 sleep(timeout * retries)
 
     @staticmethod

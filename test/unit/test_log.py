@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import pytest
+import pytest_mock
 from autosubmit.log.log import AutosubmitError, AutosubmitCritical, Log
 
 """Tests for the log module."""
@@ -65,3 +67,17 @@ def test_log_not_format():
     # Format messages
     msg = "Test {foo, bar}"
     _send_messages(msg)
+
+
+def test_set_file_retrial(mocker: pytest_mock.MockFixture):
+    max_retries = 3
+
+    # Make os.path.split raise an exception
+    mocker.patch("os.path.split", side_effect=Exception("Mocked exception"))
+
+    sleep = mocker.patch("autosubmit.log.log.sleep")
+
+    with pytest.raises(AutosubmitCritical):
+        Log.set_file("imaginary.log", max_retries=max_retries, timeout=1)
+
+    assert sleep.call_count == max_retries - 1
