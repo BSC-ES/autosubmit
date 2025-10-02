@@ -178,10 +178,8 @@ class TestExperimentHistoryDbManager:
         self.experiment_database._update_job_data_by_id(backup_job_dc)
 
     def test_bulk_update(self):
-        current_time = time.time()
         all_job_data_rows = self.experiment_database.get_job_data_all()
         job_data_rows_test = [job for job in all_job_data_rows if job.run_id == 3]
-        backup = [JobData.from_model(job) for job in job_data_rows_test]
         list_job_data_class = [JobData.from_model(job) for job in job_data_rows_test]
         backup_changes = [(HUtils.get_current_datetime(), job.status, job.rowstatus, job._id) for job in
                           list_job_data_class]

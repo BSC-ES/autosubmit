@@ -111,13 +111,13 @@ def _print_db_results(db_check_list, rows_as_dicts, run_tmpdir):
                 print(f"Job entry: {job_name} assert {str(all_ok).upper()}")
 
 
-def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[str, (bool, str)]:
+def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[str, Any]:
     """Check that the database contains the expected number of entries,
     and that all fields contain data after a completed run."""
     # Test database exists.
     job_data_db = run_tmpdir / f'metadata/data/job_data_{_EXPID}.db'
     autosubmit_db = Path(run_tmpdir, "tests.db")
-    db_check_list = {
+    db_check_list: dict = {
         "JOB_DATA_EXIST": (job_data_db.exists(), f"DB {str(job_data_db)} missing"),
         "AUTOSUBMIT_DB_EXIST": (autosubmit_db.exists(), f"DB {str(autosubmit_db)} missing"),
         "JOB_DATA_FIELDS": {}
@@ -151,7 +151,7 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[s
             if job_name not in db_check_list["JOB_DATA_FIELDS"]:
                 db_check_list["JOB_DATA_FIELDS"][job_name] = {}
 
-            previous_retry_row = {}
+            previous_retry_row: dict = {}
             for i, row_dict in enumerate(grouped_rows):
                 check_job_submit = row_dict["submit"] > 0 and row_dict["submit"] != 1970010101
                 check_job_start = row_dict["start"] > 0 and row_dict["start"] != 1970010101
@@ -227,7 +227,7 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[s
     return db_check_list
 
 
-def _assert_db_fields(db_check_list: dict[str, (bool, str)]) -> None:
+def _assert_db_fields(db_check_list: dict[str, Any]) -> None:
     """Run assertions against database values, checking for possible issues."""
     assert db_check_list["JOB_DATA_EXIST"][0], db_check_list["JOB_DATA_EXIST"][1]
     assert db_check_list["AUTOSUBMIT_DB_EXIST"][0], db_check_list["AUTOSUBMIT_DB_EXIST"][1]

@@ -188,7 +188,7 @@ def test_copy_code_local_project_local_destination_exists_force(autosubmit_exp, 
     assert any(['will not sync' in call[0][0] for call in mocked_log.info.call_args_list])
 
     # Refresh does.
-    exp.autosubmit.refresh(_EXPID, None, None)  # type: ignore
+    exp.autosubmit.refresh(_EXPID, None, None)
     assert Path(local_destination, 'AGENTS.txt').exists()
 
 
@@ -220,7 +220,7 @@ def test_copy_code_local_project_rsync_error(autosubmit_exp, tmp_path, mocker):
     )
 
     with pytest.raises(AutosubmitCritical) as cm:
-        exp.autosubmit.refresh(_EXPID, None, None)  # type: ignore
+        exp.autosubmit.refresh(_EXPID, None, None)
 
     assert not Path(local_destination, 'AGENTS.txt').exists()
     assert 'Cannot rsync' in str(cm.value.message)

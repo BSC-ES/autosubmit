@@ -754,18 +754,13 @@ class JobList(object):
         """
         if len(unified_filter[filter_type]) > 0 and unified_filter[filter_type][-1] != ",":
             unified_filter[filter_type] += ","
+        value_list = []
         if filter_type == "DATES_TO":
             value_list = self._date_list
-            level_to_check = "DATES_FROM"
         elif filter_type == "MEMBERS_TO":
             value_list = self._member_list
-            level_to_check = "MEMBERS_FROM"
         elif filter_type == "CHUNKS_TO":
             value_list = self._chunk_list
-            level_to_check = "CHUNKS_FROM"
-        elif filter_type == "SPLITS_TO":
-            value_list = []
-            level_to_check = "SPLITS_FROM"
         if "all".casefold() not in unified_filter[filter_type].casefold():
             aux = str(filter_to.pop(filter_type, None))
             if aux:
@@ -1975,7 +1970,7 @@ class JobList(object):
                     select_jobs_by_name=select_jobs_by_name,
                     select_all_jobs_by_section=select_all_jobs_by_section,
                     filter_jobs_by_section=filter_jobs_by_section)
-            except Exception as e:
+            except Exception:
                 raise AutosubmitCritical(f"Check the {unparsed_jobs} format."
                                          "\nFirst filter is optional ends with '&'."
                                          "\nSecond filter ends with ';'."
@@ -1986,7 +1981,7 @@ class JobList(object):
                                                            select_all_jobs_by_section=select_all_jobs_by_section,
                                                            filter_jobs_by_section=filter_jobs_by_section,
                                                            two_step_start=two_step_start)
-            except Exception as e:
+            except Exception:
                 raise AutosubmitCritical(f"Check the {unparsed_jobs} format."
                                          "\nFirst filter is optional ends with '&'."
                                          "\nSecond filter ends with ';'."
@@ -2367,7 +2362,7 @@ class JobList(object):
                                                          job_list is None else job_list, self.graph)
             except BaseException as e:
                 raise AutosubmitError(str(e), 6040, "Failure while saving the job_list")
-        except AutosubmitError as e:
+        except AutosubmitError:
             raise
         except BaseException as e:
             raise AutosubmitError(str(e), 6040, "Unknown failure while saving the job_list")
@@ -2831,7 +2826,7 @@ class JobList(object):
                                         if job.status == Status.QUEUING:
                                             job.platform.send_command(job.platform.cancel_cmd +
                                                                       " " + str(job.id), ignore_log=True)
-                                    except Exception as e:
+                                    except Exception:
                                         pass  # jobid finished already
                                     job.status = Status.SKIPPED
                                     save = True
@@ -2845,7 +2840,7 @@ class JobList(object):
                                         if job.status == Status.QUEUING:
                                             job.platform.send_command(job.platform.cancel_cmd +
                                                                       " " + str(job.id), ignore_log=True)
-                                    except Exception as e:
+                                    except Exception:
                                         pass  # job_id finished already
                                     job.status = Status.SKIPPED
                                     save = True
@@ -3085,7 +3080,7 @@ class JobList(object):
                 else:
                     results.append("Cannot find root.")
         except Exception:
-            return f'Job List object'
+            return 'Job List object'
         return "\n".join(results)
 
     def _recursion_print(self, job, level, visited=[], statusChange=None, nocolor=False):
@@ -3161,12 +3156,12 @@ class JobList(object):
         packages = None
         try:
             packages = JobPackagePersistence(expid).load(wrapper=False)
-        except Exception as ex:
+        except Exception:
             print("Wrapper table not found, trying packages.")
             packages = None
             try:
                 packages = JobPackagePersistence(expid).load(wrapper=True)
-            except Exception as exp2:
+            except Exception:
                 packages = None
                 pass
             pass
@@ -3199,7 +3194,7 @@ class JobList(object):
                         package_to_symbol[list_packages[i]] = 'square'
                     else:
                         package_to_symbol[list_packages[i]] = 'hexagon'
-            except Exception as ex:
+            except Exception:
                 print((traceback.format_exc()))
 
         return job_to_package, package_to_jobs, package_to_package_id, package_to_symbol
@@ -3317,7 +3312,7 @@ class JobList(object):
                     start_time = 0
                     finish_time = 0
 
-        except Exception as exp:
+        except Exception:
             print((traceback.format_exc()))
             return None
 
@@ -3401,7 +3396,7 @@ class JobList(object):
                         values) > 1 else submit_time
                     finish_time = parse_date(values[2]) if len(
                         values) > 2 else start_time
-            except Exception as exp:
+            except Exception:
                 start_time = now
                 finish_time = now
                 # NA if reading fails

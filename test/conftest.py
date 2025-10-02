@@ -42,7 +42,7 @@ from autosubmit.platforms.slurmplatform import SlurmPlatform, ParamikoPlatform
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
-    from py._path.local import LocalPath  # type: ignore
+    from py._path.local import LocalPath
 
 
 @dataclass
@@ -162,13 +162,13 @@ def autosubmit_exp(
             autosubmit.install()
             autosubmit.configure(
                 advanced=False,
-                database_path=BasicConfig.DB_DIR,  # type: ignore
-                database_filename=BasicConfig.DB_FILE,  # type: ignore
+                database_path=BasicConfig.DB_DIR,
+                database_filename=BasicConfig.DB_FILE,
                 local_root_path=str(tmp_path),
-                platforms_conf_path=None,  # type: ignore
-                jobs_conf_path=None,  # type: ignore
-                smtp_hostname=None,  # type: ignore
-                mail_from=None,  # type: ignore
+                platforms_conf_path=None,
+                jobs_conf_path=None,
+                smtp_hostname=None,
+                mail_from=None,
                 machine=False,
                 local=False,
             )
@@ -177,7 +177,7 @@ def autosubmit_exp(
             mocker.patch('autosubmit.experiment.experiment_common.db_common.last_name_used', return_value=expid)
 
         expid = autosubmit.expid(
-            description=f"Pytest experiment (delete me)",
+            description="Pytest experiment (delete me)",
             hpc="local",
             copy_id="",
             dummy=True,
@@ -384,7 +384,7 @@ def autosubmit_config(
         for k, v in basic_config.__dict__.items():
             setattr(BasicConfig, k, v)
 
-        exp_path = BasicConfig.LOCAL_ROOT_DIR / expid
+        exp_path = BasicConfig.LOCAL_ROOT_DIR / Path(expid)
         # <expid>/tmp/
         exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
         # <expid>/tmp/ASLOGS
@@ -442,7 +442,7 @@ def autosubmit_config(
 
 @pytest.fixture
 def current_tmpdir(tmpdir_factory):
-    folder = tmpdir_factory.mktemp(f'tests')
+    folder = tmpdir_factory.mktemp('tests')
     os.mkdir(folder.join('scratch'))
     file_stat = os.stat(f"{folder.strpath}")
     file_owner_id = file_stat.st_uid

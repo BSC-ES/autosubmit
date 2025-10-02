@@ -72,16 +72,16 @@ class WrapperFactory(object):
         return wrapper_cmd
 
     def vertical_wrapper(self, **kwargs):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
 
     def horizontal_wrapper(self, **kwargs):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
 
     def hybrid_wrapper_horizontal_vertical(self, **kwargs):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
 
     def hybrid_wrapper_vertical_horizontal(self, **kwargs):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
 
     def header_directives(self, **kwargs):
         pass
@@ -124,21 +124,21 @@ class WrapperFactory(object):
     def reservation_directive(self, reservation):
         return '#'
     def dependency_directive(self, dependency):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
     def queue_directive(self, queue):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
     def processors_directive(self, processors):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
     def nodes_directive(self, nodes):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
     def tasks_directive(self, tasks):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
     def partition_directive(self, partition):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
     def exclusive_directive(self, exclusive):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
     def threads_directive(self, threads):
-        raise NotImplemented(self.exception)
+        raise NotImplementedError(self.exception)
 
 
 class LocalWrapperFactory(WrapperFactory):
@@ -221,23 +221,23 @@ class SlurmWrapperFactory(WrapperFactory):
         return self.platform.allocated_nodes()
 
     def reservation_directive(self, reservation):
-        return "#SBATCH --reservation={0}".format(reservation)
+        return f"#SBATCH --reservation={reservation}"
     def dependency_directive(self, dependency):
-        return '#SBATCH --dependency=afterok:{0}'.format(dependency)
+        return f'#SBATCH --dependency=afterok:{dependency}'
     def queue_directive(self, queue):
-        return '#SBATCH --qos={0}'.format(queue)
+        return f'#SBATCH --qos={queue}'
     def partition_directive(self, partition):
-        return '#SBATCH --partition={0}'.format(partition)
+        return f'#SBATCH --partition={partition}'
     def exclusive_directive(self, exclusive):
         return '#SBATCH --exclusive'
     def tasks_directive(self, tasks):
-        return '#SBATCH --ntasks-per-node={0}'.format(tasks)
+        return f'#SBATCH --ntasks-per-node={tasks}'
     def nodes_directive(self, nodes):
-        return '#SBATCH -N {0}'.format(nodes)
+        return f'#SBATCH -N {nodes}'
     def processors_directive(self, processors):
-        return '#SBATCH -n {0}'.format(processors)
+        return f'#SBATCH -n {processors}'
     def threads_directive(self, threads):
-        return '#SBATCH --cpus-per-task={0}'.format(threads)
+        return f'#SBATCH --cpus-per-task={threads}'
 
 
 class PJMWrapperFactory(WrapperFactory):
@@ -270,27 +270,26 @@ class PJMWrapperFactory(WrapperFactory):
     def reservation_directive(self, reservation):
         return "#" # Reservation directive doesn't exist in PJM, they're handled directly by admins
 
-    def queue_directive(self, queue):
-        return '#PJM --qos={0}'.format(queue)
-    def partition_directive(self, partition):
-        return '#PJM --partition={0}'.format(partition)
     def exclusive_directive(self, exclusive):
         return '#PJM --exclusive'
+
     def tasks_directive(self, tasks):
-        return "#PJM --mpi max-proc-per-node={0}".format(tasks) # searchhint
+        return f'#PJM --mpi max-proc-per-node={tasks}' # searchhint
+
     def nodes_directive(self, nodes):
-        return '#PJM -N {0}'.format(nodes)
+        return f'#PJM -N {nodes}'
+
     def processors_directive(self, processors):
-        return '#PJM -n {0}'.format(processors)
+        return f'#PJM -n {processors}'
+
     def threads_directive(self, threads):
         return f"export OMP_NUM_THREADS={threads}"
 
     def queue_directive(self, queue):
-        return '#PJM -L rscgrp={0}'.format(queue)
+        return f'#PJM -L rscgrp={queue}'
 
     def partition_directive(self, partition):
-        return '#PJM -g {0}'.format(partition)
-
+        return f'#PJM -g {partition}'
 
 class EcWrapperFactory(WrapperFactory):
 

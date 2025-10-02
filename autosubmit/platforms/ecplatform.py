@@ -208,12 +208,12 @@ class EcPlatform(ParamikoPlatform):
         try:
             try:
                 subprocess.check_output(self.check_remote_permissions_remove_cmd, shell=False)
-            except Exception as e:
+            except Exception:
                 pass
             subprocess.check_output(self.check_remote_permissions_cmd, shell=True)
             subprocess.check_output(self.check_remote_permissions_remove_cmd, shell=True)
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     def send_command(self, command, ignore_log=False, x11 = False) -> bool:
@@ -261,7 +261,7 @@ class EcPlatform(ParamikoPlatform):
                     sleep(sleeptime)
                 else:
                     process_ok = True
-        except Exception as e:
+        except Exception:
             process_ok = False
         if not process_ok:
             Log.printlog("Log file don't recovered {0}".format(src), 6004)
@@ -294,7 +294,7 @@ class EcPlatform(ParamikoPlatform):
                     sleep(sleeptime)
                 else:
                     process_ok = True
-        except Exception as e:
+        except Exception:
             process_ok = False
         if not process_ok and must_exist:
             Log.printlog("Completed/Stat File don't recovered {0}".format(filename), 6004)

@@ -88,7 +88,7 @@ def test_get_allowed_members(
     if type(result) is str or type(result) is list:
         assert helper.get_allowed_members(ids, as_config) == result
     else:
-        with pytest.raises(result):  # type: ignore
+        with pytest.raises(result):
             helper.get_allowed_members(ids, as_config)
 
 

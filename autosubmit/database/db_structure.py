@@ -19,7 +19,6 @@ import os
 import sqlite3
 import textwrap
 import traceback
-from typing import Dict, List
 
 from autosubmit.log.log import Log
 
@@ -73,7 +72,7 @@ def create_connection(db_file):
     try:
         conn = sqlite3.connect(db_file)
         return conn
-    except Exception as e:
+    except Exception:
         return None
 
 

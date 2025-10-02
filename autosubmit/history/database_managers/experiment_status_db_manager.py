@@ -19,7 +19,6 @@
 
 import os
 import textwrap
-import time
 from typing import Protocol, cast
 from autosubmit.config.basicconfig import BasicConfig
 import autosubmit.history.utils as HUtils

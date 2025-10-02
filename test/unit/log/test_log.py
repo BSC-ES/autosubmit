@@ -47,7 +47,7 @@ def test_autosubmit_error_constructor():
 
     assert str(as_error) == " "
 
-    assert as_error.error_message == f"test abc"
+    assert as_error.error_message == "test abc"
 
 
 def test_autosubmit_critical_default_values():

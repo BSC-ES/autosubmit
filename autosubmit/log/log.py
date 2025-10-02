@@ -173,7 +173,7 @@ class Log:
         log = logging.Logger('Autosubmit', EVERYTHING)
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(INFO)
-    console_handler.setFormatter(LogFormatter(False))  # type: ignore
+    console_handler.setFormatter(LogFormatter(False))
     log.addHandler(console_handler)
 
     def __init__(self):
@@ -271,7 +271,7 @@ class Log:
                     status_file_handler.addFilter(custom_filter)
                     Log.log.addHandler(status_file_handler)
                 os.chmod(file_path, 509)
-            except Exception as e:  # retry again
+            except Exception:  # retry again
                 sleep(timeout * retries)
 
     @staticmethod

@@ -89,8 +89,7 @@ def test_add_dir_and_files_empty_folder(empty_rocrate: ROCrate):
         _add_dir_and_files(
             crate=empty_rocrate,
             base_path=Path(d),
-            relative_path=d,
-            encoding_format=None
+            relative_path=d
         )
     assert 1 == len(empty_rocrate.data_entities)
 
@@ -106,8 +105,7 @@ def test_add_dir_and_files(empty_rocrate: ROCrate):
             _add_dir_and_files(
                 crate=empty_rocrate,
                 base_path=Path(d),
-                relative_path=str(sub_path),
-                encoding_format=None
+                relative_path=str(sub_path)
             )
     assert 2 == len(empty_rocrate.data_entities)
     for entity in empty_rocrate.data_entities:
@@ -342,9 +340,9 @@ def test_rocrate(
             })
         }
         create_conf_dir(experiment_path, as_conf)
-        jobs = []
-        start_time = ''
-        end_time = ''
+        jobs: list = []
+        start_time: str = ''
+        end_time: str = ''
 
         mocked_get_autosubmit_version.return_value = '4.0.0b0'
         mocked_get_experiment_descrip.return_value = [
@@ -405,9 +403,9 @@ def test_rocrate_invalid_project(
                 'PROJECT_ORIGIN': _PROJECT_URL
             }
         }
-        rocrate_json = {}
+        rocrate_json: dict = {}
         create_conf_dir(experiment_path, as_conf)
-        jobs = []
+        jobs: list = []
 
         mocked_get_autosubmit_version.return_value = '4.0.0b0'
         mocked_get_experiment_descrip.return_value = [
@@ -683,9 +681,9 @@ def test_custom_config_loaded_file(
         # adding both directory and file to the list of loaded files
         as_conf.current_loaded_files[str(project_conf)] = 0
         as_conf.current_loaded_files[str(custom_config)] = 0
-        jobs = []
-        start_time = ''
-        end_time = ''
+        jobs: list = []
+        start_time: str = ''
+        end_time: str = ''
 
         mocked_get_autosubmit_version.return_value = '4.0.0b0'
         mocked_get_experiment_descrip.return_value = [
@@ -776,9 +774,9 @@ def test_no_duplicate_ids(
         # adding both directory and file to the list of loaded files
         as_conf.current_loaded_files[str(project_conf)] = 0
         as_conf.current_loaded_files[str(custom_config)] = 0
-        jobs = []
-        start_time = ''
-        end_time = ''
+        jobs: list = []
+        start_time: str = ''
+        end_time: str = ''
 
         mocked_get_autosubmit_version.return_value = '4.0.0b0'
         mocked_get_experiment_descrip.return_value = [

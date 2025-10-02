@@ -33,7 +33,7 @@ class TestMigrate:
 
     @pytest.fixture(scope='class')
     def migrate_tmpdir(self, tmpdir_factory):
-        folder = tmpdir_factory.mktemp(f'migrate_tests')
+        folder = tmpdir_factory.mktemp('migrate_tests')
         os.mkdir(folder.join('scratch'))
         os.mkdir(folder.join('migrate_tmp_dir'))
         file_stat = os.stat(f"{folder.strpath}")
@@ -193,7 +193,7 @@ PLATFORMS:
             f'scratch/whatever/{migrate_tmpdir.owner}/t000/real_data/dummy_symlink').read()
 
         migrate_remote_only.migrate_offer_remote()
-        assert migrate_tmpdir.join(f'migrate_tmp_dir/t000').check(dir=True)
+        assert migrate_tmpdir.join('migrate_tmp_dir/t000').check(dir=True)
         migrate_remote_only.migrate_pickup()
         assert migrate_tmpdir.join(f'scratch/whatever/{migrate_tmpdir.owner}/t000').check(dir=False)
         assert migrate_tmpdir.join(f'scratch/whatever_new/{migrate_tmpdir.owner}/t000').check(dir=True)

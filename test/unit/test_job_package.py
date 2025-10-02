@@ -232,7 +232,7 @@ def test_job_package_submission(mocker, local):
     # assert
     for job in jobs:
         # Should be called once for each job, but currently it needs two calls (for additional files) to change the code
-        job.update_parameters.assert_called()  # type: ignore
+        job.update_parameters.assert_called()
 
     job_package._create_scripts.is_called_once_with()
     job_package._send_files.is_called_once_with()

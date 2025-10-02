@@ -137,7 +137,7 @@ def test_compress_file(
             return_value=Path(temp_dir))
 
         mail_notifier.notify_experiment_status(
-            'a000', ['recipient@example.com'], mock_platform)  # type: ignore
+            'a000', ['recipient@example.com'], mock_platform)
 
         if sendmail_error:
             mock_printlog.assert_called_once()
