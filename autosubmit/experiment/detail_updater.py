@@ -17,20 +17,65 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+from abc import ABC, abstractmethod
 import datetime
 import pwd
 from pathlib import Path
 import sqlite3
-from autosubmit.database.db_common import get_experiment_id
+from typing import Any, Dict, Union
+
+from sqlalchemy import Table
+from autosubmit.database.db_common import get_connection_url, get_experiment_id
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
+
+from autosubmit.database.session import create_engine
+from autosubmit.database.tables import get_table_from_name
 
 
 LOCAL_TZ = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
 
 
-class ExperimentDetailsRepository:
+class ExperimentDetailsRepository(ABC):
+    """
+    Abstract base class for the experiment details repository.
+    This class defines the interface for the experiment details repository.
+    """
+
+    @abstractmethod
+    def get_details(self, exp_id: int) -> Union[Dict[str, Any], None]:
+        """
+        Get the details of an experiment by its ID.
+
+        :param exp_id: The ID of the experiment.
+        :return: A dictionary containing the details of the experiment.
+        """
+
+    @abstractmethod
+    def upsert_details(
+        self, exp_id: int, user: str, created: str, model: str, branch: str, hpc: str
+    ) -> None:
+        """
+        Upsert the details of an experiment.
+
+        :param exp_id: The ID of the experiment.
+        :param user: The user that created the experiment.
+        :param created: The creation date of the experiment.
+        :param model: The model of the experiment.
+        :param branch: The branch of the experiment.
+        :param hpc: The HPC of the experiment.
+        """
+
+    def delete_details(self, exp_id: int) -> None:
+        """
+        Delete the details of an experiment by its ID.
+
+        :param exp_id: The ID of the experiment.
+        """
+
+
+class ExperimentDetailsSQLiteRepository(ExperimentDetailsRepository):
     """
     Class to manage the experiment details in a SQLite database.
     This class is responsible for creating the database, creating the
@@ -120,6 +165,73 @@ class ExperimentDetailsRepository:
             conn.commit()
 
 
+class ExperimentDetailsSQLAlchemyRepository(ExperimentDetailsRepository):
+    """
+    Class to manage the experiment details in a SQLAlchemy database.
+    This class is responsible for creating the database, creating the
+    table, and providing methods to insert, update, delete, and retrieve
+    experiment details.
+    """
+
+    def __init__(self):
+        self.table: Table = get_table_from_name(schema=None, table_name='details')
+        connection_url = get_connection_url(BasicConfig.DB_PATH)
+        self.engine = create_engine(connection_url=connection_url)
+
+    def get_details(self, exp_id: int):
+        with self.engine.connect() as conn:
+            result = conn.execute(
+                self.table.select().where(self.table.c.exp_id == exp_id)
+            ).one_or_none()
+            if result:
+                return {
+                    "exp_id": result.exp_id,
+                    "user": result.user,
+                    "created": result.created,
+                    "model": result.model,
+                    "branch": result.branch,
+                    "hpc": result.hpc,
+                }
+            else:
+                return None
+
+    def upsert_details(
+        self, exp_id: int, user: str, created: str, model: str, branch: str, hpc: str
+    ):
+        with self.engine.connect() as conn:
+            conn.execute(self.table.delete().where(self.table.c.exp_id == exp_id))
+            conn.execute(
+                self.table.insert().values(
+                    exp_id=exp_id,
+                    user=user,
+                    created=created,
+                    model=model,
+                    branch=branch,
+                    hpc=hpc,
+                )
+            )
+            conn.commit()
+
+    def delete_details(self, exp_id: int):
+        with self.engine.connect() as conn:
+            conn.execute(self.table.delete().where(self.table.c.exp_id == exp_id))
+            conn.commit()
+
+
+def create_experiment_details_repository(
+    db_engine: str = "sqlite",
+) -> ExperimentDetailsRepository:
+    """
+    Factory function to create an instance of the ExperimentDetailsRepository.
+    """
+    if db_engine == "sqlite":
+        return ExperimentDetailsSQLiteRepository()
+    elif db_engine == "postgres":
+        return ExperimentDetailsSQLAlchemyRepository()
+    else:
+        raise ValueError(f"Unsupported database engine: {db_engine}")
+
+
 class ExperimentDetails:
     """
     Class to manage the experiment details.
@@ -127,7 +239,9 @@ class ExperimentDetails:
 
     def __init__(self, expid: str, init_reload: bool = True):
         self.expid = expid
-        self._details_repo = ExperimentDetailsRepository()
+        self._details_repo = create_experiment_details_repository(
+            db_engine=BasicConfig.DATABASE_BACKEND
+        )
         if init_reload:
             self.reload()
 

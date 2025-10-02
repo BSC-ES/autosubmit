@@ -406,7 +406,7 @@ class DicJobs:
                 final_jobs_list_special = []
                 if "*" in one_to_one_splits and not skip_one_to_one:
                     easier_to_filter = "," + one_to_one_splits + ","
-                    matches = re.findall(rf"\\[0-9]+", easier_to_filter)
+                    matches = re.findall(r"\\[0-9]+", easier_to_filter)
                     if len(matches) > 0:  # get *\\
 
                         split_slice = int(matches[0].split("\\")[1])
@@ -501,7 +501,7 @@ class DicJobs:
             try:
                 jobs_flattened = [job for jobs_to_flatten in jobs for job in jobs_to_flatten]
                 jobs = jobs_flattened
-            except TypeError as e:
+            except TypeError:
                 pass
         if sort_string:
             # I want to have first chunks then member then date to easily filter later on

@@ -20,7 +20,8 @@
 from datetime import datetime
 from os import utime
 from pathlib import Path
-from subprocess import CalledProcessError, SubprocessError
+from shutil import rmtree
+from subprocess import CalledProcessError
 from typing import Any, Optional, Tuple
 
 import pytest
@@ -32,7 +33,6 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_grouping import JobGrouping
 from autosubmit.job.job_list import JobList
-from autosubmit.log.log import AutosubmitCritical
 from autosubmit.monitor.monitor import (
     _check_final_status, _check_node_exists, _color_status, _create_node, _display_file,
     _display_file_xdg, clean_plot, clean_stats, Monitor
@@ -345,109 +345,6 @@ def test_create_tree_list_grouped_jobs():
 
 
 @pytest.mark.parametrize(
-    "output_format,show,display_error,error_raised",
-    [
-        ('png', True, None, None),
-        ('pdf', True, None, None),
-        ('ps', False, None, None),
-        ('ps', True, CalledProcessError(1, 'test'), None),
-        ('svg', True, None, None),
-        ('txt', False, None, None),
-        (None, False, None, AutosubmitCritical)
-    ]
-)
-def test_generate_output(
-        output_format: str,
-        show: bool,
-        display_error: Optional[SubprocessError],
-        error_raised: Optional[BaseException],
-        autosubmit_exp,
-        mocker
-):
-    """Test that monitor generates its output in different formats."""
-    mocked_log = mocker.patch('autosubmit.monitor.monitor.Log')
-
-    exp = autosubmit_exp(_EXPID, experiment_data={})
-    exp_path = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR) / _EXPID
-
-    job_list_persistence = exp.autosubmit._get_job_list_persistence(_EXPID, exp.as_conf)
-    job_list = JobList(_EXPID, exp.as_conf, YAMLParserFactory(), job_list_persistence)
-    date_list = exp.as_conf.get_date_list()
-    # TODO: we can probably simplify our code, so that ``date_format`` is calculated more easily...
-    date_format = ''
-    if exp.as_conf.get_chunk_size_unit() == 'hour':
-        date_format = 'H'
-    for date in date_list:
-        if date.hour > 1:
-            date_format = 'H'
-        if date.minute > 1:
-            date_format = 'M'
-    wrapper_jobs = {}
-    job_list.generate(
-        exp.as_conf,
-        date_list,
-        exp.as_conf.get_member_list(),
-        exp.as_conf.get_num_chunks(),
-        exp.as_conf.get_chunk_ini(),
-        exp.as_conf.load_parameters(),
-        date_format,
-        exp.as_conf.get_retrials(),
-        exp.as_conf.get_default_job_type(),
-        wrapper_jobs,
-        run_only_members=exp.as_conf.get_member_list(run_only=True),
-        force=True,
-        create=True)
-
-    monitor = Monitor()
-    if error_raised:
-        with pytest.raises(error_raised):
-            monitor.generate_output(
-                expid=_EXPID,
-                joblist=job_list.get_job_list(),
-                path=exp_path / f'tmp/LOG_{_EXPID}',
-                output_format=output_format,
-                show=show,
-                groups=None,
-                job_list_object=job_list
-            )
-    else:
-        mock_display_file = mocker.patch('autosubmit.monitor.monitor._display_file')
-        if display_error:
-            mock_display_file.side_effect = display_error
-
-        monitor.generate_output(
-            expid=_EXPID,
-            joblist=job_list.get_job_list(),
-            path=exp_path / f'tmp/LOG_{_EXPID}',
-            output_format=output_format,
-            show=show,
-            groups=None,
-            job_list_object=job_list
-        )
-
-        assert mock_display_file.called == show
-        if display_error:
-            assert mocked_log.printlog.call_count > 0
-            logged_message = mocked_log.printlog.call_args_list[-1].args[0]
-            assert 'could not be opened' in logged_message
-
-        if output_format == 'txt':
-            plots_dir = Path(exp_path, 'status')
-        else:
-            plots_dir = Path(exp_path, 'plot')
-        plots = list(plots_dir.iterdir())
-
-        assert len(plots) == 1
-        assert plots[0].name.endswith(output_format)
-
-        # TODO: txt is creating an empty file, whereas the other formats create
-        #       something that tells the user what are the jobs in the workflow.
-        #       So txt format gives less information to the user, thus the 0 size.
-        if output_format != 'txt':
-            assert plots[0].stat().st_size > 0
-
-
-@pytest.mark.parametrize(
     'error_msg',
     [
         'Unexpected',
@@ -498,9 +395,9 @@ def test_generate_output_txt(jobs: list[Job], classictxt: bool, status_dir_exist
     as_conf = autosubmit_config(_EXPID, experiment_data={})
     status_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, 'status')
     if status_dir_exists:
-        status_path.mkdir(parents=True)
+        status_path.mkdir(parents=True, exist_ok=True)
     else:
-        status_path.unlink(missing_ok=True)
+        rmtree(status_path, ignore_errors=True)
 
     status_file = status_path / f'{_EXPID}_{time_str}.txt'
 

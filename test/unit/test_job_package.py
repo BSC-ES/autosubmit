@@ -105,8 +105,7 @@ def create_job_package_wrapper(jobs, as_conf):
 
 @pytest.fixture
 def joblist(tmp_path, as_conf):
-    job_list = JobList('a000', as_conf, YAMLParserFactory(),
-                       JobListPersistenceDb(str(tmp_path)))
+    job_list = JobList('a000', as_conf, YAMLParserFactory(), JobListPersistenceDb(as_conf.expid))
     job_list._ordered_jobs_by_date_member["WRAPPERS"] = dict()
     return job_list
 
@@ -232,7 +231,7 @@ def test_job_package_submission(mocker, local):
     # assert
     for job in jobs:
         # Should be called once for each job, but currently it needs two calls (for additional files) to change the code
-        job.update_parameters.assert_called()  # type: ignore
+        job.update_parameters.assert_called()
 
     job_package._create_scripts.is_called_once_with()
     job_package._send_files.is_called_once_with()

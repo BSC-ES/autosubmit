@@ -110,7 +110,7 @@ class AutosubmitFigureDirective(SphinxDirective):
 
         raw_node = nodes.raw('', str(figure_node), format='html')
 
-        logger.debug(f'The raw HTML we will use:')
+        logger.debug('The raw HTML we will use:')
         logger.debug(str(raw_node))
 
         return [raw_node]

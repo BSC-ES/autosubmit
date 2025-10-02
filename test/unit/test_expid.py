@@ -1,24 +1,25 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+
 """ Test file for autosubmit/autosubmit.py """
+
 from contextlib import contextmanager
+from shutil import rmtree
 
 import pytest
 
@@ -57,6 +58,8 @@ def test_expid(mocker, copy_id, expected, tmp_path, autosubmit_config, monkeypat
     :param tmp_path: Path
     :return: None
     """
+    monkeypatch.setattr(db_common, 'TIMEOUT', 1)
+
     current_experiment_id = "empty"
 
     monkeypatch.setattr(db_common, 'TIMEOUT', 1)
@@ -68,6 +71,11 @@ def test_expid(mocker, copy_id, expected, tmp_path, autosubmit_config, monkeypat
     basic_config.STRUCTURES_DIR = basic_config.LOCAL_ROOT_DIR = str(tmp_path)
     basic_config.JOBDATA_DIR = str(tmp_path)
     basic_config.read()
+
+    # The fixtures create the experiment directories, so we must remove them before calling
+    # expid here.
+    exp_path = tmp_path / 'a000'
+    rmtree(exp_path)
 
     with expected:
         expid = Autosubmit.expid("Test", copy_id=copy_id)

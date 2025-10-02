@@ -1,4 +1,7 @@
 on:
+  workflow_run:
+    workflows: [Lint]
+    types: [completed]
   pull_request:
   workflow_dispatch:
   push:
@@ -42,7 +45,7 @@ jobs:
           push: false
           load: true
           tags: autosubmit/autosubmit:latest
-      
+
       - name: Test the image
         run: |
           docker run --rm autosubmit/autosubmit:latest autosubmit --version

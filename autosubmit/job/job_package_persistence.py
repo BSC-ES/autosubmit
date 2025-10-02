@@ -15,41 +15,38 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+"""Database layer for the Job packages."""
+
 from pathlib import Path
 from typing import Any, List
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.db_manager import create_db_manager
+from autosubmit.database.db_common import get_connection_url
+from autosubmit.database.db_manager import DbManager
+from autosubmit.database.tables import JobPackageTable, WrapperJobPackageTable
 from autosubmit.log.log import AutosubmitCritical
 
 
-class JobPackagePersistence(object):
-    """
-    Class that handles packages workflow.
+class JobPackagePersistence:
+    """Class that handles packages workflow.
 
     Create Packages Table, Wrappers Table.
-
-    :param persistence_path: Path to the persistence folder pkl. \n
-    :type persistence_path: String \n
-    :param persistence_file: Name of the persistence pkl file. \n
-    :type persistence_file: String
     """
 
     VERSION = 1
-    JOB_PACKAGES_TABLE = 'job_package'
-    WRAPPER_JOB_PACKAGES_TABLE = 'wrapper_job_package'
-    TABLE_FIELDS = ['exp_id', 'package_name', 'job_name', 'wallclock' ]  # new field, needs a new autosubmit create
 
     def __init__(self, expid: str):
-        options = {
-            'root_path': str(Path(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl")),
-            'db_name': f"job_packages_{expid}",
-            'db_version': self.VERSION,
-            'schema': expid
-        }
-        self.db_manager = create_db_manager(BasicConfig.DATABASE_BACKEND, **options)
-        self.db_manager.create_table(self.JOB_PACKAGES_TABLE, self.TABLE_FIELDS)
-        self.db_manager.create_table(self.WRAPPER_JOB_PACKAGES_TABLE, self.TABLE_FIELDS)
+        database_file = Path(BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl', f'job_packages_{expid}.db')
+        connection_url = get_connection_url(db_path=database_file)
+
+        if BasicConfig.DATABASE_BACKEND == "postgres":
+            _schema = expid
+        else:
+            _schema = None
+
+        self.db_manager = DbManager(connection_url=connection_url, schema=_schema)
+        self.db_manager.create_table(JobPackageTable.name)
+        self.db_manager.create_table(WrapperJobPackageTable.name)
 
     def load(self, wrapper=False) -> List[Any]:
         """
@@ -58,9 +55,9 @@ class JobPackagePersistence(object):
         :return: list of jobs per package
         """
         if not wrapper:
-            results = self.db_manager.select_all(self.JOB_PACKAGES_TABLE)
+            results = self.db_manager.select_all(JobPackageTable.name)
         else:
-            results = self.db_manager.select_all(self.WRAPPER_JOB_PACKAGES_TABLE)
+            results = self.db_manager.select_all(WrapperJobPackageTable.name)
         if len(results) > 0:
             # ['exp_id', 'package_name', 'job_name', 'wallclock']  wallclock is the new addition
             for wrapper in results:
@@ -73,40 +70,35 @@ class JobPackagePersistence(object):
                                              "'autosubmit create -f <EXPID>' to fix this issue.")
         return results
 
-    def reset(self):
-        """
-        Loads package of jobs from a database
-
-        """
-        self.db_manager.drop_table(self.WRAPPER_JOB_PACKAGES_TABLE)
-        self.db_manager.create_table(self.WRAPPER_JOB_PACKAGES_TABLE, self.TABLE_FIELDS)
-
     def save(self, package, preview_wrappers=False):
-        """
-        Persists a job list in a database
+        """Persists a job list in a database.
+
         :param package: all wrapper attributes
         :param preview_wrappers: boolean
         """
-        #self._reset_table()
         job_packages_data = []
         for job in package.jobs:
-            job_packages_data += [(package._expid, package.name, job.name, package._wallclock)]
+            # noinspection PyProtectedMember
+            job_packages_data += [{
+                'exp_id': package._expid,
+                'package_name': package.name,
+                'job_name': job.name,
+                'wallclock': package._wallclock
+            }]
 
         if preview_wrappers:
-            self.db_manager.insertMany(self.WRAPPER_JOB_PACKAGES_TABLE, job_packages_data)
+            self.db_manager.insert_many(WrapperJobPackageTable.name, job_packages_data)
         else:
-            self.db_manager.insertMany(self.JOB_PACKAGES_TABLE, job_packages_data)
-            self.db_manager.insertMany(self.WRAPPER_JOB_PACKAGES_TABLE, job_packages_data)
+            self.db_manager.insert_many(JobPackageTable.name, job_packages_data)
+            self.db_manager.insert_many(WrapperJobPackageTable.name, job_packages_data)
 
-    def reset_table(self,wrappers=False):
-        """
-        Drops and recreates the database
-        """
+    def reset_table(self, wrappers=False):
+        """Drops and recreates the database."""
         if wrappers:
-            self.db_manager.drop_table(self.WRAPPER_JOB_PACKAGES_TABLE)
-            self.db_manager.create_table(self.WRAPPER_JOB_PACKAGES_TABLE, self.TABLE_FIELDS)
+            self.db_manager.drop_table(WrapperJobPackageTable.name)
+            self.db_manager.create_table(WrapperJobPackageTable.name)
         else:
-            self.db_manager.drop_table(self.JOB_PACKAGES_TABLE)
-            self.db_manager.create_table(self.JOB_PACKAGES_TABLE, self.TABLE_FIELDS)
-            self.db_manager.drop_table(self.WRAPPER_JOB_PACKAGES_TABLE)
-            self.db_manager.create_table(self.WRAPPER_JOB_PACKAGES_TABLE, self.TABLE_FIELDS)
+            self.db_manager.drop_table(JobPackageTable.name)
+            self.db_manager.create_table(JobPackageTable.name)
+            self.db_manager.drop_table(WrapperJobPackageTable.name)
+            self.db_manager.create_table(WrapperJobPackageTable.name)

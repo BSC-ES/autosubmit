@@ -15,4 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Database tests."""
+"""Database tests.
+
+These files contain tests to ensure the database is working properly in an integrated way with Autosubmit.
+"""

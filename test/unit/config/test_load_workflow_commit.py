@@ -32,7 +32,7 @@ def test_add_autosubmit_dict(autosubmit_config, mocker):
     # test log.warning has been called
     mocker.patch.object(Log, "warning")
     as_conf._add_autosubmit_dict()
-    Log.warning.assert_called_once()  # type: ignore
+    Log.warning.assert_called_once()
 
 
 @pytest.mark.parametrize("is_owner", [True, False])

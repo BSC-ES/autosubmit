@@ -47,7 +47,7 @@ def test_save(autosubmit_config, tmpdir, mocker, data: dict, owner: str):
     as_conf.load_common_parameters(as_conf.experiment_data)
     as_conf.save()
 
-    data['ROOTDIR'] = str(as_conf.basic_config.LOCAL_ROOT_DIR / as_conf.expid)
+    data['ROOTDIR'] = str(Path(as_conf.basic_config.LOCAL_ROOT_DIR) / as_conf.expid)
 
     if not owner:
         assert not Path(as_conf.metadata_folder).exists()
