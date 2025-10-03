@@ -10,6 +10,9 @@ platform does not support wrappers anymore (it was used for testing).
 **Bug fixes:**
 
 - Fixed issue with the verification of dirty Git local repositories in operational experiments #2446
+- Fixed error when cleaning projects that use Git #2524
+- Fixed bug that occurred when copying experiments with different HPC platforms, where the incorrect platform was used 
+  instead of the user-specified platform #2650
 
 **Enhancements:**
 
@@ -28,6 +31,9 @@ platform does not support wrappers anymore (it was used for testing).
 - Improvement of error message when `LOCAL` project location is a file, not a directory #1972 #1254
 - Removed the code for wrappers with local platform that were create only for tests #2522
 - Added SQLAlchemy as the main database entrypoint, enabling backends of Sqlite (default) and Postgres (new) #2187
+- Added mypy and ruff to the CI for the files touched by a change granting a 
+  higher quality and preservation of the code #2626 #2621
+- Updated base images of micromamba and debian for security update #2610
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 

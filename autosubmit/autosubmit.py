@@ -39,7 +39,7 @@ from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, Generator
 
 from bscearth.utils.date import date2str
 from portalocker import Lock
@@ -1398,8 +1398,8 @@ class Autosubmit:
         return content
 
     @staticmethod
-    def as_conf_default_values(exp_id, hpc, minimal_configuration=False, git_repo="", git_branch="main",
-                               git_as_conf=""):
+    def as_conf_default_values(exp_id:str, hpc:str = "local", minimal_configuration:bool = False, git_repo:str = "",
+                               git_branch:str = "main", git_as_conf:str = "") -> None:
         """
         Replace default values in as_conf files
         :param exp_id: experiment id
@@ -1411,7 +1411,6 @@ class Autosubmit:
         :return: None
         """
         # the var hpc was hardcoded in the header of the function
-        hpc_default = "local"
 
         # open and replace values
         for as_conf_file in Path(BasicConfig.LOCAL_ROOT_DIR, f"{exp_id}/conf").iterdir():
@@ -1435,12 +1434,13 @@ class Autosubmit:
                         x = search.group(0).split(":")
                         # clean blank space, quotes and double quote
                         aux = x[1].strip(' "\'')
-                        # hpc in config is empty && -H is empty-> hpc_default will be introduced
-                        if len(aux) == 0 and not hpc:
-                            content = content.replace(search.group(0), f"HPCARCH: \"{hpc_default}\"")
                         # hpc in config is empty && -H has a value-> write down hpc value
-                        elif len(aux) == 0:
+                        if hpc != "":
                             content = content.replace(search.group(0), f"HPCARCH: \"{hpc}\"")
+                        elif len(aux) > 0:
+                            content = content.replace(search.group(0), f"HPCARCH: \"{aux}\"")
+                        else:
+                            content = content.replace(search.group(0), "HPCARCH: \"local\"")
                         # the other case is aux!=0 that we dont care about val(hpc) because its a copyExpId
                     if minimal_configuration:
                         search = re.search('CUSTOM_CONFIG: .*', content, re.MULTILINE)
@@ -1946,7 +1946,7 @@ class Autosubmit:
     def check_wrappers(
             as_conf: AutosubmitConfig,
             job_list: JobList,
-            platforms_to_test: set[Platform],
+            platforms_to_test: list[Platform],
             expid: str,
     ) -> tuple[dict[str, list[list[Job]]], dict[str, tuple[Status, Status]]]:
         """
@@ -2077,23 +2077,17 @@ class Autosubmit:
 
     @staticmethod
     def prepare_run(
-            expid: str,
-            start_time: Optional[str] = None,
-            start_after: Optional[str] = None,
-            run_only_members: Optional[str] = None,
-            recover: bool = False,
-            check_scripts: bool = False,
-            submitter: Optional[ParamikoSubmitter] = None
+        expid: str,
+        notransitive: bool = False,
+        start_time: str = '',
+        start_after: str = '',
+        run_only_members: str = '',
+        recover: bool = False,
+        check_scripts: bool = False,
+        submitter=None
     ) -> tuple[
-        JobList,
-        ParamikoSubmitter,
-        Optional[ExperimentHistory],
-        Optional[str],
-        AutosubmitConfig,
-        set[Platform],
-        JobPackagePersistence,
-        bool,
-    ]:
+            'JobList', 'ParamikoSubmitter', Optional['ExperimentHistory'], str, AutosubmitConfig,
+            list['Platform'], 'JobPackagePersistence', bool]:
         """
         Prepare the run of the experiment.
         :param expid: a string with the experiment id.
@@ -2163,7 +2157,7 @@ class Autosubmit:
         Autosubmit._load_parameters(
             as_conf, job_list, submitter.platforms)
         Log.debug("Checking experiment templates...")
-        platforms_to_test = set()
+        platforms_to_test = list()
         hpcarch = as_conf.get_platform()
         # Load only platforms used by the experiment, by looking at JOBS.$JOB.PLATFORM.
         # So Autosubmit only establishes connections to the machines that are used.
@@ -2180,7 +2174,7 @@ class Autosubmit:
                                          7014)
             # noinspection PyTypeChecker
             if job.status not in (Status.COMPLETED, Status.SUSPENDED):
-                platforms_to_test.add(job.platform)
+                platforms_to_test.append(job.platform)
         # This function, looks at %JOBS.$JOB.FILE% ( mandatory ) and %JOBS.$JOB.CHECK% ( default True ).
         # Checks the contents of the .sh/.py/r files and looks for AS placeholders.
         try:
@@ -2445,9 +2439,9 @@ class Autosubmit:
                             job_list.save()
                             as_conf.save()
                         time.sleep(safetysleeptime)
-                    except AutosubmitError as e:  # If an error is detected, restore all connections and job_list
-                        Log.error(f"Trace: {e.trace}")
-                        Log.error(f"{e.message} [eCode={e.code}]")
+                    except AutosubmitError as ae:  # If an error is detected, restore all connections and job_list
+                        Log.error(f"Trace: {ae.trace}")
+                        Log.error(f"{ae.message} [eCode={ae.code}]")
                         # No need to wait until the remote platform reconnection
                         recovery = False
                         as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
@@ -2458,7 +2452,7 @@ class Autosubmit:
                             for job in job_list.get_job_list():
                                 if job.fail_count > 0:
                                     failed_names[job.name] = job.fail_count
-                        except BaseException as e:
+                        except BaseException:
                             Log.printlog("Error trying to store failed job count", Log.WARNING)
                         Log.result("Storing failed job count...done")
                         while not recovery and (
@@ -2520,7 +2514,7 @@ class Autosubmit:
                         if recovery_retrials == max_recovery_retrials and max_recovery_retrials > 0:
                             raise AutosubmitCritical(
                                 f"Autosubmit Encounter too much errors during running time, limit of {max_recovery_retrials * 120} reached",
-                                7051, e.message)
+                                7051, ae.message)
                     except AutosubmitCritical as e:  # Critical errors can't be recovered. Failed configuration or autosubmit error
                         raise AutosubmitCritical(e.message, e.code, e.trace)
                     except BaseException:
@@ -2567,7 +2561,8 @@ class Autosubmit:
                     # Updating finish time for job data header
                     # Database is locked, may be related to my local db todo 4.1.1
                     try:
-                        exp_history.finish_current_experiment_run()
+                        if exp_history is not None:
+                            exp_history.finish_current_experiment_run()
                     except Exception:
                         Log.warning("Database is locked")
                 rocrate_data = as_conf.experiment_data.get("ROCRATE", None)
@@ -2589,7 +2584,7 @@ class Autosubmit:
         with suppress(NameError):
             if job_list.get_failed():
                 return 1
-            return 0
+        return 0
 
     # TODO: move to utils
     @staticmethod
@@ -2665,7 +2660,7 @@ class Autosubmit:
                                          7010, issues + "\n" + ssh_config_issues)
 
     @staticmethod
-    def submit_ready_jobs(as_conf: AutosubmitConfig, job_list: JobList, platforms_to_test: set[Platform],
+    def submit_ready_jobs(as_conf: AutosubmitConfig, job_list: JobList, platforms_to_test: list[Platform],
                           packages_persistence: JobPackagePersistence, inspect=False,
                           only_wrappers=False, hold=False) -> bool:
         """Gets READY jobs and send them to the platforms if there is available space on the queues.
@@ -3673,7 +3668,7 @@ class Autosubmit:
                     sep = '\n\t'
                     Log.result(sep.join(['Directories configured successfully:'] + [str(d) for d in dirs]))
                 except (IOError, OSError) as e:
-                    raise AutosubmitCritical(f"Can not write config file: {e.message}", 7012)
+                    raise AutosubmitCritical(f"Can not write config file: {e.errno}", 7012)
         except (AutosubmitCritical, AutosubmitError):
             raise
         except BaseException as e:
@@ -4839,18 +4834,18 @@ class Autosubmit:
                                          f"into {local_proj_dir}", 7062)
             Log.debug(f"{output}")
         elif project_type == "local":
-            local_project_path: str = as_conf.get_local_project_path()
-            if not local_project_path:
+            local_project: str = as_conf.get_local_project_path()
+            if not local_project:
                 raise AutosubmitCritical(
                     "Empty project path! Please change this parameter to a valid one.", 7014)
             # check if local_project_path is a valid path
-            local_project_path: Path = Path(local_project_path)
+            local_project_path: Path = Path(local_project)
             if not local_project_path.is_dir():
                 msg = f'Local project path is not a valid path and/or it does not exist: {str(local_project_path)}'
                 raise AutosubmitCritical(msg, 7014)
 
-            local_proj_dir = Path(BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_PROJ_DIR)
-            project_destination = local_proj_dir / project_destination
+            local_proj_dir_path: Path = Path(BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_PROJ_DIR)
+            project_destination = local_proj_dir_path / project_destination
 
             # TODO: Move to a new package/file once we simplify ``autosubmit.py``.
             def copy_contents(from_: Path, to: Path):
@@ -4865,13 +4860,13 @@ class Autosubmit:
                         shutil.rmtree(to.parent)
                     raise AutosubmitCritical(f"Cannot copy {str(from_)} into {str(to.parent)}. Exiting...", 7063)
 
-            if not local_proj_dir.exists():
-                Path(local_proj_dir).mkdir(parents=True)
+            if not local_proj_dir_path.exists():
+                Path(local_proj_dir_path).mkdir(parents=True)
                 Path(project_destination).mkdir(parents=True)
-                Log.debug(f"The project folder {local_proj_dir} has been created.")
+                Log.debug(f"The project folder {local_proj_dir_path} has been created.")
                 copy_contents(local_project_path, project_destination)
             else:
-                Log.info(f"Using project folder: {str(local_proj_dir)}")
+                Log.info(f"Using project folder: {str(local_proj_dir_path)}")
 
                 # We use ``rsync`` if the directory already exists, syncing existing files.
                 # If the file does not exist, we create the directory and issue an ``cp``
@@ -5914,12 +5909,12 @@ class Autosubmit:
             return view_file(workflow_log_file, mode) == 0
 
     @staticmethod
-    def stop(expids: str, force=False, all_expids=False, force_all=False, cancel=False,
+    def stop(expids_string: str, force=False, all_expids=False, force_all=False, cancel=False,
              current_status="", status="FAILED", force_yes=False) -> bool:
         """The stop command allows users to stop the desired experiments.
 
-        :param expids: expids to stop
-        :type expids: str
+        :param expids_string: expids to stop
+        :type expids_string: str
         :param force: force the stop of the experiment
         :type force: bool
         :param all_expids: stop all experiments
@@ -5950,23 +5945,23 @@ class Autosubmit:
                                      f"of {Status.VALUE_TO_KEY.keys()}", 7011)
 
         if all_expids:
-            expids = retrieve_expids()
+            expid_list: list[str] = retrieve_expids()
         else:
-            expids = expids.replace(',', ' ').split(' ')
-            expids = [expid.lower() for expid in filter(lambda x: x, expids)]
+            expid_list = expids_string.replace(',', ' ').split(' ')
+            expid_list = [expid.lower() for expid in filter(lambda x: x, expid_list)]
 
         truthy_values = ["true", "yes", "y", "1", ""]
         if not force_all:
-            expids: list[str] = [
+            expid_list = [
                 expid
-                for expid in expids
+                for expid in expid_list
                 if force_yes or input(
                     f"Confirm stopping the experiment: {expid} (y/n)[enter=y]? ").lower() in truthy_values
             ]
 
         sig_to_process = signal.SIGKILL if force else signal.SIGINT
         killed_expids = []
-        for expid in expids:
+        for expid in expid_list:
             pid: int = process_id(expid)
             if not pid or pid <= 1:
                 Log.info(f"Expid {expid} was not running")
