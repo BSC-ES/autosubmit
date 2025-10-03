@@ -11,52 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  changed_files:
-    runs-on: ubuntu-latest
-    name: Test changed-files
-    steps:
-      - uses: actions/checkout@v4
-      - name: Get all test, doc and src files that have changed
-        id: changed-files-yaml
-        uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62 # v47
-
-      - name: Run step if test file(s) change
-        # NOTE: Ensure all outputs are prefixed by the same key used above e.g. `test_(...)` | `doc_(...)` | `src_(...)` when trying to access the `any_changed` output.
-        if: steps.changed-files-yaml.outputs.test_any_changed == 'true'
-        env:
-          TEST_ALL_CHANGED_FILES: ${{ steps.changed-files-yaml.outputs.test_all_changed_files }}
-        run: |
-          echo "One or more test file(s) has changed."
-          echo "List all the files that have changed: $TEST_ALL_CHANGED_FILES"
-
-      - name: Run step if doc file(s) change
-        if: steps.changed-files-yaml.outputs.doc_any_changed == 'true'
-        env:
-          DOC_ALL_CHANGED_FILES: ${{ steps.changed-files-yaml.outputs.doc_all_changed_files }}
-        run: |
-          echo "One or more doc file(s) has changed."
-          echo "List all the files that have changed: $DOC_ALL_CHANGED_FILES"
-
-      # -----------------------------------------------------------------------------------------------------------
-      # Example 4
-      # -----------------------------------------------------------------------------------------------------------
-      - name: Get changed files in the docs folder
-        id: changed-files-specific
-        uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62 # v47
-        with:
-          files: docs/*.{js,html}  # Alternatively using: `docs/**`
-          files_ignore: docs/static.js
-
-      - name: Run step if any file(s) in the docs folder change
-        if: steps.changed-files-specific.outputs.any_changed == 'true'
-        env:
-          ALL_CHANGED_FILES: ${{ steps.changed-files-specific.outputs.all_changed_files }}
-        run: |
-          echo "One or more files in the docs folder has changed."
-          echo "List all the files that have changed: $ALL_CHANGED_FILES"
-
-
-  lint:
+  ruff-changes-in-file:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
