@@ -42,7 +42,7 @@ class JobListPersistence(object):
         :param persistence_path: str
 
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def load(self, persistence_path, persistence_file):
         """
@@ -51,7 +51,7 @@ class JobListPersistence(object):
         :param persistence_path: str
 
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
 
 class JobListPersistencePkl(JobListPersistence):

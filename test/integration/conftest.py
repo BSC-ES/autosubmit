@@ -35,6 +35,7 @@ from testcontainers.core.waiting_utils import wait_for_logs
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import _create_ssh_client
+from autosubmit.platforms.psplatform import PsPlatform
 from test.integration.test_utils.networking import get_free_port
 
 if TYPE_CHECKING:
@@ -42,9 +43,14 @@ if TYPE_CHECKING:
     from py._path.local import LocalPath  # type: ignore
 
 _SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
+"""This is the vanilla image from LinuxServer.io, with OpenSSH. About 39MB."""
+_SSH_DOCKER_IMAGE_X11_MFA = 'autosubmit/linuxserverio-ssh-2fa-x11:latest'
+"""This is our test image, built on top of LinuxServer.io's, but with MFA and X11. About 395MB."""
 _SSH_DOCKER_PASSWORD = 'password'
+"""Common password used in SSH containers; we mock the SSH Client of Paramiko to avoid hassle with keys."""
 
 _SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1'
+"""The Slurm Docker image. About 600 MB. It contains 2 cores, 1 node."""
 
 
 class MakeSSHClientFixture(Protocol):
@@ -150,8 +156,24 @@ def git_server(tmp_path) -> Generator[tuple[DockerContainer, Path, str], None, N
         yield container, git_repos_path, f'http://localhost:{http_port}/git'
 
 
+@pytest.fixture
+def ps_platform() -> PsPlatform:
+    platform = PsPlatform(expid='a000', name='ps', config={})
+    return platform
+
+
+def _markers_contain(request: pytest.FixtureRequest, text: str) -> bool:
+    """Check if a marker is used in the test.
+
+    Returns ``True`` if the caller test is decorated with a
+    marker that matches the given text. Otherwise, ``False``.
+    """
+    markers = request.node.iter_markers()
+    return any(marker.name == text for marker in markers)
+
+
 @pytest.fixture()
-def ssh_server(mocker, tmp_path, make_ssh_client, request):
+def ssh_server(mocker, tmp_path, make_ssh_client, request: pytest.FixtureRequest) -> DockerContainer:
     ssh_port = get_free_port()
 
     user = getuser() or "unknown"
@@ -159,16 +181,23 @@ def ssh_server(mocker, tmp_path, make_ssh_client, request):
     uid = user_pw.pw_uid
     gid = user_pw.pw_gid
 
-    with DockerContainer(image=_SSH_DOCKER_IMAGE, remove=True, hostname='openssh-server') \
-            .with_env('TZ', 'Etc/UTC') \
-            .with_env('SUDO_ACCESS', 'false') \
-            .with_env('USER_NAME', user) \
-            .with_env('USER_PASSWORD', 'password') \
-            .with_env('PUID', str(uid)) \
-            .with_env('PGID', str(gid)) \
-            .with_env('UMASK', '000') \
-            .with_env('PASSWORD_ACCESS', 'true') \
-            .with_bind_ports(2222, ssh_port) as container:
+    mfa = _markers_contain(request, 'mfa')
+    x11 = _markers_contain(request, 'x11')
+
+    ssh_image = _SSH_DOCKER_IMAGE_X11_MFA if mfa or x11 else _SSH_DOCKER_IMAGE
+
+    with DockerContainer(image=ssh_image, remove=True, hostname='openssh-server') \
+        .with_env('TZ', 'Etc/UTC') \
+        .with_env('SUDO_ACCESS', 'false') \
+        .with_env('USER_NAME', user) \
+        .with_env('USER_PASSWORD', 'password') \
+        .with_env('PUID', str(uid)) \
+        .with_env('PGID', str(gid)) \
+        .with_env('UMASK', '000') \
+        .with_env('PASSWORD_ACCESS', 'true') \
+        .with_env('MFA', str(mfa).lower()) \
+        .with_bind_ports(2222, ssh_port) as container:
+
         wait_for_logs(container, 'sshd is listening on port 2222')
 
         ssh_client = make_ssh_client(ssh_port, _SSH_DOCKER_PASSWORD, None)
@@ -178,7 +207,7 @@ def ssh_server(mocker, tmp_path, make_ssh_client, request):
 
 
 @pytest.fixture()
-def slurm_server(mocker, tmp_path: 'LocalPath', make_ssh_client: MakeSSHClientFixture, request):
+def slurm_server(mocker, tmp_path: 'LocalPath', make_ssh_client: MakeSSHClientFixture):
     ssh_port = get_free_port()
     container_name = f'slurm-server-{uuid.uuid4()}'
 

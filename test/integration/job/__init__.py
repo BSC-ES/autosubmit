@@ -15,15 +15,4 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-
-class Notifier:
-    def __init__(self):
-        pass  # pragma: no cover
-
-    @staticmethod
-    def notify_status_change(implementation, exp_id, job_name="", prev_status="", status="", notify_to=""):
-        implementation.notify_status_change(exp_id, job_name, prev_status, status, notify_to)
-
-    @staticmethod
-    def notify_experiment_status(implementation, exp_id, notify_to="",platform=""):
-        implementation.notify_experiment_status(exp_id,notify_to,platform)
+"""Integration tests for Autosubmit job packagers."""
