@@ -220,3 +220,80 @@ def test_notify_status_change(
         assert 'Traceback' not in log_calls
     else:
         mock_printlog.assert_not_called()
+
+@pytest.mark.parametrize(
+    "sendmail_error, expected_log_message",
+    [
+        # Normal case: No errors, should not log anything
+        (None, None),
+
+        # Log connection error: Simulate an error while sending email
+        (Exception("SMTP server error"),
+         'Trace:SMTP server error\nAn error has occurred while sending a warning mail about remote_platform')
+    ],
+    ids=[
+        "Normal case: No errors",
+        "Log connection error (SMTP server error)"
+    ]
+)
+def test_notify_custom_alert(
+        mock_basic_config,
+        mock_smtp,
+        mocker,
+        mail_notifier,
+        sendmail_error: Optional[Exception],
+        expected_log_message):
+    
+    subject = 'Custom Alert Subject'
+    message_body = 'This is a custom alert message'
+    mail_to = ['recipient@example.com']
+
+    mock_smtp = mocker.patch('autosubmit.notifications.mail_notifier.smtplib.SMTP')
+
+    if sendmail_error:
+        mock_smtp.side_effect = sendmail_error
+
+    mock_printlog = mocker.patch.object(Log, 'printlog')
+
+    mail_notifier.notify_custom_alert(subject, mail_to, message_body)
+
+    if expected_log_message:
+        mock_printlog.assert_called_once_with(
+            expected_log_message, 6011)
+        log_calls = [call[0][0]
+                     for call in mock_printlog.call_args_list]
+        assert 'Traceback' not in log_calls
+    else:
+        mock_printlog.assert_not_called()
+        
+        mock_smtp.assert_called_once()
+        
+        smtp_instance = mock_smtp.return_value
+        smtp_instance.sendmail.assert_called_once()
+        
+        call_args = smtp_instance.sendmail.call_args[0]
+        sender = call_args[0]
+        recipients = call_args[1]
+        message_str = call_args[2]
+        
+        assert sender == mail_notifier.config.MAIL_FROM
+        assert mail_to[0] in recipients[0]
+        assert subject in message_str
+        assert message_body in message_str
+
+
+def test_notify_custom_alert_invalid_email(mail_notifier):
+    """Test that invalid email addresses raise ValueError"""
+
+    subject = 'Test Subject'
+    message_body = 'Test message'
+    
+    with pytest.raises(ValueError, match='Invalid email in recipient list'):
+        mail_notifier.notify_custom_alert(subject, ['invalid-email'], message_body)
+    
+    with pytest.raises(ValueError, match='Empty recipient list'):
+        mail_notifier.notify_custom_alert(subject, [], message_body)
+    
+    with pytest.raises(ValueError, match='Recipients of mail notifications must be a list of emails!'):
+        mail_notifier.notify_custom_alert(subject, 'not-a-list@example.com', message_body)
+     

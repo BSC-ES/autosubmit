@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import atexit
+import copy
 import locale
 import multiprocessing
 import os
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.job.job_packages import JobPackageBase
 
+from autosubmit.performance.factory_performance import PerformanceFactory
 
 def _init_logs_log_process(as_conf, platform_name):
     Log.set_console_level(as_conf.experiment_data.get("LOG_RECOVERY_CONSOLE_LEVEL", "DEBUG"))
@@ -85,6 +87,7 @@ def recover_platform_job_logs_wrapper(
                                                                                     "DEBUG"),
         "LOG_RECOVERY_FILE_LEVEL": as_conf.experiment_data.get("CONFIG", {}).get("LOG_RECOVERY_FILE_LEVEL",
                                                                                  "EVERYTHING"),
+        "PERFORMANCE": as_conf.experiment_data.get("PERFORMANCE", {}),
     }
     _init_logs_log_process(as_conf, platform.name)
     platform.recover_platform_job_logs(as_conf)
@@ -229,6 +232,7 @@ class Platform(object):
             log_queue_size = int(platform_total_jobs) * 2
         self.log_queue_size = log_queue_size
         self.remote_log_dir = None
+        self._performance_factory = PerformanceFactory()
 
     @classmethod
     def update_workers(cls, event_worker):
@@ -1067,6 +1071,43 @@ class Platform(object):
                 process_log = True
                 break
         return process_log
+    
+    @staticmethod
+    def update_job_information(job: 'Job', as_conf: 'AutosubmitConfig') -> None:
+        """
+        Updates the job information in the Autosubmit configuration.
+
+        :param job: The job object to update.
+        :type job: Job
+        :param as_conf: The Autosubmit configuration object containing experiment data.
+        :type as_conf: AutosubmitConfig
+        """
+        
+        as_conf_copy = copy.deepcopy(as_conf)
+        as_conf_copy.reload(force_load=True)
+        job.update_parameters(as_conf_copy, set_attributes=True)
+    
+    def _compute_performance_metrics(self, job: 'Job', as_conf: 'AutosubmitConfig'):
+        """
+        Computes performance metrics for the job.
+
+        :param job: The job object for which to compute performance metrics.
+        :type job: Job
+        :param as_conf: The Autosubmit configuration object containing experiment data.
+        :type as_conf: AutosubmitConfig
+        """
+
+        performance_config = as_conf.experiment_data.get('PERFORMANCE', {})
+        try:
+            manager_performance = self._performance_factory.create_performance(job, performance_config)
+            if not manager_performance:
+                Log.warning(f"No performance manager found for job '{job.name}'. Skipping performance metrics computation.")
+                return
+            self.update_job_information(job, as_conf)
+            manager_performance.compute_and_check_performance_metrics(job)
+        except Exception as e:
+            Log.error(f"Failed to compute performance metrics for job '{job.name}': {e}")
+            Log.debug(traceback.format_exc())
 
     def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any], as_conf: 'AutosubmitConfig') -> None:
         """
@@ -1086,6 +1127,7 @@ class Platform(object):
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
                 try:
                     job.retrieve_logfiles(raise_error=True)
+                    self._compute_performance_metrics(job, as_conf)
                 except Exception:
                     jobs_pending_to_process.add(job)
                     job._log_recovery_retries += 1
@@ -1105,6 +1147,7 @@ class Platform(object):
             try:
                 job.retrieve_logfiles(raise_error=True)
                 job._log_recovery_retries += 1
+                self._compute_performance_metrics(job, as_conf)
             except:
                 if job._log_recovery_retries < 5:
                     jobs_pending_to_process.add(job)
