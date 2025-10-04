@@ -880,6 +880,10 @@ class Autosubmit:
                 expids = expid.split(" ")
             expids = [x.strip() for x in expids]
             for expid in expids:
+                exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+                if not os.path.exists(exp_path):
+                    with suppress(FileNotFoundError):
+                        raise AutosubmitCritical("Experiment does not exist", 7012)
                 as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
                 as_conf.reload(force_load=True)
 
@@ -887,11 +891,8 @@ class Autosubmit:
                     if args.command not in ["expid", "upgrade"]:
                         raise AutosubmitCritical(f"Experiment {expid} has no yml data. Please, if you really wish to use "
                                                  f"AS 4 prompt:\nautosubmit upgrade {expid}",7012)
-                exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
                 tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
                 aslogs_path = os.path.join(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
-                if not os.path.exists(exp_path):
-                    raise AutosubmitCritical("Experiment does not exist", 7012)
                 # delete is treated differently
                 owner, eadmin, current_owner = Autosubmit._check_ownership_and_set_last_command(as_conf, expid, args.command)
             if not os.path.exists(tmp_path):
