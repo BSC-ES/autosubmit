@@ -3,6 +3,7 @@
 **Bug fixes:**
 
 - Fixed issue with the verification of dirty Git local repositories in operational experiments #2446
+- Fixed issue where Autosubmit did not retry when there were networking issues in platforms #1369
 
 **Enhancements:**
 

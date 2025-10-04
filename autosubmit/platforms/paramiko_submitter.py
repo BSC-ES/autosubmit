@@ -202,7 +202,6 @@ class ParamikoSubmitter(Submitter):
             for section in platforms_with_serial_options:
                 platforms[section].serial_platform = platforms[serial]
 
-
         self.platforms = platforms
         if raise_message != "":
             raise AutosubmitError(raise_message)
