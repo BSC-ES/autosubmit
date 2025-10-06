@@ -20,6 +20,7 @@
 import argparse
 import traceback
 from contextlib import suppress
+from os import _exit  #noqa
 # noinspection PyProtectedMember
 from pathlib import Path
 from typing import Optional, Union
@@ -66,8 +67,7 @@ def exit_from_error(e: BaseException) -> int:
     trace = traceback.format_exc()
     try:
         Log.debug(trace)
-    except Exception as ex:
-        Log.debug(str(ex))
+    except BaseException:
         print(trace)
 
     is_portalocker_error = isinstance(e, BaseLockException)

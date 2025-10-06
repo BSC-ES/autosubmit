@@ -17,5 +17,5 @@
 
 """Database tests.
 
-These files contain tests to ensure the Database is working properly in an integrated way with Autosubmit
+These files contain tests to ensure the database is working properly in an integrated way with Autosubmit.
 """

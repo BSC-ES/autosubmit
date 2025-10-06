@@ -18,5 +18,5 @@
 """Autosubmit tests.
 
 These folders contain all the tests run to ensure the quality of the code in the Autosubmit tool,
-here you can find Unit, Integration, Regression, and Behaviour Tests
+here you can find Unit, Integration, and Regression Tests.
 """

@@ -729,25 +729,29 @@ class Job(object):
                 if "bash" in line:
                     if self.type != Language.BASH:
                         raise AutosubmitCritical(
-                            f"Extended {error_message_type} script: script {script_name} seems Bash but job"
-                            f" {self.script_name} isn't\n", 7011)
+                            f"Extended {error_message_type} script: script {script_name} seems Bash but job {self.script_name} isn't\n",
+                            7011)
                 elif "Rscript" in line:
                     if self.type != Language.R:
                         raise AutosubmitCritical(
-                            f"Extended {error_message_type} script: script {script_name} seems Rscript but job"
-                            f" {script_name} isn't\n", 7011)
+                            f"Extended {error_message_type} script: script {script_name} seems Rscript but job {self.script_name} isn't\n",
+                            7011)
                 elif "python" in line:
                     if self.type not in (Language.PYTHON2, Language.PYTHON3, Language.PYTHON):
                         raise AutosubmitCritical(
-                            f"Extended {error_message_type} script: script {script_name} seems Python but job"
-                            f" {self.script_name} isn't\n", 7011)
+                            f"Extended {error_message_type} script: script {script_name} seems Python but job {self.script_name} isn't\n",
+                            7011)
                 else:
+                    # TODO: Check why the fstring is not working for the text below
                     raise AutosubmitCritical(
-                        f"Extended {error_message_type} script: couldn't figure out script {script_name} type\n", 7011)
+                        "Extended {1} script: couldn't figure out script {0} type\n".format(script_name,
+                                                                                            error_message_type), 7011)
 
         if not found_hashbang:
+            # TODO: Check why the fstring is not working for the text below
             raise AutosubmitCritical(
-                f"Extended {error_message_type} script: couldn't figure out script {script_name} type\n", 7011)
+                "Extended {1} script: couldn't figure out script {0} type\n".format(script_name,
+                                                                                    error_message_type), 7011)
 
         if is_header:
             script = "\n###############\n# Header script\n###############\n" + script

@@ -1795,11 +1795,8 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
     # When the file already exists, it will append new content. It must never
     # delete the existing lines, so this assertion just verifies the content
     # written previously (if any) was not removed.
-    if existing_lines:
-        lines = len(existing_lines.split('\n')) - 1
-    else:
-        lines = 0
-    expected_lines = lines + 1
+    existing_lines = len(existing_lines.split('\n')) - 1 if existing_lines else 0
+    expected_lines = existing_lines + 1
     assert len(total_stats.read_text().split('\n')) == expected_lines
 
 

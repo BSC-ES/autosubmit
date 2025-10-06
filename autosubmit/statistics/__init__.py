@@ -17,5 +17,5 @@
 
 """Autosubmit Statistics.
 
-Generates the statistics of the jobs run by Autosubmit
+Generates the statistics of the jobs run by Autosubmit.
 """

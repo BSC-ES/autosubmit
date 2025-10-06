@@ -163,7 +163,7 @@ def retrieve_expids() -> List[str]:
 # TODO: check with Dani if the platform is needed (no processes using it on hub or destine vm?).
 #       The previous code used ``grep`` to search by expid, and also had some code ready to
 #       search by platform name, although that was not actually used anywhere, yet.
-def process_id(expid: str, command="run") -> int:
+def process_id(expid: str, command="run") -> Optional[int]:
     """Retrieve the process id of the autosubmit process.
 
     :param expid: An Autosubmit experiment ID.
@@ -183,7 +183,7 @@ def process_id(expid: str, command="run") -> int:
                 processes.append(process)
 
     if not processes:
-        return -1
+        return None
 
     if len(processes) > 1:
         Log.warning(f'Found more than one processes for "autosubmit {command} {expid}": {len(processes)}')

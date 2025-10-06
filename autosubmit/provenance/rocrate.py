@@ -90,7 +90,7 @@ DEFAULT_EXPORTED_KEYS = [
 ]
 
 
-def _add_dir_and_files(crate: ROCrate, base_path: Path, relative_path: str = '', encoding_format: str = '') -> None:
+def _add_dir_and_files(crate: ROCrate, base_path: Path, relative_path: str, encoding_format: str = None) -> None:
     """Add a directory and its files into the RO-Crate.
 
     :param crate: the RO-Crate instance.
