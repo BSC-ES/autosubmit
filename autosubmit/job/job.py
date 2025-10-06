@@ -1431,6 +1431,7 @@ class Job(object):
         if new_status == Status.COMPLETED:
             Log.debug(
                 "{0} job seems to have completed: checking...".format(self.name))
+            self._platform.get_completed_files(self.name, wrapper_failed=self.packed)
             self.check_completion()
         else:
             self.status = new_status
