@@ -15,4 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Autosubmit tests."""
+"""Autosubmit tests.
+
+These folders contain all the tests run to ensure the quality of the code in the Autosubmit tool,
+here you can find Unit, Integration, and Regression Tests.
+"""
