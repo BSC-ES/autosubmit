@@ -216,6 +216,8 @@ class Log:
         :type file_path: str
         :param type: file type
         :param level: log level
+        :param max_retries: maximum number of retries to create the log file
+        :param timeout: time to wait between retries (in seconds)
         """
         levels = {
             "STATUS_FAILED": 500,
@@ -275,11 +277,11 @@ class Log:
                     status_file_handler.addFilter(custom_filter)
                     Log.log.addHandler(status_file_handler)
                 os.chmod(file_path, 509)
-            except Exception:  # retry again
+            except Exception as exc:  # retry again
                 retries += 1
                 if retries >= max_retries:
                     raise AutosubmitCritical(
-                        message=f"Could not create log file {file_path} after {max_retries} attempts"
+                        message=f"Could not create log file {file_path} after {max_retries} attempts: {exc}"
                     )
                 sleep(timeout * retries)
 

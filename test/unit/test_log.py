@@ -15,9 +15,14 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+from typing import TYPE_CHECKING
+
 import pytest
-import pytest_mock
-from autosubmit.log.log import AutosubmitError, AutosubmitCritical, Log
+
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+
+if TYPE_CHECKING:
+    from pytest_mock import MockFixture
 
 """Tests for the log module."""
 
@@ -69,7 +74,7 @@ def test_log_not_format():
     _send_messages(msg)
 
 
-def test_set_file_retrial(mocker: pytest_mock.MockFixture):
+def test_set_file_retrial(mocker: 'MockFixture'):
     max_retries = 3
 
     # Make os.path.split raise an exception
