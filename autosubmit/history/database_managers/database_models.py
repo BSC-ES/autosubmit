@@ -32,7 +32,7 @@ ExperimentStatusRow = collections.namedtuple(
 ExperimentRow = collections.namedtuple('ExperimentRow', ["id", "name", "autosubmit_version", "description"])
 
 PragmaVersion = collections.namedtuple('PragmaVersion', ['version'])
-MaxCounterRow = collections.namedtuple('MaxCounter', ['MaxCounterRow'])
+MaxCounterRow = collections.namedtuple('MaxCounter', ['maxcounter'])
 
 class RunningStatus:
   RUNNING = "RUNNING"
