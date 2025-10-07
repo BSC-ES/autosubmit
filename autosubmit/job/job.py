@@ -735,7 +735,7 @@ class Job(object):
                     if self.type != Language.R:
                         raise AutosubmitCritical(
                             f"Extended {error_message_type} script: script {script_name} seems Rscript but job"
-                            f" {script_name} isn't\n", 7011)
+                            f" {self.script_name} isn't\n", 7011)
                 elif "python" in line:
                     if self.type not in (Language.PYTHON2, Language.PYTHON3, Language.PYTHON):
                         raise AutosubmitCritical(
@@ -1117,7 +1117,7 @@ class Job(object):
         if fail_count == -1:
             logname = os.path.join(self._tmp_path, f"{self.stat_file}0")
         else:
-            fail_count = str(fail_count)
+            fail_count = fail_count
             logname = os.path.join(self._tmp_path, f"{self.stat_file}{fail_count}")
         if os.path.exists(logname):
             lines = open(logname).readlines()
@@ -1129,7 +1129,7 @@ class Job(object):
             Log.warning(f"Log file {logname} does not exist")
             return 0
 
-    def _get_from_total_stats(self, index) -> list[datetime]:
+    def _get_from_total_stats(self, index) -> list[datetime.datetime]:
         """
         Returns list of values from given column index position in TOTAL_STATS file associated to job
 
@@ -1196,12 +1196,12 @@ class Job(object):
         :rtype: list of list
         """
         log_name = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
-        retrials_list = []
+        retrials_list: list = []
         if os.path.exists(log_name):
             already_completed = False
             # Read lines of the TOTAL_STATS file starting from last
             for retrial in reversed(open(log_name).readlines()):
-                retrial_fields = retrial.split()
+                retrial_fields: list = retrial.split()
                 if Job.is_a_completed_retrial(retrial_fields):
                     # It's a COMPLETED run
                     if already_completed:
@@ -1329,14 +1329,14 @@ class Job(object):
             except BaseException as e:
                 Log.printlog("Trace {0} \n Failed to write the {1} e=6001".format(str(e), self.name))
 
-    def retrieve_logfiles(self, raise_error: bool = False) -> dict[str, int]:
+    def retrieve_logfiles(self, raise_error: bool = False) -> None:
         """
         Retrieves log files from remote host.
 
         :param raise_error: If True, raises an error if the log files are not retrieved.
         :type raise_error: bool
         :return: Dictionary with finish timestamps per job.
-        :rtype: dict[str, int]
+        :rtype: None
         """
         backup_logname = copy.copy(self.local_logs)
         if self.wrapper_type == "vertical":
@@ -1987,7 +1987,7 @@ class Job(object):
                                                                                                  "MAX_WAITING_JOBS",
                                                                                                  -1))))
 
-    def calendar_split(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> None:
+    def calendar_split(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> dict:
         """
         Calculate the calendar splits for the job.
 
@@ -2333,7 +2333,7 @@ class Job(object):
             return False
 
     @staticmethod
-    def is_a_completed_retrial(fields: dict) -> bool:
+    def is_a_completed_retrial(fields: list) -> bool:
         """
         Returns true only if there are 4 fields: submit start finish status, and status equals COMPLETED.
         """
@@ -2375,7 +2375,7 @@ class Job(object):
             content: str,
             parameters: dict,
             as_conf: AutosubmitConfig,
-            undefined_variables: list[str] = None
+            undefined_variables: list[str] = list()
     ) -> str:
         """
         Replace placeholders in the template content.
@@ -2660,11 +2660,11 @@ class Job(object):
         :rtype: bool
         """
         log_name = sorted(list(self._log_path.glob(f"{self.name}*")), key=lambda x: x.stat().st_mtime)
-        log_name = log_name[-1] if log_name else None
+        log_name = log_name[-1] if log_name else None  # type: ignore
         if log_name:
-            file_timestamp = int(datetime.datetime.fromtimestamp(log_name.stat().st_mtime).strftime("%Y%m%d%H%M%S"))
+            file_timestamp = int(datetime.datetime.fromtimestamp(log_name.stat().st_mtime).strftime("%Y%m%d%H%M%S"))  # type: ignore
             if self.ready_date and file_timestamp >= int(self.ready_date):
-                self.local_logs = (log_name.with_suffix(".out").name, log_name.with_suffix(".err").name)
+                self.local_logs = (log_name.with_suffix(".out").name, log_name.with_suffix(".err").name)  # type: ignore
                 self.remote_logs = copy.deepcopy(self.local_logs)
                 return True
         self.local_logs = (f"{self.name}.out.{self._fail_count}", f"{self.name}.err.{self._fail_count}")
@@ -2731,13 +2731,13 @@ class WrapperJob(Job):
         self.job_list = job_list
         # divide jobs in dictionary by state?
         self.wallclock = total_wallclock  # Now it is reloaded after a run -> stop -> run
-        self.running_jobs_start = OrderedDict()
+        self.running_jobs_start: OrderedDict = OrderedDict()
         self._platform: 'ParamikoPlatform' = platform
         self.as_config = as_config
         # save start time, wallclock and processors?!
         self.checked_time = datetime.datetime.now()
         self.hold = hold
-        self.inner_jobs_running = list()
+        self.inner_jobs_running: list = list()
         self.is_wrapper = True
 
     def _queuing_reason_cancel(self, reason: str) -> bool:
@@ -3079,14 +3079,14 @@ class WrapperJob(Job):
         :return: If start_time is bigger than wallclock return True, otherwise False
         """
         elapsed = datetime.datetime.now() - parse_date(start_time)
-        wallclock = datetime.datetime.strptime(wallclock, '%H:%M')
+        wallclock_time = datetime.datetime.strptime(wallclock, '%H:%M')
         total = 0.0
-        if wallclock.hour > 0:
-            total = wallclock.hour
-        if wallclock.minute > 0:
-            total += wallclock.minute / 60.0
-        if wallclock.second > 0:
-            total += wallclock.second / 60.0 / 60.0
+        if wallclock_time.hour > 0:
+            total = wallclock_time.hour
+        if wallclock_time.minute > 0:
+            total += wallclock_time.minute / 60.0
+        if wallclock_time.second > 0:
+            total += wallclock_time.second / 60.0 / 60.0
         total = total * 1.15
         hour = int(total)
         minute = int((total - int(total)) * 60.0)
@@ -3098,7 +3098,7 @@ class WrapperJob(Job):
             return True
         return False
 
-    def _parse_timestamp(self, timestamp: int) -> datetime:
+    def _parse_timestamp(self, timestamp: int) -> str:
         """Parse a date from int to datetime.
 
         :param timestamp: time to be converted
@@ -3108,7 +3108,7 @@ class WrapperJob(Job):
         time = value.strftime('%Y-%m-%d %H:%M:%S')
         return time
 
-    def _check_time(self, output: [str], index: int) -> datetime:
+    def _check_time(self, output: list[str], index: int) -> str:
         """Generate the starting time of a job found by a generated command.
 
         :param output: The output of a CMD command executed
@@ -3116,5 +3116,5 @@ class WrapperJob(Job):
         :return: Job starting time
         """
         time = int(output[index])
-        time = self._parse_timestamp(time)
-        return time
+        parsed_time = self._parse_timestamp(time)
+        return parsed_time
