@@ -14,3 +14,8 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Autosubmit Source.
+
+These files are the core of the Autosubmit, where all the workflow will be handled, processed and generated
+"""

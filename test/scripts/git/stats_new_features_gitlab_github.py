@@ -195,7 +195,7 @@ def new_features_2025():
     ]
 
     for issue in issues_since_2025:
-        label_names = list(map(lambda l: l.name, issue.labels))
+        label_names = list(map(lambda lam: lam.name, issue.labels))
         if issue.created_at < last_day_2025:
 
             issue_type = issue.type

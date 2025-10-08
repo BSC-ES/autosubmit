@@ -911,7 +911,7 @@ class SrunVerticalHorizontalWrapperBuilder(SrunWrapperBuilder):
             declare -a scripts_{0}={1}
             """).format(str(list_index),str(built_array), '\n'.ljust(13))
             scripts_array_vars += "\"scripts_{0}\" ".format(list_index)
-            scripts_array_index += "\"0\" ".format(list_index)
+            scripts_array_index += "\"0\" "
             list_index += 1
         scripts_array_vars += ")"
         scripts_array_index += ")"

@@ -42,7 +42,7 @@ jobs:
           push: false
           load: true
           tags: autosubmit/autosubmit:latest
-      
+
       - name: Test the image
         run: |
           docker run --rm autosubmit/autosubmit:latest autosubmit --version

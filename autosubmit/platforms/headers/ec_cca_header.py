@@ -41,7 +41,7 @@ class EcCcaHeader(object):
             else:
                 queue = 'np'
 
-        return "PBS -q {0}".format(queue)
+        return f"PBS -q {queue}"
 
     # noinspection PyMethodMayBeStatic
     def get_tasks_per_node(self, job, parameters):

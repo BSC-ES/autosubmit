@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from test.conftest import AutosubmitConfigFactory
+from test.unit.conftest import AutosubmitConfigFactory
 from typing import TYPE_CHECKING
 
 import pytest

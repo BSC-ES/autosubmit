@@ -15,49 +15,64 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+"""Integration tests for Autosubmit ``DbManager``."""
+
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+import pytest
+
+from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager import DbManager
+from autosubmit.database.tables import DBVersionTable
+
+if TYPE_CHECKING:
+    # noinspection PyProtectedMember
+    from _pytest._py.path import LocalPath
 
 
-def test_create_table_command_returns_a_valid_command():
-    # arrange
-    table_name = 'tests'
-    table_fields = ['dummy1', 'dummy2', 'dummy3']
-    expected_command = 'CREATE TABLE IF NOT EXISTS tests (dummy1, dummy2, dummy3)'
-    # act
-    command = DbManager.generate_create_table_command(table_name, table_fields)
-    # assert
-    assert expected_command == command
+def _create_db_manager(db_path: Path):
+    connection_url = get_connection_url(db_path=db_path)
+    return DbManager(connection_url=connection_url)
 
 
-def test_insert_command_returns_a_valid_command():
-    # arrange
-    table_name = 'tests'
-    columns = ['col1, col2, col3']
-    values = ['dummy1', 'dummy2', 'dummy3']
-    expected_command = 'INSERT INTO tests(col1, col2, col3) VALUES ("dummy1", "dummy2", "dummy3")'
-    # act
-    command = DbManager.generate_insert_command(table_name, columns, values)
-    # assert
-    assert expected_command == command
+def test_db_manager_has_made_correct_initialization(tmp_path: "LocalPath") -> None:
+    db_manager = _create_db_manager(Path(tmp_path, f'{__name__}.db'))
+    assert db_manager.engine.name.startswith('sqlite')
 
 
-def test_insert_many_command_returns_a_valid_command():
-    # arrange
-    table_name = 'tests'
-    num_of_values = 3
-    expected_command = 'INSERT INTO tests VALUES (?,?,?)'
-    # act
-    command = DbManager.generate_insert_many_command(table_name, num_of_values)
-    # assert
-    assert expected_command == command
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_after_create_table_command_then_it_returns_1_row(tmp_path: "LocalPath", as_db: str):
+    db_manager = _create_db_manager(Path(tmp_path, 'tests.db'))
+    db_manager.create_table(DBVersionTable.name)
+    count = db_manager.count(DBVersionTable.name)
+    assert 1 == count
 
 
-def test_select_command_returns_a_valid_command():
-    # arrange
-    table_name = 'tests'
-    where = ['test=True', 'debug=True']
-    expected_command = 'SELECT * FROM tests WHERE test=True AND debug=True'
-    # act
-    command = DbManager.generate_select_command(table_name, where)
-    # assert
-    assert expected_command == command
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_after_3_inserts_into_a_table_then_it_has_4_rows(tmp_path: "LocalPath", as_db: str):
+    db_manager = _create_db_manager(Path(tmp_path, 'tests.db'))
+    db_manager.create_table(DBVersionTable.name)
+    # It already has the first version, so we are adding versions 2, 3, 4...
+    for i in range(2, 5):
+        db_manager.insert(DBVersionTable.name, {'version': str(i)})
+    count = db_manager.count(DBVersionTable.name)
+    assert 4 == count
+
+
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_select_first_where(tmp_path: "LocalPath", as_db: str):
+    db_manager = _create_db_manager(Path(tmp_path, 'tests.db'))
+    db_manager.create_table(DBVersionTable.name)
+    # It already has the first version, so we are adding versions 2, 3, 4...
+    for i in range(2, 5):
+        db_manager.insert(DBVersionTable.name, {'version': str(i)})
+    first_value = db_manager.select_first_where(DBVersionTable.name, where=None)
+    # We are getting the first version, that was already in the database
+    assert first_value[0] == 1
+    
+    last_value = db_manager.select_first_where(DBVersionTable.name, where={'version': '4'})
+    assert last_value[0] == 4

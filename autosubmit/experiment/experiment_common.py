@@ -18,6 +18,7 @@
 """Module containing functions to manage autosubmit's experiments."""
 
 import string
+from pathlib import Path
 
 from autosubmit.database import db_common
 from autosubmit.log.log import Log, AutosubmitCritical
@@ -109,7 +110,6 @@ def copy_experiment(experiment_id, description, version, test=False, operational
                                  f"as a new experiment in the db: {e}", 7011) from e
 
 
-
 def next_experiment_id(current_id):
     """
     Get next experiment identifier
@@ -184,3 +184,24 @@ def base36decode(number):
     :rtype: int
     """
     return int(number, 36)
+
+
+def create_required_folders(exp_id: str, exp_folder: Path) -> None:
+    """Create the minimum set of required folders for an Autosubmit experiment.
+
+    The newly created folders will be relative to the given experiment folder.
+
+    Each new folder with have the sme permission, ``755`` (important if you are
+    expecting something else, e.g. umask).
+
+    :param exp_id: experiment identifier
+    :param exp_folder: experiment folder
+    :raises IOError: if there are errors creating the new experiment folders (permission, not found, etc.)
+    """
+    dir_mode = 0o755
+
+    exp_folder.mkdir(mode=dir_mode)
+
+    required_dirs = ["conf", "pkl", "tmp", "tmp/ASLOGS", f"tmp/LOG_{exp_id}", "plot", "status"]
+    for required_dir in required_dirs:
+        Path(exp_folder / required_dir).mkdir(mode=dir_mode)

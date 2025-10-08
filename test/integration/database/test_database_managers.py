@@ -1,18 +1,17 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -178,10 +177,8 @@ class TestExperimentHistoryDbManager:
         self.experiment_database._update_job_data_by_id(backup_job_dc)
 
     def test_bulk_update(self):
-        current_time = time.time()
         all_job_data_rows = self.experiment_database.get_job_data_all()
         job_data_rows_test = [job for job in all_job_data_rows if job.run_id == 3]
-        backup = [JobData.from_model(job) for job in job_data_rows_test]
         list_job_data_class = [JobData.from_model(job) for job in job_data_rows_test]
         backup_changes = [(HUtils.get_current_datetime(), job.status, job.rowstatus, job._id) for job in
                           list_job_data_class]

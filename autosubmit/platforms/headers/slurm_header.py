@@ -36,10 +36,10 @@ class SlurmHeader(object):
         # There is no queue, so directive is empty
         if het > -1 and len(job.het['CURRENT_QUEUE']) > 0:
             if job.het['CURRENT_QUEUE'][het] != '':
-                return "SBATCH --qos={0}".format(job.het['CURRENT_QUEUE'][het])
+                return f"SBATCH --qos={job.het['CURRENT_QUEUE'][het]}"
         else:
             if parameters['CURRENT_QUEUE'] != '':
-                return "SBATCH --qos={0}".format(parameters['CURRENT_QUEUE'])
+                return f"SBATCH --qos={parameters['CURRENT_QUEUE']}"
         return ""
 
     def get_proccesors_directive(self, job, parameters, het=-1):

@@ -20,8 +20,8 @@
 import argparse
 import traceback
 from contextlib import suppress
+from os import _exit  #noqa
 # noinspection PyProtectedMember
-from os import _exit  # type: ignore
 from pathlib import Path
 from typing import Optional, Union
 
@@ -67,7 +67,7 @@ def exit_from_error(e: BaseException) -> int:
     trace = traceback.format_exc()
     try:
         Log.debug(trace)
-    except:
+    except BaseException:
         print(trace)
 
     is_portalocker_error = isinstance(e, BaseLockException)
@@ -80,7 +80,7 @@ def exit_from_error(e: BaseException) -> int:
         delete_lock_file()
 
     if is_autosubmit_error:
-        e: Union[AutosubmitError, AutosubmitCritical] = e  # type: ignore
+        e: Union[AutosubmitError, AutosubmitCritical] = e
         if e.trace:
             Log.debug("Trace: {0}", str(e.trace))
         Log.critical("{1} [eCode={0}]", e.code, e.message)
