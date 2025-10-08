@@ -118,7 +118,7 @@ def test_is_workflow_out_cat(mocker, autosubmit, aslogs_dir):
 
 def test_is_workflow_status_tail(mocker, autosubmit, status_path):
     popen = mocker.patch('subprocess.Popen')
-    log_file = status_path / f'{_EXPID}_anything.txt'
+    log_file = Path(status_path, f'{_EXPID}_anything.txt')
     with open(log_file, 'w') as f:
         f.write('as test')
         f.flush()

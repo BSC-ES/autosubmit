@@ -2864,7 +2864,7 @@ class JobList(object):
         # job._parents and job._children if recreate is set
         self._job_list = [job["job"] for job in self.graph.nodes().values()]
         try:
-            DbStructure.save_structure(self.graph, self.expid, self._config.experiment_data["STRUCTURES_DIR"])
+            DbStructure.save_structure(self.graph, self.expid, Path(self._config.experiment_data["STRUCTURES_DIR"]))
         except Exception as exp:
             Log.warning(str(exp))
 

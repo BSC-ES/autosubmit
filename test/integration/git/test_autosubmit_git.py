@@ -294,10 +294,11 @@ def test_git_operational_experiment_toggle_flag(
 
 # -- clean_git
 
-def test_clean_git_not_a_dir(autosubmit_config, mocker):
+def test_clean_git_not_a_dir(autosubmit_exp, mocker):
     """Test that cleaning Git fails when the project directory is actually a file."""
     mocked_log = mocker.patch('autosubmit.git.autosubmit_git.Log')
-    as_conf = autosubmit_config(_EXPID, {})
+    exp = autosubmit_exp(_EXPID, {})
+    as_conf = exp.as_conf
 
     # Remove proj dir, replacing by a file.
     proj_dir = Path(as_conf.get_project_dir())
@@ -309,10 +310,11 @@ def test_clean_git_not_a_dir(autosubmit_config, mocker):
     assert mocked_log.debug.call_args_list[1][0][0] == 'Not a directory... SKIPPING!'
 
 
-def test_clean_git_not_a_git_repo(autosubmit_config, mocker):
+def test_clean_git_not_a_git_repo(autosubmit_exp, mocker):
     """Test that cleaning Git fails when the project directory is not a Git repository."""
     mocked_log = mocker.patch('autosubmit.git.autosubmit_git.Log')
-    as_conf = autosubmit_config(_EXPID, {})
+    exp = autosubmit_exp(_EXPID, {})
+    as_conf = exp.as_conf
 
     # Missing .git folder.
     proj_dir = Path(as_conf.get_project_dir())
@@ -385,7 +387,6 @@ def test_clean_git_not_pushed(
 def test_clean_git(
         tmp_path,
         autosubmit_exp,
-        mocker,
         git_server: Generator[Tuple[DockerContainer, Path, str], None, None]
 ):
     """Test that cleaning Git fails when the project commit cannot be recorded."""

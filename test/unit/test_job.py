@@ -1184,7 +1184,7 @@ def test_construct_real_additional_file_name(file_name: str, job_name: str, expi
     assert result == expected
 
 
-def test_create_script(mocker, tmpdir):
+def test_create_script(test_tmp_path: Path, mocker) -> None:
     # arrange
     job = Job("job1", "1", Status.READY, 0)
     # arrange
@@ -1194,7 +1194,7 @@ def test_create_script(mocker, tmpdir):
     parameters['NUMTASK'] = 666
 
     job.name = "job1"
-    job._tmp_path = tmpdir.strpath
+    job._tmp_path = test_tmp_path
     job.section = "DUMMY"
     job.additional_files = ['dummy_file1', 'dummy_file2']
     mocker.patch("autosubmit.job.job.Job.update_content", return_value=(
@@ -1210,12 +1210,12 @@ def test_create_script(mocker, tmpdir):
     name_without_expid = job.name.replace(f'{job.expid}_', '') if job.expid else job.name
     job.create_script(config)
     # list tmpdir and ensure that each file is created
-    assert len(tmpdir.listdir()) == 3  # job script + additional files
-    assert tmpdir.join('job1.cmd').check()
-    assert tmpdir.join(f'dummy_file1_{name_without_expid}').check()
-    assert tmpdir.join(f'dummy_file2_{name_without_expid}').check()
+    assert len(list(test_tmp_path.iterdir())) == 3  # job script + additional files
+    assert (test_tmp_path / 'job1.cmd').exists()
+    assert (test_tmp_path / f'dummy_file1_{name_without_expid}').exists()
+    assert (test_tmp_path / f'dummy_file2_{name_without_expid}').exists()
     # assert that the script content is correct
-    with open(tmpdir.join('job1.cmd'), 'r') as f:
+    with open((test_tmp_path / 'job1.cmd'), 'r') as f:
         content = f.read()
         assert 'some-content: 999, 777, 666' in content
 

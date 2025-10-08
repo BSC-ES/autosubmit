@@ -1,7 +1,28 @@
-import sqlite3
-from typing import Any
-import pytest
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Unit tests for ``autosubmit.job.user_metrics``."""
+
 from pathlib import Path
+from typing import Any
+
+import pytest
+from pytest_mock import MockerFixture
+
 from autosubmit.job.job import Job
 from autosubmit.job.metrics_processor import (
     MAX_FILE_SIZE_MB,
@@ -9,19 +30,17 @@ from autosubmit.job.metrics_processor import (
     MetricSpecSelectorType,
     MetricSpec,
     UserMetricProcessor,
-    UserMetricRepository,
 )
-from unittest.mock import MagicMock, patch
-
 from autosubmit.platforms.locplatform import LocalPlatform
-from autosubmit.config.basicconfig import BasicConfig
+
+_EXPID = "t123"
 
 
 @pytest.fixture
-def disable_metric_repository():
-    with patch("autosubmit.job.metrics_processor.UserMetricRepository") as mock:
-        mock.return_value = MagicMock()
-        yield mock
+def disable_metric_repository(mocker):
+    mock = mocker.patch("autosubmit.job.metrics_processor.UserMetricRepository")
+    mock.return_value = mocker.MagicMock()
+    yield mock
 
 
 @pytest.mark.parametrize(
@@ -174,101 +193,78 @@ def test_metric_spec_load_invalid(metric_specs: Any):
         MetricSpec.load(metric_specs)
 
 
-def test_read_metrics_specs(disable_metric_repository):
+def test_read_metrics_specs_as_conf_exception(disable_metric_repository, mocker):
     # Mocking the AutosubmitConfig and Job objects
-    as_conf = MagicMock()
-    job = MagicMock()
-
-    as_conf.get_section.return_value = [
-        {"NAME": "metric1", "FILENAME": "file1"},
-        {
-            "NAME": "invalid metric",
-        },
-        {
-            "NAME": "metric2",
-            "FILENAME": "file2",
-            "SELECTOR": {"TYPE": "JSON", "KEY": "key1.key2.key3"},
-        },
-    ]
-    as_conf.deep_normalize = lambda x: x
+    as_conf = mocker.MagicMock()
+    as_conf.get_section.side_effect = ValueError
+    job = mocker.MagicMock()
 
     # Do the read test
     user_metric_processor = UserMetricProcessor(as_conf, job)
-    metric_specs = user_metric_processor.read_metrics_specs()
 
-    assert len(metric_specs) == 2
+    with pytest.raises(ValueError) as cm:
+        user_metric_processor.read_metrics_specs()
 
-    assert metric_specs[0].name == "metric1"
-    assert metric_specs[0].filename == "file1"
-    assert metric_specs[0].selector.type == MetricSpecSelectorType.TEXT
-    assert metric_specs[0].selector.key is None
-
-    assert metric_specs[1].name == "metric2"
-    assert metric_specs[1].filename == "file2"
-    assert metric_specs[1].selector.type == MetricSpecSelectorType.JSON
-    assert metric_specs[1].selector.key == ["key1", "key2", "key3"]
+    assert 'Invalid or missing metrics section' in str(cm.value)
 
 
-def test_process_metrics(disable_metric_repository):
+def test_process_metrics(disable_metric_repository, mocker: MockerFixture):
     # Mocking the AutosubmitConfig and Job objects
-    as_conf = MagicMock()
-    job = MagicMock()
+    as_conf = mocker.MagicMock()
+    job = mocker.MagicMock()
     job.name = "test_job"
-    job.platform = MagicMock()
-    job.platform.read_file = MagicMock()
+    job.platform = mocker.MagicMock()
+    job.platform.read_file = mocker.MagicMock()
     job.platform.read_file.return_value = b'{"key1": "value1", "key2": "value2"}'
 
-    with patch(
-        "autosubmit.job.metrics_processor.UserMetricProcessor.read_metrics_specs"
-    ) as mock_read_metrics_specs:
-        mock_read_metrics_specs.return_value = [
-            # The first metric is a text file
-            MetricSpec(
-                name="metric1",
-                filename="file1",
-                selector=MetricSpecSelector(type=MetricSpecSelectorType.TEXT, key=None),
+    mock_read_metrics_specs =  mocker.patch("autosubmit.job.metrics_processor.UserMetricProcessor.read_metrics_specs")
+    mock_read_metrics_specs.return_value = [
+        # The first metric is a text file
+        MetricSpec(
+            name="metric1",
+            filename="file1",
+            selector=MetricSpecSelector(type=MetricSpecSelectorType.TEXT, key=None),
+        ),
+        # The second metric is a JSON file
+        MetricSpec(
+            name="metric2",
+            filename="file2",
+            selector=MetricSpecSelector(
+                type=MetricSpecSelectorType.JSON, key=["key2"]
             ),
-            # The second metric is a JSON file
-            MetricSpec(
-                name="metric2",
-                filename="file2",
-                selector=MetricSpecSelector(
-                    type=MetricSpecSelectorType.JSON, key=["key2"]
-                ),
-            ),
-        ]
+        ),
+    ]
 
-        # Mocking the repository
-        mock_store_metric = MagicMock()
-        mock_repo = MagicMock()
-        mock_repo.store_metric = mock_store_metric
+    # Mocking the repository
+    mock_store_metric = mocker.MagicMock()
+    mock_repo = mocker.MagicMock()
+    mock_repo.store_metric = mock_store_metric
 
-        user_metric_processor = UserMetricProcessor(as_conf, job)
-        user_metric_processor.user_metric_repository = mock_repo
-        user_metric_processor.process_metrics()
+    user_metric_processor = UserMetricProcessor(as_conf, job)
+    user_metric_processor.user_metric_repository = mock_repo
+    user_metric_processor.process_metrics()
 
-        assert mock_read_metrics_specs.call_count == 1
+    assert mock_read_metrics_specs.call_count == 1
 
-        assert job.platform.read_file.call_count == 2
+    assert job.platform.read_file.call_count == 2
 
-        assert mock_store_metric.call_count == 2
+    assert mock_store_metric.call_count == 2
 
-        assert mock_store_metric.call_args_list[0][0][1] == "test_job"
-        assert mock_store_metric.call_args_list[0][0][2] == "metric1"
-        assert (
-            mock_store_metric.call_args_list[0][0][3]
-            == '{"key1": "value1", "key2": "value2"}'
-        )
+    assert mock_store_metric.call_args_list[0][0][1] == "test_job"
+    assert mock_store_metric.call_args_list[0][0][2] == "metric1"
+    assert (
+        mock_store_metric.call_args_list[0][0][3]
+        == '{"key1": "value1", "key2": "value2"}'
+    )
 
-        assert mock_store_metric.call_args_list[1][0][1] == "test_job"
-        assert mock_store_metric.call_args_list[1][0][2] == "metric2"
-        assert mock_store_metric.call_args_list[1][0][3] == "value2"
+    assert mock_store_metric.call_args_list[1][0][1] == "test_job"
+    assert mock_store_metric.call_args_list[1][0][2] == "metric2"
+    assert mock_store_metric.call_args_list[1][0][3] == "value2"
 
 
 def test_get_current_metric_folder(autosubmit_config):
-    JOB_NAME = "t123"
     as_conf = autosubmit_config(
-        JOB_NAME,
+        _EXPID,
         {
             "CONFIG": {
                 "METRIC_FOLDER": "/foo/bar",
@@ -279,20 +275,19 @@ def test_get_current_metric_folder(autosubmit_config):
         },
     )
 
-    job = Job(JOB_NAME, "1", 0, 1)
+    job_name = f'{_EXPID}_DUMMY_SECTION'
+
+    job = Job(job_name, "1", 0, 1)
     job.section = "DUMMY_SECTION"
 
     parameters = job.update_parameters(as_conf)
 
-    assert parameters["CURRENT_METRIC_FOLDER"] == str(
-        Path("/foo/bar").joinpath(JOB_NAME)
-    )
+    assert parameters["CURRENT_METRIC_FOLDER"] == str(Path("/foo/bar", job_name))
 
 
 def test_get_current_metric_folder_placeholder(autosubmit_config, local: LocalPlatform):
-    JOB_NAME = "t123"
     as_conf = autosubmit_config(
-        JOB_NAME,
+        _EXPID,
         {
             "CONFIG": {
                 "METRIC_FOLDER": "%CURRENT_ROOTDIR%/my_metrics_folder",
@@ -303,7 +298,9 @@ def test_get_current_metric_folder_placeholder(autosubmit_config, local: LocalPl
         },
     )
 
-    job = Job(JOB_NAME, "1", 0, 1)
+    job_name = f'{_EXPID}_DUMMY_SECTION'
+
+    job = Job(job_name, "1", 0, 1)
     job.section = "DUMMY_SECTION"
     job.platform = local
 
@@ -315,35 +312,5 @@ def test_get_current_metric_folder_placeholder(autosubmit_config, local: LocalPl
     )
 
     assert parameters["CURRENT_METRIC_FOLDER"] == str(
-        Path(parameters["CURRENT_ROOTDIR"]).joinpath("my_metrics_folder", JOB_NAME)
+        Path(parameters["CURRENT_ROOTDIR"]).joinpath("my_metrics_folder", job_name)
     )
-
-
-def test_store_metric(tmp_path):
-    EXPID = "t123"
-    with patch("autosubmit.job.metrics_processor.BasicConfig.LOCAL_ROOT_DIR", tmp_path):
-        Path(tmp_path).joinpath(EXPID, BasicConfig.LOCAL_TMP_DIR).mkdir(
-            parents=True, exist_ok=True
-        )
-
-        user_metric_repository = UserMetricRepository(EXPID)
-        user_metric_repository.store_metric(
-            run_id=1,
-            job_name="test_job",
-            metric_name="test_metric",
-            metric_value="test_value",
-        )
-
-        # Check if the metric is stored in the database
-        with sqlite3.connect(user_metric_repository.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT metric_value FROM user_metrics
-                WHERE run_id = ? AND job_name = ? AND metric_name = ?;
-                """,
-                (1, "test_job", "test_metric"),
-            )
-            result = cursor.fetchone()
-            assert result is not None
-            assert result[0] == "test_value"
