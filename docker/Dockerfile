@@ -1,4 +1,4 @@
-FROM mambaorg/micromamba:debian12-slim  AS micromamba
+FROM mambaorg/micromamba:debian13-slim  AS micromamba
 
 # The micromamba image is referenced in a multi-stage build.
 # Note that around 90% of the content of this image is actually
@@ -82,7 +82,6 @@ ENV ENV_NAME=base
 ENV PATH="$MAMBA_ROOT_PREFIX/bin:/usr/bin:/usr/local/bin:$PATH"
 
 # The directories the container will use for Autosubmit files.
-# Combined RUN commands for better layer caching
 USER root
 RUN mkdir -pv "${AUTOSUBMIT_ROOT_DIR}/logs" && \
     mkdir -pv "${AUTOSUBMIT_ROOT_DIR}/metadata" && \
@@ -157,9 +156,9 @@ RUN autosubmit configure \
 ENV AUTOSUBMIT_CONFIGURATION="${AUTOSUBMIT_ROOT_DIR}/autosubmitrc"
 
 # SSH (for Autosubmit local platform.)
-# Combined SSH setup in single RUN command
 USER root
 
+# Combined SSH setup in single RUN command
 RUN chown -R "${MAMBA_USER}:${MAMBA_USER}" "/home/${MAMBA_USER}/" && \
     chmod 0755 "/home/${MAMBA_USER}/" && \
     mkdir -pv /var/run/sshd && \
@@ -198,7 +197,6 @@ RUN chmod a+x /usr/local/bin/entrypoint.sh
 USER $MAMBA_USER
 
 EXPOSE 22
-
 
 LABEL maintainer="Autosubmit team"
 
