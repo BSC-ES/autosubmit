@@ -40,10 +40,10 @@ def test_configure(mocker, tmp_path, suffix: str, autosubmit) -> None:
         database_path=str(db_path),
         database_filename=database_filename,
         local_root_path=str(lr_path),
-        platforms_conf_path=None,  # type: ignore
-        jobs_conf_path=None,  # type: ignore
-        smtp_hostname=None,  # type: ignore
-        mail_from=None,  # type: ignore
+        platforms_conf_path=None,
+        jobs_conf_path=None,
+        smtp_hostname=None,
+        mail_from=None,
         machine=False,
         local=False)
 

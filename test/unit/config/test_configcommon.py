@@ -173,7 +173,7 @@ def test_key_error_raise(autosubmit_config: 'AutosubmitConfigFactory'):
 @pytest.mark.parametrize(
     'error,expected',
     [
-        [IOError, AutosubmitError],  # type: ignore
+        [IOError, AutosubmitError],
         [AutosubmitCritical, AutosubmitCritical],
         [AutosubmitError, AutosubmitError],
         [ValueError, AutosubmitCritical]

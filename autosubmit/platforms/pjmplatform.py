@@ -20,7 +20,7 @@ import os
 import textwrap
 from contextlib import suppress
 from time import sleep
-from typing import List, Union, TYPE_CHECKING
+from typing import List, TYPE_CHECKING
 
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
@@ -156,9 +156,9 @@ class PJMPlatform(ParamikoPlatform):
                     package.process_jobs_to_submit(jobs_id[i], hold)
                     i += 1
             save = True
-        except AutosubmitError as e:
+        except AutosubmitError:
             raise
-        except AutosubmitCritical as e:
+        except AutosubmitCritical:
             raise
         except Exception as e:
             raise AutosubmitError("{0} submission failed".format(self.name), 6015, str(e))
@@ -210,19 +210,19 @@ class PJMPlatform(ParamikoPlatform):
             cmd = f"{cmd} ; rm {cmd}"
             try:
                 self.send_command(cmd)
-            except AutosubmitError as e:
+            except AutosubmitError:
                 raise
-            except AutosubmitCritical as e:
+            except AutosubmitCritical:
                 raise
-            except Exception as e:
+            except Exception:
                 raise
             jobs_id = self.get_submitted_job_id(self.get_ssh_output())
             return jobs_id
         except IOError as e:
             raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e))
-        except AutosubmitError as e:
+        except AutosubmitError:
             raise
-        except AutosubmitCritical as e:
+        except AutosubmitCritical:
             raise
         except Exception as e:
             raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e))
@@ -234,7 +234,7 @@ class PJMPlatform(ParamikoPlatform):
         try:
             # Test if remote_path exists
             self._ftpChannel.chdir(self.remote_log_dir)
-        except IOError as e:
+        except IOError:
             try:
                 if self.send_command(self.get_mkdir_cmd()):
                     Log.debug('{0} has been created on {1} .',
@@ -283,7 +283,7 @@ class PJMPlatform(ParamikoPlatform):
             except BaseException as e:
                 raise AutosubmitError(
                     "Can't cancel the jobid: {0}".format(job.id), 6000, str(e))
-            except AutosubmitError as e:
+            except AutosubmitError:
                 raise
 
     def get_checkhost_cmd(self):
@@ -305,7 +305,7 @@ class PJMPlatform(ParamikoPlatform):
                 if 'Invalid' in reason or reason in ['ANOTHER JOB STARTED','DELAY','DEADLINE SCHEDULE STARTED','ELAPSE LIMIT EXCEEDED','FILE IO ERROR','GATE CHECK','IMPOSSIBLE SCHED','INSUFF CPU','INSUFF MEMORY','INSUFF NODE','INSUFF','INTERNAL ERROR','INVALID HOSTFILE','LIMIT OVER MEMORY','LOST COMM','NO CURRENT DIR','NOT EXIST','RSCGRP NOT EXIST','RSCGRP STOP','RSCUNIT','USER','EXCEED','WAIT SCHED']:
                     return True
             return False
-        except Exception as e:
+        except Exception:
             return False
     def get_queue_status(self, in_queue_jobs: List['Job'], list_queue_jobid, as_conf):
         if not in_queue_jobs:
@@ -330,7 +330,7 @@ class PJMPlatform(ParamikoPlatform):
         try:
             status = [x.split()[1] for x in output.splitlines()
                       if x.split()[0] == str(job_id)]
-        except BaseException as e:
+        except BaseException:
             pass
         if len(status) == 0:
             return status
@@ -494,7 +494,7 @@ class PJMPlatform(ParamikoPlatform):
                 self._ftpChannel.stat(os.path.join(
                     self.get_files_path(), filename))
                 file_exist = True
-            except IOError as e:  # File doesn't exist, retry in sleeptime
+            except IOError:  # File doesn't exist, retry in sleeptime
                 if not wrapper_failed:
                     sleep(sleeptime)
                     sleeptime = sleeptime + 5

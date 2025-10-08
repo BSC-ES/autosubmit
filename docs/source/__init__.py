@@ -15,4 +15,4 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Unit tests for Autosubmit Resources functions."""
+"""Autosubmit documents source where Sphinx will base their build."""

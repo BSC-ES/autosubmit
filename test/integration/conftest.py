@@ -39,7 +39,7 @@ from test.integration.test_utils.networking import get_free_port
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
-    from py._path.local import LocalPath  # type: ignore
+    from py._path.local import LocalPath
 
 _SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
 _SSH_DOCKER_PASSWORD = 'password'

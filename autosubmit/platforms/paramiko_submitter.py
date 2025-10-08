@@ -20,7 +20,6 @@ import os
 from collections import defaultdict
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmit.platforms.ecplatform import EcPlatform
 from autosubmit.platforms.locplatform import LocalPlatform
@@ -193,7 +192,7 @@ class ParamikoSubmitter(Submitter):
                 remote_platform.update_cmds()
 
                 platforms[section] = remote_platform
-            except Exception as e:
+            except Exception:
                 raise_message = "Error in the definition of PLATFORM in YAML: SCRATCH_DIR, PROJECT, USER, EXPID must be defined for platform {0}".format(section)
             # Executes update_cmds() from corresponding Platform Object
             # Save platform into result dictionary

@@ -60,7 +60,7 @@ def prepare_basic_config(current_tmpdir):
 
 
 @pytest.fixture
-def prepare_workflow_runs(current_tmpdir: Path) -> Path:
+def prepare_workflow_runs(current_tmpdir: Path) -> None:
     """
     factory creating path and directories for test execution
     :param current_tmpdir: mktemp

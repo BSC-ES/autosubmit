@@ -91,11 +91,11 @@ def test_read_section_running_once_create_jobs_once(mocker, dictionary):
     dictionary.read_section(section, priority, Language.BASH)
 
     # assert
-    dictionary._create_jobs_once.assert_called_once_with(  # type: ignore
+    dictionary._create_jobs_once.assert_called_once_with(
         section, priority, Language.BASH, splits)
-    dictionary._create_jobs_startdate.assert_not_called()  # type: ignore
-    dictionary._create_jobs_member.assert_not_called()  # type: ignore
-    dictionary._create_jobs_chunk.assert_not_called()  # type: ignore
+    dictionary._create_jobs_startdate.assert_not_called()
+    dictionary._create_jobs_member.assert_not_called()
+    dictionary._create_jobs_chunk.assert_not_called()
 
 
 def test_read_section_running_date_create_jobs_startdate(mocker, dictionary):
@@ -131,11 +131,11 @@ def test_read_section_running_date_create_jobs_startdate(mocker, dictionary):
     dictionary.read_section(section, priority, Language.BASH)
 
     # assert
-    dictionary._create_jobs_once.assert_not_called()  # type: ignore
-    dictionary._create_jobs_startdate.assert_called_once_with(  # type: ignore
+    dictionary._create_jobs_once.assert_not_called()
+    dictionary._create_jobs_startdate.assert_called_once_with(
         section, priority, frequency, Language.BASH, splits)
-    dictionary._create_jobs_member.assert_not_called()  # type: ignore
-    dictionary._create_jobs_chunk.assert_not_called()  # type: ignore
+    dictionary._create_jobs_member.assert_not_called()
+    dictionary._create_jobs_chunk.assert_not_called()
 
 
 def test_read_section_running_member_create_jobs_member(mocker, dictionary):
@@ -171,11 +171,11 @@ def test_read_section_running_member_create_jobs_member(mocker, dictionary):
     dictionary.read_section(section, priority, Language.BASH)
 
     # assert
-    dictionary._create_jobs_once.assert_not_called()  # type: ignore
-    dictionary._create_jobs_startdate.assert_not_called()  # type: ignore
-    dictionary._create_jobs_member.assert_called_once_with(  # type: ignore
+    dictionary._create_jobs_once.assert_not_called()
+    dictionary._create_jobs_startdate.assert_not_called()
+    dictionary._create_jobs_member.assert_called_once_with(
         section, priority, frequency, Language.BASH, splits)
-    dictionary._create_jobs_chunk.assert_not_called()  # type: ignore
+    dictionary._create_jobs_chunk.assert_not_called()
 
 
 def test_read_section_running_chunk_create_jobs_chunk(mocker, dictionary):
@@ -207,10 +207,10 @@ def test_read_section_running_chunk_create_jobs_chunk(mocker, dictionary):
     dictionary.read_section(section, options["PRIORITY"], Language.BASH)
 
     # assert
-    dictionary._create_jobs_once.assert_not_called()  # type: ignore
-    dictionary._create_jobs_startdate.assert_not_called()  # type: ignore
-    dictionary._create_jobs_member.assert_not_called()  # type: ignore
-    dictionary._create_jobs_chunk.assert_called_once_with(  # type: ignore
+    dictionary._create_jobs_once.assert_not_called()
+    dictionary._create_jobs_startdate.assert_not_called()
+    dictionary._create_jobs_member.assert_not_called()
+    dictionary._create_jobs_chunk.assert_called_once_with(
         section, options["PRIORITY"], options["FREQUENCY"],
         Language.BASH, options["SYNCHRONIZE"], options["DELAY"],
         options["SPLITS"])
@@ -535,7 +535,7 @@ def test_get_date_returns_the_jobs_and_calls_get_member_once_with_the_given_memb
 
     # arrange
     assert ['fake-job'] == returned_jobs
-    dictionary._get_member.assert_called_once_with(jobs, date_dic, member, chunk)  # type: ignore
+    dictionary._get_member.assert_called_once_with(jobs, date_dic, member, chunk)
 
 
 def test_get_date_returns_the_jobs_and_calls_get_member_for_all_its_members(mocker, dictionary):
@@ -552,9 +552,9 @@ def test_get_date_returns_the_jobs_and_calls_get_member_for_all_its_members(mock
 
     # arrange
     assert ['fake-job'] == returned_jobs
-    assert len(dictionary._member_list) == dictionary._get_member.call_count  # type: ignore
+    assert len(dictionary._member_list) == dictionary._get_member.call_count
     for member in dictionary._member_list:
-        dictionary._get_member.assert_any_call(jobs, date_dic, member, chunk)  # type: ignore
+        dictionary._get_member.assert_any_call(jobs, date_dic, member, chunk)
 
 
 def test_get_jobs_returns_the_job_of_the_section(dictionary):
@@ -584,7 +584,7 @@ def test_get_jobs_calls_get_date_with_given_date(mocker, dictionary):
 
     # arrange
     assert list() == returned_jobs
-    dictionary._get_date.assert_called_once_with(list(), dic, date, member, chunk)  # type: ignore
+    dictionary._get_date.assert_called_once_with(list(), dic, date, member, chunk)
 
 
 def test_get_jobs_calls_get_date_for_all_its_dates(mocker, dictionary):
@@ -601,9 +601,9 @@ def test_get_jobs_calls_get_date_for_all_its_dates(mocker, dictionary):
 
     # arrange
     assert list() == returned_jobs
-    assert len(dictionary._date_list) == dictionary._get_date.call_count  # type: ignore
+    assert len(dictionary._date_list) == dictionary._get_date.call_count
     for date in dictionary._date_list:
-        dictionary._get_date.assert_any_call(list(), dic, date, member, chunk)  # type: ignore
+        dictionary._get_date.assert_any_call(list(), dic, date, member, chunk)
 
 
 def test_job_list_returns_the_job_list_by_name(dictionary):

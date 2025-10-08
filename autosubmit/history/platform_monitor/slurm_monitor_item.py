@@ -95,4 +95,4 @@ class SlurmMonitorItem:
             "AveRSS": self.AveRSS}
   
   def __str__(self):
-    return "Name {0}, Status {1}, NCpus {2}, NNodes {3}, Submit {4}, Start {5}, Finish {6}, Energy {7}, MaxRSS {8}, AveRSS {9} [Energy Str {10}]".format(self.name, self.status, self.ncpus, self.nnodes, self.submit, self.start, self.finish, self.energy, self.MaxRSS, self.AveRSS, self.energy_str, self.is_batch)
+    return f"Name {self.name}, Status {self.status}, NCpus {self.ncpus}, NNodes {self.nnodes}, Submit {self.submit}, Start {self.start}, Finish {self.finish}, Energy {self.energy}, MaxRSS {self.MaxRSS}, AveRSS {self.AveRSS} [Energy Str {self.energy_str}]"

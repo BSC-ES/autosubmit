@@ -90,7 +90,7 @@ def _write_test_files(expid, local_root_dir: Path):
     # add a job of each platform type
     with jobs_path.open('w') as f:
         f.write(
-            dedent(f"""\
+            dedent("""\
                 JOBS:
                     nodes:
                         SCRIPT: |
@@ -236,7 +236,7 @@ def test_scheduler_job_types(scheduler, job_type, autosubmit, autosubmit_exp: Ca
     elif job_type == "NODES":
         actual = Path(exp_path, f"tmp/{expid}_NODES_{scheduler}.cmd").read_text()
     else:
-        for asthread in Path(exp_path, f"tmp").glob(f"*ASThread_WRAP_{job_type}_[0-9]*.cmd"):
+        for asthread in Path(exp_path, "tmp").glob(f"*ASThread_WRAP_{job_type}_[0-9]*.cmd"):
             actual = asthread.read_text()
             break
         else:

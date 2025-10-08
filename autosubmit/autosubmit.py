@@ -975,15 +975,15 @@ class Autosubmit:
         try:
             try:
                 locale.setlocale(locale.LC_ALL, 'C.UTF-8')
-            except Exception as e:
+            except Exception:
                 try:
                     locale.setlocale(locale.LC_ALL, 'C.utf8')
-                except Exception as e:
+                except Exception:
                     try:
                         locale.setlocale(locale.LC_ALL, 'en_GB')
-                    except Exception as e:
+                    except Exception:
                         locale.setlocale(locale.LC_ALL, 'es_ES')
-        except Exception as e:
+        except Exception:
             Log.info("Locale C.utf8 is not found, using 'C' as fallback")
             locale.setlocale(locale.LC_ALL, 'C')
 
@@ -1535,7 +1535,7 @@ class Autosubmit:
 
                 try:
                     return Autosubmit._delete_expid(expid, force)
-                except AutosubmitCritical as e:
+                except AutosubmitCritical:
                     raise
                 except BaseException as e:
                     raise AutosubmitCritical("Seems that something went wrong, please check the trace", 7012, str(e))
@@ -1602,8 +1602,7 @@ class Autosubmit:
             signal.signal(signal.SIGINT, signal_handler)
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             as_conf.check_conf_files(True)
-
-            project_type = as_conf.get_project_type()
+            as_conf.get_project_type()
             safetysleeptime = as_conf.get_safetysleeptime()
             Log.debug("The Experiment name is: {0}", expid)
             Log.debug("Sleep: {0}", safetysleeptime)
@@ -1739,11 +1738,11 @@ class Autosubmit:
             Log.info("No more scripts to generate, you can proceed to check them manually")
             Log.result(file_paths)
 
-        except AutosubmitCritical as e:
+        except AutosubmitCritical:
             raise
-        except AutosubmitError as e:
+        except AutosubmitError:
             raise
-        except BaseException as e:
+        except BaseException:
             raise
         return True
 
@@ -1766,7 +1765,7 @@ class Autosubmit:
         Log.warning("Generating the auxiliary job_list used for the -CW flag.")
         job_list._job_list = jobs_filtered
         job_list._persistence_file = job_list._persistence_file + "_cw_flag"
-        parameters = as_conf.load_parameters()
+        as_conf.load_parameters()
         date_list = as_conf.get_date_list()
         if len(date_list) != len(set(date_list)):
             raise AutosubmitCritical(
@@ -1774,7 +1773,7 @@ class Autosubmit:
         num_chunks = as_conf.get_num_chunks()
         chunk_ini = as_conf.get_chunk_ini()
         member_list = as_conf.get_member_list()
-        run_only_members = as_conf.get_member_list(run_only=True)
+        as_conf.get_member_list(run_only=True)
         date_format = ''
         if as_conf.get_chunk_size_unit() == 'hour':
             date_format = 'H'
@@ -1842,7 +1841,7 @@ class Autosubmit:
                         Status.VALUE_TO_KEY[wrapper_job.status]) + ' to status ' + str(
                         Status.VALUE_TO_KEY[wrapper_job.new_status]))
                     save = True
-            except Exception as e:
+            except Exception:
                 raise AutosubmitCritical(
                     "Wrapper is in Unknown Status couldn't get wrapper parameters", 7050)
 
@@ -1891,13 +1890,13 @@ class Autosubmit:
         """
         jobs_to_check: Dict[str, List[List[Job]]] = dict()
         job_changes_tracker: Dict[str, Tuple[Status, Status]] = dict()
-        for platform in platforms_to_test:
-            queuing_jobs = job_list.get_in_queue_grouped_id(platform)
-            Log.debug(f'Checking jobs for platform={platform.name}')
+        for platform_to_test in platforms_to_test:
+            queuing_jobs = job_list.get_in_queue_grouped_id(platform_to_test)
+            Log.debug(f'Checking jobs for platform={platform_to_test.name}')
             for job_id, job in queuing_jobs.items():
                 # Check Wrappers one-by-one
                 if job_list.job_package_map and job_id in job_list.job_package_map:
-                    wrapper_job, save = Autosubmit.manage_wrapper_job(as_conf, job_list, platform,
+                    wrapper_job, save = Autosubmit.manage_wrapper_job(as_conf, job_list, platform_to_test,
                                                                       job_id)
                     # Notifications e-mail
                     Autosubmit.wrapper_notify(as_conf, expid, wrapper_job)
@@ -1911,10 +1910,10 @@ class Autosubmit:
                     job_prev_status = job.status
                     # If exist key has been pressed and previous status was running, do not check
                     if not (Autosubmit.exit is True and job_prev_status == Status.RUNNING):
-                        if platform.name in jobs_to_check:
-                            jobs_to_check[platform.name].append([job, job_prev_status])
+                        if platform_to_test.name in jobs_to_check:
+                            jobs_to_check[platform_to_test.name].append([job, job_prev_status])
                         else:
-                            jobs_to_check[platform.name] = [[job, job_prev_status]]
+                            jobs_to_check[platform_to_test.name] = [[job, job_prev_status]]
         return jobs_to_check,job_changes_tracker
 
     @staticmethod
@@ -1974,11 +1973,11 @@ class Autosubmit:
                                                as_conf.get_chunk_size(),
                                                current_config=as_conf.get_full_config_as_json())
             Autosubmit.database_backup(expid)
-        except Exception as e:
+        except Exception:
             try:
                 Autosubmit.database_fix(expid)
                 # This error is important
-            except Exception as e:
+            except Exception:
                 pass
         try:
             ExperimentStatus(expid).set_as_running()
@@ -2048,7 +2047,7 @@ class Autosubmit:
                 # Start after completion trigger block
                 AutosubmitHelper.handle_start_after(start_after, expid)
                 # Handling run_only_members
-            except AutosubmitCritical as e:
+            except AutosubmitCritical:
                 raise
             except BaseException as e:
                 raise AutosubmitCritical("Failure during setting the start time check trace for details", 7014, str(e))
@@ -2107,7 +2106,7 @@ class Autosubmit:
             # noinspection PyTypeChecker
             try:
                  job.platform = submitter.platforms[job.platform_name.upper()]
-            except Exception as e:
+            except Exception:
                 raise AutosubmitCritical(f"hpcarch={job.platform_name} not found in the platforms configuration file",
                     7014)
             # noinspection PyTypeChecker
@@ -2258,7 +2257,7 @@ class Autosubmit:
                     # This function is called only once, when the experiment is started. It is used to initialize the experiment and to check the correctness of the configuration files.
                     # If there are issues while running, this function will be called again to reinitialize the experiment.
                     job_list, submitter , exp_history, host , as_conf, platforms_to_test, packages_persistence, _ = Autosubmit.prepare_run(expid, notransitive, start_time, start_after, run_only_members)
-                except AutosubmitCritical as e:
+                except AutosubmitCritical:
                     #e.message += " HINT: check the CUSTOM_DIRECTIVE syntax in your jobs configuration files."
                     raise
                 except Exception as e:
@@ -2354,14 +2353,14 @@ class Autosubmit:
                         # Safe spot to store changes
                         try:
                             exp_history = Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker, expid)
-                        except BaseException as e:
+                        except BaseException:
                             Log.printlog("Historic database seems corrupted, AS will repair it and resume the run",
                                          Log.INFO)
                             try:
                                 Autosubmit.database_fix(expid)
                                 exp_history = Autosubmit.process_historical_data_iteration(job_list,
                                                                                            job_changes_tracker, expid)
-                            except Exception as e:
+                            except Exception:
                                 Log.warning(
                                     "Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
                         if Autosubmit.exit:
@@ -2450,7 +2449,7 @@ class Autosubmit:
                 # search hint - finished run
                 job_list.save()
                 if not did_run and len(job_list.get_completed_failed_without_logs()) > 0: # Revise if there is any log unrecovered from previous run
-                    Log.info(f"Connecting to the platforms, to recover missing logs")
+                    Log.info("Connecting to the platforms, to recover missing logs")
                     submitter = Autosubmit._get_submitter(as_conf)
                     submitter.load_platforms(as_conf)
                     if submitter.platforms is None:
@@ -2465,7 +2464,7 @@ class Autosubmit:
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                 job_list.save()
                 if len(job_list.get_completed_failed_without_logs()) == 0:
-                    Log.result(f"Autosubmit recovered all job logs.")
+                    Log.result("Autosubmit recovered all job logs.")
                 else:
                     Log.warning(f"Autosubmit couldn't recover the following job logs: {[job.name for job in job_list.get_completed_failed_without_logs()]}")
                 try:
@@ -2473,10 +2472,10 @@ class Autosubmit:
                                                     historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
                     exp_history.process_job_list_changes_to_experiment_totals(job_list.get_job_list())
                     Autosubmit.database_backup(expid)
-                except Exception as e:
+                except Exception:
                     try:
                         Autosubmit.database_fix(expid)
-                    except Exception as e:
+                    except Exception:
                         pass
                 for p in platforms_to_test:
                     p.closeConnection()
@@ -2512,17 +2511,17 @@ class Autosubmit:
             return 0
 
     @staticmethod
-    def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=None): # TODO move to utils
+    def restore_platforms(platforms_to_test, mail_notify=False, as_conf=None, expid=None): # TODO move to utils
         Log.info("Checking the connection to all platforms in use")
         issues = ""
         platform_issues = ""
         ssh_config_issues = ""
         private_key_error = "Please, add your private key to the ssh-agent ( ssh-add <path_to_key> ) or use a non-encrypted key\nIf ssh agent is not initialized, prompt first eval `ssh-agent -s`"
 
-        for platform in platform_to_test:
+        for platform_to_test in platforms_to_test:
             platform_issues = ""
             try:
-                message = platform.test_connection(as_conf)
+                message = platform_to_test.test_connection(as_conf)
                 if message is None:
                     message = "OK"
                 if message != "OK":
@@ -2537,37 +2536,37 @@ class Autosubmit:
                         ssh_config_issues += message + ".Please, the eccert expiration date"
                     else:
                         ssh_config_issues += message + (f" this is an PARAMIKO SSHEXCEPTION: indicates that there is "
-                                                        f"something incompatible in the ssh_config for host:{platform.host}\n maybe"
+                                                        f"something incompatible in the ssh_config for host:{platform_to_test.host}\n maybe"
                                                         f" you need to contact your sysadmin")
-            except Exception as e:
+            except Exception:
                 try:
                     if mail_notify:
                         email = as_conf.get_mails_to()
                         if "@" in email[0]:
-                            Notifier.notify_experiment_status(MailNotifier(BasicConfig), expid, email, platform)
-                except Exception as e:
+                            Notifier.notify_experiment_status(MailNotifier(BasicConfig), expid, email, platform_to_test)
+                except Exception:
                     pass
-                platform_issues += f"\n[{platform.name}] Connection Unsuccessful to host {platform.host} "
+                platform_issues += f"\n[{platform_to_test.name}] Connection Unsuccessful to host {platform_to_test.host} "
                 issues += platform_issues
                 continue
-            if platform.check_remote_permissions():
-                Log.result(f"[{platform.name}] Correct user privileges for host {platform.host}")
+            if platform_to_test.check_remote_permissions():
+                Log.result(f"[{platform_to_test.name}] Correct user privileges for host {platform_to_test.host}")
             else:
-                platform_issues += (f"\n[{platform.name}] has configuration issues.\n Check that the connection is"
-                                    f" passwd-less.(ssh {platform.user}@{platform.host})\n Check the parameters that"
+                platform_issues += (f"\n[{platform_to_test.name}] has configuration issues.\n Check that the connection is"
+                                    f" passwd-less.(ssh {platform_to_test.user}@{platform_to_test.host})\n Check the parameters that"
                                     f" build the root_path are correct:{{scratch_dir/project/user}} ="
-                                    f" {{{platform.scratch}/{platform.project}/{platform.user}}}")
+                                    f" {{{platform_to_test.scratch}/{platform_to_test.project}/{platform_to_test.user}}}")
                 issues += platform_issues
             if platform_issues == "":
 
-                Log.printlog(f"[{platform.name}] Connection successful to host {platform.host}", Log.RESULT)
+                Log.printlog(f"[{platform_to_test.name}] Connection successful to host {platform_to_test.host}", Log.RESULT)
             else:
-                if platform.connected:
-                    platform.connected = False
-                    Log.printlog(f"[{platform.name}] Connection successful to host {platform.host}, "
+                if platform_to_test.connected:
+                    platform_to_test.connected = False
+                    Log.printlog(f"[{platform_to_test.name}] Connection successful to host {platform_to_test.host}, "
                                  f"however there are issues with %HPCROOT%", Log.WARNING)
                 else:
-                    Log.printlog(f"[{platform.name}] Connection failed to host {platform.host}", Log.WARNING)
+                    Log.printlog(f"[{platform_to_test.name}] Connection failed to host {platform_to_test.host}", Log.WARNING)
         if issues != "":
             if ssh_config_issues.find(private_key_error[:-2]) != -1:
                 raise AutosubmitCritical("Private key is encrypted, Autosubmit does not run in interactive mode.\nPlease, add the key to the ssh agent(ssh-add <path_to_key>).\nIt will remain open as long as session is active, for force clean you can prompt ssh-add -D",7073, issues + "\n" + ssh_config_issues)
@@ -2711,11 +2710,11 @@ class Autosubmit:
             if profile:
                 profiler.stop()
             raise AutosubmitCritical(e.message, e.code, e.trace)
-        except AutosubmitCritical as e:
+        except AutosubmitCritical:
             if profile:
                 profiler.stop()
             raise
-        except BaseException as e:
+        except BaseException:
             if profile:
                 profiler.stop()
             raise
@@ -3179,7 +3178,7 @@ class Autosubmit:
             if not only_remote: # Local migrate
                 try:
                     if not Autosubmit.archive(experiment_id, True, True):
-                        raise AutosubmitCritical(f"Error archiving the experiment", 7014)
+                        raise AutosubmitCritical("Error archiving the experiment", 7014)
                     Log.result("The experiment has been successfully offered.")
                 except Exception as e:
                     # todo put the IO error code
@@ -3209,13 +3208,11 @@ class Autosubmit:
         :type experiment_id: str
         """
         try:
-            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, experiment_id)
-
+            os.path.join(BasicConfig.LOCAL_ROOT_DIR, experiment_id)
             as_conf = AutosubmitConfig(
                 experiment_id, BasicConfig, YAMLParserFactory())
             as_conf.check_conf_files(False)
-
-            project_type = as_conf.get_project_type()
+            as_conf.get_project_type()
 
             submitter = Autosubmit._get_submitter(as_conf)
             submitter.load_platforms(as_conf)
@@ -3267,13 +3264,12 @@ class Autosubmit:
             tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
             if folder_path is not None and len(str(folder_path)) > 0:
                 tmp_path = folder_path
-            import platform
             # Gather experiment info
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             try:
                 as_conf.reload(True)
                 parameters = as_conf.load_parameters()
-            except Exception as e:
+            except Exception:
                 raise AutosubmitCritical(
                     "Unable to gather the parameters from config files, check permissions.", 7012)
             # Performance Metrics call
@@ -3288,7 +3284,7 @@ class Autosubmit:
                 if performance_metrics:
                     for key in ignore_performance_keys:
                         performance_metrics.pop(key, None)
-            except Exception as e:
+            except Exception:
                 Log.printlog("Autosubmit couldn't retrieve performance metrics.")
                 performance_metrics = None
             # Preparation for section parameters
@@ -3297,7 +3293,7 @@ class Autosubmit:
                 submitter.load_platforms(as_conf)
                 hpcarch = submitter.platforms[as_conf.get_platform()]
 
-            except Exception as e:
+            except Exception:
                 submitter = Autosubmit._get_submitter(as_conf)
                 submitter.load_local_platform(as_conf)
                 hpcarch = submitter.platforms[as_conf.get_platform()]
@@ -3374,9 +3370,9 @@ class Autosubmit:
                 else:
                     raise AutosubmitCritical(
                         f"Template {template_file_path} doesn't exists ", 7014)
-        except AutosubmitError as e:
+        except AutosubmitError:
             raise
-        except AutosubmitCritical as e:
+        except AutosubmitCritical:
             raise
         except BaseException as e:
             raise AutosubmitCritical("Unknown error while reporting the parameters list, likely it is due IO issues",
@@ -3426,7 +3422,7 @@ class Autosubmit:
                 user = os.stat(as_conf.conf_folder_yaml).st_uid
                 try:
                     user = pwd.getpwuid(user).pw_name
-                except Exception as e:
+                except Exception:
                     Log.warning(
                         "The user does not exist anymore in the system, using id instead")
                     continue
@@ -3594,7 +3590,7 @@ class Autosubmit:
                 except (IOError, OSError) as e:
                     raise AutosubmitCritical(
                         "Can not write config file: {0}", 7012, e.message)
-        except (AutosubmitCritical, AutosubmitError) as e:
+        except (AutosubmitCritical, AutosubmitError):
             raise
         except BaseException as e:
             raise AutosubmitCritical(str(e), 7014)
@@ -3981,7 +3977,7 @@ class Autosubmit:
                 try:
                     parser = factory.create_parser()
                     parser.load(Path(f))
-                except BaseException as e:
+                except BaseException:
                     try:
                         AutosubmitConfig.ini_to_yaml(f.parent, Path(f))
                     except BaseException:
@@ -3993,19 +3989,18 @@ class Autosubmit:
                 if not Path(f.stem + ".yml").exists():
                     try:
                         AutosubmitConfig.ini_to_yaml(Path(f).parent, Path(f))
-                    except Exception as e:
+                    except Exception:
                         Log.warning("Couldn't convert conf file to yml: {0}", Path(f).parent)
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             as_conf.reload(force_load=True)
             # Load current variables
             as_conf.check_conf_files()
             # Load current parameters ( this doesn't read job parameters)
-            parameters = as_conf.load_parameters()
+            as_conf.load_parameters()
 
         except (AutosubmitError, AutosubmitCritical):
             raise
         # Update configuration files
-        template_path = Path()
         warn = ""
         substituted = ""
         root_dir = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / expid / "conf"
@@ -4131,10 +4126,11 @@ class Autosubmit:
             backup_path = os.path.join(BasicConfig.JOBDATA_DIR, f"job_data_{expid}.sql")
             command = f"sqlite3 {database_path} .dump > {backup_path} "
             Log.debug("Backing up jobs_data...")
-            out = subprocess.call(command, shell=True)
+            subprocess.call(command, shell=True)
             Log.debug("Jobs_data database backup completed.")
-        except BaseException as e:
+        except BaseException:
             Log.debug("Jobs_data database backup failed.")
+
     @staticmethod
     def database_fix(expid):
         """
@@ -4146,7 +4142,6 @@ class Autosubmit:
         :rtype:        
         """
         os.umask(0) # Overrides user permissions
-        current_time = int(time.time())
         corrupted_db_path = os.path.join(BasicConfig.JOBDATA_DIR, f"job_data_{expid}_corrupted.db")
 
         database_path = os.path.join(BasicConfig.JOBDATA_DIR, f"job_data_{expid}.db")
@@ -4167,7 +4162,6 @@ class Autosubmit:
 
             except Exception:
                 Log.warning("It was not possible to restore the jobs_data.db file... , a new blank db will be created")
-                result = os.popen(f"rm {database_path}").read()
 
                 exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                                 historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
@@ -4304,9 +4298,6 @@ class Autosubmit:
         :return: ``True`` if the experiment has been successfully archived. ``False`` otherwise.
         :rtype: bool
         """
-
-        exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
-
         exp_folder = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
 
         if not noclean:
@@ -4527,7 +4518,7 @@ class Autosubmit:
                     try:
                         if not Autosubmit._copy_code(as_conf, expid, as_conf.get_project_type(), False):
                             return False
-                    except AutosubmitCritical as e:
+                    except AutosubmitCritical:
                         raise
                     except BaseException as e:
                         raise AutosubmitCritical("Error obtaining the project data, check the parameters related to PROJECT and GIT/SVN or LOCAL sections", code=7014,trace=str(e))
@@ -4620,12 +4611,12 @@ class Autosubmit:
                                                            current_config=as_conf.get_full_config_as_json(),
                                                            create=True)
                         Autosubmit.database_backup(expid)
-                    except BaseException as e:
+                    except BaseException:
                         Log.printlog("Historic database seems corrupted, AS will repair it and resume the run",
                                      Log.INFO)
                         try:
                             Autosubmit.database_fix(expid)
-                        except Exception as e:
+                        except Exception:
                             Log.warning(
                                 "Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
                     if not noplot:
@@ -4752,7 +4743,7 @@ class Autosubmit:
             except subprocess.CalledProcessError:
                 try:
                     shutil.rmtree(local_proj_dir, ignore_errors=True)
-                except Exception as e:
+                except Exception:
                     pass
                 raise AutosubmitCritical(f"Can not check out revision {svn_project_revision} {svn_project_url} "
                                          f"into {local_proj_dir}", 7062)
@@ -4948,7 +4939,7 @@ class Autosubmit:
             try:
                 fc_deserialized_json = json.loads(
                     Autosubmit._create_json(selected_formula))
-            except Exception as e:
+            except Exception:
                 fc_filter_is_correct = False
                 fc_validation_message += "\n\tProvided chunk formula does not have the right format. Were you trying to use another option?"
             if fc_filter_is_correct is True:
@@ -5005,7 +4996,6 @@ class Autosubmit:
         filter_is_correct = True
         selected_sections = filter_type_chunk.split(",")[1:]
         selected_formula = filter_type_chunk.split(",")[0]
-        deserialized_json = object()
         # Starting Validation
         if len(str(selected_sections).strip()) == 0:
             filter_is_correct = False
@@ -5202,8 +5192,6 @@ class Autosubmit:
         Autosubmit._check_ownership(expid, raise_error=True)
         exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
         tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
-        section_validation_message = " "
-        job_validation_message = " "
         try:
             with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
                 Log.info(
@@ -5253,7 +5241,7 @@ class Autosubmit:
                     try:
                         Autosubmit.restore_platforms([platform],as_conf=as_conf)
                         definitive_platforms.append(platform.name)
-                    except Exception as e:
+                    except Exception:
                         pass
                 ##### End of the ""function""
                 # This will raise an autosubmit critical if any of the filters has issues in the format specified by the user
@@ -5878,7 +5866,7 @@ class Autosubmit:
 
         truthy_values = ["true", "yes", "y", "1", ""]
         if not force_all:
-            expids = [
+            expids: list[str] = [
                 expid
                 for expid in expids
                 if force_yes or input(f"Confirm stopping the experiment: {expid} (y/n)[enter=y]? ").lower() in truthy_values

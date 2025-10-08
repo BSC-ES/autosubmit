@@ -34,7 +34,7 @@ _PLATFORM_NAME = 'TEST_SLURM'
 
 
 def _create_slurm_platform(expid: str, as_conf: AutosubmitConfig):
-    return SlurmPlatform(expid, _PLATFORM_NAME, config=as_conf.experiment_data, auth_password=None)
+    return SlurmPlatform(expid, _PLATFORM_NAME, config=as_conf.experiment_data)
 
 
 def test_create_platform_slurm(autosubmit_exp):

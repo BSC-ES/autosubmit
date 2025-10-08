@@ -62,14 +62,14 @@ def status_path(exp_path, as_conf):
 
 def test_invalid_file(autosubmit):
     def _fn():
-        autosubmit.cat_log(None, '8', None)  # type: ignore
+        autosubmit.cat_log(None, '8', None)
 
     pytest.raises(AutosubmitCritical, _fn)
 
 
 def test_invalid_mode(autosubmit):
     def _fn():
-        autosubmit.cat_log(None, 'o', '8')  # type: ignore
+        autosubmit.cat_log(None, 'o', '8')
 
     pytest.raises(AutosubmitCritical, _fn)
 
@@ -173,4 +173,4 @@ def test_command_line_help(mocker, autosubmit):
     with io.StringIO() as buf, redirect_stdout(buf):
         assert autosubmit.parse_args()
         assert buf
-        assert 'View workflow and job logs.' in buf.getvalue()  # type: ignore
+        assert 'View workflow and job logs.' in buf.getvalue()

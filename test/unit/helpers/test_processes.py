@@ -133,7 +133,7 @@ def test_process_id_multiple_found(mocker):
 
     pid_found = process_id('a000')
 
-    assert pid_found is 1
+    assert pid_found == 1
     assert mocked_log.warning.call_count == 1
 
 

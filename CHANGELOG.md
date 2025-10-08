@@ -42,6 +42,7 @@ the filter the jobs. Not using any value for `-fp` still returns all jobs.
 - Fix PS platform to work with the local machine #2374
 - Fixed a `ZeroDivisionError` when using RO-Crate or `stats`, and also an issue
   where the message said `None` could not be iterable. #2389
+- Fixed a bug that produces an infinite loop when it is not possible to create log files #2618
 
 **Enhancements:**
 

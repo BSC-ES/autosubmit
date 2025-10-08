@@ -669,7 +669,7 @@ class JobPackager(object):
             jobs_by_section[wrapper_name] = list()
 
         if self.jobs_in_wrapper:
-            Log.info(f"Calculating wrapper packages")
+            Log.info("Calculating wrapper packages")
         jobs_by_section["SIMPLE"] = []
         for wrapper_name,section_name in sections_split.items():
             for job in jobs_list[:]:
@@ -996,7 +996,7 @@ class JobPackagerHorizontal(object):
             if job.section not in jobs_by_section:
                 jobs_by_section[job.section] = list()
             jobs_by_section[job.section].append(job)
-        Log.info(f"Building horizontal package")
+        Log.info("Building horizontal package")
         jobs_processed = 0
         for section in jobs_by_section:
             current_package_by_section[section] = 0

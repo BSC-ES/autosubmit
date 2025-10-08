@@ -108,6 +108,6 @@ def increase_wallclock_by_chunk(current, increase, chunk):
                 minutes = 0
             return "%02d:%02d" % (hours, minutes)
         return current
-    except Exception as exp:
+    except Exception:
         # print(exp)
         return current

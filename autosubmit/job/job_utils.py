@@ -67,7 +67,7 @@ def calendar_unitsize_isgreater(split_unit,chunk_unit) -> bool:
     try:
         return CALENDAR_UNITSIZE_ENUM[split_unit] > CALENDAR_UNITSIZE_ENUM[chunk_unit]
     except KeyError:
-        raise AutosubmitCritical(f"Invalid calendar unit size")
+        raise AutosubmitCritical("Invalid calendar unit size")
 
 
 def calendar_unitsize_getlowersize(unitsize) -> str:
@@ -264,7 +264,7 @@ def get_job_package_code(expid: str, job_name: str) -> int:
                 if job_name == _job_name:
                     code = int(package_name.split("_")[-3])
                     return code
-    except Exception as e:
+    except Exception:
         pass
     return 0
 
@@ -399,7 +399,6 @@ class SubJobManager(object):
                     # Sizes of fixes
                     fixes_applied = dict()
                     if len(filtered) > 1:
-                        temp_index = 0
                         filtered[0].transit = 0
                         # Reverse for
                         for i in range(len(filtered) - 1, 0, -1):

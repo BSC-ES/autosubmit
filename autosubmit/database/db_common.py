@@ -369,7 +369,7 @@ def _check_experiment_exists(name, error_on_inexistence=True):
         if os.path.exists(os.path.join(BasicConfig.LOCAL_ROOT_DIR, name)):
             try:
                 _save_experiment(name, 'No description', "3.14.0")
-            except  BaseException as e:
+            except  BaseException:
                 pass
             return True
         return False

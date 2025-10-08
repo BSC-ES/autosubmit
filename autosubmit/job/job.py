@@ -30,7 +30,7 @@ from threading import Thread
 from time import sleep
 from typing import List, Optional, Tuple, TYPE_CHECKING
 
-from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, Log, subs_dates
+from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, subs_dates
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
@@ -729,34 +729,28 @@ class Job(object):
                 if "bash" in line:
                     if self.type != Language.BASH:
                         raise AutosubmitCritical(
-                            "Extended {2} script: script {0} seems Bash but job {1} isn't\n".format(script_name,
-                                                                                                    self.script_name,
-                                                                                                    error_message_type),
+                            f"Extended {error_message_type} script: script {script_name} seems Bash but job {self.script_name} isn't\n",
                             7011)
                 elif "Rscript" in line:
                     if self.type != Language.R:
                         raise AutosubmitCritical(
-                            "Extended {2} script: script {0} seems Rscript but job {1} isn't\n".format(script_name,
-                                                                                                       self.script_name,
-                                                                                                       error_message_type),
+                            f"Extended {error_message_type} script: script {script_name} seems Rscript but job {self.script_name} isn't\n",
                             7011)
                 elif "python" in line:
                     if self.type not in (Language.PYTHON2, Language.PYTHON3, Language.PYTHON):
                         raise AutosubmitCritical(
-                            "Extended {2} script: script {0} seems Python but job {1} isn't\n".format(script_name,
-                                                                                                      self.script_name,
-                                                                                                      error_message_type),
+                            f"Extended {error_message_type} script: script {script_name} seems Python but job {self.script_name} isn't\n",
                             7011)
                 else:
+                    # TODO: Check why the fstring is not working for the text below
                     raise AutosubmitCritical(
-                        "Extended {2} script: couldn't figure out script {0} type\n".format(script_name,
-                                                                                            self.script_name,
+                        "Extended {1} script: couldn't figure out script {0} type\n".format(script_name,
                                                                                             error_message_type), 7011)
 
         if not found_hashbang:
+            # TODO: Check why the fstring is not working for the text below
             raise AutosubmitCritical(
-                "Extended {2} script: couldn't figure out script {0} type\n".format(script_name,
-                                                                                    self.script_name,
+                "Extended {1} script: couldn't figure out script {0} type\n".format(script_name,
                                                                                     error_message_type), 7011)
 
         if is_header:
@@ -1273,25 +1267,22 @@ class Job(object):
         """
         log_recovered = False
         last_retrial = 0
-        try:
-            for i in range(0, int(self.retrials + 1)):
-                # Update local logs to give a name to the recovered log
-                self.update_local_logs(count=i, update_submit_time=False)
+        for i in range(0, int(self.retrials + 1)):
+            # Update local logs to give a name to the recovered log
+            self.update_local_logs(count=i, update_submit_time=False)
 
-                # Backup the remote log name in case that the log couldn't be recovered.
-                backup_log = copy.copy(self.remote_logs)
-                self.remote_logs = self.get_new_remotelog_name(i)
-                if self.check_remote_log_exists():
-                    self.synchronize_logs(self.platform, self.remote_logs, self.local_logs)
-                    remote_logs = copy.deepcopy(self.local_logs)
-                    self.platform.get_logs_files(self.expid, remote_logs)
-                    log_recovered = True
-                    last_retrial = i
-                else:
-                    self.remote_logs = backup_log
-                    break
-        except:
-            pass
+            # Backup the remote log name in case that the log couldn't be recovered.
+            backup_log = copy.copy(self.remote_logs)
+            self.remote_logs = self.get_new_remotelog_name(i)
+            if self.check_remote_log_exists():
+                self.synchronize_logs(self.platform, self.remote_logs, self.local_logs)
+                remote_logs = copy.deepcopy(self.local_logs)
+                self.platform.get_logs_files(self.expid, remote_logs)
+                log_recovered = True
+                last_retrial = i
+            else:
+                self.remote_logs = backup_log
+                break
 
         if log_recovered:
             self.platform.processed_wrapper_logs.add(self.wrapper_name)
@@ -1403,7 +1394,7 @@ class Job(object):
 
     @staticmethod
     def parse_time(wallclock):
-        if type(wallclock) != str:  # TODO This is a workaround for the time being, just defined for tests passing without more issues
+        if not isinstance(wallclock, str):  # TODO This is a workaround for the time being, just defined for tests passing without more issues
             return datetime.timedelta(24 * 60 * 60)
         regex = re.compile(r'(((?P<hours>\d+):)((?P<minutes>\d+)))(:(?P<seconds>\d+))?')
         parts = regex.match(wallclock)
@@ -1444,10 +1435,7 @@ class Job(object):
         if new_status == Status.COMPLETED:
             Log.debug(
                 "{0} job seems to have completed: checking...".format(self.name))
-            if not self._platform.get_completed_files(self.name, wrapper_failed=self.packed):
-                log_name = os.path.join(
-                    self._tmp_path, self.name + '_COMPLETED')
-
+            self._platform.get_completed_files(self.name, wrapper_failed=self.packed)
             self.check_completion()
         else:
             self.status = new_status
@@ -2341,7 +2329,7 @@ class Job(object):
                                                      'QOSTimeLimit','QOSResourceLimit','QOSJobLimit','InvalidQOS','InvalidAccount']:
                     return True
             return False
-        except Exception as e:
+        except Exception:
             return False
 
     @staticmethod
@@ -2770,7 +2758,7 @@ class WrapperJob(Job):
                                                      'QOSTimeLimit','QOSResourceLimit','QOSJobLimit','InvalidQOS','InvalidAccount']:
                     return True
             return False
-        except Exception as e:
+        except Exception:
             return False
 
     def check_status(self, status: str) -> None:

@@ -1755,12 +1755,12 @@ class TestWrappers:
             for p in packages_v:
                 p2, run_first = self.job_packager.check_jobs_to_run_first(p)
                 assert p2.jobs == p.jobs
-                assert run_first == False
+                assert not run_first
             self.job_packager._jobs_list.jobs_to_run_first = [d1_m1_1_s2, d1_m1_1_s3]
             for p in packages_v:
                 p2, run_first = self.job_packager.check_jobs_to_run_first(p)
                 assert p2.jobs == [d1_m1_1_s2, d1_m1_1_s3]
-                assert run_first == True
+                assert run_first
 
     def test_calculate_wrapper_bounds(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1982,7 +1982,7 @@ class TestWrappers:
             assert max_jobs_to_submit2 == 0
             assert len(packages_to_submit2) == 2
             for p in packages_to_submit2:
-                assert type(p) == JobPackageSimple
+                assert isinstance(p, JobPackageSimple)
 
             self.job_packager.wrapper_policy["WRAPPER_V"] = "mixed"
             packages_to_submit = []

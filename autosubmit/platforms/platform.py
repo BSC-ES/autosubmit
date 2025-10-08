@@ -26,7 +26,7 @@ from contextlib import suppress
 from multiprocessing import Event
 from multiprocessing.queues import Queue
 # noinspection PyProtectedMember
-from os import _exit  # type: ignore
+from os import _exit
 from pathlib import Path
 from typing import Any, Optional, Union, TYPE_CHECKING
 
@@ -204,7 +204,7 @@ class Platform(object):
         if not self.two_factor_auth:
             self.pw = None
         elif auth_password is not None and self.two_factor_auth:
-            if type(auth_password) == list:
+            if isinstance(auth_password, list):
                 self.pw = auth_password[0]
             else:
                 self.pw = auth_password
@@ -1105,7 +1105,8 @@ class Platform(object):
             try:
                 job.retrieve_logfiles(raise_error=True)
                 job._log_recovery_retries += 1
-            except:
+            except Exception as e:
+                Log.debug(str(e))
                 if job._log_recovery_retries < 5:
                     jobs_pending_to_process.add(job)
                 Log.warning(

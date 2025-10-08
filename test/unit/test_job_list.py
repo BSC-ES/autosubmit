@@ -24,7 +24,7 @@ from random import randrange
 
 import networkx
 import pytest
-from networkx import DiGraph  # type: ignore
+from networkx import DiGraph
 
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
@@ -378,14 +378,14 @@ def test_that_create_method_makes_the_correct_calls(mocker, empty_job_list, as_c
     assert job_list._member_list == member_list
     assert job_list._chunk_list == list(range(1, num_chunks + 1))
 
-    cj_args, cj_kwargs = job_list._create_jobs.call_args  # type: ignore
+    cj_args, cj_kwargs = job_list._create_jobs.call_args
     assert Language.BASH == cj_args[2]
 
     # _add_dependencies(date_list, member_list, chunk_list, dic_jobs, option="DEPENDENCIES"):
 
-    job_list._add_dependencies.assert_called_once_with(date_list, member_list, chunk_list, cj_args[0])  # type: ignore
+    job_list._add_dependencies.assert_called_once_with(date_list, member_list, chunk_list, cj_args[0])
     # Adding flag update structure
-    job_list.update_genealogy.assert_called_once_with()  # type: ignore
+    job_list.update_genealogy.assert_called_once_with()
 
     # job doesn't have job.parameters anymore TODO
     # for job in job_list._job_list:
@@ -659,7 +659,7 @@ def test_generate_job_list_from_monitor_run(as_conf, mocker, empty_job_list):
     )
     # assert update_genealogy called with right values
     # When using an 4.0 experiment, the pkl has to be recreated and act as a new one.
-    job_list3.update_genealogy.assert_called_once_with()  # type: ignore
+    job_list3.update_genealogy.assert_called_once_with()
 
     # Test when the graph previous run has more jobs than the current run
     job_list3.graph.add_node("fake-node", job=job_list3._job_list[0])

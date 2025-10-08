@@ -37,7 +37,7 @@ class PJMHeader(object):
         if parameters['CURRENT_QUEUE'] == '':
             return ""
         else:
-            return "PJM -L rscgrp={0}".format(parameters['CURRENT_QUEUE'])
+            return f"PJM -L rscgrp={parameters['CURRENT_QUEUE']}"
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_account_directive(self, job, parameters):

@@ -1,4 +1,3 @@
-import os
 
 
 def generate_experiment_cmd(hpc, description):

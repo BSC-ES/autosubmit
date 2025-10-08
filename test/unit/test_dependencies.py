@@ -2,7 +2,7 @@ import mock
 import pytest
 from datetime import datetime
 from mock.mock import MagicMock
-from networkx import DiGraph  # type: ignore
+from networkx import DiGraph
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
@@ -370,9 +370,9 @@ def test_check_dates(joblist, test_job, relationships_dates, relationships_chunk
     }
     assert result == expected_output
 
-    relationships_dates["DATES_FROM"]["20020201"]["MEMBERS_FROM"] = {}  # type: ignore
-    relationships_dates["DATES_FROM"]["20020201"]["CHUNKS_FROM"] = {}  # type: ignore
-    relationships_dates["DATES_FROM"]["20020201"]["SPLITS_FROM"] = {}  # type: ignore
+    relationships_dates["DATES_FROM"]["20020201"]["MEMBERS_FROM"] = {}
+    relationships_dates["DATES_FROM"]["20020201"]["CHUNKS_FROM"] = {}
+    relationships_dates["DATES_FROM"]["20020201"]["SPLITS_FROM"] = {}
 
     result = joblist._check_dates(relationships_dates, test_job)
     expected_output = {
@@ -416,8 +416,8 @@ def test_check_members(joblist, test_job, relationships_members, relationships_c
     }
     assert result == expected_output
 
-    relationships_members["MEMBERS_FROM"]["fc2"]["CHUNKS_FROM"] = {}  # type: ignore
-    relationships_members["MEMBERS_FROM"]["fc2"]["SPLITS_FROM"] = {}  # type: ignore
+    relationships_members["MEMBERS_FROM"]["fc2"]["CHUNKS_FROM"] = {}
+    relationships_members["MEMBERS_FROM"]["fc2"]["SPLITS_FROM"] = {}
 
     result = joblist._check_members(relationships_members, test_job)
     expected_output = {

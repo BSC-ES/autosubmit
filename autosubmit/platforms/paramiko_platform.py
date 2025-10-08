@@ -174,8 +174,9 @@ class ParamikoPlatform(Platform):
                     try:
                         transport = self._ssh.get_transport()
                         transport.send_ignore()
-                    except:
+                    except Exception as e:
                         message = "Timeout connection"
+                        Log.debug(str(e))
                 return message
 
         except EOFError as e:
@@ -223,9 +224,9 @@ class ParamikoPlatform(Platform):
                 raise AutosubmitCritical(
                     'Experiment cant no continue without unexpected behaviour, Stopping Autosubmit', 7050, trace)
 
-        except AutosubmitCritical as e:
+        except AutosubmitCritical:
             raise
-        except SSHException as e:
+        except SSHException:
             raise
         except Exception as e:
             raise AutosubmitCritical(
@@ -351,7 +352,7 @@ class ParamikoPlatform(Platform):
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, sock=self._proxy, timeout=60,
                                               banner_timeout=60)
-                        except Exception as e:
+                        except Exception:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, sock=self._proxy, timeout=60,
                                               banner_timeout=60, disabled_algorithms={'pubkeys': ['rsa-sha2-256',
@@ -380,7 +381,7 @@ class ParamikoPlatform(Platform):
                 self.transport.start_client()
                 try:
                     self.transport.auth_interactive(self.user, self.interactive_auth_handler)
-                except Exception as e:
+                except Exception:
                     Log.printlog("2FA authentication failed", 7000)
                     raise
                 if self.transport.is_authenticated():
@@ -534,7 +535,7 @@ class ParamikoPlatform(Platform):
         try:
             self._ftpChannel.remove(str(remote_file))
             return True
-        except IOError as e:
+        except IOError:
             return False
         except BaseException as e:
             # Change to Path
@@ -1045,7 +1046,7 @@ class ParamikoPlatform(Platform):
                             channel.close()
                             counterpart.close()
                             del self.channels[fd]
-            except Exception as e:
+            except Exception:
                 pass
 
     def exec_command(self, command, bufsize=-1, timeout=30, get_pty=False, retries=3, x11=False):
@@ -1153,7 +1154,6 @@ class ParamikoPlatform(Platform):
                 stdout_chunks.append(stdout.channel.recv(len(stdout.channel.in_buffer)))
 
             aux_stderr = []
-            i = 0
             x11_exit = False
 
             while (not channel.closed or channel.recv_ready() or channel.recv_stderr_ready()) and not x11_exit:
@@ -1241,9 +1241,9 @@ class ParamikoPlatform(Platform):
             return True
         except AttributeError as e:
             raise AutosubmitError(f'Session not active: {str(e)}', 6005)
-        except AutosubmitCritical as e:
+        except AutosubmitCritical:
             raise
-        except AutosubmitError as e:
+        except AutosubmitError:
             raise
         except IOError as e:
             raise AutosubmitError(str(e), 6016)
@@ -1529,7 +1529,8 @@ class ParamikoPlatform(Platform):
                 return True
             else:
                 return False
-        except:
+        except Exception as e:
+            Log.debug(str(e))
             return False
 
     def get_file_size(self, src: str) -> Union[int, None]:
