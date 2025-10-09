@@ -183,38 +183,51 @@ def copy_database(old_paths: dict, new_paths: dict, expid: str):
                         tables.ExperimentTable.c.name == expid
                     )
                 ).first()
-                if exp_row is None:
+                if exp_row:
+                    pg_conn.execute(
+                        tables.ExperimentTable.delete().where(
+                            tables.ExperimentTable.c.id == exp_row.id
+                            and tables.ExperimentTable.c.name == expid
+                        )
+                    )
+                    pg_conn.execute(
+                        tables.ExperimentTable.insert().values(
+                            id=exp_row.id,
+                            name=exp_row.name,
+                            description=exp_row.description,
+                            autosubmit_version=exp_row.autosubmit_version,
+                        )
+                    )
+                    pg_conn.commit()
+
+                    details_row = sqlite_conn.execute(
+                        select(tables.DetailsTable).where(
+                            tables.DetailsTable.c.exp_id == exp_row.id
+                        )
+                    ).first()
+                    if details_row:
+                        pg_conn.execute(
+                            tables.DetailsTable.delete().where(
+                                tables.DetailsTable.c.exp_id == details_row.exp_id
+                            )
+                        )
+                        pg_conn.execute(
+                            tables.DetailsTable.insert().values(
+                                exp_id=details_row.exp_id,
+                                user=details_row.user,
+                                created=details_row.created,
+                                model=details_row.model,
+                                branch=details_row.branch,
+                                hpc=details_row.hpc,
+                            )
+                        )
+                        pg_conn.commit()
+                    else:
+                        print(f"Details for experiment {expid} not found. Skipping.")
+
+                else:
                     print(f"Experiment {expid} not found in main database. Skipping.")
 
-                pg_conn.execute(
-                    tables.ExperimentTable.insert().values(
-                        id=exp_row.id,
-                        name=exp_row.name,
-                        description=exp_row.description,
-                        autosubmit_version=exp_row.autosubmit_version,
-                    )
-                )
-                pg_conn.commit()
-
-                details_row = sqlite_conn.execute(
-                    select(tables.DetailsTable).where(
-                        tables.DetailsTable.c.exp_id == exp_row.id
-                    )
-                ).first()
-                if details_row is None:
-                    print(f"Details for experiment {expid} not found. Skipping.")
-
-                pg_conn.execute(
-                    tables.DetailsTable.insert().values(
-                        exp_id=details_row.exp_id,
-                        user=details_row.user,
-                        created=details_row.created,
-                        model=details_row.model,
-                        branch=details_row.branch,
-                        hpc=details_row.hpc,
-                    )
-                )
-                pg_conn.commit()
         else:
             print(
                 f"Main database {main_db} does not exist. Skipping main database migration."
@@ -224,17 +237,23 @@ def copy_database(old_paths: dict, new_paths: dict, expid: str):
         job_pkl_path = old_exp_dir / "pkl" / f"job_list_{expid}.pkl"
         if job_pkl_path.exists():
             print(f"Migrating job pickle from {job_pkl_path} to PostgreSQL.")
-            with open(job_pkl_path, "rb") as f:
-                pkl_data = f.read()
+            try:
+                with open(job_pkl_path, "rb") as f:
+                    pkl_data = f.read()
 
-            pg_conn.execute(
-                tables.JobPklTable.insert().values(
-                    expid=expid,
-                    pkl=pkl_data,
-                    modified=str(os.path.getmtime(job_pkl_path)),
+                pg_conn.execute(
+                    tables.JobPklTable.delete().where(tables.JobPklTable.c.expid == expid)
                 )
-            )
-            pg_conn.commit()
+                pg_conn.execute(
+                    tables.JobPklTable.insert().values(
+                        expid=expid,
+                        pkl=pkl_data,
+                        modified=str(os.path.getmtime(job_pkl_path)),
+                    )
+                )
+                pg_conn.commit()
+            except Exception as e:
+                print(f"Error migrating job pickle: {e}")
         else:
             print(
                 f"Job pickle file {job_pkl_path} does not exist. Skipping job pickle migration."
