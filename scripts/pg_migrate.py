@@ -1,15 +1,32 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import argparse
+import os
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-import os
-from datetime import datetime, timezone
 
+from migrate import migrate_utils
 from sqlalchemy import create_engine, select
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import tables
-from migrate import migrate_utils
 
 
 def get_paths_from_rc_files(
