@@ -236,15 +236,17 @@ class JobList(object):
         """
         Creates all jobs needed for the current workflow.
         """
+        changes = False
+        if force:
+            self._reset_workflow_graph()
+            changes = True
         Log.info("Generating the workflow...")
         self._initialize_workflow_parameters(
             as_conf, date_list, member_list, num_chunks, chunk_ini, parameters, date_format, default_retrials
         )
 
-        if force:
-            self._reset_workflow_graph()
-            changes = True
-        else:
+
+        if not force:
             changes = self._load_graph(full_load, load_failed_jobs=check_failed_jobs)
 
         if changes or not self.run_mode:
@@ -475,6 +477,7 @@ class JobList(object):
             for key in ["datelist", "members", "numchunks", "splits", "dependencies"]:
                 if str(persistent.get(key, "")) != str(current.get(key, "")):
                     section_diff[key] = current[key]
+            pass
             if section_diff:
                 section_diff["status"] = "modified"
                 differences[section_name] = section_diff
@@ -504,7 +507,7 @@ class JobList(object):
         self.update_genealogy()
 
         if show_log:
-            Log.info("Looking for edgeless jobs...")
+            Log.info("Deleting edgeless jobs...")
         if len(self.graph.edges) > 0:
             self._delete_edgeless_jobs()
 
@@ -555,11 +558,8 @@ class JobList(object):
     def _save_workflow_state(
             self, as_conf: AutosubmitConfig, create: bool, new: bool
     ) -> None:
-        Log.info("Saving jobs...")
         self.save_jobs()
-        Log.info("Saving edges...")
         self.save_edges()
-        Log.info("Saving sections...")
         self.save_sections()
         for job in self.job_list:
             self._assign_platforms(as_conf, job, create, new)
@@ -2701,8 +2701,10 @@ class JobList(object):
         Persists the job list
         """
         if not self.disable_save:
+            Log.info("Saving jobs to the database...")
             self.update_status_log()
             self.dbmanager.save_jobs(self.job_list)
+            Log.info("Jobs saved.")
 
     def load_jobs(self, full_load, load_failed_jobs: bool = False) -> List[Job]:
         """
@@ -2736,7 +2738,9 @@ class JobList(object):
         Persists the job edges
         """
         if not self.disable_save:
+            Log.info("Saving edges to the database...")
             self.dbmanager.save_edges(self.graph_dict)
+            Log.info("Edges saved.")
 
     def load_edges(self, job_list, full_load=False) -> Dict[str, Any]:
         """
@@ -3335,7 +3339,6 @@ class JobList(object):
         Update genealogy remove jobs that have no templates
         """
         self.fill_parents_children()
-        self.dbmanager.save_edges(self.graph_dict)
 
     def assign_unique_fake_id(self, package: Any, max_retries: int = 2) -> None:
         """

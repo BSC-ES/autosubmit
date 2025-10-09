@@ -4675,9 +4675,7 @@ class Autosubmit:
                         job_list.rerun(as_conf.get_rerun_jobs(), as_conf)
                     else:
                         job_list.remove_rerun_only_jobs(notransitive)
-                    Log.info("\nSaving the jobs list...")
                     job_list.clear_generate()
-                    job_list.save_jobs()
                     as_conf.save()
                     groups_dict = dict()
                     # Setting up job historical database header. Must create a new run.
