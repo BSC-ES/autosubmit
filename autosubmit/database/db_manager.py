@@ -179,7 +179,7 @@ class DbManager:
             conn.commit()
         return cast(int, result.rowcount)
 
-    def upsert_many(self, table_name: str, data: List[Dict[str, Any]], conflict_cols: List[str]) -> int:
+    def upsert_many(self, table_name: str, data: List[Dict[str, Any]], conflict_cols: List[str], batch_size: int = 1000) -> int:
         """
         Perform an upsert (update or insert) operation.
         First delete the affected rows
@@ -194,6 +194,7 @@ class DbManager:
             return 0
 
         table: Table = get_table_from_name(schema=self.schema, table_name=table_name)
+        update_cols = [col for col in data[0].keys() if col not in conflict_cols]
 
         # NOTE general insert doesn't have on_conflict
         if self.engine.dialect.name == "postgresql":
@@ -207,15 +208,19 @@ class DbManager:
         # add on_conflict clause
         update_stmt = insert_stmt.on_conflict_do_update(
             index_elements=conflict_cols,
-            set_={c.name: c for c in insert_stmt.excluded if c.name not in conflict_cols},
+            set_={col: getattr(insert_stmt.excluded, col) for col in update_cols}
         )
+        total_rows = 0
 
         with self.engine.connect() as conn:
-            result = conn.execute(update_stmt, data)
+            for i in range(0, len(data), batch_size):
+                batch = data[i:i + batch_size]
+                result = conn.execute(update_stmt, batch)
+                total_rows += cast(int, result.rowcount)
             conn.commit()
 
         # Return the number of rows affected
-        return cast(int, result.rowcount)
+        return total_rows
 
     def count_where(self, table_name: str, where: dict[str, Any]) -> int:
         """Count the number of rows in a table that match a given condition."""

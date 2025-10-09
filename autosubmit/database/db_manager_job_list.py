@@ -449,9 +449,7 @@ class JobsDbManager(DbManager):
             if (job.get('split') is None and section_diff['splits'] is not None) or \
                     (section_diff['splits'] is None and job.get('split') is not None):
                 return True
-            if job['split'] > int(section_diff['splits']):
-                return True
-            elif job['split'] == -1 and int(section_diff['splits']) > 0:
+            if job['split'] > int(section_diff['splits']) or (job['split'] == -1 and int(section_diff['splits']) > 0):
                 return True
 
         if 'datelist' in section_diff and job.get('date') is not None:
