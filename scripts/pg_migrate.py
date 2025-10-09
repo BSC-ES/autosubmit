@@ -3,6 +3,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 import os
+from datetime import datetime, timezone
 
 from sqlalchemy import create_engine, select
 
@@ -242,13 +243,17 @@ def copy_database(old_paths: dict, new_paths: dict, expid: str):
                     pkl_data = f.read()
 
                 pg_conn.execute(
-                    tables.JobPklTable.delete().where(tables.JobPklTable.c.expid == expid)
+                    tables.JobPklTable.delete().where(
+                        tables.JobPklTable.c.expid == expid
+                    )
                 )
                 pg_conn.execute(
                     tables.JobPklTable.insert().values(
                         expid=expid,
                         pkl=pkl_data,
-                        modified=str(os.path.getmtime(job_pkl_path)),
+                        modified=datetime.fromtimestamp(
+                            os.path.getmtime(job_pkl_path), tz=timezone.utc
+                        ).strftime("%Y-%m-%d %H:%M:%S%z"),
                     )
                 )
                 pg_conn.commit()
