@@ -923,18 +923,18 @@ class SrunVerticalHorizontalWrapperBuilder(SrunWrapperBuilder):
             for script in scripts:
                 built_array+= str("\"" + script + "\"") + " "
             built_array += ")"
-            scripts_bash+=textwrap.dedent("""
-            declare -a scripts_{0}={1}
-            """).format(str(list_index),str(built_array), '\n'.ljust(13))
-            scripts_array_vars += "\"scripts_{0}\" ".format(list_index)
-            scripts_array_index += "\"0\" "
+            scripts_bash+=textwrap.dedent(f"""
+            declare -a scripts_{str(list_index)}={str(built_array)}
+            """).format('\n'.ljust(13))
+            scripts_array_vars += f"\"scripts_{list_index}\" "
+            scripts_array_index += f"\"{list_index}\" "
             list_index += 1
         scripts_array_vars += ")"
         scripts_array_index += ")"
-        scripts_bash += textwrap.dedent("""
-                   declare -a scripts_list={0}
-                   declare -a scripts_index={1}
-                   """).format(str(scripts_array_vars),str(scripts_array_index), '\n'.ljust(13))
+        scripts_bash += textwrap.dedent(f"""
+                   declare -a scripts_list={str(scripts_array_vars)}
+                   declare -a scripts_index={str(scripts_array_index)}
+                   """).format('\n'.ljust(13))
 
         total_threads = float(len(self.job_scripts))
         n_threads = float(self.threads)
@@ -961,9 +961,9 @@ class SrunVerticalHorizontalWrapperBuilder(SrunWrapperBuilder):
         for mask in srun_mask_values:
             mask_array += str("\"" + mask + "\"") + " "
         mask_array += ")"
-        scripts_bash += textwrap.dedent("""
-                declare -a job_mask_array={0}
-                """).format(mask_array, '\n'.ljust(13))
+        scripts_bash += textwrap.dedent(f"""
+                declare -a job_mask_array={mask_array}
+                """).format('\n'.ljust(13))
 
         return scripts_bash
 

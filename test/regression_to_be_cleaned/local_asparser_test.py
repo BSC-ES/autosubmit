@@ -21,7 +21,7 @@ def check_cmd(command, path=BIN_PATH):
     return output, error
 
 def report_test(expid):
-    output = check_cmd("autosubmit report {0} -all -v".format(expid))
+    output = check_cmd(f"autosubmit report {expid} -all -v")
     return output
 def perform_test(expid):
 

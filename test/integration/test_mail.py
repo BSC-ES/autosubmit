@@ -20,7 +20,7 @@ from unittest.mock import Mock
 
 import pytest
 import requests
-from testcontainers.core.container import DockerContainer
+from test.integration.conftest import DockerContainer
 from testcontainers.core.waiting_utils import wait_for_logs
 
 from autosubmit.job.job_common import Status

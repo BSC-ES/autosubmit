@@ -23,8 +23,8 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.helpers.utils import restore_platforms
-from autosubmit.job.job_utils import _get_submitter
 from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
 
 class Migrate:
@@ -45,11 +45,12 @@ class Migrate:
             self.basic_config.LOCAL_ROOT_DIR, self.experiment_id)
         if not os.path.exists(exp_path):
             raise AutosubmitCritical(
-                "Experiment seems to be archived, no action is performed\nHint: Try to pickup without the remote flag", 7012)
+                "Experiment seems to be archived, no action is performed\nHint: Try to pickup without the remote flag",
+                7012)
         as_conf = AutosubmitConfig(
             self.experiment_id, self.basic_config, YAMLParserFactory())
         as_conf.reload()
-        as_conf.experiment_data["PLATFORMS"] = as_conf.misc_data.get("PLATFORMS",{})
+        as_conf.experiment_data["PLATFORMS"] = as_conf.misc_data.get("PLATFORMS", {})
         platforms = self.load_platforms_in_use(as_conf)
 
         error = False
@@ -143,7 +144,7 @@ class Migrate:
                     except BaseException as e:
                         error = True
                         Log.printlog("The files/dirs on {0} cannot be copied to {1}.\nTRACE:{2}".format(
- os.path.join(p.temp_dir, self.experiment_id), p.root_dir, str(e)), 6012)
+                            os.path.join(p.temp_dir, self.experiment_id), p.root_dir, str(e)), 6012)
                         break
                 else:
                     Log.result(
@@ -161,17 +162,17 @@ class Migrate:
                 as_conf.check_conf_files(False)
                 restore_platforms(platforms)
             except BaseException as e:
-                Log.warning("Before running, configure your platform settings. Remember that the as_misc pickup platforms aren't load outside the migrate")
+                Log.warning(
+                    "Before running, configure your platform settings. Remember that the as_misc pickup platforms aren't load outside the migrate")
                 Log.warning(f"The experiment cannot run, check the configuration files:\n{e}")
             return True
 
-    def check_migrate_config(self, as_conf, platforms_to_test, pickup_data ):
-        """
-        Checks if the configuration file has the necessary information to migrate the data
+    def check_migrate_config(self, as_conf, platforms_to_test, pickup_data):
+        """Checks if the configuration file has the necessary information to migrate the data
+
         :param as_conf: Autosubmit configuration file
         :param platforms_to_test: platforms to test
         :param pickup_data: data to migrate
-
         """
         # check if all platforms_to_test are present in the pickup_data
         missing_platforms = set()
@@ -193,45 +194,55 @@ class Migrate:
                 continue
 
             Log.info(f"Checking [{platform_pickup_name}] from as_misc configuration files...")
-            valid_user = as_conf.platforms_data[platform_pickup_name].get("USER", None) and platform_pickup_data.get("USER", None)
+            valid_user = as_conf.platforms_data[platform_pickup_name].get("USER", None) and platform_pickup_data.get(
+                "USER", None)
             if valid_user:
-                if as_conf.platforms_data[platform_pickup_name].get("USER", None) == platform_pickup_data.get("USER", None):
-                    if platform_pickup_data.get("SAME_USER",False):
+                if as_conf.platforms_data[platform_pickup_name].get("USER", None) == platform_pickup_data.get("USER",
+                                                                                                              None):
+                    if platform_pickup_data.get("SAME_USER", False):
                         valid_user = True
                     else:
                         valid_user = False
-            valid_project = as_conf.platforms_data[platform_pickup_name].get("PROJECT", None) and platform_pickup_data.get("PROJECT", None)
-            scratch_dir = as_conf.platforms_data[platform_pickup_name].get("SCRATCH_DIR", None) and platform_pickup_data.get("SCRATCH_DIR", None)
-            valid_host = as_conf.platforms_data[platform_pickup_name].get("HOST", None) and platform_pickup_data.get("HOST", None)
+            valid_project = as_conf.platforms_data[platform_pickup_name].get("PROJECT",
+                                                                             None) and platform_pickup_data.get(
+                "PROJECT", None)
+            scratch_dir = as_conf.platforms_data[platform_pickup_name].get("SCRATCH_DIR",
+                                                                           None) and platform_pickup_data.get(
+                "SCRATCH_DIR", None)
+            valid_host = as_conf.platforms_data[platform_pickup_name].get("HOST", None) and platform_pickup_data.get(
+                "HOST", None)
             valid_tmp_dir = platform_pickup_data.get("TEMP_DIR", False)
             if not valid_tmp_dir:
                 continue
             elif not valid_user or not valid_project or not scratch_dir or not valid_host:
-                Log.printlog(f" Offer  USER: {as_conf.platforms_data[platform_pickup_name].get('USER',None)}\n"
-                             f" Pickup USER: {platform_pickup_data.get('USER',None)}\n"
-                             f" Offer  PROJECT: {as_conf.platforms_data[platform_pickup_name].get('PROJECT',None)}\n"
-                             f" Pickup PROJECT: {platform_pickup_data.get('PROJECT',None)}\n"
-                             f" Offer  SCRATCH_DIR: {as_conf.platforms_data[platform_pickup_name].get('SCRATCH_DIR',None)}\n"
-                             f" Pickup SCRATCH_DIR: {platform_pickup_data.get('SCRATCH_DIR',None)}\n"
+                Log.printlog(f" Offer  USER: {as_conf.platforms_data[platform_pickup_name].get('USER', None)}\n"
+                             f" Pickup USER: {platform_pickup_data.get('USER', None)}\n"
+                             f" Offer  PROJECT: {as_conf.platforms_data[platform_pickup_name].get('PROJECT', None)}\n"
+                             f" Pickup PROJECT: {platform_pickup_data.get('PROJECT', None)}\n"
+                             f" Offer  SCRATCH_DIR: {as_conf.platforms_data[platform_pickup_name].get('SCRATCH_DIR', None)}\n"
+                             f" Pickup SCRATCH_DIR: {platform_pickup_data.get('SCRATCH_DIR', None)}\n"
                              f" Shared TEMP_DIR: {platform_pickup_data.get('TEMP_DIR', '')}\n")
-                Log.printlog(f"Invalid configuration for platform [{platform_pickup_name}]\nTrying next platform...",Log.ERROR)
+                Log.printlog(f"Invalid configuration for platform [{platform_pickup_name}]\nTrying next platform...",
+                             Log.ERROR)
                 missconf_plaforms = missconf_plaforms + f', {platform_pickup_name}'
             else:
                 Log.info("Valid configuration for platform [{0}]".format(platform_pickup_name))
-                Log.result(f"Using platform: [{platform_pickup_name}] to migrate [{pickup_data[platform_pickup_name]['ROOTDIR']}] data")
+                Log.result(
+                    f"Using platform: [{platform_pickup_name}] to migrate [{pickup_data[platform_pickup_name]['ROOTDIR']}] data")
         if missconf_plaforms:
             raise AutosubmitCritical(f"Invalid migrate configuration for platforms: {missconf_plaforms[2:]}", 7014)
 
     def load_platforms_in_use(self, as_conf):
         platforms_to_test = set()
-        submitter = _get_submitter(as_conf)
-        submitter.load_platforms(as_conf)
+        submitter = ParamikoSubmitter(as_conf=as_conf)
         if submitter.platforms is None:
             raise AutosubmitCritical("No platforms configured!!!", 7014)
         platforms = submitter.platforms
         for job_data in as_conf.experiment_data["JOBS"].values():
-            platforms_to_test.add(platforms[job_data.get("PLATFORM", as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "")).upper()])
-        return [ platform for platform in platforms_to_test if platform.name != "local" ]
+            platforms_to_test.add(platforms[job_data.get("PLATFORM",
+                                                         as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH",
+                                                                                                        "")).upper()])
+        return [platform for platform in platforms_to_test if platform.name != "local"]
 
     def migrate_pickup_jobdata(self):
         # Unarchive job_data_{expid}.tar
@@ -239,7 +250,8 @@ class Migrate:
         job_data_dir = f"{self.basic_config.JOBDATA_DIR}/job_data_{self.experiment_id}"
         if os.path.exists(os.path.join(self.basic_config.JOBDATA_DIR, f"{self.experiment_id}_jobdata.tar")):
             try:
-                with tarfile.open(os.path.join(self.basic_config.JOBDATA_DIR, f"{self.experiment_id}_jobdata.tar", 'r')) as tar:
+                with tarfile.open(
+                        os.path.join(self.basic_config.JOBDATA_DIR, f"{self.experiment_id}_jobdata.tar", 'r')) as tar:
                     tar.extractall(path=job_data_dir)
                     tar.close()
                 os.remove(os.path.join(self.basic_config.JOBDATA_DIR, f"{self.experiment_id}_jobdata.tar"))
@@ -257,7 +269,8 @@ class Migrate:
             output_filepath = f'{self.experiment_id}_jobdata.tar'
             db_exists = os.path.exists(f"{job_data_dir}.db")
             sql_exists = os.path.exists(f"{job_data_dir}.sql")
-            if os.path.exists(os.path.join(self.basic_config.JOBDATA_DIR, output_filepath)) and (db_exists or sql_exists):
+            if os.path.exists(os.path.join(self.basic_config.JOBDATA_DIR, output_filepath)) and (
+                    db_exists or sql_exists):
                 os.remove(os.path.join(self.basic_config.JOBDATA_DIR, output_filepath))
             elif db_exists or sql_exists:
                 with tarfile.open(os.path.join(self.basic_config.JOBDATA_DIR, output_filepath), compress_type) as tar:
@@ -278,8 +291,8 @@ class Migrate:
         as_conf = AutosubmitConfig(self.experiment_id, self.basic_config, YAMLParserFactory())
         as_conf.check_conf_files(False)
         # Load migrate
-        #Find migrate file
-        pickup_data = as_conf.misc_data.get("PLATFORMS",{})
+        # Find migrate file
+        pickup_data = as_conf.misc_data.get("PLATFORMS", {})
         if not pickup_data:
             raise AutosubmitCritical("No migrate information found", 7014)
 
@@ -354,7 +367,9 @@ class Migrate:
                     p.send_command(f"chmod 777 -R {p.temp_dir}")
                     if p.check_absolute_file_exists(os.path.join(p.root_dir, self.experiment_id)):
                         if p.check_absolute_file_exists(os.path.join(p.temp_dir, self.experiment_id)):
-                            Log.printlog(f"Directory [{os.path.join(p.temp_dir, self.experiment_id)}] already exists. New data won't be moved until you move the old data", 6000)
+                            Log.printlog(
+                                f"Directory [{os.path.join(p.temp_dir, self.experiment_id)}] already exists. New data won't be moved until you move the old data",
+                                6000)
                             platforms_with_issues.append(p.name)
                             break
                     if not p.move_file(p.root_dir, os.path.join(p.temp_dir, self.experiment_id), False):
@@ -372,4 +387,3 @@ class Migrate:
                 Log.result(f"Platform [{p.name}] has been successfully migrated")
         if exit_with_errors:
             raise AutosubmitCritical(f'Platforms with issues: {platforms_with_issues}', 7014)
-

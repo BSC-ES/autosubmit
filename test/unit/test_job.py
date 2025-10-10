@@ -44,9 +44,11 @@ from autosubmit.job.job_utils import get_job_package_code, SubJob, SubJobManager
 from autosubmit.job.template import Language
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
+from test.unit.conftest import AutosubmitConfigFactory
 
 """Tests for the Autosubmit ``Job`` class."""
 
@@ -76,6 +78,18 @@ class TestJob:
         returned_platform = self.job.platform
 
         assert platform == returned_platform
+
+    @pytest.mark.parametrize("password", [
+        None,
+        '123',
+        ['123']
+    ], ids=["Empty", "String", "List"])
+    def test_two_factor_auth_platform(self, password):
+        plat_conf = FakeBasicConfig().props()
+        plat_conf['PLATFORMS'] = {'PLATFORM': {'2FA': True}}
+        platform = Platform(self.experiment_id, 'Platform', plat_conf, auth_password=password)
+        assert platform.name == 'Platform'
+        assert platform.two_factor_auth is not None
 
     def test_when_the_job_has_only_one_processor_returns_the_serial_platform(self):
         platform = Platform(self.experiment_id, 'parallel-platform', FakeBasicConfig().props())
@@ -155,114 +169,6 @@ class TestJob:
 
         assert initial_fail_count + 1 == incremented_fail_count
 
-    def test_hetjob(self):
-        """
-        Test job platforms with a platform. Builds job and platform using YAML data, without mocks.
-        :return:
-        """
-        expid = "t000"
-        with tempfile.TemporaryDirectory() as temp_dir:
-            BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
-            Path(temp_dir, expid).mkdir()
-            for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                         f'{expid}/conf']:
-                Path(temp_dir, path).mkdir()
-            with open(Path(temp_dir, f'{expid}/conf/experiment_data.yml'), 'w+') as experiment_data:
-                experiment_data.write(dedent(f'''\
-                            CONFIG:
-                              RETRIALS: 0
-                            DEFAULT:
-                              EXPID: {expid}
-                              HPCARCH: test
-                            PLATFORMS:
-                              test:
-                                TYPE: slurm
-                                HOST: localhost
-                                PROJECT: abc
-                                QUEUE: debug
-                                USER: me
-                                SCRATCH_DIR: /anything/
-                                ADD_PROJECT_TO_HOST: False
-                                MAX_WALLCLOCK: '00:55'
-                                TEMP_DIR: ''
-                            '''))
-                experiment_data.flush()
-            # For could be added here to cover more configurations options
-            with open(Path(temp_dir, f'{expid}/conf/hetjob.yml'), 'w+') as hetjob:
-                hetjob.write(dedent('''\
-                            JOBS:
-                                HETJOB_A:
-                                    FILE: a
-                                    PLATFORM: test
-                                    RUNNING: once
-                                    WALLCLOCK: '00:30'
-                                    MEMORY:
-                                        - 0
-                                        - 0
-                                    NODES:
-                                        - 3
-                                        - 1
-                                    TASKS:
-                                        - 32
-                                        - 32
-                                    THREADS:
-                                        - 4
-                                        - 4
-                                    CUSTOM_DIRECTIVES:
-                                        - ['#SBATCH --export=ALL', '#SBATCH --distribution=block:cyclic', '#SBATCH --exclusive']
-                                        - ['#SBATCH --export=ALL', '#SBATCH --distribution=block:cyclic:fcyclic', '#SBATCH --exclusive']
-                '''))
-
-            basic_config = FakeBasicConfig()
-            basic_config.read()
-            basic_config.LOCAL_ROOT_DIR = str(temp_dir)
-
-            config = AutosubmitConfig(expid, basic_config=basic_config, parser_factory=YAMLParserFactory())
-            config.reload(True)
-            parameters = config.load_parameters()
-            job_list_obj = JobList(expid, config, YAMLParserFactory(),
-                                   Autosubmit._get_job_list_persistence(expid, config))
-
-            job_list_obj.generate(
-                as_conf=config,
-                date_list=[],
-                member_list=[],
-                num_chunks=1,
-                chunk_ini=1,
-                parameters=parameters,
-                date_format='M',
-                default_retrials=config.get_retrials(),
-                default_job_type=config.get_default_job_type(),
-                wrapper_jobs={},
-                new=True,
-                run_only_members=[],
-                # config.get_member_list(run_only=True),
-                show_log=True,
-                create=True,
-            )
-
-            job_list = job_list_obj.get_job_list()
-            assert 1 == len(job_list)
-
-            submitter = Autosubmit._get_submitter(config)
-            submitter.load_platforms(config)
-
-            hpcarch = config.get_platform()
-            for job in job_list:
-                if job.platform_name == "" or job.platform_name is None:
-                    job.platform_name = hpcarch
-                job.platform = submitter.platforms[job.platform_name]
-
-            job = job_list[0]
-
-            # This is the final header
-            parameters = job.update_parameters(config, set_attributes=True)
-            job.update_content(config, parameters)
-
-            # Asserts the script is valid. There shouldn't be variables in the script that aren't in the parameters.
-            checked = job.check_script(config, parameters)
-            assert checked
-
     @patch('autosubmit.config.basicconfig.BasicConfig')
     def test_header_tailer(self, mocked_global_basic_config: Mock):
         """Test if header and tailer are being properly substituted onto the final .cmd file without
@@ -276,8 +182,8 @@ class TestJob:
 
         with tempfile.TemporaryDirectory() as temp_dir:
             Path(temp_dir, expid).mkdir()
-            # FIXME: (Copied from Bruno) Not sure why but the submitted
-            #  and Slurm were using the $expid/tmp/ASLOGS folder?
+            # FIXME: (Copied from Bruno) Not sure why but the submitted and
+            #        Slurm were using the $expid/tmp/ASLOGS folder?
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
                          f'{expid}/conf', f'{expid}/proj/project_files']:
                 Path(temp_dir, path).mkdir()
@@ -468,8 +374,7 @@ CONFIG:
                         )
                         job_list = job_list_obj.get_job_list()
 
-                        submitter = Autosubmit._get_submitter(config)
-                        submitter.load_platforms(config)
+                        submitter = ParamikoSubmitter(as_conf=config)
 
                         hpcarch = config.get_platform()
                         for job in job_list:
@@ -543,30 +448,215 @@ CONFIG:
                                 assert "%EXTENDED_HEADER%" not in final_script
                                 assert "%EXTENDED_TAILER%" not in final_script
 
+    def test_hetjob(self):
+        """
+        Test job platforms with a platform. Builds job and platform using YAML data, without mocks.
+        :return:
+        """
+        expid = "t000"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
+            Path(temp_dir, expid).mkdir()
+            for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
+                         f'{expid}/conf']:
+                Path(temp_dir, path).mkdir()
+            with open(Path(temp_dir, f'{expid}/conf/experiment_data.yml'), 'w+') as experiment_data:
+                experiment_data.write(dedent(f'''\
+                            CONFIG:
+                              RETRIALS: 0
+                            DEFAULT:
+                              EXPID: {expid}
+                              HPCARCH: test
+                            PLATFORMS:
+                              test:
+                                TYPE: slurm
+                                HOST: localhost
+                                PROJECT: abc
+                                QUEUE: debug
+                                USER: me
+                                SCRATCH_DIR: /anything/
+                                ADD_PROJECT_TO_HOST: False
+                                MAX_WALLCLOCK: '00:55'
+                                TEMP_DIR: ''
+                            '''))
+                experiment_data.flush()
+            # For could be added here to cover more configurations options
+            with open(Path(temp_dir, f'{expid}/conf/hetjob.yml'), 'w+') as hetjob:
+                hetjob.write(dedent('''\
+                            JOBS:
+                                HETJOB_A:
+                                    FILE: a
+                                    PLATFORM: test
+                                    RUNNING: once
+                                    WALLCLOCK: '00:30'
+                                    MEMORY:
+                                        - 0
+                                        - 0
+                                    NODES:
+                                        - 3
+                                        - 1
+                                    TASKS:
+                                        - 32
+                                        - 32
+                                    THREADS:
+                                        - 4
+                                        - 4
+                                    CUSTOM_DIRECTIVES:
+                                        - ['#SBATCH --export=ALL', '#SBATCH --distribution=block:cyclic', '#SBATCH --exclusive']
+                                        - ['#SBATCH --export=ALL', '#SBATCH --distribution=block:cyclic:fcyclic', '#SBATCH --exclusive']
+                '''))
 
-    # def test_exists_completed_file_then_sets_status_to_completed(self):
-    #     # arrange
-    #     exists_mock = Mock(return_value=True)
-    #     sys.modules['os'].path.exists = exists_mock
-    #
-    #     # act
-    #     self.job.check_completion()
-    #
-    #     # assert
-    #     exists_mock.assert_called_once_with(os.path.join(self.job._tmp_path, self.job.name + '_COMPLETED'))
-    #     self.assertEqual(Status.COMPLETED, self.job.status)
+            basic_config = FakeBasicConfig()
+            basic_config.read()
+            basic_config.LOCAL_ROOT_DIR = str(temp_dir)
 
-    # def test_completed_file_not_exists_then_sets_status_to_failed(self):
-    #     # arrange
-    #     exists_mock = Mock(return_value=False)
-    #     sys.modules['os'].path.exists = exists_mock
-    #
-    #     # act
-    #     self.job.check_completion()
-    #
-    #     # assert
-    #     exists_mock.assert_called_once_with(os.path.join(self.job._tmp_path, self.job.name + '_COMPLETED'))
-    #     self.assertEqual(Status.FAILED, self.job.status)
+            config = AutosubmitConfig(expid, basic_config=basic_config, parser_factory=YAMLParserFactory())
+            config.reload(True)
+            parameters = config.load_parameters()
+            job_list_obj = JobList(expid, config, YAMLParserFactory(),
+                                   Autosubmit._get_job_list_persistence(expid, config))
+
+            job_list_obj.generate(
+                as_conf=config,
+                date_list=[],
+                member_list=[],
+                num_chunks=1,
+                chunk_ini=1,
+                parameters=parameters,
+                date_format='M',
+                default_retrials=config.get_retrials(),
+                default_job_type=config.get_default_job_type(),
+                wrapper_jobs={},
+                new=True,
+                run_only_members=[],
+                # config.get_member_list(run_only=True),
+                show_log=True,
+                create=True,
+            )
+
+            job_list = job_list_obj.get_job_list()
+            assert 1 == len(job_list)
+
+            submitter = ParamikoSubmitter(as_conf=config)
+
+            hpcarch = config.get_platform()
+            for job in job_list:
+                if job.platform_name == "" or job.platform_name is None:
+                    job.platform_name = hpcarch
+                job.platform = submitter.platforms[job.platform_name]
+
+            job = job_list[0]
+
+            # This is the final header
+            parameters = job.update_parameters(config, set_attributes=True)
+            job.update_content(config, parameters)
+
+            # Asserts the script is valid. There shouldn't be variables in the script that aren't in the parameters.
+            checked = job.check_script(config, parameters)
+            assert checked
+
+    def test_job_parameters(self):
+        """Test job platforms with a platform. Builds job and platform using YAML data, without mocks.
+
+        Actually one mock, but that's for something in the AutosubmitConfigParser that can
+        be modified to remove the need of that mock.
+        """
+
+        expid = 't000'
+
+        for reservation in [None, '', '  ', 'some-string', 'a', '123', 'True']:
+            reservation_string = '' if not reservation else f'RESERVATION: "{reservation}"'
+            with tempfile.TemporaryDirectory() as temp_dir:
+                BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
+                Path(temp_dir, expid).mkdir()
+                # FIXME: Not sure why but the submitted and Slurm were using the $expid/tmp/ASLOGS folder?
+                for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
+                             f'{expid}/conf']:
+                    Path(temp_dir, path).mkdir()
+                with open(Path(temp_dir, f'{expid}/conf/minimal.yml'), 'w+') as minimal:
+                    minimal.write(dedent(f'''\
+                    CONFIG:
+                      RETRIALS: 0
+                    DEFAULT:
+                      EXPID: {expid}
+                      HPCARCH: test
+                    JOBS:
+                      A:
+                        FILE: a
+                        PLATFORM: test
+                        RUNNING: once
+                        {reservation_string}
+                    PLATFORMS:
+                      test:
+                        TYPE: slurm
+                        HOST: localhost
+                        PROJECT: abc
+                        QUEUE: debug
+                        USER: me
+                        SCRATCH_DIR: /anything/
+                        ADD_PROJECT_TO_HOST: False
+                        MAX_WALLCLOCK: '00:55'
+                        TEMP_DIR: ''
+                    '''))
+                    minimal.flush()
+
+                basic_config = FakeBasicConfig()
+                basic_config.read()
+                basic_config.LOCAL_ROOT_DIR = str(temp_dir)
+
+                config = AutosubmitConfig(expid, basic_config=basic_config, parser_factory=YAMLParserFactory())
+                config.reload(True)
+                parameters = config.load_parameters()
+
+                job_list_obj = JobList(expid, config, YAMLParserFactory(),
+                                       Autosubmit._get_job_list_persistence(expid, config))
+                job_list_obj.generate(
+                    as_conf=config,
+                    date_list=[],
+                    member_list=[],
+                    num_chunks=1,
+                    chunk_ini=1,
+                    parameters=parameters,
+                    date_format='M',
+                    default_retrials=config.get_retrials(),
+                    default_job_type=config.get_default_job_type(),
+                    wrapper_jobs={},
+                    new=True,
+                    run_only_members=config.get_member_list(run_only=True),
+                    show_log=True,
+                    create=True,
+                )
+                job_list = job_list_obj.get_job_list()
+                assert 1 == len(job_list)
+
+                submitter = ParamikoSubmitter(as_conf=config)
+
+                hpcarch = config.get_platform()
+                for job in job_list:
+                    if job.platform_name == "" or job.platform_name is None:
+                        job.platform_name = hpcarch
+                    job.platform = submitter.platforms[job.platform_name]
+
+                job = job_list[0]
+                parameters = job.update_parameters(config, set_attributes=True)
+                # Asserts the script is valid.
+                checked = job.check_script(config, parameters)
+                assert checked
+
+                # Asserts the configuration value is propagated as-is to the job parameters.
+                # Finally, asserts the header created is correct.
+                if not reservation:
+                    assert 'JOBS.A.RESERVATION' not in parameters
+                    template_content, additional_templates = job.update_content(config, parameters)
+                    assert not additional_templates
+
+                    assert '#SBATCH --reservation' not in template_content
+                else:
+                    assert reservation == parameters['JOBS.A.RESERVATION']
+
+                    template_content, additional_templates = job.update_content(config, parameters)
+                    assert not additional_templates
+                    assert f'#SBATCH --reservation={reservation}' in template_content
 
     def test_total_processors(self):
         for test in [
@@ -594,7 +684,6 @@ CONFIG:
             self.job.processors = test['processors']
             self.job.nodes = test['nodes']
             assert self.job.total_processors == test['expected']
-
 
     def test_get_from_total_stats(self):
         """
@@ -798,8 +887,7 @@ CONFIG:
             job_list = job_list.get_job_list()
             assert 24 == len(job_list)
 
-            submitter = Autosubmit._get_submitter(config)
-            submitter.load_platforms(config)
+            submitter = ParamikoSubmitter(as_conf=config)
 
             hpcarch = config.get_platform()
             for job in job_list:
@@ -1387,7 +1475,8 @@ def test_sub_job_manager(current_structure):
 
 
 def test_update_parameters_reset_logs(autosubmit_config, tmpdir):
-    # TODO This experiment_data (aside from WORKFLOW_COMMIT and maybe JOBS) could be a good candidate for a fixture in the conf_test. "basic functional configuration"
+    # TODO This experiment_data (aside from WORKFLOW_COMMIT and maybe JOBS)
+    #  could be a good candidate for a fixture in the conf_test. "basic functional configuration"
     as_conf = autosubmit_config(
         expid='a000',
         experiment_data={
@@ -1608,6 +1697,188 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
     assert len(total_stats.read_text().split('\n')) == expected_lines
 
 
+def test_job_repr():
+    job = Job('name', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    assert f'name STATUS: {Status.KEY_TO_VALUE["WAITING"]}' == repr(job)
+
+
+def test_job_str():
+    job = Job('name', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    assert f'name STATUS: {Status.KEY_TO_VALUE["WAITING"]}' == str(job)
+
+
+def test_job_retries():
+    """Test that ``Job`` ignores when retrials is ``None``."""
+    job = Job('name', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    assert job.retrials == 0
+    job.retrials = None
+    assert job.retrials == 0
+    job.retrials = 2
+    assert job.retrials == 2
+
+
+def test_job_wallclock():
+    """Test that ``Job`` ignores when wallclock is ``None``."""
+    job = Job('name', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    assert job.wallclock is None
+    job.wallclock = "10:00"
+    assert job.wallclock == "10:00"
+    job.wallclock = None
+    assert job.wallclock == "10:00"
+
+
+def test_job_parents():
+    single_parent = Job('single', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+
+    parents_1 = [
+        Job('mare', 'job_id', status=Status.WAITING, priority=0, loaded_data=None),
+        Job('pare', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    ]
+
+    parents_2 = [
+        Job('mae', 'job_id', status=Status.WAITING, priority=0, loaded_data=None),
+        Job('pae', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    ]
+
+    job = Job('name', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    assert len(job.parents) == 0
+
+    job.add_parent(single_parent)
+    assert len(job.parents) == 1
+
+    job.add_parent(*parents_1)
+    assert len(job.parents) == 3
+
+    job.add_parent(parents_2)  # type: ignore
+    assert len(job.parents) == 5
+
+    job.delete_parent(single_parent)
+    assert len(job.parents) == 4
+
+
+def test_job_getters_setters():
+    """Tests for a few sorted properties to verify they behave as expected."""
+    job = Job('name', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    for p in ['frequency', 'synchronize', 'delay_retrials', 'long_name']:
+        assert getattr(job, p) is None
+        setattr(job, p, 10)
+        assert getattr(job, p) == 10
+
+    # When ``_long_name`` does not exist, it falls back to the ``.name``.
+    del job._long_name
+    assert job.long_name == 'name'
+
+    assert job.log_recovered is False
+    job.log_recovered = True
+    assert job.log_recovered
+
+    assert job.remote_logs == ('', '')
+    job.remote_logs = ('a.err', 'b.err')
+    assert job.remote_logs == ('a.err', 'b.err')
+
+
+def test_job_read_tailer_no_script():
+    job = Job('name', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    assert job.read_header_tailer_script('/', None, False) == ''  # type: ignore
+
+
+@pytest.mark.parametrize(
+    'status',
+    [
+        Status.RUNNING,
+        Status.QUEUING,
+        Status.HELD
+    ]
+)
+def test_update_status_logs(status: Status, autosubmit_config, mocker):
+    platform_name = 'knock'
+    as_conf = autosubmit_config('t000', experiment_data={
+        'PLATFORMS': {
+            platform_name: {
+                'DISABLE_RECOVERY_THREADS': False
+            }
+        }
+    })
+    job = Job('name', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    job.platform_name = platform_name
+    job.new_status = status
+
+    assert job.status == Status.WAITING
+
+    mocked_log = mocker.patch('autosubmit.job.job.Log')
+
+    job.update_status(as_conf=as_conf, failed_file=False)
+
+    assert job.status == status
+
+    assert mocked_log.info.call_args_list[0][0][0] == f'Job {job.name} is {Status.VALUE_TO_KEY[status].upper()}'
+
+
+@pytest.mark.parametrize(
+    'has_completed_files,job_id',
+    [
+        (True, '0'),
+        (True, '1'),
+        (False, '0')
+    ]
+)
+def test_update_status_completed(has_completed_files: bool, job_id: str, autosubmit_config, mocker):
+    """Test that marking a job as completed works as expected.
+
+    When a job changes status to completed it tries to retrieve the completed files,
+    checks for completion (which uses the completed files retrieved), prints a result
+    entry in the logs, may retrieve the remote logs, and updates history and metrics.
+
+    Only when completed files are found, then the status is really updated to
+    completed, otherwise, the job will fail to perform this double verification and
+    will set its status to failed.
+
+    TODO: We might remove the _COMPLETED FILES altogether soon in
+          https://github.com/BSC-ES/autosubmit/issues/2559
+    """
+    platform_name = 'knock'
+    as_conf = autosubmit_config('t000', experiment_data={
+        'PLATFORMS': {
+            platform_name: {
+                'DISABLE_RECOVERY_THREADS': False
+            }
+        }
+    })
+    job = Job(as_conf.expid, job_id, status=Status.WAITING, priority=0, loaded_data=None)
+    job.platform_name = platform_name
+    job.new_status = Status.COMPLETED
+
+    local = LocalPlatform(expid='t000', name='local', config=as_conf.experiment_data)
+    local.recovery_queue = mocker.MagicMock()
+    job.platform = local
+
+    assert job.status == Status.WAITING
+
+    mocked_log = mocker.patch('autosubmit.job.job.Log')
+
+    if has_completed_files:
+        job_completed_file = Path(
+            local.root_dir,
+            local.config.get('LOCAL_TMP_DIR'),
+            f'LOG_{as_conf.expid}',
+            f'{job.name}_COMPLETED'
+        )
+        job_completed_file.parent.mkdir(parents=True, exist_ok=True)
+        job_completed_file.touch()
+        job.update_status(as_conf=as_conf, failed_file=False)
+        assert job.status == Status.COMPLETED
+
+        assert mocked_log.result.call_args_list[0][0][0] == f'Job {job.name} is COMPLETED'
+
+        if job_id == '0':
+            assert job.updated_log
+        else:
+            assert job.platform.recovery_queue.put.called  # type: ignore
+    else:
+        job.update_status(as_conf=as_conf, failed_file=False)
+        assert job.status == Status.FAILED
+
+
 def test_wrapper_job_cancel_failed_wrapper_job_error(autosubmit_config, mocker):
     """Test that an exception raised in ``cancel_failed_wrapper_job`` logs correctly."""
     as_conf = autosubmit_config(_EXPID, {})
@@ -1723,6 +1994,7 @@ def test_update_dict_parameters_invalid_script_language(platform_name: Optional[
         assert job.platform_name is None
     else:
         assert job.platform_name == platform_name.upper()
+
 
 @pytest.mark.parametrize(
     "reservation",
@@ -2004,3 +2276,36 @@ def test_process_scheduler_parameters(local):
 
     with pytest.raises(AutosubmitCritical):
         assert isinstance(job.process_scheduler_parameters(local, 0), AutosubmitCritical)
+
+
+@pytest.mark.parametrize("create_jobs", [[1, 2]], indirect=True)
+@pytest.mark.parametrize(
+    'status,failed_file',
+    [
+        (Status.RUNNING, False),
+        (Status.QUEUING, False),
+        (Status.HELD, False),
+        (Status.FAILED, False),
+        (Status.FAILED, True),
+        (Status.UNKNOWN, False),
+        (Status.SUBMITTED, False)
+    ]
+)
+def test_update_status(create_jobs: list[Job], status: Status, failed_file,
+                       autosubmit_config: 'AutosubmitConfigFactory', local: 'LocalPlatform'):
+    as_conf = autosubmit_config('t000', experiment_data={
+        'PLATFORMS': {
+            local.name: {
+                'DISABLE_RECOVERY_THREADS': False
+            }
+        }
+    })
+    job = create_jobs[0]
+    job.id = 0
+    job.platform = local
+    job.platform_name = local.name
+    job.new_status = status
+
+    assert job.status != status
+    job.update_status(as_conf=as_conf, failed_file=failed_file)
+    assert job.status == status

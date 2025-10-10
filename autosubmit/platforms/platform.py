@@ -26,7 +26,7 @@ from contextlib import suppress
 from multiprocessing.synchronize import Event
 from multiprocessing.queues import Queue
 # noinspection PyProtectedMember
-from os import _exit
+from os import _exit  # type: ignore
 from pathlib import Path
 from typing import Any, Optional, Union, TYPE_CHECKING
 
@@ -39,15 +39,19 @@ from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.job.job_packages import JobPackageBase
+    from autosubmit.job.job import Job
+    from autosubmit.job.job_list import JobList
+    from autosubmit.job.job_package_persistence import JobPackagePersistence
 
 
-def _init_logs_log_process(as_conf, platform_name):
+def _init_logs_log_process(as_conf: 'AutosubmitConfig', platform_name: str) -> None:
     Log.set_console_level(as_conf.experiment_data.get("LOG_RECOVERY_CONSOLE_LEVEL", "DEBUG"))
     if as_conf.experiment_data["ROOTDIR"]:
         aslogs_path = Path(as_conf.experiment_data["ROOTDIR"], "tmp/ASLOGS")
-        Log.set_file(aslogs_path.joinpath(f'{platform_name.lower()}_log_recovery.log'), "out",
-                     as_conf.experiment_data.get("LOG_RECOVERY_FILE_LEVEL", "EVERYTHING"))
-        Log.set_file(aslogs_path.joinpath(f'{platform_name.lower()}_log_recovery_err.log'), "err")
+        Log.set_file(
+            str(aslogs_path / f'{platform_name.lower()}_log_recovery.log'), "out",
+            as_conf.experiment_data.get("LOG_RECOVERY_FILE_LEVEL", "EVERYTHING"))
+        Log.set_file(str(aslogs_path / f'{platform_name.lower()}_log_recovery_err.log'), "err")
 
 
 def recover_platform_job_logs_wrapper(
@@ -57,17 +61,12 @@ def recover_platform_job_logs_wrapper(
         cleanup_event: Event,
         as_conf: 'AutosubmitConfig'
 ) -> None:
-    """
-    Wrapper function to recover platform job logs.
+    """Wrapper function to recover platform job logs.
 
     :param platform: The platform object responsible for managing the connection and job recovery.
-    :type platform: Any
     :param recovery_queue: A multiprocessing queue used to store jobs for recovery.
-    :type recovery_queue: multiprocessing.Queue
     :param worker_event: An event to signal work availability.
-    :type worker_event: multiprocessing.Event
     :param cleanup_event: An event to signal cleanup operations.
-    :type cleanup_event: multiprocessing.Event
     :param as_conf: The Autosubmit configuration object containing experiment data.
     :type as_conf: AutosubmitConfig
     :return: None
@@ -88,8 +87,9 @@ def recover_platform_job_logs_wrapper(
     }
     _init_logs_log_process(as_conf, platform.name)
     platform.recover_platform_job_logs(as_conf)
-    _exit(
-        0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
+    # Exit userspace after manually closing ssh sockets, recommended for child processes,
+    # the queue() and shared signals should be in charge of the main process.
+    _exit(0)
 
 
 class CopyQueue(Queue):
@@ -98,8 +98,7 @@ class CopyQueue(Queue):
     """
 
     def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, ctx: Any = None) -> None:
-        """
-        Initializes the Queue.
+        """Initializes the Queue.
 
         :param maxsize: Maximum size of the queue. Defaults to -1 (infinite size).
         :type maxsize: int
@@ -115,8 +114,7 @@ class CopyQueue(Queue):
         super().__init__(maxsize, ctx=ctx)
 
     def put(self, job: Any, block: bool = True, timeout: float = None) -> None:
-        """
-        Puts a job into the queue if it is not a duplicate.
+        """Puts a job into the queue if it is not a duplicate.
 
         :param job: The job to be added to the queue.
         :type job: Any
@@ -128,7 +126,7 @@ class CopyQueue(Queue):
         super().put(job.__getstate__(), block, timeout)
 
 
-class Platform(object):
+class Platform:
     """
     Class to manage the connections to the different platforms.
     """
@@ -138,8 +136,7 @@ class Platform(object):
     lock = multiprocessing.Lock()
 
     def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
-        """
-        Initializes the Platform object with the given experiment ID, platform name, configuration,
+        """Initializes the Platform object with the given experiment ID, platform name, configuration,
         and optional authentication password for two-factor authentication.
 
         :param expid: The experiment ID associated with the platform.
@@ -211,7 +208,7 @@ class Platform(object):
         else:
             self.pw = None
         self.max_waiting_jobs = 20
-        self.recovery_queue = None
+        self.recovery_queue: Optional[Queue] = None
         self.work_event = None
         self.cleanup_event = None
         self.log_retrieval_process_active = False
@@ -245,14 +242,14 @@ class Platform(object):
 
     @classmethod
     def remove_workers(cls, event_worker: Event) -> None:
-        """Remove the given even worker from the list of workers in this class."""
+        """Remove the given even worker from the list of workers in this class. """
         if event_worker in cls.worker_events:
             cls.worker_events.remove(event_worker)
 
     @property
     @autosubmit_parameter(name='current_arch')
     def name(self):
-        """Platform name."""
+        """Platform name. """
         return self._name
 
     @name.setter
@@ -262,7 +259,7 @@ class Platform(object):
     @property
     @autosubmit_parameter(name='current_host')
     def host(self):
-        """Platform url."""
+        """Platform url. """
         return self._host
 
     @host.setter
@@ -272,7 +269,7 @@ class Platform(object):
     @property
     @autosubmit_parameter(name='current_user')
     def user(self):
-        """Platform user."""
+        """Platform user. """
         return self._user
 
     @user.setter
@@ -282,7 +279,7 @@ class Platform(object):
     @property
     @autosubmit_parameter(name='current_proj')
     def project(self):
-        """Platform project."""
+        """Platform project. """
         return self._project
 
     @project.setter
@@ -292,7 +289,7 @@ class Platform(object):
     @property
     @autosubmit_parameter(name='current_budg')
     def budget(self):
-        """Platform budget."""
+        """Platform budget. """
         return self._budget
 
     @budget.setter
@@ -302,7 +299,7 @@ class Platform(object):
     @property
     @autosubmit_parameter(name='current_reservation')
     def reservation(self):
-        """You can configure your reservation id for the given platform."""
+        """You can configure your reservation id for the given platform. """
         return self._reservation
 
     @reservation.setter
@@ -312,7 +309,7 @@ class Platform(object):
     @property
     @autosubmit_parameter(name='current_exclusivity')
     def exclusivity(self):
-        """True if you want to request exclusivity nodes."""
+        """True if you want to request exclusivity nodes. """
         return self._exclusivity
 
     @exclusivity.setter
@@ -332,7 +329,7 @@ class Platform(object):
     @property
     @autosubmit_parameter(name='current_type')
     def type(self):
-        """Platform scheduler type."""
+        """Platform scheduler type. """
         return self._type
 
     @type.setter
@@ -342,7 +339,7 @@ class Platform(object):
     @property
     @autosubmit_parameter(name='current_scratch_dir')
     def scratch(self):
-        """Platform's scratch folder path."""
+        """Platform's scratch folder path. """
         return self._scratch
 
     @scratch.setter
@@ -352,7 +349,7 @@ class Platform(object):
     @property
     @autosubmit_parameter(name='current_proj_dir')
     def project_dir(self):
-        """Platform's project folder path."""
+        """Platform's project folder path. """
         return self._project_dir
 
     @project_dir.setter
@@ -362,7 +359,7 @@ class Platform(object):
     @property
     @autosubmit_parameter(name='current_rootdir')
     def root_dir(self):
-        """Platform's experiment folder path."""
+        """Platform's experiment folder path. """
         return self._root_dir
 
     @root_dir.setter
@@ -372,11 +369,10 @@ class Platform(object):
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
 
-    def submit_ready_jobs(self, as_conf, job_list, packages_persistence, packages_to_submit,
+    def submit_ready_jobs(self, as_conf: 'AutosubmitConfig', job_list: 'JobList',
+                          packages_persistence: 'JobPackagePersistence', packages_to_submit: list['JobPackageBase'],
                           inspect=False, only_wrappers=False, hold=False):
-
-        """
-        Gets READY jobs and send them to the platforms if there is available space on the queues
+        """Gets READY jobs and send them to the platforms if there is available space on the queues.
 
         :param hold:
         :param packages_to_submit:
@@ -400,11 +396,9 @@ class Platform(object):
         if not inspect:
             job_list.save()
         if not hold:
-            Log.debug("\nJobs ready for {1}: {0}", len(
-                job_list.get_ready(self, hold=hold)), self.name)
+            Log.debug(f"\nJobs ready for {self.name}: {len(job_list.get_ready(self, hold=hold))}")
         else:
-            Log.debug("\nJobs prepared for {1}: {0}", len(
-                job_list.get_prepared(self)), self.name)
+            Log.debug(f"\nJobs prepared for {self.name}: {len(job_list.get_prepared(self))}")
         if not inspect:
             self.generate_submit_script()
         valid_packages_to_submit: list['JobPackageBase'] = []
@@ -454,11 +448,9 @@ class Platform(object):
                                 if job_tmp.section not in error_msg:
                                     error_msg += job_tmp.section + "&"
                             if e.message.lower().find("bad parameters") != -1:
-                                error_message += "\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {0}".format(
-                                    error_msg[:-1])
+                                error_message += f"\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {error_msg[:-1]}"
                             else:
-                                error_message += "\ncheck that {1} platform has set the correct scheduler. Sections that could be affected: {0}".format(
-                                    error_msg[:-1], self.name)
+                                error_message += f"\ncheck that {self.name} platform has set the correct scheduler. Sections that could be affected: {error_msg[:-1]}"
                     except AutosubmitCritical:
                         raise
                     except Exception:
@@ -472,8 +464,7 @@ class Platform(object):
 
     @property
     def serial_platform(self):
-        """
-        Platform to use for serial jobs
+        """Platform to use for serial jobs.
 
         :return: platform's object
         :rtype: platform
@@ -489,8 +480,7 @@ class Platform(object):
     @property
     @autosubmit_parameter(name='current_partition')
     def partition(self):
-        """
-        Partition to use for jobs.
+        """Partition to use for jobs.
 
         :return: queue's name
         :rtype: str
@@ -505,8 +495,8 @@ class Platform(object):
 
     @property
     def queue(self):
-        """
-        Queue to use for jobs
+        """Queue to use for jobs.
+
         :return: queue's name
         :rtype: str
         """
@@ -520,8 +510,7 @@ class Platform(object):
 
     @property
     def serial_partition(self):
-        """
-        Partition to use for serial jobs
+        """Partition to use for serial jobs.
 
         :return: partition's name
         :rtype: str
@@ -536,8 +525,7 @@ class Platform(object):
 
     @property
     def serial_queue(self):
-        """
-        Queue to use for serial jobs
+        """Queue to use for serial jobs.
 
         :return: queue's name
         :rtype: str
@@ -569,36 +557,34 @@ class Platform(object):
         return self._allow_python_jobs == "true"
 
     def add_parameters(self, as_conf: 'AutosubmitConfig'):
-        """
-        Add parameters for the current platform to the given parameters list
+        """Add parameters for the current platform to the given parameters list
 
         :param as_conf: autosubmit config object
         :type as_conf: AutosubmitConfig object
         """
-        prefix = 'HPC'
 
-        as_conf.experiment_data['{0}ARCH'.format(prefix)] = self.name
-        as_conf.experiment_data['{0}HOST'.format(prefix)] = self.host
-        as_conf.experiment_data['{0}QUEUE'.format(prefix)] = self.queue
-        as_conf.experiment_data['{0}EC_QUEUE'.format(prefix)] = self.ec_queue
-        as_conf.experiment_data['{0}PARTITION'.format(prefix)] = self.partition
+        as_conf.experiment_data['HPCARCH'] = self.name
+        as_conf.experiment_data['HPCHOST'] = self.host
+        as_conf.experiment_data['HPCQUEUE'] = self.queue
+        as_conf.experiment_data['HPCEC_QUEUE'] = self.ec_queue
+        as_conf.experiment_data['HPCPARTITION'] = self.partition
 
-        as_conf.experiment_data['{0}USER'.format(prefix)] = self.user
-        as_conf.experiment_data['{0}PROJ'.format(prefix)] = self.project
-        as_conf.experiment_data['{0}BUDG'.format(prefix)] = self.budget
-        as_conf.experiment_data['{0}RESERVATION'.format(prefix)] = self.reservation
-        as_conf.experiment_data['{0}EXCLUSIVITY'.format(prefix)] = self.exclusivity
-        as_conf.experiment_data['{0}TYPE'.format(prefix)] = self.type
-        as_conf.experiment_data['{0}SCRATCH_DIR'.format(prefix)] = self.scratch
-        as_conf.experiment_data['{0}TEMP_DIR'.format(prefix)] = self.temp_dir
+        as_conf.experiment_data['HPCUSER'] = self.user
+        as_conf.experiment_data['HPCPROJ'] = self.project
+        as_conf.experiment_data['HPCBUDG'] = self.budget
+        as_conf.experiment_data['HPCRESERVATION'] = self.reservation
+        as_conf.experiment_data['HPCEXCLUSIVITY'] = self.exclusivity
+        as_conf.experiment_data['HPCTYPE'] = self.type
+        as_conf.experiment_data['HPCSCRATCH_DIR'] = self.scratch
+        as_conf.experiment_data['HPCTEMP_DIR'] = self.temp_dir
         if self.temp_dir is None:
             self.temp_dir = ''
-        as_conf.experiment_data['{0}ROOTDIR'.format(prefix)] = self.root_dir
+        as_conf.experiment_data['HPCROOTDIR'] = self.root_dir
 
-        as_conf.experiment_data['{0}LOGDIR'.format(prefix)] = self.get_files_path()
+        as_conf.experiment_data['HPCLOGDIR'] = self.get_files_path()
 
     def send_file(self, filename: str, check=True) -> bool:
-        """Sends a local file to the platform
+        """Sends a local file to the platform.
 
         :param filename: The name of the file to send.
         :param check: Whether the platform must perform tests (e.g. for permission).
@@ -606,8 +592,7 @@ class Platform(object):
         raise NotImplementedError  # pragma: no cover
 
     def move_file(self, src, dest):
-        """
-        Moves a file on the platform
+        """Moves a file on the platform.
 
         :param src: source name
         :type src: str
@@ -617,8 +602,7 @@ class Platform(object):
         raise NotImplementedError  # pragma: no cover
 
     def get_file(self, filename, must_exist=True, relative_path='', ignore_log=False, wrapper_failed=False):
-        """
-        Copies a file from the current platform to experiment's tmp folder
+        """Copies a file from the current platform to experiment's tmp folder
 
         :param wrapper_failed:
         :param ignore_log:
@@ -634,8 +618,7 @@ class Platform(object):
         raise NotImplementedError  # pragma: no cover
 
     def get_files(self, files, must_exist=True, relative_path=''):
-        """
-        Copies some files from the current platform to experiment's tmp folder
+        """Copies some files from the current platform to experiment's tmp folder.
 
         :param files: file names
         :type files: [str]
@@ -650,8 +633,7 @@ class Platform(object):
             self.get_file(filename, must_exist, relative_path)
 
     def delete_file(self, filename: str):
-        """
-        Deletes a file from this platform
+        """Deletes a file from this platform.
 
         :param filename: file name
         :type filename: str
@@ -662,24 +644,20 @@ class Platform(object):
 
     # Executed when calling from Job
     def get_logs_files(self, exp_id: str, remote_logs: tuple[str, str]) -> None:
-        """
-        Get the given LOGS files
+        """Get the given LOGS files.
 
         :param exp_id: experiment id
         :type exp_id: str
         :param remote_logs: names of the log files
         :type remote_logs: (str, str)
         """
-        return NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def get_checkpoint_files(self, job):
-        """
-        Get all the checkpoint files of a job
+        """Get all the checkpoint files of a job.
 
         :param job: Get the checkpoint files
         :type job: Job
-        :param max_step: max step possible
-        :type max_step: int
         """
         if not job.current_checkpoint_step:
             job.current_checkpoint_step = 0
@@ -695,8 +673,7 @@ class Platform(object):
                 self.get_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}', False, ignore_log=True)
 
     def get_completed_files(self, job_name, retries=0, recovery=False, wrapper_failed=False):
-        """
-        Get the COMPLETED file of the given job
+        """Get the COMPLETED file of the given job.
 
         :param wrapper_failed:
         :param recovery:
@@ -710,20 +687,17 @@ class Platform(object):
         if recovery:
             retries = 5
             for i in range(retries):
-                if self.get_file('{0}_COMPLETED'.format(job_name), False, ignore_log=recovery):
+                if self.get_file(f'{job_name}_COMPLETED', False, ignore_log=recovery):
                     return True
             return False
-        if self.check_file_exists('{0}_COMPLETED'.format(job_name), wrapper_failed=wrapper_failed):
-            if self.get_file('{0}_COMPLETED'.format(job_name), True, wrapper_failed=wrapper_failed):
-                return True
-            else:
-                return False
-        else:
-            return False
+
+        if self.check_file_exists(f'{job_name}_COMPLETED', wrapper_failed=wrapper_failed):
+            return self.get_file(f'{job_name}_COMPLETED', True, wrapper_failed=wrapper_failed)
+
+        return False
 
     def remove_stat_file(self, job: Any) -> bool:
-        """
-        Removes STAT files from remote.
+        """Removes STAT files from remote.
 
         :param job: Job to check.
         :type job: Job
@@ -736,8 +710,7 @@ class Platform(object):
         return False
 
     def remove_completed_file(self, job_name):
-        """
-        Removes *COMPLETED* files from remote
+        """Removes *COMPLETED* files from remote.
 
         :param job_name: name of job to check
         :type job_name: str
@@ -746,25 +719,23 @@ class Platform(object):
         """
         filename = job_name + '_COMPLETED'
         if self.delete_file(filename):
-            Log.debug('{0} been removed', filename)
+            Log.debug(f'{filename} been removed')
             return True
         return False
 
     def remove_checkpoint_file(self, filename):
-        """
-        Removes *CHECKPOINT* files from remote
+        """Removes *CHECKPOINT* files from remote.
 
-        :param job_name: name of job to check
+        :param filename: file name to delete.
         :return: True if successful, False otherwise
         """
         if self.check_file_exists(filename):
             self.delete_file(filename)
 
-    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3):
+    def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3):
         return True
 
     def get_stat_file(self, job, count=-1):
-
         if count == -1:  # No internal retrials
             filename = f"{job.stat_file}{job.fail_count}"
         else:
@@ -785,8 +756,7 @@ class Platform(object):
 
     @autosubmit_parameter(name='current_logdir')
     def get_files_path(self):
-        """
-        The platform's LOG directory.
+        """The platform's LOG directory.
 
         :return: platform's LOG directory
         :rtype: str
@@ -797,9 +767,8 @@ class Platform(object):
             path = Path(self.remote_log_dir)
         return str(path)
 
-    def submit_job(self, job, script_name, hold=False, export="none"):
-        """
-        Submit a job from a given job object.
+    def submit_job(self, job: 'Job', script_name: str, hold: bool = False, export: str = "none"):
+        """Submit a job from a given job object.
 
         :param job: job object
         :type job: autosubmit.job.job.Job
@@ -814,13 +783,13 @@ class Platform(object):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def check_Alljobs(self, job_list, as_conf, retries=5):
+    def check_all_jobs(self, job_list: list['Job'], as_conf:'AutosubmitConfig', retries: int = 5):
         for job, job_prev_status in job_list:
             self.check_job(job)
 
-    def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
-        """
-        Checks job running status
+    def check_job(self, job: 'Job', default_status: str = Status.COMPLETED, retries:int = 5,
+                  submit_hold_check: bool = False, is_wrapper: bool = False):
+        """Checks job running status.
 
         :param is_wrapper:
         :param submit_hold_check:
@@ -833,12 +802,11 @@ class Platform(object):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def closeConnection(self):
+    def close_connection(self):
         return
 
     def write_jobid(self, jobid: str, complete_path: str) -> None:
-        """
-        Writes Job id in an out/err file.
+        """Writes Job id in an out/err file.
 
         :param jobid: job id
         :type jobid: str
@@ -848,11 +816,11 @@ class Platform(object):
         return NotImplementedError
 
     def generate_submit_script(self) -> None:
-        """Opens Submit script file."""
+        """Opens Submit script file. """
         raise NotImplementedError  # pragma: no cover
 
     def submit_script(self, hold: bool = False) -> Union[list[str], str]:
-        """Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once."""
+        """Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once. """
         raise NotImplementedError  # pragma: no cover
 
     def add_job_to_log_recover(self, job):
@@ -874,8 +842,7 @@ class Platform(object):
         raise NotImplementedError  # pragma: no cover
 
     def restore_connection(self, as_conf: 'AutosubmitConfig', log_recovery_process: bool = False) -> None:
-        """
-        Restores the SSH connection to the platform.
+        """Restores the SSH connection to the platform.
 
         :param as_conf: The Autosubmit configuration object used to establish the connection.
         :type as_conf: AutosubmitConfig
@@ -885,8 +852,7 @@ class Platform(object):
         raise NotImplementedError  # pragma: no cover
 
     def clean_log_recovery_process(self) -> None:
-        """
-        Cleans the log recovery process variables.
+        """Cleans the log recovery process variables.
 
         This method sets the cleanup event to signal the log recovery process to finish,
         waits for the process to join with a timeout, and then resets all related variables.
@@ -945,7 +911,7 @@ class Platform(object):
         self.recovery_queue = CopyQueue(ctx=ctx)
         # Cleanup will be automatically prompt on control + c or a normal exit
         atexit.register(self.send_cleanup_signal)
-        atexit.register(self.closeConnection)
+        atexit.register(self.close_connection)
         return new_platform
 
     def create_new_process(self, ctx: SpawnContext, new_platform: 'Platform', as_conf) -> None:
@@ -982,8 +948,7 @@ class Platform(object):
                 self.join_new_process()
 
     def send_cleanup_signal(self) -> None:
-        """
-        Sends a cleanup signal to the log recovery process if it is alive.
+        """Sends a cleanup signal to the log recovery process if it is alive.
         This function is executed by the atexit module
         """
         if self.log_recovery_process and self.log_recovery_process.is_alive():
@@ -992,8 +957,7 @@ class Platform(object):
             self.log_recovery_process.join(timeout=60)
 
     def wait_mandatory_time(self, sleep_time: int = 60) -> bool:
-        """
-        Waits for the work_event to be set or the cleanup_event to be set for a mandatory time.
+        """Waits for the work_event to be set or the cleanup_event to be set for a mandatory time.
 
         :param sleep_time: Minimum time to wait in seconds. Defaults to 60.
         :type sleep_time: int
@@ -1026,13 +990,10 @@ class Platform(object):
         return process_log
 
     def wait_until_timeout(self, timeout: int = 60) -> bool:
-        """
-        Waits until the timeout is reached or any signal is set to process logs.
+        """Waits until the timeout is reached or any signal is set to process logs.
 
-        :param sleep_time: Maximum time to wait in seconds. Defaults to 60.
-        :type sleep_time: int
+        :param timeout: Maximum time to wait in seconds. Defaults to 60.
         :return: True if there is work to process, False otherwise.
-        :rtype: bool
         """
         process_log = False
         for _ in range(timeout, 0, -1):
@@ -1043,8 +1004,7 @@ class Platform(object):
         return process_log
 
     def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any], as_conf: 'AutosubmitConfig') -> None:
-        """
-        Recovers log files for jobs from the recovery queue and retries failed jobs.
+        """Recovers log files for jobs from the recovery queue and retries failed jobs.
 
         :param identifier: Identifier for logging purposes.
         :param jobs_pending_to_process: Set of jobs that had issues during log retrieval.
@@ -1080,11 +1040,11 @@ class Platform(object):
                 job.retrieve_logfiles(raise_error=True)
                 job._log_recovery_retries += 1
             except Exception as e:
-                Log.debug(str(e))
                 if job._log_recovery_retries < 5:
                     jobs_pending_to_process.add(job)
                 Log.warning(
-                    f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry '{job.fail_count}'.")
+                    f"{identifier} (Retry) Failed to recover log for job '{job.name}' "
+                    f"and retry '{job.fail_count}': {str(e)}")
             Log.result(
                 f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
         if len(jobs_pending_to_process) > 0:
@@ -1094,8 +1054,7 @@ class Platform(object):
         return jobs_pending_to_process
 
     def recover_platform_job_logs(self, as_conf: 'AutosubmitConfig') -> None:
-        """
-        Recovers the logs of the jobs that have been submitted.
+        """Recovers the logs of the jobs that have been submitted.
         When this is executed as a process, the exit is controlled by the work_event and cleanup_events of the main process.
         """
         setproctitle.setproctitle(f"autosubmit log {self.expid} recovery {self.name.lower()}")
@@ -1119,34 +1078,42 @@ class Platform(object):
             Log.debug(traceback.format_exc())
 
         with suppress(Exception):
-            self.closeConnection()
+            self.close_connection()
 
         Log.info(f"{identifier} Exiting.")
-        _exit(
-            0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
+        # Exit userspace after manually closing ssh sockets, recommended for child processes,
+        # the queue() and shared signals should be in charge of the main process.
+        _exit(0)
 
     def create_a_new_copy(self):
         raise NotImplementedError  # pragma: no cover
 
     def get_file_size(self, src: str) -> Union[int, None]:
-        """
-        Get file size in bytes
+        """Get file size in bytes.
+
         :param src: file path
         """
         raise NotImplementedError  # pragma: no cover
 
     def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
-        """
-        Read file content as bytes. If max_size is set, only the first max_size bytes are read.
+        """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
+
         :param src: file path
         :param max_size: maximum size to read
         """
         raise NotImplementedError  # pragma: no cover
 
     def compress_file(self, file_path: str) -> Union[str, None]:
-        """
-        Compress a file.
+        """Compress a file.
+
         :param file_path: file path
-        :return: path to the compressed file. None if compression failed.
+        :return: The path to the compressed file. None if compression failed.
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def get_remote_log_dir(self) -> str:
+        """Get the variable remote_log_dir that stores the directory of the experiment's log.
+
+        :return: The remote_log_dir variable.
         """
         raise NotImplementedError  # pragma: no cover

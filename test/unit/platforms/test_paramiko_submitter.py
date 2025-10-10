@@ -36,17 +36,10 @@ if TYPE_CHECKING:
 _EXPID = 't000'
 
 
-def test_constructor():
-    """Test the constructor of the submitter."""
-    submitter = ParamikoSubmitter()
-    assert submitter.platforms is None
-
-
 def test_load_local_platform(autosubmit_config):
     """Test that the function to load the local platform (only) works."""
     as_conf = autosubmit_config(_EXPID, {})
-    submitter = ParamikoSubmitter()
-    submitter.load_local_platform(as_conf)
+    submitter = ParamikoSubmitter(as_conf=as_conf)
 
     assert len(submitter.platforms) == 2  # local and LOCAL, right?
 
@@ -60,8 +53,7 @@ def test_load_local_platform(autosubmit_config):
 def test_load_platforms_only_local(autosubmit_config):
     """Test that loads the platforms without any experiment data, ensuring local is loaded anyway."""
     as_conf = autosubmit_config(_EXPID, {})
-    submitter = ParamikoSubmitter()
-    submitter.load_platforms(as_conf, None, None)
+    submitter = ParamikoSubmitter(as_conf, None, None)
 
     assert len(submitter.platforms) == 2  # local and LOCAL, right?
 
@@ -92,7 +84,7 @@ def test_platform_with_no_jobs(autosubmit_config):
             }
         }
     })
-    submitter = ParamikoSubmitter()
+    submitter = ParamikoSubmitter(as_conf=as_conf, auth_password=None, local_auth_password=None)
     submitter.load_platforms(as_conf, None, None)
 
     assert len(submitter.platforms) == 2  # local and LOCAL, right?
@@ -127,8 +119,7 @@ def test_load_slurm_platform(autosubmit_config):
             }
         }
     })
-    submitter = ParamikoSubmitter()
-    submitter.load_platforms(as_conf, None, None)
+    submitter = ParamikoSubmitter(as_conf, None, None)
 
     assert len(submitter.platforms) == 3
 
@@ -213,8 +204,7 @@ def test_serial_platform(experiment_data: dict, autosubmit_config):
     for platform, data in experiment_data['PLATFORMS'].items():
         data['USER'] = user
     as_conf = autosubmit_config(_EXPID, experiment_data=experiment_data)
-    submitter = ParamikoSubmitter()
-    submitter.load_platforms(as_conf, None, None)
+    submitter = ParamikoSubmitter(as_conf, None, None)
 
     assert len(submitter.platforms) == 4
 
@@ -260,17 +250,15 @@ def test_platform_types(platform_type: str, expected_type_or_error: Union['Param
             }
         }
     })
-    submitter = ParamikoSubmitter()
-
     if expected_type_or_error is AutosubmitCritical:
         with pytest.raises(expected_type_or_error):  # type: ignore
-            submitter.load_platforms(as_conf, None, None)
+            ParamikoSubmitter(as_conf, None, None)
     else:
-        submitter.load_platforms(as_conf, None, None)
+        submitter = ParamikoSubmitter(as_conf, None, None)
         assert len(submitter.platforms) == 3
 
         platform = submitter.platforms['sample']
-        assert isinstance(platform, expected_type_or_error)
+        assert isinstance(platform, expected_type_or_error)  # type: ignore
 
         assert platform.expid == as_conf.expid
         assert platform.name == 'sample'
@@ -316,9 +304,8 @@ def test_ecplatform_fails_without_crashing(autosubmit_config):
             }
         }
     })
-    submitter = ParamikoSubmitter()
+    submitter = ParamikoSubmitter(as_conf=as_conf, auth_password=None, local_auth_password=None)
 
-    submitter.load_platforms(as_conf, None, None)
     assert len(submitter.platforms) == 2
 
     assert 'ecaccess' not in submitter.platforms
@@ -354,9 +341,8 @@ def test_adding_project_to_host(hostname: str, add_project_to_host: bool, expect
             }
         }
     })
-    submitter = ParamikoSubmitter()
+    submitter = ParamikoSubmitter(as_conf, None, None)
 
-    submitter.load_platforms(as_conf, None, None)
     assert len(submitter.platforms) == 3
 
     assert submitter.platforms['sample'].host == expected_hostname
@@ -382,9 +368,8 @@ def test_add_invalid_platform(autosubmit_config):
             }
         }
     })
-    submitter = ParamikoSubmitter()
 
     with pytest.raises(AutosubmitError) as cm:
-        submitter.load_platforms(as_conf, None, None)
+        ParamikoSubmitter(as_conf=as_conf)
 
     assert 'must be defined' in str(cm.value.message)

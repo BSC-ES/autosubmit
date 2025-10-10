@@ -40,6 +40,7 @@ from autosubmit.job.job_packages import JobPackageVertical
 from autosubmit.job.job_utils import Dependency
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.slurmplatform import SlurmPlatform
+from autosubmit.platforms.wrappers.wrapper_builder import SrunVerticalHorizontalWrapperBuilder
 
 """Tests for wrappers."""
 
@@ -2115,7 +2116,6 @@ class TestWrappers:
 class FakeBasicConfig:
     def __init__(self):
         pass
-
     def props(self):
         pr = {}
         for name in dir(self):
@@ -2132,8 +2132,6 @@ class FakeBasicConfig:
     LOCAL_PROJ_DIR = '/dummy/local/proj/dir'
     DEFAULT_PLATFORMS_CONF = ''
     DEFAULT_JOBS_CONF = ''
-
-
 @pytest.fixture(scope='function')
 def setup(autosubmit_config, tmpdir):
     experiment_id = 'random-id'
@@ -2297,3 +2295,31 @@ def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wr
         result = job_packager.process_not_wrappeable_packages(not_wrappeable_package_info, packages_to_submit,
                                                               max_jobs_to_submit, wrapper_limits)
     assert result == expected
+
+
+def test_build_imports():
+    kwargs:dict = {'header_directive': True, 'jobs_scripts': ["test"], 'threads': 2, 'num_processors': True,
+                   'num_processors_value': True, 'expid': True}
+    vh_wrapper = SrunVerticalHorizontalWrapperBuilder(**kwargs).build_imports()
+    assert type(vh_wrapper) is str and '("t" "e" "s" "t" )' in vh_wrapper
+
+
+def test_build_srun_launcher():
+    kwargs:dict = {'header_directive': True, 'jobs_scripts': ["test"], 'threads': 2, 'num_processors': True,
+                   'num_processors_value': True, 'expid': True}
+    vh_wrapper = SrunVerticalHorizontalWrapperBuilder(**kwargs).build_srun_launcher("job1, job2, job3, job4, job5")
+    assert type(vh_wrapper) is str and "job1, job2, job3, job4, job5" in vh_wrapper
+
+
+# TODO This test was created but getting stuck at many different issues, it'll be dealt with later
+# def test_calculate_wrapper_het_header():
+#     header = SlurmHeader()
+#     wr_job = Object
+#     wr_job.name = "wrappers_test"
+#     wr_job._platform = Object
+#     wr_job._platform.remote_log_dir = "test_platform"
+#     wr_job.wallclock = "01:00"
+#     wr_job.het = {'HETSIZE': {'CURRENT_QUEUE': ''}, 'CURRENT_QUEUE': '', 'NODES': [2], 'PARTITION': [''], 'CURRENT_PROJ': '', 'EXCLUSIVE': 'false',
+#                   'MEMORY': '', 'MEMORY_PER_TASK': 2, 'NUMTHREADS': '', 'RESERVATION': '', 'CUSTOM_DIRECTIVES': '', 'TASKS': '',
+#                   }
+#     header.calculate_wrapper_het_header(wr_job=wr_job)

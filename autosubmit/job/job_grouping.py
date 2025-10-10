@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 class JobGrouping(object):
 
-    def __init__(self, group_by, jobs: list["Job"], job_list: "JobList", expand_list: Optional[list] = None,
+    def __init__(self, group_by: str, jobs: list["Job"], job_list: "JobList", expand_list: Optional[list] = None,
                  expanded_status: Optional[list] = None):
         if not expand_list:
             expand_list = []

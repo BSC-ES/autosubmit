@@ -86,8 +86,7 @@ class Test2DWrapperDistributionStrategy:
         job_dcs = info_handler.execute_distribution(self.job_data_dcs_in_wrapper[0], self.job_data_dcs_in_wrapper,
                                                     slurm_monitor)
         for job in job_dcs:
-            print(("{0} -> {1} and {2} : ncpus {3} running {4}".format(job.job_name, job.energy, job.rowstatus,
-                                                                       job.ncpus, job.running_time)))
+            print(f"{job.job_name} -> {job.energy} and {job.rowstatus} : ncpus {job.ncpus} running {job.running_time}")
         for level in info_handler.strategy.jobs_per_level:
             print([job.job_name for job in level])
         total_in_jobs = sum(job.energy for job in job_dcs[:-1])  # ignore last

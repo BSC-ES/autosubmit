@@ -18,7 +18,7 @@
 from getpass import getuser
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Optional
+from typing import Generator, Optional
 
 import pytest
 
@@ -31,7 +31,7 @@ from autosubmit.platforms.psplatform import PsPlatform
 
 
 @pytest.fixture
-def paramiko_platform() -> ParamikoPlatform:
+def paramiko_platform() -> Generator[ParamikoPlatform, None, None]:
     local_root_dir = TemporaryDirectory()
     config = {
         "LOCAL_ROOT_DIR": local_root_dir.name,
@@ -49,7 +49,7 @@ def paramiko_platform() -> ParamikoPlatform:
 
 
 @pytest.fixture
-def ps_platform(tmpdir) -> PsPlatform:
+def ps_platform(tmpdir) -> Generator[tuple[PsPlatform, Path], None, None]:
     tmp_path = Path(tmpdir)
     tmpdir.owner = tmp_path.owner()
     config = {
@@ -89,7 +89,7 @@ def test_paramiko_platform_constructor(paramiko_platform):
     assert platform.wrapper is None
     assert platform.header is None
     assert len(platform.job_status) == 4
-    # These calls are not implemented, but should not raise any error
+    # These calls are not implemented but should not raise any error
     platform.get_submit_script()
     platform.generate_submit_script()
 
@@ -99,8 +99,8 @@ def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_p
     mocker.patch('autosubmit.platforms.paramiko_platform.sleep')
 
     platform = paramiko_platform
-    platform.get_checkAlljobs_cmd = mocker.Mock()
-    platform.get_checkAlljobs_cmd.side_effect = ['ls']
+    platform.get_check_all_jobs_cmd = mocker.Mock()
+    platform.get_check_all_jobs_cmd.side_effect = ['ls']
     platform.send_command = mocker.Mock()
     ae = AutosubmitError(message='Test', code=123, trace='ERR!')
     platform.send_command.side_effect = ae
@@ -110,7 +110,7 @@ def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_p
     job.id = 'TEST'
     job.name = 'TEST'
     with pytest.raises(AutosubmitError) as cm:
-        platform.check_Alljobs(
+        platform.check_all_jobs(
             job_list=[[job, None]],
             as_conf=as_conf,
             retries=-1)
@@ -123,8 +123,8 @@ def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_p
     mocker.patch('autosubmit.platforms.paramiko_platform.sleep')
 
     platform = paramiko_platform
-    platform.get_checkAlljobs_cmd = mocker.Mock()
-    platform.get_checkAlljobs_cmd.side_effect = ['ls']
+    platform.get_check_all_jobs_cmd = mocker.Mock()
+    platform.get_check_all_jobs_cmd.side_effect = ['ls']
     platform.send_command = mocker.Mock()
     ae = AutosubmitError(message='Test', code=123, trace='ERR!')
     platform.send_command.side_effect = [None, ae]
@@ -138,7 +138,7 @@ def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_p
     platform.get_queue_status = mocker.Mock(side_effect=None)
 
     with pytest.raises(AutosubmitError) as cm:
-        platform.check_Alljobs(
+        platform.check_all_jobs(
             job_list=[[job, None]],
             as_conf=as_conf,
             retries=1)
@@ -215,7 +215,7 @@ def test_get_pscall(paramiko_platform):
 
 
 def test_remove_multiple_files_no_error_path_does_not_exist(paramiko_platform):
-    """Test that calling a platform function to remove multiple files accepts non-existing directories."""
+    """Test that calling a platform function to remove multiple files accepts non-existing directories. """
     from uuid import uuid4
     paramiko_platform.tmp_path = 'non-existing-path-' + uuid4().hex
     assert paramiko_platform.remove_multiple_files([]) == ""
@@ -252,7 +252,7 @@ def test_init_local_x11_display(exception: Optional[Exception], expected: Option
     ['linux', 'darwin']
 )
 def test_poller(platform: str, mocker, paramiko_platform):
-    """Test the file descriptor poller, initialized to kqueue on Linux, and poll on other systems."""
+    """Test the file descriptor poller, initialized to kqueue on Linux, and poll on other systems. """
     mocked_sys = mocker.patch('autosubmit.platforms.paramiko_platform.sys')
     mocked_sys.platform = platform
     mocker.patch('autosubmit.platforms.paramiko_platform.select')
@@ -291,8 +291,8 @@ def test_poller(platform: str, mocker, paramiko_platform):
     ]
 )
 def test_parse_joblist(job_list: list, expected: str, paramiko_platform: ParamikoPlatform):
-    """Test that the conversion of list of jobs to str is working correctly."""
-    cmd = paramiko_platform.parse_joblist(job_list)
+    """Test that the conversion of a list of jobs to str is working correctly. """
+    cmd = paramiko_platform.parse_job_list(job_list)
     assert cmd == expected
 
 
@@ -360,7 +360,7 @@ def test_move_file_errors(error, must_exist, expected_error_or_return_value, par
 
     The main execution path of that function is tested with an integration test.
     """
-    # The function gets called first inside the try, but it may be called again in the except.
+    # The function gets called first inside the try, but it may be called again in the except block.
     mocker.patch.object(paramiko_platform, 'get_files_path', side_effect=[error, tmp_path])
 
     if type(expected_error_or_return_value) is bool:
@@ -375,7 +375,7 @@ def test_move_file_errors(error, must_exist, expected_error_or_return_value, par
     'header_fn,directive,value',
     [
         ('get_queue_directive', '%QUEUE_DIRECTIVE%', '-q debug'),
-        ('get_proccesors_directive', '%NUMPROC_DIRECTIVE%', '-np 10'),
+        ('get_processors_directive', '%NUMPROC_DIRECTIVE%', '-np 10'),
         ('get_partition_directive', '%PARTITION_DIRECTIVE%', '-p 1'),
         ('get_tasks_per_node', '%TASKS_PER_NODE_DIRECTIVE%', '-t 1'),
         ('get_threads_per_task', '%THREADS_PER_TASK_DIRECTIVE%', '-tt 11'),

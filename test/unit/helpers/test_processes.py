@@ -34,7 +34,7 @@ def _create_process(mocker, expid, username: Optional[str] = None, command='run'
         '-lc',
         'DEBUG',
         command,
-        '--notransitive',
+        '--update_version',
         expid,
         '-v'
     ]

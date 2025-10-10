@@ -30,7 +30,6 @@ from autosubmit.platforms.paramiko_platform import ParamikoPlatformException
 from autosubmit.platforms.pjmplatform import PJMPlatform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from autosubmit.platforms.submitter import Submitter
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -49,7 +48,7 @@ def _get_platforms_used(hpcarch: str, jobs_data: dict) -> set[str]:
 
 
 def _get_serial_platforms(platforms_used: set[str], platforms_data: dict) -> dict[str, list]:
-    """Traverse used platforms and look for serial platforms."""
+    """Traverse used platforms and then look for serial platforms."""
     serial_platforms = defaultdict(list)
     for platform in list(platforms_used):
         hpc: Optional[str] = platforms_data.get(platform, {}).get("SERIAL_PLATFORM", None)
@@ -64,10 +63,10 @@ def _get_serial_platforms(platforms_used: set[str], platforms_data: dict) -> dic
 def _get_host(section_host: str, add_project_to_host: bool, project: str) -> str:
     """Get the section host.
 
-    If ``add_project_to_host`` is ``False``, then we return the section host provided,
+    If ``add_project_to_host`` is ``False`` we return the section host provided,
     stripping spaces (from head and tail).
 
-    Otherwise, if the host name does not contain commas we return a single string with
+    Otherwise, if the host name does not contain commas, we return a single string with
     the host name, a hyphen, and the project.
 
     If the host name does contain commas, in that case we will create a list with all the
@@ -106,11 +105,13 @@ def _get_platform_by_type(platform_type: str, expid: str, platform_name: str, ex
 
 
 # TODO: This doesn't need a class if we just return ``platforms``.
-class ParamikoSubmitter(Submitter):
+class ParamikoSubmitter:
     """Class to manage the experiments Paramiko platforms."""
 
-    def __init__(self):
+    def __init__(self, as_conf: 'AutosubmitConfig', auth_password: Optional[str] = None,
+                       local_auth_password=None):
         self.platforms = None
+        self.load_platforms(as_conf=as_conf, auth_password=auth_password, local_auth_password=local_auth_password)
 
     def load_local_platform(self, as_conf: 'AutosubmitConfig', experiment_data: Optional[dict] = None,
                             auth_password: Optional[str] = None) -> None:
@@ -133,7 +134,7 @@ class ParamikoSubmitter(Submitter):
         local_platform.temp_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, 'ASlogs')
         local_platform.root_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, local_platform.expid)
         local_platform.host = 'localhost'
-        # Add object to entry in dictionary
+        # Add an object to entry in dictionary
         self.platforms = {
             'local': local_platform,
             'LOCAL': local_platform
@@ -141,7 +142,7 @@ class ParamikoSubmitter(Submitter):
 
     def load_platforms(self, as_conf: 'AutosubmitConfig', auth_password: Optional[str] = None,
                        local_auth_password=None) -> None:
-        """Create all the platforms object that will be used by the experiment."""
+        """Create all the platform's object that will be used by the experiment."""
         exp_data: dict = as_conf.experiment_data
         platforms_used: set[str] = _get_platforms_used(
             hpcarch=as_conf.get_platform(),
@@ -173,7 +174,7 @@ class ParamikoSubmitter(Submitter):
                     raise AutosubmitCritical(
                         f"PLATFORMS.{section_name}.TYPE: {platform_type} for {section_name} is not supported", 7012)
             except ParamikoPlatformException as e:
-                # This is raised only by the ``EcPlatform``, if the underlying platform type is missing.
+                # This is raised only by the ``EcPlatform`` if the underlying platform type is missing.
                 Log.error(f"Queue exception: {str(e)}")
                 return
 
@@ -181,7 +182,7 @@ class ParamikoSubmitter(Submitter):
             remote_platform.type = platform_type
             remote_platform._version = platform_version
 
-            # Concatenating host + project and adding to the object
+            # Concatenating the host with a project and adding to the object
             add_project_to_host: Union[str, bool] = section_platform.get('ADD_PROJECT_TO_HOST', False)
             add_project_to_host: bool = str(add_project_to_host).lower() != "false"
             section_project = section_platform.get('PROJECT', "")
@@ -235,3 +236,4 @@ class ParamikoSubmitter(Submitter):
 
         if raise_message:
             raise AutosubmitError(raise_message)
+

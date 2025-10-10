@@ -36,7 +36,6 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
-from autosubmit.job import job_utils
 from autosubmit.job.job_common import Status, increase_wallclock_by_chunk
 from autosubmit.job.job_utils import get_job_package_code, get_split_size_unit, get_split_size
 from autosubmit.job.metrics_processor import UserMetricProcessor
@@ -176,10 +175,10 @@ class Job(object):
     #     return self.name == other.name and self.id == other.id
 
     def __str__(self):
-        return "{0} STATUS: {1}".format(self.name, self.status)
+        return f"{self.name} STATUS: {self.status}"
 
     def __repr__(self):
-        return "{0} STATUS: {1}".format(self.name, self.status)
+        return f"{self.name} STATUS: {self.status}"
 
     def __init__(self, name=None, job_id=None, status=None, priority=None, loaded_data=None):
 
@@ -249,7 +248,7 @@ class Job(object):
         self.check = 'true'
         self.check_warnings = False
         self.packed = False
-        self.hold = False  # type: bool
+        self.hold = False # type: bool
         self.distance_weight = 0
         self.level = 0
         self._export = "none"
@@ -273,10 +272,10 @@ class Job(object):
         self.updated_log = False
         self._log_recovered = False
         self.log_recovered = False
-        self.submit_time_timestamp = None # for wrappers, all jobs inside a wrapper are submitted at the same time
+        self.submit_time_timestamp = None  # for wrappers, all jobs inside a wrapper are submitted at the same time
         self.start_time_timestamp = None
-        self.finish_time_timestamp = None # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
-        self._script = None # Inline code to be executed
+        self.finish_time_timestamp = None  # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
+        self._script = None  # Inline code to be executed
         self._log_recovery_retries = None
         self.ready_date = None
         self.wrapper_name = None
@@ -401,6 +400,7 @@ class Job(object):
     def x11_options(self):
         """Allows to set salloc parameters for x11"""
         return self._x11_options
+
     @x11_options.setter
     def x11_options(self, value):
         self._x11_options = value
@@ -669,11 +669,13 @@ class Job(object):
     @custom_directives.setter
     def custom_directives(self, value):
         self._custom_directives = value
+
     @property  # type: ignore
     @autosubmit_parameter(name='splits')
     def splits(self):
         """Max number of splits."""
         return self._splits
+
     @splits.setter
     def splits(self, value):
         self._splits = value
@@ -718,8 +720,7 @@ class Job(object):
             script_file = open(os.path.join(as_conf.get_project_dir(), script_path), 'r')
         except Exception as e:
             # We stop Autosubmit if we don't find the script
-            raise AutosubmitCritical(F"Extended {error_message_type} script: failed to fetch {str(e)} \n", 7014)
-
+            raise AutosubmitCritical(f"Extended {error_message_type} script: failed to fetch {str(e)} \n", 7014)
         for line in script_file:
             if line[:2] != "#!":
                 script += line
@@ -742,16 +743,12 @@ class Job(object):
                             f"Extended {error_message_type} script: script {script_name} seems Python but job"
                             f" {self.script_name} isn't\n", 7011)
                 else:
-                    # TODO: Check why the fstring is not working for the text below
                     raise AutosubmitCritical(
-                        "Extended {1} script: couldn't figure out script {0} type\n".format(script_name,
-                        error_message_type), 7011)
+                        f"Extended {error_message_type} script: couldn't figure out script {script_name} type\n", 7011)
 
         if not found_hashbang:
-            # TODO: Check why the fstring is not working for the text below
             raise AutosubmitCritical(
-                "Extended {1} script: couldn't figure out script {0} type\n".format(script_name,
-                                                                                    error_message_type), 7011)
+                f"Extended {error_message_type} script: couldn't figure out script {script_name} type\n", 7011)
 
         if is_header:
             script = "\n###############\n# Header script\n###############\n" + script
@@ -1358,13 +1355,9 @@ class Job(object):
             self.write_end_time(self.status == Status.COMPLETED, self.fail_count)
 
     def retrieve_logfiles(self, raise_error: bool = False) -> None:
-        """
-        Retrieves log files from remote host.
+        """Retrieves log files from the remote host.
 
         :param raise_error: If True, raises an error if the log files are not retrieved.
-        :type raise_error: bool
-        :return: Dictionary with finish timestamps per job.
-        :rtype: None
         """
         backup_logname = copy.copy(self.local_logs)
         if self.wrapper_type == "vertical":
@@ -1375,7 +1368,7 @@ class Job(object):
         if not log_recovered:
             self.local_logs = backup_logname
             if raise_error and self.wrapper_name not in self.platform.processed_wrapper_logs:
-                raise AutosubmitCritical("Failed to retrieve logs for job {0}".format(self.name), 6000)
+                raise AutosubmitCritical("Failed to retrieve logs for job {self.name}", 6000)
         else:
             self.write_stats(last_retrial)
             if self.wrapper_type == "vertical":
@@ -1450,57 +1443,54 @@ class Job(object):
         return False
 
     def update_status(self, as_conf: AutosubmitConfig, failed_file: bool = False) -> Status:
-        """
-        Updates job status, checking COMPLETED file if needed
+        """Updates job status, checking COMPLETED file if needed.
 
-        :param as_conf:
+        :param as_conf: Autosubmit configuration.
         :param failed_file: boolean, if True, checks if the job failed
-        :return:
+        :return: The new status.
         """
         previous_status = self.status
         self.prev_status = previous_status
         new_status = self.new_status
         if new_status == Status.COMPLETED:
-            Log.debug(
-                "{0} job seems to have completed: checking...".format(self.name))
+            Log.debug(f"{self.name} job seems to have completed: checking...")
             self._platform.get_completed_files(self.name, wrapper_failed=self.packed)
             self.check_completion()
         else:
             self.status = new_status
+
         if self.status == Status.RUNNING:
-            Log.info("Job {0} is RUNNING", self.name)
+            Log.info(f"Job {self.name} is RUNNING")
         elif self.status == Status.QUEUING:
-            Log.info("Job {0} is QUEUING", self.name)
+            Log.info(f"Job {self.name} is QUEUING")
         elif self.status == Status.HELD:
-            Log.info("Job {0} is HELD", self.name)
+            Log.info(f"Job {self.name} is HELD")
         elif self.status == Status.COMPLETED:
-            Log.result("Job {0} is COMPLETED", self.name)
+            Log.result(f"Job {self.name} is COMPLETED")
         elif self.status == Status.FAILED:
             if not failed_file:
                 if self.status == Status.COMPLETED:
-                    Log.result("Job {0} is COMPLETED", self.name)
+                    Log.result(f"Job {self.name} is COMPLETED")
                 else:
                     self.update_children_status()
         elif self.status == Status.UNKNOWN:
-            Log.printlog("Job {0} is UNKNOWN. Checking completed files to confirm the failure...".format(
-                self.name), 3000)
+            Log.printlog(f"Job {self.name} is UNKNOWN. Checking completed files to confirm the failure...", 3000)
             self._platform.get_completed_files(
                 self.name, wrapper_failed=self.packed)
             self.check_completion(Status.UNKNOWN)
             if self.status == Status.UNKNOWN:
-                Log.printlog("Job {0} is UNKNOWN. Checking completed files to confirm the failure...".format(
-                    self.name), 6009)
+                Log.printlog(f"Job {self.name} is UNKNOWN. Checking completed files to confirm the failure...", 6009)
             elif self.status == Status.COMPLETED:
-                Log.result("Job {0} is COMPLETED", self.name)
+                Log.result(f"Job {self.name} is COMPLETED")
         elif self.status == Status.SUBMITTED:
             # after checking the jobs , no job should have the status "submitted"
-            Log.printlog("Job {0} in SUBMITTED status. This should never happen on this step..".format(
-                self.name), 6008)
+            Log.printlog(f"Job {self.name} in SUBMITTED status. This should never happen on this step..", 6008)
 
         # Updating logs
         if self.status in [Status.COMPLETED, Status.FAILED, Status.UNKNOWN]:
-            if str(as_conf.platforms_data.get(self.platform.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "true":
-                self.retrieve_logfiles(self.platform)
+            if str(as_conf.platforms_data.get(self.platform.name, {}).get('DISABLE_RECOVERY_THREADS',
+                                                                          "false")).lower() == "true":
+                self.retrieve_logfiles(raise_error=True)
             else:
                 self.platform.add_job_to_log_recover(self)
 
@@ -1514,8 +1504,8 @@ class Job(object):
                 last_run_id = (
                     exp_history.manager.get_experiment_run_dc_with_max_id().run_id
                 )
-                metric_procesor = UserMetricProcessor(as_conf, self, last_run_id)
-                metric_procesor.process_metrics()
+                metric_processor = UserMetricProcessor(as_conf, self, last_run_id)
+                metric_processor.process_metrics()
             except Exception as exc:
                 # Warn if metrics are not processed
                 Log.printlog(
@@ -1531,7 +1521,7 @@ class Job(object):
         """
         Returns the submitter corresponding to the communication defined on Autosubmit's config file
         """
-        return ParamikoSubmitter()
+        return ParamikoSubmitter(as_conf=as_conf)
 
     def update_children_status(self):
         children = list(self.children)
@@ -1644,7 +1634,6 @@ class Job(object):
 
         return parameters
 
-
     def process_scheduler_parameters(self, job_platform, chunk):
         """
         Parsers yaml data stored in the dictionary and calculates the components of the heterogeneous job if any
@@ -1656,7 +1645,7 @@ class Job(object):
         else:
             hetsize = 1
         if type(self.nodes) is list:
-            hetsize = max(hetsize,len(self.nodes))
+            hetsize = max(hetsize, len(self.nodes))
         self.het['HETSIZE'] = hetsize
         self.het['PROCESSORS'] = list()
         self.het['NODES'] = list()
@@ -1945,8 +1934,7 @@ class Job(object):
             parameters['EXTENDED_HEADER'] = self.read_header_tailer_script(self.ext_header_path, as_conf, True)
             parameters['EXTENDED_TAILER'] = self.read_header_tailer_script(self.ext_tailer_path, as_conf, False)
         elif self.ext_header_path or self.ext_tailer_path:
-            Log.warning("An extended header or tailer is defined in {0}, but it is ignored in dummy projects.",
-                        self._section)
+            Log.warning(f"An extended header or tailer is defined in {self._section}, but it is ignored in dummy projects.")
         else:
             parameters['EXTENDED_HEADER'] = ""
             parameters['EXTENDED_TAILER'] = ""
@@ -2266,7 +2254,8 @@ class Job(object):
 
         return parameters
 
-    def update_parameters(self, as_conf: AutosubmitConfig, set_attributes: bool = False, reset_logs: bool = False) -> dict:
+    def update_parameters(self, as_conf: AutosubmitConfig, set_attributes: bool = False,
+                          reset_logs: bool = False) -> dict:
         """
         Refresh the job's parameters value.
 
@@ -2297,7 +2286,8 @@ class Job(object):
         parameters = as_conf.load_parameters()
         parameters = self.update_current_parameters(as_conf, parameters)
         parameters = self.update_job_parameters(as_conf, parameters, set_attributes)
-        parameters = self.update_platform_associated_parameters(as_conf, parameters, parameters['CHUNK'], set_attributes)
+        parameters = self.update_platform_associated_parameters(as_conf, parameters, parameters['CHUNK'],
+                                                                set_attributes)
         parameters = self.update_wrapper_parameters(as_conf, parameters)
         parameters = self.update_placeholders(as_conf, parameters, replace_by_empty=True)
         parameters.update(as_conf.default_parameters)
@@ -2310,8 +2300,7 @@ class Job(object):
 
     def init_platform(self, as_conf: AutosubmitConfig) -> None:
         if not self.platform:
-            submitter = job_utils._get_submitter(as_conf)
-            submitter.load_platforms(as_conf)
+            submitter = ParamikoSubmitter(as_conf=as_conf)
             if not self.platform_name:
                 self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
             self.platform = submitter.platforms.get(self.platform_name)
@@ -2391,13 +2380,20 @@ class Job(object):
         try:
             if len(reason.split('(', 1)) > 1:
                 reason = reason.split('(', 1)[1].split(')')[0]
-                if 'Invalid' in reason or reason in ['AssociationJobLimit', 'AssociationResourceLimit', 'AssociationTimeLimit',
-                                                     'BadConstraints', 'QOSMaxCpuMinutesPerJobLimit', 'QOSMaxWallDurationPerJobLimit',
-                                                     'QOSMaxNodePerJobLimit', 'DependencyNeverSatisfied', 'QOSMaxMemoryPerJob',
-                                                     'QOSMaxMemoryPerNode', 'QOSMaxMemoryMinutesPerJob', 'QOSMaxNodeMinutesPerJob',
-                                                     'InactiveLimit', 'JobLaunchFailure', 'NonZeroExitCode', 'PartitionNodeLimit',
-                                                     'PartitionTimeLimit', 'SystemFailure', 'TimeLimit', 'QOSUsageThreshold',
-                                                     'QOSTimeLimit','QOSResourceLimit','QOSJobLimit','InvalidQOS','InvalidAccount']:
+                if 'Invalid' in reason or reason in ['AssociationJobLimit', 'AssociationResourceLimit',
+                                                     'AssociationTimeLimit',
+                                                     'BadConstraints', 'QOSMaxCpuMinutesPerJobLimit',
+                                                     'QOSMaxWallDurationPerJobLimit',
+                                                     'QOSMaxNodePerJobLimit', 'DependencyNeverSatisfied',
+                                                     'QOSMaxMemoryPerJob',
+                                                     'QOSMaxMemoryPerNode', 'QOSMaxMemoryMinutesPerJob',
+                                                     'QOSMaxNodeMinutesPerJob',
+                                                     'InactiveLimit', 'JobLaunchFailure', 'NonZeroExitCode',
+                                                     'PartitionNodeLimit',
+                                                     'PartitionTimeLimit', 'SystemFailure', 'TimeLimit',
+                                                     'QOSUsageThreshold',
+                                                     'QOSTimeLimit', 'QOSResourceLimit', 'QOSJobLimit', 'InvalidQOS',
+                                                     'InvalidAccount']:
                     return True
             return False
         except Exception:
@@ -2446,7 +2442,7 @@ class Job(object):
             content: str,
             parameters: dict,
             as_conf: AutosubmitConfig,
-            undefined_variables: list[str] = list()
+            undefined_variables: list[str] = None
     ) -> str:
         """
         Replace placeholders in the template content.
@@ -2462,6 +2458,8 @@ class Job(object):
         :return: Content with placeholders substituted.
         :rtype: str
         """
+        if undefined_variables is None:
+            undefined_variables = []
 
         placeholders = re.findall(r'%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', content, flags=re.IGNORECASE)
         for placeholder in placeholders:
@@ -2516,12 +2514,12 @@ class Job(object):
         template_content = self.get_wrapped_content(as_conf, parameters)
         for key, value in parameters.items():
             template_content = re.sub(
-                '%(?<!%%)' + key + '%(?!%%)', str(parameters[key]), template_content,flags=re.I)
+                '%(?<!%%)' + key + '%(?!%%)', str(parameters[key]), template_content, flags=re.I)
         for variable in self.undefined_variables:
             template_content = re.sub(
-                '%(?<!%%)' + variable + '%(?!%%)', '', template_content,flags=re.I)
+                '%(?<!%%)' + variable + '%(?!%%)', '', template_content, flags=re.I)
         template_content = template_content.replace("%%", "%")
-        script_name = '{0}.{1}.cmd'.format(self.name, wrapper_tag)
+        script_name = f'{self.name}.{wrapper_tag}.cmd'
         open(os.path.join(self._tmp_path, script_name),
              'w').write(template_content)
         os.chmod(os.path.join(self._tmp_path, script_name), 0o755)
@@ -2554,7 +2552,9 @@ class Job(object):
                              "of parameters set, and will be replaced by a blank value: {0}".format(
                                 self.undefined_variables), 5013)
                 if not set(variables).issuperset(set(parameters)):
-                    Log.printlog(f"The following set of variables are not being used in the templates: {str(set(parameters) - set(variables))}", 5013)
+                    Log.printlog(
+                        f"The following set of variables are not being used in the templates: {str(set(parameters) - set(variables))}",
+                        5013)
 
         return out
 
@@ -2601,7 +2601,8 @@ class Job(object):
                 f.write(self.submit_time_timestamp)
 
         # Writing database
-        exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
+        exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
+                                        historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
         exp_history.write_submit_time(self.name, submit=data_time[1],
                                       status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), ncpus=self.processors,
                                       wallclock=self.wallclock, qos=self.queue, date=self.date, member=self.member,
@@ -2611,14 +2612,14 @@ class Job(object):
                                       children=self.children_names_str, workflow_commit=self.workflow_commit)
 
     def update_start_time(self, count=-1):
-        start_time_ = self.check_start_time(count) # last known start time from the .cmd file
+        start_time_ = self.check_start_time(count)  # last known start time from the .cmd file
         if start_time_:
             self.start_time_timestamp = start_time_
         else:
             Log.warning(f"Start time for job {self.name} not found in the .cmd file, using last known time.")
             self.start_time_timestamp = self.start_time_timestamp if self.start_time_timestamp else time.time()
         if count > 0 or self.wrapper_name in self.platform.processed_wrapper_logs:
-            self.submit_time_timestamp = date2str(datetime.datetime.fromtimestamp(self.start_time_timestamp),'S')
+            self.submit_time_timestamp = date2str(datetime.datetime.fromtimestamp(self.start_time_timestamp), 'S')
 
     def fix_local_logs_timestamps(self, current_timestamp: str, new_timestamp: str) -> None:
         """
@@ -2659,9 +2660,13 @@ class Job(object):
         # noinspection PyTypeChecker
         f.write(date2str(datetime.datetime.fromtimestamp(self.start_time_timestamp), 'S'))
         # Writing database
-        exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-        exp_history.write_start_time(self.name, start=self.start_time_timestamp, status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"),  qos=self.queue, job_id=self.id, wrapper_queue=self._wrapper_queue, wrapper_code=get_job_package_code(self.expid, self.name),
-                                children=self.children_names_str)
+        exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
+                                        historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
+        exp_history.write_start_time(self.name, start=self.start_time_timestamp,
+                                     status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), qos=self.queue,
+                                     job_id=self.id, wrapper_queue=self._wrapper_queue,
+                                     wrapper_code=get_job_package_code(self.expid, self.name),
+                                     children=self.children_names_str)
         return True
 
     def write_vertical_time(
@@ -2702,12 +2707,16 @@ class Job(object):
                 stat_file.write('FAILED')
         out, err = self.local_logs
         # Launch first as simple non-threaded function
-        exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-        job_data_dc = exp_history.write_finish_time(self.name, finish=self.finish_time_timestamp, status=final_status, job_id=self.id, out_file=out, err_file=err)
+        exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
+                                        historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
+        job_data_dc = exp_history.write_finish_time(self.name, finish=self.finish_time_timestamp, status=final_status,
+                                                    job_id=self.id, out_file=out, err_file=err)
 
         # Launch second as threaded function only for slurm
         if job_data_dc and type(self.platform) is not str and self.platform.type == "slurm":
-            thread_write_finish = Thread(target=ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR).write_platform_data_after_finish, args=(job_data_dc, self.platform))
+            thread_write_finish = Thread(target=ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
+                                                                  historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR).write_platform_data_after_finish,
+                                         args=(job_data_dc, self.platform))
             thread_write_finish.name = "JOB_data_{}".format(self.name)
             thread_write_finish.start()
 
@@ -2760,9 +2769,7 @@ class Job(object):
                 return True
         return False
 
-    def synchronize_logs(
-        self, platform: "Platform", remote_logs, local_logs, last=True
-    ):
+    def synchronize_logs(self, platform: 'Platform', remote_logs, local_logs, last=True):
         platform.move_file(remote_logs[0], local_logs[0], True)  # .out
         platform.move_file(remote_logs[1], local_logs[1], True)  # .err
         if last and local_logs[0] != "":
@@ -2808,10 +2815,12 @@ class Job(object):
                     if line_info and line_info[0].isdigit():
                         self.ready_date = line_info[0]
                     else:
-                        self.ready_date = datetime.datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
+                        self.ready_date = datetime.datetime.fromtimestamp(stat_file.stat().st_mtime).strftime(
+                            '%Y%m%d%H%M%S')
                         Log.debug(f"Failed to recover ready date for the job {self.name}")
                 else:  # Default to last mod time
-                    self.ready_date = datetime.datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
+                    self.ready_date = datetime.datetime.fromtimestamp(stat_file.stat().st_mtime).strftime(
+                        '%Y%m%d%H%M%S')
                     Log.debug(f"Failed to recover ready date for the job {self.name}")
 
 
@@ -2831,16 +2840,16 @@ class WrapperJob(Job):
     """
 
     def __init__(
-        self,
-        name: str,
-        job_id: int,
-        status: str,
-        priority: int,
-        job_list: List[Job],
-        total_wallclock: str,
-        platform: 'ParamikoPlatform',
-        as_config: AutosubmitConfig,
-        hold: bool,
+            self,
+            name: str,
+            job_id: int,
+            status: str,
+            priority: int,
+            job_list: List[Job],
+            total_wallclock: str,
+            platform: 'ParamikoPlatform',
+            as_config: AutosubmitConfig,
+            hold: bool,
     ):
         super(WrapperJob, self).__init__(name, job_id, status, priority)
         self.failed = False
@@ -2865,13 +2874,20 @@ class WrapperJob(Job):
         try:
             if len(reason.split('(', 1)) > 1:
                 reason = reason.split('(', 1)[1].split(')')[0]
-                if 'Invalid' in reason or reason in ['AssociationJobLimit', 'AssociationResourceLimit', 'AssociationTimeLimit',
-                                                     'BadConstraints', 'QOSMaxCpuMinutesPerJobLimit', 'QOSMaxWallDurationPerJobLimit',
-                                                     'QOSMaxNodePerJobLimit', 'DependencyNeverSatisfied', 'QOSMaxMemoryPerJob',
-                                                     'QOSMaxMemoryPerNode', 'QOSMaxMemoryMinutesPerJob', 'QOSMaxNodeMinutesPerJob',
-                                                     'InactiveLimit', 'JobLaunchFailure', 'NonZeroExitCode', 'PartitionNodeLimit',
-                                                     'PartitionTimeLimit', 'SystemFailure', 'TimeLimit', 'QOSUsageThreshold',
-                                                     'QOSTimeLimit','QOSResourceLimit','QOSJobLimit','InvalidQOS','InvalidAccount']:
+                if 'Invalid' in reason or reason in ['AssociationJobLimit', 'AssociationResourceLimit',
+                                                     'AssociationTimeLimit',
+                                                     'BadConstraints', 'QOSMaxCpuMinutesPerJobLimit',
+                                                     'QOSMaxWallDurationPerJobLimit',
+                                                     'QOSMaxNodePerJobLimit', 'DependencyNeverSatisfied',
+                                                     'QOSMaxMemoryPerJob',
+                                                     'QOSMaxMemoryPerNode', 'QOSMaxMemoryMinutesPerJob',
+                                                     'QOSMaxNodeMinutesPerJob',
+                                                     'InactiveLimit', 'JobLaunchFailure', 'NonZeroExitCode',
+                                                     'PartitionNodeLimit',
+                                                     'PartitionTimeLimit', 'SystemFailure', 'TimeLimit',
+                                                     'QOSUsageThreshold',
+                                                     'QOSTimeLimit', 'QOSResourceLimit', 'QOSJobLimit', 'InvalidQOS',
+                                                     'InvalidAccount']:
                     return True
             return False
         except Exception:
@@ -2908,8 +2924,8 @@ class WrapperJob(Job):
         # Fail can come from check function or running/completed checkers.
         if self.status in [Status.FAILED, Status.UNKNOWN]:
             self.status = Status.FAILED
-            if self.prev_status in [Status.SUBMITTED,Status.QUEUING]:
-                self.update_failed_jobs(True) # check false ready jobs
+            if self.prev_status in [Status.SUBMITTED, Status.QUEUING]:
+                self.update_failed_jobs(True)  # check false ready jobs
             elif self.prev_status in [Status.FAILED, Status.UNKNOWN]:
                 self.failed = True
                 self._check_running_jobs()
@@ -2918,9 +2934,9 @@ class WrapperJob(Job):
                 if not self.failed:
                     if self._platform.check_file_exists('WRAPPER_FAILED', wrapper_failed=True):
                         for job in self.inner_jobs_running:
-                            if job.platform.check_file_exists('{0}_FAILED'.format(job.name), wrapper_failed=True):
+                            if job.platform.check_file_exists(f'{job.name}_FAILED', wrapper_failed=True):
                                 Log.info(
-                                    "Wrapper {0} Failed, checking inner_jobs...".format(self.name))
+                                    f"Wrapper {self.name} Failed, checking inner_jobs...")
                                 self.failed = True
                                 self._platform.delete_file('WRAPPER_FAILED')
                                 break
@@ -2979,8 +2995,8 @@ class WrapperJob(Job):
             reason = self._platform.parse_queue_reason(
                 self._platform._ssh_output, self.id)
             if self._queuing_reason_cancel(reason):
-                Log.printlog("Job {0} will be cancelled and set to FAILED as it was queuing due to {1}".format(
-                    self.name, reason), 6009)
+                Log.printlog(f"Job {self.name} will be cancelled and set to FAILED as it was queuing due to {reason}",
+                             6009)
                 # while running jobs?
                 self._check_running_jobs()
                 self.update_failed_jobs(check_ready_jobs=True)
@@ -2991,24 +3007,24 @@ class WrapperJob(Job):
                 if self.hold == "false":
                     # SHOULD BE MORE CLASS
                     # GET_scontrol release but not sure if this can be implemented on others PLATFORMS
-                    self._platform.send_command("scontrol release " + "{0}".format(self.id))
+                    self._platform.send_command("scontrol release " + f"{self.id}")
                     self.new_status = Status.QUEUING
                     for job in self.job_list:
                         job.hold = self.hold
                         job.new_status = Status.QUEUING
                         job.update_status(self.as_config)
-                    Log.info("Job {0} is QUEUING {1}", self.name, reason)
+                    Log.info(f"Job {self.name} is QUEUING {reason}")
                 else:
                     self.status = Status.HELD
-                    Log.info("Job {0} is HELD", self.name)
+                    Log.info(f"Job {self.name} is HELD")
             elif reason == '(JobHeldAdmin)':
                 Log.debug(
-                    "Job {0} Failed to be HELD, canceling... ", self.name)
+                    f"Job {self.name} Failed to be HELD, canceling... ", )
                 self._platform.send_command(
-                    self._platform.cancel_cmd + " {0}".format(self.id))
+                    self._platform.cancel_cmd + f" {self.id}")
                 self.status = Status.WAITING
             else:
-                Log.info("Job {0} is QUEUING {1}", self.name, reason)
+                Log.info(f"Job {self.name} is QUEUING {reason}")
         if prev_status != self.status:
             for job in self.job_list:
                 job.hold = self.hold
@@ -3025,8 +3041,8 @@ class WrapperJob(Job):
         start_time = self.running_jobs_start[job]
         if self._is_over_wallclock(start_time, job.wallclock):
             if job.wrapper_type != "vertical":
-                Log.printlog("Job {0} inside wrapper {1} is running for longer than it's wallclock!".format(
-                    job.name, self.name), 6009)
+                Log.printlog(f"Job {job.name} inside wrapper {self.name} is running for longer than it's wallclock!",
+                             6009)
             return True
         return False
 
@@ -3077,9 +3093,13 @@ class WrapperJob(Job):
                 os.chmod(log_dir, 0o770)
             open(multiple_checker_inner_jobs, 'w+').write(command)
             os.chmod(multiple_checker_inner_jobs, 0o770)
-            self._platform.send_file(multiple_checker_inner_jobs, False)
-            command = (f"cd {self._platform.get_files_path()}; "
-                       f"{os.path.join(self._platform.get_files_path(), 'inner_jobs_checker.sh')}")
+            if self.platform.name != "local":  # already "sent"...
+                self._platform.send_file(multiple_checker_inner_jobs, False)
+                command = (f"cd {self._platform.get_files_path()}; "
+                           f"{os.path.join(self._platform.get_files_path(), 'inner_jobs_checker.sh')}")
+            else:
+                command = f"cd {self._platform.get_files_path()}; ./inner_jobs_checker.sh; cd {os.getcwd()}"
+            #
             wait = 2
             retries = 5
             over_wallclock = False
@@ -3096,33 +3116,31 @@ class WrapperJob(Job):
                         if len(out) > 1:
                             if job not in self.running_jobs_start:
                                 start_time = self._check_time(out, 1)
-                                Log.info("Job {0} started at {1}".format(
-                                    job_name, str(parse_date(start_time))))
+                                Log.info(f"Job {job_name} started at {str(parse_date(start_time))}")
                                 self.running_jobs_start[job] = start_time
                                 job.new_status = Status.RUNNING
-                                #job.status = Status.RUNNING
+                                # job.status = Status.RUNNING
                                 job.update_status(self.as_config)
                             if len(out) == 2:
-                                Log.info("Job {0} is RUNNING".format(job_name))
+                                Log.info(f"Job {job_name} is RUNNING")
                                 over_wallclock = self._check_inner_job_wallclock(
                                     job)  # messaged included
                                 if over_wallclock:
                                     if job.wrapper_type != "vertical":
                                         job.status = Status.FAILED
                                         Log.printlog(
-                                            "Job {0} is FAILED".format(job_name), 6009)
+                                            f"Job {job_name} is FAILED", 6009)
                             elif len(out) == 3:
                                 end_time = self._check_time(out, 2)
                                 self._check_finished_job(job)
-                                Log.info("Job {0} finished at {1}".format(
-                                    job_name, str(parse_date(end_time))))
+                                Log.info(f"Job {job_name} finished at {str(parse_date(end_time))}")
                 if content == '':
                     sleep(wait)
                 retries = retries - 1
             if retries == 0 or over_wallclock:
                 self.status = Status.FAILED
 
-    def _check_finished_job(self, job: Job, failed_file: bool = False) -> None:
+    def _check_finished_job(self, job: 'Job', failed_file: bool = False) -> None:
         """Will set the jobs status to failed, unless they're completed, in which,
         the function will change it to complete.
 
@@ -3139,7 +3157,7 @@ class WrapperJob(Job):
                 if output is None or len(output) == 0:
                     sleep(wait)
                 retries = retries - 1
-            if (output is not None and len(str(output)) > 0 ) or 'COMPLETED' in output:
+            if (output is not None and len(str(output)) > 0) or 'COMPLETED' in output:
                 job.new_status = Status.COMPLETED
             else:
                 failed_file = True
@@ -3155,11 +3173,12 @@ class WrapperJob(Job):
         running_jobs = self.inner_jobs_running
         real_running = copy.deepcopy(self.inner_jobs_running)
         if check_ready_jobs:
-            running_jobs += [job for job in self.job_list if job.status == Status.READY or job.status == Status.SUBMITTED or job.status == Status.QUEUING]
+            running_jobs += [job for job in self.job_list if
+                             job.status == Status.READY or job.status == Status.SUBMITTED or job.status == Status.QUEUING]
         self.inner_jobs_running = list()
         for job in running_jobs:
-            if job.platform.check_file_exists('{0}_FAILED'.format(job.name), wrapper_failed=True, max_retries=2):
-                if job.platform.get_file('{0}_FAILED'.format(job.name), False, wrapper_failed=True):
+            if job.platform.check_file_exists(f'{job.name}_FAILED', wrapper_failed=True, max_retries=2):
+                if job.platform.get_file(f'{job.name}_FAILED', False, wrapper_failed=True):
                     self._check_finished_job(job, True)
             else:
                 if job in real_running:

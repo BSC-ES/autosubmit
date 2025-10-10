@@ -187,3 +187,49 @@ def test_check_conf_files_errors(error: Exception, expected: Exception,
     mocker.patch.object(as_conf, 'reload', side_effect=error)
     with pytest.raises(expected):
         as_conf.reload.side_effect = as_conf.check_conf_files()
+
+@pytest.mark.parametrize(
+    'experiment_job,expected',
+    [
+        [{
+            'JOBS': {
+                'A': {
+                    'RUNNING': 'once',
+                    'FILE': 'test.sh'
+                }
+            }
+        }, False],
+        [{
+            'JOBS': {
+                'A': {
+                    'RUNNING': 'once',
+                    'FILE': 'test.sh',
+                    'CHECK': 'False',
+                }
+            }
+        }, False],
+        [{
+            'JOBS': {
+                'A': {
+                    'RUNNING': 'once',
+                    'FILE': 'test.sh',
+                    'CHECK': 'ON_SUBMISSION',
+                }
+            }
+        }, True],
+        [{
+            'JOBS': {
+                'A': {
+                    'SCRIPT': '',
+                    'RUNNING': 'once',
+                    'FILE': 'test.sh',
+                    'RERUN_DEPENDENCIES': 'RUNNING A'
+                }
+            }
+        }, True]
+    ]
+)
+def test_set_version(autosubmit_config: 'AutosubmitConfigFactory', experiment_job, expected):
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data=experiment_job)
+    as_conf.ignore_file_path = True
+    assert as_conf.check_jobs_conf() == expected

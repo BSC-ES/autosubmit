@@ -33,24 +33,7 @@ if TYPE_CHECKING:
 
 
 class LocalPlatform(ParamikoPlatform):
-    """
-    Class to manage jobs to localhost
-
-    :param expid: experiment's identifier
-    :type expid: str
-    """
-
-    def submit_Script(self, hold=False):
-        pass  # pragma: no cover
-
-    def parse_Alljobs_output(self, output, job_id):
-        pass  # pragma: no cover
-
-    def parse_queue_reason(self, output, job_id):
-        pass  # pragma: no cover
-
-    def get_checkAlljobs_cmd(self, jobs_id):
-        pass  # pragma: no cover
+    """Class to manage jobs to localhost."""
 
     def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
         ParamikoPlatform.__init__(self, expid, name, config, auth_password=auth_password)
@@ -71,13 +54,23 @@ class LocalPlatform(ParamikoPlatform):
 
         self.update_cmds()
 
+    def submit_script(self, hold=False):
+        pass
+
+    def parse_all_jobs_output(self, output, job_id):
+        pass
+
+    def parse_queue_reason(self, output, job_id):
+        pass
+
+    def get_check_all_jobs_cmd(self, jobs_id):
+        pass
+
     def create_a_new_copy(self):
         return LocalPlatform(self.expid, self.name, self.config)
 
     def update_cmds(self):
-        """
-        Updates commands for platforms
-        """
+        """Updates commands for platforms."""
         self.root_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "tmp", 'LOG_' + self.expid)
         self.cancel_cmd = "kill -SIGINT"
@@ -115,7 +108,7 @@ class LocalPlatform(ParamikoPlatform):
         command = self.get_call(job_script, job, export=export, timeout=seconds)
         return f"cd {self.remote_log_dir} ; {command}"
 
-    def get_checkjob_cmd(self, job_id):
+    def get_check_job_cmd(self, job_id):
         return self.get_pscall(job_id)
 
     def write_jobid(self, jobid: str, complete_path: str) -> None:
@@ -142,8 +135,7 @@ class LocalPlatform(ParamikoPlatform):
             Log.error("Writing Job Id Failed : " + str(exc))
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
-        """
-        Establishes an SSH connection to the host.
+        """Establishes an SSH connection to the host.
 
         :param as_conf: The Autosubmit configuration object.
         :param reconnect: Indicates whether to attempt reconnection if the initial connection fails.
@@ -159,8 +151,7 @@ class LocalPlatform(ParamikoPlatform):
             self.connect(as_conf)
 
     def restore_connection(self, as_conf: 'AutosubmitConfig', log_recovery_process: bool = False) -> None:
-        """
-        Restores the SSH connection to the platform.
+        """Restores the SSH connection to the platform.
 
         :param as_conf: The Autosubmit configuration object used to establish the connection.
         :type as_conf: AutosubmitConfig
@@ -169,11 +160,12 @@ class LocalPlatform(ParamikoPlatform):
         """
         self.connected = True
 
-    def check_Alljobs(self, job_list, as_conf, retries=5):
+    def check_all_jobs(self, job_list, as_conf, retries=5):
         for job, prev_job_status in job_list:
             self.check_job(job)
 
     def send_command(self, command, ignore_log=False, x11=False) -> bool:
+
         lang = locale.getlocale()[1]
         if lang is None:
             lang = locale.getdefaultlocale()[1]
@@ -183,16 +175,15 @@ class LocalPlatform(ParamikoPlatform):
             output = subprocess.check_output(command.encode(lang), shell=True)
         except subprocess.CalledProcessError as e:
             if not ignore_log:
-                Log.error('Could not execute command {0} on {1}'.format(e.cmd, self.host))
+                Log.error(f'Could not execute command {e.cmd} on {self.host}')
             return False
         self._ssh_output = output.decode(lang)
-        Log.debug("Command '{0}': {1}", command, self._ssh_output)
+        Log.debug(f"Command '{command}': {self._ssh_output}")
 
         return True
 
     def send_file(self, filename: str, check: bool = True) -> bool:
-        """
-        Sends a file to a specified location using a command.
+        """Sends a file to a specified location using a command.
 
         :param filename: The name of the file to send.
         :type filename: str
@@ -201,19 +192,19 @@ class LocalPlatform(ParamikoPlatform):
         :return: True if the file was sent successfully.
         :rtype: bool
         """
-        command = f'{self.put_cmd} {os.path.join(self.tmp_path, Path(filename).name)} {os.path.join(self.tmp_path, "LOG_" + self.expid, Path(filename).name)}; chmod 770 {os.path.join(self.tmp_path, "LOG_" + self.expid, Path(filename).name)}'
+        command = (f'{self.put_cmd} {os.path.join(self.tmp_path, Path(filename).name)} '
+                   f'{os.path.join(self.tmp_path, "LOG_" + self.expid, Path(filename).name)}; '
+                   f'chmod 770 {os.path.join(self.tmp_path, "LOG_" + self.expid, Path(filename).name)}')
         try:
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError:
-            Log.error('Could not send file {0} to {1}'.format(os.path.join(self.tmp_path, filename),
-                                                              os.path.join(self.tmp_path, 'LOG_' + self.expid,
-                                                                           filename)))
+            Log.error(
+                f'Could not send file {os.path.join(self.tmp_path, filename)} to {os.path.join(self.tmp_path, f"LOG_{self.expid}", filename)}')
             raise
         return True
 
     def remove_multiple_files(self, filenames: str) -> str:
-        """
-        Creates a shell script to remove multiple files in the remote and sets the appropriate permissions.
+        """Creates a shell script to remove multiple files in the remote and sets the appropriate permissions.
 
         :param filenames: A string containing the filenames to be removed.
         :type filenames: str
@@ -221,7 +212,7 @@ class LocalPlatform(ParamikoPlatform):
         :rtype: str
         """
         # This function is a copy of the slurm one
-        log_dir = os.path.join(self.tmp_path, 'LOG_{0}'.format(self.expid))
+        log_dir = os.path.join(self.tmp_path, f'LOG_{self.expid}')
         multiple_delete_previous_run = os.path.join(
             log_dir, "multiple_delete_previous_run.sh")
         if os.path.exists(log_dir):
@@ -239,14 +230,12 @@ class LocalPlatform(ParamikoPlatform):
         file_path = os.path.join(local_path, filename)
         if os.path.exists(file_path):
             os.remove(file_path)
-
-        command = '{0} {1} {2}'.format(self.get_cmd, os.path.join(self.tmp_path, 'LOG_' + self.expid, filename),
-                                       file_path)
+        command = f'{self.get_cmd} {os.path.join(self.tmp_path, f"LOG_{self.expid}", filename)} {file_path}'
         try:
             subprocess.check_call(command, stdout=open(os.devnull, 'w'), stderr=open(os.devnull, 'w'), shell=True)
         except subprocess.CalledProcessError:
             if must_exist:
-                raise Exception('File {0} does not exists'.format(filename))
+                raise Exception(f'File {filename} does not exists')
             return False
         return True
 
@@ -256,8 +245,7 @@ class LocalPlatform(ParamikoPlatform):
     # Moves .err .out
     def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 1,
                           max_retries: int = 1) -> bool:
-        """
-        Checks if a file exists in the platform.
+        """Checks if a file exists in the platform.
 
         :param src: source name.
         :type src: str
@@ -276,25 +264,24 @@ class LocalPlatform(ParamikoPlatform):
             if os.path.isfile(os.path.join(self.get_files_path(), src)):
                 return True
             sleep(sleeptime)
-        Log.warning("File {0} does not exist".format(src))
+        Log.warning(f"File {src} does not exist")
         return False
 
-    def delete_file(self, filename: str, del_cmd: bool = False) -> bool:
+    def delete_file(self, filename, del_cmd=False):
         if del_cmd:
-            command = '{0} {1}'.format(self.del_cmd, os.path.join(self.tmp_path, "LOG_" + self.expid, filename))
+            command = f'{self.del_cmd} {os.path.join(self.tmp_path, "LOG_" + self.expid, filename)}'
         else:
-            command = '{0} {1}'.format(self.del_cmd, os.path.join(self.tmp_path, "LOG_" + self.expid, filename))
-            command += ' ; {0} {1}'.format(self.del_cmd, os.path.join(self.tmp_path, filename))
+            command = f'{self.del_cmd} {os.path.join(self.tmp_path, "LOG_" + self.expid, filename)}'
+            command += f' ; {self.del_cmd} {os.path.join(self.tmp_path, filename)}'
         try:
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError:
-            Log.debug('Could not remove file {0}'.format(os.path.join(self.tmp_path, filename)))
+            Log.debug(f'Could not remove file {os.path.join(self.tmp_path, filename)}')
             return False
         return True
 
     def move_file(self, src, dest, must_exist=False):
-        """
-        Moves a file on the platform (includes .err and .out)
+        """Moves a file on the platform (includes .err and .out)
 
         :param src: source name.
         :type src: str
@@ -310,21 +297,17 @@ class LocalPlatform(ParamikoPlatform):
             return True
         except IOError as e:
             if must_exist:
-                raise AutosubmitError("File {0} does not exists".format(
-                    os.path.join(path_root, src)), 6004, str(e))
+                raise AutosubmitError(f"File {os.path.join(path_root, src)} does not exists", 6004, str(e))
             else:
-                Log.debug("File {0} doesn't exists ".format(path_root))
+                Log.debug(f"File {path_root} doesn't exists ")
                 return False
         except Exception as e:
             if str(e) in "Garbage":
-                raise AutosubmitError('File {0} does not exists'.format(
-                    os.path.join(self.get_files_path(), src)), 6004, str(e))
+                raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exists', 6004, str(e))
             if must_exist:
-                raise AutosubmitError("File {0} does not exists".format(
-                    os.path.join(self.get_files_path(), src)), 6004, str(e))
+                raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exists", 6004, str(e))
             else:
-                Log.printlog("Log file couldn't be moved: {0}".format(
-                    os.path.join(self.get_files_path(), src)), 5001)
+                Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
                 return False
 
     def get_ssh_output(self):
@@ -334,14 +317,11 @@ class LocalPlatform(ParamikoPlatform):
         return self._ssh_output_err
 
     def get_logs_files(self, exp_id: str, remote_logs: tuple[str, str]) -> None:
-        """
-        Do nothing because the log files are already in the local platform (redundancy).
-        """
+        """Do nothing because the log files are already in the local platform (redundancy)."""
         return
 
-    def check_completed_files(self, sections: str = None) -> str:
-        """
-        Checks for completed files in the remote log directory.
+    def check_completed_files(self, sections: str = None) -> Optional[str]:
+        """Checks for completed files in the remote log directory.
         This function is used to check inner_jobs of a wrapper.
 
         :param sections: Space-separated string of sections to check for completed files. Defaults to None.
@@ -361,32 +341,31 @@ class LocalPlatform(ParamikoPlatform):
 
         if self.send_command(command, True):
             return self._ssh_output
-        else:
-            return None
+        return None
 
-    def get_file_size(self, src: str) -> Union[int, None]:
-        """
-        Get file size in bytes
+    def get_file_size(self, src: Union[str, Path]) -> Union[int, None]:
+        """Get file size in bytes
+
         :param src: file path
         """
         try:
             return Path(src).stat().st_size
-        except Exception:
-            Log.debug(f"Error getting file size for {src}")
-            return None
+        except Exception as e:
+            Log.debug(f"Error getting file size for {src}: {str(e)}")
+        return None
 
-    def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
-        """
-        Read file content as bytes. If max_size is set, only the first max_size bytes are read.
+    def read_file(self, src: Union[str, Path], max_size: int = None) -> Union[bytes, None]:
+        """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
+
         :param src: file path
         :param max_size: maximum size to read
         """
         try:
             with open(src, "rb") as f:
                 return f.read(max_size)
-        except Exception:
-            Log.debug(f"Error reading file {src}")
-            return None
+        except Exception as e:
+            Log.debug(f"Error reading file {src}: {str(e)}")
+        return None
 
     def compress_file(self, file_path: str) -> None:
         Log.debug(f"Compressing file {file_path} using {self.remote_logs_compress_type}")
@@ -405,5 +384,4 @@ class LocalPlatform(ParamikoPlatform):
             return output
         except Exception as exc:
             Log.error(f"Error compressing file {file_path}: {exc}")
-
         return None

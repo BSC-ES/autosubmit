@@ -21,7 +21,7 @@ in the ``test/unit`` directory."""
 from dataclasses import dataclass
 from getpass import getuser
 from pathlib import Path
-from typing import cast, Optional, Protocol, Union, TYPE_CHECKING
+from typing import cast, Generator, Optional, Protocol, Union, TYPE_CHECKING
 
 import pytest
 
@@ -54,7 +54,7 @@ class ExperimentPlatformServer:
 
 
 @pytest.fixture(scope='module', autouse=True)
-def ssh_config() -> None:
+def ssh_config() -> Generator[Path, None, None]:
     # Paramiko platform relies on parsing the SSH config file, failing if it does not exist.
     ssh_config = Path('~/.ssh/config').expanduser()
     delete_ssh_config = False
@@ -69,9 +69,11 @@ def ssh_config() -> None:
 
 
 @pytest.fixture()
-def exp_platform_server(autosubmit_exp, ssh_server) -> ExperimentPlatformServer:
+def exp_platform_server(autosubmit_exp, ssh_server, request) -> ExperimentPlatformServer:
     """Fixture that returns an Autosubmit experiment, a platform, and the (Docker) server used."""
     user = getuser()
+    test_name = request.node.name
+    platform_scratch_dir = Path(_PLATFORM_REMOTE_DIR, test_name)
     exp = autosubmit_exp(_EXPID, experiment_data={
         'PLATFORMS': {
             _PLATFORM_NAME: {
@@ -79,7 +81,7 @@ def exp_platform_server(autosubmit_exp, ssh_server) -> ExperimentPlatformServer:
                 'HOST': ssh_server.get_docker_client().host(),
                 'PROJECT': _PLATFORM_PROJECT,
                 'USER': user,
-                'SCRATCH_DIR': _PLATFORM_REMOTE_DIR,
+                'SCRATCH_DIR': str(platform_scratch_dir),
                 'ADD_PROJECT_TO_HOST': 'False',
                 'MAX_WALLCLOCK': '48:00',
                 'DISABLE_RECOVERY_THREADS': 'True'
@@ -103,8 +105,7 @@ def exp_platform_server(autosubmit_exp, ssh_server) -> ExperimentPlatformServer:
     # NOTE: The set up of platforms is done partially in the platform constructor and
     #       partially by a submitter (i.e., they are tightly coupled, which makes it hard
     #       to maintain and test).
-    submitter = ParamikoSubmitter()
-    submitter.load_platforms(as_conf=exp.as_conf)
+    submitter = ParamikoSubmitter(as_conf=exp.as_conf)
 
     ps_platform: 'PsPlatform' = submitter.platforms[_PLATFORM_NAME]
 
@@ -158,11 +159,12 @@ def create_job_parameters_platform(autosubmit_exp) -> CreateJobParametersPlatfor
     ],
     ids=['filename', 'filename_long_path']
 )
-def test_send_file(filename: str, exp_platform_server: ExperimentPlatformServer):
+def test_send_file(filename: str, exp_platform_server: ExperimentPlatformServer, request):
     """This test opens an SSH connection (via sftp) and sends a file to the remote location.
 
     It launches a Docker Image using the testcontainers library.
     """
+    test_name = request.node.name
     user = getuser()
 
     exp = exp_platform_server.experiment
@@ -172,18 +174,28 @@ def test_send_file(filename: str, exp_platform_server: ExperimentPlatformServer)
     ps_platform.connect(as_conf=exp.as_conf, reconnect=False, log_recovery_process=False)
     assert ps_platform.check_remote_permissions()
 
+    platform_tmp_path = Path(ps_platform.tmp_path)
+
     # generate the file
     if "/" in filename:
         filename_dir = Path(filename).parent
-        Path(ps_platform.tmp_path, filename_dir).mkdir(parents=True, exist_ok=True)
+        Path(platform_tmp_path, filename_dir).mkdir(parents=True, exist_ok=True)
         filename = Path(filename).name
-    with open(str(Path(ps_platform.tmp_path, filename)), 'w') as f:
+
+    with open(str(Path(platform_tmp_path, filename)), 'w') as f:
         f.write('test')
 
     assert ps_platform.send_file(filename)
 
-    file = f'{_PLATFORM_REMOTE_DIR}/{_PLATFORM_PROJECT}/{user}/{exp.expid}/LOG_{exp.expid}/{filename}'
-    result = ssh_server.exec(f'ls {file}')
+    file = Path(
+        _PLATFORM_REMOTE_DIR,
+        test_name,
+        _PLATFORM_PROJECT,
+        user,
+        exp.expid,
+        f'LOG_{exp.expid}/{filename}'
+    )
+    result = ssh_server.exec(f'ls {str(file)}')
     assert result.exit_code == 0
 
 
@@ -199,7 +211,7 @@ def test_send_file_errors(exp_platform_server: ExperimentPlatformServer):
     check = False
 
     # Fails if the connection is not active.
-    ps_platform.closeConnection()
+    ps_platform.close_connection()
     with pytest.raises(AutosubmitError) as cm:
         ps_platform.send_file(__file__, check=check)
     assert 'Connection does not appear to be active' in str(cm.value.message)
@@ -366,7 +378,7 @@ def test_exec_command_ssh_session_not_active_cannot_restore(exp_platform_server:
     """Test that when an error occurs, and it cannot restore, then we return falsey values."""
     exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
 
-    exp_platform_server.platform.closeConnection()
+    exp_platform_server.platform.close_connection()
 
     # This dummy mock prevents the platform from being able to restore its connection.
     mocker.patch.object(exp_platform_server.platform, 'restore_connection')
@@ -378,8 +390,9 @@ def test_exec_command_ssh_session_not_active_cannot_restore(exp_platform_server:
 
 
 @pytest.mark.docker
-def test_fs_operations(exp_platform_server: 'ExperimentPlatformServer'):
+def test_fs_operations(exp_platform_server: 'ExperimentPlatformServer', request):
     """Test that we can access files, send new files, move, delete."""
+    test_name = request.node.name
     user = getuser()
 
     local_file = Path(exp_platform_server.platform.tmp_path, 'test.txt')
@@ -388,7 +401,7 @@ def test_fs_operations(exp_platform_server: 'ExperimentPlatformServer'):
     with open(local_file, 'w+') as f:
         f.write(text)
 
-    remote_file = Path(_PLATFORM_REMOTE_DIR, _PLATFORM_PROJECT, user, exp_platform_server.experiment.expid,
+    remote_file = Path(_PLATFORM_REMOTE_DIR, test_name, _PLATFORM_PROJECT, user, exp_platform_server.experiment.expid,
                        f'LOG_{exp_platform_server.experiment.expid}', local_file.name)
 
     exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)

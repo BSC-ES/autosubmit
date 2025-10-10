@@ -96,7 +96,7 @@ def check_experiment_ownership(
     else:
         is_eadmin = False
     if not is_owner and raise_error:
-        raise AutosubmitCritical("You don't own the experiment {0}.".format(expid), 7012)
+        raise AutosubmitCritical(f"You don't own the experiment {expid}.", 7012)
     return is_owner, is_eadmin, current_owner_name
 
 
@@ -126,9 +126,8 @@ def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=N
                     ssh_config_issues += message + ".Please, the eccert expiration date"
                 else:
                     ssh_config_issues += message + (" this is an PARAMIKO SSHEXCEPTION: indicates that there is "
-                                                    "something incompatible in the ssh_config for host:{0}\n maybe "
-                                                    "you need to contact your sysadmin").format(
-                        platform.host)
+                                                    f"something incompatible in the ssh_config for host:{platform.host}\n maybe "
+                                                    "you need to contact your sysadmin")
         except Exception as e:
             with suppress(Exception):
                 if mail_notify:
@@ -150,7 +149,7 @@ def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=N
             issues += platform_issues
         if platform_issues == "":
 
-            Log.printlog("[{1}] Connection successful to host {0}".format(platform.host, platform.name), Log.RESULT)
+            Log.printlog(f"[{platform.name}] Connection successful to host {platform.host}", Log.RESULT)
         else:
             if platform.connected:
                 platform.connected = False
@@ -160,7 +159,7 @@ def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=N
                     Log.WARNING
                 )
             else:
-                Log.printlog("[{1}] Connection failed to host {0}".format(platform.host, platform.name), Log.WARNING)
+                Log.printlog(f"[{platform.name}] Connection failed to host {platform.host}", Log.WARNING)
 
     if issues != "":
         if ssh_config_issues.find(private_key_error[:-2]) != -1:

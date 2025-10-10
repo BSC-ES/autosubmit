@@ -62,3 +62,15 @@ PLATFORMS:
     PROJECT: Earth
     USER: dbeltran
     SCRATCH_DIR: /esarchive/scratch
+  TEST_SLURM:
+    ADD_PROJECT_TO_HOST: False
+    HOST: '127.0.0.1'
+    MAX_WALLCLOCK: '01:00'
+    PROJECT: 'group'
+    QUEUE: 'gp_debug'
+    SCRATCH_DIR: '/tmp/scratch/'
+    TEMP_DIR: ''
+    TYPE: 'slurm'
+    USER: 'root'
+    MAX_PROCESSORS: 1
+    PROCESSORS_PER_NODE: 1

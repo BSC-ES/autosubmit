@@ -131,7 +131,7 @@ def initialize_autosubmitrc(tmp_path: 'LocalPath', request: 'FixtureRequest', au
 
     By default, the database backend is SQLite. If you need Postgres, you
     must use the ``as_db`` integration tests fixture, and that fixture will
-    modify the INI settings appropriately, and create one database per test.
+    modify the INI settings appropriately and create one database per test.
     """
     autosubmitrc = tmp_path / 'autosubmitrc'
     autosubmitrc.write_text(
@@ -153,7 +153,7 @@ def initialize_autosubmitrc(tmp_path: 'LocalPath', request: 'FixtureRequest', au
 
                 [defaultstats]
                 path = {tmp_path / "as_output/stats"}
-                
+
                 [database]
                 backend = sqlite
                 path = {tmp_path}

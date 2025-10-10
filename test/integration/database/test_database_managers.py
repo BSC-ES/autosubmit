@@ -79,10 +79,10 @@ class TestExperimentHistoryDbManager:
     def setup_method(self):
         self.experiment_database = ExperimentHistoryDbManager(EXPID, JOBDATA_DIR)
         source_path_tt00 = os.path.join(JOBDATA_DIR, EXPID_TT00_SOURCE)
-        self.target_path_tt00 = os.path.join(JOBDATA_DIR, "job_data_{0}.db".format(EXPID))
+        self.target_path_tt00 = os.path.join(JOBDATA_DIR, f"job_data_{EXPID}.db")
         copy2(source_path_tt00, self.target_path_tt00)
         source_path_tt01 = os.path.join(JOBDATA_DIR, EXPID_TT01_SOURCE)
-        self.target_path_tt01 = os.path.join(JOBDATA_DIR, "job_data_{0}.db".format(EXPID_NONE))
+        self.target_path_tt01 = os.path.join(JOBDATA_DIR, f"job_data_{EXPID_NONE}.db")
         copy2(source_path_tt01, self.target_path_tt01)
         self.experiment_database.initialize()
 
@@ -128,7 +128,7 @@ class TestExperimentHistoryDbManager:
 
     def test_insert_and_delete_job_data(self):
         max_run_id = self.experiment_database.get_experiment_run_dc_with_max_id().run_id
-        new_job_data_name = "test_001_name_{0}".format(int(time.time()))
+        new_job_data_name = f"test_001_name_{int(time.time())}"
         new_job_data = JobData(_id=1, job_name=new_job_data_name, run_id=max_run_id)
         new_job_data_id = self.experiment_database._insert_job_data(new_job_data)
         assert new_job_data_id is not None

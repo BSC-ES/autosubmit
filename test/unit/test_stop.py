@@ -160,7 +160,7 @@ def test_stop_expids_force_all(autosubmit, mocker, expids: str, user_input: List
         current_status="RUNNING",
         status="FAILED")
 
-    mocked_input.call_count == len(expids)
+    assert mocked_input.call_count == len(expids.split(' '))
 
     kill_signal = mocked_kill.call_args_list[0][0][1]
     assert kill_signal == signal.SIGKILL
@@ -240,3 +240,4 @@ def test_stop_expids(autosubmit, mocker, expids: str, num_expids: int, cancel: b
 
         if sleep:
             assert mocked_sleep.call_count > 0
+

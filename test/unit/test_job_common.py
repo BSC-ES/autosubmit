@@ -14,8 +14,9 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+import pytest
 
-
+import autosubmit.job.job_common as job_common
 from autosubmit.job.job_common import Status
 
 """This test is intended to prevent wrong changes on the Status class definition."""
@@ -32,3 +33,18 @@ def test_value_to_key_has_the_same_values_as_status_constants():
     assert 'QUEUING' == Status.VALUE_TO_KEY[Status.QUEUING]
     assert 'RUNNING' == Status.VALUE_TO_KEY[Status.RUNNING]
     assert 'COMPLETED' == Status.VALUE_TO_KEY[Status.COMPLETED]
+
+
+@pytest.mark.parametrize(
+    'number,result',
+    [
+        ('1G', 1000000000),
+        ('1M', 1000000),
+        ('1K', 1000),
+        ('1', 1),
+        ('Not a Number', 0.0),
+    ],
+    ids=['G', 'M', 'K', 'Any', 'Not a Number']
+)
+def test_parse_output_number(number, result):
+    assert result == job_common.parse_output_number(number)

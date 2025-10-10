@@ -200,14 +200,12 @@ class AutosubmitConfig(object):
                 else:
                     if must_exists:
                         raise AutosubmitCritical(
-                            "[INDEX ERROR], {0} must exists. Check that {1} is an section that exists.".format(
-                                section_str,
-                                str(current_level)),
+                            f"[INDEX ERROR], {section_str} must exists. Check that {str(current_level)} is an section that exists.",
                             7014)
         if current_level is None or (
                 not isinstance(current_level, numbers.Number) and len(current_level) == 0) and must_exists:
             raise AutosubmitCritical(
-                "{0} must exists. Check that subsection {1} exists.".format(section_str, str(current_level)), 7014)
+                f"{section_str} must exists. Check that subsection {str(current_level)} exists.", 7014)
         if current_level is None or (not isinstance(current_level, numbers.Number) and len(current_level) == 0):
             return d_value
         return current_level
@@ -455,20 +453,18 @@ class AutosubmitConfig(object):
         if len(list(self.warn_config.keys())) > 0:
             message = "In Configuration files:\n"
             for section in self.warn_config:
-                message += "Issues in [{0}] config file:".format(section)
+                message += f"Issues in [{section}] config file:"
                 for parameter in self.warn_config[section]:
-                    message += "\n[{0}] {1} ".format(parameter[0],
-                                                     parameter[1])
+                    message += f"\n[{parameter[0]}] {parameter[1]} "
                 message += "\n"
             Log.printlog(message, 6013)
 
         if len(list(self.wrong_config.keys())) > 0:
             message = "On Configuration files:\n"
             for section in self.wrong_config:
-                message += "Critical Issues on [{0}] config file:".format(
-                    section)
+                message += f"Critical Issues on [{section}] config file:"
                 for parameter in self.wrong_config[section]:
-                    message += "\n[{0}] {1}".format(parameter[0], parameter[1])
+                    message += f"\n[{parameter[0]}] {parameter[1]}"
                 message += "\n"
             raise AutosubmitCritical(message, 7014)
         return True
@@ -1175,7 +1171,7 @@ class AutosubmitConfig(object):
                 # special case: check dynamic variables in the for loop
                 for for_section, for_values in data[key].items():
                     if len(for_values) == 0:
-                        raise AutosubmitCritical("Empty for loop in section {0}".format(long_key + key), 7014)
+                        raise AutosubmitCritical(f"Empty for loop in section {long_key + key}", 7014)
                     if not isinstance(for_values[0], dict):
                         for_values = str(for_values).strip("[]")
                         for_values = for_values.replace("'", "")
@@ -1384,7 +1380,7 @@ class AutosubmitConfig(object):
 
         if not main_platform_found:
             self.wrong_config["Expdef"] += [
-                ["Default", "Main platform is not defined! check if [HPCARCH = {0}] has any typo".format(self.hpcarch)]]
+                ["Default", f"Main platform is not defined! check if [HPCARCH = {self.hpcarch}] has any typo"]]
         main_platform_issues = False
         for platform, error in self.wrong_config.get("Platform", []):
             if platform.upper() == self.hpcarch.upper():
@@ -1403,7 +1399,7 @@ class AutosubmitConfig(object):
             return True
         return False
 
-    def check_jobs_conf(self, no_log=False):
+    def check_jobs_conf(self, no_log=False) -> bool:
         """Checks experiment's jobs configuration file.
         :param no_log: if True, it doesn't print any log message
         :type no_log: bool
@@ -1428,11 +1424,9 @@ class AutosubmitConfig(object):
                                     if check_value not in "on_submission":
                                         self.wrong_config["Jobs"] += [
                                             [section,
-                                             "FILE {0} doesn't exist and check parameter is not set on_submission value".format(
-                                                 section_file_path)]]
+                                             f"FILE {section_file_path} doesn't exist and check parameter is not set on_submission value"]]
                                 else:
-                                    self.wrong_config["Jobs"] += [[section, "FILE {0} doesn't exist".format(
-                                        os.path.join(self.get_project_dir(), section_file_path))]]
+                                    self.wrong_config["Jobs"] += [[section, f"FILE {os.path.join(self.get_project_dir(), section_file_path)} doesn't exist"]]
 
             dependencies = section_data.get('DEPENDENCIES', '')
             if dependencies != "":
@@ -1451,7 +1445,7 @@ class AutosubmitConfig(object):
                         if dependency.upper() not in parser["JOBS"].keys():
                             self.warn_config["Jobs"].append(
                                 [section,
-                                 "Dependency parameter is invalid, job {0} is not configured".format(dependency)])
+                                 f"Dependency parameter is invalid, job {dependency} is not configured"])
             rerun_dependencies = section_data.get('RERUN_DEPENDENCIES', "").upper()
             if rerun_dependencies:
                 for dependency in rerun_dependencies.split(' '):
@@ -1462,7 +1456,7 @@ class AutosubmitConfig(object):
                     if dependency not in parser["JOBS"].keys():
                         self.warn_config["Jobs"] += [
                             [section,
-                             "RERUN_DEPENDENCIES parameter is invalid, job {0} is not configured".format(dependency)]]
+                             f"RERUN_DEPENDENCIES parameter is invalid, job {dependency} is not configured"]]
             running_type = section_data.get('RUNNING', "once").lower()
             if running_type not in ['once', 'date', 'member', 'chunk']:
                 self.wrong_config["Jobs"] += [[section,
@@ -1470,7 +1464,7 @@ class AutosubmitConfig(object):
         if "Jobs" not in self.wrong_config:
             if not no_log:
                 Log.result('Jobs sections OK')
-            return True
+                return True
         return False
 
     def check_expdef_conf(self, no_log=False):
@@ -2227,7 +2221,7 @@ class AutosubmitConfig(object):
         # Allows to use the old format for define a list.
         if type(date_value) is not list:
             if not date_value.startswith("["):
-                string = '[{0}]'.format(date_value)
+                string = f'[{date_value}]'
             else:
                 string = date_value
             split_string = nestedExpr('[', ']').parseString(string).asList()
@@ -2304,7 +2298,7 @@ class AutosubmitConfig(object):
         if not string:
             return member_list
         elif not string.startswith("["):
-            string = '[{0}]'.format(string)
+            string = f'[{string}]'
         split_string = nestedExpr('[', ']').parseString(string).asList()
         string_member = None
         for split in split_string[0]:
@@ -2378,12 +2372,12 @@ class AutosubmitConfig(object):
                 content = "AS_MISC: True\n" + content
             if re.search('AS_COMMAND:.*', content):
                 content = content.replace(re.search('AS_COMMAND:.*', content).group(0),
-                                          "AS_COMMAND: {0}".format(command))
+                                          f"AS_COMMAND: {command}")
             else:
-                content = content + "AS_COMMAND: {0}\n".format(command)
+                content = content + f"AS_COMMAND: {command}\n"
         except Exception as e:
             Log.warning(f'Failed to set last Autosubmit command, using fallback: {str(e)}')
-            content = "AS_MISC: True\nAS_COMMAND: {0}\n".format(command)
+            content = f"AS_MISC: True\nAS_COMMAND: {command}\n"
         open(misc, 'w').write(content)
         os.chmod(misc, 0o755)
 
@@ -2398,7 +2392,7 @@ class AutosubmitConfig(object):
             content = open(version_file, 'r').read()
             if re.search('AUTOSUBMIT_VERSION:.*', content):
                 content = content.replace(re.search('AUTOSUBMIT_VERSION:.*', content).group(0),
-                                          "AUTOSUBMIT_VERSION: {0}".format(autosubmit_version))
+                                          f"AUTOSUBMIT_VERSION: {autosubmit_version}")
         except Exception as e:
             Log.warning(f'Failed to set Autosubmit version, using fallback: {str(e)}')
             content = "CONFIG:\n  AUTOSUBMIT_VERSION: " + autosubmit_version + "\n"
@@ -2519,7 +2513,7 @@ class AutosubmitConfig(object):
         input_file = str(ini_file)
         backup_path = root_dir / Path(ini_file.name + "_AS_v3_backup")
         if not backup_path.exists():
-            Log.info("Backup stored at {0}".format(backup_path))
+            Log.info(f"Backup stored at {backup_path}")
             shutil.copyfile(ini_file, backup_path)
         # Read key=value property configs in python dictionary
 

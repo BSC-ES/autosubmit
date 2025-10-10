@@ -22,7 +22,7 @@ import pytest
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_utils import cancel_jobs
+from autosubmit.job.job_utils import cancel_jobs, get_split_size_unit
 from autosubmit.log.log import AutosubmitCritical
 
 """Tests for ``autosubmit.job.job_utils``."""
@@ -145,3 +145,23 @@ def test_cancel_jobs(create_job_list):
 
     for job in job_list.get_job_list():
         assert job.status == Status.KEY_TO_VALUE[target_status]
+
+@pytest.mark.parametrize(
+    'data,result',
+    [
+        ({'JOBS': {'TEST': {'SPLITSIZEUNIT': "none"}}, 'EXPERIMENT': {'CHUNKSIZEUNIT': "none"}}, "day"),
+        ({'JOBS': {'TEST': {'SPLITSIZEUNIT': "none"}}, 'EXPERIMENT': {'CHUNKSIZEUNIT': "day"}}, "hour"),
+        ({'JOBS': {'TEST': {'SPLITSIZEUNIT': "none"}}, 'EXPERIMENT': {'CHUNKSIZEUNIT': "month"}}, "day"),
+        ({'JOBS': {'TEST': {'SPLITSIZEUNIT': "none"}}, 'EXPERIMENT': {'CHUNKSIZEUNIT': "year"}}, "month"),
+        ({'JOBS': {'TEST': {'SPLITSIZEUNIT': "something-else"}}, 'EXPERIMENT': {'CHUNKSIZEUNIT': "none"}}, "something-else"),
+    ],
+    ids=[
+        'return day',
+        'return hour',
+        'return day',
+        'return month',
+        'return something-else'
+    ]
+)
+def test_get_split_size_unit(data, result):
+    assert get_split_size_unit(data, 'TEST') == result

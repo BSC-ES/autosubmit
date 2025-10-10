@@ -7,6 +7,11 @@ experimental and not recommended for production yet.
 Autosubmit Config Parser code has been merged back into this code base. LOCAL
 platform does not support wrappers anymore (it was used for testing).
 
+The `--notransitive` argument has been deprecated in all commands. You may still
+use it without a failure, but there will be a warning displayed asking you to
+update your command line. This argument will be completely removed on a later
+release.
+
 **Bug fixes:**
 
 - Fixed issue with the verification of dirty Git local repositories in operational experiments #2446
@@ -47,6 +52,10 @@ platform does not support wrappers anymore (it was used for testing).
 - Added automated citation instructions to the website landing page #2480
 - Improving the error message handling for incorrect YAML syntax (too cryptic) #2651
 - Added a platform option to remove remote log files of the job's output after log recovery #2655
+- Deprecated `--notransitive` argument as that was not used anymore #2577
+- docstrings were made more uniform across several functions (should reflect in sphinx docs),
+  fixed several ruff and mypy warnings, and did minor refactorings in the code like removing the
+  `Submitter` class and using `ParamikoSubmitter` directly (only implementation) #2577
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 

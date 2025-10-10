@@ -83,9 +83,9 @@ def _match_autosubmit_cmdline(cmdline: List[str], command='run', expid: Optional
     'a000'
     >>> _match_autosubmit_cmdline(['autosubmit', '-lc', 'DEBUG', 'run', 'a001'])
     'a001'
-    >>> _match_autosubmit_cmdline(['autosubmit', '-lc', 'DEBUG', 'run', '--notransitive', 'a000'])
+    >>> _match_autosubmit_cmdline(['autosubmit', '-lc', 'DEBUG', 'run', '--update_version', 'a000'])
     'a000'
-    >>> _match_autosubmit_cmdline(['autosubmit', '-lc', 'DEBUG', 'run', '--notransitive', 'a000'], 'run', None)
+    >>> _match_autosubmit_cmdline(['autosubmit', '-lc', 'DEBUG', 'run', '--update_version', 'a000'], 'run', None)
     'a000'
     >>> _match_autosubmit_cmdline(['/home/panda/envs/autosubmit/venv/bin/autosubmit', 'create', 'a000'], 'create')
     'a000'

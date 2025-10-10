@@ -49,10 +49,10 @@ class TestExperimentHistory:
     #   cls.exp = ExperimentHistory("tt00") # example database
     def setup_method(self):
         source_path_tt00 = os.path.join(JOBDATA_DIR, EXPID_TT00_SOURCE)
-        self.target_path_tt00 = os.path.join(JOBDATA_DIR, "job_data_{0}.db".format(EXPID))
+        self.target_path_tt00 = os.path.join(JOBDATA_DIR, f"job_data_{EXPID}.db")
         copy2(source_path_tt00, self.target_path_tt00)
         source_path_tt01 = os.path.join(JOBDATA_DIR, EXPID_TT01_SOURCE)
-        self.target_path_tt01 = os.path.join(JOBDATA_DIR, "job_data_{0}.db".format(EXPID_NONE))
+        self.target_path_tt01 = os.path.join(JOBDATA_DIR, f"job_data_{EXPID_NONE}.db")
         copy2(source_path_tt01, self.target_path_tt01)
         self.job_list = [
             job("a29z_20000101_fc2_1_POST", "2000-01-01 00:00:00", "POST", "COMPLETED", ""),

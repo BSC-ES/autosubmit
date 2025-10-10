@@ -24,7 +24,7 @@ import locale
 import os
 from contextlib import suppress
 from time import sleep
-from typing import List, Union, Any, TYPE_CHECKING
+from typing import Any, Optional, Union, TYPE_CHECKING
 
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.job.job_common import Status
@@ -41,7 +41,8 @@ if TYPE_CHECKING:
 class SlurmPlatform(ParamikoPlatform):
     """Class to manage jobs to host using SLURM scheduler."""
 
-    def __init__(self, expid: str, name: str, config: dict, auth_password: str = None) -> None:
+    def __init__(self, expid: str, name: str, config: dict,
+                 auth_password: Optional[Union[str, list[str]]] = None) -> None:
         """Initialization of the Class SlurmPlatform.
 
         :param expid: ID of the experiment which will instantiate the SlurmPlatform.
@@ -73,7 +74,7 @@ class SlurmPlatform(ParamikoPlatform):
         self.job_status['QUEUING'] = ['PENDING', 'CONFIGURING', 'RESIZING']
         self.job_status['FAILED'] = ['FAILED', 'CANCELLED', 'CANCELLED+', 'NODE_FAIL',
                                      'PREEMPTED', 'SUSPENDED', 'TIMEOUT', 'OUT_OF_MEMORY', 'OUT_OF_ME+', 'OUT_OF_ME']
-        self._pathdir = "\$HOME/LOG_" + self.expid
+        self._pathdir = f"$HOME/LOG_{self.expid}"
         self._allow_arrays = False
         self._allow_wrappers = True
         self.update_cmds()
@@ -81,13 +82,12 @@ class SlurmPlatform(ParamikoPlatform):
         exp_id_path = os.path.join(self.config.get("LOCAL_ROOT_DIR"), self.expid)
         tmp_path = os.path.join(exp_id_path, "tmp")
         self._submit_script_path = os.path.join(
-            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh") # noqa
+            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh")
         self._submit_script_base_name = os.path.join(
-            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_") # noqa
+            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
 
     def create_a_new_copy(self):
-        """
-        Return a copy of a SlurmPlatform object with the same
+        """Return a copy of a SlurmPlatform object with the same
         expid, name and config as the original.
 
         :return: A new platform type slurm
@@ -96,8 +96,7 @@ class SlurmPlatform(ParamikoPlatform):
         return SlurmPlatform(self.expid, self.name, self.config)
 
     def get_submit_cmd_x11(self, args: str, script_name: str) -> str:
-        """
-        Returns the submit command for the platform.
+        """Returns the submit command for the platform.
 
         :param args: Arguments to be used in the construction of the submit command.
         :type args: str
@@ -113,8 +112,7 @@ class SlurmPlatform(ParamikoPlatform):
         return cmd
 
     def generate_new_name_submit_script_file(self) -> None:
-        """
-        Delete the current file and generates a new one with a new name.
+        """Delete the current file and generates a new one with a new name.
 
         :rtype: None
         """
@@ -124,8 +122,7 @@ class SlurmPlatform(ParamikoPlatform):
 
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages: list[str],
                                  error_message: str = "", hold: bool = False) -> tuple[bool, list]:
-        """
-        Retrieve multiple jobs identifiers.
+        """Retrieve multiple jobs identifiers.
 
         :param valid_packages_to_submit: List of valid Job Packages to be processes
         :type valid_packages_to_submit: List[JobPackageBase]
@@ -145,13 +142,13 @@ class SlurmPlatform(ParamikoPlatform):
                 duplicated_jobs_already_checked = False
                 platform = valid_packages_to_submit[0].jobs[0].platform
                 try:
-                    jobs_id = self.submit_Script(hold=hold)
+                    jobs_id = self.submit_script(hold=hold)
                 except AutosubmitError as e:
                     job_names = []
                     duplicated_jobs_already_checked = True
                     with suppress(Exception):
                         for package_ in valid_packages_to_submit:
-                            if hasattr(package_,"name"):
+                            if hasattr(package_, "name"):
                                 job_names.append(package_.name)  # wrapper_name
                             else:
                                 job_names.append(package_.jobs[0].name)  # job_name
@@ -196,14 +193,14 @@ class SlurmPlatform(ParamikoPlatform):
                             f"Are you sure that [{self.type.upper()}] scheduler is the "
                             f"correct type for platform [{self.name.upper()}]?.\n Please, double check that "
                             f"{self.type.upper()} is loaded for {self.name.upper()} before "
-                            f"autosubmit launch any job.",7070
+                            f"autosubmit launch any job.", 7070
                         ) from e
                     raise AutosubmitError(
                         "Submission failed, this can be due a failure on the platform", 6015, str(e)) from e
                 if jobs_id is None or len(jobs_id) <= 0:
                     raise AutosubmitError(
                         "Submission failed, this can be due a failure on the platform",
-                        6015,f"Jobs_id {jobs_id}")
+                        6015, f"Jobs_id {jobs_id}")
                 if hold:
                     sleep(10)
                 jobid_index = 0
@@ -229,13 +226,14 @@ class SlurmPlatform(ParamikoPlatform):
                                 retries = retries - 1
                             if not can_continue:
                                 package.jobs[0].platform.send_command(
-                                    package.jobs[0].platform.cancel_cmd+f" {current_package_id}")
+                                    package.jobs[0].platform.cancel_cmd + f" {current_package_id}")
                                 jobid_index += 1
                                 continue
                             if not self.hold_job(package.jobs[0]):
                                 jobid_index += 1
                                 continue
-                        except Exception:
+                        except Exception as e:
+                            Log.debug(f'Adding {current_package_id} to failed packages: {str(e)}')
                             failed_packages.append(current_package_id)
                             continue
                     package.process_jobs_to_submit(current_package_id, hold)
@@ -244,9 +242,9 @@ class SlurmPlatform(ParamikoPlatform):
                         job_name = package.name if hasattr(package, "name") else package.jobs[0].name
                         jobid = self.get_jobid_by_jobname(job_name)
                         if len(jobid) > 1:  # Cancel each job that is not the associated
-                            ids_to_check = [package.jobs[0].id]
+                            ids_to_check: list = [package.jobs[0].id]
                             if package.jobs[0].het:
-                                for i in range(1,package.jobs[0].het.get("HETSIZE",1)): # noqa
+                                for i in range(1, package.jobs[0].het.get("HETSIZE", 1)):
                                     ids_to_check.append(str(int(ids_to_check[0]) + i))
                             # TODO to optimize cancel all jobs at once
                             for id_ in [jobid for jobid in jobid if jobid not in ids_to_check]:
@@ -270,8 +268,7 @@ class SlurmPlatform(ParamikoPlatform):
         return save, valid_packages_to_submit
 
     def generate_submit_script(self) -> None:
-        """
-        Delete the current file and generates a new one with a new name.
+        """Delete the current file and generates a new one with a new name.
 
         :rtype: None
         """
@@ -281,18 +278,15 @@ class SlurmPlatform(ParamikoPlatform):
         self.generate_new_name_submit_script_file()
 
     def get_submit_script(self) -> str:
-        """
-        Change file permissions to 0o750 and return the path of the file.
+        """Change file permissions to 0o750 and return the path of the file.
 
         :return: Path to the file
-        :rtype: str
         """
         os.chmod(self._submit_script_path, 0o750)
         return self._submit_script_path
 
     def submit_job(self, job, script_name: str, hold: bool = False, export: str = "none") -> Union[int, None]:
-        """
-        Submit a job from a given job object.
+        """Submit a job from a given job object.
 
         :param job: Job object
         :type job: autosubmit.job.job.Job
@@ -302,9 +296,7 @@ class SlurmPlatform(ParamikoPlatform):
         :type hold: bool
         :param export: Set within the jobs.yaml, used to export environment script to use before the job is launched.
         :type export: str
-
         :return: job id for the submitted job.
-        :rtype: int
         """
         if job is None or not job:
             x11 = False
@@ -324,10 +316,10 @@ class SlurmPlatform(ParamikoPlatform):
             return int(job_id)
         return None
 
-    def submit_Script(self, hold: bool = False) -> Union[List[int], int]:
-        """
-        Sends a Submit file Script with sbatch instructions, execute it in the platform and
-        retrieves the Jobs_ID of all jobs at once.
+    def submit_script(self, hold: bool = False) -> Union[list[int], int]:
+        """Sends a Submit file Script with sbatch instructions.
+
+        Execute it in the platform and retrieves the Jobs_ID of all jobs at once.
 
         :param hold: Submit a job in held status. Held jobs will only earn priority status if the
             remote machine allows it.
@@ -350,19 +342,13 @@ class SlurmPlatform(ParamikoPlatform):
             return jobs_id
         except IOError as e:
             raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e)) from e
-        except AutosubmitError:
-            raise
-        except AutosubmitCritical:
+        except (AutosubmitError, AutosubmitCritical):
             raise
         except Exception as e:
             raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e)) from e
 
     def check_remote_log_dir(self) -> None:
-        """
-        Creates log dir on remote host.
-
-        :rtype: None
-        """
+        """Creates log dir on remote host."""
 
         try:
             # Test if remote_path exists
@@ -380,11 +366,7 @@ class SlurmPlatform(ParamikoPlatform):
                 raise AutosubmitError("SFTP session not active ", 6007, str(e)) from e
 
     def update_cmds(self) -> None:
-        """
-        Updates commands for platforms.
-
-        :rtype: None
-        """
+        """Updates commands for platforms. """
         self.root_dir = os.path.join(
             self.scratch, self.project_dir, self.user, self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
@@ -399,12 +381,10 @@ class SlurmPlatform(ParamikoPlatform):
         self._submit_cmd_x11 = f'{self.remote_log_dir}'
 
     def hold_job(self, job) -> bool:
-        """
-        Create a Slurm command to cancel the execution of the Job.
+        """Create a Slurm command to cancel the execution of the Job.
 
         :param job: Job to be held.
         :type job: autosubmit.job.job.Job
-
         :return: A boolean indicating whether the job is being held.
         :rtype: bool
         """
@@ -441,8 +421,7 @@ class SlurmPlatform(ParamikoPlatform):
                 raise as_err
 
     def get_mkdir_cmd(self) -> str:
-        """
-        Get the variable mkdir_cmd that stores the mkdir command.
+        """Get the variable mkdir_cmd that stores the mkdir command.
 
         :return: Mkdir command
         :rtype: str
@@ -450,8 +429,7 @@ class SlurmPlatform(ParamikoPlatform):
         return self.mkdir_cmd
 
     def get_remote_log_dir(self) -> str:
-        """
-        Get the variable remote_log_dir that stores the directory of the Log of the experiment.
+        """Get the variable remote_log_dir that stores the directory of the Log of the experiment.
 
         :return: The remote_log_dir variable.
         :rtype: str
@@ -459,74 +437,41 @@ class SlurmPlatform(ParamikoPlatform):
         return self.remote_log_dir
 
     def parse_job_output(self, output: str) -> str:
-        """
-        Parses check job command output, so it can be interpreted by autosubmit.
+        """Parses check job command output, so it can be interpreted by autosubmit.
 
         :param output: output to parse.
         :type output: str
-
         :return: job status.
         :rtype: str
         """
         return output.strip().split(' ')[0].strip()
 
-    def parse_Alljobs_output(self, output: str, job_id: int) -> Union[list[str], str]: # noqa
-        """
-        Filter one or more status of a specific Job ID.
-
-        :param output: Output of the status of the jobs.
-        :type output: str
-        :param job_id: job ID.
-        :type job_id: int
-
-        :return: All status related to a Job.
-        :rtype: Union[list[str], str]
-        """
+    def parse_all_jobs_output(self, output: str, job_id: int) -> Union[list[str], str]:
         status = ""
         with suppress(Exception):
-            status = [x.split()[1] for x in output.splitlines()
-                      if x.split()[0][:len(str(job_id))] == str(job_id)]
+            status = [
+                x.split()[1]
+                for x in output.splitlines()
+                if x.split()[0][:len(str(job_id))] == str(job_id)
+            ]
         if len(status) == 0:
             return status
         return status[0]
 
-    def get_submitted_job_id(self, output_lines: str, x11: bool = False) -> Union[list[int], int]:
-        """
-
-        :param output_lines: Output of the ssh command.
-        :type output_lines: str
-        :param x11: Enable x11 forwarding, to enable graphical jobs.
-        :type x11: bool
-
-        :return: List of job ids that got submitted and had an output.
-        :rtype: Union[list[int], int]
-        """
+    def get_submitted_job_id(self, output: str, x11: bool = False) -> Union[list[int], int]:
         try:
-            if output_lines.find("failed") != -1:
-                raise AutosubmitCritical(
-                    "Submission failed. Command Failed", 7014)
+            if output.find("failed") != -1:
+                raise AutosubmitCritical("Submission failed. Command Failed", 7014)
             if x11:
-                return int(output_lines.splitlines()[0])
+                return int(output.splitlines()[0])
             jobs_id = []
-            for output in output_lines.splitlines():
-                jobs_id.append(int(output.split(' ')[3]))
+            for line in output.splitlines():
+                jobs_id.append(int(line.split(' ')[3]))
             return jobs_id
         except IndexError as exc:
             raise AutosubmitCritical("Submission failed. There are issues on your config file", 7014) from exc
 
     def get_submit_cmd(self, job_script: str, job, hold: bool = False, export: str = "") -> str:
-        """
-        :param job_script: Name of the script of the job.
-        :type job_script: str
-        :param job: Job object.
-        :type job: autosubmit.job.job.Job
-        :param hold: Send job hold.
-        :type hold: bool
-        :param export: Set within the jobs.yaml, used to export environment script to use before the job is launched.
-        :type export: str
-        :return: Submit command for the script.
-        :rtype: str
-        """
         if (export is None or export.lower() == "none") or len(export) == 0:
             export = ""
         else:
@@ -551,61 +496,48 @@ class SlurmPlatform(ParamikoPlatform):
         else:
             return export + self.get_submit_cmd_x11(job.x11_options.strip(""), job_script.strip(""))
 
-    def get_checkjob_cmd(self, job_id: str) -> str: # noqa
-        """
-        Generates sacct command to the job selected.
+    def get_check_job_cmd(self, job_id: str) -> str:
+        """Generates sacct command to the job selected.
 
         :param job_id: ID of a job.
-        :param job_id: str
-
         :return: Generates the sacct command to be executes.
-        :rtype: str
         """
         return f'sacct -n -X --jobs {job_id} -o "State"'
 
-    def get_checkAlljobs_cmd(self, jobs_id: str): # noqa
-        """
-        Generates sacct command to all the jobs passed down.
+    def get_check_all_jobs_cmd(self, jobs_id: str):
+        """Generates sacct command to all the jobs passed down.
 
         :param jobs_id: ID of one or more jobs.
-        :param jobs_id: str
-
         :return: sacct command to all jobs.
         :rtype: str
         """
         return f"sacct -n -X --jobs {jobs_id} -o jobid,State"
 
     def get_estimated_queue_time_cmd(self, job_id: str):
-        """
-        Gets an estimated queue time to the job selected.
+        """Gets an estimated queue time to the job selected.
 
         :param job_id: ID of a job.
         :param job_id: str
-
         :return: Gets estimated queue time.
         :rtype: str
         """
         return f"scontrol -o show JobId {job_id} | grep -Po '(?<=EligibleTime=)[0-9-:T]*'"
 
     def get_queue_status_cmd(self, job_id: str) -> str:
-        """
-        Get queue generating squeue command to the job selected.
+        """Get queue generating squeue command to the job selected.
 
         :param job_id: ID of a job.
         :param job_id: str
-
         :return: Gets estimated queue time.
         :rtype: str
         """
         return f'squeue -j {job_id} -o %A,%R'
 
-    def get_jobid_by_jobname_cmd(self, job_name: str) -> str: # noqa
-        """
-        Looks for a job based on its name.
+    def get_jobid_by_jobname_cmd(self, job_name: str) -> str:
+        """Looks for a job based on its name.
 
         :param job_name: Name given to a job
         :param job_name: str
-
         :return: Command to look for a job in the queue.
         :rtype: str
         """
@@ -613,25 +545,21 @@ class SlurmPlatform(ParamikoPlatform):
 
     @staticmethod
     def cancel_job(job_id: str) -> str:
-        """
-        Command to cancel a job.
+        """Command to cancel a job.
 
         :param job_id: ID of a job.
         :param job_id: str
-
         :return: Cancel job command.
         :rtype: str
         """
         return f'scancel {job_id}'
 
     def get_job_energy_cmd(self, job_id: str) -> str:
-        """
-        Generates a command to get data from a job
+        """Generates a command to get data from a job
         JobId, State, NCPUS, NNodes, Submit, Start, End, ConsumedEnergy, MaxRSS, AveRSS%25.
 
         :param job_id: ID of a job.
         :param job_id: str
-
         :return: Command to get job energy.
         :rtype: str
         """
@@ -639,25 +567,20 @@ class SlurmPlatform(ParamikoPlatform):
                 f'Start,End,ConsumedEnergy,MaxRSS%25,AveRSS%25')
 
     def parse_queue_reason(self, output: str, job_id: str) -> str:
-        """
-        Parses the queue reason from the output of the command.
+        """Parses the queue reason from the output of the command.
 
         :param output: output of the command.
         :param job_id: job id
-
         :return: queue reason.
-        :rtype: str
         """
-        reason = [x.split(',')[1] for x in output.splitlines()
-                  if x.split(',')[0] == str(job_id)]
-        if isinstance(reason,list):
-            # convert reason to str
-            return ''.join(reason)
-        return reason # noqa F501
+        return ''.join([
+            x.split(',')[1]
+            for x in output.splitlines()
+            if x.split(',')[0] == str(job_id)
+        ])
 
-    def get_queue_status(self, in_queue_jobs: List['Job'], list_queue_jobid: str, as_conf: AutosubmitConfig) -> None:
-        """
-        get_queue_status
+    def get_queue_status(self, in_queue_jobs: list['Job'], list_queue_jobid: str, as_conf: AutosubmitConfig) -> None:
+        """get_queue_status.
 
         :param in_queue_jobs: List of Job.
         :type in_queue_jobs: list[Job]
@@ -665,8 +588,6 @@ class SlurmPlatform(ParamikoPlatform):
         :type list_queue_jobid: str
         :param as_conf: experiment configuration.
         :type as_conf: autosubmit.config.AutosubmitConfig
-
-        :rtype:None
         """
         if not in_queue_jobs:
             return
@@ -690,13 +611,11 @@ class SlurmPlatform(ParamikoPlatform):
                 else:
                     job.new_status = Status.HELD
 
-    def wrapper_header(self,**kwargs: Any) -> str:
-        """
-        It generates the header of the wrapper configuring it to execute the Experiment.
+    def wrapper_header(self, **kwargs: Any) -> str:
+        """It generates the header of the wrapper configuring it to execute the Experiment.
 
         :param kwargs: Key arguments associated to the Job/Experiment to configure the wrapper.
         :type kwargs: Any
-
         :return: a sequence of slurm commands.
         :rtype: str
         """
@@ -704,8 +623,7 @@ class SlurmPlatform(ParamikoPlatform):
 
     @staticmethod
     def allocated_nodes() -> str:
-        """
-        It sets the allocated nodes of the wrapper
+        """It sets the allocated nodes of the wrapper
 
         :return: A command that changes the num of Node per job
         :rtype: str
@@ -714,8 +632,8 @@ class SlurmPlatform(ParamikoPlatform):
 
     def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5,
                           max_retries: int = 3) -> bool:
-        """
-        Checks if a file exists on the FTP server.
+        """Checks if a file exists on the FTP server.
+
         :param src: The name of the file to check.
         :type src: str
         :param wrapper_failed: Whether the wrapper has failed. Defaults to False.
@@ -724,11 +642,10 @@ class SlurmPlatform(ParamikoPlatform):
         :type sleeptime: int
         :param max_retries: Maximum number of retries. Defaults to 3.
         :type max_retries: int
-
         :return: True if the file exists, False otherwise
         :rtype: bool
         """
-        # noqa TODO check the sleeptime retrials of these function, previously it was waiting a lot of time
+        # TODO check the sleeptime retrials of these function, previously it was waiting a lot of time
         file_exist = False
         retries = 0
         while not file_exist and retries < max_retries:

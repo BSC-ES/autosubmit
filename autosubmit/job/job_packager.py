@@ -69,6 +69,10 @@ class JobPackager(object):
         self.special_variables = dict()
         self.wrappers_with_error = {}
 
+        self.running_jobs_len = None
+        self.queuing_jobs_len = None
+        self.waiting_jobs_len = None
+
         # TODO: Add default values
         # Wrapper building starts here
         for wrapper_section,wrapper_data in self._as_config.experiment_data.get("WRAPPERS",{}).items():
@@ -82,15 +86,15 @@ class JobPackager(object):
                 self.jobs_in_wrapper[wrapper_section] = self._as_config.get_wrapper_jobs(wrapper_data)
                 self.extensible_wallclock[wrapper_section] = self._as_config.get_extensible_wallclock(wrapper_data)
         self.wrapper_info = [self.wrapper_type,self.wrapper_policy,self.wrapper_method,self.jobs_in_wrapper,self.extensible_wallclock] # to pass to job_packages
-        Log.debug("Number of jobs available: {0}", self._max_wait_jobs_to_submit)
+        Log.debug(f"Number of jobs available: {self._max_wait_jobs_to_submit}")
         if self.hold:
-            Log.debug("Number of jobs prepared: {0}", len(jobs_list.get_prepared(platform)))
+            Log.debug(f"Number of jobs prepared: {len(jobs_list.get_prepared(platform))}")
             if len(jobs_list.get_prepared(platform)) > 0:
-                Log.debug("Jobs ready for {0}: {1}", self._platform.name, len(jobs_list.get_prepared(platform)))
+                Log.debug(f"Jobs ready for {self._platform.name}: {len(jobs_list.get_prepared(platform))}")
         else:
-            Log.debug("Number of jobs ready: {0}", len(jobs_list.get_ready(platform, hold=False)))
+            Log.debug(f"Number of jobs ready: {len(jobs_list.get_ready(platform, hold=False))}")
             if len(jobs_list.get_ready(platform)) > 0:
-                Log.debug("Jobs ready for {0}: {1}", self._platform.name, len(jobs_list.get_ready(platform)))
+                Log.debug(f"Jobs ready for {self._platform.name}: {len(jobs_list.get_ready(platform))}")
         self._maxTotalProcessors = 0
 
     def compute_weight(self, job_list):
@@ -438,12 +442,12 @@ class JobPackager(object):
     def check_if_packages_are_ready_to_build(self) -> tuple[list[Job], bool]:
         """Check if the packages are ready to be built.
 
-        Returns a tuple with two elements. First contains the list of jobs ready to be built.
+        Returns a tuple with two elements. The first contains the list of jobs ready to be built.
         The second element in the tuple is a boolean indicating if it can be built or not.
 
         :return: list of jobs ready to be built, boolean indicating if there are underlying blocking errors.
         """
-        Log.info("Calculating possible ready jobs for {0}".format(self._platform.name))
+        Log.info(f"Calculating possible ready jobs for {self._platform.name}")
         jobs_ready = []
         if len(self._jobs_list.jobs_to_run_first) > 0:
             jobs_ready = [
@@ -494,7 +498,7 @@ class JobPackager(object):
 
     def calculate_job_limits(self,platform,job=None):
         jobs_list = self._jobs_list
-        # Submitted + Queuing Jobs for specific Platform
+        # Submitted + Queuing Jobs for a specific Platform
         queuing_jobs = jobs_list.get_queuing(platform)
         # We now consider the running jobs count
         running_jobs = jobs_list.get_running(platform)
@@ -531,12 +535,10 @@ class JobPackager(object):
         self._max_jobs_to_submit = self._max_jobs_to_submit if self._max_jobs_to_submit > 0 else 0
         self.max_jobs = min(self._max_wait_jobs_to_submit,self._max_jobs_to_submit)
 
-    def build_packages(self):
-        # type: () -> List[JobPackageBase]
-        """Returns the list of the built packages to be submitted
+    def build_packages(self) -> list[JobPackageBase]:
+        """Returns the list of the built packages to be submitted.
 
         :return: List of packages depending on type of package, JobPackageVertical Object for 'vertical'.
-        :rtype: List() of JobPackageVertical
         """
         packages_to_submit = list()
         jobs_ready, ready = self.check_if_packages_are_ready_to_build()
@@ -583,7 +585,7 @@ class JobPackager(object):
             section = self._as_config.experiment_data.get("WRAPPERS", {}).get(self.current_wrapper_section, {}).get("JOBS_IN_WRAPPER", "")
             if not self._platform.allow_wrappers and self.wrapper_type[self.current_wrapper_section] in ['horizontal', 'vertical', 'vertical-horizontal', 'horizontal-vertical']:
                 Log.warning(
-                    "Platform {0} does not allow wrappers, submitting jobs individually".format(self._platform.name))
+                    f"Platform {self._platform.name} does not allow wrappers, submitting jobs individually")
                 for job in jobs:
                     non_wrapped_jobs.append(job)
                 continue

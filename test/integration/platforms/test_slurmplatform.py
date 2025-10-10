@@ -15,23 +15,34 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Integration tests for the Slurm platform."""
+"""Integration tests for the Slurm platform.
 
-from pathlib import Path
+As these tests use a GitHub Actions service with limited capacity for running jobs,
+we limit in pytest how many tests we run in parallel to avoid the service becoming
+unresponsive (which likely explains our banner timeout messages before, as probably
+it was busy churning the previous messages and Slurm jobs).
+
+This is done by assigning the tests the group "slurm". This forces pytest to send
+all the grouped tests to the same worker.
+"""
+
 import re
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 
 from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.history.experiment_history import ExperimentHistory
+from autosubmit.job.job import Job
+from autosubmit.job.job_common import Status
+from autosubmit.job.job_list import JobList
+from autosubmit.job.job_list_persistence import JobListPersistencePkl
+from autosubmit.job.job_packager import JobPackager
 from autosubmit.log.utils import is_gzip_file, is_xz_file
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-
-if TYPE_CHECKING:
-    from test.integration.conftest import AutosubmitExperimentFixture
-    from testcontainers.core.container import DockerContainer
+from test.integration.conftest import AutosubmitExperimentFixture, DockerContainer
 
 _EXPID = 't001'
 
@@ -39,12 +50,17 @@ _PLATFORM_NAME = 'TEST_SLURM'
 
 
 def _create_slurm_platform(expid: str, as_conf: AutosubmitConfig):
-    return SlurmPlatform(expid, _PLATFORM_NAME, config=as_conf.experiment_data)
+    return SlurmPlatform(expid, _PLATFORM_NAME, config=as_conf.experiment_data, auth_password=None)
 
 
-def test_create_platform_slurm(autosubmit_exp):
+@pytest.mark.xdist_group('slurm')
+@pytest.mark.slurm
+def test_create_platform_slurm(
+        autosubmit_exp,
+        slurm_server: 'DockerContainer',
+):
     """Test the Slurm platform object creation."""
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp('t000', experiment_data={
         'JOBS': {
             'SIM': {
                 'PLATFORM': _PLATFORM_NAME,
@@ -63,6 +79,8 @@ def test_create_platform_slurm(autosubmit_exp):
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             }
         }
     })
@@ -71,6 +89,7 @@ def test_create_platform_slurm(autosubmit_exp):
     # TODO: add more assertion statements...
 
 
+@pytest.mark.xdist_group('slurm')
 @pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     {
@@ -92,6 +111,8 @@ def test_create_platform_slurm(autosubmit_exp):
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
     },
@@ -100,12 +121,12 @@ def test_create_platform_slurm(autosubmit_exp):
             'SIM': {
                 'PLATFORM': _PLATFORM_NAME,
                 'RUNNING': 'chunk',
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
             },
             'SIM_2': {
                 'PLATFORM': _PLATFORM_NAME,
                 'RUNNING': 'chunk',
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
                 'DEPENDENCIES': 'SIM',
             },
         },
@@ -120,6 +141,8 @@ def test_create_platform_slurm(autosubmit_exp):
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
     },
@@ -127,10 +150,13 @@ def test_create_platform_slurm(autosubmit_exp):
     'Simple Workflow',
     'Dependency Workflow',
 ])
-def test_run_simple_workflow_slurm(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict,
-                                   slurm_server: 'DockerContainer'):
+def test_run_simple_workflow_slurm(
+        autosubmit_exp: AutosubmitExperimentFixture,
+        experiment_data: dict,
+        slurm_server: 'DockerContainer'
+):
     """Runs a simple Bash script using Slurm."""
-    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
+    exp = autosubmit_exp('t001', experiment_data=experiment_data)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
@@ -138,18 +164,13 @@ def test_run_simple_workflow_slurm(autosubmit_exp: 'AutosubmitExperimentFixture'
 
 
 @pytest.mark.parametrize('experiment_data', [
-    # Vertical Wrapper Workflow
     {
-        'DEFAULT': {
-            'EXPID': _EXPID,
-            'HPCARCH': _PLATFORM_NAME,
-        },
         'JOBS': {
             'SIM': {
                 'DEPENDENCIES': {
                     'SIM-1': {}
                 },
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -159,7 +180,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: 'AutosubmitExperimentFixture'
                 'DEPENDENCIES': {
                     'SIM',
                 },
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -170,7 +191,7 @@ def test_run_simple_workflow_slurm(autosubmit_exp: 'AutosubmitExperimentFixture'
                     'SIM',
                     'POST',
                 },
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'once',
                 'CHECK': 'on_submission',
@@ -181,15 +202,15 @@ def test_run_simple_workflow_slurm(autosubmit_exp: 'AutosubmitExperimentFixture'
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
                 'HOST': '127.0.0.1',
-                'MAX_WALLCLOCK': '02:00',
+                'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
                 'SCRATCH_DIR': '/tmp/scratch/',
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
-                'MAX_PROCESSORS': 10,
-                'PROCESSORS_PER_NODE': 10,
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
         'WRAPPERS': {
@@ -200,18 +221,13 @@ def test_run_simple_workflow_slurm(autosubmit_exp: 'AutosubmitExperimentFixture'
             }
         },
     },
-    # Wrapper Vertical
     {
-        'DEFAULT': {
-            'EXPID': _EXPID,
-            'HPCARCH': _PLATFORM_NAME,
-        },
         'JOBS': {
-            'SIM_V': {
+            'SIMV': {
                 'DEPENDENCIES': {
-                    'SIM_V-1': {}
+                    'SIMV-1': {}
                 },
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -230,30 +246,25 @@ def test_run_simple_workflow_slurm(autosubmit_exp: 'AutosubmitExperimentFixture'
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
-                'MAX_PROCESSORS': 10,
-                'PROCESSORS_PER_NODE': 10,
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
         'WRAPPERS': {
-            'WRAPPER_V': {
+            'WRAPPERV': {
                 'TYPE': 'vertical',
-                'JOBS_IN_WRAPPER': 'SIM_V',
+                'JOBS_IN_WRAPPER': 'SIMV',
                 'RETRIALS': 0,
             },
         },
     },
-    # Wrapper Horizontal
     {
-        'DEFAULT': {
-            'EXPID': _EXPID,
-            'HPCARCH': _PLATFORM_NAME,
-        },
         'JOBS': {
-            'SIM_H': {
+            'SIMH': {
                 'DEPENDENCIES': {
-                    'SIM_H-1': {}
+                    'SIMH-1': {}
                 },
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -272,30 +283,25 @@ def test_run_simple_workflow_slurm(autosubmit_exp: 'AutosubmitExperimentFixture'
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
-                'MAX_PROCESSORS': 10,
-                'PROCESSORS_PER_NODE': 10,
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
         'WRAPPERS': {
-            'WRAPPER_H': {
+            'WRAPPERH': {
                 'TYPE': 'horizontal',
-                'JOBS_IN_WRAPPER': 'SIM_H',
+                'JOBS_IN_WRAPPER': 'SIMH',
                 'RETRIALS': 0,
             },
         },
     },
-    # Wrapper Horizontal-vertical
     {
-        'DEFAULT': {
-            'EXPID': _EXPID,
-            'HPCARCH': _PLATFORM_NAME,
-        },
         'JOBS': {
-            'SIM_H_V': {
+            'SIMHV': {
                 'DEPENDENCIES': {
-                    'SIM_H_V-1': {}
+                    'SIMHV-1': {}
                 },
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -314,30 +320,25 @@ def test_run_simple_workflow_slurm(autosubmit_exp: 'AutosubmitExperimentFixture'
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
-                'MAX_PROCESSORS': 10,
-                'PROCESSORS_PER_NODE': 10,
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
         'WRAPPERS': {
-            'WRAPPER_H_V': {
+            'WRAPPERHV': {
                 'TYPE': 'horizontal-vertical',
-                'JOBS_IN_WRAPPER': 'SIM_H_V',
+                'JOBS_IN_WRAPPER': 'SIMHV',
                 'RETRIALS': 0,
             },
         },
     },
-    # Wrapper Vertical-horizontal
     {
-        'DEFAULT': {
-            'EXPID': _EXPID,
-            'HPCARCH': _PLATFORM_NAME,
-        },
         'JOBS': {
-            'SIM_V_H': {
+            'SIMVH': {
                 'DEPENDENCIES': {
-                    'SIM_V_H-1': {},
+                    'SIMVH-1': {},
                 },
-                'SCRIPT': 'sleep 0',
+                'SCRIPT': 'echo "0"',
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
@@ -356,14 +357,14 @@ def test_run_simple_workflow_slurm(autosubmit_exp: 'AutosubmitExperimentFixture'
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
-                'MAX_PROCESSORS': 10,
-                'PROCESSORS_PER_NODE': 10,
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
         'WRAPPERS': {
-            'WRAPPER_V_H': {
+            'WRAPPERVH': {
                 'TYPE': 'vertical-horizontal',
-                'JOBS_IN_WRAPPER': 'SIM_V_H',
+                'JOBS_IN_WRAPPER': 'SIMVH',
                 'RETRIALS': 0,
             },
         },
@@ -501,8 +502,8 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
-                'MAX_PROCESSORS': 10,
-                'PROCESSORS_PER_NODE': 10,
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
         'WRAPPERS': {
@@ -619,8 +620,8 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
                 'TEMP_DIR': '',
                 'TYPE': 'slurm',
                 'USER': 'root',
-                'MAX_PROCESSORS': 10,
-                'PROCESSORS_PER_NODE': 10,
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
             },
         },
         'WRAPPERS': {
@@ -640,16 +641,17 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
 def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubmit_exp: 'AutosubmitExperimentFixture',
                                                  slurm_server: 'DockerContainer'):
     """Runs a simple Bash script using Slurm."""
-    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, wrapper=True)
+
+    exp = autosubmit_exp('t002', experiment_data=experiment_data, wrapper=True)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.as_conf.experiment_data = {
         'EXPERIMENT': {
-            'DATELIST': '20120101 20120201',
-            'MEMBERS': '000 001',
+            'DATELIST': '20000101',
+            'MEMBERS': 'fc0 fc1',
             'CHUNKSIZEUNIT': 'day',
-            'CHUNKSIZE': '1',
-            'NUMCHUNKS': '3',
+            'CHUNKSIZE': 1,
+            'NUMCHUNKS': '2',
             'CHUNKINI': '',
             'CALENDAR': 'standard',
         }
@@ -659,6 +661,7 @@ def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubm
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 
+@pytest.mark.docker
 @pytest.mark.slurm
 def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer'):
     exp = autosubmit_exp(_EXPID, experiment_data={
@@ -691,8 +694,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
             },
         }
     }, wrapper=True)
-    submitter = ParamikoSubmitter()
-    submitter.load_platforms(as_conf=exp.as_conf)
+    submitter = ParamikoSubmitter(as_conf=exp.as_conf)
 
     slurm_platform: SlurmPlatform = submitter.platforms[_PLATFORM_NAME]
 
@@ -700,7 +702,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
 
     assert slurm_platform.check_remote_permissions()
 
-    slurm_platform.closeConnection()
+    slurm_platform.close_connection()
     assert not slurm_platform.check_remote_permissions()
 
 
@@ -1087,7 +1089,7 @@ def test_remove_files_on_transfer_slurm(
     autosubmit_exp: "AutosubmitExperimentFixture",
     slurm_server: "DockerContainer",
 ):
-    _NEW_EXPID = "t444" # Use a different EXPID to avoid conflicts
+    _NEW_EXPID = "t444"  # Use a different EXPID to avoid conflicts
     exp = autosubmit_exp(_NEW_EXPID, experiment_data=experiment_data)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
@@ -1107,3 +1109,40 @@ def test_remove_files_on_transfer_slurm(
 
     for filename in filenames:
         assert not bool(re.match(r".*\.(out|err)(\.(xz|gz))?$", filename))
+
+
+def test_check_if_packages_are_ready_to_build(autosubmit_exp):
+    exp = autosubmit_exp('a000', experiment_data={})
+    platform_config = {
+        "LOCAL_ROOT_DIR": exp.as_conf.basic_config.LOCAL_ROOT_DIR,
+        "LOCAL_TMP_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR+'exp_tmp_dir'),
+        "LOCAL_ASLOG_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR+'aslogs_dir')
+    }
+    platform = SlurmPlatform('a000', "wrappers_test", platform_config)
+
+    job_list = JobList('a000', exp.as_conf, YAMLParserFactory(), JobListPersistencePkl())
+    for i in range(3):
+        job = Job(f"job{i}", i, Status.READY, 0)
+        job.section = f"SECTION{i}"
+        job.platform = platform
+        job_list._job_list.append(job)
+
+    packager = JobPackager(exp.as_conf, platform, job_list)
+    packager.wallclock = "01:00"
+    packager.het = {
+        'HETSIZE': {'CURRENT_QUEUE': ''},
+        'CURRENT_QUEUE': '',
+        'NODES': [2],
+        'PARTITION': [''],
+        'CURRENT_PROJ': '',
+        'EXCLUSIVE': 'false',
+        'MEMORY': '',
+        'MEMORY_PER_TASK': 2,
+        'NUMTHREADS': '',
+        'RESERVATION': '',
+        'CUSTOM_DIRECTIVES': '',
+        'TASKS': ''
+    }
+
+    job_result, check = packager.check_if_packages_are_ready_to_build()
+    assert check and len(job_result) == 3

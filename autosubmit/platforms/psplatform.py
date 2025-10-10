@@ -43,10 +43,10 @@ class PsPlatform(ParamikoPlatform):
         self.job_status['FAILED'] = []
         self.update_cmds()
 
-    def get_checkAlljobs_cmd(self, jobs_id):
+    def get_check_all_jobs_cmd(self, jobs_id):
         pass  # pragma: no cover
 
-    def parse_Alljobs_output(self, output, job_id):
+    def parse_all_jobs_output(self, output, job_id):
         pass  # pragma: no cover
 
     def parse_queue_reason(self, output, job_id):
@@ -55,7 +55,7 @@ class PsPlatform(ParamikoPlatform):
     def create_a_new_copy(self):
         return PsPlatform(self.expid, self.name, self.config)
 
-    def submit_Script(self, hold=False):
+    def submit_script(self, hold=False):
         pass  # pragma: no cover
 
     def update_cmds(self):
@@ -67,8 +67,10 @@ class PsPlatform(ParamikoPlatform):
         self.put_cmd = "scp"
         self.get_cmd = "scp"
         self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
-        self.remove_checker = "rm -rf " + os.path.join(self.scratch, self.project_dir,self.user,"ps_permission_checker_azxbyc")
-        self.mkdir_checker = "mkdir -p " + os.path.join(self.scratch, self.project_dir,self.user,"ps_permission_checker_azxbyc")
+        self.remove_checker = "rm -rf " + os.path.join(self.scratch, self.project_dir, self.user,
+                                                       "ps_permission_checker_azxbyc")
+        self.mkdir_checker = "mkdir -p " + os.path.join(self.scratch, self.project_dir, self.user,
+                                                        "ps_permission_checker_azxbyc")
 
     def get_checkhost_cmd(self):
         return self._checkhost_cmd
@@ -82,7 +84,7 @@ class PsPlatform(ParamikoPlatform):
     def parse_job_output(self, output):
         return output
 
-    def get_submitted_job_id(self, output, x11 = False):
+    def get_submitted_job_id(self, output, x11=False):
         return output
 
     def get_submit_cmd(self, job_script, job, hold=False, export=""):
@@ -92,11 +94,11 @@ class PsPlatform(ParamikoPlatform):
             export += " ; "
         return self.get_call(job_script, job, export=export, timeout=job.wallclock_in_seconds)
 
-    def get_checkjob_cmd(self, job_id):
+    def get_check_job_cmd(self, job_id):
         return self.get_pscall(job_id)
 
-    def check_Alljobs(self, job_list, as_conf, retries=5):
-        for job,prev_status in job_list:
+    def check_all_jobs(self, job_list, as_conf, retries=5):
+        for job, prev_status in job_list:
             self.check_job(job)
 
     def check_remote_permissions(self) -> bool:

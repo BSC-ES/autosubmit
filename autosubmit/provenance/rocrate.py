@@ -188,15 +188,14 @@ def _get_git_branch_and_commit(project_path: str) -> tuple[str, str]:
     """
     try:
         output = subprocess.check_output(
-            "cd {0}; git rev-parse --abbrev-ref HEAD".format(project_path),
-            shell=True, text=True)
+            f"cd {project_path}; git rev-parse --abbrev-ref HEAD", shell=True, text=True)
     except subprocess.CalledProcessError as e:
         raise AutosubmitCritical("Failed to retrieve project branch...", 7014, str(e))
 
     project_branch = output.strip()
     Log.debug("Project branch is: " + project_branch)
     try:
-        output = subprocess.check_output("cd {0}; git rev-parse HEAD".format(project_path), shell=True, text=True)
+        output = subprocess.check_output(f"cd {project_path}; git rev-parse HEAD", shell=True, text=True)
     except subprocess.CalledProcessError as e:
         raise AutosubmitCritical("Failed to retrieve project commit SHA...", 7014, str(e))
     project_sha = output.strip()

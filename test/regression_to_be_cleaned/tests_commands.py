@@ -1,35 +1,35 @@
 
 
 def generate_experiment_cmd(hpc, description):
-    return 'autosubmit expid -H ' + hpc + ' -d ' + description
+    return f'autosubmit expid -H {hpc} -d {description}'
 
 
 def create_experiment_cmd(experiment_id):
-    return 'autosubmit -lf EVERYTHING -lc EVERYTHING create {0} --hide'.format(experiment_id)
+    return f'autosubmit -lf EVERYTHING -lc EVERYTHING create {experiment_id} --hide'
 
 
 def run_experiment_cmd(experiment_id):
-    return 'autosubmit -lf EVERYTHING -lc EVERYTHING run {0}'.format(experiment_id)
+    return f'autosubmit -lf EVERYTHING -lc EVERYTHING run {experiment_id}'
 
 
 def monitor_experiment_cmd(experiment_id):
-    return 'autosubmit -lf EVERYTHING -lc EVERYTHING monitor {0} --hide'.format(experiment_id)
+    return f'autosubmit -lf EVERYTHING -lc EVERYTHING monitor {experiment_id} --hide'
 
 
 def refresh_experiment_cmd(experiment_id):
-    return 'autosubmit -lf EVERYTHING -lc EVERYTHING refresh {0}'.format(experiment_id)
+    return f'autosubmit -lf EVERYTHING -lc EVERYTHING refresh {experiment_id}'
 
 
 def recovery_experiment_cmd(experiment_id):
-    return 'autosubmit -lf EVERYTHING -lc EVERYTHING recovery {0} --all --hide -s'.format(experiment_id)
+    return f'autosubmit -lf EVERYTHING -lc EVERYTHING recovery {experiment_id} --all --hide -s'
 
 
 def check_experiment_cmd(experiment_id):
-    return 'autosubmit -lf EVERYTHING -lc EVERYTHING check {0}'.format(experiment_id)
+    return f'autosubmit -lf EVERYTHING -lc EVERYTHING check {experiment_id}'
 
 
 def stats_experiment_cmd(experiment_id):
-    return 'autosubmit -lf EVERYTHING -lc EVERYTHING stats {0} --hide'.format(experiment_id)
+    return f'autosubmit -lf EVERYTHING -lc EVERYTHING stats {experiment_id} --hide'
 
 
 def create_database_cmd():
