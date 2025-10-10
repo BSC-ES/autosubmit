@@ -69,8 +69,7 @@ def test_load_save_load(as_db: str, autosubmit_exp):
         }
     })
 
-    submitter = ParamikoSubmitter()
-    submitter.load_platforms(exp.as_conf)
+    submitter = ParamikoSubmitter(as_conf=exp.as_conf)
 
     # TODO: We already have the AS experiment from the call above, it'd be nicer
     #       to use the jobs from that experiment instead of recreating here.

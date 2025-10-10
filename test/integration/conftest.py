@@ -293,8 +293,7 @@ class MakeSSHClientFixture(Protocol):
         ...
 
 
-def _make_ssh_client(ssh_port: int, password: Optional[str], key: Optional[Union['Path', str]],
-                     mfa: Optional[bool] = False) -> paramiko.SSHClient:
+def _make_ssh_client(ssh_port: int, password: Optional[str], key: Optional[Union['Path', str]]) -> paramiko.SSHClient:
     """Creates the SSH client
 
     It modifies the list of arguments so that the port is always
@@ -390,18 +389,18 @@ def ps_platform() -> PsPlatform:
     return platform
 
 
-def _markers_contain(request: "FixtureRequest", text: str) -> bool:
+def _markers_contain(request: "FixtureRequest", txt: str) -> bool:
     """Check if a marker is used in the test.
 
     Returns ``True`` if the caller test is decorated with a
     marker that matches the given text. Otherwise, ``False``.
     """
     markers = request.node.iter_markers()
-    return any(marker.name == text for marker in markers)
+    return any(marker.name == txt for marker in markers)
 
 
 @pytest.fixture
-def ssh_server(mocker, tmp_path, request) -> DockerContainer:
+def ssh_server(mocker, tmp_path, request) -> Generator[DockerContainer, None, None]:
     ssh_port = get_free_port()
 
     user = getuser() or "unknown"
@@ -427,11 +426,11 @@ def ssh_server(mocker, tmp_path, request) -> DockerContainer:
             .with_bind_ports(2222, ssh_port) as container:
         wait_for_logs(container, 'sshd is listening on port 2222')
 
-        ssh_client = _make_ssh_client(ssh_port, _SSH_DOCKER_PASSWORD, None, mfa)
+        ssh_client = _make_ssh_client(ssh_port, _SSH_DOCKER_PASSWORD, None)
         mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
 
         if mfa:
-            # It uses Transport, and not SSH client directly. Ideally, we would be able
+            # It uses a Transport and not an SSH client directly. Ideally, we would be able
             # to use just one way
             original_paramiko_config = paramiko.SSHConfig()
             with open(Path('~/.ssh/config').expanduser()) as f:
@@ -530,7 +529,7 @@ def _setup_pg_db(conn: Connection) -> None:
 
 
 @pytest.fixture(scope='session', autouse=True)
-def postgres_server(request: 'FixtureRequest') -> Generator[PostgresContainer, None, None]:
+def postgres_server(request: 'FixtureRequest') -> Generator[Optional[PostgresContainer], None, None]:
     """Fixture to set up and tear down a Postgres database for testing.
 
     Enabled only if the mark 'postgres' was specified.
@@ -539,7 +538,6 @@ def postgres_server(request: 'FixtureRequest') -> Generator[PostgresContainer, N
     """
     mark_expression = request.config.option.markexpr
     if mark_expression and 'postgres' not in mark_expression:
-        # print("Skipping Postgres setup because -m 'postgres' was not specified")
         yield None
     else:
         pg_random_port = get_free_port()
@@ -593,7 +591,7 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
             db = db.split('[')[0]
         db = f'{db}_{time_ns()}'
 
-        # Create new DB to run the current test completely isolated from others.
+        # Create a new DB to run the current test completely isolated from others.
         # We use the test name, minus the [params], appending the current nanoseconds
         # instead to distinguish parametrized tests too -- really isolated.
         from sqlalchemy import create_engine, text

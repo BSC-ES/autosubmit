@@ -38,9 +38,9 @@ def test_stop_bypass_prompt_confirmation(
     passed_args = ["autosubmit", "stop"] + (["-y"] if force_yes else []) + [_EXPID]
     mocker.patch("sys.argv", passed_args)
 
-    mock_input = mocker.patch("builtins.input")
+    mock_input = mocker.patch("autosubmit.autosubmit.input")
     mock_input.return_value = "no"
 
-    assert main() is None
+    assert main() == 0
 
     assert mock_input.call_count == (0 if force_yes else 1)
