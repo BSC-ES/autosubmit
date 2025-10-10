@@ -286,7 +286,7 @@ class Log:
                 sleep(timeout * retries)
 
     @staticmethod
-    def reset_status_file(file_path: str, type='status', level=WARNING) -> None:
+    def reset_status_file(file_path: str, type: str = 'status') -> None:
         """
         Configure the file to store the log. If another file was specified earlier, new messages will only go to the
         new file.
@@ -294,7 +294,6 @@ class Log:
         :param file_path: file to store the log
         :type file_path: str
         :param type: file type
-        :param level: log level
         """
         try:
             # test = Log.log.handlers
