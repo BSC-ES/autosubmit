@@ -29,8 +29,8 @@ from typing import Optional
 
 import pytest
 from bscearth.utils.date import date2str
-from mock import Mock, MagicMock
-from mock.mock import patch
+from mock import Mock, MagicMock  # type: ignore
+from mock.mock import patch  # type: ignore
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.configcommon import AutosubmitConfig
@@ -432,7 +432,7 @@ CONFIG:
                             configuration.flush()
 
                         mocked_basic_config = FakeBasicConfig
-                        mocked_basic_config.read = MagicMock()
+                        mocked_basic_config.read = MagicMock()  # type: ignore
 
                         mocked_basic_config.LOCAL_ROOT_DIR = str(temp_dir)
                         mocked_basic_config.STRUCTURES_DIR = '/dummy/structures/dir'
@@ -490,8 +490,8 @@ CONFIG:
                                 job.check_script(config, parameters)
                                 # create the script
                                 job.create_script(config)
-                                with open(Path(temp_dir, f'{expid}/tmp/t000_A.cmd'), 'r') as file:
-                                    full_script = file.read()
+                                with open(Path(temp_dir, f'{expid}/tmp/t000_A.cmd'), 'r') as file:  # type: ignore
+                                    full_script = file.read()  # type: ignore
                                     if "header" in extended_position:
                                         assert header_content in full_script
                                     if "tailer" in extended_position:
@@ -538,8 +538,8 @@ CONFIG:
                             # create the script
                             job.create_script(config)
                             # finally, if we don't have scripts, check if the placeholders have been removed
-                            with open(Path(temp_dir, f'{expid}/tmp/t000_A.cmd'), 'r') as file:
-                                final_script = file.read()
+                            with open(Path(temp_dir, f'{expid}/tmp/t000_A.cmd'), 'r') as file:  # type: ignore
+                                final_script = file.read()  # type: ignore
                                 assert "%EXTENDED_HEADER%" not in final_script
                                 assert "%EXTENDED_TAILER%" not in final_script
 
@@ -1795,8 +1795,11 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
     # When the file already exists, it will append new content. It must never
     # delete the existing lines, so this assertion just verifies the content
     # written previously (if any) was not removed.
-    existing_lines = len(existing_lines.split('\n')) - 1 if existing_lines else 0
-    expected_lines = existing_lines + 1
+    if existing_lines:
+        lines = len(existing_lines.split('\n')) - 1
+    else:
+        lines = 0
+    expected_lines = lines + 1
     assert len(total_stats.read_text().split('\n')) == expected_lines
 
 
