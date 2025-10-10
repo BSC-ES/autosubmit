@@ -415,11 +415,11 @@ def slurm_server(session_mocker, tmp_path_factory):
     }
 
     docker_container = DockerContainer(
-            image=_SLURM_DOCKER_IMAGE,
-            remove=True,
-            hostname='slurmctld',
-            name=container_name,
-            **docker_args
+        image=_SLURM_DOCKER_IMAGE,
+        remove=True,
+        hostname='slurmctld',
+        name=container_name,
+        **docker_args
     )
 
     # TODO: GH needs --volume /sys/fs/cgroup:/sys/fs/cgroup:rw

@@ -278,10 +278,8 @@ class PJMWrapperFactory(WrapperFactory):
 
     def nodes_directive(self, nodes):
         return f'#PJM -N {nodes}'
-
     def processors_directive(self, processors):
         return f'#PJM -n {processors}'
-
     def threads_directive(self, threads):
         return f"export OMP_NUM_THREADS={threads}"
 
@@ -306,6 +304,6 @@ class EcWrapperFactory(WrapperFactory):
         return queue
 
     def dependency_directive(self, dependency):
-        return '#PBS -v depend=afterok:{0}'.format(dependency)
+        return f'#PBS -v depend=afterok:{dependency}'
 
 
