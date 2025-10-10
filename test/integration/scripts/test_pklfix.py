@@ -29,7 +29,8 @@ if TYPE_CHECKING:
 
 _EXPID = "t111"
 
-
+#TODO there is no pklfix, dbfix is not yet implemented
+@pytest.skip(allow_module_level=True)
 @pytest.mark.parametrize("force", [True, False])
 def test_pklfix_bypass_prompt_confirmation(autosubmit_exp, mocker: 'MockerFixture', force: bool):
     """Test if the --force option bypasses the prompt confirmation."""
