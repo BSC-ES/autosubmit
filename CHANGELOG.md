@@ -10,6 +10,7 @@ platform does not support wrappers anymore (it was used for testing).
 **Bug fixes:**
 
 - Fixed issue with the verification of dirty Git local repositories in operational experiments #2446
+- Fixed error when cleaning projects that use Git #2524
 
 **Enhancements:**
 
