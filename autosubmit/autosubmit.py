@@ -1367,8 +1367,8 @@ class Autosubmit:
         return content
 
     @staticmethod
-    def as_conf_default_values(exp_id, hpc, minimal_configuration=False, git_repo="", git_branch="main",
-                               git_as_conf=""):
+    def as_conf_default_values(exp_id:str, hpc:str = "local", minimal_configuration:bool = False, git_repo:str = "",
+                               git_branch:str = "main", git_as_conf:str = "") -> None:
         """
         Replace default values in as_conf files
         :param exp_id: experiment id
@@ -1380,7 +1380,6 @@ class Autosubmit:
         :return: None
         """
         # the var hpc was hardcoded in the header of the function
-        hpc_default = "local"
 
         # open and replace values
         for as_conf_file in Path(BasicConfig.LOCAL_ROOT_DIR, f"{exp_id}/conf").iterdir():
@@ -1404,12 +1403,13 @@ class Autosubmit:
                         x = search.group(0).split(":")
                         # clean blank space, quotes and double quote
                         aux = x[1].strip(' "\'')
-                        # hpc in config is empty && -H is empty-> hpc_default will be introduced
-                        if len(aux) == 0 and not hpc:
-                            content = content.replace(search.group(0), f"HPCARCH: \"{hpc_default}\"")
                         # hpc in config is empty && -H has a value-> write down hpc value
-                        elif len(aux) == 0:
+                        if hpc != "":
                             content = content.replace(search.group(0), f"HPCARCH: \"{hpc}\"")
+                        elif len(aux) > 0:
+                            content = content.replace(search.group(0), f"HPCARCH: \"{aux}\"")
+                        else:
+                            content = content.replace(search.group(0), "HPCARCH: \"local\"")
                         # the other case is aux!=0 that we dont care about val(hpc) because its a copyExpId
                     if minimal_configuration:
                         search = re.search('CUSTOM_CONFIG: .*', content, re.MULTILINE)
