@@ -1,0 +1,9 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+echo "Enabling X11 in SSH server"
+
+sed -i 's/X11Forwarding no/X11Forwarding yes/' /config/sshd/sshd_config
+sed -i 's/#X11DisplayOffset 10/X11DisplayOffset 10/' /config/sshd/sshd_config
+sed -i 's/#X11UseLocalhost yes/X11UseLocalhost yes/' /config/sshd/sshd_config
+

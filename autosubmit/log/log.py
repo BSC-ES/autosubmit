@@ -177,7 +177,7 @@ class Log:
     log.addHandler(console_handler)
 
     def __init__(self):
-        pass
+        pass  # pragma: no cover
 
     def init_variables(self, file_path="") -> None:
         self.file_path = file_path
