@@ -742,11 +742,13 @@ class Job(object):
                             f"Extended {error_message_type} script: script {script_name} seems Python but job"
                             f" {self.script_name} isn't\n", 7011)
                 else:
+                    # TODO: Check why the fstring is not working for the text below
                     raise AutosubmitCritical(
                         "Extended {1} script: couldn't figure out script {0} type\n".format(script_name,
                         error_message_type), 7011)
 
         if not found_hashbang:
+            # TODO: Check why the fstring is not working for the text below
             raise AutosubmitCritical(
                 "Extended {1} script: couldn't figure out script {0} type\n".format(script_name,
                                                                                     error_message_type), 7011)
@@ -1433,6 +1435,7 @@ class Job(object):
         if new_status == Status.COMPLETED:
             Log.debug(
                 "{0} job seems to have completed: checking...".format(self.name))
+            self._platform.get_completed_files(self.name, wrapper_failed=self.packed)
             self.check_completion()
         else:
             self.status = new_status
