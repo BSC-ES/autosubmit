@@ -31,7 +31,6 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.experiment.experiment_common import new_experiment, copy_experiment
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
-from test.conftest import _initialize_autosubmitrc
 
 _EXPID = 't000'
 _DESCRIPTION = "for testing"
@@ -88,7 +87,6 @@ def test_expid_mutually_exclusive_arguments(type_flag: str, autosubmit: Autosubm
     :param autosubmit: Autosubmit interface that instantiate with no experiment.
     """
     autosubmit.install()
-    base_experiment = autosubmit_exp('t000', experiment_data={})  # this calls to _initialize_autosubmitrc(tmp_path)
 
     is_operational = type_flag == 'op'
     is_evaluation = type_flag == 'ev'

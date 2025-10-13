@@ -14,6 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Dict
@@ -28,7 +29,7 @@ from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.database.tables import WrapperJobsTable, get_table_from_name, JobsTable, ExperimentStructureTable
 from autosubmit.job.job import Job
 from autosubmit.job.job_list import JobList
-from test.conftest import autosubmit_config
+import inspect
 
 raw_job_list = [
     {'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None, 'finish_time_timestamp': None,
@@ -69,6 +70,23 @@ raw_graph_edges = [
 
 # --- Fixtures.
 
+@pytest.fixture(scope='function')
+def _expid(as_exp):
+    """
+    Creates a new expid and returns the EXPID
+    """
+    return as_exp.expid
+
+
+@pytest.fixture(scope='function')
+def as_exp(autosubmit_exp):
+    """
+    Creates a new expid and returns the EXPID
+    """
+    as_exp = autosubmit_exp(blank_experiment=True)
+    return as_exp
+
+
 def _modify_data(expid, conf_dir, data) -> Path:
     data_path = conf_dir / f"{expid}.yml"
     yaml = YAML()
@@ -78,11 +96,6 @@ def _modify_data(expid, conf_dir, data) -> Path:
 
 
 def _init_test(as_exp, conf_dir, data) -> Path:
-    as_exp.autosubmit._check_ownership_and_set_last_command(
-        as_exp.as_conf,
-        as_exp.expid,
-        'create')
-
     for f in conf_dir.glob('*.yml'):
         f.unlink()
 
@@ -100,7 +113,7 @@ def _assert_exit_code(final_status: str, exit_code: int) -> None:
         assert exit_code == 0
 
 
-def _get_expected_job_names(expid, unified_data, once_sections = []) -> list[str]:
+def _get_expected_job_names(expid, unified_data, once_sections=[]) -> list[str]:
     # job names are in the format expid_section_<date>_<member>_<chunk>_<split>
     # All recieved is running at chunk level
     dates = unified_data['EXPERIMENT']['DATELIST']
@@ -125,17 +138,15 @@ def _get_expected_job_names(expid, unified_data, once_sections = []) -> list[str
             if splits:
                 splits = int(splits)
                 for split in range(1, splits + 1) if splits else [None]:
-                        job_names.append(f"{expid}_{str(split)}_{section}".upper())
+                    job_names.append(f"{expid}_{str(split)}_{section}".upper())
             else:
                 job_names.append(f"{expid}_{section}".upper())
 
     return job_names
 
 
-def generate_job_list(autosubmit_config, db_manager) -> JobList:
+def generate_job_list(as_conf, db_manager) -> JobList:
     """Generate a JobList with the raw_job_list data."""
-    as_conf = autosubmit_config("dummy-expid", {})
-
     job_list = JobList("dummy-expid", as_conf, YAMLParserFactory(), run_mode=True)
     job_list.dbmanager = db_manager
 
@@ -157,33 +168,22 @@ def _create_db_manager(db_path: Path = None, schema: str = None) -> JobsDbManage
 
 
 @pytest.mark.parametrize(
-    'db_engine,options,full_load',
-    [
-        # postgres
-        pytest.param('postgres', {'schema': 'test_schema'}, True,
-                     marks=[pytest.mark.postgres, pytest.mark.docker]),
-        pytest.param('postgres', {'schema': 'test_schema'}, False,
-                     marks=[pytest.mark.postgres, pytest.mark.docker]),
-        # sqlite
-        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999}, True),
-        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999}, False)
-    ]
+    'full_load',
+    [True, False]
 )
 def test_db_job_list_edges(
         tmp_path: Path,
-        db_engine: str,
-        options: dict,
         full_load: bool,
-        request: pytest.FixtureRequest
+        as_db: str,
+        _expid: str
 ):
-    # Load dynamically the fixture,
-    # ref: https://stackoverflow.com/a/64348247.
-    request.getfixturevalue(f"as_db_{db_engine}")
-    raw_graph_edges_local = raw_graph_edges
-    if db_engine == 'sqlite':
-        db_manager = _create_db_manager(db_path=tmp_path / options['db_name'])
+    db_path = tmp_path
+    if as_db == 'sqlite':
+        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
     else:
-        db_manager = _create_db_manager(schema=options['schema'])
+        db_manager = _create_db_manager(schema=_expid)
+
+    raw_graph_edges_local = raw_graph_edges
 
     # Table is empty ( created by load_edges or any method )
     result = db_manager.load_edges(raw_job_list, full_load=full_load)
@@ -214,27 +214,17 @@ def test_db_job_list_edges(
 
 
 @pytest.mark.parametrize(
-    'db_engine,options,full_load',
-    [
-        # postgres
-        pytest.param('postgres', {'schema': 'test_schema'}, True,
-                     marks=[pytest.mark.postgres, pytest.mark.docker]),
-        pytest.param('postgres', {'schema': 'test_schema'}, False,
-                     marks=[pytest.mark.postgres, pytest.mark.docker]),
-        # sqlite
-        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999}, True),
-        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999}, False)
-    ]
+    'full_load',
+    [True, False]
 )
-def test_db_job_list_jobs(tmp_path: Path, db_engine: str, options: dict, request, full_load: bool,
-                          autosubmit_config):
-    request.getfixturevalue(f"as_db_{db_engine}")
-    if db_engine == 'sqlite':
-        db_manager = _create_db_manager(db_path=tmp_path / options['db_name'])
+def test_db_job_list_jobs(tmp_path: Path, full_load: bool, as_db: str, autosubmit_exp, _expid: str):
+    as_exp = autosubmit_exp(_expid)
+    db_path = tmp_path
+    if as_db == 'sqlite':
+        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
     else:
-        db_manager = _create_db_manager(schema=options['schema'])
-
-    job_list = generate_job_list(autosubmit_config, db_manager)
+        db_manager = _create_db_manager(schema=f"{_expid}")
+    job_list = generate_job_list(as_exp.as_conf, db_manager)
     job_list.save_jobs()
     job_list.save_edges()
 
@@ -261,56 +251,37 @@ def test_db_job_list_jobs(tmp_path: Path, db_engine: str, options: dict, request
 
 
 @pytest.mark.parametrize(
-    'db_engine,options,full_load',
-    [
-        # postgres
-        pytest.param('postgres', {'schema': 'test_schema'}, True,
-                     marks=[pytest.mark.postgres, pytest.mark.docker]),
-        pytest.param('postgres', {'schema': 'test_schema'}, False,
-                     marks=[pytest.mark.postgres, pytest.mark.docker]),
-        # sqlite
-        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999}, True),
-        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999}, False)
-    ]
+    'full_load',
+    [True, False]
 )
 def test_db_job_list_jobs_and_edges_together(
         tmp_path: Path,
-        db_engine: str,
-        options: dict,
         full_load: bool,
-        request: pytest.FixtureRequest,
-        autosubmit_config: Callable
+        as_db: str,
+        as_exp: Any,
+        _expid: str
 ):
     """
     Test loading and saving both jobs and edges together with different full_load options.
 
     This test verifies that JobList's database manager can correctly save and load
     both jobs and graph edges in a coordinated way.
-
-    :param tmp_path: Temporary directory path for SQLite database files
+    :param tmp_path: Temporary directory path
     :type tmp_path: Path
-    :param db_engine: Database engine to use ('sqlite' or 'postgres')
-    :type db_engine: str
-    :param options: Database connection options
-    :type options: dict
-    :param full_load: Whether to use full_load when loading data
+    :param full_load: Whether to perform a full load of jobs and edges
     :type full_load: bool
-    :param request: Pytest request fixture for accessing other fixtures
-    :type request: pytest.FixtureRequest
-    :param autosubmit_config: Fixture to create a test configuration
-    :type autosubmit_config: Callable
+    :param _expid: Experiment ID fixture
+    :type _expid: str
     """
-    # Load database fixture
-    request.getfixturevalue(f"as_db_{db_engine}")
-
-    # Create database manager
-    if db_engine == 'sqlite':
-        db_manager = _create_db_manager(db_path=tmp_path / options['db_name'])
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+    db_path = exp_path / "db"
+    if as_db == 'sqlite':
+        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
     else:
-        db_manager = _create_db_manager(schema=options['schema'])
+        db_manager = _create_db_manager(schema=_expid)
 
     # Create and save original job list with jobs and edges
-    job_list = generate_job_list(autosubmit_config, db_manager)
+    job_list = generate_job_list(as_exp.as_conf, db_manager)
     job_list.dbmanager = db_manager
 
     # Save jobs and edges to database
@@ -345,21 +316,13 @@ def test_db_job_list_jobs_and_edges_together(
 
 
 @pytest.mark.parametrize(
-    'db_engine,options',
-    [
-        # postgres
-        pytest.param('postgres', {'schema': 'test_schema'},
-                     marks=[pytest.mark.postgres, pytest.mark.docker]),
-        # sqlite
-        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999})
-    ]
+    'full_load',
+    [True, False]
 )
 def test_load_job_by_name(
         tmp_path: Path,
-        db_engine: str,
-        options: dict,
-        request: pytest.FixtureRequest,
-        autosubmit_config: Callable
+        full_load: bool,
+        as_exp: Callable
 ):
     """
     Test loading a job by its name from the database.
@@ -372,8 +335,8 @@ def test_load_job_by_name(
     :type options: dict
     :param request: Pytest request fixture for accessing other fixtures
     :type request: pytest.FixtureRequest
-    :param autosubmit_config: Fixture to create a test configuration
-    :type autosubmit_config: Callable
+    :param as_exp.as_conf: Fixture to create a test configuration
+    :type as_exp.as_conf: Callable
     """
     # Load database fixture
     request.getfixturevalue(f"as_db_{db_engine}")
@@ -383,7 +346,7 @@ def test_load_job_by_name(
     else:
         db_manager = _create_db_manager(schema=options['schema'])
 
-    job_list = generate_job_list(autosubmit_config, db_manager)
+    job_list = generate_job_list(as_exp.as_conf, db_manager)
     job_list.save_jobs()
 
     job_name = "a01f_LOCAL_SETUP"
@@ -409,29 +372,24 @@ def test_load_job_by_name(
 
 
 @pytest.mark.parametrize(
-    'db_engine,options',
-    [
-        # postgres
-        pytest.param('postgres', {'schema': 'test_schema'},
-                     marks=[pytest.mark.postgres, pytest.mark.docker]),
-        # sqlite
-        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999})
-    ]
+    'full_load',
+    [True, False]
 )
 def test_select_latest_inner_jobs(
         tmp_path: Path,
-        db_engine: str,
-        options: dict,
-        request: pytest.FixtureRequest,
-        autosubmit_config: Callable
+        as_db: str,
+        full_load: bool,
+        _expid: str,
+        as_exp: Any,
 ):
-    request.getfixturevalue(f"as_db_{db_engine}")
-    if db_engine == 'sqlite':
-        db_manager = _create_db_manager(db_path=tmp_path / options['db_name'])
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+    db_path = exp_path / "db"
+    if as_db == 'sqlite':
+        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
     else:
-        db_manager = _create_db_manager(schema=options['schema'])
+        db_manager = _create_db_manager(schema=_expid)
 
-    job_list = generate_job_list(autosubmit_config, db_manager)
+    job_list = generate_job_list(as_exp.as_conf, db_manager)
     job_list.save_jobs()
 
     # prepare wrapper
@@ -498,30 +456,25 @@ def test_select_latest_inner_jobs(
 
 
 @pytest.mark.parametrize(
-    'db_engine,options',
-    [
-        # postgres
-        pytest.param('postgres', {'schema': 'test_schema'},
-                     marks=[pytest.mark.postgres, pytest.mark.docker]),
-        # sqlite
-        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999})
-    ]
+    'full_load',
+    [True, False]
 )
 def test_load_job_by_name(
         tmp_path: Path,
-        db_engine: str,
-        options: dict,
-        request: pytest.FixtureRequest,
-        autosubmit_config: Callable
+        full_load: bool,
+        as_db: str,
+        _expid: str,
+        as_exp: Any,
 ):
-    request.getfixturevalue(f"as_db_{db_engine}")
-    if db_engine == 'sqlite':
-        db_manager = _create_db_manager(db_path=tmp_path / options['db_name'])
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+    db_path = exp_path / "db"
+    if as_db == 'sqlite':
+        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
     else:
-        db_manager = _create_db_manager(schema=options['schema'])
+        db_manager = _create_db_manager(schema=_expid)
 
     # Generate and save some jobs
-    job_list = generate_job_list(autosubmit_config, db_manager)
+    job_list = generate_job_list(as_exp.as_conf, db_manager)
     job_list.save_jobs()
 
     # this returns the raw tuple, convert to dict for easier testing
@@ -543,34 +496,25 @@ def test_load_job_by_name(
 
 
 @pytest.mark.parametrize(
-    'db_engine,options,preview',
-    [
-        # postgres
-        pytest.param('postgres', {'schema': 'test_schema'}, False,
-                     marks=[pytest.mark.postgres, pytest.mark.docker]),
-        pytest.param('postgres', {'schema': 'test_schema'}, True,
-                     marks=[pytest.mark.postgres, pytest.mark.docker]),
-        # sqlite
-        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999}, False),
-        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999}, True)
-    ]
+    'preview',
+    [True, False]
 )
 def test_load_wrapper(
         tmp_path: Path,
-        db_engine: str,
-        options: dict,
         preview: bool,
-        request: pytest.FixtureRequest,
-        autosubmit_config: Callable
+        as_db: str,
+        _expid: str,
+        as_exp: Any,
 ):
-    request.getfixturevalue(f"as_db_{db_engine}")
-    if db_engine == 'sqlite':
-        db_manager = _create_db_manager(db_path=tmp_path / options['db_name'])
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+    db_path = exp_path / "db"
+    if as_db == 'sqlite':
+        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
     else:
-        db_manager = _create_db_manager(schema=options['schema'])
+        db_manager = _create_db_manager(schema=_expid)
 
     # Generate and save some jobs
-    job_list = generate_job_list(autosubmit_config, db_manager)
+    job_list = generate_job_list(as_exp.as_conf, db_manager)
     for job in job_list.job_list:
         job.status = 2
     job_list.save_jobs()
@@ -630,44 +574,28 @@ def test_load_wrapper(
         assert inner_job['job_name'] in [job.name for job in job_list.job_list[:3]]
 
 
-@pytest.mark.parametrize(
-    'db_engine,options',
-    [
-        # postgres
-        pytest.param('postgres', {'schema': 'test_schema'},
-                     marks=[pytest.mark.postgres, pytest.mark.docker]),
-        # sqlite
-        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999})
-    ]
-)
 def test_clear_unused_nodes(
         tmp_path: Path,
-        db_engine: str,
-        options: dict,
-        request: pytest.FixtureRequest,
-        autosubmit_config: Callable
+        as_db: str,
+        as_exp: Any,
+        _expid: str
 ):
     """
     Test the clear_unused_nodes method which removes jobs from the database based on configuration differences.
 
     :param tmp_path: Temporary directory path
     :type tmp_path: Path
-    :param db_engine: Database engine to use ('sqlite' or 'postgres')
-    :type db_engine: str
-    :param options: Database connection options
-    :type options: dict
-    :param request: Pytest request fixture for accessing other fixtures
-    :type request: pytest.FixtureRequest
-    :param autosubmit_config: Fixture to create a test configuration
-    :type autosubmit_config: Callable
+    :param as_exp.as_conf: Fixture to create a test configuration
+    :type as_exp.as_conf: Callable
     """
-    request.getfixturevalue(f"as_db_{db_engine}")
-    if db_engine == 'sqlite':
-        db_manager = _create_db_manager(db_path=tmp_path / options['db_name'])
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+    db_path = exp_path / "db"
+    if as_db == 'sqlite':
+        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
     else:
-        db_manager = _create_db_manager(schema=options['schema'])
+        db_manager = _create_db_manager(schema=_expid)
 
-    job_list = generate_job_list(autosubmit_config, db_manager)
+    job_list = generate_job_list(as_exp.as_conf, db_manager)
 
     test_jobs = [
         Job(loaded_data={
@@ -778,26 +706,17 @@ def test_clear_unused_nodes(
         assert loaded_job['name'] == job_name
 
 
-@pytest.mark.parametrize(
-    'db_engine,options',
-    [
-        # postgres
-        # pytest.param('postgres', {'schema': 'test_schema'},
-        #            marks=[pytest.mark.postgres, pytest.mark.docker]),
-        # sqlite
-        pytest.param('sqlite', {'db_name': 'test_db_manager.db', 'db_version': 999})
-    ]
-)
-def test_backup_and_restore(monkeypatch, tmp_path, db_engine: str, request: pytest.FixtureRequest, options: dict):
+def test_backup_and_restore(monkeypatch, tmp_path, _expid, as_db, as_exp: Any):
     """" Test backup of database and restore it afterwards. """
 
-    request.getfixturevalue(f"as_db_{db_engine}")
-    BasicConfig.DATABASE_BACKEND = db_engine
-    if db_engine == 'sqlite':
-        db_manager = _create_db_manager(db_path=tmp_path / options['db_name'])
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+    db_path = exp_path / "db"
+    if as_db == 'sqlite':
+        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
     else:
-        db_manager = _create_db_manager(schema=options['schema'])
-
+        db_manager = _create_db_manager(schema=_expid)
+        # TODO: not implemented
+        return 0
     # Create tables
     jobs_table = get_table_from_name(schema=db_manager.schema, table_name=JobsTable.name)
     edges_table = get_table_from_name(schema=db_manager.schema, table_name=ExperimentStructureTable.name)
@@ -807,8 +726,8 @@ def test_backup_and_restore(monkeypatch, tmp_path, db_engine: str, request: pyte
     sample_job = {
         'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None,
         'finish_time_timestamp': None, 'frequency': None, 'id': 0,
-        'name': 'a01f_LOCAL_SETUP', 'section': 'LOCAL_SETUP',
-        'script_name': 'a01f_LOCAL_SETUP.cmd', 'split': -1, 'splits': -1,
+        'name': f'{_expid}_LOCAL_SETUP', 'section': 'LOCAL_SETUP',
+        'script_name': f'{_expid}_LOCAL_SETUP', 'split': -1, 'splits': -1,
         'status': 'READY', 'local_logs_err': None, 'local_logs_out': None,
         'max_checkpoint_step': 0, 'packed': False, 'platform_name': None,
         'priority': 0, 'ready_date': None, 'remote_logs_err': None,
@@ -818,7 +737,7 @@ def test_backup_and_restore(monkeypatch, tmp_path, db_engine: str, request: pyte
     }
     db_manager.insert(jobs_table.name, sample_job)
     sample_edge = {
-        'e_from': 'a01f_LOCAL_SETUP', 'e_to': 'a01f_REMOTE_SETUP', 'from_step': 0,
+        'e_from': f'{_expid}_LOCAL_SETUP', 'e_to': f'{_expid}_REMOTE_SETUP', 'from_step': 0,
         'min_trigger_status': 'COMPLETED', 'completion_status': 'WAITING', 'fail_ok': True
     }
     db_manager.insert(edges_table.name, sample_edge)
@@ -832,341 +751,340 @@ def test_backup_and_restore(monkeypatch, tmp_path, db_engine: str, request: pyte
     db_manager.drop_table(edges_table.name)
 
     # Restore
-    db_manager.restore()
+    assert 0 == db_manager.restore()
 
-    loaded_job = db_manager.load_job_by_name("a01f_LOCAL_SETUP")
+    loaded_job = db_manager.load_job_by_name(f'{_expid}_LOCAL_SETUP')
     assert loaded_job is not None
-    assert loaded_job['name'] == "a01f_LOCAL_SETUP"
+    assert loaded_job['name'] == f'{_expid}_LOCAL_SETUP'
 
 
 # -- Tests for detecting changes in dependencies -- #
 
 
+DEPENDENCIES_CHANGED_DATA = [
+    {
+        "EXPERIMENT": {
+            "DATELIST": "20000101 20010101",
+            "MEMBERS": "fc0 fc1",
+            "CHUNKSIZEUNIT": "month",
+            "CHUNKSIZE": "4",
+            "NUMCHUNKS": "1",
+            "CHUNKINI": "",
+            "CALENDAR": "standard",
+        }
+    },
+    {
+        "EXPERIMENT": {
+            "DATELIST": "20000101 20010101",
+            "MEMBERS": "fc0 fc1",
+            "CHUNKSIZEUNIT": "month",
+            "CHUNKSIZE": "4",
+            "NUMCHUNKS": "3",
+            "CHUNKINI": "",
+            "CALENDAR": "standard",
+        }
+    },
+    {
+        "EXPERIMENT": {
+            "DATELIST": "20000101 20010101 20020101",
+            "MEMBERS": "fc0 fc1",
+            "CHUNKSIZEUNIT": "month",
+            "CHUNKSIZE": "4",
+            "NUMCHUNKS": "2",
+            "CHUNKINI": "",
+            "CALENDAR": "standard",
+        }
+    },
+    {
+        "EXPERIMENT": {
+            "DATELIST": "20000101",
+            "MEMBERS": "fc0 fc1",
+            "CHUNKSIZEUNIT": "month",
+            "CHUNKSIZE": "4",
+            "NUMCHUNKS": "2",
+            "CHUNKINI": "",
+            "CALENDAR": "standard",
+        }
+    },
+    {
+        "EXPERIMENT": {
+            "DATELIST": "19990101 19990131",
+            "MEMBERS": "fc0 fc1",
+            "CHUNKSIZEUNIT": "month",
+            "CHUNKSIZE": "4",
+            "NUMCHUNKS": "2",
+            "CHUNKINI": "",
+            "CALENDAR": "standard",
+        }
+    },
+    {
+        "EXPERIMENT": {
+            "DATELIST": "20000101 20010101",
+            "MEMBERS": "fc0",
+            "CHUNKSIZEUNIT": "month",
+            "CHUNKSIZE": "4",
+            "NUMCHUNKS": "2",
+            "CHUNKINI": "",
+            "CALENDAR": "standard",
+        }
+    },
+    {
+        "EXPERIMENT": {
+            "DATELIST": "20000101 20010101",
+            "MEMBERS": "fc0 fc1 fc2",
+            "CHUNKSIZEUNIT": "month",
+            "CHUNKSIZE": "4",
+            "NUMCHUNKS": "2",
+            "CHUNKINI": "",
+            "CALENDAR": "standard",
+        }
+    },
+    {
+        "EXPERIMENT": {
+            "DATELIST": "20000101 20010101",
+            "MEMBERS": "fcA fcB",
+            "CHUNKSIZEUNIT": "month",
+            "CHUNKSIZE": "4",
+            "NUMCHUNKS": "2",
+            "CHUNKINI": "",
+            "CALENDAR": "standard",
+        }
+    },
+    {
+        "JOBS": {
+            "vjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vjob-1",
+                "wallclock": "00:01",
+                "splits": 3,
+            },
+            "hjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "hjob-1",
+                "wallclock": "00:01",
+                "splits": 3,
+            },
+            "vhjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vhjob-1",
+                "wallclock": "00:01",
+                "splits": 3,
+            },
+            "hvjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "hvjob-1",
+                "wallclock": "00:01",
+                "splits": 3,
+            },
+            "job": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "job-1",
+                "wallclock": "00:01",
+                "splits": 3,
+            }
+        }
+    },
+    {
+        "JOBS": {
+            "vjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vjob-1",
+                "wallclock": "00:01",
+                "splits": 3,
+            },
+            "hjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "hjob-1",
+                "wallclock": "00:01",
+                "splits": 3,
+            },
+            "vhjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vhjob-1",
+                "wallclock": "00:01",
+                "splits": 3,
+            },
+            "hvjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "hvjob-1",
+                "wallclock": "00:01",
+                "splits": 3,
+            },
+            "job": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "job-1",
+                "wallclock": "00:01",
+                "splits": 3,
+            }
+        }
+    },
+    {
+        "JOBS": {
+            "vjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vjob-1",
+                "wallclock": "00:01",
+                "splits": 3,
+            },
+            "hjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "hjob-1",
+                "wallclock": "00:01",
+                "splits": 3,
+            },
+            "vhjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vhjob-1",
+                "wallclock": "00:01",
+                "splits": 3,
+            },
+            "hvjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "hvjob-1",
+                "wallclock": "00:01",
+                "splits": 3,
+            },
+            "job": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "job-1",
+                "wallclock": "00:01",
+                "splits": 3,
+            }
+        }
+    },
+    {
+        "JOBS": {
+            "hjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "hjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "vhjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vhjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "vjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "hvjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "hvjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+        }
+    },
+    {
 
-DEPENDENCIES_CHANGED_DATA =  [
-        {
-            "EXPERIMENT": {
-                "DATELIST": "20000101 20010101",
-                "MEMBERS": "fc0 fc1",
-                "CHUNKSIZEUNIT": "month",
-                "CHUNKSIZE": "4",
-                "NUMCHUNKS": "1",
-                "CHUNKINI": "",
-                "CALENDAR": "standard",
+        "JOBS": {
+            "hjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "hjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "vhjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vhjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "hvjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "hvjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "vjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "newjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "newjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "job": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "job-1",
+                "wallclock": "00:01",
+                "splits": 2,
             }
-        },
-        {
-            "EXPERIMENT": {
-                "DATELIST": "20000101 20010101",
-                "MEMBERS": "fc0 fc1",
-                "CHUNKSIZEUNIT": "month",
-                "CHUNKSIZE": "4",
-                "NUMCHUNKS": "3",
-                "CHUNKINI": "",
-                "CALENDAR": "standard",
+        }
+    },
+    {
+        "JOBS": {
+            "hjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "hjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "vhjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vhjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "vjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "hvjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "hvjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "job": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vjob",
+                "wallclock": "00:01",
+                "splits": 2,
             }
-        },
-        {
-            "EXPERIMENT": {
-                "DATELIST": "20000101 20010101 20020101",
-                "MEMBERS": "fc0 fc1",
-                "CHUNKSIZEUNIT": "month",
-                "CHUNKSIZE": "4",
-                "NUMCHUNKS": "2",
-                "CHUNKINI": "",
-                "CALENDAR": "standard",
-            }
-        },
-        {
-            "EXPERIMENT": {
-                "DATELIST": "20000101",
-                "MEMBERS": "fc0 fc1",
-                "CHUNKSIZEUNIT": "month",
-                "CHUNKSIZE": "4",
-                "NUMCHUNKS": "2",
-                "CHUNKINI": "",
-                "CALENDAR": "standard",
-            }
-        },
-        {
-            "EXPERIMENT": {
-                "DATELIST": "19990101 19990131",
-                "MEMBERS": "fc0 fc1",
-                "CHUNKSIZEUNIT": "month",
-                "CHUNKSIZE": "4",
-                "NUMCHUNKS": "2",
-                "CHUNKINI": "",
-                "CALENDAR": "standard",
-            }
-        },
-        {
-            "EXPERIMENT": {
-                "DATELIST": "20000101 20010101",
-                "MEMBERS": "fc0",
-                "CHUNKSIZEUNIT": "month",
-                "CHUNKSIZE": "4",
-                "NUMCHUNKS": "2",
-                "CHUNKINI": "",
-                "CALENDAR": "standard",
-            }
-        },
-        {
-            "EXPERIMENT": {
-                "DATELIST": "20000101 20010101",
-                "MEMBERS": "fc0 fc1 fc2",
-                "CHUNKSIZEUNIT": "month",
-                "CHUNKSIZE": "4",
-                "NUMCHUNKS": "2",
-                "CHUNKINI": "",
-                "CALENDAR": "standard",
-            }
-        },
-        {
-            "EXPERIMENT": {
-                "DATELIST": "20000101 20010101",
-                "MEMBERS": "fcA fcB",
-                "CHUNKSIZEUNIT": "month",
-                "CHUNKSIZE": "4",
-                "NUMCHUNKS": "2",
-                "CHUNKINI": "",
-                "CALENDAR": "standard",
-            }
-        },
-        {
-            "JOBS": {
-                "vjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "vjob-1",
-                    "wallclock": "00:01",
-                    "splits": 3,
-                },
-                "hjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "hjob-1",
-                    "wallclock": "00:01",
-                    "splits": 3,
-                },
-                "vhjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "vhjob-1",
-                    "wallclock": "00:01",
-                    "splits": 3,
-                },
-                "hvjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "hvjob-1",
-                    "wallclock": "00:01",
-                    "splits": 3,
-                },
-                "job": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "job-1",
-                    "wallclock": "00:01",
-                    "splits": 3,
-                }
-            }
-        },
-        {
-            "JOBS": {
-                "vjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "vjob-1",
-                    "wallclock": "00:01",
-                    "splits": 3,
-                },
-                "hjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "hjob-1",
-                    "wallclock": "00:01",
-                    "splits": 3,
-                },
-                "vhjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "vhjob-1",
-                    "wallclock": "00:01",
-                    "splits": 3,
-                },
-                "hvjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "hvjob-1",
-                    "wallclock": "00:01",
-                    "splits": 3,
-                },
-                "job": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "job-1",
-                    "wallclock": "00:01",
-                    "splits": 3,
-                }
-            }
-        },
-        {
-            "JOBS": {
-                "vjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "vjob-1",
-                    "wallclock": "00:01",
-                    "splits": 3,
-                },
-                "hjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "hjob-1",
-                    "wallclock": "00:01",
-                    "splits": 3,
-                },
-                "vhjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "vhjob-1",
-                    "wallclock": "00:01",
-                    "splits": 3,
-                },
-                "hvjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "hvjob-1",
-                    "wallclock": "00:01",
-                    "splits": 3,
-                },
-                "job": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "job-1",
-                    "wallclock": "00:01",
-                    "splits": 3,
-                }
-            }
-        },
-        {
-            "JOBS": {
-                "hjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "hjob-1",
-                    "wallclock": "00:01",
-                    "splits": 2,
-                },
-                "vhjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "vhjob-1",
-                    "wallclock": "00:01",
-                    "splits": 2,
-                },
-                "vjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "vjob-1",
-                    "wallclock": "00:01",
-                    "splits": 2,
-                },
-                "hvjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "hvjob-1",
-                    "wallclock": "00:01",
-                    "splits": 2,
-                },
-            }
-        },
-        {
-
-            "JOBS": {
-                "hjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "hjob-1",
-                    "wallclock": "00:01",
-                    "splits": 2,
-                },
-                "vhjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "vhjob-1",
-                    "wallclock": "00:01",
-                    "splits": 2,
-                },
-                "hvjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "hvjob-1",
-                    "wallclock": "00:01",
-                    "splits": 2,
-                },
-                "vjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "vjob-1",
-                    "wallclock": "00:01",
-                    "splits": 2,
-                },
-                "newjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "newjob-1",
-                    "wallclock": "00:01",
-                    "splits": 2,
-                },
-                "job": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "job-1",
-                    "wallclock": "00:01",
-                    "splits": 2,
-                }
-            }
-        },
-        {
-            "JOBS": {
-                "hjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "hjob-1",
-                    "wallclock": "00:01",
-                    "splits": 2,
-                },
-                "vhjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "vhjob-1",
-                    "wallclock": "00:01",
-                    "splits": 2,
-                },
-                "vjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "vjob-1",
-                    "wallclock": "00:01",
-                    "splits": 2,
-                },
-                "hvjob": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "hvjob-1",
-                    "wallclock": "00:01",
-                    "splits": 2,
-                },
-                "job": {
-                    "SCRIPT": "echo 'Hello World'",
-                    "RUNNING": "chunk",
-                    "DEPENDENCIES": "vjob",
-                    "wallclock": "00:01",
-                    "splits": 2,
-                }
-            }
-        },
+        }
+    },
     {
         "JOBS": {
             "hjob": {
@@ -1206,68 +1124,54 @@ DEPENDENCIES_CHANGED_DATA =  [
             }
         }
     },
-    ]
+]
 
 DEPENDENCIES_IDS = [
-        "fewer_chunks",
-        "more_chunks",
-        "more_datelist",
-        "fewer_datelist",
-        "change_datelist",
-        "fewer_members",
-        "more_members",
-        "change_member_names",
-        "more_splits",
-        "fewer_splits",
-        "remove_splits",
-        "remove_job",
-        "add_new_job",
-        "change_dependencies",
-        "running_type_change",
-    ]
+    "fewer_chunks",
+    "more_chunks",
+    "more_datelist",
+    "fewer_datelist",
+    "change_datelist",
+    "fewer_members",
+    "more_members",
+    "change_member_names",
+    "more_splits",
+    "fewer_splits",
+    "remove_splits",
+    "remove_job",
+    "add_new_job",
+    "change_dependencies",
+    "running_type_change",
+]
 
 
 @pytest.mark.parametrize(
-    "db_engine,options,changed_data",
+    "changed_data",
     [
         pytest.param(
-            "sqlite",
-            {"db_name": "job_list.db", "db_version": 999},
             DEPENDENCIES_CHANGED_DATA[i],
-            id=DEPENDENCIES_IDS[i] + "_sqlite"
-        )
-        for i in range(len(DEPENDENCIES_CHANGED_DATA))
-    ] + [
-        pytest.param(
-            "postgres",
-            {"schema": "test_with_createcw_command_differences"},
-            DEPENDENCIES_CHANGED_DATA[i],
-            marks=[pytest.mark.postgres, pytest.mark.docker],
-            id=DEPENDENCIES_IDS[i] + "_postgres"
+            id=DEPENDENCIES_IDS[i]
         )
         for i in range(len(DEPENDENCIES_CHANGED_DATA))
     ]
 )
 def test_with_createcw_command_differences(
-    autosubmit_exp: Any,
-    changed_data: Dict[str, Any],
-    db_engine: str,
-    options: Dict[str, Any],
-    request: pytest.FixtureRequest,
-    tmp_path: Path,
+        as_exp: Any,
+        changed_data: Dict[str, Any],
+        tmp_path: Path,
+        as_db: str,
+        _expid: str,
 ) -> None:
     """
     Integration test to verify database updates.
     The experiment is created with an initial configuration, and then recreated with modifications to test
     So we're testing the Autosubmit ability to detect and handle changes.
-    :param autosubmit_exp: Fixture to create an autosubmit experiment
+    :param as_exp: new expid
     :param changed_data: Dictionary containing configuration changes to be applied
-    :param db_engine: Database engine to use ('sqlite' or 'postgres')
-    :param options: Database connection options
-    :param request: Pytest request fixture for accessing other fixtures
-    """
-    _EXPID = "test_with_createcw_command_differences"
+    :param tmp_path: Temporary directory path
+    :param as_db: Fixture to set up the database
 
+    """
     fixed_data = dict(
         CONFIG={
             'AUTOSUBMIT_VERSION': 4.2,
@@ -1281,11 +1185,11 @@ def test_with_createcw_command_differences(
             'TO': '',
         },
         STORAGE={
-            'TYPE': f"{db_engine}",
+            'TYPE': f"{as_db}",
             'COPY_REMOTE_LOGS': True,
         },
         DEFAULT={
-            'EXPID': _EXPID,
+            'EXPID': _expid,
             'HPCARCH': 'TEST_SLURM',
         },
         PROJECT={
@@ -1401,21 +1305,17 @@ def test_with_createcw_command_differences(
 
         }
     )
-
-    request.getfixturevalue(f"as_db_{db_engine}")
-    BasicConfig.DATABASE_BACKEND = db_engine
-    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _EXPID
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
     db_path = exp_path / "db"
     conf_dir = exp_path / 'conf'
     unified_data = fixed_data | mutable_experiment_wrappers | mutable_jobs
-    as_exp = autosubmit_exp(_EXPID)
     _init_test(as_exp, conf_dir, unified_data)
-    if db_engine == 'sqlite':
-        db_manager = _create_db_manager(db_path=db_path / options['db_name'])
+    if as_db == 'sqlite':
+        db_manager = _create_db_manager(Path(db_path, f'job_list.db'))
     else:
-        db_manager = _create_db_manager(schema=_EXPID)
+        db_manager = _create_db_manager(schema=_expid)
 
-    exit_code = as_exp.autosubmit.create(_EXPID, noplot=True, hide=False, force=True, check_wrappers=True)
+    exit_code = as_exp.autosubmit.create(_expid, noplot=True, hide=False, force=True, check_wrappers=True)
     _assert_exit_code("SUCCESS", exit_code)
     once_sections = []
     for section in unified_data.get('JOBS', {}):
@@ -1436,7 +1336,7 @@ def test_with_createcw_command_differences(
     new_data = unified_data | changed_data
     _modify_data(as_exp.expid, conf_dir, new_data)
 
-    exit_code = as_exp.autosubmit.create(_EXPID, noplot=True, hide=False, force=False, check_wrappers=True)
+    exit_code = as_exp.autosubmit.create(_expid, noplot=True, hide=False, force=False, check_wrappers=True)
     _assert_exit_code("SUCCESS", exit_code)
     once_sections = []
     for section in new_data.get('JOBS', {}):

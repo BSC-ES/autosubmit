@@ -281,13 +281,12 @@ class JobsDbManager(DbManager):
                 ]
                 self.upsert_many(wrapper_info_table.name, updated_wrappers, ['name'])
             else:
-                updated_wrapper = {**wrapper_info, 'status': Status.VALUE_TO_KEY[int(wrapper_info['status'])]}
+                updated_wrapper = [{**wrapper_info, 'status': Status.VALUE_TO_KEY[int(wrapper_info['status'])]}]
                 self.upsert_many(wrapper_info_table.name, updated_wrapper, ['name'])
             try:
                 self.insert_many(innerjobs_table.name, inner_jobs)
             except IntegrityError as e:
                 Log.warning(f"Unique constraint failed when inserting inner jobs: {e}")
-
 
     def select_latest_inner_jobs(
             self,
@@ -511,7 +510,7 @@ class JobsDbManager(DbManager):
 
         for package in packages:
             where = {'id': package['id']}
-            values = {'status': Status.VALUE_TO_KEY[int(package['status'])] }
+            values = {'status': Status.VALUE_TO_KEY[int(package['status'])]}
             self.update_where(wrapper_info_table.name, where, values)
 
     def get_wrappers_id(self) -> List[int]:

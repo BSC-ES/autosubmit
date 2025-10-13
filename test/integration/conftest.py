@@ -126,6 +126,7 @@ def autosubmit_exp(
             wrapper=False,
             reload=True,
             create=True,
+            blank_experiment=False,
             mock_last_name_used=True,
             *_,
             **kwargs
@@ -261,8 +262,13 @@ def autosubmit_exp(
         #       needed, especially if the disk has the valid value?
         config.experiment_data['DEFAULT']['EXPID'] = expid
 
-        if create:
-            autosubmit.create(expid, noplot=True, hide=False, force=True, check_wrappers=wrapper)
+        if blank_experiment:
+            for f in conf_dir.iterdir():
+                if f.is_file():
+                    f.unlink()
+        else:
+            if create:
+                autosubmit.create(expid, noplot=True, hide=False, force=True, check_wrappers=wrapper)
 
         return AutosubmitExperiment(
             expid=expid,
@@ -416,9 +422,9 @@ def slurm_server(session_mocker, tmp_path_factory):
     }
 
     docker_container = DockerContainer(
-            image=_SLURM_DOCKER_IMAGE,
-            hostname='slurmctld',
-            **docker_args
+        image=_SLURM_DOCKER_IMAGE,
+        hostname='slurmctld',
+        **docker_args
     )
 
     # TODO: GH needs --volume /sys/fs/cgroup:/sys/fs/cgroup:rw
@@ -508,7 +514,7 @@ def postgres_server(request: 'FixtureRequest') -> Generator[PostgresContainer, N
                 port=5432,
                 username=_PG_USER,
                 password=_PG_PASSWORD,
-                dbname=_PG_DATABASE)\
+                dbname=_PG_DATABASE) \
                 .with_bind_ports(5432, pg_random_port) as container:
             # Setup database
             with create_engine(conn_url).connect() as conn:
@@ -540,6 +546,8 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
     if not autosubmitrc_file.exists():
         raise ValueError(f'Missing autosubmitrc file: {autosubmitrc_file}')
 
+    os.environ['AUTOSUBMIT_CONFIGURATION'] = str(autosubmitrc_file)
+
     if backend == 'postgres':
         # Replace the backend by postgres (default is sqlite)
         user = postgres_server.env['POSTGRES_USER']
@@ -548,7 +556,8 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
         db = request.node.name
         if '[' in db:
             db = db.split('[')[0]
-        db = f'{db}_{time_ns()}'
+        rng = uuid.uuid4().hex[:6]
+        db = f'{db}_{time_ns()}_{rng}'
 
         # Create new DB to run the current test completely isolated from others.
         # We use the test name, minus the [params], appending the current nanoseconds
@@ -578,11 +587,5 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
         raise ValueError(f'Unsupported database backend: {backend}')
 
     BasicConfig.read()
-
-    # DO NOT USE THIS EXPID!
-    # TODO: This function calls ``Autosubmit.install``, or we could call it here.
-    # Previous tests were using it and everything is working, but this doesn't
-    # smell very good. There might be a better way.
-    autosubmit_exp('____')
 
     return backend

@@ -24,7 +24,6 @@ import pytest
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from test.conftest import AutosubmitExperimentFixture
 from autosubmit.log.log import Log
 Log.get_logger("Autosubmit")
 

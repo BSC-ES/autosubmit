@@ -34,16 +34,12 @@ if TYPE_CHECKING:
     from pytest import FixtureRequest
 
 
-@pytest.fixture(scope='function')
-def autosubmit(tmp_path) -> Autosubmit:
+@pytest.fixture(scope='module')
+def autosubmit() -> Autosubmit:
     """Create an instance of ``Autosubmit``.
 
     Useful when you need ``Autosubmit`` but do not need any experiments."""
-    _initialize_autosubmitrc(tmp_path, "sqlite")
-
-    autosubmit_instance = Autosubmit()
-    autosubmit_instance.install()
-    return autosubmit_instance
+    return Autosubmit()
 
 
 @pytest.fixture
@@ -120,6 +116,7 @@ def local(prepare_test):
     }
     local = LocalPlatform(expid='t000', name='local', config=config)
     return local
+
 
 @pytest.fixture(scope='function', autouse=True)
 def initialize_autosubmitrc(tmp_path: 'LocalPath', request: 'FixtureRequest', autosubmit: Autosubmit) -> None:

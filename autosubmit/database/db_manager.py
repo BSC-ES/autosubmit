@@ -267,7 +267,7 @@ class DbManager:
             except subprocess.CalledProcessError as e:
                 Log.warning(f"Error backing up database: {e.output.decode()}")
 
-    def restore(self):
+    def restore(self) -> int:
         if BasicConfig.DATABASE_BACKEND == "sqlite":
             import sqlite3  # Bulk operation , SQLACHEMY is too slow for these operations
             if not self.restore_path.exists():
@@ -283,13 +283,20 @@ class DbManager:
                 raise FileNotFoundError(f"Backup file {self.restore_path} does not exist.")
             try:
                 db_url = self.engine.url
-                cmd = f"cd {str(self.restore_path.parent)}; pg_restore --host {db_url.host} --port {db_url.port} --username {db_url.username} --dbname {db_url.database} --clean --if-exists --jobs=4 --format=c --file={self.restore_path}"
+                cmd = (
+                    f"cd {str(self.restore_path.parent)}; "
+                    f"pg_restore --host {db_url.host} --port {db_url.port} "
+                    f"--username {db_url.username} --dbname {db_url.database} "
+                    f"--clean --if-exists --jobs=4 --format=c {self.restore_path}"
+                )
                 env = os.environ.copy()
                 env["PGPASSWORD"] = db_url.password
                 subprocess.run(cmd, shell=True, check=True, env=env)
                 self.restore_path.chmod(0o660)
             except subprocess.CalledProcessError as e:
                 Log.warning(f"Error restoring database: {e}")
+                return 1
+        return 0
 
     def update_where(self, table_name: str, values: dict[str, Any], where: dict[str, Any]) -> int:
         table = get_table_from_name(schema=self.schema, table_name=table_name)

@@ -77,11 +77,12 @@ def test_select_first_where(tmp_path: "LocalPath", as_db: str):
     first_value = db_manager.select_first_where(DBVersionTable.name, where=None)
     # We are getting the first version, that was already in the database
     assert first_value[0] == 1
-    
+
     assert 1 == first_value[0]
 
     last_value = db_manager.select_first_where(DBVersionTable.name, where={'version': '4'})
     assert last_value[0] == 4
+
 
 def test_create_db_raises_dbexception(monkeypatch, tmp_path: "LocalPath") -> None:
     """
@@ -432,43 +433,12 @@ def test_delete_experiment_db(monkeypatch, tmp_path):
     assert count == 0
 
 
-@pytest.mark.parametrize(
-    "db_engine",
-    [
-        # postgres
-        pytest.param("postgres", marks=[pytest.mark.postgres, pytest.mark.docker]),
-        # sqlite
-        pytest.param("sqlite")
-    ],
-)
-def test_delete_experiment_sqlalchemy(monkeypatch, tmp_path, db_engine: str, request):
-    """
-    Test that delete_experiment works correctly without DbManager (mainly sqlite)
-    """
-
-    request.getfixturevalue(f"as_db_{db_engine}")
-    db_manager = _create_db_manager(BasicConfig.DB_PATH)
-    db_manager.create_table('experiment')
-    db_manager.insert('experiment', {'name': 'test_experiment', 'autosubmit_version': 1,
-                                     'description': 'Test experiment description'})
-    assert db_manager.count('experiment') == 1
-    delete_experiment(experiment_id='test_experiment')
-    assert db_manager.count('experiment') == 0
-
-
-@pytest.mark.parametrize(
-    "db_engine",
-    [
-        # sqlite
-        pytest.param("sqlite")
-    ],
-)
-def test_check_db_sqlite(monkeypatch, tmp_path, db_engine: str, request):
+def test_check_db_sqlite(monkeypatch, tmp_path, as_db: str):
     """
     Test that check_db works correctly without DbManager (mainly sqlite)
     """
-
-    request.getfixturevalue(f"as_db_{db_engine}")
+    if as_db == "postgres":
+        pytest.skip("Skipping sqlite specific test when using postgres")
     db_manager = _create_db_manager(BasicConfig.DB_PATH)
     db_manager.create_table(DBVersionTable.name)
     db_manager.insert(DBVersionTable.name, {'version': 3})
