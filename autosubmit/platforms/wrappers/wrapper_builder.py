@@ -1,19 +1,17 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
-
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
 # This file is part of Autosubmit.
-
+#
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # Autosubmit is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -30,22 +28,26 @@ class WrapperDirector:
     """
     def __init__(self):
         self._builder = None
+
     def construct(self, builder):
         self._builder = builder
 
         header = self._builder.build_header()
         job_thread = self._builder.build_job_thread()
-        #if "bash" not in header[0:15]:
+        # if "bash" not in header[0:15]:
 
         main = self._builder.build_main()
-        #else:
+        # else:
         #    nodes,main = self._builder.build_main() #What to do with nodes?
         # change to WrapperScript object
         wrapper_script = header + job_thread + main
         wrapper_script = wrapper_script.replace("_NEWLINE_", '\\n')
 
         return wrapper_script
+
+
 class WrapperBuilder(object):
+
     def __init__(self, **kwargs):
         if "retrials" in list(kwargs.keys()):
             self.retrials = kwargs['retrials']
@@ -66,7 +68,7 @@ class WrapperBuilder(object):
     def build_header(self):
         return textwrap.dedent(self.header_directive) + self.build_imports()
 
-    def build_imports(self):
+    def build_imports(self) -> str:
         pass  # pragma: no cover
 
     def build_job_thread(self):
