@@ -64,11 +64,12 @@ dependencies = [
     "ruamel.yaml==0.18.15",
     "configobj",
     "pyparsing",
-    "configparser"
+    "configparser",
+    "types-requests"
 ]
 
 [project.urls]
-Homepage = "https://www.bsc.es/projects/earthscience/autosubmit/" 
+Homepage = "https://www.bsc.es/projects/earthscience/autosubmit/"
 Documentation = "https://autosubmit.readthedocs.io/"
 "Download Link" = "https://earth.bsc.es/wiki/doku.php?id=tools:autosubmit"
 
@@ -86,8 +87,7 @@ tests = [
     "pytest-mock",
     "ruff==0.14.0",
     "pytest-xdist",
-    "testcontainers",
-    "types-requests"
+    "testcontainers"
 ]
 docs = [
     "livereload",
