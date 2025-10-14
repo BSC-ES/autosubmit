@@ -1094,7 +1094,7 @@ class AutosubmitConfig(object):
         for i, key in enumerate(filter(None, keys)):
             matches = list(re.finditer(pattern, key, flags=re.IGNORECASE))[::-1]
             if in_the_end and "^" in key:
-                pattern_special_variables = '%\^[a-zA-Z0-9_.-]*%'
+                pattern_special_variables = '%\^[a-zA-Z0-9_.-]*%' # noqa
                 matches.extend(list(re.finditer(pattern_special_variables, key, flags=re.IGNORECASE))[::-1])
             for match in matches:
                 value = self._get_substituted_value(key, match, parameters, start_long, dict_keys_type)
@@ -1188,7 +1188,7 @@ class AutosubmitConfig(object):
             # Pattern to search a string starting with % and ending with % allowing the chars [],._ to exist in the middle
             dynamic_var_pattern = '%[a-zA-Z0-9_.-]*%'
             # Pattern to search a string starting with %^ and ending with %
-            special_dynamic_var_pattern = '%\^[a-zA-Z0-9_.-]*%'
+            special_dynamic_var_pattern = '%\^[a-zA-Z0-9_.-]*%' # noqa
 
             if not isinstance(val, collections.abc.Mapping) and re.search(dynamic_var_pattern, str(val),
                                                                           flags=re.IGNORECASE) is not None:
@@ -2803,7 +2803,7 @@ class AutosubmitConfig(object):
     @staticmethod
     def is_valid_mail_address(mail_address):
         if re.match('^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})$', mail_address,
-                    flags=re.IGNORECASE):
+                    flags=re.IGNORECASE): # noqa
             return True
         else:
             return False
