@@ -1,4 +1,4 @@
-FROM mambaorg/micromamba:1-bookworm-slim AS micromamba
+FROM mambaorg/micromamba:debian13-slim  AS micromamba
 
 # The micromamba image is referenced in a multi-stage build.
 # Note that around 90% of the content of this image is actually
@@ -93,8 +93,9 @@ RUN mkdir -pv "${AUTOSUBMIT_ROOT_DIR}/logs" && \
 # bash, curl, dialog, graphviz, python3-tk, sqlite3 are for: Autosubmit dependencies listed at readthedocs.
 # less, vim, iputils-ping, net-tools are for: convenience.
 # TODO: add something like xpdf=3.04+git20210103-3 if GUI/X is needed.
+# Combined package installation and cleanup in single RUN command
 RUN apt update && \
-    apt install -y \
+    apt install -y --no-install-recommends \
       gcc \
       bash \
       ca-certificates \
@@ -116,13 +117,13 @@ RUN apt update && \
       xdg-utils && \
     update-ca-certificates && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 USER $MAMBA_USER
 
 # Install and configure Autosubmit.
 
-# Install Python.
+# Install Python
 RUN micromamba install --yes --name base --channel conda-forge \
       git=2.41.0 \
       python=3.9.16 && \
@@ -136,25 +137,20 @@ RUN micromamba install --yes --name base --channel conda-forge \
 ARG GIT_REF
 ARG AUTOSUBMIT_VERSION
 RUN if [ -n "${GIT_REF}" ] ; then \
-      pip install git+https://github.com/BSC-ES/autosubmit.git@${GIT_REF}; \
+      pip install --no-cache-dir git+https://github.com/BSC-ES/autosubmit.git@${GIT_REF}; \
     elif [ -n "${AUTOSUBMIT_VERSION}" ] ; then \
-      pip install autosubmit==${AUTOSUBMIT_VERSION}; \
+      pip install --no-cache-dir autosubmit==${AUTOSUBMIT_VERSION}; \
     else \
-      pip install autosubmit; \
+      pip install --no-cache-dir autosubmit; \
     fi
 
-# Configure Autosubmit.
+# Configure Autosubmit and copy config in single layer
 RUN autosubmit configure \
       -db "${AUTOSUBMIT_ROOT_DIR}/database/" \
       -dbf autosubmit.db \
-      -lr "${AUTOSUBMIT_ROOT_DIR}/experiments/"
-
-# Copy the default config file /home/${MAMBA_USER}/.autosubmitrc to ${AUTOSUBMIT_ROOT_DIR}/autosubmitrc
-RUN cp "/home/${MAMBA_USER}/.autosubmitrc" "${AUTOSUBMIT_ROOT_DIR}/autosubmitrc" && \
+      -lr "${AUTOSUBMIT_ROOT_DIR}/experiments/" && \
+    cp "/home/${MAMBA_USER}/.autosubmitrc" "${AUTOSUBMIT_ROOT_DIR}/autosubmitrc" && \
     chown -R "${MAMBA_USER}:${MAMBA_USER}" "${AUTOSUBMIT_ROOT_DIR}"
-
-# Set AUTOSUBMIT_CONFIGURATION to the path of the Autosubmit configuration file.
-ENV AUTOSUBMIT_CONFIGURATION="${AUTOSUBMIT_ROOT_DIR}/autosubmitrc"
 
 # Set AUTOSUBMIT_CONFIGURATION to the path of the Autosubmit configuration file.
 ENV AUTOSUBMIT_CONFIGURATION="${AUTOSUBMIT_ROOT_DIR}/autosubmitrc"
@@ -162,6 +158,7 @@ ENV AUTOSUBMIT_CONFIGURATION="${AUTOSUBMIT_ROOT_DIR}/autosubmitrc"
 # SSH (for Autosubmit local platform.)
 USER root
 
+# Combined SSH setup in single RUN command
 RUN chown -R "${MAMBA_USER}:${MAMBA_USER}" "/home/${MAMBA_USER}/" && \
     chmod 0755 "/home/${MAMBA_USER}/" && \
     mkdir -pv /var/run/sshd && \
