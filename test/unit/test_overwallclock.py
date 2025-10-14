@@ -19,7 +19,6 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList

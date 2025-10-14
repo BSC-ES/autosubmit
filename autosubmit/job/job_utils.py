@@ -20,7 +20,6 @@ from typing import Dict, Optional, TYPE_CHECKING
 
 from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates
 
-from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log, AutosubmitCritical
 

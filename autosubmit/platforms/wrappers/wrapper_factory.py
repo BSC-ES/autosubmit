@@ -64,7 +64,7 @@ class WrapperFactory(object):
             placeholder = placeholder[1:-1]
             try:
                 value = str(wrapper_data.jobs[0].parameters.get(placeholder.upper(), ""))
-            except BaseException as e:
+            except BaseException:
                 pass
             value = ""
             if not value or value == "[]":

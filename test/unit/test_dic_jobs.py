@@ -27,7 +27,6 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.template import Language
-from autosubmit.config.yamlparser import YAMLParserFactory
 
 _EXPID = 't001'
 _DATE_LIST = ['fake-date1', 'fake-date2']

@@ -21,7 +21,7 @@ from datetime import datetime
 from os import utime
 from pathlib import Path
 from shutil import rmtree
-from subprocess import CalledProcessError, SubprocessError
+from subprocess import CalledProcessError
 from typing import Any, Optional, Tuple
 
 import pytest
@@ -33,7 +33,6 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_grouping import JobGrouping
 from autosubmit.job.job_list import JobList
-from autosubmit.log.log import AutosubmitCritical
 from autosubmit.monitor.monitor import (
     _check_final_status, _check_node_exists, _color_status, _create_node, _display_file,
     _display_file_xdg, clean_plot, clean_stats, Monitor

@@ -22,12 +22,10 @@ the ``test/integration/test_db_common.py`` for more tests.
 """
 
 import inspect
-import os
 
 import pytest
 from autosubmit.config.basicconfig import BasicConfig
 
-from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import db_common
 from autosubmit.log.log import AutosubmitCritical
 

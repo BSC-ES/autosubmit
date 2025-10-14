@@ -20,11 +20,9 @@
 from pathlib import Path
 from textwrap import dedent
 
-import pytest
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.log.log import AutosubmitCritical
 from test.unit.conftest import AutosubmitConfigFactory
 
 

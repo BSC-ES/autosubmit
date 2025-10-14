@@ -1258,7 +1258,7 @@ class Job(object):
                     remote_logs = copy.deepcopy(self.local_logs)
                     self.platform.get_logs_files(self.expid, remote_logs)
                     log_recovered = True
-        except BaseException as e:
+        except BaseException:
             log_recovered = False
 
         return log_recovered

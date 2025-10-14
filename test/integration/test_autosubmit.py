@@ -19,8 +19,6 @@
 
 from contextlib import nullcontext as does_not_raise
 from os import R_OK, W_OK
-from pathlib import Path
-from shutil import copy
 from typing import TYPE_CHECKING
 
 import pytest
@@ -28,12 +26,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 
-from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import get_experiment_description
-from autosubmit.log.log import AutosubmitCritical
-from autosubmit.scripts.autosubmit import main
 from autosubmit.log.log import AutosubmitCritical
 
 if TYPE_CHECKING:

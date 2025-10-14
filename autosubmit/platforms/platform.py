@@ -443,15 +443,15 @@ class Platform(object):
                                 error_msg[:-1], self.name)
                 except AutosubmitCritical:
                     raise
-                except Exception as e:
+                except Exception:
                     self.connected = False
                     raise
 
-            except AutosubmitCritical as e:
+            except AutosubmitCritical:
                 raise
-            except AutosubmitError as e:
+            except AutosubmitError:
                 raise
-            except Exception as e:
+            except Exception:
                 raise
         if valid_packages_to_submit:
             any_job_submitted = True
@@ -1061,7 +1061,7 @@ class Platform(object):
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
                 try:
                     job.retrieve_logfiles(raise_error=True)
-                except Exception as e:
+                except Exception:
                     jobs_pending_to_process.add(job)
                     job._log_recovery_retries += 1
                     Log.warning(

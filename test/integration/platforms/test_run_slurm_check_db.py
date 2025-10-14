@@ -34,7 +34,6 @@ import pytest
 from threading import Thread
 from time import sleep
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 
 if TYPE_CHECKING:
@@ -90,7 +89,7 @@ def as_exp(autosubmit_exp, tmp_path: Path) -> Any:
                 'MAX_WALLCLOCK': '48:00',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': f'/tmp/scratch',
+                'SCRATCH_DIR': '/tmp/scratch',
                 'TEMP_DIR': '',
                 'USER': 'root',
                 'PROCESSORS': '1',

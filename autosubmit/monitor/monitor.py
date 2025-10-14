@@ -32,7 +32,6 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.helpers.utils import NaturalSort, check_experiment_ownership
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_list import JobList
 from autosubmit.log.log import Log, AutosubmitCritical
 from autosubmit.monitor.diagram import create_stats_report
 

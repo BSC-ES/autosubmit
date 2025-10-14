@@ -19,7 +19,6 @@
 """ Test file for autosubmit/autosubmit.py """
 
 from contextlib import contextmanager
-from shutil import rmtree
 
 import pytest
 from pathlib import Path
@@ -28,7 +27,6 @@ from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import db_common
 from autosubmit.log.log import AutosubmitCritical
-from ..conftest import initialize_autosubmitrc
 
 @contextmanager
 def does_not_raise():

@@ -75,7 +75,6 @@ from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
-from autosubmit.platforms.submitter import Submitter
 
 
 dialog = None
@@ -1307,7 +1306,7 @@ class Autosubmit:
             Log.info("Removing Structure db...")
             try:
                 os.remove(structure_db_path)
-            except IOError as e:
+            except IOError:
                 Log.warning(f"Structure database {structure_db_path} does not exist. Skipping deletion.")
             except BaseException as e:
                 error_message += f"Cannot delete structure: {e}\n"
@@ -1320,7 +1319,7 @@ class Autosubmit:
                     os.remove(db_path)
                 if sql_path.exists():
                     os.remove(sql_path)
-            except IOError as e:
+            except IOError:
                 Log.warning(f"Job data database {job_data_db_path} does not exist. Skipping deletion.")
             except BaseException as e:
                 error_message += f"Cannot delete job_data: {e}\n"
@@ -2189,7 +2188,7 @@ class Autosubmit:
             # noinspection PyTypeChecker
             try:
                 job.platform = submitter.platforms[job.platform_name.upper()]
-            except Exception as e:
+            except Exception:
                 raise AutosubmitCritical(f"hpcarch={job.platform_name} not found in the platforms configuration file",
                                          7014)
             # noinspection PyTypeChecker
@@ -2415,7 +2414,7 @@ class Autosubmit:
 
                             exp_history = Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker,
                                                                                        expid)
-                        except BaseException as e:
+                        except BaseException:
                             Log.printlog("Historic database seems corrupted, AS will repair it and resume the run",
                                          Log.INFO)
                             try:
@@ -2523,7 +2522,7 @@ class Autosubmit:
                 job_list.save_jobs()
                 if not did_run and len(
                         job_list.get_completed_failed_without_logs()) > 0:  # Revise if there is any log unrecovered from previous run
-                    Log.info(f"Connecting to the platforms, to recover missing logs")
+                    Log.info("Connecting to the platforms, to recover missing logs")
                     submitter = Autosubmit._get_submitter(as_conf)
                     submitter.load_platforms(as_conf)
                     if submitter.platforms is None:
@@ -3100,7 +3099,7 @@ class Autosubmit:
         :rtype: bool
         """
         if not save:
-            Log.warning(f"Changes will be NOT saved to the jobList. Use -s option to save")
+            Log.warning("Changes will be NOT saved to the jobList. Use -s option to save")
 
         Autosubmit._check_ownership(expid, raise_error=True)
         exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
@@ -3195,7 +3194,7 @@ class Autosubmit:
                             for s in expand_status:
                                 status.append(Autosubmit._get_status(s.upper()))
                         else:
-                            Log.warning(f"Grouping status has an invalid format, it should be a string or a list of strings")
+                            Log.warning("Grouping status has an invalid format, it should be a string or a list of strings")
                 job_grouping = JobGrouping(group_by, copy.deepcopy(job_list.get_job_list()), job_list,
                                            expand_list=expand,
                                            expanded_status=status)
@@ -3514,7 +3513,7 @@ class Autosubmit:
                 Log.result("Branch: {0}", branch)
                 Log.result("HPC: {0}", hpc)
                 Log.result("Description: {0}", description[0][0])
-            except Exception as e:
+            except Exception:
                 not_described_experiments.append(experiment_id)
         if len(not_described_experiments) > 0:
             Log.printlog(f"Could not describe the following experiments:\n"

@@ -14,24 +14,17 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-from pathlib import Path
 from typing import Any
 
 import networkx
 import pytest
-from networkx import DiGraph
 
-from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.database.db_common import get_connection_url
-from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.template import Language
-from autosubmit.database import session
-
 
 """Tests for the ``JobList`` class."""
 
@@ -250,6 +243,7 @@ def test_that_create_job_method_calls_dic_jobs_method_with_increasing_priority(m
     # arrange
     dic_mock.read_section.assert_any_call('fake-section-1', 0, Language.BASH)
     dic_mock.read_section.assert_any_call('fake-section-2', 1, Language.BASH)
+
 
 def test_run_only_selected_members(setup_job_list, as_conf, autosubmit):
     """

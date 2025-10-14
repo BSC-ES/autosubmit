@@ -14,7 +14,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Dict
@@ -29,7 +28,6 @@ from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.database.tables import WrapperJobsTable, get_table_from_name, JobsTable, ExperimentStructureTable
 from autosubmit.job.job import Job
 from autosubmit.job.job_list import JobList
-import inspect
 
 raw_job_list = [
     {'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None, 'finish_time_timestamp': None,
@@ -1311,7 +1309,7 @@ def test_with_createcw_command_differences(
     unified_data = fixed_data | mutable_experiment_wrappers | mutable_jobs
     _init_test(as_exp, conf_dir, unified_data)
     if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, f'job_list.db'))
+        db_manager = _create_db_manager(Path(db_path, 'job_list.db'))
     else:
         db_manager = _create_db_manager(schema=_expid)
 
