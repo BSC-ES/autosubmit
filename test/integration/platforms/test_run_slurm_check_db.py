@@ -942,7 +942,7 @@ def test_run_interrupted(
         all_expids=False,
         cancel=False,
         current_status=current_statuses,
-        expids=_EXPID,
+        arg_expids=_EXPID,
         force=True,
         force_all=True,
         status='FAILED')

@@ -87,7 +87,7 @@ class DbManager:
             row = conn.execute(query).first()
         return row.tuple() if row else None
 
-    def select_all_with_columns(self, table_name: str) -> list[tuple[str, Any]]:
+    def select_all_with_columns(self, table_name: str) -> List[tuple[tuple[str, Any]]]:
         """Select rows from a table. Return a list of hasheable tuples."""
         table = get_table_from_name(schema=self.schema, table_name=table_name)
         with self.engine.connect() as conn:
@@ -99,7 +99,7 @@ class DbManager:
             self,
             table,
             where
-    ) -> List[tuple[str, Any]]:
+    ) -> List[tuple[tuple[str, Any]]]:
         """
         Select rows from a table with specific columns. Return a list of hashable tuples.
 

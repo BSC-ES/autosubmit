@@ -2256,14 +2256,18 @@ class AutosubmitConfig(object):
         """
         return self.get_section(['SVN', 'PROJECT_REVISION'])
 
-    def get_local_project_path(self):
+    def get_local_project_path(self) -> Path:
         """
         Gets path to origin for local project
 
         :return: path to local project
-        :rtype: str
+        :rtype: Path
         """
-        return self.get_section(['LOCAL', 'PROJECT_PATH'])
+        path = self.get_section(['LOCAL', 'PROJECT_PATH'])
+        if not path:
+            raise AutosubmitCritical(
+                "Empty project path! Please change this parameter to a valid one.", 7014)
+        return Path(path)
 
     def get_date_list(self):
         """

@@ -399,7 +399,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
         models = [Models.JobDataRow(*row) for row in job_data_rows][-1]
         return JobData.from_model(models)
 
-    def get_job_data_max_counter(self, job_name: str = None) -> int:
+    def get_job_data_max_counter(self, job_name: Optional[str] = None) -> int:
         """
         Get the maximum counter value from the `job_data` table. If a `job_name` is provided,
         the query will filter by that specific job name.
@@ -420,7 +420,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
         if not counter_result[0][0]:
             return DEFAULT_MAX_COUNTER
         else:
-            max_counter = Models.MaxCounterRow(*counter_result[0]).maxcounter
+            max_counter = Models.MaxCounter(*counter_result[0]).maxcounter
             return max_counter if max_counter else DEFAULT_MAX_COUNTER
 
     def _set_historical_pragma_version(self, version=10):
@@ -479,7 +479,7 @@ class ExperimentHistoryDatabaseManager(Protocol):
 
     def get_job_data_by_job_id_name(self, job_id: int, job_name: str): ...
 
-    def get_job_data_max_counter(self, job_name: str = None) -> int: ...
+    def get_job_data_max_counter(self, job_name: Optional[str] = None) -> int: ...
 
 
 class SqlAlchemyExperimentHistoryDbManager:
@@ -648,7 +648,8 @@ class SqlAlchemyExperimentHistoryDbManager:
             self._update_job_data_by_id(job_data_dc)
         return len(job_data_dcs)
 
-    def get_job_data_dc_unique_latest_by_job_name(self, job_name):
+    def get_job_data_dc_unique_latest_by_job_name(self, job_name: Optional[str]):
+        """ Returns JobData data class for the latest job_data_row with last=1 by job_name. """
         job_data_row_last = self._get_job_data_last_by_name(job_name)
         if len(job_data_row_last) > 0:
             return JobData.from_model(job_data_row_last[0])

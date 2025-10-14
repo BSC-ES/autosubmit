@@ -842,8 +842,6 @@ class Autosubmit:
                     print(f.read())
                     return True
             return False
-        elif args.command == 'dbfix':
-            return Autosubmit.database_fix(args.expid)
 
         elif args.command == 'sqlitefix':  # TODO job_list_to_db, rename the name
             return Autosubmit.sqlite_fix(args.expid, args.force)
@@ -1992,14 +1990,12 @@ class Autosubmit:
     def check_wrappers(
             as_conf: AutosubmitConfig,
             job_list: JobList,
-            platforms_to_test: Set[Platform],
             expid: str,
-    ) -> Tuple[Dict[str, List[List[Job]]], Dict[str, Tuple[Status, Status]]]:
+    ) -> None:
         """
         Check wrappers and inner jobs status also order the non-wrapped jobs to be submitted by active platforms
         :param as_conf: a AutosubmitConfig object
         :param job_list: a JobList object
-        :param platforms_to_test: a list of Platform
         :param expid: a string with the experiment id
         :return: non-wrapped jobs to check and a dictionary with the changes in the jobs status
         """
@@ -2032,11 +2028,8 @@ class Autosubmit:
                                                current_config=as_conf.get_full_config_as_json())
             Autosubmit.database_backup(expid)
         except Exception:
-            try:
-                Autosubmit.database_fix(expid)
-                # This error is important
-            except Exception:
-                pass
+            Log.warning(f"Couldn't access the historical database for experiment {expid}")
+
         try:
             ExperimentStatus(expid).set_as_running()
         except Exception as e:
@@ -2268,7 +2261,8 @@ class Autosubmit:
             if not p.log_recovery_process or not p.log_recovery_process.is_alive():
                 p.clean_log_recovery_process()
                 p.spawn_log_retrieval_process(as_conf)
-            p.work_event.set()
+            if p.work_event:
+                p.work_event.set()
 
     @staticmethod
     def run_experiment(expid, notransitive=False, start_time=None, start_after=None, run_only_members=None,
@@ -2359,7 +2353,7 @@ class Autosubmit:
                             raise AutosubmitError("Config files seems to not be accessible", 6040, str(e))
                         total_jobs, safetysleeptime, default_retrials, check_wrapper_jobs_sleeptime = Autosubmit.get_iteration_info(
                             as_conf, job_list)
-                        Autosubmit.check_wrappers(as_conf, job_list, platforms_to_test, expid)
+                        Autosubmit.check_wrappers(as_conf, job_list, expid)
                         wrappers_id = job_list.get_wrappers_id()
                         # Check non-wrapped jobs
                         for p in platforms_to_test:
@@ -2403,13 +2397,7 @@ class Autosubmit:
                         except BaseException:
                             Log.printlog("Historic database seems corrupted, AS will repair it and resume the run",
                                          Log.INFO)
-                            try:
-                                Autosubmit.database_fix(expid)
-                                exp_history = Autosubmit.process_historical_data_iteration(job_list,
-                                                                                           job_changes_tracker, expid)
-                            except Exception:
-                                Log.warning(
-                                    "Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
+                            Log.warning("Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
                         if Autosubmit.exit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             job_list.save_jobs()
@@ -2498,7 +2486,7 @@ class Autosubmit:
                         if recovery_retrials == max_recovery_retrials and max_recovery_retrials > 0:
                             raise AutosubmitCritical(
                                 f"Autosubmit Encounter too much errors during running time, limit of {max_recovery_retrials * 120} reached",
-                                7051, e.message)
+                                7051)
                     except AutosubmitCritical as e:  # Critical errors can't be recovered. Failed configuration or autosubmit error
                         raise AutosubmitCritical(e.message, e.code, e.trace)
                     except BaseException:
@@ -2530,13 +2518,11 @@ class Autosubmit:
                 try:
                     exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                                     historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-                    exp_history.process_job_list_changes_to_experiment_totals(job_list.get_job_list())
-                    Autosubmit.database_backup(expid)
+                    if exp_history is not None:
+                        exp_history.process_job_list_changes_to_experiment_totals(job_list.get_job_list())
+                        Autosubmit.database_backup(expid)
                 except Exception:
-                    try:
-                        Autosubmit.database_fix(expid)
-                    except Exception:
-                        pass
+                    pass
                 for p in platforms_to_test:
                     p.closeConnection()
                 if len(job_list.get_failed()) > 0:
@@ -2546,7 +2532,8 @@ class Autosubmit:
                     # Updating finish time for job data header
                     # Database is locked, may be related to my local db todo 4.1.1
                     try:
-                        exp_history.finish_current_experiment_run()
+                        if exp_history is not None:
+                            exp_history.finish_current_experiment_run()
                     except Exception:
                         Log.warning("Database is locked")
                 rocrate_data = as_conf.experiment_data.get("ROCRATE", None)
@@ -2569,6 +2556,7 @@ class Autosubmit:
             if job_list.get_failed():
                 return 1
             return 0
+        return 0
 
     @staticmethod
     def restore_platforms(platforms_to_test, mail_notify=False, as_conf=None, expid=None):  # TODO move to utils
@@ -3652,8 +3640,7 @@ class Autosubmit:
                     sep = '\n\t'
                     Log.result(sep.join(['Directories configured successfully:'] + [str(d) for d in dirs]))
                 except (IOError, OSError) as e:
-                    raise AutosubmitCritical(
-                        "Can not write config file: {0}", 7012, e.message)
+                    raise AutosubmitCritical("Can not write config file: {0}", 7012, str(e))
         except (AutosubmitCritical, AutosubmitError):
             raise
         except BaseException as e:
@@ -4634,13 +4621,7 @@ class Autosubmit:
                                                            create=True)
                         Autosubmit.database_backup(expid)
                     except BaseException:
-                        Log.printlog("Historic database seems corrupted, AS will repair it and resume the run",
-                                     Log.INFO)
-                        try:
-                            Autosubmit.database_fix(expid)
-                        except Exception:
-                            Log.warning(
-                                "Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
+                        Log.warning("Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
                     if not noplot:
                         from .monitor.monitor import Monitor
                         if group_by:
@@ -4735,45 +4716,9 @@ class Autosubmit:
                 Log.warning(f"Platform {as_conf.get_platform()} not found in configuration file")
                 hpcarch = "local"
             return AutosubmitGit.clone_repository(as_conf, force, hpcarch)
-        elif project_type == "svn":
-            svn_project_url = as_conf.get_svn_project_url()
-            svn_project_revision = as_conf.get_svn_project_revision()
-            local_proj_dir = os.path.join(
-                BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_PROJ_DIR)
-            if os.path.exists(local_proj_dir):
-                Log.info(f"Using project folder: {local_proj_dir}")
-                if not force:
-                    Log.debug("The project folder exists. SKIPPING...")
-                    return True
-                else:
-                    shutil.rmtree(local_proj_dir, ignore_errors=True)
-            try:
-                os.mkdir(local_proj_dir)
-            except BaseException as e:
-                raise AutosubmitCritical(f"Project path:{local_proj_dir} can't be created. Revise that the path"
-                                         f" is the correct one.", 7014, str(e))
 
-            Log.debug(f"The project folder {local_proj_dir} has been created.")
-            Log.info(f"Checking out revision {svn_project_revision} {svn_project_url} into {local_proj_dir}")
-            try:
-                output = subprocess.check_output("cd " + local_proj_dir + "; svn --force-interactive checkout -r " +
-                                                 svn_project_revision + " " + svn_project_url + " " +
-                                                 project_destination, shell=True)
-            except subprocess.CalledProcessError:
-                try:
-                    shutil.rmtree(local_proj_dir, ignore_errors=True)
-                except Exception:
-                    pass
-                raise AutosubmitCritical(f"Can not check out revision {svn_project_revision} {svn_project_url} "
-                                         f"into {local_proj_dir}", 7062)
-            Log.debug("{0}", output)
         elif project_type == "local":
-            local_project_path: str = as_conf.get_local_project_path()
-            if not local_project_path:
-                raise AutosubmitCritical(
-                    "Empty project path! Please change this parameter to a valid one.", 7014)
-            # check if local_project_path is a valid path
-            local_project_path: Path = Path(local_project_path)
+            local_project_path = as_conf.get_local_project_path()
             if not local_project_path.is_dir():
                 msg = f'Local project path is not a valid path and/or it does not exist: {str(local_project_path)}'
                 raise AutosubmitCritical(msg, 7014)
@@ -4798,7 +4743,7 @@ class Autosubmit:
                 Path(local_proj_dir).mkdir(parents=True)
                 Path(project_destination).mkdir(parents=True)
                 Log.debug(f"The project folder {local_proj_dir} has been created.")
-                copy_contents(local_project_path, project_destination)
+                copy_contents(Path(local_project_path), project_destination)
             else:
                 Log.info(f"Using project folder: {str(local_proj_dir)}")
 
@@ -4807,7 +4752,7 @@ class Autosubmit:
                 # command to copy the files. Otherwise, we inform the user of no action.
                 if not project_destination.exists():
                     Path(project_destination).mkdir(parents=True)
-                    copy_contents(local_project_path, project_destination)
+                    copy_contents(Path(local_project_path), project_destination)
                 elif force:
                     try:
                         cmd = f"rsync -ach --info=progress2 {str(local_project_path)}/* {str(project_destination)}"
@@ -5733,7 +5678,7 @@ class Autosubmit:
                     '--lines=+1',
                     '--retry',
                     '--follow=name',
-                    workflow_log_file
+                    str(workflow_log_file)
                 ]
                 proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL)
                 with suppress(KeyboardInterrupt):
@@ -5824,12 +5769,12 @@ class Autosubmit:
             return view_file(workflow_log_file, mode) == 0
 
     @staticmethod
-    def stop(expids: str, force=False, all_expids=False, force_all=False, cancel=False,
+    def stop(arg_expids: str, force=False, all_expids=False, force_all=False, cancel=False,
              current_status="", status="FAILED", force_yes=False) -> None:
         """The stop command allows users to stop the desired experiments.
 
-        :param expids: expids to stop
-        :type expids: str
+        :param arg_expids: expids to stop
+        :type arg_expids: str
         :param force: force the stop of the experiment
         :type force: bool
         :param all_expids: stop all experiments
@@ -5858,16 +5803,16 @@ class Autosubmit:
         except KeyError:
             raise AutosubmitCritical(f"Invalid status -fs. All values must match one "
                                      f"of {Status.VALUE_TO_KEY.keys()}", 7011)
-
+        expids: list[str] = []
         if all_expids:
             expids = retrieve_expids()
         else:
-            expids = expids.replace(',', ' ').split(' ')
+            expids = arg_expids.replace(',', ' ').split(' ')
             expids = [expid.lower() for expid in filter(lambda x: x, expids)]
 
         truthy_values = ["true", "yes", "y", "1", ""]
         if not force_all:
-            expids: list[str] = [
+            expids = [
                 expid
                 for expid in expids
                 if force_yes or input(f"Confirm stopping the experiment: {expid} (y/n)[enter=y]? ").lower() in truthy_values
@@ -5896,5 +5841,6 @@ class Autosubmit:
                     Log.info(f"Waiting for the autosubmit run to safety stop: {expid}")
                     sleep(5)
             if cancel:
-                job_list, _, _, _, _, _, _, _ = Autosubmit.prepare_run(expid, check_scripts=False)
+                job_list, _, _, _, _, _, _ = Autosubmit.prepare_run(expid, check_scripts=False)
+
                 cancel_jobs(job_list, active_jobs_filter=current_status, target_status=status)

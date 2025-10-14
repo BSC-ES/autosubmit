@@ -212,8 +212,8 @@ class Platform(object):
             self.pw = None
         self.max_waiting_jobs = 20
         self.recovery_queue = None
-        self.work_event = None
-        self.cleanup_event = None
+        self.work_event: Optional[Event] = None
+        self.cleanup_event: Optional[Event] = None
         self.log_retrieval_process_active = False
         self.log_recovery_process = None
         self.keep_alive_timeout = 60 * 5  # Useful in case of kill -9
