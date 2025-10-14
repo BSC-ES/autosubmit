@@ -38,7 +38,7 @@ from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
-from typing import Dict, Set, Tuple, Union, Any, List, Optional
+from typing import Dict, Tuple, Union, Any, List, Optional
 
 from bscearth.utils.date import date2str
 from portalocker import Lock
@@ -63,7 +63,6 @@ from autosubmit.helpers.processes import process_id
 from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, strtobool
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.experiment_status import ExperimentStatus
-from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_grouping import JobGrouping
 from autosubmit.job.job_list import JobList
