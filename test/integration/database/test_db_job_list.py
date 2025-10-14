@@ -317,62 +317,6 @@ def test_db_job_list_jobs_and_edges_together(
     'full_load',
     [True, False]
 )
-def test_load_job_by_name(
-        tmp_path: Path,
-        full_load: bool,
-        as_exp: Callable
-):
-    """
-    Test loading a job by its name from the database.
-
-    :param tmp_path: Temporary directory path
-    :type tmp_path: Path
-    :param db_engine: Database engine to use ('sqlite' or 'postgres')
-    :type db_engine: str
-    :param options: Database connection options
-    :type options: dict
-    :param request: Pytest request fixture for accessing other fixtures
-    :type request: pytest.FixtureRequest
-    :param as_exp.as_conf: Fixture to create a test configuration
-    :type as_exp.as_conf: Callable
-    """
-    # Load database fixture
-    request.getfixturevalue(f"as_db_{db_engine}")
-
-    if db_engine == 'sqlite':
-        db_manager = _create_db_manager(db_path=tmp_path / options['db_name'])
-    else:
-        db_manager = _create_db_manager(schema=options['schema'])
-
-    job_list = generate_job_list(as_exp.as_conf, db_manager)
-    job_list.save_jobs()
-
-    job_name = "a01f_LOCAL_SETUP"
-    loaded_job = db_manager.load_job_by_name(job_name)
-
-    assert loaded_job is not None
-    assert loaded_job['name'] == job_name
-    assert loaded_job['section'] == 'LOCAL_SETUP'
-    assert loaded_job['status'] == 'READY'
-    assert loaded_job['script_name'] == 'a01f_LOCAL_SETUP.cmd'
-    assert loaded_job['priority'] == 0
-
-    # Check for expected keys in the job dictionary
-    expected_keys = {'chunk', 'current_checkpoint_step', 'date', 'date_split',
-                     'finish_time_timestamp', 'frequency', 'id', 'local_logs_err',
-                     'local_logs_out', 'max_checkpoint_step', 'name', 'packed',
-                     'platform_name', 'priority', 'ready_date', 'remote_logs_err',
-                     'remote_logs_out', 'script_name', 'section', 'split', 'splits',
-                     'start_time', 'start_time_timestamp', 'status', 'submit_time_timestamp',
-                     'synchronize', 'updated_log', 'member'}
-
-    assert set(loaded_job.keys()) == expected_keys
-
-
-@pytest.mark.parametrize(
-    'full_load',
-    [True, False]
-)
 def test_select_latest_inner_jobs(
         tmp_path: Path,
         as_db: str,

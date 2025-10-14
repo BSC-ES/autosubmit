@@ -226,7 +226,6 @@ def test_open_conn(monkeypatch: pytest.MonkeyPatch, tmp_path, scenario: str) -> 
     elif scenario == "operational_error_missing_tables":
         monkeypatch.setattr("autosubmit.database.db_common.BasicConfig.DATABASE_BACKEND", "sqlite")
         monkeypatch.setattr("autosubmit.database.db_common.BasicConfig.DB_PATH", str(db_path))
-        err = "no such table: db_version"
         with pytest.raises(AutosubmitCritical) as e:
             open_conn(str(db_path))
             assert "database version does not match" in str(e.value).lower()
@@ -427,7 +426,7 @@ def test_check_db_sqlite(monkeypatch, tmp_path, as_db: str):
     db_manager = _create_db_manager(BasicConfig.DB_PATH)
     db_manager.create_table(DBVersionTable.name)
     db_manager.insert(DBVersionTable.name, {'version': 3})
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError):
         check_db_path(Path("dummy"), must_exists=True)
 
     exists = check_db_path(Path("dummy"), must_exists=False)

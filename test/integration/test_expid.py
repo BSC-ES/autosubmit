@@ -450,7 +450,7 @@ def test_expid_generated_correctly(tmp_path, autosubmit_exp, autosubmit):
 
 def test_delete_experiment(mocker, tmp_path, autosubmit_exp, autosubmit: Autosubmit):
     autosubmit.install()
-    as_exp = autosubmit_exp(_EXPID, _get_experiment_data(tmp_path))
+    autosubmit_exp(_EXPID, _get_experiment_data(tmp_path))
     mocker.patch("autosubmit.autosubmit.process_id", return_value=None)
     autosubmit.delete(expid=f'{_EXPID}', force=True)
     assert all(_EXPID not in Path(f).name for f in Path(BasicConfig.LOCAL_ROOT_DIR).iterdir())
@@ -472,8 +472,7 @@ def test_delete_experiment(mocker, tmp_path, autosubmit_exp, autosubmit: Autosub
 
 def test_delete_experiment_not_owner(mocker, tmp_path, autosubmit_exp, autosubmit: Autosubmit):
     autosubmit.install()
-    as_exp = autosubmit_exp(_EXPID, _get_experiment_data(tmp_path))
-    run_dir = as_exp.as_conf.basic_config.LOCAL_ROOT_DIR
+    autosubmit_exp(_EXPID, _get_experiment_data(tmp_path))
     mocker.patch('autosubmit.autosubmit.Autosubmit._user_yes_no_query', return_value=True)
     mocker.patch('pwd.getpwuid', side_effect=TypeError)
     mocker.patch("autosubmit.autosubmit.process_id", return_value=None)

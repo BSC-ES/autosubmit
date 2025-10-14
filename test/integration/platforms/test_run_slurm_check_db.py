@@ -154,7 +154,7 @@ def _print_db_results(db_check_list, rows_as_dicts, run_tmpdir):
                 print(f"Job entry: {job_name} assert {str(all_ok).upper()}")
 
 
-def run_in_thread(target: Callable[..., Any], *args, **kwargs) -> "threading.Thread":
+def run_in_thread(target: Callable[..., Any], *args, **kwargs) -> Thread:
     """
     Run the given target function in a separate thread.
 
