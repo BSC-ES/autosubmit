@@ -34,7 +34,7 @@ jobs:
     name: mypy run
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-python@v3
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install mypy
