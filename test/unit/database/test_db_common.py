@@ -30,7 +30,6 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import db_common
 from autosubmit.log.log import AutosubmitCritical
-from test.conftest import _initialize_autosubmitrc
 
 
 @pytest.mark.parametrize(
@@ -60,7 +59,6 @@ def test_db_common_sqlite_multiprocessing_queue_error(mocker, fn: str, tmp_path)
     mocked_queue = mocker.patch('multiprocessing.Queue')
     mocker.patch('multiprocessing.Queue', return_value=mocked_queue)
     mocker.patch('multiprocessing.Process')
-    autosubmitrc = _initialize_autosubmitrc(tmp_path,backend='sqlite')
     mocked_queue.get.side_effect = [Exception]
 
     db_common_fn = getattr(db_common, fn)

@@ -23,12 +23,15 @@ from networkx import DiGraph
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.database.db_common import get_connection_url
+from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
-from test.conftest import _initialize_autosubmitrc
 from autosubmit.job.template import Language
+from autosubmit.database import session
+
 
 """Tests for the ``JobList`` class."""
 
@@ -45,8 +48,6 @@ def as_conf(autosubmit_config):
 
 @pytest.fixture
 def setup_job_list(as_conf, tmp_path):
-    # Autosubmitrc
-    _initialize_autosubmitrc(tmp_path, "sqlite")
     job_list = JobList(_EXPID, as_conf, YAMLParserFactory())
     job_list.graph = networkx.DiGraph()
     jobs = [
@@ -103,11 +104,6 @@ def test_save_jobs(as_conf, setup_job_list, tmp_path):
     job_list.save_jobs()
     job_list.save_edges()
     job_list.save_sections()
-    # Check if the file exists
-    job_list_db = f"{_EXPID}/db/job_list.db"
-
-    if as_conf.experiment_data["DATABASE_BACKEND"] == 'sqlite':
-        assert (Path(BasicConfig.LOCAL_ROOT_DIR) / job_list_db).exists()
     db_jobs = job_list.dbmanager.select_all_jobs()
     db_edges = job_list.dbmanager.select_edges(db_jobs)
     assert len(db_jobs) == len(jobs)
@@ -129,7 +125,7 @@ def test_save_jobs(as_conf, setup_job_list, tmp_path):
         "no_full_load_no_failed"
     ]
 )
-def test_load(as_conf: Any, setup_job_list: Any, tmp_path: Any, full_load: bool, load_failed_jobs) -> None:
+def test_load(as_conf: Any, setup_job_list: Any, tmp_path: Any, full_load: bool, load_failed_jobs, autosubmit) -> None:
     """
     Test loading the job list with different full_load options.
 
@@ -255,7 +251,7 @@ def test_that_create_job_method_calls_dic_jobs_method_with_increasing_priority(m
     dic_mock.read_section.assert_any_call('fake-section-1', 0, Language.BASH)
     dic_mock.read_section.assert_any_call('fake-section-2', 1, Language.BASH)
 
-def test_run_only_selected_members(setup_job_list, as_conf):
+def test_run_only_selected_members(setup_job_list, as_conf, autosubmit):
     """
     Test that only jobs with members in the run_members list are loaded. ( autosubmit run $expid -rom --run_only_members)
     """

@@ -47,7 +47,6 @@ from pyparsing import nestedExpr
 from ruamel.yaml import YAML
 
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
-import autosubmit.history.utils as HUtils
 import autosubmit.statistics.utils as StatisticsUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
@@ -77,6 +76,7 @@ from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.submitter import Submitter
+
 
 dialog = None
 

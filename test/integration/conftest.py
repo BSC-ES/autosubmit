@@ -20,6 +20,7 @@ import configparser
 import multiprocessing
 import os
 import uuid
+from contextlib import suppress
 from dataclasses import dataclass
 from fileinput import FileInput
 from getpass import getuser
@@ -43,6 +44,7 @@ from testcontainers.postgres import PostgresContainer
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import _create_ssh_client
@@ -587,5 +589,7 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
         raise ValueError(f'Unsupported database backend: {backend}')
 
     BasicConfig.read()
+    with suppress(AutosubmitCritical):  # ( TODO: check which functions call as_db twice or if this is used in combination other fixture that calls autosubmit.install)
+        autosubmit.install()
 
     return backend

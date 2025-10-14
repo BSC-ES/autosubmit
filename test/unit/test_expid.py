@@ -28,8 +28,7 @@ from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import db_common
 from autosubmit.log.log import AutosubmitCritical
-from test.conftest import _initialize_autosubmitrc
-
+from ..conftest import initialize_autosubmitrc
 
 @contextmanager
 def does_not_raise():
@@ -53,7 +52,7 @@ def build_db_mock(current_experiment_id, mock_db_common, mocker):
     ('', does_not_raise()),
     ('test', pytest.raises(AutosubmitCritical))
 ], ids=['success', 'fail'])
-def test_expid(copy_id, expected, tmp_path, autosubmit_config, monkeypatch) -> None:
+def test_expid(copy_id, expected, tmp_path, autosubmit_config, monkeypatch, autosubmit) -> None:
     """
     Function to test if the autosubmit().expid generates the paths and expid properly
 
@@ -61,8 +60,8 @@ def test_expid(copy_id, expected, tmp_path, autosubmit_config, monkeypatch) -> N
     :param tmp_path: Path
     :return: None
     """
+    autosubmit.install()
     monkeypatch.setattr(db_common, 'TIMEOUT', 1)
-    _initialize_autosubmitrc(tmp_path, backend='sqlite')
     with expected:
         expid = Autosubmit.expid("Test", copy_id=copy_id)
         experiment = Autosubmit.describe(expid)

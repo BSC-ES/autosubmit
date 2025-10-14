@@ -357,25 +357,16 @@ def test_update_experiment_nonexistent(setup_experiment_table):
 
 ### SQLAlchemy specific tests below ###
 
-# TODO It seems that these are not yet prepared to run with SQLITE # ask to Luiggi and @kinow
-# Instead they're using other methods to test the same functionality
-
-@pytest.mark.parametrize(
-    "db_engine",
-    [
-        # postgres
-        pytest.param("postgres", marks=[pytest.mark.postgres, pytest.mark.docker]),
-    ],
-)
-def test_get_autosubmit_version_sqlalchemy(monkeypatch, tmp_path, db_engine: str, request):
+def test_get_autosubmit_version_sqlalchemy(monkeypatch, tmp_path, as_db: str):
     """
     Test that get_autosubmit_version returns the correct version using DbManager (SQLAlchemy).
     """
+    if as_db == "sqlite":
+        pytest.skip("Skipping SQLAlchemy specific test when using sqlite")
     db_path = tmp_path / "tests.db"
     monkeypatch.setattr("autosubmit.database.db_common.CURRENT_DATABASE_VERSION", 3, raising=False)
     # monkey _get_sqlalchemy_conn
     # Create database and insert version
-    request.getfixturevalue(f"as_db_{db_engine}")
     db_manager = _create_db_manager(db_path)  # TODO: I think this forces to the db name be "tests.db"
     db_manager.create_table(DBVersionTable.name)
     db_manager.insert(DBVersionTable.name, {'version': 3})
@@ -386,19 +377,13 @@ def test_get_autosubmit_version_sqlalchemy(monkeypatch, tmp_path, db_engine: str
     assert version == '3'
 
 
-@pytest.mark.parametrize(
-    "db_engine",
-    [
-        # postgres
-        pytest.param("postgres", marks=[pytest.mark.postgres, pytest.mark.docker]),
-    ],
-)
-def test_last_name_used_sqlalchemy(monkeypatch, tmp_path, db_engine, request):
+def test_last_name_used_sqlalchemy(monkeypatch, tmp_path, as_db):
     """
     Test that last_name_used returns the correct last name using DbManager (SQLAlchemy).
     """
+    if as_db == "sqlite":
+        pytest.skip("Skipping SQLAlchemy specific test when using sqlite")
     db_path = tmp_path / "tests.db"
-    request.getfixturevalue(f"as_db_{db_engine}")
     db_manager = _create_db_manager(db_path)
     db_manager.create_table('experiment')
     db_manager.insert('experiment', {'name': 'oexp1', 'autosubmit_version': 1, 'description': 'First experiment'})

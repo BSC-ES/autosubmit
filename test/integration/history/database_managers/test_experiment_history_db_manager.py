@@ -43,10 +43,12 @@ _EXPID = 't0123'
 @pytest.mark.postgres
 def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
     """Test history database manager using the old (SQLite) and new (SQLAlchemy) implementations."""
-    options = {"schema": "test_schema_history"}
+    _EXPID = "test_schema_history"
+    options = {"schema": _EXPID}
     is_sqlalchemy = as_db != "sqlite"
     tmp_test_dir = os.path.join(str(tmp_path), "test_experiment_history_db_manager")
     os.mkdir(tmp_test_dir)
+    options["expid"] = _EXPID
     if not is_sqlalchemy:
         # N.B.: We do it here, as we don't know the temporary path name until the fixture exists,
         #       and because it's harmless to the Postgres test to have the tmp_path fixture.
