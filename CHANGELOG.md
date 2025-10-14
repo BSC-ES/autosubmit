@@ -11,6 +11,7 @@ platform does not support wrappers anymore (it was used for testing).
 
 - Fixed issue with the verification of dirty Git local repositories in operational experiments #2446
 - Fixed error when cleaning projects that use Git #2524
+- HPC copy, when copying an experiment, was failing in some cases, fixing edge cases #2650
 
 **Enhancements:**
 
