@@ -20,7 +20,7 @@ import os
 import textwrap
 from contextlib import suppress
 from time import sleep
-from typing import List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING, Union
 
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
@@ -192,8 +192,7 @@ class PJMPlatform(ParamikoPlatform):
         return None
 
 
-    def submit_Script(self, hold=False):
-        # type: (bool) -> Union[List[str], str]
+    def submit_Script(self, hold=False)-> Union[list[str], str]:
         """
         Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once.
 
