@@ -29,6 +29,8 @@ platform does not support wrappers anymore (it was used for testing).
 - Improvement of error message when `LOCAL` project location is a file, not a directory #1972 #1254
 - Removed the code for wrappers with local platform that were create only for tests #2522
 - Added SQLAlchemy as the main database entrypoint, enabling backends of Sqlite (default) and Postgres (new) #2187
+- Added mypy and ruff to the CI for the files touched by a change granting a 
+  higher quality and preservation of the code #2626 #2621
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 
