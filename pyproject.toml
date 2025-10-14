@@ -86,7 +86,8 @@ tests = [
     "pytest-mock",
     "ruff==0.14.0",
     "pytest-xdist",
-    "testcontainers"
+    "testcontainers",
+    "types-requests"
 ]
 docs = [
     "livereload",
