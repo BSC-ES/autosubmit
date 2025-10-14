@@ -31,6 +31,7 @@ platform does not support wrappers anymore (it was used for testing).
 - Added SQLAlchemy as the main database entrypoint, enabling backends of Sqlite (default) and Postgres (new) #2187
 - Added mypy and ruff to the CI for the files touched by a change granting a 
   higher quality and preservation of the code #2626 #2621
+- Updated base images of micromamba and debian for security update #2610
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 
