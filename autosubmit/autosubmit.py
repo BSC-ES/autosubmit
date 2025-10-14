@@ -76,7 +76,6 @@ from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 
-
 dialog = None
 
 """
@@ -1108,14 +1107,13 @@ class Autosubmit:
                     Log.set_file(os.path.join(tmp_path, command + '_err.log'), "err")
                 else:
                     Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                              args.command + expid + '.log'), "out", log_level)
+                                              command + expid + '.log'), "out", log_level)
                     Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                              args.command + expid + '_err.log'), "err")
+                                              command + expid + '_err.log'), "err")
                     Log.printlog(f"Permissions of {tmp_path} are {oct_perm}. The log is being written in the "
                                  f"{BasicConfig.GLOBAL_LOG_DIR} path instead of {oct_perm}. "
                                  f"Please tell to the owner to fix the permissions")
         Log.file_path = tmp_path
-
 
     @staticmethod
     def _check_ownership_and_set_last_command(as_conf, expid, command):
@@ -1897,17 +1895,6 @@ class Autosubmit:
         if len(date_list) != len(set(date_list)):
             raise AutosubmitCritical(
                 'There are repeated start dates!', 7014)
-        num_chunks = as_conf.get_num_chunks()
-        chunk_ini = as_conf.get_chunk_ini()
-        member_list = as_conf.get_member_list()
-        date_format = ''
-        if as_conf.get_chunk_size_unit() == 'hour':
-            date_format = 'H'
-        for date in date_list:
-            if date.hour > 1:
-                date_format = 'H'
-            if date.minute > 1:
-                date_format = 'M'
         wrapper_jobs = dict()
         for wrapper_section, wrapper_data in as_conf.experiment_data.get("WRAPPERS", {}).items():
             if type(wrapper_data) is not dict:
@@ -2404,7 +2391,6 @@ class Autosubmit:
                             job_list.save_jobs()
                             as_conf.save()
 
-
                         # Safe spot to store changes
                         try:
                             # Track all jobs change for GUI
@@ -2700,7 +2686,7 @@ class Autosubmit:
                 if platform.type.lower() in ["slurm", "pjm"] and not inspect and not only_wrappers:
                     # Process the script generated in submit_ready_jobs
                     save_2, valid_packages_to_submit = platform.process_batch_ready_jobs(valid_packages_to_submit,
-                                                                                          failed_packages,
+                                                                                         failed_packages,
                                                                                          error_message="", hold=hold)
 
                 if not inspect:
@@ -2866,8 +2852,6 @@ class Autosubmit:
                 # Database modification
                 # reset wrapper table
                 # Load another job_list to go through that goes through the jobs, but we want to monitor the other one
-                job_list_wr = Autosubmit.load_job_list(
-                    expid, as_conf, notransitive=notransitive, monitor=True, new=False)
                 Autosubmit.generate_scripts_andor_wrappers(as_conf, job_list, True)
             job_list.load_wrappers()
             if not job_list.packages_dict and check_wrapper:
@@ -2969,7 +2953,6 @@ class Autosubmit:
             jobs = StatisticsUtils.filter_by_section(job_list.get_job_list(), filter_type)
             jobs, period_ini, period_fi = StatisticsUtils.filter_by_time_period(jobs, filter_period)
             # Package information
-            symbols = job_list.retrieve_symbols()
             queue_time_fixes = {}
             if job_list.packages_dict:
                 current_table_structure = job_list.graph_dict
@@ -3075,8 +3058,8 @@ class Autosubmit:
         # Check which jobs have been completed and return names
         # If a job has more than one run, the childs of run id > parent should be set to WAITING
         Log.warning("Offline mode: No connection to the platforms will be established, using jobdata to recover the experiment")
-        # add the code
-        raise NotImplementedError("Offline recovery not implemented yet")
+        # TODO: add the code
+        completed_jobnames = ""
         return list(completed_jobnames)
 
     @staticmethod
@@ -4215,47 +4198,6 @@ class Autosubmit:
         elif BasicConfig.DATABASE_BACKEND == 'postgres':
             # TODO: Implement Postgres backup
             Log.debug("Postgres database backup not implemented yet.")
-
-    @staticmethod
-    def database_fix(expid):
-        """
-        Database methods. Performs a sql dump of the database and restores it.
-
-        :param expid: experiment identifier
-        :type expid: str
-        :return:
-        :rtype:
-        """
-        # TODO, fix potgress or sqlite in case of corrupted database
-        raise "NotImplementedError"
-        os.umask(0)  # Overrides user permissions
-        current_time = int(time.time())
-        corrupted_db_path = os.path.join(BasicConfig.JOBDATA_DIR, f"job_data_{expid}_corrupted.db")
-
-        database_path = os.path.join(BasicConfig.JOBDATA_DIR, f"job_data_{expid}.db")
-        dump_file_name = f'job_data_{expid}.sql'
-        dump_file_path = os.path.join(BasicConfig.JOBDATA_DIR, dump_file_name)
-        bash_command = f'cat {dump_file_path} | sqlite3 {database_path}'
-        try:
-            if os.path.exists(database_path):
-                os.popen(f"mv {database_path} {corrupted_db_path}").read()
-                time.sleep(1)
-                Log.info("Original database moved.")
-            try:
-                exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                                historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-                Log.info("Restoring from sql")
-                os.popen(bash_command).read()
-                exp_history.initialize_database()
-
-            except Exception:
-                Log.warning("It was not possible to restore the jobs_data.db file... , a new blank db will be created")
-
-                exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                                historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
-                exp_history.initialize_database()
-        except Exception as exp:
-            Log.critical(str(exp))
 
     @staticmethod
     def rocrate(expid, path: Path):

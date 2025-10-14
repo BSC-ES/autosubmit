@@ -648,12 +648,12 @@ def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubm
 
     exp.autosubmit._setup_log_files(
         command="run",
-        expids=None,
+        expids=[],
         expid="t001",
         owner=True,
-        tmp_path=tmp_path,
-        aslogs_path=aslogs_path,
-        exp_path=exp_path,
+        tmp_path=str(tmp_path),
+        aslogs_path=str(aslogs_path),
+        exp_path=str(exp_path),
         log_level="DEBUG",
         console_level="DEBUG"
     )
