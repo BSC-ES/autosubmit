@@ -249,7 +249,7 @@ class Job(object):
         self.check = 'true'
         self.check_warnings = False
         self.packed = False
-        self.hold = False  # type: bool
+        self.hold: bool = False
         self.distance_weight = 0
         self.level = 0
         self._export = "none"
@@ -310,7 +310,7 @@ class Job(object):
                 self.status
         self.validate_template = False
 
-    def clean_attributes(self):
+    def clean_attributes(self) -> None:
         if self.status == Status.FAILED and self.fail_count >= self.retrials:
             return None
         self.rerun_only = False
