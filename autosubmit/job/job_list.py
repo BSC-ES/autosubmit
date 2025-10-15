@@ -652,7 +652,7 @@ class JobList(object):
             filters = [{}]
         return filters
 
-    def _check_dates(self, relationships: Dict, current_job: Job) -> {}:
+    def _check_dates(self, relationships: Dict, current_job: Job) -> dict:
         """
         Check if the current_job_value is included in the filter_from and retrieve filter_to value
         :param relationships: Remaining filters to apply.
@@ -711,7 +711,7 @@ class JobList(object):
         filters_to_apply = self._unify_to_filters(filters_to_apply)
         return filters_to_apply
 
-    def _check_chunks(self, relationships: Dict, current_job: Job) -> {}:
+    def _check_chunks(self, relationships: Dict, current_job: Job) -> dict:
         """
         Check if the current_job_value is included in the filter_from and retrieve filter_to value
         :param relationships: Remaining filters to apply.
@@ -744,7 +744,7 @@ class JobList(object):
         filters_to_apply = self._unify_to_filters(filters_to_apply, current_job.splits)
         return filters_to_apply
 
-    def _unify_to_filter(self, unified_filter, filter_to, filter_type, splits=None) -> {}:
+    def _unify_to_filter(self, unified_filter, filter_to, filter_type, splits=None) -> dict:
         """
         Unify filter_to filters into a single dictionary
         :param unified_filter: Single dictionary with all filters_to
@@ -765,10 +765,10 @@ class JobList(object):
             aux = str(filter_to.pop(filter_type, None))
             if aux:
                 if "," in aux:
-                    aux = aux.split(",")
+                    aux_split = aux.split(",")
                 else:
-                    aux = [aux]
-                for element in aux:
+                    aux_split = [aux]
+                for element in aux_split:
                     if element == "":
                         continue
                     # Get only the first alphanumeric part and [:] chars
@@ -1244,7 +1244,6 @@ class JobList(object):
                 auto_chunk = int(job_name_separated[3]) + int(dependency.distance)
             if auto_chunk < 1:
                 auto_chunk = int(job_name_separated[3])
-            auto_chunk = str(auto_chunk)
             # Get first split of the given chunk
             auto_job_name = ("_".join(job_name_separated[:3]) +
                              f"_{auto_chunk}_1_{dependency.section}")
@@ -2222,7 +2221,7 @@ class JobList(object):
                 return job
         return None
 
-    def get_jobs_by_section(self, section_list: list, banned_jobs: list = None,
+    def get_jobs_by_section(self, section_list: list, banned_jobs: Optional[list] = None,
                             get_only_non_completed: bool = False) -> list:
         """
         Get jobs by section.
@@ -2253,10 +2252,9 @@ class JobList(object):
                     jobs.append(job)
         return jobs
 
-    def get_in_queue_grouped_id(self, platform):
-        # type: (object) -> Dict[int, List[Job]]
+    def get_in_queue_grouped_id(self, platform) -> Dict[int, List[Job]]:
         jobs = self.get_in_queue(platform)
-        jobs_by_id = dict()
+        jobs_by_id: dict = {}
         for job in jobs:
             if job.id not in jobs_by_id:
                 jobs_by_id[job.id] = list()
@@ -2473,8 +2471,8 @@ class JobList(object):
 
         :returns: jobs_to_check - Jobs that fulfill the special conditions.
         """
-        jobs_to_check = []
-        jobs_to_skip = []
+        jobs_to_check: list = []
+        jobs_to_skip: list = []
         for target_status, sorted_job_list in self.jobs_edges.items():
             if target_status == "ALL":
                 continue
@@ -2558,7 +2556,7 @@ class JobList(object):
             job.platform.add_job_to_log_recover(job)
         return log_recovered
 
-    def check_if_log_is_recovered(self, job: Job) -> Path:
+    def check_if_log_is_recovered(self, job: Job) -> Optional[Path]:
         """
         Check if the log is recovered.
 
@@ -2583,7 +2581,7 @@ class JobList(object):
         return None
 
     def update_list(self, as_conf: AutosubmitConfig, store_change: bool = True,
-                    fromSetStatus: bool = False, submitter: object = None,
+                    from_set_status: bool = False, submitter: object = None,
                     first_time: bool = False) -> bool:
         """
         Updates job list, resetting failed jobs and changing to READY
@@ -2591,7 +2589,7 @@ class JobList(object):
 
         :param first_time:
         :param submitter:
-        :param fromSetStatus:
+        :param from_set_status:
         :param store_change:
         :param as_conf: autosubmit config object
         :type as_conf: AutosubmitConfig
@@ -2693,7 +2691,7 @@ class JobList(object):
                         Log.debug(f"Resetting sync job: {job.name} status to: WAITING "
                                   "for parents completion...")
         Log.debug('Updating WAITING jobs')
-        if not fromSetStatus:
+        if not from_set_status:
             all_parents_completed = []
             for job in self.get_delayed():
                 if datetime.datetime.now() >= job.delay_end:
@@ -3049,7 +3047,7 @@ class JobList(object):
         for job in all_jobs:
             if len(job.parents) == 0:
                 roots.append(job)
-        visited = list()
+        visited: list = []
         # print(root)
         # root exists
         for root in roots:
@@ -3221,13 +3219,9 @@ class JobList(object):
         and the text that represents it
         :rtype: int, int, str
         """
-        status = "NA"
         energy = 0
         seconds_queued = 0
         seconds_running = 0
-        submit_time = datetime.timedelta()
-        start_time = datetime.timedelta()
-        finish_time = datetime.timedelta()
 
         try:
             # Getting data from new job database
@@ -3249,7 +3243,7 @@ class JobList(object):
                                 t_start = c_start if t_start > c_start else t_start
                                 job_data.start = t_start
 
-                        if seconds is False:
+                        if not seconds:
                             queue_time = math.ceil(
                                 job_data.queuing_time() / 60)
                             running_time = math.ceil(
