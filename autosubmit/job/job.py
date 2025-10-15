@@ -680,6 +680,7 @@ class Job(object):
     @custom_directives.setter
     def custom_directives(self, value):
         self._custom_directives = value
+
     @property  # type: ignore
     @autosubmit_parameter(name='splits')
     def splits(self):
@@ -757,7 +758,7 @@ class Job(object):
                     # TODO: Check why the fstring is not working for the text below
                     raise AutosubmitCritical(
                         "Extended {1} script: couldn't figure out script {0} type\n".format(script_name,
-                        error_message_type), 7011)
+                                                                                            error_message_type), 7011)
 
         if not found_hashbang:
             # TODO: Check why the fstring is not working for the text below
@@ -2985,10 +2986,6 @@ class WrapperJob(Job):
                 over_wallclock = self._check_inner_job_wallclock(job)
                 if over_wallclock and job.wrapper_type != "vertical":
                     job.new_status = Status.FAILED
-
-
-
-
 
     def _is_over_wallclock(self, start_time: str, wallclock: str) -> bool:
         """This calculates if the job is over its wallclock time, which indicates that a jobs is running for too long.

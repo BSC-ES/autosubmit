@@ -1058,13 +1058,91 @@ DEPENDENCIES_CHANGED_DATA = [
             },
             "job": {
                 "SCRIPT": "echo 'Hello World'",
-                "RUNNING": "once",
+                "RUNNING": "date",
                 "DEPENDENCIES": "job-1",
                 "wallclock": "00:01",
                 "splits": 2,
             }
         }
     },
+    {
+        "JOBS": {
+            "hjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "hjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "vhjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vhjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "vjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "hvjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "hvjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "job": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "member",
+                "DEPENDENCIES": "job-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            }
+        }
+    },
+    {
+        "JOBS": {
+            "hjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "hjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "vhjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vhjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "vjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "vjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "hvjob": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "chunk",
+                "DEPENDENCIES": "hvjob-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            },
+            "job": {
+                "SCRIPT": "echo 'Hello World'",
+                "RUNNING": "once",
+                "DEPENDENCIES": "job-1",
+                "wallclock": "00:01",
+                "splits": 2,
+            }
+        }
+    }
 ]
 
 DEPENDENCIES_IDS = [
@@ -1082,7 +1160,10 @@ DEPENDENCIES_IDS = [
     "remove_job",
     "add_new_job",
     "change_dependencies",
-    "running_type_change",
+    "running_type_change_date",
+    "running_type_change_member",
+    "running_type_change_once",
+
 ]
 
 
