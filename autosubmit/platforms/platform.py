@@ -33,13 +33,13 @@ from typing import Any, Optional, Union, TYPE_CHECKING
 import setproctitle
 
 from autosubmit.helpers.parameters import autosubmit_parameter
-from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.job.job_packages import JobPackageBase
+
 
 
 def _init_logs_log_process(as_conf, platform_name):
@@ -377,8 +377,6 @@ class Platform(object):
         :type as_conf: AutosubmitConfig object
         :param job_list: job list to check
         :type job_list: JobList object
-        :param packages_persistence: Handles database per experiment.
-        :type packages_persistence: JobPackagePersistence object
         :param inspect: True if coming from generate_scripts_andor_wrappers().
         :type inspect: Boolean
         :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw.
@@ -770,7 +768,7 @@ class Platform(object):
         :rtype: int
         """
 
-    def check_Alljobs(self, job_list: list[Job], as_conf, retries=5):
+    def check_Alljobs(self, job_list: list[Any], as_conf, retries=5):
         """
         Checks jobs running status
 
