@@ -38,7 +38,7 @@ from typing import Optional, Union, TYPE_CHECKING
 import Xlib.support.connect as xlib_connect
 import paramiko
 from paramiko.agent import Agent
-from paramiko.ssh_exception import (SSHException)
+from paramiko.ssh_exception import SSHException
 
 from autosubmit.job.job_common import Status
 from autosubmit.job.template import Language
@@ -147,13 +147,13 @@ class ParamikoPlatform(Platform):
         self.job_status: Optional[dict[str, list]] = None
         self._ssh: Optional[paramiko.SSHClient] = None
         self._ssh_config = None
-        self._ssh_output = None
-        self._host_config = None
+        self._ssh_output: str = ''
+        self._host_config: dict = {}
         self._host_config_id = None
         self.submit_cmd = ""
         self._ftpChannel: Optional[paramiko.SFTPClient] = None
         self.transport: Optional[paramiko.Transport] = None
-        self.channels = {}
+        self.channels: dict = {}
         if sys.platform != "linux":
             self.poller = select.kqueue()
         else:
@@ -196,8 +196,8 @@ class ParamikoPlatform(Platform):
         self.connected = False
         self._ssh = None
         self._ssh_config = None
-        self._ssh_output = None
-        self._host_config = None
+        self._ssh_output = ''
+        self._host_config = {}
         self._host_config_id = None
         self._ftpChannel = None
         self.transport = None
@@ -873,7 +873,7 @@ class ParamikoPlatform(Platform):
                 if not is_wrapper:
                     if job.status != Status.RUNNING:
                         job.start_time = datetime.datetime.now()  # URi: start time
-                    if job.start_time is not None and str(job.wrapper_type).lower() == "none":
+                    if job.start_time is not None and str(job.wrapper_type).lower() == "":
                         wallclock = job.wallclock
                         if job.wallclock == "00:00" or job.wallclock is None:
                             wallclock = job.platform.max_wallclock
@@ -1003,7 +1003,7 @@ class ParamikoPlatform(Platform):
                     job_status = job.status
                 if job.status != Status.RUNNING:
                     job.start_time = datetime.datetime.now()  # URi: start time
-                if job.start_time is not None and str(job.wrapper_type).lower() == "none":
+                if job.start_time is not None and str(job.wrapper_type).lower() == "":
                     wallclock = job.wallclock
                     if job.wallclock == "00:00":
                         wallclock = job.platform.max_wallclock
@@ -1683,7 +1683,7 @@ class ParamikoPlatform(Platform):
             Log.debug(f"Error getting file size for {src}: {str(e)}")
             return None
 
-    def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
+    def read_file(self, src: str, max_size: Optional[int] = None) -> Union[bytes, None]:
         """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
 
         :param src: file path

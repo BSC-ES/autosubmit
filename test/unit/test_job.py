@@ -1008,7 +1008,7 @@ def test_update_stat_file():
     job = Job("dummyname", 1, Status.WAITING, 0)
     job.fail_count = 0
     job.script_name = "dummyname.cmd"
-    job.wrapper_type = None
+    job.wrapper_type = ''
     job.update_stat_file()
     assert job.stat_file == "dummyname_STAT_"
     job.fail_count = 1
@@ -2340,3 +2340,120 @@ def test_update_status(create_jobs: list[Job], status: Status, failed_file,
     assert job.status != status
     job.update_status(as_conf=as_conf, failed_file=failed_file)
     assert job.status == status
+
+
+@pytest.mark.parametrize(
+    'new_status,recovery_threads',
+    [
+        (Status.HELD, True),
+        (Status.COMPLETED, False),
+        (Status.FAILED, True),
+        (Status.UNKNOWN, False),
+        (Status.SUBMITTED, True),
+    ], ids=["HELD", "COMPLETED", "FAILED", "UNKNOWN", "SUBMITTED"]
+)
+def test_update_status_extra(local: 'Platform', autosubmit_config: 'AutosubmitConfig', new_status, recovery_threads):
+    """testing function to update the status of a job"""
+
+    job = Job(f'{_EXPID}_dummy', 1, Status.WAITING, 0)
+    job.submit_time_timestamp = date2str(datetime.now(), 'S')
+    job.platform = local
+    job.delay = 1
+    job.frequency = 1
+    job.synchronize = 1
+    job.local_logs = ""
+    job.delay_retrials = 1
+    job.log_recovered = ""
+    job.new_status = new_status
+    job.long_name = "long_name"
+    job.remote_logs = "remote_logs"
+
+    Path(job._tmp_path).mkdir(parents=True)
+    path: str = (str(job._tmp_path) + "/" + job.name + '_COMPLETED')
+    Path(path).touch()
+
+    autosubmit_config.platforms_data = {"local": {"DISABLE_RECOVERY_THREADS": recovery_threads, "whatever2": "dummy_value2"}}
+
+    with patch('autosubmit.job.job.Job.retrieve_logfiles', return_value=True):
+        with patch('autosubmit.platforms.platform.Platform.add_job_to_log_recover', return_value=True):
+            job.update_status(autosubmit_config)
+
+    if new_status != -2:
+        assert job.status == new_status
+    else:
+        assert job.status == 5
+
+
+@pytest.mark.parametrize(
+    'over_wallclock,expected_return,file_creating',
+    [
+        (True, Status.FAILED, False),
+        (False, None, False),
+        (True, Status.COMPLETED, True),
+        (False, None, True),
+    ], ids=["True", "False", "True_File", "False_File"]
+)
+def test_check_completion(local: 'Platform', over_wallclock, expected_return, file_creating):
+    """testing function to update content on the script to be executed on the platform"""
+
+    job = Job(f'{_EXPID}_dummy', 1, Status.WAITING, 0)
+    job.submit_time_timestamp = date2str(datetime.now(), 'S')
+    job.platform = local
+    job.name = 'TEST'
+
+    if file_creating:
+        Path(job._tmp_path).mkdir(parents=True)
+        Path(job._tmp_path + "/" + job.name + '_COMPLETED').touch()
+
+    assert expected_return == job.check_completion(over_wallclock=over_wallclock)
+
+
+def test_update_content(local: 'Platform', autosubmit_config: 'AutosubmitConfig'):
+    """testing function to update content on the script to be executed on the platform"""
+
+    job = Job(f'{_EXPID}_dummy', 1, Status.WAITING, 0)
+    job.submit_time_timestamp = date2str(datetime.now(), 'S')
+    job.platform = local
+    job.file = 'test.txt'
+    job.het = {}
+
+    as_conf = autosubmit_config(expid='t000', experiment_data={})
+    as_conf.experiment_data['PROJECT'] = {'PROJECT':'test', 'PROJECT_TYPE':'123'}
+    as_conf.experiment_data['PROJECT_TYPE'] = {'PROJECT':'test', 'PROJECT_TYPE':'123'}
+
+    Path(as_conf.get_project_dir()).mkdir(parents=True)
+    Path(as_conf.get_project_dir() + "/" + job.file).touch()
+
+    file, list_content = job.update_content(as_conf, parameters={})
+
+    assert "%TASKTYPE% %DEFAULT.EXPID% EXPERIMENT" in file
+    assert len(list_content) == 0
+
+
+@pytest.mark.parametrize('time',
+    [
+        True,
+        False
+    ], ids=["past_time", "current_time"])
+def test_check_inner_job_wallclock(local: 'Platform', autosubmit_config: 'AutosubmitConfig', time):
+    """testing function to update content on the script to be executed on the platform"""
+
+    as_conf = autosubmit_config(expid='t000', experiment_data={})
+    as_conf.experiment_data['PROJECT'] = {'PROJECT':'test', 'PROJECT_TYPE':'123'}
+    as_conf.experiment_data['PROJECT_TYPE'] = {'PROJECT':'test', 'PROJECT_TYPE':'123'}
+
+    wrapper_job = WrapperJob(_EXPID, 1, 'WAITING', 0, [], '24:00', local, as_conf, False)
+
+    job = Job(f'{_EXPID}_dummy', 1, Status.WAITING, 0)
+    job.submit_time_timestamp = date2str(datetime.now(), 'S')
+    job.platform = local
+    job.name = 'TEST'
+    job.wallclock = '01:00'
+    job.wrapper_type = 'vertical'
+
+    if time:
+        wrapper_job.running_jobs_start[job] = date2str(datetime(1900, 2, 2, 10, 10, 10), 'S')
+    else:
+        wrapper_job.running_jobs_start[job] = date2str(datetime.now(), 'S')
+
+    assert time == wrapper_job._check_inner_job_wallclock(job)
