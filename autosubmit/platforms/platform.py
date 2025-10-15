@@ -33,6 +33,7 @@ from typing import Any, Optional, Union, TYPE_CHECKING
 import setproctitle
 
 from autosubmit.helpers.parameters import autosubmit_parameter
+from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
@@ -769,7 +770,7 @@ class Platform(object):
         :rtype: int
         """
 
-    def check_Alljobs(self, job_list: list["Job"], as_conf, retries=5):
+    def check_Alljobs(self, job_list: list[Job], as_conf, retries=5):
         """
         Checks jobs running status
 
