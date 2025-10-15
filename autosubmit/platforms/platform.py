@@ -97,7 +97,7 @@ class CopyQueue(Queue):
     A queue that copies the object gathered.
     """
 
-    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, ctx: Any = None) -> None:
+    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = 0.0, ctx: Any = None) -> None:
         """
         Initializes the Queue.
 
@@ -114,7 +114,7 @@ class CopyQueue(Queue):
         self.timeout = timeout
         super().__init__(maxsize, ctx=ctx)
 
-    def put(self, job: Any, block: bool = True, timeout: float = None) -> None:
+    def put(self, job: Any, block: bool = True, timeout: Optional[float] = None) -> None:
         """
         Puts a job into the queue if it is not a duplicate.
 
@@ -133,7 +133,7 @@ class Platform(object):
     Class to manage the connections to the different platforms.
     """
     # This is a list of the keep_alive events, used to send the signal outside the main loop of Autosubmit
-    worker_events = list()
+    worker_events: list = []
     # Shared lock between the main process and a retrieval log process
     lock = multiprocessing.Lock()
 
@@ -152,8 +152,8 @@ class Platform(object):
         :type auth_password: str or list, optional
         """
         self.connected = False
-        self.expid = expid  # type: str
-        self._name = name  # type: str
+        self.expid: str = expid
+        self._name: str = name
         self.config = config
         self.tmp_path = os.path.join(
             self.config.get("LOCAL_ROOT_DIR", ""), self.expid, self.config.get("LOCAL_TMP_DIR", ""))
@@ -217,7 +217,7 @@ class Platform(object):
         self.log_retrieval_process_active = False
         self.log_recovery_process = None
         self.keep_alive_timeout = 60 * 5  # Useful in case of kill -9
-        self.processed_wrapper_logs = set()
+        self.processed_wrapper_logs: set = set()
         self.compress_remote_logs = False
         self.remote_logs_compress_type = "gzip"
         self.compression_level = 9
@@ -1042,7 +1042,8 @@ class Platform(object):
                 break
         return process_log
 
-    def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any], as_conf: 'AutosubmitConfig') -> None:
+    def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any],
+                        as_conf: 'AutosubmitConfig') -> set[Any]:
         """
         Recovers log files for jobs from the recovery queue and retries failed jobs.
 
@@ -1102,7 +1103,7 @@ class Platform(object):
         identifier = f"{self.name.lower()}(log_recovery):"
         try:
             Log.info(f"{identifier} Starting...")
-            jobs_pending_to_process = set()
+            jobs_pending_to_process: set = set()
             self.connected = False
             self.restore_connection(as_conf, log_recovery_process=True)
             Log.result(f"{identifier} successfully connected.")
@@ -1135,7 +1136,7 @@ class Platform(object):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
+    def read_file(self, src: str, max_size: int = 0) -> Union[bytes, None]:
         """
         Read file content as bytes. If max_size is set, only the first max_size bytes are read.
         :param src: file path
