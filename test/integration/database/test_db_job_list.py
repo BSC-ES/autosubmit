@@ -110,8 +110,32 @@ def _assert_exit_code(final_status: str, exit_code: int) -> None:
         assert exit_code == 0
 
 
-def _get_expected_job_names(expid, unified_data, once_sections, member_sections, date_sections, chunk_sections) -> list[str]:
-    # job names are in the format expid_section_<date>_<member>_<chunk>_<split>
+def _get_expected_job_names(
+    expid: str,
+    unified_data: Dict[str, Any],
+    once_sections: List[str],
+    member_sections: List[str],
+    date_sections: List[str],
+    chunk_sections: List[str]
+) -> List[str]:
+    """
+    Generate expected job names based on experiment configuration and section types.
+
+    :param expid: Experiment ID.
+    :type expid: str
+    :param unified_data: Unified experiment configuration data.
+    :type unified_data: Dict[str, Any]
+    :param once_sections: Sections that run only once per experiment.
+    :type once_sections: List[str]
+    :param member_sections: Sections that run per member.
+    :type member_sections: List[str]
+    :param date_sections: Sections that run per date.
+    :type date_sections: List[str]
+    :param chunk_sections: Sections that run per chunk (date, member, chunk, split).
+    :type chunk_sections: List[str]
+    :return: List of expected job names.
+    :rtype: List[str]
+    """
     dates = unified_data['EXPERIMENT']['DATELIST']
     members = unified_data['EXPERIMENT']['MEMBERS']
     chunks = int(unified_data['EXPERIMENT']['NUMCHUNKS'])

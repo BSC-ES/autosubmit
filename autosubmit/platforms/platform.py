@@ -590,7 +590,6 @@ class Platform(object):
         :param filename: The name of the file to send.
         :param check: Whether the platform must perform tests (e.g. for permission).
         """
-        raise NotImplementedError
 
     def move_file(self, src, dest):
         """
@@ -601,7 +600,6 @@ class Platform(object):
         :param dest: destination name
         :type dest: str
         """
-        raise NotImplementedError
 
     def get_file(self, filename, must_exist=True, relative_path='', ignore_log=False, wrapper_failed=False):
         """
@@ -618,7 +616,6 @@ class Platform(object):
         :return: True if file is copied successfully, false otherwise
         :rtype: bool
         """
-        raise NotImplementedError
 
     def get_files(self, files, must_exist=True, relative_path=''):
         """
@@ -645,7 +642,6 @@ class Platform(object):
         :return: True if successful or file does not exist
         :rtype: bool
         """
-        raise NotImplementedError
 
     # Executed when calling from Job
     def get_logs_files(self, exp_id, remote_logs):
@@ -772,13 +768,20 @@ class Platform(object):
         :return: job id for the submitted job
         :rtype: int
         """
-        raise NotImplementedError
 
-    def check_Alljobs(self, job_list, as_conf, retries=5):
-        for job in job_list:
-            self.check_job(job)
-            if job.new_status != job.status:
-                job.update_status(as_conf)
+    def check_Alljobs(self, job_list: list["Job"], as_conf, retries=5):
+        """
+        Checks jobs running status
+
+        :param job_list: list of jobs
+        :type job_list: list
+        :param as_conf: config
+        :type as_conf: as_conf
+        :param retries: retries
+        :type retries: int
+        :return: current job status
+        :rtype: autosubmit.job.job_common.Status
+        """
 
     def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
         """
@@ -793,7 +796,6 @@ class Platform(object):
         :return: current job status
         :rtype: autosubmit.job.job_common.Status
         """
-        raise NotImplementedError
 
     def closeConnection(self):
         return
@@ -840,13 +842,11 @@ class Platform(object):
     def generate_submit_script(self):
         # type: () -> None
         """ Opens Submit script file """
-        raise NotImplementedError
 
     def submit_script(self, hold: bool = False) -> Union[list[str], str]:
         """
         Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once.
         """
-        raise NotImplementedError
 
     def add_job_to_log_recover(self, job):
         if job.id and int(job.id) != 0:
@@ -865,7 +865,6 @@ class Platform(object):
         :param log_recovery_process: Specifies if the call is made from the log retrieval process.
         :return: None
         """
-        raise NotImplementedError
 
     def restore_connection(self, as_conf: 'AutosubmitConfig', log_recovery_process: bool = False) -> None:
         """
@@ -876,7 +875,6 @@ class Platform(object):
         :param log_recovery_process: Indicates that the call is made from the log retrieval process.
         :type log_recovery_process: bool
         """
-        raise NotImplementedError
 
     def clean_log_recovery_process(self) -> None:
         """
@@ -1128,14 +1126,18 @@ class Platform(object):
             0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
 
     def create_a_new_copy(self):
-        raise NotImplementedError
+        """
+        Creates a new copy of the current platform object.
+
+        :return: A new instance of the platform with the same attributes as the current one.
+        :rtype: Platform
+        """
 
     def get_file_size(self, src: str) -> Union[int, None]:
         """
         Get file size in bytes
         :param src: file path
         """
-        raise NotImplementedError
 
     def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
         """
@@ -1143,7 +1145,6 @@ class Platform(object):
         :param src: file path
         :param max_size: maximum size to read
         """
-        raise NotImplementedError
 
     def get_remote_log_dir(self) -> str:
         """
@@ -1152,7 +1153,6 @@ class Platform(object):
         :return: The remote_log_dir variable.
         :rtype: str
         """
-        raise NotImplementedError
 
     def get_completed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
         """
@@ -1163,7 +1163,6 @@ class Platform(object):
         :return: List of job names with COMPLETED files.
         :rtype: List[str]
         """
-        raise NotImplementedError
 
     def get_failed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
         """
@@ -1174,7 +1173,6 @@ class Platform(object):
         :return: List of job names with COMPLETED files.
         :rtype: List[str]
         """
-        raise NotImplementedError
 
     def delete_failed_and_completed_names(self, job_names: list[str]) -> None:
         """
@@ -1183,4 +1181,3 @@ class Platform(object):
         :param job_names: List of job names whose COMPLETED and FAILED files should be deleted
         :type job_names: List[str]
         """
-        raise NotImplementedError
