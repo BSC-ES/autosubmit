@@ -248,7 +248,7 @@ class Job(object):
         self.check = 'true'
         self.check_warnings = False
         self.packed = False
-        self.hold = False  # type: bool
+        self.hold: bool = False
         self.distance_weight = 0
         self.level = 0
         self._export = "none"
@@ -284,9 +284,9 @@ class Job(object):
         self._notify_on = None
         # The three variables under this message are related to the #PR2918 that is a development
         # focused on adding the key information for computing the simulated years for the CPMIPS metrics.
-        self._cpmip_thresholds = {} 
-        self._chunk_size = None 
-        self._chunk_size_unit = None 
+        self._cpmip_thresholds = {}
+        self._chunk_size = None
+        self._chunk_size_unit = None
         self._processors_per_node = None
         self.ec_queue = None
         self.platform_name = None
@@ -309,7 +309,7 @@ class Job(object):
                 self.status
         self.validate_template = False
 
-    def clean_attributes(self):
+    def clean_attributes(self) -> None:
         if self.status == Status.FAILED and self.fail_count >= self.retrials:
             return None
         self.rerun_only = False
