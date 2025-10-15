@@ -37,7 +37,7 @@ from typing import Optional, Union, TYPE_CHECKING
 import Xlib.support.connect as xlib_connect
 import paramiko
 from paramiko.agent import Agent
-from paramiko.ssh_exception import (SSHException)
+from paramiko.ssh_exception import SSHException
 
 from autosubmit.job.job_common import Status
 from autosubmit.job.template import Language
@@ -92,14 +92,14 @@ class ParamikoPlatform(Platform):
         self.job_status: Optional[dict[str, list]] = None
         self._ssh: Optional[paramiko.SSHClient] = None
         self._ssh_config = None
-        self._ssh_output = None
-        self._user_config_file = None
-        self._host_config = None
+        self._ssh_output: str = ''
+        self._user_config_file: str = ''
+        self._host_config: dict = {}
         self._host_config_id = None
         self.submit_cmd = ""
         self._ftpChannel: Optional[paramiko.SFTPClient] = None
         self.transport = None
-        self.channels = {}
+        self.channels: dict = {}
         if sys.platform != "linux":
             self.poller = select.kqueue()
         else:
@@ -142,9 +142,9 @@ class ParamikoPlatform(Platform):
         self.connected = False
         self._ssh = None
         self._ssh_config = None
-        self._ssh_output = None
-        self._user_config_file = None
-        self._host_config = None
+        self._ssh_output = ''
+        self._user_config_file = ''
+        self._host_config = {}
         self._host_config_id = None
         self._ftpChannel = None
         self.transport = None
@@ -503,7 +503,7 @@ class ParamikoPlatform(Platform):
 
     def get_list_of_files(self):
         return self._ftpChannel.get(self.get_files_path)
-    
+
     def _chunked_md5(self, file_buffer: BufferedReader) -> str:
         """Calculate the MD5 checksum of a file in chunks to avoid high memory usage.
 
@@ -515,7 +515,7 @@ class ParamikoPlatform(Platform):
         for chunk in iter(lambda: file_buffer.read(CHUNK_SIZE), b""):
             md5_hash.update(chunk)
         return md5_hash.hexdigest()
-    
+
     def _checksum_validation(self, local_path: str, remote_path: str) -> bool:
         """Validates that the checksum of the local file matches the checksum of the remote file.
 
@@ -805,7 +805,7 @@ class ParamikoPlatform(Platform):
                 if not is_wrapper:
                     if job.status != Status.RUNNING:
                         job.start_time = datetime.datetime.now()  # URi: start time
-                    if job.start_time is not None and str(job.wrapper_type).lower() == "none":
+                    if job.start_time is not None and str(job.wrapper_type).lower() == "":
                         wallclock = job.wallclock
                         if job.wallclock == "00:00" or job.wallclock is None:
                             wallclock = job.platform.max_wallclock
@@ -936,7 +936,7 @@ class ParamikoPlatform(Platform):
                     job_status = job.status
                 if job.status != Status.RUNNING:
                     job.start_time = datetime.datetime.now()  # URi: start time
-                if job.start_time is not None and str(job.wrapper_type).lower() == "none":
+                if job.start_time is not None and str(job.wrapper_type).lower() == "":
                     wallclock = job.wallclock
                     if job.wallclock == "00:00":
                         wallclock = job.platform.max_wallclock
@@ -1161,6 +1161,7 @@ class ParamikoPlatform(Platform):
                 retries = retries - 1
         if retries <= 0:
             return False, False, False
+        return True, True, True
 
     def send_command_non_blocking(self, command, ignore_log):
         thread = threading.Thread(target=self.send_command, args=(command, ignore_log))
@@ -1614,7 +1615,7 @@ class ParamikoPlatform(Platform):
             Log.debug(f"Error getting file size for {src}: {str(e)}")
             return None
 
-    def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
+    def read_file(self, src: str, max_size: Optional[int] = None) -> Union[bytes, None]:
         """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
 
         :param src: file path
