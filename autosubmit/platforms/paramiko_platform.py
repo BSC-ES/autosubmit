@@ -17,6 +17,8 @@
 
 import datetime
 import getpass
+import hashlib
+from io import BufferedReader
 import locale
 import os
 import random
@@ -111,6 +113,13 @@ class ParamikoPlatform(Platform):
         except Exception as e:
             Log.warning(f"X11 display not found: {e}")
             self.local_x11_display = None
+        self.remove_files_on_transfer = False
+        if self.config:
+            self.remove_files_on_transfer = self.config.get(
+                self.config.get("PLATFORMS", {})
+                .get(self.name.upper(), {})
+                .get("REMOVE_FILES_ON_TRANSFER", False)
+            )
 
     @property
     def header(self):
@@ -507,6 +516,34 @@ class ParamikoPlatform(Platform):
 
     def get_list_of_files(self):
         return self._ftpChannel.get(self.get_files_path)
+    
+    def _chunked_md5(self, file_buffer: BufferedReader) -> str:
+        """Calculate the MD5 checksum of a file in chunks to avoid high memory usage.
+
+        :param file: A file-like object opened in binary mode.
+        :return: The MD5 checksum as a hexadecimal string.
+        """
+        CHUNK_SIZE = 64 * 1024  # 64KB
+        md5_hash = hashlib.md5()
+        for chunk in iter(lambda: file_buffer.read(CHUNK_SIZE), b""):
+            md5_hash.update(chunk)
+        return md5_hash.hexdigest()
+    
+    def _checksum_validation(self, local_path: str, remote_path: str) -> bool:
+        """
+        Validates that the checksum of the local file matches the checksum of the remote file.
+        :param local_path: Path to the local file.
+        :param remote_path: Path to the remote file.
+        """
+        try:
+            with open(local_path, "rb") as local_file:
+                local_md5 = self._chunked_md5(local_file)
+            with self._ftpChannel.file(remote_path, "rb") as remote_file:
+                remote_md5 = self._chunked_md5(remote_file)
+            return local_md5 == remote_md5
+        except Exception as exc:
+            Log.warning(f"Checksum validation failed: {exc}")
+            return False
 
     # Gets .err and .out
     def get_file(self, filename, must_exist=True, relative_path='', ignore_log=False, wrapper_failed=False):
@@ -534,6 +571,16 @@ class ParamikoPlatform(Platform):
         remote_path = os.path.join(self.get_files_path(), filename)
         try:
             self._ftpChannel.get(remote_path, file_path)
+
+            # Remove file from remote if configured and checksum matches
+            if self.remove_files_on_transfer and self._checksum_validation(
+                file_path, remote_path
+            ):
+                try:
+                    self._ftpChannel.remove(remote_path)
+                except Exception as e:
+                    Log.warning(f"Failed to remove remote file {remote_path}: {e}")
+
             return True
         except Exception as e:
             try:
