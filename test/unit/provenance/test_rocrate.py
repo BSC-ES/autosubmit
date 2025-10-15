@@ -300,7 +300,7 @@ def test_rocrate(
         for output_file in ['graph_1.png', 'graph_2.gif', 'graph_3.gif', 'graph.jpg']:
             Path(project_path, output_file).touch()
         # required paths for AS
-        for other_required_path in ['conf', 'pkl', 'plot', 'status']:
+        for other_required_path in ['conf', 'db', 'plot', 'status']:
             Path(experiment_path, other_required_path).mkdir()
         as_conf.experiment_data = {
             'DEFAULT': {
@@ -385,7 +385,7 @@ def test_rocrate_invalid_project(
         for output_file in ['graph_1.png', 'graph_2.gif', 'graph_3.gif', 'graph.jpg']:
             Path(project_path, output_file).touch()
         # required paths for AS
-        for other_required_path in ['conf', 'pkl', 'plot', 'status']:
+        for other_required_path in ['conf', 'db', 'plot', 'status']:
             Path(experiment_path, other_required_path).mkdir()
         as_conf.experiment_data = {
             'DEFAULT': {
@@ -450,7 +450,7 @@ def test_rocrate_invalid_parameter_type(
         for output_file in ['graph_1.png', 'graph_2.gif', 'graph_3.gif', 'graph.jpg']:
             Path(project_path, output_file).touch()
         # required paths for AS
-        for other_required_path in ['conf', 'pkl', 'plot', 'status']:
+        for other_required_path in ['conf', 'db', 'plot', 'status']:
             Path(experiment_path, other_required_path).mkdir()
         as_conf.experiment_data = {
             'DEFAULT': {
@@ -528,7 +528,7 @@ def test_rocrate_main(
         for output_file in ['graph_1.png', 'graph_2.gif', 'graph_3.gif', 'graph.jpg']:
             Path(project_path, output_file).touch()
         # required paths for AS
-        for other_required_path in ['conf', 'pkl', 'plot', 'status']:
+        for other_required_path in ['conf', 'db', 'plot', 'status']:
             Path(experiment_path, other_required_path).mkdir()
         mocked_as_conf = Mock(autospec=AutosubmitConfig)
         mocked_AutosubmitConfig.return_value = mocked_as_conf
@@ -566,7 +566,7 @@ def test_rocrate_main(
             }
         }
         create_conf_dir(experiment_path, as_conf=mocked_as_conf)
-        mocked_as_conf.get_storage_type.return_value = 'pkl'
+        mocked_as_conf.get_storage_type.return_value = 'db'
         mocked_as_conf.get_date_list.return_value = []
 
         mocked_get_autosubmit_version.return_value = '4.0.0b0'
@@ -630,7 +630,7 @@ def test_custom_config_loaded_file(
         project_path = Path(experiment_path, 'proj')
         project_path.mkdir()
         # required paths for AS
-        for other_required_path in ['conf', 'pkl', 'plot', 'status']:
+        for other_required_path in ['conf', 'db', 'plot', 'status']:
             Path(experiment_path, other_required_path).mkdir()
 
         # custom config file
@@ -723,7 +723,7 @@ def test_no_duplicate_ids(
         project_path = Path(experiment_path, 'proj')
         project_path.mkdir()
         # required paths for AS
-        for other_required_path in ['conf', 'pkl', 'plot', 'status']:
+        for other_required_path in ['conf', 'db', 'plot', 'status']:
             Path(experiment_path, other_required_path).mkdir()
 
         # custom config file

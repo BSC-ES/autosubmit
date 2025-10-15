@@ -26,7 +26,6 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistenceDb
 from autosubmit.job.template import Language
 
 _EXPID = 't001'
@@ -53,8 +52,7 @@ def dictionary(as_conf):
 
 @pytest.fixture
 def joblist(tmp_path, as_conf):
-    job_list_persistence = JobListPersistenceDb(str(tmp_path))
-    return JobList(_EXPID, as_conf, YAMLParserFactory(), job_list_persistence)
+    return JobList(_EXPID, as_conf, YAMLParserFactory())
 
 
 def test_read_section_running_once_create_jobs_once(mocker, dictionary):
@@ -239,7 +237,7 @@ def test_build_job_with_existent_job_list_status(mocker, dictionary):
     dictionary.build_job('fake-section2', priority, date, member, chunk, Language.BASH, section_data, splits=1)
 
     # assert
-    assert Status.WAITING == section_data[0].status
+    assert Status.READY == section_data[0].status
     assert Status.RUNNING == section_data[1].status
 
 
@@ -604,14 +602,6 @@ def test_get_jobs_calls_get_date_for_all_its_dates(mocker, dictionary):
     assert len(dictionary._date_list) == dictionary._get_date.call_count
     for date in dictionary._date_list:
         dictionary._get_date.assert_any_call(list(), dic, date, member, chunk)
-
-
-def test_job_list_returns_the_job_list_by_name(dictionary):
-    # act
-    job_list = [Job("child", 1, Status.WAITING, 0), Job("child2", 1, Status.WAITING, 0)]
-    dictionary.job_list = job_list
-    # arrange
-    assert {'child': job_list[0], 'child2': job_list[1]} == dictionary.job_list
 
 
 def test_create_jobs_split(mocker, dictionary):

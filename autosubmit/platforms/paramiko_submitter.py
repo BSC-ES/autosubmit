@@ -19,6 +19,7 @@
 import os
 from collections import defaultdict
 
+
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmit.platforms.ecplatform import EcPlatform
@@ -28,6 +29,7 @@ from autosubmit.platforms.pjmplatform import PJMPlatform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from autosubmit.platforms.submitter import Submitter
+from .platform import Platform
 
 
 class ParamikoSubmitter(Submitter):
@@ -37,6 +39,15 @@ class ParamikoSubmitter(Submitter):
 
     def __init__(self):
         self.platforms = None
+
+    @property
+    def platforms_object(self) -> list[Platform]:
+        """
+        Returns a list of all the platforms objects used by the experiment.
+        :return: List of platform objects
+        :rtype: list[Platform]
+        """
+        return list(self.platforms.values())
 
     def load_local_platform(self, asconf):
         platforms = dict()
