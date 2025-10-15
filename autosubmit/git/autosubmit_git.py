@@ -308,8 +308,7 @@ class AutosubmitGit:
                     hpcarch.send_command(command_githook)
                 command_1 = "cd {0}; {1} ".format(project_path, command_1)
                 hpcarch.send_command(command_1)
-        except subprocess.CalledProcessError as e:
-            Log.debug("Trace: {0}", str(e))
+        except subprocess.CalledProcessError:
             shutil.rmtree(project_path)
             if os.path.exists(project_backup_path):
                 Log.info("Restoring proj folder...")

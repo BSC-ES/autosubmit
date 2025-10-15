@@ -49,11 +49,6 @@ class ParamikoSubmitter(Submitter):
         """
         return list(self.platforms.values())
 
-    @platforms_object.setter
-    def platforms_object(self, value):
-        """Prevent direct modification of the platforms_object."""
-        raise AttributeError("platforms_object is a dynamic view and cannot be directly modified.")
-
     def load_local_platform(self, asconf):
         platforms = dict()
         # Build Local Platform Object
