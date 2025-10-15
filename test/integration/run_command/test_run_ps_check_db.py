@@ -44,8 +44,9 @@ _EXPID = 't000'
 """The experiment ID used throughout the test."""
 
 
-# TODO expand the tests to test Slurm, PSPlatform, Ecplatform whenever possible
+# TODO expand the tests (Ecplatform, PJM) whenever possible
 
+# TODO common conftest between all run_command tests
 
 # --- Fixtures.
 @pytest.fixture(autouse=True, scope="function")
