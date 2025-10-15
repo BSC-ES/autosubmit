@@ -110,9 +110,8 @@ def _assert_exit_code(final_status: str, exit_code: int) -> None:
         assert exit_code == 0
 
 
-def _get_expected_job_names(expid, unified_data, once_sections=[]) -> list[str]:
+def _get_expected_job_names(expid, unified_data, once_sections, member_sections, date_sections, chunk_sections) -> list[str]:
     # job names are in the format expid_section_<date>_<member>_<chunk>_<split>
-    # All recieved is running at chunk level
     dates = unified_data['EXPERIMENT']['DATELIST']
     members = unified_data['EXPERIMENT']['MEMBERS']
     chunks = int(unified_data['EXPERIMENT']['NUMCHUNKS'])
@@ -120,7 +119,7 @@ def _get_expected_job_names(expid, unified_data, once_sections=[]) -> list[str]:
     job_names = []
     for section in section_names:
         splits = unified_data['JOBS'][section].get('splits', None)
-        if section not in once_sections:
+        if section in chunk_sections:
             if splits is not None:
                 splits = int(splits)
             for date in dates.split():
@@ -131,13 +130,33 @@ def _get_expected_job_names(expid, unified_data, once_sections=[]) -> list[str]:
                                 job_names.append(f"{expid}_{str(date)}_{str(member)}_{str(chunk)}_{str(split)}_{section}".upper())
                         else:
                             job_names.append(f"{expid}_{str(date)}_{str(member)}_{str(chunk)}_{section}".upper())
-        else:
-            if splits:
+        elif section in once_sections:
+            if splits is not None:
                 splits = int(splits)
                 for split in range(1, splits + 1) if splits else [None]:
                     job_names.append(f"{expid}_{str(split)}_{section}".upper())
             else:
                 job_names.append(f"{expid}_{section}".upper())
+        elif section in member_sections:
+            if splits:
+                splits = int(splits)
+                for split in range(1, splits + 1) if splits else [None]:
+                    for date in dates.split():
+                        for member in members.split():
+                            job_names.append(f"{expid}_{str(date)}_{str(member)}_{str(split)}_{section}".upper())
+            else:
+                for date in dates.split():
+                    for member in members.split():
+                        job_names.append(f"{expid}_{str(date)}_{str(member)}_{section}".upper())
+        elif section in date_sections:
+            if splits is not None:
+                splits = int(splits)
+                for split in range(1, splits + 1) if splits else [None]:
+                    for date in dates.split():
+                        job_names.append(f"{expid}_{str(date)}_{str(split)}_{section}".upper())
+            else:
+                for date in dates.split():
+                    job_names.append(f"{expid}_{str(date)}_{section}".upper())
 
     return job_names
 
@@ -1330,7 +1349,7 @@ def test_with_createcw_command_differences(
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
     db_path = exp_path / "db"
     conf_dir = exp_path / 'conf'
-    unified_data = fixed_data | mutable_experiment_wrappers | mutable_jobs
+    unified_data: Dict[str, Dict] = fixed_data | mutable_experiment_wrappers | mutable_jobs
     _init_test(as_exp, conf_dir, unified_data)
     if as_db == 'sqlite':
         db_manager = _create_db_manager(Path(db_path, 'job_list.db'))
@@ -1340,10 +1359,19 @@ def test_with_createcw_command_differences(
     exit_code = as_exp.autosubmit.create(_expid, noplot=True, hide=False, force=True, check_wrappers=True)
     _assert_exit_code("SUCCESS", exit_code)
     once_sections = []
+    member_sections = []
+    date_sections = []
+    chunk_sections = []
     for section in unified_data.get('JOBS', {}):
         if unified_data['JOBS'][section].get('RUNNING', '').lower() == 'once':
             once_sections.append(section)
-    expected_job_names = _get_expected_job_names(as_exp.expid, unified_data, once_sections)
+        elif unified_data['JOBS'][section].get('RUNNING', '').lower() == 'member':
+            member_sections.append(section)
+        elif unified_data['JOBS'][section].get('RUNNING', '').lower() == 'date':
+            date_sections.append(section)
+        else:
+            chunk_sections.append(section)
+    expected_job_names = _get_expected_job_names(as_exp.expid, unified_data, once_sections, member_sections, date_sections, chunk_sections)
     db_jobs = db_manager.load_jobs(full_load=True)
     db_jobs = {job['name'].upper(): job for job in db_jobs}
 
@@ -1355,16 +1383,26 @@ def test_with_createcw_command_differences(
     assert len(missing_in_db) == 0, f"Missing jobs in DB: {missing_in_db}"
     assert len(unexpected_in_db) == 0, f"Unexpected jobs in DB: {unexpected_in_db}"
 
-    new_data = unified_data | changed_data
+    new_data: Dict[str, Dict] = unified_data | changed_data
     _modify_data(as_exp.expid, conf_dir, new_data)
 
     exit_code = as_exp.autosubmit.create(_expid, noplot=True, hide=False, force=False, check_wrappers=True)
     _assert_exit_code("SUCCESS", exit_code)
     once_sections = []
+    member_sections = []
+    date_sections = []
+    chunk_sections = []
+
     for section in new_data.get('JOBS', {}):
         if new_data['JOBS'][section].get('RUNNING', '').lower() == 'once':
             once_sections.append(section)
-    expected_job_names = _get_expected_job_names(as_exp.expid, new_data, once_sections)
+        elif new_data['JOBS'][section].get('RUNNING', '').lower() == 'member':
+            member_sections.append(section)
+        elif new_data['JOBS'][section].get('RUNNING', '').lower() == 'date':
+            date_sections.append(section)
+        else:
+            chunk_sections.append(section)
+    expected_job_names = _get_expected_job_names(as_exp.expid, new_data, once_sections, member_sections, date_sections, chunk_sections)
     db_jobs = db_manager.load_jobs(full_load=True)
     db_jobs = {job['name'].upper(): job for job in db_jobs}
 
