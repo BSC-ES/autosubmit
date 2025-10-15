@@ -39,13 +39,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          export COVERAGE_PROCESS_START=.coveragerc
           python -m pip install --upgrade pip packaging setuptools twine
           pip install --upgrade -e .[all]
 
       - name: Unit tests
         run: |
-          export COVERAGE_PROCESS_START=.coveragerc
           pytest \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
@@ -114,7 +112,6 @@ jobs:
       # CONTRIBUTING.md file for details how to set up your environment to run these.
       - name: Integration tests
         run: |
-          export COVERAGE_PROCESS_START=.coveragerc
           pytest \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
@@ -162,7 +159,6 @@ jobs:
       # Run regression tests
       - name: Regression tests
         run: |
-          export COVERAGE_PROCESS_START=.coveragerc
           pytest \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
@@ -215,7 +211,6 @@ jobs:
 
       - name: Integration tests
         run: |
-          export COVERAGE_PROCESS_START=.coveragerc
           pytest \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \

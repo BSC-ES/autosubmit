@@ -4,7 +4,7 @@
 [run]
 branch = True
 cover_pylib = False
-concurrency = multiprocessing,thread,subprocess
+concurrency = multiprocessing
 data_file = .coverage
 disable_warnings =
     trace-changed
@@ -19,6 +19,9 @@ parallel = True
 source = ./autosubmit
 timid = False
 sigterm = True
+patch =
+    fork
+    subprocess
 
 [report]
 exclude_lines =
