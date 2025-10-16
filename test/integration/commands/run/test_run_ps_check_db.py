@@ -45,8 +45,9 @@ _EXPID = 't000'
 
 
 # TODO expand the tests (Ecplatform, PJM) whenever possible
-
-# TODO common conftest between all run_command tests
+# TODO move to integration/command/conftest all common fixtures
+# TODO this is an old test that has its own as_exp fixture, we should use the general one (autosubmit_exp)
+# TODO The db check could be improved to check everything not only the job_data table
 
 # --- Fixtures.
 @pytest.fixture(autouse=True, scope="function")
@@ -70,7 +71,7 @@ def as_exp(autosubmit_exp, tmp_path: Path) -> Any:
     :return: Configured experiment object.
     :rtype: Any
     """
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(_EXPID, include_jobs=False, experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'none',
             'PROJECT_DESTINATION': 'dummy_project'

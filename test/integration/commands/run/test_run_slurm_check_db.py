@@ -34,6 +34,8 @@ import pytest
 from threading import Thread
 from time import sleep
 
+import yaml
+
 from autosubmit.config.basicconfig import BasicConfig
 
 if TYPE_CHECKING:
@@ -44,8 +46,10 @@ _EXPID = 't000'
 """The experiment ID used throughout the test."""
 
 
-# TODO expand the tests to test Slurm, PSPlatform, Ecplatform whenever possible
-
+# TODO expand the tests (Ecplatform, PJM) whenever possible
+# TODO move to integration/command/conftest all common fixtures
+# TODO this is an old test that has its own as_exp fixture, we should use the general one (autosubmit_exp)
+# TODO The db check could be improved to check everything not only the job_data table
 
 # --- Fixtures.
 @pytest.fixture(autouse=True, scope="function")
@@ -56,20 +60,9 @@ def set_debug_log_level() -> None:
     from autosubmit.log.log import Log
     Log.set_console_level("DEBUG")
 
-
-@pytest.fixture
-def as_exp(autosubmit_exp, tmp_path: Path) -> Any:
-    """
-    Create an isolated experiment using a temporary directory for each test.
-
-    :param autosubmit_exp: Factory fixture for creating experiment objects.
-    :type autosubmit_exp: Callable
-    :param tmp_path: Temporary directory unique to the test.
-    :type tmp_path: Path
-    :return: Configured experiment object.
-    :rtype: Any
-    """
-    exp = autosubmit_exp(_EXPID, experiment_data={
+@pytest.fixture(scope="function")
+def common_conf(tmp_path) -> dict:
+    return {
         'PROJECT': {
             'PROJECT_TYPE': 'none',
             'PROJECT_DESTINATION': 'dummy_project'
@@ -95,9 +88,20 @@ def as_exp(autosubmit_exp, tmp_path: Path) -> Any:
                 'PROCESSORS': '1',
                 'MAX_PROCESSORS': '128',
                 'PROCESSORS_PER_NODE': '128',
-            }
+            },
         }
-    })
+    }
+
+@pytest.fixture
+def prepare_scratch(tmp_path: Path) -> Any:
+    """
+    Create an isolated experiment using a temporary directory for each test.
+
+    :param tmp_path: Temporary directory unique to the test.
+    :type tmp_path: Path
+    :return: Configured experiment object.
+    :rtype: Any
+    """
     run_tmpdir = tmp_path
 
     dummy_dir = run_tmpdir / f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/dummy_dir"
@@ -109,10 +113,6 @@ def as_exp(autosubmit_exp, tmp_path: Path) -> Any:
         f.write('dummy data')
 
     (real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
-
-    exp.as_conf.reload(force_load=True)
-
-    return exp
 
 
 # --- Internal utility functions.
@@ -370,36 +370,6 @@ def _assert_files_recovered(files_check_list):
         assert files_check_list[check_name]
 
 
-def _init_run(as_exp, jobs_data) -> Path:
-    as_conf = as_exp.as_conf
-    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
-
-    exp_path = run_tmpdir / _EXPID
-    jobs_path = exp_path / f"conf/jobs_{_EXPID}.yml"
-    with jobs_path.open('w') as f:
-        f.write(jobs_data)
-
-    # This is set in _init_log which is not done automatically by Autosubmit
-    as_exp.autosubmit._check_ownership_and_set_last_command(
-        as_exp.as_conf,
-        as_exp.expid,
-        'run')
-
-    # We have to reload as we changed the jobs.
-    as_conf.reload(force_load=True)
-
-    return exp_path / f'tmp/LOG_{_EXPID}'
-
-
-def _modify_jobs_data(as_exp, jobs_data) -> Path:
-    as_conf = as_exp.as_conf
-    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
-
-    exp_path = run_tmpdir / _EXPID
-    jobs_path = exp_path / f"conf/jobs_{_EXPID}.yml"
-    with jobs_path.open('w') as f:
-        f.write(jobs_data)
-
 
 # -- Tests
 
@@ -635,17 +605,22 @@ wrappers:
         "Success with wrapper (vertical-horizontal)", "Failure with wrapper (vertical-horizontal)",
         "Success with wrapper (horizontal)", "Failure with wrapper (horizontal)"])
 def test_run_uninterrupted(
-        as_exp,
-        jobs_data,
+        autosubmit_exp,
+        jobs_data: str,
         expected_db_entries,
         final_status,
         wrapper_type,
-        slurm_server: 'DockerContainer'
+        slurm_server: 'DockerContainer',
+        prepare_scratch,
+        common_conf,
 ):
+    jobs_data_yaml = yaml.load(jobs_data, Loader=yaml.SafeLoader)
+    merged_conf = common_conf | jobs_data_yaml
+    as_exp = autosubmit_exp(experiment_data=common_conf | jobs_data_yaml, include_jobs=False, create=True)
     as_conf = as_exp.as_conf
-    log_dir = _init_run(as_exp, jobs_data)
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+    log_dir = Path(exp_path) / BasicConfig.LOCAL_ROOT_DIR / "tmp" / f"LOG_{as_exp.expid}"
     aslogs_path = Path(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
 
 
@@ -923,15 +898,20 @@ wrappers:
         "Success_hybrid_vh", "Failed_hybrid_vh",
         "Success_simple_h", "Failed_simple_h"])
 def test_run_interrupted(
-        jobs_data: str,
-        expected_db_entries: int,
-        final_status: str,
-        wrapper_type: str,
-        as_exp: 'AutosubmitExperiment',
-        slurm_server: 'DockerContainer'
+        as_exp,
+        jobs_data,
+        expected_db_entries,
+        final_status,
+        wrapper_type,
+        slurm_server: 'DockerContainer',
+        prepare_scratch,
+        common_conf,
 ):
+    as_exp = autosubmit_exp(experiment_data=common_conf | jobs_data, include_jobs=False, create=True)
     as_conf = as_exp.as_conf
-    log_dir = _init_run(as_exp, jobs_data)
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
+    tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+    log_dir = Path(exp_path) / BasicConfig.LOCAL_ROOT_DIR / "tmp" / f"LOG_{as_exp.expid}"
 
     # Run the experiment
     # This was not being interrupted, so we run it in a thread to simulate the interruption and then stop it.
