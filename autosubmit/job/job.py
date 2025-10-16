@@ -1383,8 +1383,7 @@ class Job(object):
         :param failed_file: boolean, if True, checks if the job failed
         :return:
         """
-        previous_status = self.status
-        self.prev_status = previous_status
+        self.prev_status = self.status
         new_status = self.new_status
         if new_status == Status.COMPLETED:
             Log.debug(

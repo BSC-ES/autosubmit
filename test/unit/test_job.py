@@ -1918,3 +1918,52 @@ def test_update_dict_parameters_invalid_script_language(platform_name: Optional[
         assert job.platform_name is None
     else:
         assert job.platform_name == platform_name.upper()
+
+@pytest.mark.parametrize(
+    'new_status,recovery_threads',
+    [
+        (Status.HELD, True),
+        (Status.COMPLETED, False),
+        (Status.FAILED, True),
+        (Status.UNKNOWN, False),
+        (Status.SUBMITTED, True),
+    ], ids=["HELD", "COMPLETED", "FAILED", "UNKNOWN", "SUBMITTED"]
+)
+def test_update_status(local: 'Platform', autosubmit_config: 'AutosubmitConfig', new_status, recovery_threads):
+
+    job = Job(f'{_EXPID}_dummy', 1, Status.WAITING, 0)
+    job.submit_time_timestamp = date2str(datetime.now(), 'S')
+    job.platform = local
+    job.delay = 1
+    job.frequency = 1
+    job.synchronize = 1
+    job.local_logs = ""
+    job.delay_retrials = 1
+    job.log_recovered = ""
+    job.new_status = new_status
+    job.long_name = "long_name"
+    job.remote_logs = "remote_logs"
+
+    autosubmit_config.platforms_data = {"local": {"DISABLE_RECOVERY_THREADS": recovery_threads, "whatever2": "dummy_value2"}}
+
+    with patch('autosubmit.job.job.Job.retrieve_logfiles', return_value=True):
+        with patch('autosubmit.platforms.platform.Platform.add_job_to_log_recover', return_value=True):
+            job.update_status(autosubmit_config)
+
+
+@pytest.mark.parametrize(
+    'over_wallclock',
+    [
+        True,
+        False,
+    ], ids=["True", "False"]
+)
+def test_check_completion(local: 'Platform', over_wallclock):
+
+    job = Job(f'{_EXPID}_dummy', 1, Status.WAITING, 0)
+    job.submit_time_timestamp = date2str(datetime.now(), 'S')
+    job.platform = local
+
+    job.check_completion(over_wallclock=over_wallclock)
+
+
