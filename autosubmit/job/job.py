@@ -182,7 +182,7 @@ class Job(object):
 
         self.rerun_only = False
         self.delay_end = None
-        self.wrapper_type = None
+        self.wrapper_type: str = ''
         self._wrapper_queue = None
         self._platform = None
         self._queue = None
@@ -216,7 +216,7 @@ class Job(object):
         self.undefined_variables: list[str] = []
         self.log_retries = 5
         self.id = job_id
-        self.file = None
+        self.file: str = ''
         self.additional_files: list[str] = []
         self.executable = None
         self._local_logs = ('', '')
@@ -298,7 +298,7 @@ class Job(object):
         if self.status != Status.FAILED and self.fail_count <= self.retrials:
             self.rerun_only = False
             self.delay_end = None
-            self.wrapper_type = None
+            self.wrapper_type = ''
             self._wrapper_queue = None
             self._queue = None
             self._partition = None
@@ -2227,15 +2227,6 @@ class Job(object):
                 if as_conf.get_project_type().lower() != "none" and len(as_conf.get_project_type()) > 0:
                     template_file = open(Path(as_conf.get_project_dir() + "/" + self.file), 'r')
                     template = ''
-                    if as_conf.get_remote_dependencies() == "true":
-                        if self.type == Language.BASH:
-                            template = 'sleep 5' + "\n"
-                        elif self.type == Language.PYTHON2:
-                            template = 'time.sleep(5)' + "\n"
-                        elif self.type == Language.PYTHON3 or self.type == Language.PYTHON:
-                            template = 'time.sleep(5)' + "\n"
-                        elif self.type == Language.R:
-                            template = 'Sys.sleep(5)' + "\n"
                     template += template_file.read()
                     template_file.close()
                 else:
