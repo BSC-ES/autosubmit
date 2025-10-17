@@ -34,8 +34,7 @@ import pytest
 from threading import Thread
 from time import sleep
 
-import yaml
-
+from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
 
 if TYPE_CHECKING:
@@ -614,7 +613,8 @@ def test_run_uninterrupted(
         prepare_scratch,
         common_conf,
 ):
-    jobs_data_yaml = yaml.load(jobs_data, Loader=yaml.SafeLoader)
+    yaml = YAML(typ='rt')
+    jobs_data_yaml = yaml.load(jobs_data)
     merged_conf = common_conf | jobs_data_yaml
     as_exp = autosubmit_exp(experiment_data=common_conf | jobs_data_yaml, include_jobs=False, create=True)
     as_conf = as_exp.as_conf
