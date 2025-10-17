@@ -182,7 +182,7 @@ class Job(object):
 
         self.rerun_only = False
         self.delay_end = None
-        self.wrapper_type = None
+        self.wrapper_type: str = ''
         self._wrapper_queue = None
         self._platform = None
         self._queue = None
@@ -216,7 +216,7 @@ class Job(object):
         self.undefined_variables: list[str] = []
         self.log_retries = 5
         self.id = job_id
-        self.file = None
+        self.file: str = ''
         self.additional_files: list[str] = []
         self.executable = None
         self._local_logs = ('', '')
@@ -298,7 +298,7 @@ class Job(object):
         if self.status != Status.FAILED and self.fail_count <= self.retrials:
             self.rerun_only = False
             self.delay_end = None
-            self.wrapper_type = None
+            self.wrapper_type = ''
             self._wrapper_queue = None
             self._queue = None
             self._partition = None
@@ -2227,15 +2227,6 @@ class Job(object):
                 if as_conf.get_project_type().lower() != "none" and len(as_conf.get_project_type()) > 0:
                     template_file = open(Path(as_conf.get_project_dir() + "/" + self.file), 'r')
                     template = ''
-                    if as_conf.get_remote_dependencies() == "true":
-                        if self.type == Language.BASH:
-                            template = 'sleep 5' + "\n"
-                        elif self.type == Language.PYTHON2:
-                            template = 'time.sleep(5)' + "\n"
-                        elif self.type == Language.PYTHON3 or self.type == Language.PYTHON:
-                            template = 'time.sleep(5)' + "\n"
-                        elif self.type == Language.R:
-                            template = 'Sys.sleep(5)' + "\n"
                     template += template_file.read()
                     template_file.close()
                 else:
@@ -2653,7 +2644,7 @@ class Job(object):
                     self.ready_date = datetime.datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
                     Log.debug(f"Failed to recover ready date for the job {self.name}")
 
-test: list = []
+decorator_list: list = []
 list_decorators = ['x11', 'x11_options', 'tasktype', 'jobname', 'script', 'fail_count', 'retrials', 'checkpoint',
                     'sdate', 'member', 'chunk', 'split', 'delay', 'wallclock', 'hyperthreading', 'nodes', 'numthreads',
                     'threads', 'cpus_per_task', 'numtask', 'tasks', 'tasks_per_node', 'scratch_free_space', 'memory',
@@ -2662,7 +2653,7 @@ list_decorators = ['x11', 'x11_options', 'tasktype', 'jobname', 'script', 'fail_
                     'processors', 'processors_per_node']
 for decorator_to_import in list_decorators:
     decorator = Job(name=decorator_to_import)
-    test.append(decorator.__doc__)
+    decorator_list.append(decorator.__doc__)
 
 class WrapperJob(Job):
     """Defines a wrapper from a package.
