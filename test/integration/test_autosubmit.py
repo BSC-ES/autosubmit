@@ -322,7 +322,5 @@ def test_update_description(as_db: str, autosubmit, autosubmit_exp, mocker):
     'Correct FOR',
 ])
 def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict, context_mgr: 'AbstractContextManager'):
-    exp = autosubmit_exp('t000', experiment_data, reload=False, create=False)
-    as_conf = exp.as_conf
     with context_mgr:
-        as_conf.reload(force_load=True)
+        exp = autosubmit_exp('t000', experiment_data, include_jobs=False, create=True)

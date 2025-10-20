@@ -80,7 +80,7 @@ def as_exp(autosubmit_exp):
     """
     Creates a new expid and returns the EXPID
     """
-    as_exp = autosubmit_exp(blank_experiment=True)
+    as_exp = autosubmit_exp(include_jobs=False)
     return as_exp
 
 

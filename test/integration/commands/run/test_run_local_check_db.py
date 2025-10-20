@@ -28,7 +28,7 @@ if TYPE_CHECKING:
             SCRIPT: |
                 echo "Hello World with id=Success"
                 sleep 1
-            PLATFORM: TEST_PS
+            PLATFORM: LOCAL
             RUNNING: chunk
             wallclock: 00:01
     """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
@@ -42,7 +42,7 @@ if TYPE_CHECKING:
             SCRIPT: |
                 sleep 2
                 d_echo "Hello World with id=FAILED"
-            PLATFORM: TEST_PS
+            PLATFORM: LOCAL
             RUNNING: chunk
             wallclock: 00:01
             retrials: 2  
@@ -136,7 +136,7 @@ def test_run_uninterrupted(
                 SCRIPT: |
                     sleep 2
                     d_echo "Hello World with id=FAILED"
-                PLATFORM: TEST_PS
+                PLATFORM: LOCAL
                 RUNNING: chunk
                 wallclock: 00:01
                 retrials: 2  

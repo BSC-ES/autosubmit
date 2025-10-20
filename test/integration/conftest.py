@@ -163,27 +163,29 @@ def autosubmit_exp(
             operational = expid.startswith('o')
             evaluation = expid.startswith('e')
             testcase = expid.startswith('t')
-
-        expid = autosubmit.expid(
-            description="Pytest experiment (delete me)",
-            hpc="local",
-            copy_id="",
-            dummy=True,
-            minimal_configuration=False,
-            git_repo="",
-            git_branch="",
-            git_as_conf="",
-            operational=operational,
-            testcase=testcase,
-            evaluation=evaluation,
-            use_local_minimal=False
-        )
-        exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
+        # Reuse the same expid if already exists and reconfigure it
+        if expid and Path(tmp_path / expid).exists():
+            exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
+        else:
+            expid = autosubmit.expid(
+                description="Pytest experiment (delete me)",
+                hpc="local",
+                copy_id="",
+                dummy=True,
+                minimal_configuration=False,
+                git_repo="",
+                git_branch="",
+                git_as_conf="",
+                operational=operational,
+                testcase=testcase,
+                evaluation=evaluation,
+                use_local_minimal=False
+            )
+            exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
         conf_dir = exp_path / "conf"
         global_logs = Path(BasicConfig.GLOBAL_LOG_DIR)
         global_logs.mkdir(parents=True, exist_ok=True)
-        # TODO: to remove when autosubmit.install is able to create these folders
-        Path(BasicConfig.STRUCTURES_DIR).mkdir(parents=True, exist_ok=True)
+        Path(BasicConfig.STRUCTURES_DIR).mkdir(parents=True, exist_ok=True) # TODO: to remove when autosubmit.install is able to create these folders
         exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
         aslogs_dir = exp_tmp_dir / BasicConfig.LOCAL_ASLOG_DIR
         status_dir = exp_path / 'status'
@@ -220,7 +222,8 @@ def autosubmit_exp(
         if not include_jobs:
             config.experiment_data['JOBS'] = {}
 
-        with open(conf_dir / 'basic_structure.yml', 'w') as f:
+        # ensure that it is always the first file loaded by Autosubmit
+        with open(conf_dir / 'aaaaaabasic_structure.yml', 'w') as f:
             YAML().dump(config.experiment_data, f)
 
         other_yaml = {
@@ -252,6 +255,9 @@ def autosubmit_exp(
 
         if create:
             autosubmit.create(expid, noplot=True, hide=False, force=True, check_wrappers=wrapper)
+            config.set_last_as_command('create')
+        else:
+            config.set_last_as_command('expid')
 
         return AutosubmitExperiment(
             expid=expid,
