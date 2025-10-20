@@ -22,12 +22,10 @@ import os
 import uuid
 from contextlib import suppress
 from dataclasses import dataclass
-from fileinput import FileInput
 from getpass import getuser
 from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 from pwd import getpwnam
-from re import sub
 from subprocess import check_output
 from tempfile import TemporaryDirectory
 from time import time_ns

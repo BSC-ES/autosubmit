@@ -15,5 +15,5 @@ def test_recovery(autosubmit_exp, general_data, experiment_data, jobs_data):
     """
     config_data = general_data | experiment_data | jobs_data
 
-    as_exp = autosubmit_exp(experiment_data=config_data, include_jobs=False, create=True)
+    autosubmit_exp(experiment_data=config_data, include_jobs=False, create=True)
     # Todo the actual test

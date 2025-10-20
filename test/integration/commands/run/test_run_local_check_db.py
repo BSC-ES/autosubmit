@@ -11,7 +11,6 @@ from test.integration.commands.run.conftest import _check_db_fields, _assert_exi
 
 if TYPE_CHECKING:
     from testcontainers.core.container import DockerContainer
-    from test.conftest import AutosubmitExperiment
 
 
 # -- Tests
