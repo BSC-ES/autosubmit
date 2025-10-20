@@ -391,16 +391,19 @@ class LocalPlatform(ParamikoPlatform):
     def compress_file(self, file_path: str) -> None:
         Log.debug(f"Compressing file {file_path} using {self.remote_logs_compress_type}")
         try:
+            compression_level = self.compression_level
             if self.remote_logs_compress_type == "xz":
-                output = log_utils.compress_xz(file_path, keep_input=False)
+                output = log_utils.compress_xz(
+                    file_path, preset=compression_level, keep_input=False
+                )
             else:
-                output = log_utils.compress_gzip(file_path, keep_input=False)
-
-            # Keep the file name
-            Path(output).rename(file_path)
+                output = log_utils.compress_gzip(
+                    file_path, compression_level=compression_level, keep_input=False
+                )
 
             Log.debug(f"File {file_path} compressed")
+            return output
         except Exception as exc:
             Log.error(f"Error compressing file {file_path}: {exc}")
 
-        return file_path
+        return None

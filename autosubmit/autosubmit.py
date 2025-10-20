@@ -2278,7 +2278,7 @@ class Autosubmit:
         return total_jobs, safetysleeptime, default_retrials, check_wrapper_jobs_sleeptime
 
     @staticmethod
-    def check_logs_status(job_list, as_conf, new_run):
+    def check_logs_status(job_list: "JobList", as_conf, new_run):
         for job in job_list.get_completed_failed_without_logs():
             if new_run:
                 job.platform.spawn_log_retrieval_process(as_conf)

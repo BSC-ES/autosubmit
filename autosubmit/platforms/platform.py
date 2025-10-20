@@ -23,7 +23,7 @@ import queue  # only for the exception
 import time
 import traceback
 from contextlib import suppress
-from multiprocessing import Event
+from multiprocessing.synchronize import Event
 from multiprocessing.queues import Queue
 # noinspection PyProtectedMember
 from os import _exit
@@ -220,8 +220,10 @@ class Platform(object):
         self.processed_wrapper_logs = set()
         self.compress_remote_logs = False
         self.remote_logs_compress_type = "gzip"
+        self.compression_level = 9
         log_queue_size = 200
         if self.config:
+            platform_config: dict = self.config.get("PLATFORMS", {}).get(self.name.upper(), {})
             # We still support TOTALJOBS and TOTAL_JOBS for backwards compatibility... # TODO change in 4.2, I think
             default_queue_size = self.config.get("CONFIG", {}).get("LOG_RECOVERY_QUEUE_SIZE", 100)
             platform_default_queue_size = self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get(
@@ -229,17 +231,10 @@ class Platform(object):
             config_total_jobs = self.config.get("CONFIG", {}).get("TOTAL_JOBS", platform_default_queue_size)
             platform_total_jobs = self.config.get("PLATFORMS", {}).get('TOTAL_JOBS', config_total_jobs)
             log_queue_size = int(platform_total_jobs) * 2
-            self.compress_remote_logs = (
-                self.config.get("PLATFORMS", {})
-                .get(self.name.upper(), {})
-                .get("COMPRESS_REMOTE_LOGS", False)
-            )
-            self.remote_logs_compress_type = (
-                self.config.get("PLATFORMS", {})
-                .get(self.name.upper(), {})
-                .get("REMOTE_LOGS_COMPRESS_TYPE")
-                or "gzip"
-            )
+            self.compress_remote_logs = platform_config.get("COMPRESS_REMOTE_LOGS", False)
+            self.remote_logs_compress_type = platform_config.get("REMOTE_LOGS_COMPRESS_TYPE", "gzip")
+            self.compression_level = platform_config.get("COMPRESSION_LEVEL", 9)
+            
         self.log_queue_size = log_queue_size
         self.remote_log_dir = None
 
@@ -1148,10 +1143,10 @@ class Platform(object):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def compress_file(self, file_path: str) -> str:
+    def compress_file(self, file_path: str) -> Union[str, None]:
         """
         Compress a file.
         :param file_path: file path
-        :return: path to the compressed file
+        :return: path to the compressed file. None if compression failed.
         """
         raise NotImplementedError  # pragma: no cover
