@@ -64,6 +64,7 @@ def general_data(tmp_path: Path) -> Dict[str, object]:
         }
     }
 
+
 @pytest.fixture(scope="function")
 def experiment_data(tmp_path: Path) -> Dict[str, object]:
     """
@@ -86,6 +87,7 @@ def experiment_data(tmp_path: Path) -> Dict[str, object]:
             'CALENDAR': 'standard',
         }
     }
+
 
 @pytest.fixture(scope="function")
 def jobs_data(tmp_path: Path) -> Dict[str, object]:
@@ -129,7 +131,7 @@ def jobs_data(tmp_path: Path) -> Dict[str, object]:
                 },
                 'RUNNING': 'chunk',
                 'WALLCLOCK': '02:00',
-                'PLATFORM': 'TEST-PS',
+                'PLATFORM': 'TEST_PS',
                 'SPLITS': '3',
                 'CHECK': 'on_submission',
             },
@@ -145,9 +147,9 @@ def jobs_data(tmp_path: Path) -> Dict[str, object]:
                 },
                 'RUNNING': 'chunk',
                 'WALLCLOCK': '02:00',
-                'PLATFORM': 'TEST-SLURM',
+                'PLATFORM': 'TEST_SLURM',
                 'SPLITS': "3",
                 'CHECK': 'on_submission',
+            }
         }
     }
-}

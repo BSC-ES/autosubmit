@@ -3034,7 +3034,9 @@ class Autosubmit:
         # Fetch all completed files and return names
         completed_jobnames = set()
         for p in platforms:
-            p.test_connection(as_conf)
+            message = p.test_connection(as_conf)
+            if not p.connected:
+                raise AutosubmitCritical(f"Couldn't connect to platform {p.name} during recovery: {message}", 7010)
             completed_jobnames.update(p.get_completed_job_names())
 
         return list(completed_jobnames)
