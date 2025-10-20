@@ -43,12 +43,13 @@ def test_save(autosubmit_config, tmpdir, mocker, data: dict, owner: str):
         os.environ["USER"] = Path(tmpdir).owner()
     else:
         os.environ["USER"] = 'whatever'
-    as_conf = autosubmit_config(expid='t000', experiment_data=data, include_basic_config=False)
-    as_conf.load_common_parameters(as_conf.experiment_data)
-    as_conf.save()
-
+    as_conf = autosubmit_config(expid='t000', experiment_data=data, include_basic_config=True)
     data['ROOTDIR'] = str(Path(as_conf.basic_config.LOCAL_ROOT_DIR) / as_conf.expid)
-
+    # TODO: figure why some autosubmit_config conf_test( I hope ) is adding functions to experiment_data
+    as_conf.experiment_data = {k: v for k, v in data.items() if not callable(v)}
+    as_conf.load_common_parameters(as_conf.experiment_data)
+    as_conf.load_as_env_variables(as_conf.experiment_data)
+    as_conf.save()
     if not owner:
         assert not Path(as_conf.metadata_folder).exists()
     else:
