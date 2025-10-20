@@ -1816,7 +1816,11 @@ class Job(object):
                 self.custom_directives = self.het['CUSTOM_DIRECTIVES'][0]
             else:
                 if type(self.custom_directives) is str:  # TODO This is a workaround for the time being, just defined for tests passing without more issues
-                    self.custom_directives = json.loads(self.custom_directives)
+                    try:
+                        self.custom_directives = json.loads(self.custom_directives)
+                    except Exception as e:
+                        raise AutosubmitCritical(f"A problem occurred with the Custom Directives formating: {e}", 6000)
+
             if len(self.het['CUSTOM_DIRECTIVES']) < self.het['HETSIZE']:
                 for x in range(self.het['HETSIZE'] - len(self.het['CUSTOM_DIRECTIVES'])):
                     self.het['CUSTOM_DIRECTIVES'].append(self.custom_directives)
