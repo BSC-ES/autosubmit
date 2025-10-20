@@ -2576,7 +2576,7 @@ class JobList(object):
                     non_completed_parents_current.append(parent[0])
         return non_completed_parents_current, completed_parents
 
-    def update_log_status(self, job, as_conf, new_run=False):
+    def update_log_status(self, job: 'Job', as_conf, new_run=False):
         """
         Updates the log err and log out.
         """
@@ -2600,7 +2600,8 @@ class JobList(object):
             # TODO in pickle -> db/yaml migration(II): 
             #  And remove these two lines
             # we only want the last one
-            job.local_logs = (log_recovered.name, log_recovered.name[:-4] + ".err")
+            err_filename = log_recovered.name.replace(".out", ".err")
+            job.local_logs = (log_recovered.name, err_filename)
             job.updated_log = True
         elif new_run and not job.updated_log and str(
                 as_conf.platforms_data.get(job.platform.name, {}).get('DISABLE_RECOVERY_THREADS',
@@ -2624,12 +2625,20 @@ class JobList(object):
         """
 
         if not hasattr(job, "updated_log") or not job.updated_log:
-            for log_recovered in self.path_to_logs.glob(f"{job.name}.*.out"):
-                file_timestamp = int(
-                    datetime.datetime.fromtimestamp(log_recovered.stat().st_mtime).
-                    strftime("%Y%m%d%H%M%S"))
-                if job.ready_date and file_timestamp >= int(job.ready_date):
-                    return log_recovered
+            job_log_files = self.path_to_logs.glob(f"{job.name}.*")
+            for log_recovered in job_log_files:
+                match = re.match(
+                    rf"{re.escape(job.name)}" + r"\.(\d{14})\.(out)(.gz|.xz)?$",
+                    log_recovered.name,
+                )
+                if match:
+                    file_timestamp = int(
+                        datetime.datetime.fromtimestamp(
+                            log_recovered.stat().st_mtime
+                        ).strftime("%Y%m%d%H%M%S")
+                    )
+                    if job.ready_date and file_timestamp >= int(job.ready_date):
+                        return log_recovered  # TODO: Change to return the tuple of (.out,.err) files
         return None
 
     def update_list(self, as_conf: AutosubmitConfig, store_change: bool = True,

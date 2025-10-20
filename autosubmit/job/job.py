@@ -1249,10 +1249,10 @@ class Job(object):
         from the platform.
         """
         self.synchronize_logs(self.platform, self.remote_logs, self.local_logs)
-        remote_logs = copy.deepcopy(self.local_logs)
+        remote_logs = list(copy.deepcopy(self.local_logs))
 
         # Prepare remote logs
-        for remote_log in remote_logs:
+        for idx, remote_log in enumerate(remote_logs):
             log_full_path = Path(
                 self.platform.get_files_path(), remote_log
             )
@@ -1269,9 +1269,14 @@ class Job(object):
 
             # Compress if enabled
             if self.platform.compress_remote_logs:
-                self.platform.compress_file(str(log_full_path))
+                compressed_path = self.platform.compress_file(str(log_full_path))
+                remote_logs[idx] = str(Path(compressed_path).name) if compressed_path else remote_log
+
+        # Back to unmutable
+        remote_logs = tuple(remote_logs)
 
         # Retrieve remote logs
+        Log.debug(f"Retrieving log files {remote_logs} for job {self.name}")
         self.platform.get_logs_files(self.expid, remote_logs)
 
 
@@ -1285,7 +1290,10 @@ class Job(object):
                 try:
                     self._sync_retrieve_logfiles()
                     log_recovered = True
-                except BaseException:
+                except BaseException as exc:
+                    Log.warning(
+                        f"Failed to retrieve log files for job {self.name} e=6002: {str(exc)}"
+                    )
                     log_recovered = False
         return log_recovered
 
@@ -1307,9 +1315,7 @@ class Job(object):
             backup_log = copy.copy(self.remote_logs)
             self.remote_logs = self.get_new_remotelog_name(i)
             if self.check_remote_log_exists():
-                self.synchronize_logs(self.platform, self.remote_logs, self.local_logs)
-                remote_logs = copy.deepcopy(self.local_logs)
-                self.platform.get_logs_files(self.expid, remote_logs)
+                self._sync_retrieve_logfiles()
                 log_recovered = True
                 last_retrial = i
             else:

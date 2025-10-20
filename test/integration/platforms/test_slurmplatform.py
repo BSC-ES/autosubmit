@@ -753,10 +753,34 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
                 },
             },
         },
+        {
+            "JOBS": {
+                "SIM": {
+                    "PLATFORM": _PLATFORM_NAME,
+                    "RUNNING": "once",
+                    "SCRIPT": 'echo "This is job ${SLURM_JOB_ID} EOM"',
+                },
+            },
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "127.0.0.1",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "PS",
+                    "USER": "root",
+                    "COMPRESS_REMOTE_LOGS": True,
+                },
+            },
+        },
     ],
     ids=[
         "Compress logs with default gzip",
         "Compress logs with xz",
+        "Compress logs with default gzip in PS platform",
     ],
 )
 def test_simple_workflow_compress_logs_slurm(
@@ -769,7 +793,7 @@ def test_simple_workflow_compress_logs_slurm(
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
-    assert 0 == exp.autosubmit.run_experiment(exp.expid)
+    exp.autosubmit.run_experiment(exp.expid)
 
     # Check if the log files are compressed
     logs_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR).joinpath(

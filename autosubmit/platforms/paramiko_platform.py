@@ -520,6 +520,7 @@ class ParamikoPlatform(Platform):
             self._ftpChannel.get(remote_path, file_path)
             return True
         except Exception as e:
+            Log.debug(f"Could not retrieve file {filename} from platform {self.name}: {str(e)}")
             with suppress(Exception):
                 os.remove(file_path)
             # FIXME: Huh, probably a bug here? See unit/test_paramiko_platform function test_get_file_errors
@@ -1583,22 +1584,25 @@ class ParamikoPlatform(Platform):
         try:
             if self.remote_logs_compress_type == "xz":
                 output = file_path + ".xz"
-                self.send_command(f"xz -9 -e {file_path}", ignore_log=True)
+                compression_level = self.compression_level
+                self.send_command(f"xz -{compression_level} -e -c {file_path} > {output}", ignore_log=True)
             else:
                 output = file_path + ".gz"
-                self.send_command(f"gzip -c {file_path} > {output}", ignore_log=True)
-                # Remove the input file if compression succeeded
-                if self.check_absolute_file_exists(output):
-                    self.delete_file(file_path)
+                compression_level = self.compression_level
+                self.send_command(f"gzip -{compression_level} -c {file_path} > {output}", ignore_log=True)
 
-            # Keep the file name
-            self._ftpChannel.rename(output, file_path)
+            # Validate and remove the input file if compression succeeded
+            if self.check_absolute_file_exists(output):
+                self.delete_file(file_path)
 
-            Log.debug(f"File {file_path} compressed")
+                Log.debug(f"File {file_path} compressed successfully to {output}")
+                return output
+            else:
+                Log.error(f"Compression failed for file {file_path}")
         except Exception as exc:
             Log.error(f"Error compressing file {file_path}: {exc}")
 
-        return file_path
+        return None
 
     def _init_local_x11_display(self) -> None:
         """Initialize the X11 display on this platform."""
