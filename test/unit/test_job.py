@@ -1918,3 +1918,13 @@ def test_update_dict_parameters_invalid_script_language(platform_name: Optional[
         assert job.platform_name is None
     else:
         assert job.platform_name == platform_name.upper()
+
+
+def test_process_scheduler_parameters(local):
+    job = Job(_EXPID, '1', 'WAITING', 0, None)
+    job.het = {}
+    job.platform = local
+    job.custom_directives = "['#SBATCH --export=ALL',  #SBATCH --account=xxxxx']"
+
+    with pytest.raises(AutosubmitCritical):
+        assert isinstance(job.process_scheduler_parameters(local, 0), AutosubmitCritical)
