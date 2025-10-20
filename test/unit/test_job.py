@@ -595,6 +595,7 @@ CONFIG:
             self.job.nodes = test['nodes']
             assert self.job.total_processors == test['expected']
 
+
     def test_get_from_total_stats(self):
         """
         test of the function get_from_total_stats validating the file generation
@@ -1983,3 +1984,13 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
     assert parameters["CURRENT_JOB_HAS_PRIO"] == "whatever"
     assert parameters["CURRENT_WRAPPER_HAS_PRIO"] == "whatever_from_wrapper"
     assert parameters["CURRENT_PLATFORM_HAS_PRIO"] == "whatever_from_platform"
+
+
+def test_process_scheduler_parameters(local):
+    job = Job(_EXPID, '1', 'WAITING', 0, None)
+    job.het = {}
+    job.platform = local
+    job.custom_directives = "['#SBATCH --export=ALL',  #SBATCH --account=xxxxx']"
+
+    with pytest.raises(AutosubmitCritical):
+        assert isinstance(job.process_scheduler_parameters(local, 0), AutosubmitCritical)

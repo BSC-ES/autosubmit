@@ -40,6 +40,7 @@ platform does not support wrappers anymore (it was used for testing).
 - Added "CUSTOM_" directives support in the wrapper configuration #2669
 - Added a platform option to compress log files of the job's output during log recovery #2555
 - Added automated citation instructions to the website landing page #2480
+- Improving the error message handling for incorrect YAML syntax (too cryptic) #2651
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 

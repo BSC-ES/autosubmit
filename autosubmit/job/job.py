@@ -1843,7 +1843,11 @@ class Job(object):
                 self.custom_directives = self.het['CUSTOM_DIRECTIVES'][0]
             else:
                 if type(self.custom_directives) is str:  # TODO This is a workaround for the time being, just defined for tests passing without more issues
-                    self.custom_directives = json.loads(self.custom_directives)
+                    try:
+                        self.custom_directives = json.loads(self.custom_directives)
+                    except (ValueError, TypeError) as e:
+                        raise AutosubmitCritical(f"Error parsing custom directives: '{self.custom_directives}: {e}'", 6000)
+
             if len(self.het['CUSTOM_DIRECTIVES']) < self.het['HETSIZE']:
                 for x in range(self.het['HETSIZE'] - len(self.het['CUSTOM_DIRECTIVES'])):
                     self.het['CUSTOM_DIRECTIVES'].append(self.custom_directives)
@@ -2649,7 +2653,7 @@ class Job(object):
         return True
 
     def write_vertical_time(
-        self, count: int = -1, first_submit_timestamp: str = None
+        self, count: int = -1, first_submit_timestamp: str = ''
     ) -> None:
         self.update_start_time(count=count)
         self.update_local_logs(update_submit_time=False, count=count)
