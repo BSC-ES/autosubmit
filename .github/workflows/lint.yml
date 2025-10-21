@@ -38,6 +38,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install mypy
+      - run: python3 -m pip install types-requests
       - name: Get Python changed files
         id: changed-py-files
         uses: tj-actions/changed-files@v47
