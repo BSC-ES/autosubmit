@@ -20,7 +20,7 @@
 from contextlib import nullcontext as does_not_raise
 from getpass import getuser
 from pathlib import Path
-from typing import Callable, ContextManager, Generator, Tuple, Union, cast
+from typing import Callable, ContextManager, Generator, Union
 
 import pytest
 from testcontainers.sftp import DockerContainer
@@ -165,7 +165,7 @@ def test_git_submodules_dirty(
         expid: str,
         expected: ContextManager,
         autosubmit_exp: Callable,
-        git_server: Generator[Tuple[DockerContainer, Path, str], None, None],
+        git_server: Generator[tuple[DockerContainer, Path, str], None, None],
         tmp_path
 ) -> None:
     """Tests that Autosubmit detects dirty local Git submodules, especially with operational experiments.
@@ -177,7 +177,7 @@ def test_git_submodules_dirty(
     expected to fail, raising an error when the experiment is operational.
     """
 
-    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str
+    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str # type: ignore
 
     git_repo = git_repos_path / 'git_repository'
     git_submodule = git_repos_path / 'git_submodule'
@@ -232,7 +232,7 @@ def test_git_operational_experiment_toggle_flag(
         git_operational_check_enabled: bool,
         expected: Union[int, Exception],
         autosubmit_exp: Callable,
-        git_server: Generator[Tuple[DockerContainer, Path, str], None, None],
+        git_server: Generator[tuple[DockerContainer, Path, str], None, None],
         tmp_path,
         mocker,
         autosubmit
@@ -250,7 +250,7 @@ def test_git_operational_experiment_toggle_flag(
     mocked_log = mocker.patch('autosubmit.autosubmit.Log')
     expid = 'o001'
 
-    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str
+    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str # type: ignore
 
     git_repo = git_repos_path / 'git_repository'
 
@@ -288,7 +288,7 @@ def test_git_operational_experiment_toggle_flag(
         assert mocked_log.warning.called
         assert mocked_log.warning.call_args[0][0] == 'Git operational check disabled by user'
     else:
-        with pytest.raises(cast(expected, Exception)):
+        with pytest.raises(Exception):
             autosubmit.run_command(args=args)
 
 
@@ -328,10 +328,10 @@ def test_clean_git_not_a_git_repo(autosubmit_exp, mocker):
 def test_clean_git_not_committed(
         tmp_path,
         autosubmit_exp,
-        git_server: Generator[Tuple[DockerContainer, Path, str], None, None]
+        git_server: Generator[tuple[DockerContainer, Path, str], None, None]
 ):
     """Test that cleaning Git fails when the project directory has new files not committed yet."""
-    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str
+    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str  # type: ignore
 
     git_repo = git_repos_path / test_clean_git_not_committed.__name__
     create_git_repository(git_repo, bare=True)
@@ -357,10 +357,10 @@ def test_clean_git_not_committed(
 def test_clean_git_not_pushed(
         tmp_path,
         autosubmit_exp,
-        git_server: Generator[Tuple[DockerContainer, Path, str], None, None]
+        git_server: Generator[tuple[DockerContainer, Path, str], None, None]
 ):
     """Test that cleaning Git fails when the project directory has staged changed not pushed."""
-    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str
+    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str  # type: ignore
 
     git_repo = git_repos_path / test_clean_git_not_pushed.__name__
     create_git_repository(git_repo, bare=True)
@@ -387,10 +387,10 @@ def test_clean_git_not_pushed(
 def test_clean_git(
         tmp_path,
         autosubmit_exp,
-        git_server: Generator[Tuple[DockerContainer, Path, str], None, None]
+        git_server: Generator[tuple[DockerContainer, Path, str], None, None]
 ):
     """Test that cleaning Git fails when the project commit cannot be recorded."""
-    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str
+    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str  # type: ignore
 
     git_repo = git_repos_path / test_clean_git_not_pushed.__name__
     create_git_repository(git_repo, bare=True)
