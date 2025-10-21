@@ -199,6 +199,36 @@ def test_create_expid_flag_hpc(fake_hpc: str, expected_hpc: str, autosubmit: Aut
     assert hpc_result_experiment == expected_hpc
 
 
+@pytest.mark.parametrize("experiment_hpc,expected_hpc", [
+    ("local","mn5"),
+    ("mn5","marenostrum"), ])
+def test_copy_expid_with_flag_hpc(tmp_path: Path, autosubmit: Autosubmit, experiment_hpc, expected_hpc):
+    """Create expid using the flag -H. Defining a value for the flag and not defining any value for that flag.
+
+    code-block:: console
+
+        autosubmit expid -H ithaca -d "experiment"
+        autosubmit expid -H "" -d "experiment"
+
+    :param fake_hpc: The value for the -H flag (hpc value).
+    :param expected_hpc: The value it is expected for the variable hpc.
+    :param autosubmit: Autosubmit interface that instantiate with no experiment.
+    """
+    autosubmit.install()
+
+    exp_id = autosubmit.expid('experiment', hpc=experiment_hpc, minimal_configuration=True)
+    copy_exp = autosubmit.expid('copy', hpc=expected_hpc , copy_id=exp_id, minimal_configuration=True)
+
+    describe = autosubmit.describe(exp_id)
+    hpc_experiment = describe[4].lower()
+
+    describe_copy = autosubmit.describe(copy_exp)
+    hpc_experiment_copy = describe_copy[4].lower()
+
+    assert hpc_experiment != hpc_experiment_copy
+    assert hpc_experiment_copy == expected_hpc
+
+
 @pytest.mark.parametrize("fake_hpc,expected_hpc", [
     ("mn5", "mn5"),
     ("", "local"),
@@ -253,7 +283,7 @@ def test_copy_expid_no(autosubmit: Autosubmit):
     describe = autosubmit.describe(copy_experiment_id)
     hpc_result = describe[4].lower()
 
-    assert hpc_result != new_hpc
+    assert hpc_result == new_hpc
 
 
 def _get_experiment_data(tmp_path):
