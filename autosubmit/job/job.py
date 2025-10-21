@@ -1279,6 +1279,9 @@ class Job(object):
         Log.debug(f"Retrieving log files {remote_logs} for job {self.name}")
         self.platform.get_logs_files(self.expid, remote_logs)
 
+        # Update local logs
+        self.local_logs = remote_logs
+
 
     def retrieve_external_retrials_logfiles(self):
         log_recovered = False
@@ -1346,7 +1349,7 @@ class Job(object):
                 self.inc_fail_count()
         else:
             # Update local logs without updating the submit time
-            self.update_local_logs(update_submit_time=False)
+            # self.update_local_logs(update_submit_time=False)
             self.platform.get_stat_file(self)
             self.write_submit_time()
             self.write_start_time(count=self.fail_count)
@@ -2579,7 +2582,7 @@ class Job(object):
 
     def write_vertical_time(self, count=-1):
         self.update_start_time(count=count)
-        self.update_local_logs(update_submit_time=False)
+        # self.update_local_logs(update_submit_time=False)
         self.write_submit_time()
         self.write_start_time(count=count, vertical_wrapper=True)
         self.write_end_time(self.status == Status.COMPLETED, count=count)
