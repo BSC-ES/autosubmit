@@ -245,7 +245,6 @@ class JobList(object):
             as_conf, date_list, member_list, num_chunks, chunk_ini, parameters, date_format, default_retrials
         )
 
-
         if not force:
             changes = self._load_graph(full_load, load_failed_jobs=check_failed_jobs)
 
@@ -268,8 +267,8 @@ class JobList(object):
                 raise AutosubmitCritical("Changes detected after loading active jobs. "
                                          "This shouldn't happen, please report it in GitHub. "
                                          "To solve this issue, autosubmit create $expid -f -np, autosubmit recovery $expid --all -s and autosubmit run $expid",
-                    7015
-                )
+                                         7015
+                                         )
         Log.result("Workflow generation completed.")
 
     def clear(self) -> None:
@@ -434,7 +433,6 @@ class JobList(object):
         self.dbmanager.clear_unused_nodes(differences)
         self.dbmanager.save_sections_data(sections)
 
-
     def compute_section_differences(self) -> Dict[str, Dict[str, Any]]:
         """
         Compute the differences between the current sections and the persistent sections in the database.
@@ -468,16 +466,16 @@ class JobList(object):
                 "numchunks": section["numchunks"],
                 "splits": section["splits"],
                 "dependencies": section["dependencies"],
+                "expid": section["expid"],
             }
 
         for section_name in persistent_names & current_names:
             persistent = persistent_sections[section_name]
             current = current_sections[section_name]
             section_diff = {}
-            for key in ["datelist", "members", "numchunks", "splits", "dependencies"]:
+            for key in ["datelist", "members", "numchunks", "splits", "dependencies", "expid"]:
                 if str(persistent.get(key, "")) != str(current.get(key, "")):
                     section_diff[key] = current[key]
-            pass
             if section_diff:
                 section_diff["status"] = "modified"
                 differences[section_name] = section_diff
@@ -577,6 +575,7 @@ class JobList(object):
         datelist_ref = str(experiment_section.get("DATELIST", ""))
         members_ref = str(experiment_section.get("MEMBERS", ""))
         numchunks_ref = int(experiment_section.get("NUMCHUNKS", 1))
+        expid_ref = self._as_conf.experiment_data.get("DEFAULT", {}).get("EXPID", "unknown_expid")
         data_to_store: List[Dict[str, Any]] = []
         for section_name, section_data in sections.items():
             splits = None if not section_data.get("SPLITS", None) else section_data.get("SPLITS", 0)
@@ -592,6 +591,7 @@ class JobList(object):
                 "datelist": datelist,
                 "members": members,
                 "numchunks": numchunks,
+                "expid": expid_ref,
             })
 
         return data_to_store
@@ -2588,8 +2588,8 @@ class JobList(object):
 
         active = (self.get_in_queue(platform) + self.get_ready(
             platform=platform, hold=True) + self.get_ready(platform=platform, hold=False) +
-                  self.get_delayed(platform=platform) + [ failed_job for failed_job in self.get_failed(platform=platform)
-                                                          if failed_job.fail_count < failed_job.retrials])
+                  self.get_delayed(platform=platform) + [failed_job for failed_job in self.get_failed(platform=platform)
+                                                         if failed_job.fail_count < failed_job.retrials])
 
         tmp = [job for job in active if job.hold and not (job.status ==
                                                           Status.SUBMITTED or job.status == Status.READY or job.status == Status.DELAYED)]
@@ -3046,7 +3046,6 @@ class JobList(object):
         Log.debug('Update finished')
         return save
 
-
     def is_wrapper_still_running(self, job: Job) -> bool:
         """
         Check if the wrapper job for a given job is still running.
@@ -3060,7 +3059,6 @@ class JobList(object):
         if self.job_package_map and int(job.id) in self.job_package_map:
             job.packed = True
         return job.packed
-
 
     def update_parents_edge_completeness(self, job: Job) -> None:
         """

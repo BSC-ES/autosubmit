@@ -30,7 +30,6 @@ def general_data(tmp_path: Path) -> Dict[str, object]:
         },
         'DEFAULT': {
             'HPCARCH': "local",
-            'EXPID': 't001'
         },
         'PLATFORMS': {
             'TEST_SLURM': {
@@ -111,7 +110,6 @@ def jobs_data(tmp_path: Path) -> Dict[str, object]:
                             'ALL': {'SPLITS_TO': 'previous'}
                         }
                     },
-                    'SIM-1': {}
                 },
                 'RUNNING': 'chunk',
                 'WALLCLOCK': '02:00',

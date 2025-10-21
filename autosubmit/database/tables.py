@@ -203,6 +203,7 @@ SectionsStructureTable = Table(
     Column("datelist", String, nullable=True),
     Column("members", String, nullable=True),
     Column("numchunks", Integer, nullable=True),
+    Column("expid", String, nullable=True),
 )
 
 

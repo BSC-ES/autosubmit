@@ -5161,6 +5161,8 @@ class Autosubmit:
         :param detail: detail
         :return:
         """
+        if filter_status:
+            filter_status = filter_status.upper()
         Autosubmit._check_ownership(expid, raise_error=True)
         exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
         tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)

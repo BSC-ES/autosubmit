@@ -30,7 +30,7 @@ def job_list(as_exp, submitter):
 @pytest.fixture
 def prepare_scratch(tmp_path: Path, job_list, job_names_to_recover, slurm_server) -> Any:
     """
-    Create an isolated experiment using a temporary directory for each test.
+    Generates some completed and stat files in the scratch directory to simulate completed jobs.
 
     :param tmp_path: Temporary directory unique to the test.
     :type tmp_path: Path
@@ -40,7 +40,7 @@ def prepare_scratch(tmp_path: Path, job_list, job_names_to_recover, slurm_server
     slurm_root = f"/tmp/scratch/group/root/{_EXPID}/"
     log_dir = Path(slurm_root) / f'LOG_{_EXPID}/'
     local_completed_dir = tmp_path / _EXPID / "tmp" / f'LOG_{_EXPID}/'
-    slurm_server.exec(f'mkdir -p {log_dir}')
+    slurm_server.exec(f'mkdir -p {log_dir}')  # combining this with the touch, makes the touch generates a folder instead of a file. I have no idea why.
 
     cmds = []
     for name in job_names_to_recover:
@@ -82,11 +82,11 @@ def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_n
         force=False,
         offline=False
     )
-    job_list = as_exp.autosubmit.load_job_list(
+    job_list_ = as_exp.autosubmit.load_job_list(
         as_exp.expid, as_exp.as_conf, new=False, full_load=True,
         check_failed_jobs=True)
 
-    completed_jobs = [job.name for job in job_list.get_job_list() if job.status == Status.COMPLETED]
+    completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
 
     for name in job_names_to_recover:
         assert name in completed_jobs
