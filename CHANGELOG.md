@@ -13,6 +13,7 @@ platform does not support wrappers anymore (it was used for testing).
 - Fixed error when cleaning projects that use Git #2524
 - Fixed bug that occurred when copying experiments with different HPC platforms, where the incorrect platform was used 
   instead of the user-specified platform #2650
+- Fixed 'NoneType' object has no attribute 'set' that would have set a 'NoneType' instead of a 'EventType' #2611 #2583
 
 **Enhancements:**
 
