@@ -737,7 +737,7 @@ class Platform:
         return False
 
     @autosubmit_parameter(name='current_logdir')
-    def get_files_path(self):
+    def get_files_path(self) -> str:
         """The platform's LOG directory.
 
         :return: platform's LOG directory
