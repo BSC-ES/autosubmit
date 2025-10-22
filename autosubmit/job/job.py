@@ -1819,18 +1819,25 @@ class Job(object):
             self.partition = self.partition
 
         self.het['CUSTOM_DIRECTIVES'] = list()
-        if type(self.custom_directives) is list:
-            self.custom_directives = json.dumps(self.custom_directives)
-        self.custom_directives = self.custom_directives.replace("\'", "\"").strip("[]").strip(", ")
-        if self.custom_directives == '':
+
+        if not self.custom_directives:
             if job_platform.custom_directives is None:
-                job_platform.custom_directives = ''
-            if type(job_platform.custom_directives) is list:
+                job_platform.custom_directives = []
+
+            if isinstance(job_platform.custom_directives, list):
                 self.custom_directives = json.dumps(job_platform.custom_directives)
                 self.custom_directives = self.custom_directives.replace("\'", "\"").strip("[]").strip(", ")
-            else:
+            elif isinstance(job_platform.custom_directives, str):
                 self.custom_directives = job_platform.custom_directives.replace("\'", "\"").strip("[]").strip(", ")
-        if self.custom_directives != '':
+            else:
+                self.custom_directives = []
+
+        elif isinstance(self.custom_directives, list):
+            self.custom_directives = json.dumps(self.custom_directives)
+
+        elif isinstance(self.custom_directives, str):
+            self.custom_directives = self.custom_directives.replace("\'", "\"").strip("[]").strip(", ")
+
             if self.custom_directives[0] != "\"":
                 self.custom_directives = "\"" + self.custom_directives
             if self.custom_directives[-1] != "\"":
