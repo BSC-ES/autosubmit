@@ -91,11 +91,12 @@ tests = [
 ]
 docs = [
     "livereload",
-    "pydata-sphinx-theme>=0.15,<0.17",
+    "pydata-sphinx-theme>=0.16.1,<0.17",
     "sphinx>=5,<9",
     "sphinx-autobuild>=2021.3,<2024.11",
     "sphinx_rtd_theme",
-    "sphinx-reredirects==0.1.*"
+    "sphinx-reredirects==0.1.*",
+    "sphinx_design"
 ]
 all = [
     "autosubmit[tests]",
