@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 title: Autosubmit
-message: "If you use this software, please cite it using these metadata."
+message: "If you use Autosubmit, please cite it using these metadata."
 license: GPL-3.0
 type: software
 abstract: "Autosubmit is a lightweight workflow manager designed to meet climate research necessities."

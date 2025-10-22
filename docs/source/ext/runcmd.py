@@ -14,6 +14,7 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 from docutils import nodes
 from docutils.nodes import Node
@@ -42,8 +43,8 @@ class _Singleton(type):
         return cls._instances[cls]
 
 
-class Singleton(_Singleton("SingletonMeta", (object,), {})):
-    pass
+class Singleton(_Singleton("SingletonMeta", (object,), {})):  # type: ignore
+    pass  # pragma: no cover
 
 
 class CMDCache(Singleton):
@@ -110,7 +111,7 @@ class RunCmdDirective(code.CodeBlock):
     required_arguments = 1
     optional_arguments = 99
 
-    option_spec = {
+    option_spec = {  # type: ignore
         # code.CodeBlock option_spec
         "linenos": directives.flag,
         "dedent": int,
@@ -179,11 +180,11 @@ class RunCmdDirective(code.CodeBlock):
         for items in reader:
             for regex in items:
                 if regex != "":
-                    match = RE_SPLIT.match(regex)
-                    p = match.group("pattern")
+                    match: Optional[re.Match[str]] = RE_SPLIT.match(regex)
+                    p = match.group("pattern")  # type: ignore
                     # Let's unescape the escape chars here as we don't need them to be
                     # escaped in the replacement at this point
-                    r = match.group("replacement").replace("\\", "")
+                    r = match.group("replacement").replace("\\", "")  # type: ignore
                     output = re.sub(p, r, output)
 
         # Note: Sphinx's CodeBlock directive expects an array of command-line

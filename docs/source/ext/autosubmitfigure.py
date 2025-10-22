@@ -9,7 +9,7 @@
 
 from pathlib import Path
 from shutil import copy, move
-from typing import cast
+from typing import cast, Optional
 from sphinx.util import logging
 
 from docutils import nodes
@@ -56,7 +56,10 @@ class AutosubmitFigureDirective(SphinxDirective):
     def run(self) -> list[Node]:
         caption = self.options.get('caption')
 
-        configuration_name = self.options.get('name', None)
+        configuration_name: Optional[str] = self.options.get('name', None)
+        if configuration_name is None:
+            logger.warning('No configuration name specified in the figure directive, skipping copying YAML files.')
+            raise ValueError('No configuration name specified in the figure directive.')
         source_path = Path(self.env.srcdir, self.env.docname).parent
         _copy_rst_yaml_files_to_as_experiment(source_path, self.env.app.outdir.parent, configuration_name)
 
@@ -64,8 +67,8 @@ class AutosubmitFigureDirective(SphinxDirective):
             'autosubmit',
             '-lc',
             'DEBUG',
-            self.options.get('command'),
-            self.options.get('expid'),
+            cast(str, self.options.get('command')),
+            cast(str, self.options.get('expid')),
             '--hide',
             '-o',
             self.options.get('type', 'png'),
@@ -79,7 +82,7 @@ class AutosubmitFigureDirective(SphinxDirective):
         # ``autosubmitrc`` file in this directory, or you might end up using real experiments.
         experiment_plot_path = Path(self.env.app.outdir.parent, 'autosubmit/autosubmit/a000/plot/')
         target_path = Path(self.env.app.outdir, '_static/images/', self.env.docname).parent
-        figure_name = self.options.get('figure')
+        figure_name: str = cast(str, self.options.get('figure'))
         _move_latest_image(experiment_plot_path, target_path, figure_name)
 
         # We extract the part after the build directory (e.g. after ``build/html``, like

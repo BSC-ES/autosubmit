@@ -18,9 +18,10 @@
 import functools
 import inspect
 from collections import defaultdict
-from typing import Dict
+from typing import Any
 
-PARAMETERS = defaultdict(defaultdict)
+
+PARAMETERS: dict[str, Any] = defaultdict(defaultdict)
 """Global default dictionary holding a multi-level dictionary with the Autosubmit
 parameters. At the first level we have the parameter groups.
 
@@ -39,14 +40,14 @@ to populate the comments in the Autosubmit YAML configuration files.
 """
 
 
-def autosubmit_parameters(cls=None, *, parameters: Dict):
+def autosubmit_parameters(cls=None, *, parameters: dict):
     """Decorator for Autosubmit configuration parameters defined in a class.
 
     This is useful for parameters that are not defined in a single function or
     class (e.g. parameters that are created on-the-fly in functions)."""
 
-    def wrap(cls):
-        parameters = wrap.parameters
+    def wrap(cls) -> Any:
+        parameters = wrap.parameters  # type: ignore
 
         for group, group_parameters in parameters.items():
             group = group.upper()
@@ -60,7 +61,7 @@ def autosubmit_parameters(cls=None, *, parameters: Dict):
 
         return cls
 
-    wrap.parameters = parameters
+    wrap.parameters = parameters  # type: ignore
 
     # NOTE: This is not reachable code, as the parameters must be defined!
     # if cls is not None:

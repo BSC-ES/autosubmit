@@ -273,6 +273,10 @@ of how to install Autosubmit with Conda.
       </div>
    </div>
 
+Citing Autosubmit
+=================
+
+.. citation::
 
 Contact Us
 ==========
