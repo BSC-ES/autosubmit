@@ -700,7 +700,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
 
     assert slurm_platform.check_remote_permissions()
 
-    slurm_platform.closeConnection()
+    slurm_platform.close_connection()
     assert not slurm_platform.check_remote_permissions()
 
 

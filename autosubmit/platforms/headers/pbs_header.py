@@ -20,8 +20,8 @@
 import textwrap
 
 
-class SlurmHeader(object):
-    """Class to handle the SLURM headers of a job"""
+class PBSHeader(object):
+    """Class to handle the PBS headers of a job"""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_queue_directive(self, job, parameters, het=-1):
@@ -35,11 +35,31 @@ class SlurmHeader(object):
         # There is no queue, so directive is empty
         if het > -1 and len(job.het['CURRENT_QUEUE']) > 0:
             if job.het['CURRENT_QUEUE'][het] != '':
-                return f"SBATCH --qos={job.het['CURRENT_QUEUE'][het]}"
+                return f"qsub -l qos={job.het['CURRENT_QUEUE'][het]}"
         else:
             if parameters['CURRENT_QUEUE'] != '':
-                return f"SBATCH --qos={parameters['CURRENT_QUEUE']}"
+                return f"qsub -l qos={parameters['CURRENT_QUEUE']}"
         return ""
+
+
+    # noinspection PyMethodMayBeStatic,PyUnusedLocal
+    def get_custom_directives(self, job, parameters, het=-1):
+        """Returns custom directives for the specified job
+
+        :param job: job to create custom directive for
+        :type job: Job
+        :return: custom directives
+        :rtype: str
+        """
+        # There is no custom directives, so directive is empty
+        if het > -1 and len(job.het['CUSTOM_DIRECTIVES']) > 0:
+            if job.het['CUSTOM_DIRECTIVES'][het] != '':
+                return '\n'.join(str(s) for s in job.het['CUSTOM_DIRECTIVES'][het])
+        else:
+            if parameters['CUSTOM_DIRECTIVES'] != '':
+                return '\n'.join(str(s) for s in parameters['CUSTOM_DIRECTIVES'])
+        return ""
+
 
     def get_proccesors_directive(self, job, parameters, het=-1):
         """Returns processors directive for the specified job
@@ -58,7 +78,7 @@ class SlurmHeader(object):
                 het] == '1' and int(job_nodes) > 0:
                 return ""
             else:
-                return "SBATCH -n {0}".format(job.het['PROCESSORS'][het])
+                return f"qsub -l ppn={job.het['PROCESSORS'][het]}"
         if job.nodes == "":
             job_nodes = 0
         else:
@@ -66,7 +86,8 @@ class SlurmHeader(object):
         if job.processors == '' or job.processors == '1' and int(job_nodes) > 0:
             return ""
         else:
-            return "SBATCH -n {0}".format(job.processors)
+            return f"qsub -l ppn={job.processors}"
+
 
     def get_partition_directive(self, job, parameters, het=-1):
         """Returns partition directive for the specified job
@@ -78,11 +99,12 @@ class SlurmHeader(object):
         """
         if het > -1 and len(job.het['PARTITION']) > 0:
             if job.het['PARTITION'][het] != '':
-                return "SBATCH --partition={0}".format(job.het['PARTITION'][het])
+                return f"qsub -q={job.het['PARTITION'][het]}"
         else:
             if job.partition != '':
-                return "SBATCH --partition={0}".format(job.partition)
+                return f"qsub -q={job.partition}"
         return ""
+
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_account_directive(self, job, parameters, het=-1):
@@ -95,11 +117,12 @@ class SlurmHeader(object):
         """
         if het > -1 and len(job.het['CURRENT_PROJ']) > 0:
             if job.het['CURRENT_PROJ'][het] != '':
-                return "SBATCH -A {0}".format(job.het['CURRENT_PROJ'][het])
+                return f"qsub -q debug-g -l select=1:mpiprocs=2 -W group_list={job.het['CURRENT_PROJ'][het]} ./a00b/LOG_a00b/a00b_LOCAL_SETUP.cmd"
         else:
             if parameters['CURRENT_PROJ'] != '':
-                return "SBATCH -A {0}".format(parameters['CURRENT_PROJ'])
+                return f"qsub -q debug-g -l select=1:mpiprocs=2 -W group_list={parameters['CURRENT_PROJ']} ./a00b/LOG_a00b/a00b_LOCAL_SETUP.cmd"
         return ""
+
 
     def get_exclusive_directive(self, job, parameters, het=-1):
         """Returns account directive for the specified job
@@ -111,11 +134,12 @@ class SlurmHeader(object):
         """
         if het > -1 and len(job.het['EXCLUSIVE']) > 0:
             if str(parameters['EXCLUSIVE']).lower() == 'true':
-                return "SBATCH --exclusive"
+                return "qsub -l naccesspolicy=singlejob"
         else:
             if str(parameters['EXCLUSIVE']).lower() == 'true':
-                return "SBATCH --exclusive"
+                return "qsub -l naccesspolicy=singlejob"
         return ""
+
 
     def get_nodes_directive(self, job, parameters, het=-1):
         """Returns nodes directive for the specified job
@@ -127,11 +151,12 @@ class SlurmHeader(object):
         """
         if het > -1 and len(job.het['NODES']) > 0:
             if job.het['NODES'][het] != '':
-                return "SBATCH --nodes={0}".format(job.het['NODES'][het])
+                return f"qsub -l nodes={job.het['NODES'][het]}"
         else:
             if parameters['NODES'] != '':
-                return "SBATCH --nodes={0}".format(parameters['NODES'])
+                return f"qsub -l nodes={parameters['NODES']}"
         return ""
+
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_memory_directive(self, job, parameters, het=-1):
@@ -144,11 +169,12 @@ class SlurmHeader(object):
         """
         if het > -1 and len(job.het['MEMORY']) > 0:
             if job.het['MEMORY'][het] != '':
-                return "SBATCH --mem={0}".format(job.het['MEMORY'][het])
+                return f"qsub -l mem={job.het['MEMORY'][het]}"
         else:
             if parameters['MEMORY'] != '':
-                return "SBATCH --mem={0}".format(parameters['MEMORY'])
+                return f"qsub -l mem={parameters['MEMORY']}"
         return ""
+
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_memory_per_task_directive(self, job, parameters, het=-1):
@@ -161,11 +187,12 @@ class SlurmHeader(object):
         """
         if het > -1 and len(job.het['MEMORY_PER_TASK']) > 0:
             if job.het['MEMORY_PER_TASK'][het] != '':
-                return "SBATCH --mem-per-cpu={0}".format(job.het['MEMORY_PER_TASK'][het])
+                return f"qsub -l vmem={job.het['MEMORY_PER_TASK'][het]}"
         else:
             if parameters['MEMORY_PER_TASK'] != '':
-                return "SBATCH --mem-per-cpu={0}".format(parameters['MEMORY_PER_TASK'])
+                return f"qsub -l vmem={parameters['MEMORY_PER_TASK']}"
         return ""
+
 
     def get_threads_per_task(self, job, parameters, het=-1):
         """Returns threads per task directive for the specified job
@@ -178,14 +205,14 @@ class SlurmHeader(object):
         # There is no threads per task, so directive is empty
         if het > -1 and len(job.het['NUMTHREADS']) > 0:
             if job.het['NUMTHREADS'][het] != '':
-                return f"SBATCH --cpus-per-task={job.het['NUMTHREADS'][het]}"
+                return f"qsub -l ppn={job.het['NUMTHREADS'][het]}"
         else:
             if parameters['NUMTHREADS'] != '':
-                return "SBATCH --cpus-per-task={0}".format(parameters['NUMTHREADS'])
+                return f"qsub -l ppn={parameters['NUMTHREADS']}"
         return ""
 
-    # noinspection PyMethodMayBeStatic,PyUnusedLocal
 
+    # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_reservation_directive(self, job, parameters, het=-1):
         """Returns reservation directive for the specified job
 
@@ -196,28 +223,12 @@ class SlurmHeader(object):
 
         if het > -1 and len(job.het['RESERVATION']) > 0:
             if job.het['RESERVATION'][het] != '':
-                return "SBATCH --reservation={0}".format(job.het['RESERVATION'][het])
+                return f"qsub -W x={job.het['RESERVATION'][het]}"
         else:
             if parameters['RESERVATION'] != '':
-                return "SBATCH --reservation={0}".format(parameters['RESERVATION'])
+                return f"qsub -W x={parameters['RESERVATION']}"
         return ""
 
-    def get_custom_directives(self, job, parameters, het=-1):
-        """Returns custom directives for the specified job
-
-        :param job: job to create custom directive for
-        :type job: Job
-        :return: custom directives
-        :rtype: str
-        """
-        # There is no custom directives, so directive is empty
-        if het > -1 and len(job.het['CUSTOM_DIRECTIVES']) > 0:
-            if job.het['CUSTOM_DIRECTIVES'][het] != '':
-                return '\n'.join(str(s) for s in job.het['CUSTOM_DIRECTIVES'][het])
-        else:
-            if parameters['CUSTOM_DIRECTIVES'] != '':
-                return '\n'.join(str(s) for s in parameters['CUSTOM_DIRECTIVES'])
-        return ""
 
     def get_tasks_per_node(self, job, parameters, het=-1):
         """Returns memory per task directive for the specified job
@@ -229,80 +240,34 @@ class SlurmHeader(object):
         """
         if het > -1 and len(job.het['TASKS']) > 0:
             if int(job.het['TASKS'][het]):
-                return "SBATCH --ntasks-per-node={0}".format(job.het['TASKS'][het])
+                return f"qsub -l nodes={job.het['TASKS'][het]}:ppn={job.het['TASKS'][het]}"
         else:
             if int(parameters['TASKS']) > 1:
-                return "SBATCH --ntasks-per-node={0}".format(parameters['TASKS'])
+                return f"qsub -l nodes={parameters['TASKS']}:ppn={parameters['TASKS']}"
         return ""
 
-    def wrapper_header(self, **kwargs):
-
-        wr_header = f"""
-###############################################################################
-#              {kwargs["name"].split("_")[0] + "_Wrapper"}
-###############################################################################
-"""
-        if kwargs["wrapper_data"].het.get("HETSIZE", 1) <= 1:
-            wr_header += f"""
-#SBATCH -J {kwargs["name"]}
-{kwargs["queue"]}
-{kwargs["partition"]}
-{kwargs["dependency"]}
-#SBATCH -A {kwargs["project"]}
-#SBATCH --output={kwargs["name"]}.out
-#SBATCH --error={kwargs["name"]}.err
-#SBATCH -t {kwargs["wallclock"]}:00
-{kwargs["threads"]}
-{kwargs["nodes"]}
-{kwargs["num_processors"]}
-{kwargs["tasks"]}
-{kwargs["exclusive"]}
-{kwargs["custom_directives"]}
-{kwargs.get("reservation", "#")}
-#
-    """
-        else:
-            wr_header = self.calculate_wrapper_het_header(kwargs["wrapper_data"])
-        if kwargs["method"] == 'srun':
-            language = kwargs["executable"]
-            if language is None or len(language) == 0:
-                language = "#!/bin/bash"
-            return language + wr_header
-        else:
-            language = kwargs["executable"]
-            if language is None or len(language) == 0 or "bash" in language:
-                language = "#!/usr/bin/env python3"
-            return language + wr_header
 
     def hetjob_common_header(self, hetsize, wrapper=None):
-        if not wrapper:
-            header = textwrap.dedent("""\
-                    
-                    ###############################################################################
-                    #                   %TASKTYPE% %DEFAULT.EXPID% EXPERIMENT
-                    ###############################################################################
-                    #                   Common directives
-                    ###############################################################################
-                    #
-                    #SBATCH -t %WALLCLOCK%:00
-                    #SBATCH -J %JOBNAME%
-                    #SBATCH --output=%CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%OUT_LOG_DIRECTIVE%
-                    #SBATCH --error=%CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%ERR_LOG_DIRECTIVE%
-                    #%X11%
-                    #
-                        """)
-        else:
-            header = f"""
-###############################################################################
-#              {wrapper.name.split("_")[0] + "_Wrapper"}
-###############################################################################
-#SBATCH -J {wrapper.name}
-#SBATCH --output={wrapper._platform.remote_log_dir}/{wrapper.name}.out
-#SBATCH --error={wrapper._platform.remote_log_dir}/{wrapper.name}.err
-#SBATCH -t {wrapper.wallclock}:00
-#
-###########################################################################################
-"""
+        header = textwrap.dedent("""\
+
+                ###############################################################################
+                #                   %TASKTYPE% %DEFAULT.EXPID% EXPERIMENT
+                ###############################################################################
+                #                   Common directives
+                ###############################################################################
+                #
+                #PBS -q debug-g
+                #PBS -l select=1
+                #PBS -l walltime=%WALLCLOCK%:00
+                #PBS -N %JOBNAME%
+                #PBS -o %CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%OUT_LOG_DIRECTIVE%
+                #PBS -e %CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%ERR_LOG_DIRECTIVE%
+                #PBS -W group_list=group1
+                #PBS -j oe
+                #
+                    """)
+
+
         for components in range(hetsize):
             header += textwrap.dedent(f"""\
             ###############################################################################
@@ -319,39 +284,10 @@ class SlurmHeader(object):
             #%RESERVATION_DIRECTIVE_{components}%
             #%TASKS_PER_NODE_DIRECTIVE_{components}%
             %CUSTOM_DIRECTIVES_{components}%
-            #SBATCH hetjob
+            #PBS hetjob
             """)
         return header
 
-    def calculate_wrapper_het_header(self, wr_job):
-        hetsize = wr_job.het["HETSIZE"]
-        header = self.hetjob_common_header(hetsize, wr_job)
-        for components in range(hetsize):
-            header = header.replace(
-                f'%QUEUE_DIRECTIVE_{components}%', self.get_queue_directive(wr_job, components))
-            header = header.replace(
-                f'%PARTITION_DIRECTIVE_{components}%', self.get_partition_directive(wr_job, components))
-            header = header.replace(
-                f'%ACCOUNT_DIRECTIVE_{components}%', self.get_account_directive(wr_job, components))
-            header = header.replace(
-                f'%MEMORY_DIRECTIVE_{components}%', self.get_memory_directive(wr_job, components))
-            header = header.replace(
-                f'%MEMORY_PER_TASK_DIRECTIVE_{components}%', self.get_memory_per_task_directive(wr_job, components))
-            header = header.replace(
-                f'%THREADS_PER_TASK_DIRECTIVE_{components}%', self.get_threads_per_task(wr_job, components))
-            header = header.replace(
-                f'%NODES_DIRECTIVE_{components}%', self.get_nodes_directive(wr_job, components))
-            header = header.replace(
-                f'%NUMPROC_DIRECTIVE_{components}%', self.get_proccesors_directive(wr_job, components))
-            header = header.replace(
-                f'%RESERVATION_DIRECTIVE_{components}%', self.get_reservation_directive(wr_job, components))
-            header = header.replace(
-                f'%TASKS_PER_NODE_DIRECTIVE_{components}%', self.get_tasks_per_node(wr_job, components))
-            header = header.replace(
-                f'%CUSTOM_DIRECTIVES_{components}%', self.get_custom_directives(wr_job, components))
-        header = header[:-len("#SBATCH hetjob\n")]  # last element
-
-        return header
 
     def calculate_het_header(self, job, parameters):
         header = self.hetjob_common_header(hetsize=job.het["HETSIZE"])
@@ -362,7 +298,7 @@ class SlurmHeader(object):
 
         if job.x11:
             header = header.replace(
-                '%X11%', "SBATCH --x11=batch")
+                '%X11%', "qsub -X")
         else:
             header = header.replace('%X11%', "#")
 
@@ -379,68 +315,49 @@ class SlurmHeader(object):
                 f'%MEMORY_PER_TASK_DIRECTIVE_{components}%',
                 self.get_memory_per_task_directive(job, parameters, components))
             header = header.replace(
-                f'%THREADS_PER_TASK_DIRECTIVE_{components}%', self.get_threads_per_task(job, parameters, components))
+                f'%THREADS_PER_TASK_DIRECTIVE_{components}%',
+                self.get_threads_per_task(job, parameters, components))
             header = header.replace(
                 f'%NODES_DIRECTIVE_{components}%', self.get_nodes_directive(job, parameters, components))
             header = header.replace(
                 f'%NUMPROC_DIRECTIVE_{components}%', self.get_proccesors_directive(job, parameters, components))
             header = header.replace(
-                f'%RESERVATION_DIRECTIVE_{components}%', self.get_reservation_directive(job, parameters, components))
+                f'%RESERVATION_DIRECTIVE_{components}%',
+                self.get_reservation_directive(job, parameters, components))
             header = header.replace(
                 f'%TASKS_PER_NODE_DIRECTIVE_{components}%', self.get_tasks_per_node(job, parameters, components))
             header = header.replace(
                 f'%CUSTOM_DIRECTIVES_{components}%', self.get_custom_directives(job, parameters, components))
-        header = header[:-len("#SBATCH hetjob\n")]  # last element
+        header = header[:-len("#PBS hetjob\n")]  # last element
 
         return header
 
     SERIAL = textwrap.dedent("""\
-###############################################################################
-#                   %TASKTYPE% %DEFAULT.EXPID% EXPERIMENT
-###############################################################################
-#
-#%QUEUE_DIRECTIVE%
-#%PARTITION_DIRECTIVE%
-#%EXCLUSIVE_DIRECTIVE%
-#%ACCOUNT_DIRECTIVE%
-#%MEMORY_DIRECTIVE%
-#%THREADS_PER_TASK_DIRECTIVE%
-#%TASKS_PER_NODE_DIRECTIVE%
-#%NODES_DIRECTIVE%
-#%NUMPROC_DIRECTIVE%
-#%RESERVATION_DIRECTIVE%
-#SBATCH -t %WALLCLOCK%:00
-#SBATCH -J %JOBNAME%
-#SBATCH --output=%CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%OUT_LOG_DIRECTIVE%
-#SBATCH --error=%CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%ERR_LOG_DIRECTIVE%
-%CUSTOM_DIRECTIVES%
-#%X11%
-#
-###############################################################################
-           """)
+            ###############################################################################
+            #                         %TASKTYPE% %DEFAULT.EXPID% EXPERIMENT
+            ###############################################################################
+            #
+            #!/bin/sh --login
+            #PBS -N %JOBNAME%
+            #PBS -l walltime=%WALLCLOCK%
+            #PBS -e %CURRENT_SCRATCH_DIR%/%CURRENT_PROJ%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%
+            #PBS -o %CURRENT_SCRATCH_DIR%/%CURRENT_PROJ%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%
+            %CUSTOM_DIRECTIVES%
+            #
+            ###############################################################################
+            """)
 
     PARALLEL = textwrap.dedent("""\
-###############################################################################
-#                   %TASKTYPE% %DEFAULT.EXPID% EXPERIMENT
-###############################################################################
-#
-#%QUEUE_DIRECTIVE%
-#%PARTITION_DIRECTIVE%
-#%EXCLUSIVE_DIRECTIVE%
-#%ACCOUNT_DIRECTIVE%
-#%MEMORY_DIRECTIVE%
-#%MEMORY_PER_TASK_DIRECTIVE%
-#%THREADS_PER_TASK_DIRECTIVE%
-#%NODES_DIRECTIVE%
-#%NUMPROC_DIRECTIVE%
-#%RESERVATION_DIRECTIVE%
-#%TASKS_PER_NODE_DIRECTIVE%
-#SBATCH -t %WALLCLOCK%:00
-#SBATCH -J %JOBNAME%
-#SBATCH --output=%CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%OUT_LOG_DIRECTIVE%
-#SBATCH --error=%CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%ERR_LOG_DIRECTIVE%
-%CUSTOM_DIRECTIVES%
-#%X11%
-#
-###############################################################################
-    """)
+            ###############################################################################
+            #                         %TASKTYPE% %DEFAULT.EXPID% EXPERIMENT
+            ###############################################################################
+            #
+            #!/bin/sh --login
+            #PBS -N %JOBNAME%
+            #PBS -l walltime=%WALLCLOCK%
+            #PBS -e %CURRENT_SCRATCH_DIR%/%CURRENT_PROJ%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%
+            #PBS -o %CURRENT_SCRATCH_DIR%/%CURRENT_PROJ%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%
+            %CUSTOM_DIRECTIVES%
+            #
+            ###############################################################################
+            """)

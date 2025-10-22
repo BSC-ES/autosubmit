@@ -18,6 +18,7 @@ platform does not support wrappers anymore (it was used for testing).
 - Fixes an issue with all-filter #2565
 - Fixes an issue when setting a dependency to a different date or member # 2466 ( #2518 partially)
 - Fixes an issue with sections ignoring the MAX_WAITING_JOBS parameter #2613
+- Fixed 'NoneType' object has no attribute 'set' that would have set a 'NoneType' instead of a 'EventType' #2611 #2583
 
 **Enhancements:**
 

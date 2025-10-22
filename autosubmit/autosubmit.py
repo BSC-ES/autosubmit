@@ -2518,7 +2518,7 @@ class Autosubmit:
                     except Exception:
                         pass
                 for p in platforms_to_test:
-                    p.closeConnection()
+                    p.close_connection()
                 if len(job_list.get_failed()) > 0:
                     Log.info("Some jobs have failed and reached maximum retrials")
                 else:
@@ -2662,7 +2662,7 @@ class Autosubmit:
                 if not inspect and len(valid_packages_to_submit) > 0:
                     job_list.save()
                 save_2 = False
-                if platform.type.lower() in ["slurm", "pjm"] and not inspect and not only_wrappers:
+                if platform.type.lower() in ["slurm", "pjm", "pbs"] and not inspect and not only_wrappers:
                     # Process the script generated in submit_ready_jobs
                     save_2, valid_packages_to_submit = platform.process_batch_ready_jobs(valid_packages_to_submit,
                                                                                          failed_packages,

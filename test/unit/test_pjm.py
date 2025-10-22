@@ -137,19 +137,19 @@ def test_parse_all_jobs_output(remote_platform):
     failed_jobs = ["167737", "167738", "167739"]
     jobs_that_arent_listed = ["3442432423", "238472364782", "1728362138712"]
     for job_id in _EXPECTED_COMPLETED_JOBS:
-        assert remote_platform.parse_Alljobs_output(_EXPECTED_OUTPUT, job_id) in remote_platform.job_status[
+        assert remote_platform.parse_all_jobs_output(_EXPECTED_OUTPUT, job_id) in remote_platform.job_status[
             "COMPLETED"]
     for job_id in failed_jobs:
-        assert remote_platform.parse_Alljobs_output(_EXPECTED_OUTPUT, job_id) in remote_platform.job_status[
+        assert remote_platform.parse_all_jobs_output(_EXPECTED_OUTPUT, job_id) in remote_platform.job_status[
             "FAILED"]
     for job_id in queued_jobs:
-        assert remote_platform.parse_Alljobs_output(_EXPECTED_OUTPUT, job_id) in remote_platform.job_status[
+        assert remote_platform.parse_all_jobs_output(_EXPECTED_OUTPUT, job_id) in remote_platform.job_status[
             "QUEUING"]
     for job_id in running_jobs:
-        assert remote_platform.parse_Alljobs_output(_EXPECTED_OUTPUT, job_id) in remote_platform.job_status[
+        assert remote_platform.parse_all_jobs_output(_EXPECTED_OUTPUT, job_id) in remote_platform.job_status[
             "RUNNING"]
     for job_id in jobs_that_arent_listed:
-        assert remote_platform.parse_Alljobs_output(_EXPECTED_OUTPUT, job_id) == []
+        assert remote_platform.parse_all_jobs_output(_EXPECTED_OUTPUT, job_id) == []
 
 
 def test_get_submitted_job_id(remote_platform):
@@ -173,9 +173,9 @@ def test_process_batch_ready_jobs_valid_packages_to_submit(mocker, pjm_platform,
     failed_packages = []
     pjm_platform.get_jobid_by_jobname = mocker.MagicMock()
     pjm_platform.send_command = mocker.MagicMock()
-    pjm_platform.submit_Script = mocker.MagicMock()
+    pjm_platform.submit_script = mocker.MagicMock()
     jobs_id = [1, 2, 3]
-    pjm_platform.submit_Script.return_value = jobs_id
+    pjm_platform.submit_script.return_value = jobs_id
     pjm_platform.process_batch_ready_jobs(valid_packages_to_submit, failed_packages)
     for i, package in enumerate(valid_packages_to_submit):
         for job in package.jobs:

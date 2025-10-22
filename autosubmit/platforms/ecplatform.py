@@ -42,16 +42,16 @@ class EcPlatform(ParamikoPlatform):
     :type scheduler: str (pbs, loadleveler)
     """
 
-    def parse_Alljobs_output(self, output, job_id):
+    def parse_all_jobs_output(self, output, job_id):
         pass  # pragma: no cover
 
     def parse_queue_reason(self, output, job_id):
         pass  # pragma: no cover
 
-    def get_checkAlljobs_cmd(self, jobs_id):
+    def get_check_all_jobs_cmd(self, jobs_id):
         pass  # pragma: no cover
 
-    def submit_Script(self, hold=False):
+    def submit_script(self, hold=False):
         pass  # pragma: no cover
 
     def __init__(self, expid, name, config, scheduler):
@@ -139,7 +139,7 @@ class EcPlatform(ParamikoPlatform):
     def get_submitted_job_id(self, output, x11 = False):
         return output
 
-    def get_checkjob_cmd(self, job_id):
+    def get_check_job_cmd(self, job_id):
         return self._checkjob_cmd + str(job_id)
 
     def get_submit_cmd(self, job_script, job, hold=False, export=""):

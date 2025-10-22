@@ -40,16 +40,16 @@ class LocalPlatform(ParamikoPlatform):
     :type expid: str
     """
 
-    def submit_Script(self, hold=False):
+    def submit_script(self, hold=False):
         pass  # pragma: no cover
 
-    def parse_Alljobs_output(self, output, job_id):
+    def parse_all_jobs_output(self, output, job_id):
         pass  # pragma: no cover
 
     def parse_queue_reason(self, output, job_id):
         pass  # pragma: no cover
 
-    def get_checkAlljobs_cmd(self, jobs_id):
+    def get_check_all_jobs_cmd(self, jobs_id):
         pass  # pragma: no cover
 
     def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
@@ -115,7 +115,7 @@ class LocalPlatform(ParamikoPlatform):
         command = self.get_call(job_script, job, export=export, timeout=seconds)
         return f"cd {self.remote_log_dir} ; {command}"
 
-    def get_checkjob_cmd(self, job_id):
+    def get_check_job_cmd(self, job_id):
         return self.get_pscall(job_id)
 
     def write_jobid(self, jobid: str, complete_path: str) -> None:

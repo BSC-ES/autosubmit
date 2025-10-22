@@ -43,10 +43,10 @@ class PsPlatform(ParamikoPlatform):
         self.job_status['FAILED'] = []
         self.update_cmds()
 
-    def get_checkAlljobs_cmd(self, jobs_id):
+    def get_check_all_jobs_cmd(self, jobs_id):
         pass  # pragma: no cover
 
-    def parse_Alljobs_output(self, output, job_id):
+    def parse_all_jobs_output(self, output, job_id):
         pass  # pragma: no cover
 
     def parse_queue_reason(self, output, job_id):
@@ -55,7 +55,7 @@ class PsPlatform(ParamikoPlatform):
     def create_a_new_copy(self):
         return PsPlatform(self.expid, self.name, self.config)
 
-    def submit_Script(self, hold=False):
+    def submit_script(self, hold=False):
         pass  # pragma: no cover
 
     def update_cmds(self):
@@ -92,7 +92,7 @@ class PsPlatform(ParamikoPlatform):
             export += " ; "
         return self.get_call(job_script, job, export=export, timeout=job.wallclock_in_seconds)
 
-    def get_checkjob_cmd(self, job_id):
+    def get_check_job_cmd(self, job_id):
         return self.get_pscall(job_id)
 
     def check_Alljobs(self, job_list, as_conf, retries=5):

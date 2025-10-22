@@ -655,3 +655,21 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
     autosubmit_exp('____')
 
     return backend
+
+
+def sleep(timeout, retry=3):
+    def the_real_decorator(function):
+        def wrapper(*args, **kwargs):
+            retries = 0
+            while retries < retry:
+                try:
+                    value = function(*args, **kwargs)
+                    if value is None:
+                        return
+                except Exception:
+                    time.sleep(timeout)
+                    retries += 1
+
+        return wrapper
+
+    return the_real_decorator

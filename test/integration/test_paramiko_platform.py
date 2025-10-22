@@ -199,7 +199,7 @@ def test_send_file_errors(exp_platform_server: ExperimentPlatformServer):
     check = False
 
     # Fails if the connection is not active.
-    ps_platform.closeConnection()
+    ps_platform.close_connection()
     with pytest.raises(AutosubmitError) as cm:
         ps_platform.send_file(__file__, check=check)
     assert 'Connection does not appear to be active' in str(cm.value.message)
@@ -366,7 +366,7 @@ def test_exec_command_ssh_session_not_active_cannot_restore(exp_platform_server:
     """Test that when an error occurs, and it cannot restore, then we return falsey values."""
     exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
 
-    exp_platform_server.platform.closeConnection()
+    exp_platform_server.platform.close_connection()
 
     # This dummy mock prevents the platform from being able to restore its connection.
     mocker.patch.object(exp_platform_server.platform, 'restore_connection')
