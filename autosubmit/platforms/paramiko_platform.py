@@ -1169,7 +1169,7 @@ class ParamikoPlatform(Platform):
                             del self.channels[fd]
 
     def exec_command(
-            self, command, bufsize=-1, timeout=30, get_pty=False, retries=3, x11=False
+            self, command, bufsize=-1, timeout=30, retries=3, x11=False
     ) -> Union[tuple[paramiko.Channel, paramiko.Channel, paramiko.Channel], tuple[bool, bool, bool]]:
         """Execute a command on the SSH server.
 
