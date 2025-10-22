@@ -25,8 +25,7 @@ class EcCcaHeader(object):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_queue_directive(self, job, parameters):
-        """
-        Returns queue directive for the specified job
+        """Returns queue directive for the specified job
 
         :param job: job to create queue directive for
         :type job: Job
@@ -59,8 +58,7 @@ class EcCcaHeader(object):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_memory_per_task_directive(self, job, parameters):
-        """
-        Returns memory per task directive for the specified job
+        """Returns memory per task directive for the specified job
 
         :param job: job to create memory per task directive for
         :type job: Job
@@ -74,8 +72,7 @@ class EcCcaHeader(object):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_hyperthreading_directive(self, job, parameters):
-        """
-        Returns hyperthreading directive for the specified job
+        """Returns hyperthreading directive for the specified job
 
         :param job: job to create hyperthreading directive for
         :type job: Job
@@ -89,8 +86,7 @@ class EcCcaHeader(object):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_custom_directives(self, job, parameters):
-        """
-        Returns custom directives for the specified job
+        """Returns custom directives for the specified job
 
         :param job: job to create custom directive for
         :type job: Job
