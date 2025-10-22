@@ -23,6 +23,7 @@ from time import time, sleep
 from psutil import Process
 
 from autosubmit.scripts.autosubmit import main
+from test.integration.conftest import sleep
 
 _EXPID = 't000'
 
