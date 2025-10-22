@@ -1602,10 +1602,10 @@ class Job(object):
         :rtype: dict
         """
         for key, value in as_conf.platforms_data.get(self.platform_name, {}).items():
-            parameters[f"CURRENT_{key.upper()}"] = value
+            parameters[f"CURRENT_{key.upper()}"] = parameters.get(f"CURRENT_{key.upper()}", value)
 
         for key, value in as_conf.jobs_data[self.section].items():
-            parameters[f"CURRENT_{key.upper()}"] = value
+            parameters[f"CURRENT_{key.upper()}"] = parameters.get(f"CURRENT_{key.upper()}", value)
 
         parameters["CURRENT_METRIC_FOLDER"] = self.get_metric_folder(as_conf=as_conf)
 
@@ -1632,6 +1632,7 @@ class Job(object):
         parameters['CURRENT_PROJ_DIR'] = self.platform.project_dir
         parameters['CURRENT_ROOTDIR'] = self.platform.root_dir
         parameters['CURRENT_LOGDIR'] = self.platform.get_files_path()
+        parameters['CURRENT_CUSTOM_DIRECTIVES'] = self.platform.custom_directives
         return parameters
 
     def process_scheduler_parameters(self, job_platform, chunk):
