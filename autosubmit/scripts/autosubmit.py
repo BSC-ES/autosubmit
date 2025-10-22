@@ -80,8 +80,8 @@ def exit_from_error(e: BaseException) -> int:
     if is_autosubmit_error:
         e: Union[AutosubmitError, AutosubmitCritical] = e
         if e.trace:
-            Log.critical("Trace: {0}", str(e.trace))
-        Log.critical("{1} [eCode={0}]", e.code, e.message)
+            Log.critical(f"Trace: {str(e.trace)}")
+        Log.critical(f"{e.message} [eCode={e.code}]")
         err_code = e.code
 
     if not is_portalocker_error and not is_autosubmit_error:

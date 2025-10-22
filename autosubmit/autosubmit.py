@@ -2116,7 +2116,8 @@ class Autosubmit:
             if not p.log_recovery_process or not p.log_recovery_process.is_alive():
                 p.clean_log_recovery_process()
                 p.spawn_log_retrieval_process(as_conf)
-            p.work_event.set()
+            if p.work_event:
+                p.work_event.set()
 
     @staticmethod
     def run_experiment(expid: str, start_time: Optional[str] = None, start_after: Optional[str] = None,
@@ -2278,9 +2279,9 @@ class Autosubmit:
                             job_list.save()
                             as_conf.save()
                         time.sleep(safetysleeptime)
-                    except AutosubmitError as e:  # If an error is detected, restore all connections and job_list
-                        Log.error(f"Trace: {e.trace}")
-                        Log.error(f"{e.message} [eCode={e.code}]")
+                    except AutosubmitError as ae:  # If an error is detected, restore all connections and job_list
+                        Log.error(f"Trace: {ae.trace}")
+                        Log.error(f"{ae.message} [eCode={ae.code}]")
                         # No need to wait until the remote platform reconnection
                         recovery = False
                         as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
@@ -2352,8 +2353,9 @@ class Autosubmit:
                             except BaseException:
                                 reconnected = False
                         if recovery_retrials == max_recovery_retrials and max_recovery_retrials > 0:
-                            raise AutosubmitCritical(f"Autosubmit Encounter too much errors during running time, limit of {max_recovery_retrials * 120} reached",
-                                                     7051, e.message)
+                            raise AutosubmitCritical(
+                                f"Autosubmit Encounter too much errors during running time, limit of {max_recovery_retrials * 120} reached",
+                                7051, ae.message)
                     except AutosubmitCritical as e:  # Critical errors can't be recovered. Failed configuration or autosubmit error
                         raise AutosubmitCritical(e.message, e.code, e.trace)
                     except BaseException:
@@ -2371,7 +2373,7 @@ class Autosubmit:
                     Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf, expid=expid)
                 Log.info("Waiting for all logs to be updated")
                 for p in platforms_to_test:
-                    if p.log_recovery_process:
+                    if p.log_recovery_process and p.log_recovery_process.is_alive():
                         p.cleanup_event.set()  # Send cleanup event
                         p.log_recovery_process.join()
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=False)

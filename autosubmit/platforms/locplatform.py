@@ -55,13 +55,13 @@ class LocalPlatform(ParamikoPlatform):
         self.has_scheduler = False
 
     def parse_all_jobs_output(self, output, job_id):
-        pass
+        pass  # pragma: no cover
 
     def parse_queue_reason(self, output, job_id):
-        pass
+        pass  # pragma: no cover
 
     def get_check_all_jobs_cmd(self, jobs_id):
-        pass
+        pass  # pragma: no cover
 
     def create_a_new_copy(self):
         return LocalPlatform(self.expid, self.name, self.config)
