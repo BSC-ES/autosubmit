@@ -460,7 +460,6 @@ def slurm_server(session_mocker, tmp_path_factory):
         image=_SLURM_DOCKER_IMAGE,
         remove=True,
         hostname='slurmctld',
-        name=container_name,
         **docker_args
     )
 
@@ -470,7 +469,8 @@ def slurm_server(session_mocker, tmp_path_factory):
 
     with docker_container \
             .with_env('TZ', 'Etc/UTC') \
-            .with_bind_ports(2222, ssh_port) as container:
+            .with_bind_ports(2222, ssh_port) \
+            .with_name(container_name) as container:
         # TODO: or maybe wait for 'debug:  sched: Running job scheduler for full queue.'?
         wait_for_logs(container, 'No fed_mgr state file')
 

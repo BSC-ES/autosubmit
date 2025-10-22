@@ -2267,6 +2267,7 @@ class Job(object):
         parameters = self.update_job_parameters(as_conf, parameters, set_attributes)
         parameters = self.update_platform_associated_parameters(as_conf, parameters, parameters['CHUNK'], set_attributes)
         parameters = self.update_wrapper_parameters(as_conf, parameters)
+        parameters = self.update_current_parameters(as_conf, parameters)
         if set_attributes:
             self.update_job_variables_final_values(parameters)
         for event in self.platform.worker_events:  # keep alive log retrieval workers.
