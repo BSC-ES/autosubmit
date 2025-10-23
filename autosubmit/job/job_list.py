@@ -1758,7 +1758,7 @@ class JobList(object):
         return date_format
 
     def copy_ordered_jobs_by_date_member(self):
-        pass
+        pass  # pragma: no cover
 
     def get_ordered_jobs_by_date_member(self, section):
         """

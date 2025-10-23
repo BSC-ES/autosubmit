@@ -46,8 +46,9 @@ from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import _create_ssh_client
-from autosubmit.platforms.slurmplatform import SlurmPlatform
 # noinspection PyProtectedMember
+from autosubmit.platforms.psplatform import PsPlatform
+from autosubmit.platforms.slurmplatform import SlurmPlatform
 from test.integration.test_utils.networking import get_free_port
 
 if TYPE_CHECKING:
@@ -57,9 +58,14 @@ if TYPE_CHECKING:
     from pytest import FixtureRequest
 
 _SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
+"""This is the vanilla image from LinuxServer.io, with OpenSSH. About 39MB."""
+_SSH_DOCKER_IMAGE_X11_MFA = 'autosubmit/linuxserverio-ssh-2fa-x11:latest'
+"""This is our test image, built on top of LinuxServer.io's, but with MFA and X11. About 395MB."""
 _SSH_DOCKER_PASSWORD = 'password'
+"""Common password used in SSH containers; we mock the SSH Client of Paramiko to avoid hassle with keys."""
 
 _SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1'
+"""The Slurm Docker image. About 600 MB. It contains 2 cores, 1 node."""
 
 _PG_USER = 'postgres'
 _PG_PASSWORD = 'postgres'
@@ -98,7 +104,7 @@ class AutosubmitExperimentFixture(Protocol):
 @pytest.fixture
 def autosubmit_exp(
         autosubmit: Autosubmit,
-        request: pytest.FixtureRequest,
+        request: "FixtureRequest",
         tmp_path: "LocalPath",
         mocker: "MockerFixture",
 ) -> AutosubmitExperimentFixture:
@@ -287,7 +293,8 @@ class MakeSSHClientFixture(Protocol):
         ...
 
 
-def _make_ssh_client(ssh_port: int, password: Optional[str], key: Union['Path', str]) -> paramiko.SSHClient:
+def _make_ssh_client(ssh_port: int, password: Optional[str], key: Optional[Union['Path', str]],
+                     mfa: Optional[bool] = False) -> paramiko.SSHClient:
     """Creates the SSH client
 
     It modifies the list of arguments so that the port is always
@@ -377,8 +384,24 @@ def git_server(tmp_path_factory) -> Generator[tuple[DockerContainer, Path, str],
         yield container, git_repos_path, f'http://localhost:{http_port}/git'
 
 
-@pytest.fixture()
-def ssh_server(mocker, tmp_path):
+@pytest.fixture
+def ps_platform() -> PsPlatform:
+    platform = PsPlatform(expid='a000', name='ps', config={})
+    return platform
+
+
+def _markers_contain(request: "FixtureRequest", text: str) -> bool:
+    """Check if a marker is used in the test.
+
+    Returns ``True`` if the caller test is decorated with a
+    marker that matches the given text. Otherwise, ``False``.
+    """
+    markers = request.node.iter_markers()
+    return any(marker.name == text for marker in markers)
+
+
+@pytest.fixture
+def ssh_server(mocker, tmp_path, request) -> DockerContainer:
     ssh_port = get_free_port()
 
     user = getuser() or "unknown"
@@ -386,7 +409,12 @@ def ssh_server(mocker, tmp_path):
     uid = user_pw.pw_uid
     gid = user_pw.pw_gid
 
-    with DockerContainer(image=_SSH_DOCKER_IMAGE, remove=True, hostname='openssh-server') \
+    mfa = _markers_contain(request, 'mfa')
+    x11 = _markers_contain(request, 'x11')
+
+    ssh_image = _SSH_DOCKER_IMAGE_X11_MFA if mfa or x11 else _SSH_DOCKER_IMAGE
+
+    with DockerContainer(image=ssh_image, remove=True, hostname='openssh-server') \
             .with_env('TZ', 'Etc/UTC') \
             .with_env('SUDO_ACCESS', 'false') \
             .with_env('USER_NAME', user) \
@@ -395,11 +423,25 @@ def ssh_server(mocker, tmp_path):
             .with_env('PGID', str(gid)) \
             .with_env('UMASK', '000') \
             .with_env('PASSWORD_ACCESS', 'true') \
+            .with_env('MFA', str(mfa).lower()) \
             .with_bind_ports(2222, ssh_port) as container:
         wait_for_logs(container, 'sshd is listening on port 2222')
 
-        ssh_client = _make_ssh_client(ssh_port, _SSH_DOCKER_PASSWORD, None)
+        ssh_client = _make_ssh_client(ssh_port, _SSH_DOCKER_PASSWORD, None, mfa)
         mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
+
+        if mfa:
+            # It uses Transport, and not SSH client directly. Ideally, we would be able
+            # to use just one way
+            original_paramiko_config = paramiko.SSHConfig()
+            with open(Path('~/.ssh/config').expanduser()) as f:
+                original_paramiko_config.parse(f)
+            modified_config = original_paramiko_config.lookup('localhost')
+            modified_config['port'] = f'{ssh_port}'
+
+            paramiko_config: paramiko.SSHConfig = mocker.MagicMock(spec=paramiko.SSHConfig)
+            paramiko_config.lookup = lambda *args, **kwargs: modified_config
+            mocker.patch('autosubmit.platforms.paramiko_platform.paramiko.SSHConfig', return_value=paramiko_config)
 
         yield container
 
@@ -415,11 +457,11 @@ def slurm_server(session_mocker, tmp_path_factory):
     }
 
     docker_container = DockerContainer(
-            image=_SLURM_DOCKER_IMAGE,
-            remove=True,
-            hostname='slurmctld',
-            name=container_name,
-            **docker_args
+        image=_SLURM_DOCKER_IMAGE,
+        remove=True,
+        hostname='slurmctld',
+        name=container_name,
+        **docker_args
     )
 
     # TODO: GH needs --volume /sys/fs/cgroup:/sys/fs/cgroup:rw
@@ -509,7 +551,7 @@ def postgres_server(request: 'FixtureRequest') -> Generator[PostgresContainer, N
                 port=5432,
                 username=_PG_USER,
                 password=_PG_PASSWORD,
-                dbname=_PG_DATABASE)\
+                dbname=_PG_DATABASE) \
                 .with_bind_ports(5432, pg_random_port) as container:
             # Setup database
             with create_engine(conn_url).connect() as conn:
