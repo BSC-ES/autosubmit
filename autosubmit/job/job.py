@@ -1619,20 +1619,19 @@ class Job(object):
                 self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
             job_platform = submitter.platforms.get(self.platform_name)
             self.platform: 'ParamikoPlatform' = job_platform
-        parameters['CURRENT_ARCH'] = self.platform.name
-        parameters['CURRENT_HOST'] = self.platform.host
-        parameters['CURRENT_USER'] = self.platform.user
-        parameters['CURRENT_PROJ'] = self.platform.project
-        parameters['CURRENT_BUDG'] = self.platform.budget
-        parameters['CURRENT_RESERVATION'] = self.platform.reservation
-        parameters['CURRENT_EXCLUSIVITY'] = self.platform.exclusivity
-        parameters['CURRENT_HYPERTHREADING'] = self.platform.hyperthreading
-        parameters['CURRENT_TYPE'] = self.platform.type
-        parameters['CURRENT_SCRATCH_DIR'] = self.platform.scratch
-        parameters['CURRENT_PROJ_DIR'] = self.platform.project_dir
-        parameters['CURRENT_ROOTDIR'] = self.platform.root_dir
-        parameters['CURRENT_LOGDIR'] = self.platform.get_files_path()
-        parameters['CURRENT_CUSTOM_DIRECTIVES'] = self.platform.custom_directives
+        parameters['CURRENT_ARCH'] = parameters.get("CURRENT_ARCH", self.platform.name)
+        parameters['CURRENT_HOST'] = parameters.get("CURRENT_HOST", self.platform.host)
+        parameters['CURRENT_USER'] = parameters.get("CURRENT_USER", self.platform.user)
+        parameters['CURRENT_PROJ'] = parameters.get("CURRENT_PROJ", self.platform.project)
+        parameters['CURRENT_BUDG'] = parameters.get("CURRENT_BUDG", self.platform.budget)
+        parameters['CURRENT_RESERVATION'] = parameters.get("CURRENT_RESERVATION", self.platform.reservation)
+        parameters['CURRENT_EXCLUSIVITY'] = parameters.get("CURRENT_EXCLUSIVITY", self.platform.exclusivity)
+        parameters['CURRENT_HYPERTHREADING'] = parameters.get("CURRENT_HYPERTHREADING", self.platform.hyperthreading)
+        parameters['CURRENT_TYPE'] = parameters.get("CURRENT_TYPE", self.platform.type)
+        parameters['CURRENT_SCRATCH_DIR'] = parameters.get("CURRENT_SCRATCH_DIR", self.platform.scratch)
+        parameters['CURRENT_PROJ_DIR'] = parameters.get("CURRENT_PROJ_DIR", self.platform.project_dir)
+        parameters['CURRENT_ROOTDIR'] = parameters.get("CURRENT_ROOTDIR", self.platform.root_dir)
+        parameters['CURRENT_LOGDIR'] = parameters.get("CURRENT_LOGDIR", self.platform.get_files_path())
         return parameters
 
     def process_scheduler_parameters(self, job_platform, chunk):
@@ -1819,25 +1818,18 @@ class Job(object):
             self.partition = self.partition
 
         self.het['CUSTOM_DIRECTIVES'] = list()
-
-        if not self.custom_directives:
+        if type(self.custom_directives) is list:
+            self.custom_directives = json.dumps(self.custom_directives)
+        self.custom_directives = self.custom_directives.replace("\'", "\"").strip("[]").strip(", ")
+        if self.custom_directives == '':
             if job_platform.custom_directives is None:
-                job_platform.custom_directives = []
-
-            if isinstance(job_platform.custom_directives, list):
+                job_platform.custom_directives = ''
+            if type(job_platform.custom_directives) is list:
                 self.custom_directives = json.dumps(job_platform.custom_directives)
                 self.custom_directives = self.custom_directives.replace("\'", "\"").strip("[]").strip(", ")
-            elif isinstance(job_platform.custom_directives, str):
-                self.custom_directives = job_platform.custom_directives.replace("\'", "\"").strip("[]").strip(", ")
             else:
-                self.custom_directives = []
-
-        elif isinstance(self.custom_directives, list):
-            self.custom_directives = json.dumps(self.custom_directives)
-
-        elif isinstance(self.custom_directives, str):
-            self.custom_directives = self.custom_directives.replace("\'", "\"").strip("[]").strip(", ")
-
+                self.custom_directives = job_platform.custom_directives.replace("\'", "\"").strip("[]").strip(", ")
+        if self.custom_directives != '':
             if self.custom_directives[0] != "\"":
                 self.custom_directives = "\"" + self.custom_directives
             if self.custom_directives[-1] != "\"":
@@ -2274,7 +2266,8 @@ class Job(object):
         parameters = self.update_job_parameters(as_conf, parameters, set_attributes)
         parameters = self.update_platform_associated_parameters(as_conf, parameters, parameters['CHUNK'], set_attributes)
         parameters = self.update_wrapper_parameters(as_conf, parameters)
-        parameters = self.update_current_parameters(as_conf, parameters)
+        parameters.update(as_conf.default_parameters)
+        parameters = as_conf.substitute_dynamic_variables(parameters, max_deep=25, in_the_end=True)
         if set_attributes:
             self.update_job_variables_final_values(parameters)
         for event in self.platform.worker_events:  # keep alive log retrieval workers.
