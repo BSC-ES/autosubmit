@@ -2078,7 +2078,6 @@ class Autosubmit:
     @staticmethod
     def prepare_run(
         expid: str,
-        notransitive: bool = False,
         start_time: str = '',
         start_after: str = '',
         run_only_members: str = '',
@@ -2289,8 +2288,8 @@ class Autosubmit:
             p.work_event.set()
 
     @staticmethod
-    def run_experiment(expid: str, start_time: Optional[str] = None, start_after: Optional[str] = None,
-                       run_only_members: Optional[str] = None, profile=False) -> int:
+    def run_experiment(expid: str, start_time: str = '', start_after: str = '',
+                       run_only_members: str = '', profile=False) -> int:
         """
         Runs and experiment (submitting all the jobs properly and repeating its execution in case of failure).
         :param expid: the experiment id
