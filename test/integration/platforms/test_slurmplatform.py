@@ -808,12 +808,46 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
                 }
             },
         },
+        {
+            "JOBS": {
+                "SIM": {
+                    "PLATFORM": _PLATFORM_NAME,
+                    "RUNNING": "once",
+                    "SCRIPT": 'd_echo "FAIL"',
+                    "RETRIALS": 2,
+                },
+            },
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "127.0.0.1",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "COMPRESS_REMOTE_LOGS": True,
+                    "PROCESSORS_PER_NODE": 1,
+                    "MAX_PROCESSORS": 1,
+                },
+            },
+            "WRAPPERS": {
+                "WRAPPER": {
+                    "TYPE": "vertical",
+                    "JOBS_IN_WRAPPER": "SIM",
+                    "POLICY": "flexible",
+                }
+            },
+        }
     ],
     ids=[
         "Compress logs with default gzip",
         "Compress logs with xz",
         "Compress logs with default gzip in PS platform",
         "Compress logs with gzip and vertical wrapper",
+        "Compress logs with gzip, vertical wrappers and retrials",
     ],
 )
 def test_simple_workflow_compress_logs_slurm(
@@ -854,7 +888,7 @@ def test_simple_workflow_compress_logs_slurm(
     last_job_data = exp_history.manager.get_all_last_job_data_dcs()
     assert len(last_job_data) > 0, "No job data found after running the experiment."
 
-    logs_filenames = []
+    logs_filenames: list[str] = []
     for job in last_job_data:
         logs_filenames.extend([job.out, job.err])
 
@@ -863,11 +897,13 @@ def test_simple_workflow_compress_logs_slurm(
         assert any(is_xz_file(str(f)) for f in files), (
             "No compressed xz log files found."
         )
+        assert all(log_filename.endswith(".xz") for log_filename in logs_filenames)
     else:
         _val_fn = is_gzip_file
         assert any(is_gzip_file(str(f)) for f in files), (
             "No compressed gzip log files found."
         )
+        assert all(log_filename.endswith(".gz") for log_filename in logs_filenames)
 
     for log_filename in logs_filenames:
         log_path = logs_dir.joinpath(log_filename)
