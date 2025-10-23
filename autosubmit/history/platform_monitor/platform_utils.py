@@ -49,7 +49,6 @@ def parse_output_number(string_number):
             number = float(number) * multiplier
         except Exception:
             number = 0.0
-            pass        
     return number
 
 def try_parse_time_to_timestamp(input_):

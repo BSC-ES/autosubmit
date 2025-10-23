@@ -18,7 +18,7 @@
 
 class Notifier:
     def __init__(self):
-        pass
+        pass  # pragma: no cover
 
     @staticmethod
     def notify_status_change(implementation, exp_id, job_name="", prev_status="", status="", notify_to=""):

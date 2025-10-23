@@ -18,23 +18,23 @@
 # along with Autosubmit.  If not, see <http: www.gnu.org / licenses / >.
 
 
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from autosubmit.config.configcommon import AutosubmitConfig
 
 
+# TODO: We have one submitter, this can possibly be deleted.
 class Submitter:
-    """
-    Class to manage the experiments platform
-    """
-    def load_platforms(self, asconf, retries=5, auth_password=None):
-        """
-        Create all the platforms object that will be used by the experiment
+    """Class to manage the experiments platforms."""
 
-        :param retries: retries in case creation of service fails
-        :param asconf: autosubmit config to use
-        :type asconf: AutosubmitConfig
-        :param auth_password: password to use for authentication
-        :type auth_password: str
-        :return: platforms used by the experiment
-        :rtype: dict
-        """
+    def load_platforms(self, as_conf: 'AutosubmitConfig', auth_password: Optional[str] = None,
+                       local_auth_password=None) -> None:
+        """Create all the platforms object that will be used by the experiment.
 
-        raise Exception('Method Not Implemented')
+        :param as_conf: Autosubmit configuration.
+        :param auth_password: Password used for authentication.
+        :param local_auth_password: Password used for local authorization.
+        :return: A set with the platform names.
+        """
+        raise NotImplementedError  # pragma: no cover
