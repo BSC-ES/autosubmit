@@ -26,7 +26,6 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import Log, AutosubmitError
 from autosubmit.platforms.headers.local_header import LocalHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
-from autosubmit.platforms.wrappers.wrapper_factory import LocalWrapperFactory
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -41,16 +40,16 @@ class LocalPlatform(ParamikoPlatform):
     """
 
     def submit_Script(self, hold=False):
-        pass
+        pass  # pragma: no cover
 
     def parse_Alljobs_output(self, output, job_id):
-        pass
+        pass  # pragma: no cover
 
     def parse_queue_reason(self, output, job_id):
-        pass
+        pass  # pragma: no cover
 
     def get_checkAlljobs_cmd(self, jobs_id):
-        pass
+        pass  # pragma: no cover
 
     def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
         ParamikoPlatform.__init__(self, expid, name, config, auth_password=auth_password)
@@ -67,8 +66,7 @@ class LocalPlatform(ParamikoPlatform):
         self.job_status['RUNNING'] = ['0']
         self.job_status['QUEUING'] = []
         self.job_status['FAILED'] = []
-        self._allow_wrappers = True
-        self._wrapper = LocalWrapperFactory(self)
+        self._allow_wrappers = False
 
         self.update_cmds()
 

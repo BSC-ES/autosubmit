@@ -471,7 +471,7 @@ def create_rocrate_archive(
     #     exported_keys.append('SUBVERSION')
     else:
         # Dummy?
-        pass
+        pass  # pragma: no cover
 
     ins = []
     outs = []

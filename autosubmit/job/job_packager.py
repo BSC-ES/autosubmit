@@ -20,7 +20,7 @@ import operator
 from contextlib import suppress
 from math import ceil
 from operator import attrgetter
-from typing import List
+from typing import List, TYPE_CHECKING
 
 from bscearth.utils.date import sum_str_hours
 
@@ -30,6 +30,11 @@ from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, Jo
     JobPackageSimpleWrapped, JobPackageHorizontalVertical, JobPackageVerticalHorizontal, JobPackageBase
 from autosubmit.job.template import Language
 from autosubmit.log.log import Log, AutosubmitCritical
+
+if TYPE_CHECKING:
+    from autosubmit.config.configcommon import AutosubmitConfig
+    from autosubmit.job.job_list import JobList
+    from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 
 
 class JobPackager(object):
@@ -44,8 +49,7 @@ class JobPackager(object):
     :type jobs_list: JobList object.
     """
 
-
-    def __init__(self, as_config, platform, jobs_list, hold=False):
+    def __init__(self, as_config: 'AutosubmitConfig', platform: 'ParamikoPlatform', jobs_list: 'JobList', hold=False):
         self.current_wrapper_section = "WRAPPERS"
         self._as_config = as_config
         self._platform = platform
@@ -65,9 +69,8 @@ class JobPackager(object):
         self.special_variables = dict()
         self.wrappers_with_error = {}
 
-
-        #todo add default values
-        #Wrapper building starts here
+        # TODO: Add default values
+        # Wrapper building starts here
         for wrapper_section,wrapper_data in self._as_config.experiment_data.get("WRAPPERS",{}).items():
             if isinstance(wrapper_data,collections.abc.Mapping ):
                 self.wrapper_type[wrapper_section] = self._as_config.get_wrapper_type(wrapper_data)
@@ -127,7 +130,6 @@ class JobPackager(object):
                 job.distance_weight = job.distance_weight - 1
 
     def calculate_wrapper_bounds(self, section_list):
-
         """
         Returns the minimum and maximum number of jobs that can be wrapped
 
@@ -433,28 +435,34 @@ class JobPackager(object):
         message += "\nThis message is activated when only jobs_in_wrappers are in active(Ready+) status.\n"
         return message
 
-    def check_if_packages_are_ready_to_build(self):
-        """
-        Check if the packages are ready to be built
-        :return: List of jobs ready to be built, boolean indicating if packages can't be built for other reasons ( max_total_jobs...)
+    def check_if_packages_are_ready_to_build(self) -> tuple[list[Job], bool]:
+        """Check if the packages are ready to be built.
+
+        Returns a tuple with two elements. First contains the list of jobs ready to be built.
+        The second element in the tuple is a boolean indicating if it can be built or not.
+
+        :return: list of jobs ready to be built, boolean indicating if there are underlying blocking errors.
         """
         Log.info("Calculating possible ready jobs for {0}".format(self._platform.name))
-        jobs_ready = list()
+        jobs_ready = []
         if len(self._jobs_list.jobs_to_run_first) > 0:
-            jobs_ready = [job for job in self._jobs_list.jobs_to_run_first if
-                     ( self._platform is None or job.platform.name.upper() == self._platform.name.upper()) and
-                     job.status == Status.READY]
-        if len(jobs_ready) == 0:
+            jobs_ready = [
+                job
+                for job in self._jobs_list.jobs_to_run_first
+                if (self._platform is None or job.platform.name.upper() == self._platform.name.upper())
+                and job.status == Status.READY
+            ]
+        if not jobs_ready:
             if self.hold:
                 jobs_ready = self._jobs_list.get_prepared(self._platform)
             else:
                 jobs_ready = self._jobs_list.get_ready(self._platform)
 
-        if self.hold and len(jobs_ready) > 0:
+        if self.hold and jobs_ready:
             self.compute_weight(jobs_ready)
-            sorted_jobs = sorted(
-                jobs_ready, key=operator.attrgetter('distance_weight'))
-            jobs_in_held_status = self._jobs_list.get_held_jobs() + self._jobs_list.get_submitted(self._platform, hold=self.hold)
+            sorted_jobs = sorted(jobs_ready, key=operator.attrgetter('distance_weight'))
+            jobs_in_held_status = self._jobs_list.get_held_jobs() + self._jobs_list.get_submitted(
+                self._platform, hold=self.hold)
             held_by_id = dict()
             for held_job in jobs_in_held_status:
                 if held_job.id not in held_by_id:
@@ -462,27 +470,27 @@ class JobPackager(object):
                 held_by_id[held_job.id].append(held_job)
             current_held_jobs = len(list(held_by_id.keys()))
             remaining_held_slots = 5 - current_held_jobs
-            Log.debug("there are currently {0} held jobs".format(remaining_held_slots))
-            try:
+            Log.debug(f"There are currently {remaining_held_slots} held jobs")
+            with suppress(IndexError):
                 while len(sorted_jobs) > remaining_held_slots:
                     del sorted_jobs[-1]
                 for job in sorted_jobs:
                     if job.distance_weight > 3:
                         sorted_jobs.remove(job)
                 jobs_ready = sorted_jobs
-                pass
-            except IndexError:
-                pass
-        if len(jobs_ready) == 0:
-            # If there are no jobs ready, result is tuple of empty
-            return jobs_ready,False
-        #check if there are jobs listed on calculate_job_limits
+
+        # If there are no jobs ready, result is tuple of empty
+        if not jobs_ready:
+            return jobs_ready, False
+
+        # Check if there are jobs listed on calculate_job_limits
         self.calculate_job_limits(self._platform)
+        # If there is no more space in platform, result is tuple of empty
         if not (self._max_wait_jobs_to_submit > 0 and self._max_jobs_to_submit > 0):
-            # If there is no more space in platform, result is tuple of empty
-            Log.debug('Max jobs to submit reached, waiting for more space in platform {0}'.format(self._platform.name))
-            return jobs_ready,False
-        return jobs_ready,True
+            Log.debug(f'Max jobs to submit reached, waiting for more space in platform {self._platform.name}')
+            return jobs_ready, False
+
+        return jobs_ready, True
 
     def calculate_job_limits(self,platform,job=None):
         jobs_list = self._jobs_list
@@ -683,7 +691,6 @@ class JobPackager(object):
                 del jobs_by_section[wrappers]
         return jobs_by_section
 
-
     def _build_horizontal_packages(self, section_list, wrapper_limits, section, wrapper_info={}):
         packages = []
         horizontal_packager = JobPackagerHorizontal(section_list, self._platform.max_processors, wrapper_limits,
@@ -731,7 +738,7 @@ class JobPackager(object):
         return packages
 
     def _build_hybrid_package(self, jobs_list, wrapper_limits, section,wrapper_info={}):
-        #self.wrapper_info = wrapper_info
+        # self.wrapper_info = wrapper_info
         jobs_resources = dict()
         jobs_resources['MACHINEFILES'] = self._as_config.get_wrapper_machinefiles()
 
@@ -802,7 +809,9 @@ class JobPackager(object):
         return JobPackageVerticalHorizontal(current_package, total_processors, total_wallclock,
                                             jobs_resources=jobs_resources, method=self.wrapper_method[self.current_wrapper_section], configuration=self._as_config, wrapper_section=self.current_wrapper_section )
 
-#TODO rename and unite JobPackerVerticalMixed to JobPackerVertical since the difference between the two is not needed anymore
+
+# TODO: Rename and unite JobPackerVerticalMixed to JobPackerVertical since
+#       the difference between the two is not needed anymore
 class JobPackagerVertical(object):
     """
     Vertical Packager Parent Class
@@ -867,7 +876,7 @@ class JobPackagerVertical(object):
         return self.jobs_list
 
     def get_wrappable_child(self, job):
-        pass
+        pass  # pragma: no cover
 
     def _is_wrappable(self, job):
         """
@@ -887,6 +896,7 @@ class JobPackagerVertical(object):
                     return False
             return True
         return False
+
 
 class JobPackagerVerticalMixed(JobPackagerVertical):
     """
@@ -925,7 +935,6 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
         # Extract list of sorted jobs per date and member
         self.sorted_jobs = dict_jobs[date][member]
         self.index = 0
-
 
     def get_wrappable_child(self, job: Job) -> Job:
         """
@@ -1113,7 +1122,8 @@ class JobPackagerHorizontal(object):
     def create_components_dict(self):
         self._sectionList = []
         # it was job.parameters
-        parameters = {}  # TODO machinefiles, can wait nobody is using it and I really think this was not working before anyway
+        # TODO machinefiles, can wait nobody is using it and I really think this was not working before anyway
+        parameters = {}
         for job in self.job_list:
             if job.section not in self._sectionList:
                 self._sectionList.append(job.section)
