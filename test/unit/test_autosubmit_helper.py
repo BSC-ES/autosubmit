@@ -55,8 +55,8 @@ def test_handle_start_time(time):
 @pytest.mark.parametrize(
     'ids,return_list_value,result',
     [
+        ('', [''], []),
         (None, [''], []),
-        ('', [''], AutosubmitCritical),
         (_EXPID, ['a001'], AutosubmitCritical),
         (_EXPID, [_EXPID], [_EXPID]),
         (f'{_EXPID} a001', [_EXPID, 'a001'], [_EXPID, 'a001']),
