@@ -68,7 +68,7 @@ def ps_platform(tmpdir) -> PsPlatform:
         }
     }
     platform = PsPlatform(expid='a000', name='local-ps', config=config)
-    platform.host = '127.0.0.1'
+    platform.host = 'localDocker'
     platform.user = tmpdir.owner
     platform.root_dir = Path(tmpdir) / "remote"
     platform.root_dir.mkdir(parents=True, exist_ok=True)
@@ -99,8 +99,8 @@ def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_p
     mocker.patch('autosubmit.platforms.paramiko_platform.sleep')
 
     platform = paramiko_platform
-    platform.get_checkAlljobs_cmd = mocker.Mock()
-    platform.get_checkAlljobs_cmd.side_effect = ['ls']
+    platform.get_check_all_jobs_cmd = mocker.Mock()
+    platform.get_check_all_jobs_cmd.side_effect = ['ls']
     platform.send_command = mocker.Mock()
     ae = AutosubmitError(message='Test', code=123, trace='ERR!')
     platform.send_command.side_effect = ae
@@ -110,7 +110,7 @@ def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_p
     job.id = 'TEST'
     job.name = 'TEST'
     with pytest.raises(AutosubmitError) as cm:
-        platform.check_Alljobs(
+        platform.check_all_jobs(
             job_list=[[job, None]],
             as_conf=as_conf,
             retries=-1)
@@ -123,8 +123,8 @@ def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_p
     mocker.patch('autosubmit.platforms.paramiko_platform.sleep')
 
     platform = paramiko_platform
-    platform.get_checkAlljobs_cmd = mocker.Mock()
-    platform.get_checkAlljobs_cmd.side_effect = ['ls']
+    platform.get_check_all_jobs_cmd = mocker.Mock()
+    platform.get_check_all_jobs_cmd.side_effect = ['ls']
     platform.send_command = mocker.Mock()
     ae = AutosubmitError(message='Test', code=123, trace='ERR!')
     platform.send_command.side_effect = [None, ae]
@@ -138,7 +138,7 @@ def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_p
     platform.get_queue_status = mocker.Mock(side_effect=None)
 
     with pytest.raises(AutosubmitError) as cm:
-        platform.check_Alljobs(
+        platform.check_all_jobs(
             job_list=[[job, None]],
             as_conf=as_conf,
             retries=1)
@@ -290,9 +290,9 @@ def test_poller(platform: str, mocker, paramiko_platform):
         )
     ]
 )
-def test_parse_joblist(job_list: list, expected: str, paramiko_platform: ParamikoPlatform):
+def test_parse_job_list(job_list: list, expected: str, paramiko_platform: ParamikoPlatform):
     """Test that the conversion of list of jobs to str is working correctly."""
-    cmd = paramiko_platform.parse_joblist(job_list)
+    cmd = paramiko_platform.parse_job_list(job_list)
     assert cmd == expected
 
 
@@ -375,7 +375,7 @@ def test_move_file_errors(error, must_exist, expected_error_or_return_value, par
     'header_fn,directive,value',
     [
         ('get_queue_directive', '%QUEUE_DIRECTIVE%', '-q debug'),
-        ('get_proccesors_directive', '%NUMPROC_DIRECTIVE%', '-np 10'),
+        ('get_processors_directive', '%NUMPROC_DIRECTIVE%', '-np 10'),
         ('get_partition_directive', '%PARTITION_DIRECTIVE%', '-p 1'),
         ('get_tasks_per_node', '%TASKS_PER_NODE_DIRECTIVE%', '-t 1'),
         ('get_threads_per_task', '%THREADS_PER_TASK_DIRECTIVE%', '-tt 11'),

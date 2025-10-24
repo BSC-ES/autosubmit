@@ -15,7 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Code for handling submitting jobs to platforms."""
+"""Jobs submitter for ``ParamikoPlatform``.
+
+In the past we had a different submitter, for Sage. But at the
+moment this is our only submitter available. The previous dependency
+to ``Submitter`` has been removed.
+"""
 
 
 import os
@@ -23,6 +28,7 @@ from collections import defaultdict
 from typing import Optional, Union, TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmit.platforms.ecplatform import EcPlatform
 from autosubmit.platforms.locplatform import LocalPlatform
@@ -30,7 +36,6 @@ from autosubmit.platforms.paramiko_platform import ParamikoPlatformException
 from autosubmit.platforms.pjmplatform import PJMPlatform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from autosubmit.platforms.submitter import Submitter
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -106,11 +111,13 @@ def _get_platform_by_type(platform_type: str, expid: str, platform_name: str, ex
 
 
 # TODO: This doesn't need a class if we just return ``platforms``.
-class ParamikoSubmitter(Submitter):
+class ParamikoSubmitter:
     """Class to manage the experiments Paramiko platforms."""
 
-    def __init__(self):
+    def __init__(self, as_conf: Optional[AutosubmitConfig] = None):
         self.platforms = None
+        if as_conf:
+            self.load_platforms(as_conf=as_conf)
 
     def load_local_platform(self, as_conf: 'AutosubmitConfig', experiment_data: Optional[dict] = None,
                             auth_password: Optional[str] = None) -> None:

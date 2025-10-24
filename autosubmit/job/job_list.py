@@ -39,9 +39,10 @@ from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packages import JobPackageThread
-from autosubmit.job.job_utils import Dependency, _get_submitter
+from autosubmit.job.job_utils import Dependency
 from autosubmit.job.job_utils import transitive_reduction
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
 
 class JobList(object):
@@ -71,6 +72,7 @@ class JobList(object):
         self.packages_dict = dict()
         self._ordered_jobs_by_date_member = dict()
 
+        self.dependency_map = None
         self.packages_id = dict()
         self.job_package_map = dict()
         self.sections_checked = set()
@@ -233,7 +235,7 @@ class JobList(object):
         if show_log:
             Log.info("Creating jobs...")
         self._create_jobs(self._dic_jobs, 0, default_job_type)
-        # This dic_job is key to the dependencies management as they're ordered 
+        # This dic_job is key to the dependencies management as they're ordered
         # by date[member[chunk]]
         if show_log:
             Log.info("Adding dependencies to the graph..")
@@ -283,11 +285,10 @@ class JobList(object):
                     self._ordered_jobs_by_date_member[wrapper_section] = {}
             except BaseException as e:
                 raise AutosubmitCritical(f"Some section jobs of the wrapper:{wrapper_section} are missing from your "
-                    "JOBS definition in YAML", 7014, str(e))
+                                         "JOBS definition in YAML", 7014, str(e))
         # divide job_list per platform name
         job_list_per_platform = self.split_by_platform()
-        submitter = _get_submitter(as_conf)
-        submitter.load_platforms(as_conf)
+        submitter = ParamikoSubmitter(as_conf=as_conf)
 
         for platform in job_list_per_platform:
             for job in job_list_per_platform[platform]:
@@ -847,13 +848,13 @@ class JobList(object):
 
         return unified_filter
 
-    def _filter_current_job(self, current_job, relationships):
-        '''
-        This function will filter the current job based on the relationships given
+    def _filter_current_job(self, current_job: Job, relationships: dict) -> dict:
+        """This function will filter the current job based on the relationships given.
+
         :param current_job: Current job to filter
         :param relationships: Relationships to apply
         :return: dict() with the filters to apply, or empty dict() if no filters to apply
-        '''
+        """
 
         # This function will look if the given relationship is set for the given job DATEs,MEMBER,
         # CHUNK,SPLIT ( _from filters )
@@ -898,11 +899,11 @@ class JobList(object):
                 filters_to_apply = relationships
         return filters_to_apply
 
-    def _add_edges_map_info(self, job, special_status):
+    def _add_edges_map_info(self, job: Job, special_status: str):
         """
         Special relations to be check in the update_list method
         :param job: Current job
-        :param parent: parent jobs to check
+        :param special_status:
         :return:
         """
         if special_status not in self.jobs_edges:
@@ -912,7 +913,7 @@ class JobList(object):
             self.jobs_edges["ALL"] = set()
         self.jobs_edges["ALL"].add(job)
 
-    def add_special_conditions(self, job, special_conditions, filters_to_apply, parent):
+    def add_special_conditions(self, job: Job, special_conditions: dict, filters_to_apply: dict, parent: Job) -> None:
         """
         Add special conditions to the job edge
         :param job: Job
@@ -930,7 +931,7 @@ class JobList(object):
             self._add_edges_map_info(job, special_conditions["STATUS"])  # job_list map
             job.add_edge_info(parent, special_conditions)  # this job
 
-    def _apply_jobs_edge_info(self, job, dependencies):
+    def _apply_jobs_edge_info(self, job: Job, dependencies: dict) -> None:
         # prune first
         job.edge_info = {}
         # get dependency that has special conditions set
@@ -966,7 +967,7 @@ class JobList(object):
                 self.add_special_conditions(job, special_conditions,
                                             filters_to_apply_by_section[key], parent)
 
-    def find_current_section(self, job_section, section, dic_jobs, distance, visited_section=[]):
+    def find_current_section(self, job_section, section, dic_jobs, distance, visited_section):
         sections = dic_jobs.as_conf.jobs_data[section].get("DEPENDENCIES", {}).keys()
         if len(sections) == 0:
             return distance
@@ -1426,7 +1427,6 @@ class JobList(object):
                                                                             problematic_dependencies)
 
         return problematic_dependencies
-
 
     @staticmethod
     def _calculate_dependency_metadata(chunk, chunk_list, member, member_list, date,
@@ -1906,8 +1906,8 @@ class JobList(object):
         """
         unsubmitted = [job for job in self._job_list if (platform is None or
                                                          job.platform.name == platform.name) and (
-                                   job.status != Status.SUBMITTED and
-                                   job.status != Status.QUEUING and job.status != Status.RUNNING)]
+                               job.status != Status.SUBMITTED and
+                               job.status != Status.QUEUING and job.status != Status.RUNNING)]
 
         if wrapper:
             return [job for job in unsubmitted if job.packed is False]
@@ -2055,9 +2055,9 @@ class JobList(object):
                                                                re.search(
                                                                    "(^|[^0-9a-z_])" + str(job.chunk) + "([^a-z0-9_]|$)",
                                                                    section_chunks) is not None) and (
-                                              section_members == "" or
-                                              re.search("(^|[^0-9a-z_])" + str(job.member) + "([^a-z0-9_]|$)",
-                                                        section_members.lower()) is not None)]
+                                          section_members == "" or
+                                          re.search("(^|[^0-9a-z_])" + str(job.member) + "([^a-z0-9_]|$)",
+                                                    section_members.lower()) is not None)]
                 ultimate_jobs_list.extend(jobs_final)
         # Duplicates out
         ultimate_jobs_list = list(set(ultimate_jobs_list))
@@ -2544,10 +2544,10 @@ class JobList(object):
         log_recovered = self.check_if_log_is_recovered(job)
         if log_recovered:
             job.updated_log = True
-            # TODO in pickle -> db/yaml migration(I): 
+            # TODO in pickle -> db/yaml migration(I):
             #  Do the save of the job here then clean attributes from mem ( or even the full job )
             job.clean_attributes()
-            # TODO in pickle -> db/yaml migration(II): 
+            # TODO in pickle -> db/yaml migration(II):
             #  And remove these two lines
             # we only want the last one
             job.local_logs = (log_recovered.name, log_recovered.name[:-4] + ".err")
@@ -2746,8 +2746,6 @@ class JobList(object):
                                     break
             if as_conf.get_remote_dependencies() == "true":
                 for job in self.get_prepared():
-                    tmp = [
-                        parent for parent in job.parents if parent.status == Status.COMPLETED]
                     tmp2 = [parent for parent in job.parents if
                             parent.status == Status.COMPLETED or parent.status == Status.SKIPPED
                             or parent.status == Status.FAILED]
@@ -2883,7 +2881,7 @@ class JobList(object):
                         # Need to store the wallclock for the is_overwallclock function
                         packages_persistence.save(package, inspect)
 
-    def check_scripts(self, as_conf):
+    def check_scripts(self, as_conf) -> bool:
         """
         When we have created the scripts, all parameters should have been substituted.
         %PARAMETER% handlers not allowed
@@ -3004,10 +3002,8 @@ class JobList(object):
                          'conf', "jobs_" + self._expid + ".yaml"))
         return jobs_parser
 
-    def remove_rerun_only_jobs(self, notransitive=False):
-        """
-        Removes all jobs to be run only in reruns
-        """
+    def remove_rerun_only_jobs(self) -> None:
+        """Removes all jobs to be run only in reruns."""
         flag = False
         for job in self._job_list[:]:
             if job.rerun_only == "true":
@@ -3018,7 +3014,8 @@ class JobList(object):
             self.update_genealogy()
         del self._dic_jobs
 
-    def print_with_status(self, status_change: Optional[dict[Any, Any]] = None, nocolor=False, existing_list=None) -> str:
+    def print_with_status(self, status_change: Optional[dict[Any, Any]] = None, nocolor=False,
+                          existing_list=None) -> str:
         """
         Returns the string representation of the dependency tree of the Job List
 
@@ -3036,7 +3033,7 @@ class JobList(object):
         all_jobs = self.get_all() if existing_list is None else existing_list
         # Header
         result = (bcolors.BOLD if nocolor is False else '') + \
-            "## String representation of Job List [" + str(len(all_jobs)) + "] "
+                 "## String representation of Job List [" + str(len(all_jobs)) + "] "
         if status_change is not None and len(str(status_change)) > 0:
             result += ("with " + (bcolors.OKGREEN if nocolor is False else '') +
                        str(len(list(status_change.keys()))) + " Change(s) ##" +

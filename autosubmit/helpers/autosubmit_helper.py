@@ -101,15 +101,15 @@ def handle_start_after(start_after: str, expid: str) -> None:
             sleep(60)
 
 
-def get_allowed_members(run_members: str, as_conf: AutosubmitConfig) -> Union[list[str], list[Any]]:
+def get_allowed_members(run_members: str = '', as_conf: 'AutosubmitConfig' = AutosubmitConfig) -> Union[list[str], list[Any]]:
     """Check if the members sent are allowed
 
-   :param run_members: str
-   :param as_conf: AutosubmitConfig
+    :param run_members: str
+    :param as_conf: AutosubmitConfig
 
-   :return: dict
+    :return: dict
     """
-    if run_members is not None:
+    if run_members != '' and run_members is not None:
         allowed_members = run_members.split()
         runs_missing = [run_member for run_member in allowed_members if run_member not in as_conf.get_member_list()]
         if len(runs_missing) > 0:
@@ -118,6 +118,6 @@ def get_allowed_members(run_members: str, as_conf: AutosubmitConfig) -> Union[li
                 f"the current list of members specified in the conf files."
                 f"\nCurrent list of members: {str(as_conf.get_member_list())}")
         if len(allowed_members) == 0:
-            raise AutosubmitCritical("Not a valid -rom --run_only_members input: {0}".format(str(run_members)))
+            raise AutosubmitCritical(f"Not a valid -rom --run_only_members input: {str(run_members)}")
         return allowed_members
     return []

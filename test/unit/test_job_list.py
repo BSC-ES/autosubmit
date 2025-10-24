@@ -487,7 +487,11 @@ def test_create_dictionary(job_list, mocker, as_conf, empty_job_list):
     job_list.graph = graph
     # act
 
-    mocker.patch('autosubmit.job.job_list._get_submitter', autospec=True)
+    mock_get_submitter = mocker.patch('autosubmit.job.job_list.ParamikoSubmitter', autospec=True)
+    mock_submitter = mock_get_submitter.return_value
+    mock_submitter.load_platforms = mocker.MagicMock()
+    mock_submitter.load_platforms.return_value = ["fake-platform"]
+    mock_submitter.platforms = None
     job_list.generate(
         as_conf=as_conf,
         date_list=date_list,

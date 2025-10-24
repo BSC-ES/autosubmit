@@ -284,4 +284,4 @@ class EcWrapperFactory(WrapperFactory):
         return queue
 
     def dependency_directive(self, dependency):
-        return '#PBS -v depend=afterok:{0}'.format(dependency)
+        return f'#PBS -v depend=afterok:{dependency}'

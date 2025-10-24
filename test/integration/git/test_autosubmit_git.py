@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Callable, ContextManager, Generator, Tuple, Union, cast
 
 import pytest
-from testcontainers.sftp import DockerContainer
+from test.integration.conftest import DockerContainer
 
 from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
 from autosubmit.log.log import AutosubmitCritical
@@ -42,11 +42,11 @@ def _get_experiment_data(tmp_path) -> dict:
     return {
         'PLATFORMS': {
             'pytest-ps': {
-                'type': 'ps',
-                'host': '127.0.0.1',
-                'user': _user,
-                'project': 'whatever',
-                'scratch': str(tmp_path / 'scratch'),
+                'TYPE': 'ps',
+                'HOST': '127.0.0.1',
+                'USER': _user,
+                'PROJECT': 'whatever',
+                'SCRATCH': str(tmp_path / 'scratch'),
                 'DISABLE_RECOVERY_THREADS': 'True'
             }
         },
@@ -165,7 +165,7 @@ def test_git_submodules_dirty(
         expid: str,
         expected: ContextManager,
         autosubmit_exp: Callable,
-        git_server: Generator[Tuple[DockerContainer, Path, str], None, None],
+        git_server: Generator[tuple[DockerContainer, Path, str], None, None],
         tmp_path
 ) -> None:
     """Tests that Autosubmit detects dirty local Git submodules, especially with operational experiments.
@@ -232,7 +232,7 @@ def test_git_operational_experiment_toggle_flag(
         git_operational_check_enabled: bool,
         expected: Union[int, Exception],
         autosubmit_exp: Callable,
-        git_server: Generator[Tuple[DockerContainer, Path, str], None, None],
+        git_server: Generator[tuple[DockerContainer, Path, str], None, None],
         tmp_path,
         mocker,
         autosubmit
@@ -282,14 +282,14 @@ def test_git_operational_experiment_toggle_flag(
     _, args = autosubmit.parse_args()
 
     if type(expected) is int:
-        exit_code = autosubmit.run_command(args=args)
+        exit_code = autosubmit.run_command(args)
         assert exit_code == expected
 
         assert mocked_log.warning.called
         assert mocked_log.warning.call_args[0][0] == 'Git operational check disabled by user'
     else:
         with pytest.raises(cast(expected, Exception)):
-            autosubmit.run_command(args=args)
+            autosubmit.run_command(args)
 
 
 # -- clean_git
@@ -328,7 +328,7 @@ def test_clean_git_not_a_git_repo(autosubmit_exp, mocker):
 def test_clean_git_not_committed(
         tmp_path,
         autosubmit_exp,
-        git_server: Generator[Tuple[DockerContainer, Path, str], None, None]
+        git_server: Generator[tuple[DockerContainer, Path, str], None, None]
 ):
     """Test that cleaning Git fails when the project directory has new files not committed yet."""
     _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str
@@ -357,7 +357,7 @@ def test_clean_git_not_committed(
 def test_clean_git_not_pushed(
         tmp_path,
         autosubmit_exp,
-        git_server: Generator[Tuple[DockerContainer, Path, str], None, None]
+        git_server: Generator[tuple[DockerContainer, Path, str], None, None]
 ):
     """Test that cleaning Git fails when the project directory has staged changed not pushed."""
     _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str

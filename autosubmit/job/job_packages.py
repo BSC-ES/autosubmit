@@ -124,7 +124,7 @@ class JobPackageBase(object):
                 Log.warning(
                     f'Script {job.name} has some empty variables. An empty value has substituted these variables')
             else:
-                Log.result("Script {0} OK", job.name)
+                Log.result(f"Script {job.name} OK")
             # looking for directives on jobs
             self._custom_directives = self._custom_directives | set(job.custom_directives)
 
@@ -149,12 +149,12 @@ class JobPackageBase(object):
             if not os.path.exists(os.path.join(configuration.get_project_dir(), job.file)):
                 if configuration.get_project_type().lower() != "none" and len(configuration.get_project_type()) > 0:
                     raise AutosubmitCritical(
-                        "Template [ {0} ] using CHECK=On_submission has some empty variable {0}".format(job.name), 7014)
+                        f"Template [ {job.name} ] using CHECK=On_submission has some empty variable {job.name}", 7014)
             if not job.check_script(configuration, show_logs=job.check_warnings):
                 Log.warning(
                     f'Script {job.name} has some empty variables. An empty value has substituted these variables')
             else:
-                Log.result("Script {0} OK", job.name)
+                Log.result(f"Script {job.name} OK")
             # looking for directives on jobs
             self._custom_directives = self._custom_directives | set(job.custom_directives)
         self._create_scripts(configuration)
@@ -206,16 +206,16 @@ class JobPackageBase(object):
             raise
         except BaseException:
             raise
-        try:
-            if not only_generate:
-                Log.debug("Sending Files")
-                self._send_files()
-                Log.debug("Submitting")
-                self._do_submission(hold=hold)
-        except AutosubmitCritical:
-            raise
-        except BaseException as e:
-            raise AutosubmitCritical("Error while submitting jobs: {0}".format(e), 7013)
+        # try:
+        if not only_generate:
+            Log.debug("Sending Files")
+            self._send_files()
+            Log.debug("Submitting")
+            self._do_submission(hold=hold)
+        # except AutosubmitCritical:
+        #     raise
+        # except BaseException as e:
+        #     raise AutosubmitCritical(f"Error while submitting jobs: {e}", 7013)
 
     def _create_scripts(self, configuration: 'AutosubmitConfig'):
         raise Exception('Not implemented')
@@ -290,7 +290,7 @@ class JobPackageSimple(JobPackageBase):
             job.id = self.platform.submit_job(job, job_scripts[job.name], hold=hold, export=self.export)
             if job.id is None or not job.id:
                 continue
-            Log.info("{0} submitted", job.name)
+            Log.info(f"{job.name} submitted")
             job.status = Status.SUBMITTED
             job.wrapper_name = job.name
             job.id = str(job.id)
@@ -351,7 +351,7 @@ class JobPackageArray(JobPackageBase):
         self._common_script = self._create_common_script(timestamp)
 
     def _create_i_input(self, filename, index):
-        filename += '.{0}'.format(index)
+        filename += f'.{index}'
         input_content = self._job_scripts[self.jobs[index].name]
         open(os.path.join(self._tmp_path, filename), 'wb').write(input_content)
         os.chmod(os.path.join(self._tmp_path, filename), 0o755)
@@ -389,9 +389,10 @@ class JobPackageArray(JobPackageBase):
 
         if package_id is None or not package_id:  # platforms with a submit.cmd
             return
+
         for i in range(0, len(self.jobs)):  # platforms without a submit.cmd
-            Log.info("{0} submitted", self.jobs[i].name)
-            self.jobs[i].id = str(package_id) + '[{0}]'.format(i)
+            Log.info(f"{self.jobs[i].name} submitted")
+            self.jobs[i].id = str(package_id) + f'[{i}]'
             self.jobs[i].status = Status.SUBMITTED
             # Identify to which wrapper this job belongs once it is in the recovery queue
             self.jobs[i].wrapper_name = self.name
@@ -626,7 +627,7 @@ class JobPackageThread(JobPackageBase):
         os.chmod(tar_path, 0o755)
         self.platform.send_file(tar_path, check=False)
         Log.debug("Uncompress - send_command")
-        self.platform.send_command("cd {0}; tar -xvf {1}".format(self.platform.get_files_path(), output_filepath))
+        self.platform.send_command(f"cd {self.platform.get_files_path()}; tar -xvf {output_filepath}")
         Log.debug("Send_file: common_script")
         self.platform.send_file(self._common_script)
 
@@ -748,7 +749,7 @@ class JobPackageThreadWrapped(JobPackageThread):
         if package_id is None or not package_id:
             raise Exception('Submission failed')
         for i in range(0, len(self.jobs)):
-            Log.info("{0} submitted", self.jobs[i].name)
+            Log.info(f"{self.jobs[i].name} submitted")
             self.jobs[i].id = str(package_id)
             self.jobs[i].status = Status.SUBMITTED
             self.jobs[i].wrapper_name = self.name
