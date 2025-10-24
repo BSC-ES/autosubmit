@@ -307,16 +307,9 @@ def ecaccess(prepare_test, conf_dict):
     return ecaccess
 
 
-@pytest.fixture
-def ps(prepare_test, conf_dict):
-    from autosubmit.platforms.psplatform import PsPlatform
-    ps = PsPlatform(expid='t000', name='pytest-ps', config=conf_dict)
-    return ps
-
-
-def test_create_a_new_copy(local, pjm, slurm, ps, ecaccess):
+def test_create_a_new_copy(local, pjm, slurm, ps_platform, ecaccess):
     assert local.create_a_new_copy().name == local.name
     assert pjm.create_a_new_copy().name == pjm.name
     assert slurm.create_a_new_copy().name == slurm.name
-    assert ps.create_a_new_copy().name == ps.name
+    assert ps_platform.create_a_new_copy().name == ps_platform.name
     assert ecaccess.create_a_new_copy().name == ecaccess.name

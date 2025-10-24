@@ -43,16 +43,16 @@ class EcPlatform(ParamikoPlatform):
     """
 
     def parse_all_jobs_output(self, output, job_id):
-        pass
+        pass  # pragma: no cover
 
     def parse_queue_reason(self, output, job_id):
-        pass
+        pass  # pragma: no cover
 
     def get_check_all_jobs_cmd(self, jobs_id):
-        pass
+        pass  # pragma: no cover
 
     def submit_script(self, hold=False):
-        pass
+        pass  # pragma: no cover
 
     def __init__(self, expid, name, config, scheduler):
         ParamikoPlatform.__init__(self, expid, name, config)
@@ -250,8 +250,7 @@ class EcPlatform(ParamikoPlatform):
         return True
 
     def move_file(self, src, dest, must_exist=False):
-        command = (f"ecaccess-file-move {self.host}:{os.path.join(self.remote_log_dir, src)} "
-                   f"{self.host}:{os.path.join(self.remote_log_dir, dest)}")
+        command = "ecaccess-file-move {0}:{1} {0}:{2}".format(self.host,os.path.join(self.remote_log_dir,src) , os.path.join(self.remote_log_dir,dest))
         try:
             retries = 0
             sleeptime = 5

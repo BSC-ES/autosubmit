@@ -1282,10 +1282,10 @@ class Autosubmit:
     @staticmethod
     def generate_as_config(
             exp_id: str,
-            dummy: bool = False,
-            minimal_configuration: bool = False,
-            local: bool = False,
-            parameters: dict[str, Union[dict, list, str]] = None
+            dummy: bool=False,
+            minimal_configuration: bool=False,
+            local: bool=False,
+            parameters=None
     ) -> None:
         """Retrieve the configuration from autosubmit.config package.
 
@@ -1341,7 +1341,7 @@ class Autosubmit:
         template_files = [file.name for file in (read_files('autosubmit.config') / 'files').iterdir() if file.is_file()]
         if parameters is None:
             parameters = {}
-        parameter_comments = dict(_recurse_into_parameters(parameters))
+        parameter_comments: dict = dict(_recurse_into_parameters(parameters))
 
         for as_conf_file in template_files:
             origin = str(read_files('autosubmit.config') / f'files/{as_conf_file}')
@@ -2094,9 +2094,9 @@ class Autosubmit:
         :param start_after: a string with the experiment id to start after.
         :param run_only_members: a string with the members to run.
         :param recover: a boolean to indicate if the experiment is recovering from a failure.
-        :param check_scripts: Whether to check the scripts before submitting.
+        :param check_scripts: check scripts
         :param submitter: the actual loaded platforms if any
-        :return: a tuple
+        :return: a Union
         """
         host = platform.node()
         # Init the AutosubmitConfig and check that every file exists, and it is a valid configuration.

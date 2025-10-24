@@ -26,7 +26,6 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import Log, AutosubmitError
 from autosubmit.platforms.headers.local_header import LocalHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
-from autosubmit.platforms.wrappers.wrapper_factory import LocalWrapperFactory
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -50,8 +49,7 @@ class LocalPlatform(ParamikoPlatform):
         self.job_status['RUNNING'] = ['0']
         self.job_status['QUEUING'] = []
         self.job_status['FAILED'] = []
-        self._allow_wrappers = True
-        self._wrapper = LocalWrapperFactory(self)
+        self._allow_wrappers = False
 
         self.update_cmds()
 

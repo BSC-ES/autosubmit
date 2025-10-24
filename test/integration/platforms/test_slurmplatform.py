@@ -35,7 +35,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_packager import JobPackager
-
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 from test.integration.conftest import AutosubmitExperimentFixture, DockerContainer
@@ -655,6 +655,51 @@ def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubm
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
+
+
+@pytest.mark.slurm
+def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer'):
+    exp = autosubmit_exp(_EXPID, experiment_data={
+        'JOBS': {
+            'SIM_V_H': {
+                'DEPENDENCIES': {
+                    'SIM_V_H-1': {},
+                },
+                'SCRIPT': 'sleep 0',
+                'WALLCLOCK': '00:03',
+                'RUNNING': 'chunk',
+                'CHECK': 'on_submission',
+                'RETRIALS': 1,
+                'PLATFORM': _PLATFORM_NAME,
+            },
+        },
+        'PLATFORMS': {
+            _PLATFORM_NAME: {
+                'ADD_PROJECT_TO_HOST': False,
+                'HOST': '127.0.0.1',
+                'MAX_WALLCLOCK': '00:03',
+                'PROJECT': 'group',
+                'QUEUE': 'gp_debug',
+                'SCRATCH_DIR': '/tmp/scratch/',
+                'TEMP_DIR': '',
+                'TYPE': 'slurm',
+                'USER': 'root',
+                'MAX_PROCESSORS': 10,
+                'PROCESSORS_PER_NODE': 10,
+            },
+        }
+    }, wrapper=True)
+    submitter = ParamikoSubmitter()
+    submitter.load_platforms(as_conf=exp.as_conf)
+
+    slurm_platform: SlurmPlatform = submitter.platforms[_PLATFORM_NAME]
+
+    slurm_platform.connect(as_conf=exp.as_conf)
+
+    assert slurm_platform.check_remote_permissions()
+
+    slurm_platform.close_connection()
+    assert not slurm_platform.check_remote_permissions()
 
 
 def test_check_if_packages_are_ready_to_build(autosubmit_exp):

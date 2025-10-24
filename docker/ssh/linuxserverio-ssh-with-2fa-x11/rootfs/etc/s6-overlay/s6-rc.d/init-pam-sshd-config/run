@@ -1,0 +1,11 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+if [[ "$MFA" == "true" ]]; then
+  echo "Enabling PAM MFA"
+  sed -i '/auth      include   base-auth/c\
+auth      required  pam_unix.so\
+auth      required  pam_google_authenticator.so' /etc/pam.d/sshd
+else
+  echo "PAM MFA is disabled"
+fi

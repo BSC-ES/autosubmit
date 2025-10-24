@@ -61,7 +61,7 @@ dependencies = [
     "setproctitle",
     "invoke>=2.0",
     "SQLAlchemy~=2.0.23",
-    "ruamel.yaml==0.18.15",
+    "ruamel.yaml==0.18.16",
     "configobj",
     "pyparsing",
     "configparser",
