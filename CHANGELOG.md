@@ -13,6 +13,7 @@ platform does not support wrappers anymore (it was used for testing).
 - Fixed error when cleaning projects that use Git #2524
 - Fixed bug that occurred when copying experiments with different HPC platforms, where the incorrect platform was used 
   instead of the user-specified platform #2650
+- Fixed bug that occured when having "CUSTOM_" placeholders in the header section of a wrapper #2669
 - Fixes an issue with multi-day applications dependencies bug #2631
 - Fixes an issue with all-filter #2565
 
@@ -36,6 +37,7 @@ platform does not support wrappers anymore (it was used for testing).
 - Added mypy and ruff to the CI for the files touched by a change granting a 
   higher quality and preservation of the code #2626 #2621
 - Updated base images of micromamba and debian for security update #2610
+- Added "CUSTOM_" directives support in the wrapper configuration #2669
 - Added a platform option to compress log files of the job's output during log recovery #2555
 
 ### 4.1.15: Bug fixes, enhancements, and new features
