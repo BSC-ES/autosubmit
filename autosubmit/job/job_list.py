@@ -353,23 +353,52 @@ class JobList(object):
             dependency_list.add(dependency)
         return dependency_list
 
-    def _add_dependencies(self, date_list, member_list, chunk_list, dic_jobs,
-                          option="DEPENDENCIES"):
+    @staticmethod
+    def _strip_key(dep: str) -> str:
+        """Return the dependency string up to the first '+' or '-'."""
+        for sep in ("+", "-"):
+            if sep in dep:
+                return dep.split(sep, 1)[0]
+        return dep
+
+    def _add_dependencies(
+            self,
+            date_list: List[Any],
+            member_list: List[Any],
+            chunk_list: List[int],
+            dic_jobs: DicJobs,
+            option: str = "DEPENDENCIES",
+    ) -> None:
+        """Build dependency maps and populate the dependency graph for all jobs.
+
+        Iterate experiment `JOBS` sections to:
+        - build deep dependency maps (with and without distance metadata),
+        - compute and attach edges for each job,
+        - add dependencies that couldn't (or not solved yet) be safetly added for later pruning,
+        - add per-edge metadata to job objects.
+
+        :param date_list: List of dates used by the experiment.
+        :param member_list: List of members used by the experiment.
+        :param chunk_list: List of chunk identifiers used by the experiment.
+        :param dic_jobs: DicJobs instance containing job templates and experiment data.
+        :param option: Dependency option key.
+        """
         jobs_data = dic_jobs.experiment_data.get("JOBS", {})
         problematic_jobs = {}
         # map dependencies
         self.dependency_map = dict()
+        self.dependency_map_with_distances = dict()
+
         for section in jobs_data.keys():
             self.dependency_map[section] = self._deep_map_dependencies(section,
                                                                        jobs_data, option, set(), strip_keys=True)
-            self.dependency_map[section].remove(section)
-        # map dependencies
-        self.dependency_map_with_distances = dict()
-        for section in jobs_data.keys():
             self.dependency_map_with_distances[section] = self._deep_map_dependencies(section,
                                                                                       jobs_data, option, set(),
                                                                                       strip_keys=False)
-            self.dependency_map_with_distances[section].remove(section)
+
+            if not any(self._strip_key(dependency) == section for dependency in jobs_data.get(section, {}).get(option, {})):
+                self.dependency_map[section].remove(section)
+                self.dependency_map_with_distances[section].remove(section)
 
         # Generate all graph before adding dependencies.
         for job_section in (section for section in jobs_data.keys()):
@@ -1159,15 +1188,13 @@ class JobList(object):
         for parent in possible_parents:
             edge_added = False
             if any_all_filter:
-                if (parent.chunk and parent.chunk != self.depends_on_previous_chunk.get(
-                        parent.section, parent.chunk) or (parent.running == "chunk" and
-                                                          parent.chunk != chunk_list[
-                                                              -1] and not filters_to_apply_of_parent) or
+                if (parent.chunk and parent.chunk != self.depends_on_previous_chunk.get(parent.section, parent.chunk) or
+                        (parent.running == "chunk" and parent.chunk != chunk_list[-1] and parent.section in self.dependency_map[parent.section]) or
                         self.actual_job_depends_on_previous_chunk or
-                        self.actual_job_depends_on_special_chunk or parent.name in special_dependencies
+                        self.actual_job_depends_on_special_chunk or
+                        parent.name in special_dependencies
                 ):
                     continue
-
             if parent.section == job.section:
                 if not job.splits or int(job.splits) > 0:
                     self.depends_on_previous_split[job.section] = int(parent.split)

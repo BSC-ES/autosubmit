@@ -14,6 +14,7 @@ platform does not support wrappers anymore (it was used for testing).
 - Fixed bug that occurred when copying experiments with different HPC platforms, where the incorrect platform was used 
   instead of the user-specified platform #2650
 - Fixes an issue with multi-day applications dependencies bug #2631
+- Fixes an issue with all-filter #2565
 
 **Enhancements:**
 

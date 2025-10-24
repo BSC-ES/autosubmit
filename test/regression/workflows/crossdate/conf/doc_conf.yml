@@ -8,11 +8,10 @@ experiment:
 wrappers:
     wrapper_simda:
         TYPE: "horizontal-vertical"
-        JOBS_IN_WRAPPER: "SIM DA"
+        JOBS_IN_WRAPPER: "SIM&DA"
 JOBS:
   LOCAL_SETUP:
     FILE: templates/local_setup.sh
-    PLATFORM: marenostrum_archive
     RUNNING: once
     NOTIFY_ON: COMPLETED
     PROCESSORS: '2'
@@ -21,13 +20,11 @@ JOBS:
     THREADS: "2"
   LOCAL_SEND_SOURCE:
     FILE: templates/01_local_send_source.sh
-    PLATFORM: marenostrum_archive
     DEPENDENCIES: LOCAL_SETUP
     RUNNING: once
     NOTIFY_ON: FAILED
   LOCAL_SEND_STATIC:
     FILE: templates/01b_local_send_static.sh
-    PLATFORM: marenostrum_archive
     DEPENDENCIES: LOCAL_SETUP
     RUNNING: once
     NOTIFY_ON: FAILED
@@ -51,7 +48,6 @@ JOBS:
     NOTIFY_ON: FAILED
   LOCAL_SEND_INITIAL_DA:
     FILE: templates/00b_local_send_initial_DA.sh
-    PLATFORM: marenostrum_archive
     DEPENDENCIES: LOCAL_SETUP LOCAL_SEND_INITIAL_DA-1
     RUNNING: chunk
     SYNCHRONIZE: member
@@ -93,3 +89,8 @@ JOBS:
     WALLCLOCK: 00:12
     PROCESSORS: '256'
     NOTIFY_ON: FAILED
+PLATFORMS:
+    TEST_SLURM:
+        TYPE: SLURM
+        MAX_PROCESSORS: '1024'
+        MAX_WALLCLOCK: 48:00
