@@ -246,7 +246,7 @@ class SlurmPlatform(ParamikoPlatform):
                         if len(jobid) > 1:  # Cancel each job that is not the associated
                             ids_to_check = [package.jobs[0].id]
                             if package.jobs[0].het:
-                                for i in range(1,package.jobs[0].het.get("HETSIZE",1)): # noqa
+                                for i in range(1, package.jobs[0].het.get("HETSIZE", 1)):
                                     ids_to_check.append(str(int(ids_to_check[0]) + i))
                             # TODO to optimize cancel all jobs at once
                             for id_ in [jobid for jobid in jobid if jobid not in ids_to_check]:

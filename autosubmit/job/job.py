@@ -28,7 +28,7 @@ from functools import reduce
 from pathlib import Path
 from threading import Thread
 from time import sleep
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import Optional, Tuple, TYPE_CHECKING
 
 from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, subs_dates
 
@@ -886,9 +886,9 @@ class Job(object):
     @partition.setter
     def partition(self, value):
         """
-        Sets the partion to be used by the job.
+        Sets the partition to be used by the job.
 
-        :param value: partion to set
+        :param value: partition to set
         :type value: HPCPlatform
         """
         self._partition = value
@@ -1335,8 +1335,6 @@ class Job(object):
 
         :param raise_error: If True, raises an error if the log files are not retrieved.
         :type raise_error: bool
-        :return: Dictionary with finish timestamps per job.
-        :rtype: None
         """
         backup_logname = copy.copy(self.local_logs)
         if self.wrapper_type == "vertical":
@@ -1433,12 +1431,14 @@ class Job(object):
         self.prev_status = previous_status
         new_status = self.new_status
         if new_status == Status.COMPLETED:
-            Log.debug(
-                "{0} job seems to have completed: checking...".format(self.name))
-            self._platform.get_completed_files(self.name, wrapper_failed=self.packed)
-            self.check_completion()
+            Log.debug(f"{self.name} job seems to have completed: checking...")
+            if not self._platform.get_completed_files(self.name, wrapper_failed=self.packed):
+                Log.debug("Failed to get platform's completed files")
+            completion_status = self.check_completion()
+            Log.debug(f"Completion status: {completion_status}")
         else:
             self.status = new_status
+
         if self.status == Status.RUNNING:
             Log.info("Job {0} is RUNNING", self.name)
         elif self.status == Status.QUEUING:
@@ -1472,7 +1472,7 @@ class Job(object):
         # Updating logs
         if self.status in [Status.COMPLETED, Status.FAILED, Status.UNKNOWN]:
             if str(as_conf.platforms_data.get(self.platform.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "true":
-                self.retrieve_logfiles(self.platform)
+                self.retrieve_logfiles(raise_error=True)
             else:
                 self.platform.add_job_to_log_recover(self)
 
@@ -1486,8 +1486,8 @@ class Job(object):
                 last_run_id = (
                     exp_history.manager.get_experiment_run_dc_with_max_id().run_id
                 )
-                metric_procesor = UserMetricProcessor(as_conf, self, last_run_id)
-                metric_procesor.process_metrics()
+                metric_processor = UserMetricProcessor(as_conf, self, last_run_id)
+                metric_processor.process_metrics()
             except Exception as exc:
                 # Warn if metrics are not processed
                 Log.printlog(
@@ -1825,7 +1825,7 @@ class Job(object):
 
             for x in range(self.het['HETSIZE']):
                 self.het['CUSTOM_DIRECTIVES'].append(self.custom_directives)
-        # Ignore the heterogeneous parameters if the cores or nodes are no specefied as a list
+        # Ignore the heterogeneous parameters if the cores or nodes are no specified as a list
         if self.het['HETSIZE'] == 1:
             self.het = dict()
         if not self.wallclock:
@@ -2137,7 +2137,7 @@ class Job(object):
             self.x11 = False if str(parameters.get("CURRENT_X11", False)).lower() == "false" else True
             self.notify_on = parameters.get("CURRENT_NOTIFY_ON", [])
             self.update_stat_file()
-            if self.checkpoint:  # To activate placeholder sustitution per <empty> in the template
+            if self.checkpoint:  # To activate placeholder substitution per <empty> in the template
                 parameters["AS_CHECKPOINT"] = self.checkpoint
             self.wchunkinc = as_conf.get_wchunkinc(self.section)
 
@@ -2646,7 +2646,7 @@ class Job(object):
                 return True
         return False
 
-    def synchronize_logs(self, platform, remote_logs, local_logs, last = True):
+    def synchronize_logs(self, platform, remote_logs, local_logs, last=True):
         platform.move_file(remote_logs[0], local_logs[0], True)  # .out
         platform.move_file(remote_logs[1], local_logs[1], True)  # .err
         if last and local_logs[0] != "":
@@ -2720,7 +2720,7 @@ class WrapperJob(Job):
         job_id: int,
         status: str,
         priority: int,
-        job_list: List[Job],
+        job_list: list[Job],
         total_wallclock: str,
         platform: 'ParamikoPlatform',
         as_config: AutosubmitConfig,
@@ -2780,7 +2780,7 @@ class WrapperJob(Job):
             # Log.info("Wrapper {0} is {1}".format(self.name, Status().VALUE_TO_KEY[self.status]))
             # This will update the status from submitted or hold to running
             # (if safety timer is high enough or queue is fast enough)
-            if prev_status in [Status.SUBMITTED]:
+            if prev_status == Status.SUBMITTED:
                 for job in self.job_list:
                     job.status = Status.QUEUING
             self._check_running_jobs()  # Check and update inner_jobs status that are eligible
@@ -2792,8 +2792,8 @@ class WrapperJob(Job):
         # Fail can come from check function or running/completed checkers.
         if self.status in [Status.FAILED, Status.UNKNOWN]:
             self.status = Status.FAILED
-            if self.prev_status in [Status.SUBMITTED,Status.QUEUING]:
-                self.update_failed_jobs(True) # check false ready jobs
+            if self.prev_status in [Status.SUBMITTED, Status.QUEUING]:
+                self.update_failed_jobs(True)  # check false ready jobs
             elif self.prev_status in [Status.FAILED, Status.UNKNOWN]:
                 self.failed = True
                 self._check_running_jobs()
@@ -2802,9 +2802,8 @@ class WrapperJob(Job):
                 if not self.failed:
                     if self._platform.check_file_exists('WRAPPER_FAILED', wrapper_failed=True):
                         for job in self.inner_jobs_running:
-                            if job.platform.check_file_exists('{0}_FAILED'.format(job.name), wrapper_failed=True):
-                                Log.info(
-                                    "Wrapper {0} Failed, checking inner_jobs...".format(self.name))
+                            if job.platform.check_file_exists(f'{job.name}_FAILED', wrapper_failed=True):
+                                Log.info(f"Wrapper {self.name} Failed, checking inner_jobs...")
                                 self.failed = True
                                 self._platform.delete_file('WRAPPER_FAILED')
                                 break
@@ -2814,12 +2813,13 @@ class WrapperJob(Job):
                         still_running = False
             else:
                 still_running = False
+            # TODO: Probably we don't need  ``still_running`` if we move the
+            #       ``self.cancel.failed_wrapper_job()`` call to where it's set to ``False``?
             if not still_running:
                 self.cancel_failed_wrapper_job()
 
-    def check_inner_jobs_completed(self, jobs: List[Job]) -> None:
+    def check_inner_jobs_completed(self, jobs: list[Job]) -> None:
         """Will get all the jobs that the status are not completed and check if it was completed or not.
-
         :param jobs: Jobs inside the wrapper
         """
         not_completed_jobs = [
@@ -2856,7 +2856,6 @@ class WrapperJob(Job):
 
         :param prev_status: previous status of a job
         """
-        reason = str()
         if self._platform.type == 'slurm':
             self._platform.send_command(
                 self._platform.get_queue_status_cmd(self.id))

@@ -26,19 +26,23 @@ from contextlib import suppress
 from multiprocessing import Event
 from multiprocessing.queues import Queue
 # noinspection PyProtectedMember
-from os import _exit
+from os import _exit  # type: ignore
 from pathlib import Path
-from typing import Any, Optional, Union, TYPE_CHECKING
+from typing import Any, Optional, Union, cast, TYPE_CHECKING
 
 import setproctitle
 
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
+from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
-    from autosubmit.job.job_packages import JobPackageBase
+    from autosubmit.job.job import Job
+    from autosubmit.job.job_list import JobList
+    from autosubmit.job.job_packages import JobPackageBase, JobPackageThread
+    from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 
 
 def _init_logs_log_process(as_conf, platform_name):
@@ -71,7 +75,6 @@ def recover_platform_job_logs_wrapper(
     :param as_conf: The Autosubmit configuration object containing experiment data.
     :type as_conf: AutosubmitConfig
     :return: None
-    :rtype: None
     """
     platform.recovery_queue = recovery_queue
     platform.work_event = worker_event
@@ -88,8 +91,9 @@ def recover_platform_job_logs_wrapper(
     }
     _init_logs_log_process(as_conf, platform.name)
     platform.recover_platform_job_logs(as_conf)
-    _exit(
-        0)  # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue() and shared signals should be in charge of the main process.
+    # Exit userspace after manually closing ssh sockets, recommended for child processes, the queue()
+    # and shared signals should be in charge of the main process.
+    _exit(0)
 
 
 class CopyQueue(Queue):
@@ -232,7 +236,7 @@ class Platform(object):
 
     @classmethod
     def update_workers(cls, event_worker):
-        # This is visible on all instances simultaneosly. Is to send the keep alive signal.
+        # This is visible on all instances simultaneously. Is to send the keep alive signal.
         cls.worker_events.append(event_worker)
 
     @classmethod
@@ -364,26 +368,26 @@ class Platform(object):
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
 
-    def submit_ready_jobs(self, as_conf, job_list, packages_persistence, packages_to_submit,
-                          inspect=False, only_wrappers=False, hold=False):
+    def submit_ready_jobs(
+            self,
+            as_conf: 'AutosubmitConfig',
+            job_list: 'JobList',
+            packages_persistence: JobPackagePersistence,
+            packages_to_submit: list['JobPackageBase'],
+            inspect=False,
+            only_wrappers=False,
+            hold=False
+    ) -> tuple[bool, list[str], str, list['JobPackageBase'], bool]:
+        """Gets ``READY`` jobs and send them to the platforms if there is available space on the queues.
 
-        """
-        Gets READY jobs and send them to the platforms if there is available space on the queues
-
-        :param hold:
-        :param packages_to_submit:
         :param as_conf: autosubmit config object
-        :type as_conf: AutosubmitConfig object
         :param job_list: job list to check
-        :type job_list: JobList object
         :param packages_persistence: Handles database per experiment.
-        :type packages_persistence: JobPackagePersistence object
+        :param packages_to_submit:
         :param inspect: True if coming from generate_scripts_andor_wrappers().
-        :type inspect: Boolean
         :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw.
-        :type only_wrappers: Boolean
-        :return: True if at least one job was submitted, False otherwise \n
-        :rtype: Boolean
+        :param hold:
+        :return: True if at least one job was submitted, False otherwise
         """
         any_job_submitted = False
         save = False
@@ -407,10 +411,15 @@ class Platform(object):
                     if hasattr(package, "name"):
                         job_list.packages_dict[package.name] = package.jobs
                         from ..job.job import WrapperJob
-                        wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.READY, 0,
-                                                 package.jobs, package._wallclock, package.platform, as_conf, hold)
+                        package: 'JobPackageThread' = cast('JobPackageThread', package)
+                        wrapper_platform: 'ParamikoPlatform' = cast('ParamikoPlatform', package.platform)
+                        # noinspection PyProtectedMember
+                        wrapper_job = WrapperJob(
+                            package.name, package.jobs[0].id, Status.READY, 0, package.jobs, package._wallclock,
+                            wrapper_platform, as_conf, hold)
                         job_list.job_package_map[package.jobs[0].id] = wrapper_job
                         packages_persistence.save(package, inspect)
+                    # noinspection PyProtectedMember
                     for innerJob in package._jobs:
                         any_job_submitted = True
                         # Setting status to COMPLETED, so it does not get stuck in the loop that calls this function
@@ -449,7 +458,8 @@ class Platform(object):
                                 error_message += "\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {0}".format(
                                     error_msg[:-1])
                             else:
-                                error_message += "\ncheck that {1} platform has set the correct scheduler. Sections that could be affected: {0}".format(
+                                error_message += ("\ncheck that {1} platform has set the correct scheduler. "
+                                                  "Sections that could be affected: {0}").format(
                                     error_msg[:-1], self.name)
                     except AutosubmitCritical:
                         raise
@@ -458,12 +468,18 @@ class Platform(object):
                         raise
             except Exception:
                 raise
+
+        # FIXME: If we can infer this value based on whether the ``valid_packages_to_submit`` is truthy,
+        #        then users can do that too, or infer it some other way -- i.e. we can probably drop that
+        #        value from the returned tuple, maybe even return a single type in the future or build a
+        #        dataclass or similar (easier for types/test).
         if valid_packages_to_submit:
             any_job_submitted = True
+
         return save, failed_packages, error_message, valid_packages_to_submit, any_job_submitted
 
     @property
-    def serial_platform(self):
+    def serial_platform(self) -> 'Platform':
         """
         Platform to use for serial jobs
 
@@ -665,14 +681,10 @@ class Platform(object):
         (job_out_filename, job_err_filename) = remote_logs
         self.get_files([job_out_filename, job_err_filename], False, 'LOG_{0}'.format(exp_id))
 
-    def get_checkpoint_files(self, job):
-        """
-        Get all the checkpoint files of a job
+    def get_checkpoint_files(self, job: 'Job'):
+        """Get all the checkpoint files of a job.
 
         :param job: Get the checkpoint files
-        :type job: Job
-        :param max_step: max step possible
-        :type max_step: int
         """
         if not job.current_checkpoint_step:
             job.current_checkpoint_step = 0
@@ -747,7 +759,7 @@ class Platform(object):
         """
         Removes *CHECKPOINT* files from remote
 
-        :param job_name: name of job to check
+        :param filename: name of file to remove
         :return: True if successful, False otherwise
         """
         if self.check_file_exists(filename):
@@ -790,12 +802,11 @@ class Platform(object):
             path = Path(self.remote_log_dir)
         return str(path)
 
-    def submit_job(self, job, script_name, hold=False, export="none"):
+    def submit_job(self, job: Optional['Job'], script_name, hold=False, export="none"):
         """
         Submit a job from a given job object.
 
         :param job: job object
-        :type job: autosubmit.job.job.Job
         :param script_name: job script's name
         :rtype script_name: str
         :param hold: if True, the job will be submitted in hold state
@@ -879,8 +890,8 @@ class Platform(object):
         if job.id and int(job.id) != 0:
             self.recovery_queue.put(job)
         else:
-            Log.warning(
-                f"Job {job.name} and retry number:{job.fail_count} has no job id. Autosubmit will no record this retry.")
+            Log.warning(f"Job {job.name} and retry number:{job.fail_count} has no job id. "
+                        f"Autosubmit will no record this retry.")
             job.updated_log = True
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
@@ -926,7 +937,6 @@ class Platform(object):
         self.processed_wrapper_logs = set()
 
     def load_process_info(self, platform):
-
         platform.host = self.host
         # Retrieve more configurations settings and save them in the object
         platform.project = self.project
@@ -1046,21 +1056,15 @@ class Platform(object):
         return process_log
 
     def wait_until_timeout(self, timeout: int = 60) -> bool:
-        """
-        Waits until the timeout is reached or any signal is set to process logs.
+        """Waits until the timeout is reached or any signal is set to process logs.
 
-        :param sleep_time: Maximum time to wait in seconds. Defaults to 60.
-        :type sleep_time: int
+        :param timeout: Maximum time to wait in seconds. Defaults to 60.
         :return: True if there is work to process, False otherwise.
-        :rtype: bool
         """
-        process_log = False
         for _ in range(timeout, 0, -1):
             time.sleep(1)
             if self.work_event.is_set() or not self.recovery_queue.empty() or self.cleanup_event.is_set():
-                process_log = True
-                break
-        return process_log
+                return True
 
     def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any], as_conf: 'AutosubmitConfig') -> None:
         """
@@ -1083,15 +1087,15 @@ class Platform(object):
                 except Exception:
                     jobs_pending_to_process.add(job)
                     job._log_recovery_retries += 1
-                    Log.warning(
-                        f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry:'{job.fail_count}'.")
+                    Log.warning(f"{identifier} (Retry) Failed to recover log for job '{job.name}' "
+                                f"and retry:'{job.fail_count}'.")
             except queue.Empty:
                 pass
 
         if len(jobs_pending_to_process) > 0:  # Restore the connection if there was an issue with one or more jobs.
             self.restore_connection(as_conf, log_recovery_process=True)
 
-        # This second while is to keep retring the failed jobs.
+        # This second while is to keep retrying the failed jobs.
         # With the unique queue, the main process won't send the job again, so we have to store it here.
         while len(jobs_pending_to_process) > 0:  # jobs that had any issue during the log retrieval
             job = jobs_pending_to_process.pop()
@@ -1108,8 +1112,8 @@ class Platform(object):
             Log.result(
                 f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
         if len(jobs_pending_to_process) > 0:
-            self.restore_connection(as_conf,
-                                    log_recovery_process=True)  # Restore the connection if there was an issue with one or more jobs.
+            # Restore the connection if there was an issue with one or more jobs.
+            self.restore_connection(as_conf, log_recovery_process=True)
 
         return jobs_pending_to_process
 
