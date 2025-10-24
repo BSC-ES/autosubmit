@@ -424,18 +424,21 @@ class JobList(object):
 
         :return:
         """
+        from itertools import combinations
+        from networkx import NetworkXError
+
         delete_relations = set()
         for section, jobs in problematic_jobs.items():
             for child_name, parents in jobs.items():
-                for parent_name in parents:
-                    for another_parent_name in list(parents)[1:]:
-                        if self.graph.has_successor(parent_name, another_parent_name):
-                            delete_relations.add((parent_name, child_name))
-                        elif self.graph.has_successor(another_parent_name, parent_name):
-                            delete_relations.add((another_parent_name, child_name))
+                parents_list = list(parents)
+                for parent_name, another_parent_name in combinations(parents_list, 2):
+                    if self.graph.has_successor(parent_name, another_parent_name):
+                        delete_relations.add((parent_name, child_name))
+                    elif self.graph.has_successor(another_parent_name, parent_name):
+                        delete_relations.add((another_parent_name, child_name))
 
         for relation_to_delete in delete_relations:
-            with suppress(Exception):
+            with suppress(NetworkXError):
                 self.graph.remove_edge(relation_to_delete[0], relation_to_delete[1])
 
     @staticmethod
@@ -1258,23 +1261,43 @@ class JobList(object):
                 job.splits = auto_splits
         return dependency
 
-    def _manage_job_dependencies(self, dic_jobs, job, date_list, member_list, chunk_list,
-                                 dependencies_keys, dependencies, graph):
+    def _manage_job_dependencies(
+            self,
+            dic_jobs: DicJobs,
+            job: Job,
+            date_list: List[str],
+            member_list: List[str],
+            chunk_list: List[int],
+            dependencies_keys: Dict[str, Any],
+            dependencies: Dict[str, Dependency],
+            graph: DiGraph,
+    ) -> set[str]:
         """
         Manage job dependencies for a given job and update the dependency graph.
 
-        This function calculates and manages the dependencies of a job based on its configuration,
-        relationships, and other metadata. It also updates the dependency graph accordingly.
+        :param dic_jobs: Helper containing generated jobs and configuration.
+        :type dic_jobs: `DicJobs`
+        :param job: Current job object being processed.
+        :type job: `Job`
+        :param date_list: Ordered list of dates used by the workflow (YYYYMMDD strings).
+        :type date_list: List[str]
+        :param member_list: Ordered list of members.
+        :type member_list: List[str]
+        :param chunk_list: Ordered list of chunk indices.
+        :type chunk_list: List[int]
+        :param dependencies_keys: Raw dependency keys as defined in the configuration. Keys may include special modifiers
+            such as `+`, `-`, `*` or `?` and optional numeric distances (e.g., `SIM-1`, `CLEAN+2`).
+        :type dependencies_keys: Dict[str, Any]
+        :param dependencies: Parsed mapping from original dependency key to `Dependency` objects.
+        :type dependencies: Dict[str, `Dependency`]
+        :param graph: The NetworkX directed graph being populated with edges.
+        :type graph: `DiGraph`
 
-        :param dic_jobs: JobList object containing job configurations and metadata.
-        :param job: Current job being processed.
-        :param date_list: List of dates relevant to the job.
-        :param member_list: List of members relevant to the job.
-        :param chunk_list: List of chunks relevant to the job.
-        :param dependencies_keys: Keys representing the dependencies of the job.
-        :param dependencies: Dictionary of dependency objects.
-        :param graph: Dependency graph to be updated.
-        :return: Set of problematic dependencies that could not be resolved.
+        :return: A set with names of parent jobs considered problematic (e.g., edges added but parent missing/ambiguous).
+        :rtype: set[str]
+
+        :raises ValueError: If dependency key parsing encounters an invalid numeric distance.
+        :raises KeyError: If required sections are missing from `dic_jobs.as_conf.jobs_data`.
         """
         # Initialize variables
         distances_of_current_section = {}
@@ -1330,20 +1353,17 @@ class JobList(object):
             # Handle dependencies to other sections
             if aux_key != job.section:
                 dependencies_of_that_section = dic_jobs.as_conf.jobs_data[aux_key].get("DEPENDENCIES", {})
-                for key in dependencies_of_that_section.keys():
-                    if "-" in key:
-                        stripped_key = key.split("-")[0]
-                    elif "+" in key:
-                        stripped_key = key.split("+")[0]
-                    else:
-                        stripped_key = key
+                for key, relationships in dependencies_of_that_section.items():
+                    if "-" in key or "+" in key:
+                        continue
 
                     # Skip dependencies that are already defined or delayed
-                    if stripped_key in dependencies_keys_without_special_chars and stripped_key != job.section:
+                    elif key != job.section:
                         if job.running == "chunk" and dic_jobs.as_conf.jobs_data[aux_key].get("DELAY", None):
                             if job.chunk <= int(dic_jobs.as_conf.jobs_data[aux_key].get("DELAY", 0)):
                                 continue
-                        if dependencies.get(stripped_key, None) and not dependencies[stripped_key].relationships:
+                        # Only natural dependencies
+                        if dependencies.get(key, None) and not relationships:
                             dependencies_to_del.add(key)
 
         # Calculate maximum distance for dependencies
@@ -1390,7 +1410,6 @@ class JobList(object):
             if len(filters_to_apply) > 0:
                 dependencies_of_that_section = dic_jobs.as_conf.jobs_data[dependency.section].get("DEPENDENCIES", {})
                 # Adds the dependencies to the job, and if not possible, adds the job to the problematic_dependencies
-
                 special_dependencies, problematic_dependencies = (
                     self._calculate_filter_dependencies(filters_to_apply, dic_jobs, job, dependency,
                                                         date, member, chunk, graph,
@@ -1402,6 +1421,7 @@ class JobList(object):
                 if key in dependencies_non_natural_to_del:
                     continue
                 natural_sections.append(key)
+
         for key in natural_sections:
             dependency = dependencies[key]
             self._normalize_auto_keyword(job, dependency)
@@ -1417,20 +1437,50 @@ class JobList(object):
                                             key_aux_stripped.split("+")[0] if "+" in key_aux_stripped else
                                             key_aux_stripped for key_aux_stripped in aux.keys()]
 
-            problematic_dependencies = self._calculate_natural_dependencies(dic_jobs, job, dependency, date,
-                                                                            member, chunk, graph,
-                                                                            distances_of_current_section, key,
-                                                                            dependencies_of_that_section, chunk_list,
-                                                                            date_list, member_list,
-                                                                            special_dependencies, max_distance,
-                                                                            problematic_dependencies)
+            problematic_dependencies = self._calculate_natural_dependencies(
+                dic_jobs, job, dependency, date, member, chunk, graph,
+                distances_of_current_section, key,
+                dependencies_of_that_section, chunk_list,
+                date_list, member_list,
+                special_dependencies, max_distance,
+                problematic_dependencies
+            )
 
         return problematic_dependencies
 
-
     @staticmethod
-    def _calculate_dependency_metadata(chunk, chunk_list, member, member_list, date,
-                                       date_list, dependency):
+    def _calculate_dependency_metadata(
+            chunk: Optional[int],
+            chunk_list: List[int],
+            member: Optional[str],
+            member_list: List[str],
+            date: Optional[str],
+            date_list: List[str],
+            dependency: Any
+    ) -> Tuple[bool, Tuple[Optional[int], Optional[str], Optional[str]]]:
+        """Compute the target chunk, member, and date for a dependency with a +/- distance.
+
+        Compute the target chunk, member, and date for a dependency that specifies a
+        positive or negative distance.
+
+        :param chunk: Current chunk index or ``None``.
+        :type chunk: Optional[int]
+        :param chunk_list: Ordered list of available chunk indices.
+        :type chunk_list: List[int]
+        :param member: Current member identifier or ``None``.
+        :type member: Optional[str]
+        :param member_list: Ordered list of available members.
+        :type member_list: List[str]
+        :param date: Current date string or ``None``.
+        :type date: Optional[str]
+        :param date_list: Ordered list of available dates.
+        :type date_list: List[str]
+        :param dependency: Dependency object.
+        :type dependency: Any
+        :returns: Tuple where the first element is a boolean ``skip`` flag and the second is
+            a tuple ``(chunk, member, date)`` with the computed targets.
+        :rtype: Tuple[bool, Tuple[Optional[int], Optional[str], Optional[str]]].
+        """
         skip = False
         if dependency.sign == '-':
             if chunk is not None and len(str(chunk)) > 0 and dependency.running == 'chunk':

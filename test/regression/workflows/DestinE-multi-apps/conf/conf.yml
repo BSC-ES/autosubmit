@@ -1,0 +1,48 @@
+DEFAULT:
+  EXPID: a00f
+  HPCARCH: LOCAL
+JOBS:
+  APP:
+    FILE: templates/application.sh
+    RUNNING: chunk
+    WALLCLOCK: 00:20
+    CHECK: on_submission
+    NOTIFY_ON:
+    - FAILED
+    DEPENDENCIES:
+      OPA:
+      APP-1:
+  OPA:
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:3]*\1'
+      OPA:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: previous
+      OPA-1: {}
+    FILE: ""
+    PLATFORM: LOCAL
+    RUNNING: chunk
+    CHECK: on_submission
+    RETRIALS: '0'
+    WALLCLOCK: 00:20
+    SPLITS: 3
+EXPERIMENT:
+  DATELIST: 20200101
+  MEMBERS: fc0
+  CHUNKSIZEUNIT: month
+  SPLITSIZEUNIT: day
+  CHUNKSIZE: 1
+  NUMCHUNKS: 2
+  CALENDAR: standard
+CONFIG:
+  AUTOSUBMIT_VERSION: 4.1.15
+  TOTALJOBS: 20
+  MAXWAITINGJOBS: 20
+
+PROJECT:
+  PROJECT_TYPE: None
+  PROJECT_DESTINATION: git_project
