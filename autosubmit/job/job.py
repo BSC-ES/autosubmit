@@ -1241,6 +1241,48 @@ class Job(object):
             err_exist = False
         return out_exist or err_exist
 
+    def _sync_retrieve_logfiles(self):
+        """
+        Synchronizes the log files.
+        It prepares the log files to be retrieved by writing the jobid to them
+        and compressing them if enabled. Then, it retrieves the log files
+        from the platform.
+        """
+        self.synchronize_logs(self.platform, self.remote_logs, self.local_logs)
+        remote_logs = list(copy.deepcopy(self.local_logs))
+
+        # Prepare remote logs
+        for idx, remote_log in enumerate(remote_logs):
+            log_full_path = Path(
+                self.platform.get_files_path(), remote_log
+            )
+
+            # Write jobid to logs
+            try:
+                self.platform.write_jobid(self.id, str(log_full_path))
+            except BaseException as exc:
+                Log.printlog(
+                    "Trace {0} \n Failed to write the {1} e=6001".format(
+                        str(exc), self.name
+                    )
+                )
+
+            # Compress if enabled
+            if self.platform.compress_remote_logs:
+                compressed_path = self.platform.compress_file(str(log_full_path))
+                remote_logs[idx] = str(Path(compressed_path).name) if compressed_path else remote_log
+
+        # Back to unmutable
+        remote_logs = tuple(remote_logs)
+
+        # Retrieve remote logs
+        Log.debug(f"Retrieving log files {remote_logs} for job {self.name}")
+        self.platform.get_logs_files(self.expid, remote_logs)
+
+        # Update local logs
+        self.local_logs = remote_logs
+
+
     def retrieve_external_retrials_logfiles(self):
         log_recovered = False
         self.remote_logs = self.get_new_remotelog_name()
@@ -1249,11 +1291,12 @@ class Job(object):
         else:
             if self.check_remote_log_exists():
                 try:
-                    self.synchronize_logs(self.platform, self.remote_logs, self.local_logs)
-                    remote_logs = copy.deepcopy(self.local_logs)
-                    self.platform.get_logs_files(self.expid, remote_logs)
+                    self._sync_retrieve_logfiles()
                     log_recovered = True
-                except BaseException:
+                except BaseException as exc:
+                    Log.warning(
+                        f"Failed to retrieve log files for job {self.name} e=6002: {str(exc)}"
+                    )
                     log_recovered = False
         return log_recovered
 
@@ -1275,9 +1318,7 @@ class Job(object):
             backup_log = copy.copy(self.remote_logs)
             self.remote_logs = self.get_new_remotelog_name(i)
             if self.check_remote_log_exists():
-                self.synchronize_logs(self.platform, self.remote_logs, self.local_logs)
-                remote_logs = copy.deepcopy(self.local_logs)
-                self.platform.get_logs_files(self.expid, remote_logs)
+                self._sync_retrieve_logfiles()
                 log_recovered = True
                 last_retrial = i
             else:
@@ -1302,32 +1343,19 @@ class Job(object):
         """
         # Write stats for vertical wrappers
         if self.wrapper_type == "vertical":  # Disable AS retrials for vertical wrappers to use internal ones
+            first_submit_timestamp = self.submit_time_timestamp
             for i in range(0, int(last_retrial + 1)):
                 self.platform.get_stat_file(self, count=i)
-                self.write_vertical_time(i)
+                self.write_vertical_time(i, first_submit_timestamp)
                 self.inc_fail_count()
-
-                # Update the logs with Autosubmit Job ID Brand
-                try:
-                    for local_log in self.local_logs:
-                        self.platform.write_jobid(self.id, os.path.join(
-                            self._tmp_path, 'LOG_' + str(self.expid), local_log))
-                except BaseException as e:
-                    Log.printlog("Trace {0} \n Failed to write the {1} e=6001".format(str(e), self.name))
         else:
             # Update local logs without updating the submit time
             self.update_local_logs(update_submit_time=False)
+            self.check_compressed_local_logs()
             self.platform.get_stat_file(self)
             self.write_submit_time()
             self.write_start_time(count=self.fail_count)
             self.write_end_time(self.status == Status.COMPLETED, self.fail_count)
-            # Update the logs with Autosubmit Job ID Brand
-            try:
-                for local_log in self.local_logs:
-                    self.platform.write_jobid(self.id, os.path.join(
-                        self._tmp_path, 'LOG_' + str(self.expid), local_log))
-            except BaseException as e:
-                Log.printlog("Trace {0} \n Failed to write the {1} e=6001".format(str(e), self.name))
 
     def retrieve_logfiles(self, raise_error: bool = False) -> None:
         """
@@ -2499,6 +2527,23 @@ class Job(object):
         else:
             self.local_logs = (f"{self.name}.{self.submit_time_timestamp}.out",
                                f"{self.name}.{self.submit_time_timestamp}.err")
+        
+    def check_compressed_local_logs(self) -> None:
+        """
+        Checks if the current local log files are compressed versions (.gz or .xz)
+        and updates the local_logs attribute accordingly.
+        """
+        compress_ext = [".gz", ".xz"]
+        _aux_local_logs = list(copy.deepcopy(self.local_logs))
+        for i, log_file in enumerate(self.local_logs):
+            for ext in compress_ext:
+                _aux_path = Path(self._tmp_path, f"LOG_{self.expid}").joinpath(log_file + ext)
+                Log.debug(f"Checking existence of log file: {_aux_path}")
+                if _aux_path.exists():
+                    Log.debug(f"Found compressed log file: {_aux_path}")
+                    _aux_local_logs[i] += ext
+                    break
+        self.local_logs = tuple(_aux_local_logs)
 
     def write_submit_time(self) -> None:
         """Writes submit date and time to the ``TOTAL_STATS`` file.
@@ -2535,6 +2580,31 @@ class Job(object):
         if count > 0 or self.wrapper_name in self.platform.processed_wrapper_logs:
             self.submit_time_timestamp = date2str(datetime.datetime.fromtimestamp(self.start_time_timestamp),'S')
 
+    def fix_local_logs_timestamps(self, current_timestamp: str, new_timestamp: str) -> None:
+        """
+        Renames local log files to update the timestamp in their names without
+        changing the prefix and extension.
+
+        It assumes that self.local_logs contains the new timestamp in their names.
+
+        :param current_timestamp: The current timestamp in the log file names.
+        :param new_timestamp: The new timestamp to replace the current one.
+        """
+        extensions = ["", ".gz", ".xz"]
+        for log_file in self.local_logs:
+            logs_path = Path(self._tmp_path, f"LOG_{self.expid}")
+
+            for ext in extensions:
+                old_log_path = logs_path.joinpath(log_file.replace(new_timestamp, current_timestamp) + ext)
+                new_log_path = logs_path.joinpath(log_file + ext)
+
+                if old_log_path.exists():
+                    Log.debug(f"Renaming log file from {old_log_path} to {new_log_path}")
+                    old_log_path.rename(new_log_path)
+                    break
+                else:
+                    Log.debug(f"Log file {old_log_path} does not exist, skipping rename.")
+
     def write_start_time(self, count=-1, vertical_wrapper=False):
         """
         Writes start date and time to TOTAL_STATS file
@@ -2554,9 +2624,13 @@ class Job(object):
                                 children=self.children_names_str)
         return True
 
-    def write_vertical_time(self, count=-1):
+    def write_vertical_time(
+        self, count: int = -1, first_submit_timestamp: str = None
+    ) -> None:
         self.update_start_time(count=count)
-        self.update_local_logs(update_submit_time=False)
+        self.update_local_logs(update_submit_time=False, count=count)
+        self.fix_local_logs_timestamps(first_submit_timestamp, self.submit_time_timestamp)
+        self.check_compressed_local_logs()
         self.write_submit_time()
         self.write_start_time(count=count, vertical_wrapper=True)
         self.write_end_time(self.status == Status.COMPLETED, count=count)
@@ -2646,7 +2720,9 @@ class Job(object):
                 return True
         return False
 
-    def synchronize_logs(self, platform, remote_logs, local_logs, last = True):
+    def synchronize_logs(
+        self, platform: "Platform", remote_logs, local_logs, last=True
+    ):
         platform.move_file(remote_logs[0], local_logs[0], True)  # .out
         platform.move_file(remote_logs[1], local_logs[1], True)  # .err
         if last and local_logs[0] != "":

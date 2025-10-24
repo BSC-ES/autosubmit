@@ -296,6 +296,31 @@ class ParamikoPlatform(Platform):
         else:
             Log.warning(f"SSH config file {self._user_config_file} not found")
 
+    def write_jobid(self, jobid: str, complete_path: str) -> None:
+        try:
+            lang = locale.getlocale()[1]
+            if lang is None:
+                lang = locale.getdefaultlocale()[1]
+                if lang is None:
+                    lang = "UTF-8"
+            title_job = b"[INFO] JOBID=" + str(jobid).encode(lang)
+
+            if self.check_absolute_file_exists(complete_path):
+                file_type = complete_path[-3:]
+                if file_type == "out" or file_type == "err":
+                    with self._ftpChannel.file(complete_path, "rb+") as f:
+                        # Reading into memory (Potentially slow)
+                        first_line: bytes = f.readline()
+                        # Not rewrite
+                        if not first_line.startswith(b"[INFO] JOBID="):
+                            content = f.read()
+                            f.seek(0, 0)
+                            f.write(title_job + b"\n\n" + first_line + content)
+                        f.close()
+
+        except Exception as exc:
+            Log.error("Writing Job Id Failed : " + str(exc))
+
     def connect(
             self,
             as_conf: Optional['AutosubmitConfig'],
@@ -458,6 +483,12 @@ class ParamikoPlatform(Platform):
             raise AutosubmitError(f'Cannot send file {local_path} to {remote_path}. '
                                   f'An unexpected error occurred: {str(e)}', 6004)
 
+    def get_logs_files(self, exp_id: str, remote_logs: tuple[str, str]) -> None:
+        (job_out_filename, job_err_filename) = remote_logs
+        self.get_files(
+            [job_out_filename, job_err_filename], False, "LOG_{0}".format(exp_id)
+        )
+
     def get_list_of_files(self):
         return self._ftpChannel.get(self.get_files_path)
 
@@ -489,6 +520,7 @@ class ParamikoPlatform(Platform):
             self._ftpChannel.get(remote_path, file_path)
             return True
         except Exception as e:
+            Log.debug(f"Could not retrieve file {filename} from platform {self.name}: {str(e)}")
             with suppress(Exception):
                 os.remove(file_path)
             # FIXME: Huh, probably a bug here? See unit/test_paramiko_platform function test_get_file_errors
@@ -1546,6 +1578,31 @@ class ParamikoPlatform(Platform):
         except Exception:
             Log.debug(f"Error reading file {src}")
             return None
+        
+    def compress_file(self, file_path):
+        Log.debug(f"Compressing file {file_path} using {self.remote_logs_compress_type}")
+        try:
+            if self.remote_logs_compress_type == "xz":
+                output = file_path + ".xz"
+                compression_level = self.compression_level
+                self.send_command(f"xz -{compression_level} -e -c {file_path} > {output}", ignore_log=True)
+            else:
+                output = file_path + ".gz"
+                compression_level = self.compression_level
+                self.send_command(f"gzip -{compression_level} -c {file_path} > {output}", ignore_log=True)
+
+            # Validate and remove the input file if compression succeeded
+            if self.check_absolute_file_exists(output):
+                self.delete_file(file_path)
+
+                Log.debug(f"File {file_path} compressed successfully to {output}")
+                return output
+            else:
+                Log.error(f"Compression failed for file {file_path}")
+        except Exception as exc:
+            Log.error(f"Error compressing file {file_path}: {exc}")
+
+        return None
 
     def _init_local_x11_display(self) -> None:
         """Initialize the X11 display on this platform."""

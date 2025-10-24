@@ -26,6 +26,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import Log, AutosubmitError
 from autosubmit.platforms.headers.local_header import LocalHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+import autosubmit.log.utils as log_utils
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -116,6 +117,29 @@ class LocalPlatform(ParamikoPlatform):
 
     def get_checkjob_cmd(self, job_id):
         return self.get_pscall(job_id)
+
+    def write_jobid(self, jobid: str, complete_path: str) -> None:
+        try:
+            lang = locale.getlocale()[1]
+            if lang is None:
+                lang = locale.getdefaultlocale()[1]
+                if lang is None:
+                    lang = 'UTF-8'
+            title_job = b"[INFO] JOBID=" + str(jobid).encode(lang)
+            if os.path.exists(complete_path):
+                file_type = complete_path[-3:]
+                if file_type == "out" or file_type == "err":
+                    with open(complete_path, "rb+") as f:
+                        # Reading into memory (Potentially slow)
+                        first_line = f.readline()
+                        # Not rewrite
+                        if not first_line.startswith(b'[INFO] JOBID='):
+                            content = f.read()
+                            f.seek(0, 0)
+                            f.write(title_job + b"\n\n" + first_line + content)
+                        f.close()
+        except Exception as exc:
+            Log.error("Writing Job Id Failed : " + str(exc))
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """
@@ -309,15 +333,9 @@ class LocalPlatform(ParamikoPlatform):
     def get_ssh_output_err(self):
         return self._ssh_output_err
 
-    def get_logs_files(self, exp_id, remote_logs):
+    def get_logs_files(self, exp_id: str, remote_logs: tuple[str, str]) -> None:
         """
-        Overriding the parent's implementation.
         Do nothing because the log files are already in the local platform (redundancy).
-
-        :param exp_id: experiment id
-        :type exp_id: str
-        :param remote_logs: names of the log files
-        :type remote_logs: (str, str)
         """
         return
 
@@ -369,3 +387,23 @@ class LocalPlatform(ParamikoPlatform):
         except Exception:
             Log.debug(f"Error reading file {src}")
             return None
+
+    def compress_file(self, file_path: str) -> None:
+        Log.debug(f"Compressing file {file_path} using {self.remote_logs_compress_type}")
+        try:
+            compression_level = self.compression_level
+            if self.remote_logs_compress_type == "xz":
+                output = log_utils.compress_xz(
+                    file_path, preset=compression_level, keep_input=False
+                )
+            else:
+                output = log_utils.compress_gzip(
+                    file_path, compression_level=compression_level, keep_input=False
+                )
+
+            Log.debug(f"File {file_path} compressed")
+            return output
+        except Exception as exc:
+            Log.error(f"Error compressing file {file_path}: {exc}")
+
+        return None

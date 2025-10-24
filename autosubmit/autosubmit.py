@@ -722,6 +722,7 @@ class Autosubmit:
                                 help='Select the status (one or more) to filter the list of jobs.')
             subparser.add_argument('-t', '--target', type=str, default="FAILED", metavar='STATUS',
                                 help='Final status of killed jobs. Default is FAILED.')
+
             args, unknown = parser.parse_known_args()
             if args.version:
                 Log.info(Autosubmit.autosubmit_version)
@@ -2246,7 +2247,7 @@ class Autosubmit:
         return total_jobs, safetysleeptime, default_retrials, check_wrapper_jobs_sleeptime
 
     @staticmethod
-    def check_logs_status(job_list, as_conf, new_run):
+    def check_logs_status(job_list: "JobList", as_conf, new_run):
         for job in job_list.get_completed_failed_without_logs():
             if new_run:
                 job.platform.spawn_log_retrieval_process(as_conf)
