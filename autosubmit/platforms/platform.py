@@ -23,7 +23,7 @@ import queue  # only for the exception
 import time
 import traceback
 from contextlib import suppress
-from multiprocessing import Event
+from multiprocessing.synchronize import Event
 from multiprocessing.queues import Queue
 # noinspection PyProtectedMember
 from os import _exit
@@ -51,7 +51,7 @@ def _init_logs_log_process(as_conf, platform_name):
 
 
 def recover_platform_job_logs_wrapper(
-        platform: Any,
+        platform: 'Platform',
         recovery_queue: Queue,
         worker_event: Event,
         cleanup_event: Event,
@@ -97,7 +97,7 @@ class CopyQueue(Queue):
     A queue that copies the object gathered.
     """
 
-    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, ctx: Any = None) -> None:
+    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = 0.0, ctx: Any = None) -> None:
         """
         Initializes the Queue.
 
@@ -114,7 +114,7 @@ class CopyQueue(Queue):
         self.timeout = timeout
         super().__init__(maxsize, ctx=ctx)
 
-    def put(self, job: Any, block: bool = True, timeout: float = None) -> None:
+    def put(self, job: Any, block: bool = True, timeout: Optional[float] = None) -> None:
         """
         Puts a job into the queue if it is not a duplicate.
 
@@ -133,7 +133,7 @@ class Platform(object):
     Class to manage the connections to the different platforms.
     """
     # This is a list of the keep_alive events, used to send the signal outside the main loop of Autosubmit
-    worker_events = list()
+    worker_events: list = []
     # Shared lock between the main process and a retrieval log process
     lock = multiprocessing.Lock()
 
@@ -152,8 +152,8 @@ class Platform(object):
         :type auth_password: str or list, optional
         """
         self.connected = False
-        self.expid = expid  # type: str
-        self._name = name  # type: str
+        self.expid: str = expid
+        self._name: str = name
         self.config = config
         self.tmp_path = os.path.join(
             self.config.get("LOCAL_ROOT_DIR", ""), self.expid, self.config.get("LOCAL_TMP_DIR", ""))
@@ -211,13 +211,13 @@ class Platform(object):
         else:
             self.pw = None
         self.max_waiting_jobs = 20
-        self.recovery_queue = None
-        self.work_event = None
-        self.cleanup_event = None
+        self.recovery_queue: Queue = self.get_mp_context().Queue(maxsize=0)
+        self.work_event: Event = self.get_mp_context().Event()
+        self.cleanup_event: Event = self.get_mp_context().Event()
         self.log_retrieval_process_active = False
-        self.log_recovery_process = None
+        self.log_recovery_process = self.get_mp_context().Process()
         self.keep_alive_timeout = 60 * 5  # Useful in case of kill -9
-        self.processed_wrapper_logs = set()
+        self.processed_wrapper_logs: set = set()
         log_queue_size = 200
         if self.config:
             # We still support TOTALJOBS and TOTAL_JOBS for backwards compatibility... # TODO change in 4.2, I think
@@ -913,16 +913,16 @@ class Platform(object):
         """
         if self.cleanup_event:
             self.cleanup_event.set()  # Indicates to old child ( if reachable ) to finish.
-        if self.log_recovery_process:
+        if self.log_recovery_process.is_alive():
             # Waits for old child ( if reachable ) to finish. Timeout in case of it being blocked.
             self.log_recovery_process.join(timeout=60)
         # Resets everything related to the log recovery process.
-        self.recovery_queue = None
+        self.recovery_queue = self.get_mp_context().Queue()
         self.log_retrieval_process_active = False
         self.remove_workers(self.work_event)
-        self.work_event = None
-        self.cleanup_event = None
-        self.log_recovery_process = None
+        self.work_event = self.get_mp_context().Event()
+        self.cleanup_event = self.get_mp_context().Event()
+        self.log_recovery_process = self.get_mp_context().Process()
         self.processed_wrapper_logs = set()
 
     def load_process_info(self, platform):
@@ -1062,7 +1062,8 @@ class Platform(object):
                 break
         return process_log
 
-    def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any], as_conf: 'AutosubmitConfig') -> None:
+    def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any], as_conf: 'AutosubmitConfig') -> set[
+        Any]:
         """
         Recovers log files for jobs from the recovery queue and retries failed jobs.
 
@@ -1122,7 +1123,7 @@ class Platform(object):
         identifier = f"{self.name.lower()}(log_recovery):"
         try:
             Log.info(f"{identifier} Starting...")
-            jobs_pending_to_process = set()
+            jobs_pending_to_process: set = set()
             self.connected = False
             self.restore_connection(as_conf, log_recovery_process=True)
             Log.result(f"{identifier} successfully connected.")
@@ -1155,7 +1156,7 @@ class Platform(object):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
+    def read_file(self, src: str, max_size: int = 0) -> Union[bytes, None]:
         """
         Read file content as bytes. If max_size is set, only the first max_size bytes are read.
         :param src: file path
