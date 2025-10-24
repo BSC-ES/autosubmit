@@ -1849,6 +1849,7 @@ class AutosubmitConfig(object):
                                                  self.load_config_file(self.misc_data, Path(filename), load_misc=True))
             self.load_current_hpcarch_parameters()
             self.load_workflow_commit()
+            self.dynamic_variables = {}
 
     def _add_autosubmit_dict(self) -> None:
         """Add the AUTOSUBMIT namespace to the experiment data."""
@@ -2838,3 +2839,16 @@ class AutosubmitConfig(object):
             # replace all '%(?<!%%)\w+%(?!%%)' with parameters value
             content = content.replace(match, parameters.get(match[1:-1], ""))
         return content
+
+    def get_current_wrapper(self, section):
+        """Returns the wrapper configuration for a given job section.
+
+        :param section: job section
+        :type section: str
+        :return: wrapper configuration
+        :rtype: dict
+        """
+        for wrapper in self.experiment_data.get("WRAPPERS", {}).values():
+            if section in wrapper.get("JOBS_IN_WRAPPER", ""):
+                return wrapper
+        return {}
