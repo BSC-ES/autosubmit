@@ -282,14 +282,14 @@ def test_git_operational_experiment_toggle_flag(
     _, args = autosubmit.parse_args()
 
     if type(expected) is int:
-        exit_code = autosubmit.run_command(args=args)
+        exit_code = autosubmit.run_command(args)
         assert exit_code == expected
 
         assert mocked_log.warning.called
         assert mocked_log.warning.call_args[0][0] == 'Git operational check disabled by user'
     else:
         with pytest.raises(cast(expected, Exception)):
-            autosubmit.run_command(args=args)
+            autosubmit.run_command(args)
 
 
 # -- clean_git

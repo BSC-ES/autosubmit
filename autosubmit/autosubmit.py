@@ -39,8 +39,9 @@ from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
-from typing import Any, Optional, Union, Generator
+from typing import Any, Optional, Union
 
+from argparse import Namespace
 from bscearth.utils.date import date2str
 from portalocker import Lock
 from portalocker.exceptions import BaseLockException
@@ -169,7 +170,7 @@ class Autosubmit:
         os.environ['PYTHONUNBUFFERED'] = 'true'
 
     @staticmethod
-    def parse_args() -> tuple[int, Optional[argparse.Namespace]]:
+    def parse_args() -> tuple[int, Optional[Namespace]]:
         """
         Parse arguments given to an executable and start execution of command given.
 
@@ -746,7 +747,7 @@ class Autosubmit:
             raise AutosubmitCritical(f"Incorrect arguments for this command: {str(e)}", 7011)
 
     @staticmethod
-    def run_command(args: dict):
+    def run_command(args: Namespace):
         expid = "None"
 
         if hasattr(args, 'notransitive') and args.notransitive:
@@ -2077,16 +2078,23 @@ class Autosubmit:
 
     @staticmethod
     def prepare_run(
-        expid: str,
-        start_time: str = '',
-        start_after: str = '',
-        run_only_members: str = '',
-        recover: bool = False,
-        check_scripts: bool = False,
-        submitter=None
+            expid: str,
+            start_time: str = '',
+            start_after: str = '',
+            run_only_members: str = '',
+            recover: bool = False,
+            check_scripts: bool = False,
+            submitter: Optional[ParamikoSubmitter] = None
     ) -> tuple[
-            'JobList', 'ParamikoSubmitter', Optional['ExperimentHistory'], str, AutosubmitConfig,
-            list['Platform'], 'JobPackagePersistence', bool]:
+        JobList,
+        ParamikoSubmitter,
+        Optional[ExperimentHistory],
+        Optional[str],
+        AutosubmitConfig,
+        list[Platform],
+        JobPackagePersistence,
+        bool,
+    ]:
         """
         Prepare the run of the experiment.
         :param expid: a string with the experiment id.
@@ -2094,9 +2102,9 @@ class Autosubmit:
         :param start_after: a string with the experiment id to start after.
         :param run_only_members: a string with the members to run.
         :param recover: a boolean to indicate if the experiment is recovering from a failure.
-        :param check_scripts: check scripts
+        :param check_scripts: Whether to check the scripts before submitting.
         :param submitter: the actual loaded platforms if any
-        :return: a Union
+        :return: a tuple
         """
         host = platform.node()
         # Init the AutosubmitConfig and check that every file exists, and it is a valid configuration.

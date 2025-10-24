@@ -36,7 +36,6 @@ from autosubmit.platforms.paramiko_platform import ParamikoPlatformException
 from autosubmit.platforms.pjmplatform import PJMPlatform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from autosubmit.platforms.submitter import Submitter
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
