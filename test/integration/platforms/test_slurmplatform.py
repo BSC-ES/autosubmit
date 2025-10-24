@@ -887,3 +887,138 @@ def test_simple_workflow_compress_logs_slurm(
         assert _val_fn(str(log_path)), (
             f"Log file {log_path} is not compressed as expected."
         )
+
+
+@pytest.mark.slurm
+@pytest.mark.parametrize(
+    "experiment_data",
+    [
+        {
+            "JOBS": {
+                "SIM": {
+                    "PLATFORM": _PLATFORM_NAME,
+                    "RUNNING": "once",
+                    "SCRIPT": 'echo "This is job ${SLURM_JOB_ID} EOM"',
+                },
+            },
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "127.0.0.1",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "COMPRESS_REMOTE_LOGS": True,
+                },
+            },
+        },
+    ],
+    ids=[
+        "Default compress logs with missing compression tool",
+    ],
+)
+def test_compress_log_missing_tool(
+    experiment_data: dict,
+    autosubmit_exp: "AutosubmitExperimentFixture",
+    slurm_server: "DockerContainer",
+    mocker,
+):
+    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
+    _create_slurm_platform(exp.expid, exp.as_conf)
+
+    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
+
+    # Mock the compress_file method to simulate missing compression tool
+    mocker.patch(
+        "autosubmit.platforms.paramiko_platform.ParamikoPlatform.compress_file",
+        return_value=None,
+    )
+    exp.autosubmit.run_experiment(exp.expid)
+
+    # Check if the log files are compressed
+    logs_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR).joinpath(
+        exp.expid, exp.as_conf.basic_config.LOCAL_TMP_DIR, f"LOG_{exp.expid}"
+    )
+
+    # Get all files in the logs directory
+    files = [f for f in Path(logs_dir).glob("*")]
+    assert len(files) > 0, f"No log files found in {logs_dir}"
+
+    # Get job_data
+    exp_history = ExperimentHistory(
+        exp.expid,
+        exp.as_conf.basic_config.JOBDATA_DIR,
+        exp.as_conf.basic_config.HISTORICAL_LOG_DIR,
+    )
+    last_job_data = exp_history.manager.get_all_last_job_data_dcs()
+    assert len(last_job_data) > 0, "No job data found after running the experiment."
+
+    logs_filenames: list[str] = []
+    for job in last_job_data:
+        logs_filenames.extend([job.out, job.err])
+
+    # None of the log files should be compressed
+    for log_filename in logs_filenames:
+        assert not log_filename.endswith(".gz") and not log_filename.endswith(".xz"), (
+            f"Log file {log_filename} should not have a compressed extension."
+        )
+
+        log_path = logs_dir.joinpath(log_filename)
+        assert log_path.exists(), f"Log file {log_path} does not exist."
+        assert not is_gzip_file(str(log_path)) and not is_xz_file(str(log_path)), (
+            f"Log file {log_path} should not be compressed."
+        )
+
+
+@pytest.mark.slurm
+@pytest.mark.parametrize(
+    "experiment_data",
+    [
+        {
+            "JOBS": {
+                "SIM": {
+                    "PLATFORM": _PLATFORM_NAME,
+                    "RUNNING": "once",
+                    "SCRIPT": 'echo "This is job ${SLURM_JOB_ID} EOM"',
+                },
+            },
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "127.0.0.1",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "COMPRESS_REMOTE_LOGS": True,
+                },
+            },
+        },
+    ],
+    ids=[
+        "Default compress logs with missing compression tool",
+    ],
+)
+def test_compress_log_fail_command(
+    experiment_data: dict,
+    autosubmit_exp: "AutosubmitExperimentFixture",
+    slurm_server: "DockerContainer",
+    mocker,
+):
+    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
+    _create_slurm_platform(exp.expid, exp.as_conf)
+
+    mocker.patch(
+        "autosubmit.platforms.paramiko_platform.ParamikoPlatform.send_command",
+        side_effect=Exception("cmd not found"),
+    )
+
+    result = exp.platform.compress_file("/some_log_file.log")
+    assert result is None
