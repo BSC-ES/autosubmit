@@ -543,109 +543,6 @@ CONFIG:
                                 assert "%EXTENDED_HEADER%" not in final_script
                                 assert "%EXTENDED_TAILER%" not in final_script
 
-    def test_job_parameters(self):
-        """Test job platforms with a platform. Builds job and platform using YAML data, without mocks.
-
-        Actually one mock, but that's for something in the AutosubmitConfigParser that can
-        be modified to remove the need of that mock.
-        """
-
-        expid = 't000'
-
-        for reservation in [None, '', '  ', 'some-string', 'a', '123', 'True']:
-            reservation_string = '' if not reservation else f'RESERVATION: "{reservation}"'
-            with tempfile.TemporaryDirectory() as temp_dir:
-                BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
-                Path(temp_dir, expid).mkdir()
-                # FIXME: Not sure why but the submitted and Slurm were using the $expid/tmp/ASLOGS folder?
-                for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                             f'{expid}/conf']:
-                    Path(temp_dir, path).mkdir()
-                with open(Path(temp_dir, f'{expid}/conf/minimal.yml'), 'w+') as minimal:
-                    minimal.write(dedent(f'''\
-                    CONFIG:
-                      RETRIALS: 0
-                    DEFAULT:
-                      EXPID: {expid}
-                      HPCARCH: test
-                    JOBS:
-                      A:
-                        FILE: a
-                        PLATFORM: test
-                        RUNNING: once
-                        {reservation_string}
-                    PLATFORMS:
-                      test:
-                        TYPE: slurm
-                        HOST: localhost
-                        PROJECT: abc
-                        QUEUE: debug
-                        USER: me
-                        SCRATCH_DIR: /anything/
-                        ADD_PROJECT_TO_HOST: False
-                        MAX_WALLCLOCK: '00:55'
-                        TEMP_DIR: ''
-                    '''))
-                    minimal.flush()
-
-                basic_config = FakeBasicConfig()
-                basic_config.read()
-                basic_config.LOCAL_ROOT_DIR = str(temp_dir)
-
-                config = AutosubmitConfig(expid, basic_config=basic_config, parser_factory=YAMLParserFactory())
-                config.reload(True)
-                parameters = config.load_parameters()
-
-                job_list_obj = JobList(expid, config, YAMLParserFactory(),
-                                       Autosubmit._get_job_list_persistence(expid, config))
-                job_list_obj.generate(
-                    as_conf=config,
-                    date_list=[],
-                    member_list=[],
-                    num_chunks=1,
-                    chunk_ini=1,
-                    parameters=parameters,
-                    date_format='M',
-                    default_retrials=config.get_retrials(),
-                    default_job_type=config.get_default_job_type(),
-                    wrapper_jobs={},
-                    new=True,
-                    run_only_members=config.get_member_list(run_only=True),
-                    show_log=True,
-                    create=True,
-                )
-                job_list = job_list_obj.get_job_list()
-                assert 1 == len(job_list)
-
-                submitter = Autosubmit._get_submitter(config)
-                submitter.load_platforms(config)
-
-                hpcarch = config.get_platform()
-                for job in job_list:
-                    if job.platform_name == "" or job.platform_name is None:
-                        job.platform_name = hpcarch
-                    job.platform = submitter.platforms[job.platform_name]
-
-                job = job_list[0]
-                parameters = job.update_parameters(config, set_attributes=True)
-                # Asserts the script is valid.
-                checked = job.check_script(config, parameters)
-                assert checked
-
-                # Asserts the configuration value is propagated as-is to the job parameters.
-                # Finally, asserts the header created is correct.
-                if not reservation:
-                    assert 'JOBS.A.RESERVATION' not in parameters
-                    template_content, additional_templates = job.update_content(config, parameters)
-                    assert not additional_templates
-
-                    assert '#SBATCH --reservation' not in template_content
-                else:
-                    assert reservation == parameters['JOBS.A.RESERVATION']
-
-                    template_content, additional_templates = job.update_content(config, parameters)
-                    assert not additional_templates
-                    assert f'#SBATCH --reservation={reservation}' in template_content
 
     # def test_exists_completed_file_then_sets_status_to_completed(self):
     #     # arrange
@@ -697,109 +594,6 @@ CONFIG:
             self.job.processors = test['processors']
             self.job.nodes = test['nodes']
             assert self.job.total_processors == test['expected']
-
-    def test_job_script_checking_contains_the_right_variables(self):
-        # This test (and feature) was implemented in order to avoid
-        # false positives on the checking process with auto-ecearth3
-        # Arrange
-        parameters = {}
-        section = "RANDOM-SECTION"
-        self.job._init_runtime_parameters()
-        self.job.section = section
-        parameters['ROOTDIR'] = "none"
-        parameters['PROJECT_TYPE'] = "none"
-        processors = 80
-        threads = 1
-        tasks = 16
-        memory = 80
-        wallclock = "00:30"
-        self.as_conf.get_member_list = Mock(return_value=[])
-        custom_directives = '["whatever"]'
-        options = {
-            'PROCESSORS': processors,
-            'THREADS': threads,
-            'TASKS': tasks,
-            'MEMORY': memory,
-            'WALLCLOCK': wallclock,
-            'CUSTOM_DIRECTIVES': custom_directives,
-            'SCRATCH_FREE_SPACE': 0,
-            'PLATFORM': 'dummy_platform',
-        }
-        self.as_conf.jobs_data[section] = options
-
-        dummy_serial_platform = MagicMock()
-        dummy_serial_platform.name = 'serial'
-        dummy_platform = MagicMock()
-        dummy_platform.serial_platform = dummy_serial_platform
-        dummy_platform.name = 'dummy_platform'
-        dummy_platform.max_wallclock = '00:55'
-
-        self.as_conf.substitute_dynamic_variables = MagicMock()
-        default = {'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%',
-                   'M': '%M%', 'M_': '%M_%', 'm': '%m%', 'm_': '%m_%'}
-        self.as_conf.substitute_dynamic_variables.return_value = default
-        dummy_platform.custom_directives = '["whatever"]'
-        self.as_conf.dynamic_variables = {}
-        self.as_conf.parameters = MagicMock()
-        self.as_conf.return_value = {}
-        self.as_conf.normalize_parameters_keys = MagicMock()
-        self.as_conf.normalize_parameters_keys.return_value = default
-        self.job._platform = dummy_platform
-        self.as_conf.platforms_data = {"DUMMY_PLATFORM": {"whatever": "dummy_value", "whatever2": "dummy_value2"}}
-
-        # Act
-        parameters = self.job.update_parameters(self.as_conf, set_attributes=True)
-        # Assert
-        assert 'CURRENT_WHATEVER' in parameters
-        assert 'CURRENT_WHATEVER2' in parameters
-
-        assert 'dummy_value' == parameters['CURRENT_WHATEVER']
-        assert 'dummy_value2' == parameters['CURRENT_WHATEVER2']
-        assert 'd' in parameters
-        assert 'd_' in parameters
-        assert 'Y' in parameters
-        assert 'Y_' in parameters
-        assert '%d%' == parameters['d']
-        assert '%d_%' == parameters['d_']
-        assert '%Y%' == parameters['Y']
-        assert '%Y_%' == parameters['Y_']
-        # update parameters when date is not none and chunk is none
-        self.job.date = datetime(1975, 5, 25, 22, 0, 0, 0, timezone.utc)
-        self.job.chunk = None
-        parameters = self.job.update_parameters(self.as_conf, set_attributes=True)
-        assert 1 == parameters['CHUNK']
-        # update parameters when date is not none and chunk is not none
-        self.job.date = datetime(1975, 5, 25, 22, 0, 0, 0, timezone.utc)
-        self.job.chunk = 1
-        self.job.date_format = 'H'
-        parameters = self.job.update_parameters(self.as_conf, set_attributes=True)
-        assert 1 == parameters['CHUNK']
-        assert "TRUE" == parameters['CHUNK_FIRST']
-        assert "TRUE" == parameters['CHUNK_LAST']
-        assert "1975" == parameters['CHUNK_START_YEAR']
-        assert "05" == parameters['CHUNK_START_MONTH']
-        assert "25" == parameters['CHUNK_START_DAY']
-        assert "22" == parameters['CHUNK_START_HOUR']
-        assert "1975" == parameters['CHUNK_END_YEAR']
-        assert "05" == parameters['CHUNK_END_MONTH']
-        assert "26" == parameters['CHUNK_END_DAY']
-        assert "22" == parameters['CHUNK_END_HOUR']
-        assert "1975" == parameters['CHUNK_SECOND_TO_LAST_YEAR']
-
-        assert "05" == parameters['CHUNK_SECOND_TO_LAST_MONTH']
-        assert "25" == parameters['CHUNK_SECOND_TO_LAST_DAY']
-        assert "22" == parameters['CHUNK_SECOND_TO_LAST_HOUR']
-        assert '1975052522' == parameters['CHUNK_START_DATE']
-        assert '1975052622' == parameters['CHUNK_END_DATE']
-        assert '1975052522' == parameters['CHUNK_SECOND_TO_LAST_DATE']
-        assert '1975052422' == parameters['DAY_BEFORE']
-        assert '1' == parameters['RUN_DAYS']
-
-        self.job.chunk = 2
-        parameters = self.job.update_parameters(self.as_conf, set_attributes=True)
-        assert 2 == parameters['CHUNK']
-        assert "FALSE" == parameters['CHUNK_FIRST']
-        assert "FALSE" == parameters['CHUNK_LAST']
 
     def test_get_from_total_stats(self):
         """
@@ -1918,3 +1712,274 @@ def test_update_dict_parameters_invalid_script_language(platform_name: Optional[
         assert job.platform_name is None
     else:
         assert job.platform_name == platform_name.upper()
+
+@pytest.mark.parametrize(
+    "reservation",
+    [None, "", "  ", "some-string", "a", "123", "True"],
+    ids=["None", "empty", "spaces", "some-string", "a", "123", "True"]
+)
+def test_job_parameters(reservation: Optional[str], tmp_path: Path) -> None:
+    """
+    Parametrized test for job reservation propagation.
+
+    :param reservation: reservation value from configuration (may be None or string)
+    :type reservation: Optional[str]
+    :param tmp_path: pytest tmp path fixture
+    :type tmp_path: Path
+    """
+    expid = "t000"
+    reservation_string = "" if not reservation else f'RESERVATION: "{reservation}"'
+
+    # prepare experiment tree
+    BasicConfig.LOCAL_ROOT_DIR = str(tmp_path)
+    Path(tmp_path, expid).mkdir()
+    for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
+                 f'{expid}/conf']:
+        Path(tmp_path, path).mkdir()
+
+    # create minimal configuration
+    conf_path = Path(tmp_path, f'{expid}/conf/minimal.yml')
+    conf_path.write_text(dedent(f'''\
+        CONFIG:
+          RETRIALS: 0
+        DEFAULT:
+          EXPID: {expid}
+          HPCARCH: test
+        JOBS:
+          A:
+            FILE: a
+            PLATFORM: test
+            RUNNING: once
+            {reservation_string}
+        PLATFORMS:
+          test:
+            TYPE: slurm
+            HOST: localhost
+            PROJECT: abc
+            QUEUE: debug
+            USER: me
+            SCRATCH_DIR: /anything/
+            ADD_PROJECT_TO_HOST: False
+            MAX_WALLCLOCK: '00:55'
+            TEMP_DIR: ''
+    '''))
+
+    # bootstrap config and generate jobs
+    basic_config = FakeBasicConfig()
+    basic_config.read()
+    basic_config.LOCAL_ROOT_DIR = str(tmp_path)
+
+    config = AutosubmitConfig(expid, basic_config=basic_config, parser_factory=YAMLParserFactory())
+    config.reload(True)
+    parameters = config.load_parameters()
+
+    job_list_obj = JobList(expid, config, YAMLParserFactory(),
+                           Autosubmit._get_job_list_persistence(expid, config))
+    job_list_obj.generate(
+        as_conf=config,
+        date_list=[],
+        member_list=[],
+        num_chunks=1,
+        chunk_ini=1,
+        parameters=parameters,
+        date_format='M',
+        default_retrials=config.get_retrials(),
+        default_job_type=config.get_default_job_type(),
+        wrapper_jobs={},
+        new=True,
+        run_only_members=config.get_member_list(run_only=True),
+        show_log=True,
+        create=True,
+    )
+    job_list = job_list_obj.get_job_list()
+    assert len(job_list) == 1
+
+    submitter = Autosubmit._get_submitter(config)
+    submitter.load_platforms(config)
+
+    hpcarch = config.get_platform()
+    for job in job_list:
+        if job.platform_name == "" or job.platform_name is None:
+            job.platform_name = hpcarch
+        job.platform = submitter.platforms[job.platform_name]
+
+    job = job_list[0]
+    parameters = job.update_parameters(config, set_attributes=True)
+
+    # script validity
+    assert job.check_script(config, parameters)
+
+    # reservation propagation assertions
+    if not reservation:
+        assert 'JOBS.A.RESERVATION' not in parameters
+        template_content, additional_templates = job.update_content(config, parameters)
+        assert not additional_templates
+        assert '#SBATCH --reservation' not in template_content
+    else:
+        assert reservation == parameters['JOBS.A.RESERVATION']
+        template_content, additional_templates = job.update_content(config, parameters)
+        assert not additional_templates
+        assert f'#SBATCH --reservation={reservation}' in template_content
+
+
+def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch):
+
+    as_conf = autosubmit_config('t000', {})
+
+    additional_experiment_data = {
+        "EXPERIMENT": {
+            "CALENDAR": "standard",
+            "CHUNKSIZE": 1,
+            "CHUNKSIZEUNIT": "month",
+            "DATELIST": 20200101,
+            "MEMBERS": "fc0",
+            "NUMCHUNKS": 1,
+            "SPLITSIZEUNIT": "day",
+        },
+        "HPCADD_PROJECT_TO_HOST": False,
+        "HPCAPP_PARTITION": "gp_debug",
+        "HPCARCH": "TEST_SLURM",
+        "HPCBUDG": "",
+        "HPCCATALOG_NAME": "mn5-phase2",
+        "HPCCONTAINER_COMMAND": "singularity",
+        "HPCCUSTOM_DIRECTIVES": "['#SBATCH --export=ALL', '#SBATCH --hint=nomultithread']",
+        "HPCDATABRIDGE_FDB_HOME": "test2",
+        "HPCDATA_DIR": "test",
+        "HPCDEVELOPMENT_PROJECT": "bla",
+        "HPCEC_QUEUE": "hpc",
+        "HPCEXCLUSIVE": "True",
+        "HPCEXCLUSIVITY": "",
+        "HPCFDB_PROD": "test3",
+        "HPCHOST": "mn5-cluster1",
+        "HPCHPCARCH_LOWERCASE": "TEST_SLURM",
+        "HPCHPCARCH_SHORT": "MN5",
+        "HPCHPC_EARTHKIT_REGRID_CACHE_DIR": "test4",
+        "HPCHPC_PROJECT_ROOT": "test5",
+        "HPCLOGDIR": "test6",
+        "HPCMAX_PROCESSORS": 15,
+        "HPCMAX_WALLCLOCK": "02:00",
+        "HPCMODULES_PROFILE_PATH": None,
+        "HPCOPA_CUSTOM_DIRECTIVES": "",
+        "HPCOPA_EXCLUSIVE": False,
+        "HPCOPA_MAX_PROC": 2,
+        "HPCOPA_PROCESSORS": 112,
+        "HPCOPERATIONAL_PROJECT": "bla",
+        "HPCPARTITION": "",
+        "HPCPROCESSORS_PER_NODE": 112,
+        "HPCPROD_APP_AUX_IN_DATA_DIR": "test7",
+        "HPCPROJ": "bla",
+        "HPCPROJECT": "bla",
+        "HPCQUEUE": "gp_debug",
+        "HPCRESERVATION": "",
+        "HPCROOTDIR": "test8",
+        "HPCSCRATCH_DIR": "test10",
+        "HPCSYNC_DATAMOVER": "True",
+        "HPCTEMP_DIR": "",
+        "HPCTEST_APP_AUX_IN_DATA_DIR": "test9",
+        "HPCTYPE": "slurm",
+        "HPCUSER": "bla",
+        "JOBDATA_DIR": "bla",
+        "JOBS": {
+            "TEST_JOB_2": {
+                "ADDITIONAL_FILES": ["bla"],
+                "CHECK": "on_submission",
+                "CUSTOM_DIRECTIVES": "%CURRENT_OPA_CUSTOM_DIRECTIVES%",
+                "DEPENDENCIES": {
+                    "TEST_JOB_2": {"SPLITS_FROM": {"ALL": {}}},
+                    "TEST_JOB_2-1": {},
+                },
+                "EXCLUSIVE": "%CURRENT_OPA_EXCLUSIVE%",
+                "FILE": "templates/opa.sh",
+                "NODES": 1,
+                "NOTIFY_ON": ["FAILED"],
+                "PARTITION": "%CURRENT_APP_PARTITION%",
+                "PLATFORM": "TEST_SLURM",
+                "PROCESSORS": "%CURRENT_OPA_PROCESSORS%",
+                "RETRIALS": 0,
+                "RUNNING": "chunk",
+                "SPLITS": "auto",
+                "TASKS": 1,
+                "THREADS": 1,
+                "WALLCLOCK": "00:30",
+                "JOB_HAS_PRIO": "whatever",
+                "WRAPPER_HAS_PRIO": "%CURRENT_NOT_EXISTENT_PLACEHOLDER%",
+            }
+        },
+        "PLATFORMS": {
+            "TEST_SLURM": {
+                "ADD_PROJECT_TO_HOST": False,
+                "APP_PARTITION": "gp_debug",
+                "CATALOG_NAME": "mn5-phase2",
+                "CONTAINER_COMMAND": "singularity",
+                "CUSTOM_DIRECTIVES": "['#SBATCH --export=ALL', '#SBATCH --hint=nomultithread']",
+                "DATABRIDGE_FDB_HOME": "bla",
+                "DATA_DIR": "bla",
+                "DEVELOPMENT_PROJECT": "bla",
+                "EXCLUSIVE": "True",
+                "FDB_PROD": "bla",
+                "HOST": "mn5-cluster1",
+                "HPCARCH_LOWERCASE": "TEST_SLURM",
+                "HPCARCH_SHORT": "MN5",
+                "HPC_EARTHKIT_REGRID_CACHE_DIR": "bla",
+                "HPC_PROJECT_ROOT": "/gpfs/projects",
+                "MAX_PROCESSORS": 15,
+                "MAX_WALLCLOCK": "02:00",
+                "MODULES_PROFILE_PATH": None,
+                "OPA_CUSTOM_DIRECTIVES": "whatever",
+                "OPA_EXCLUSIVE": False,
+                "OPA_MAX_PROC": 2,
+                "OPA_PROCESSORS": 112,
+                "OPERATIONAL_PROJECT": "bla",
+                "PROCESSORS_PER_NODE": 112,
+                "PROD_APP_AUX_IN_DATA_DIR": "bla",
+                "PROJECT": "bla",
+                "QUEUE": "gp_debug",
+                "SCRATCH_DIR": "/gpfs/scratch",
+                "SYNC_DATAMOVER": "True",
+                "TEMP_DIR": "",
+                "TEST_APP_AUX_IN_DATA_DIR": "bla",
+                "TYPE": "slurm",
+                "USER": "me",
+                "NEVER_RESOLVED": "%must_be_empty%",
+                "JOB_HAS_PRIO": "%CURRENT_NOT_EXISTENT_PLACEHOLDER%",
+                "WRAPPER_HAS_PRIO": "%CURRENT_NOT_EXISTENT_PLACEHOLDER%",
+                "PLATFORM_HAS_PRIO": "whatever_from_platform"
+            },
+        },
+        "PROJDIR": "bla",
+        "PROJECT": {"PROJECT_DESTINATION": "git_project", "PROJECT_TYPE": "none"},
+        "ROOTDIR": "bla",
+        "SMTP_SERVER": "",
+        "STARTDATES": ["20200101"],
+        "STORAGE": {},
+        "STRUCTURES_DIR": "/bla",
+        "WRAPPERS": {
+            "WRAPPER_0": {
+                "JOBS_IN_WRAPPER": "TEST_JOB_2",
+                "MAX_WRAPPED": 2,
+                "TYPE": "vertical",
+                "WRAPPER_HAS_PRIO": "whatever_from_wrapper",
+            }
+        },
+    }
+    as_conf.experiment_data = as_conf.experiment_data | additional_experiment_data
+    monkeypatch.setattr(as_conf, 'reload', lambda: None)
+    job = Job(_EXPID, '1', Status.WAITING, 0)
+    job.section = 'TEST_JOB_2'
+    job.date = datetime(2020, 1, 1)
+    job.member = 'fc0'
+    job.chunk = 1
+    job.platform_name = 'TEST_SLURM'
+    job.split = -1
+
+    parameters = job.update_parameters(as_conf, set_attributes=True)
+    placeholders_not_resolved = []
+    for key, value in parameters.items():
+        if isinstance(value, str):
+            if value.startswith("%") and value.endswith("%") and key not in as_conf.default_parameters.keys():
+                placeholders_not_resolved.append(key)
+    assert not placeholders_not_resolved, f"Placeholders not resolved: {placeholders_not_resolved}"
+    assert parameters["CURRENT_NEVER_RESOLVED"] == ""
+    assert parameters["CURRENT_JOB_HAS_PRIO"] == "whatever"
+    assert parameters["CURRENT_WRAPPER_HAS_PRIO"] == "whatever_from_wrapper"
+    assert parameters["CURRENT_PLATFORM_HAS_PRIO"] == "whatever_from_platform"

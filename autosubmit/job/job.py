@@ -1592,47 +1592,46 @@ class Job(object):
 
     def update_current_parameters(self, as_conf: AutosubmitConfig, parameters: dict) -> dict:
         """
-        Update the %CURRENT_*% parameters with the current platform and jobs.
+        Populate and update `CURRENT_XXX` parameters and placeholders in the given parameters dictionary.
 
-        :param as_conf: The Autosubmit configuration object.
+        :param as_conf: Autosubmit configuration object containing `platforms_data`,
+            `jobs_data` and other experiment-level settings.
         :type as_conf: AutosubmitConfig
-        :param parameters: The dictionary to update with current parameters.
+        :param parameters: Parameters dictionary to be updated. This dict is modified
         :type parameters: dict
-        :return: The updated parameter's dictionary.
+        :return: The same `parameters` dictionary updated.
         :rtype: dict
         """
+
         for key, value in as_conf.platforms_data.get(self.platform_name, {}).items():
-            parameters[f"CURRENT_{key.upper()}"] = parameters.get(f"CURRENT_{key.upper()}", value)
+            parameters[f"CURRENT_{key.upper()}"] = value
+
+        parameters['CURRENT_ARCH'] = parameters.get('CURRENT_ARCH', self.platform.name)
+        parameters['CURRENT_HOST'] = parameters.get('CURRENT_HOST', self.platform.host)
+        parameters['CURRENT_USER'] = parameters.get('CURRENT_USER', self.platform.user)
+        parameters['CURRENT_PROJ'] = parameters.get('CURRENT_PROJ', self.platform.project)
+        parameters['CURRENT_BUDG'] = parameters.get('CURRENT_BUDG', self.platform.budget)
+        parameters['CURRENT_RESERVATION'] = parameters.get('CURRENT_RESERVATION', self.platform.reservation)
+        parameters['CURRENT_EXCLUSIVITY'] = parameters.get('CURRENT_EXCLUSIVITY', self.platform.exclusivity)
+        parameters['CURRENT_HYPERTHREADING'] = parameters.get('CURRENT_HYPERTHREADING', self.platform.hyperthreading)
+        parameters['CURRENT_TYPE'] = parameters.get('CURRENT_TYPE', self.platform.type)
+        parameters['CURRENT_SCRATCH_DIR'] = parameters.get('CURRENT_SCRATCH_DIR', self.platform.scratch)
+        parameters['CURRENT_PROJ_DIR'] = parameters.get('CURRENT_PROJ_DIR', self.platform.project_dir)
+        parameters['CURRENT_ROOTDIR'] = parameters.get('CURRENT_ROOTDIR', self.platform.root_dir)
+        parameters['CURRENT_LOGDIR'] = parameters.get('CURRENT_LOGDIR', self.platform.get_files_path())
 
         for key, value in as_conf.jobs_data[self.section].items():
-            parameters[f"CURRENT_{key.upper()}"] = parameters.get(f"CURRENT_{key.upper()}", value)
+            parameters[f"CURRENT_{key.upper()}"] = value
+
+        for key, value in as_conf.get_current_wrapper(self.section).items():
+            parameters[f"CURRENT_{key.upper()}"] = value
 
         parameters["CURRENT_METRIC_FOLDER"] = self.get_metric_folder(as_conf=as_conf)
 
+        self.update_placeholders(as_conf, parameters)
+
         return parameters
 
-    def update_platform_parameters(self, as_conf: AutosubmitConfig, parameters: dict) -> dict:
-        if not self.platform:
-            submitter = job_utils._get_submitter(as_conf)
-            submitter.load_platforms(as_conf)
-            if not self.platform_name:
-                self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
-            job_platform = submitter.platforms.get(self.platform_name)
-            self.platform: 'ParamikoPlatform' = job_platform
-        parameters['CURRENT_ARCH'] = parameters.get("CURRENT_ARCH", self.platform.name)
-        parameters['CURRENT_HOST'] = parameters.get("CURRENT_HOST", self.platform.host)
-        parameters['CURRENT_USER'] = parameters.get("CURRENT_USER", self.platform.user)
-        parameters['CURRENT_PROJ'] = parameters.get("CURRENT_PROJ", self.platform.project)
-        parameters['CURRENT_BUDG'] = parameters.get("CURRENT_BUDG", self.platform.budget)
-        parameters['CURRENT_RESERVATION'] = parameters.get("CURRENT_RESERVATION", self.platform.reservation)
-        parameters['CURRENT_EXCLUSIVITY'] = parameters.get("CURRENT_EXCLUSIVITY", self.platform.exclusivity)
-        parameters['CURRENT_HYPERTHREADING'] = parameters.get("CURRENT_HYPERTHREADING", self.platform.hyperthreading)
-        parameters['CURRENT_TYPE'] = parameters.get("CURRENT_TYPE", self.platform.type)
-        parameters['CURRENT_SCRATCH_DIR'] = parameters.get("CURRENT_SCRATCH_DIR", self.platform.scratch)
-        parameters['CURRENT_PROJ_DIR'] = parameters.get("CURRENT_PROJ_DIR", self.platform.project_dir)
-        parameters['CURRENT_ROOTDIR'] = parameters.get("CURRENT_ROOTDIR", self.platform.root_dir)
-        parameters['CURRENT_LOGDIR'] = parameters.get("CURRENT_LOGDIR", self.platform.get_files_path())
-        return parameters
 
     def process_scheduler_parameters(self, job_platform, chunk):
         """
@@ -2212,7 +2211,6 @@ class Job(object):
         self.exclusive = parameters["EXCLUSIVE"]
         self.threads = parameters["THREADS"]
         self.tasks = parameters["TASKS"]
-        self.reservation = parameters["RESERVATION"]
         self.hyperthreading = parameters["HYPERTHREADING"]
         self.queue = parameters["CURRENT_QUEUE"]
         self.partition = parameters["PARTITION"]
@@ -2228,6 +2226,29 @@ class Job(object):
         self.log_recovered = False
         self.packed_during_building = False
         self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT", {}).get("WORKFLOW_COMMIT", "")
+
+    def update_placeholders(self, as_conf: AutosubmitConfig, parameters: dict, replace_by_empty=False) -> dict:
+        """
+        Find and substitute dynamic placeholders in `parameters` using the provided
+        Autosubmit configuration helpers.
+
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: AutosubmitConfig
+        :param parameters: Parameters dictionary potentially containing placeholders.
+        :type parameters: dict
+        :param replace_by_empty: Flag indicating whether to replace dynamic variables with empty strings.
+        :type replace_by_empty: bool
+        :return: Parameters with placeholders substituted.
+        :rtype: dict
+        """
+        as_conf.deep_read_loops(parameters)
+        as_conf.substitute_dynamic_variables(parameters)
+        if replace_by_empty and as_conf.dynamic_variables:
+            for var in as_conf.dynamic_variables.keys():
+                parameters[var] = ""
+        as_conf.dynamic_variables = {}
+
+        return parameters
 
     def update_parameters(self, as_conf: AutosubmitConfig, set_attributes: bool = False, reset_logs: bool = False) -> dict:
         """
@@ -2256,24 +2277,29 @@ class Job(object):
                 self.start_time = datetime.datetime.now()
             # Parameters that affect to all the rest of parameters
             self.update_dict_parameters(as_conf)
+        self.init_platform(as_conf)
         parameters = as_conf.load_parameters()
-        parameters.update(as_conf.default_parameters)
-        parameters = as_conf.substitute_dynamic_variables(parameters, max_deep=25, in_the_end=True)
-        parameters = self.update_platform_parameters(as_conf, parameters)
         parameters = self.update_current_parameters(as_conf, parameters)
-        parameters = as_conf.deep_read_loops(parameters)
-        parameters = as_conf.substitute_dynamic_variables(parameters, max_deep=25, in_the_end=True)
         parameters = self.update_job_parameters(as_conf, parameters, set_attributes)
         parameters = self.update_platform_associated_parameters(as_conf, parameters, parameters['CHUNK'], set_attributes)
         parameters = self.update_wrapper_parameters(as_conf, parameters)
+        parameters = self.update_placeholders(as_conf, parameters, replace_by_empty=True)
         parameters.update(as_conf.default_parameters)
-        parameters = as_conf.substitute_dynamic_variables(parameters, max_deep=25, in_the_end=True)
         if set_attributes:
             self.update_job_variables_final_values(parameters)
         for event in self.platform.worker_events:  # keep alive log retrieval workers.
             if not event.is_set():
                 event.set()
+        parameters.update(as_conf.default_parameters)
         return parameters
+
+    def init_platform(self, as_conf: AutosubmitConfig) -> None:
+        if not self.platform:
+            submitter = job_utils._get_submitter(as_conf)
+            submitter.load_platforms(as_conf)
+            if not self.platform_name:
+                self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
+            self.platform = submitter.platforms.get(self.platform_name)
 
     def update_content_extra(self, as_conf: AutosubmitConfig, files: list[str]) -> list[str]:
         additional_templates = []
@@ -2421,9 +2447,6 @@ class Job(object):
         :return: Content with placeholders substituted.
         :rtype: str
         """
-        # TODO quick fix for 4.1.15 release, to see why it is needed
-        if as_conf.dynamic_variables:
-            parameters = as_conf.substitute_dynamic_variables(parameters, max_deep=25, in_the_end=True)
 
         placeholders = re.findall(r'%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', content, flags=re.IGNORECASE)
         for placeholder in placeholders:
