@@ -58,7 +58,7 @@ jobs:
           coverage xml
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage_unit_py-${{ matrix.python-version }}
           path: coverage.xml
@@ -132,7 +132,7 @@ jobs:
           coverage xml
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage_integration_py-${{ matrix.python-version }}-${{ matrix.pytest-markers }}
           path: coverage.xml
@@ -178,7 +178,7 @@ jobs:
           coverage xml
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage_regression_py-${{ matrix.python-version }}
           path: coverage.xml
@@ -231,7 +231,7 @@ jobs:
           coverage xml
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage_slurm_py-${{ matrix.python-version }}
           path: coverage.xml
@@ -277,7 +277,7 @@ jobs:
           coverage report
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage_docs-${{ matrix.python-version }}
           path: docs/coverage.xml
