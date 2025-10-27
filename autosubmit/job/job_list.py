@@ -1303,7 +1303,6 @@ class JobList(object):
         distances_of_current_section_member = {}
         problematic_dependencies = set()
         special_dependencies = set()
-        dependencies_to_del = set()
         dependencies_non_natural_to_del = set()
         max_distance = 0
         dependencies_keys_without_special_chars = []
@@ -1349,25 +1348,6 @@ class JobList(object):
                                                                                                      "once") == "member":
                             self.actual_job_depends_on_previous_member = True
 
-            # Handle dependencies to other sections
-            if aux_key != job.section:
-                dependencies_of_that_section = dic_jobs.as_conf.jobs_data[aux_key].get("DEPENDENCIES", {})
-                for key in dependencies_of_that_section.keys():
-                    if "-" in key:
-                        stripped_key = key.split("-")[0]
-                    elif "+" in key:
-                        stripped_key = key.split("+")[0]
-                    else:
-                        stripped_key = key
-                    if key not in dependencies.keys():
-                        # Skip dependencies that are already defined or delayed
-                        if stripped_key in dependencies_keys_without_special_chars and stripped_key != job.section:
-                            if job.running == "chunk" and dic_jobs.as_conf.jobs_data[aux_key].get("DELAY", None):
-                                if job.chunk <= int(dic_jobs.as_conf.jobs_data[aux_key].get("DELAY", 0)):
-                                    continue
-                            if dependencies.get(stripped_key, None) and not dependencies[stripped_key].relationships:
-                                dependencies_to_del.add(key)
-
         # Calculate maximum distance for dependencies
         for key in self.dependency_map_with_distances[job.section]:
             if "-" in key:
@@ -1393,11 +1373,10 @@ class JobList(object):
                     distances_of_current_section_member[aux_key] = distance
 
         # Process sections with special filters
-        sections_to_calculate = [key for key in dependencies_keys.keys() if key not in dependencies_to_del]
         natural_sections: List[str] = []
 
         # Parse first sections with special filters if any
-        for key in sections_to_calculate:
+        for key in dependencies_keys.keys():
             dependency = dependencies[key]
             skip, (chunk, member, date) = JobList._calculate_dependency_metadata(job.chunk, chunk_list,
                                                                                  job.member, member_list,

@@ -244,7 +244,7 @@ JOBS:
     SYNCHRONIZE: member
     WALLCLOCK: 00:30
     DELAY: '0'
-    SPLITS: '6'
+    SPLITS: '2'
   DA:
     FILE: hidden
     DEPENDENCIES:
@@ -259,7 +259,7 @@ JOBS:
     RETRIALS: '2'
     NOTIFY_ON:
     - FAILED
-    SPLITS: '6'
+    SPLITS: '2'
   POSTPROC_CTRL:
     FILE: hidden
     DEPENDENCIES:
@@ -281,7 +281,7 @@ JOBS:
     WALLCLOCK: 00:30
     NOTIFY_ON:
     - FAILED
-    SPLITS: '6'
+    SPLITS: '2'
   ARCHIVE:
     FILE: hidden
     DEPENDENCIES:
@@ -327,7 +327,7 @@ JOBS:
     - FAILED
 EXPERIMENT:
   DATELIST: '20241008'
-  MEMBERS: 00[0-6]
+  MEMBERS: 00[0-1]
   CHUNKSIZEUNIT: day
   CHUNKSIZE: 1
   NUMCHUNKS: 1
