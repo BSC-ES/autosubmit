@@ -244,7 +244,7 @@ JOBS:
     SYNCHRONIZE: member
     WALLCLOCK: 00:30
     DELAY: '0'
-    SPLITS: '2'
+    SPLITS: '6'
   DA:
     FILE: hidden
     DEPENDENCIES:
