@@ -286,7 +286,7 @@ def test_git_operational_experiment_toggle_flag(
         assert exit_code == expected
 
         assert mocked_log.warning.called
-        assert mocked_log.warning.call_args[0][0] == 'Git operational check disabled by user'
+        assert mocked_log.warning.mock_calls[1][1][0] == 'Git operational check disabled by user'
     else:
         with pytest.raises(Exception):
             autosubmit.run_command(args=args)
