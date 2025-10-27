@@ -2134,7 +2134,7 @@ class Autosubmit:
         Autosubmit._load_parameters(
             as_conf, job_list, submitter.platforms)
         Log.debug("Checking experiment templates...")
-        platforms_to_test = list()
+        platforms_to_test = set()
         hpcarch = as_conf.get_platform()
         # Load only platforms used by the experiment, by looking at JOBS.$JOB.PLATFORM. So Autosubmit only establishes connections to the machines that are used.
         # Also, it ignores platforms used by "COMPLETED/FAILED" jobs as they are no need any more. ( in case of recovery or run a workflow that were already running )
@@ -2146,10 +2146,10 @@ class Autosubmit:
                  job.platform = submitter.platforms[job.platform_name.upper()]
             except Exception:
                 raise AutosubmitCritical(f"hpcarch={job.platform_name} not found in the platforms configuration file",
-                    7014)
+                                         7014)
             # noinspection PyTypeChecker
             if job.status not in (Status.COMPLETED, Status.SUSPENDED):
-                platforms_to_test.append(job.platform)
+                platforms_to_test.add(job.platform)
         # This function, looks at %JOBS.$JOB.FILE% ( mandatory ) and %JOBS.$JOB.CHECK% ( default True ).
         # Checks the contents of the .sh/.py/r files and looks for AS placeholders.
         try:
@@ -2221,9 +2221,9 @@ class Autosubmit:
             # establish the connection to all platforms
             # Restore is a misleading, it is actually a "connect" function when the recover flag is not set.
             Autosubmit.restore_platforms(platforms_to_test,as_conf=as_conf)
-            return job_list, submitter , exp_history, host , as_conf, platforms_to_test, packages_persistence, False
+            return job_list, submitter , exp_history, host , as_conf, list(platforms_to_test), packages_persistence, False
         else:
-            return job_list, submitter, None, None, as_conf, platforms_to_test, packages_persistence, True
+            return job_list, submitter, None, None, as_conf, list(platforms_to_test), packages_persistence, True
 
     @staticmethod
     def get_iteration_info(as_conf,job_list):
