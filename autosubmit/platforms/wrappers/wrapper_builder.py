@@ -75,10 +75,12 @@ class WrapperBuilder(object):
         pass  # pragma: no cover
 
     # hybrids
+
     def build_joblist_thread(self, **kwargs):
         pass  # pragma: no cover
 
     # horizontal and hybrids
+
     def build_nodes_list(self):
         pass  # pragma: no cover
 
@@ -370,6 +372,7 @@ for i in range(len(pid_list)):
             print(datetime.now(), "The job ", pid.template," has FAILED")
                     """).format(jobs_list, self.exit_thread, '\n'.ljust(13)), 4)
         return parallel_threads_launcher
+
     def build_parallel_threads_launcher_horizontal(self, jobs_list, thread, footer=True):
         parallel_threads_launcher = textwrap.dedent("""
 pid_list = []

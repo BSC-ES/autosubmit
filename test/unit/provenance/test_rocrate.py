@@ -15,9 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Tests for the RO-Crate generation in Autosubmit."""
+"""Unit tests for the RO-Crate generation in Autosubmit."""
 
-import datetime
 import json
 import tempfile
 from pathlib import Path
@@ -501,114 +500,6 @@ def test_rocrate_main_fail_missing_rocrate(
 
     assert cm.value.message == 'You must provide an ROCRATE configuration key when using RO-Crate...'
     assert mocked_Log.error.call_count == 1
-
-
-@patch('autosubmit.autosubmit.JobList')
-@patch('autosubmit.autosubmit.AutosubmitConfig')
-@patch('autosubmit.provenance.rocrate.BasicConfig')
-@patch('autosubmit.provenance.rocrate.get_experiment_description')
-@patch('autosubmit.provenance.rocrate.get_autosubmit_version')
-def test_rocrate_main(
-        mocked_get_autosubmit_version: Mock,
-        mocked_get_experiment_description: Mock,
-        mocked_BasicConfig: Mock,
-        mocked_AutosubmitConfig: Mock,
-        mocked_JobList: Mock,
-        create_conf_dir: Callable):
-    with tempfile.TemporaryDirectory() as temp_dir:
-        mocked_BasicConfig.LOCAL_ROOT_DIR = temp_dir
-        mocked_BasicConfig.LOCAL_TMP_DIR.mkdir()
-        experiment_path = Path(mocked_BasicConfig.LOCAL_ROOT_DIR, _EXPID)
-        experiment_path.mkdir()
-        mocked_BasicConfig.LOCAL_TMP_DIR = Path(experiment_path, 'tmp')
-        mocked_BasicConfig.LOCAL_TMP_DIR.mkdir()
-        project_path = Path(experiment_path, 'proj')
-        project_path.mkdir()
-        # some outputs
-        for output_file in ['graph_1.png', 'graph_2.gif', 'graph_3.gif', 'graph.jpg']:
-            Path(project_path, output_file).touch()
-        # required paths for AS
-        for other_required_path in ['conf', 'pkl', 'plot', 'status']:
-            Path(experiment_path, other_required_path).mkdir()
-        mocked_as_conf = Mock(autospec=AutosubmitConfig)
-        mocked_AutosubmitConfig.return_value = mocked_as_conf
-        mocked_as_conf.experiment_data = {
-            'DEFAULT': {
-                'EXPID': _EXPID
-            },
-            'EXPERIMENT': {},
-            'CONFIG': {},
-            'ROOTDIR': str(experiment_path),
-            'PROJECT': {
-                'PROJECT_DESTINATION': '',
-                'PROJECT_TYPE': 'LOCAL'
-            },
-            'LOCAL': {
-                'PROJECT_PATH': str(project_path)
-            },
-            'APP': {
-                'INPUT_1': 1,
-                'INPUT_2': 2
-            },
-            'ROCRATE': {
-                'INPUTS': ['APP'],
-                'OUTPUTS': [
-                    'graph_*.gif'
-                ],
-                'PATCH': json.dumps({
-                    '@graph': [
-                        {
-                            '@id': './',
-                            "license": "Apache-2.0"
-                        }
-                    ]
-                })
-            }
-        }
-        create_conf_dir(experiment_path, as_conf=mocked_as_conf)
-        mocked_as_conf.get_storage_type.return_value = 'pkl'
-        mocked_as_conf.get_date_list.return_value = []
-
-        mocked_get_autosubmit_version.return_value = '4.0.0b0'
-        mocked_get_experiment_description.return_value = [
-            ['mocked test project']
-        ]
-
-        mocked_job_list = Mock()
-        mocked_JobList.return_value = mocked_job_list
-
-        job1 = Mock(autospec=Job)
-        job1_submit_time = datetime.datetime.strptime("21/11/06 16:30", "%d/%m/%y %H:%M")
-        job1_start_time = datetime.datetime.strptime("21/11/06 16:40", "%d/%m/%y %H:%M")
-        job1_finished_time = datetime.datetime.strptime("21/11/06 16:50", "%d/%m/%y %H:%M")
-        job1.get_last_retrials.return_value = [
-            [job1_submit_time, job1_start_time, job1_finished_time, 'COMPLETED']]
-        job1.name = 'job1'
-        job1.date = '2006'
-        job1.member = 'fc0'
-        job1.section = 'JOB'
-        job1.chunk = '1'
-        job1.processors = '1'
-
-        job2 = Mock(autospec=Job)
-        job2_submit_time = datetime.datetime.strptime("21/11/06 16:40", "%d/%m/%y %H:%M")
-        job2_start_time = datetime.datetime.strptime("21/11/06 16:50", "%d/%m/%y %H:%M")
-        job2_finished_time = datetime.datetime.strptime("21/11/06 17:00", "%d/%m/%y %H:%M")
-        job2.get_last_retrials.return_value = [
-            [job2_submit_time, job2_start_time, job2_finished_time, 'COMPLETED']]
-        job2.name = 'job2'
-        job2.date = '2006'
-        job2.member = 'fc1'
-        job2.section = 'JOB'
-        job2.chunk = '1'
-        job2.processors = '1'
-
-        mocked_job_list.get_job_list.return_value = [job1, job2]
-        mocked_job_list.get_ready.return_value = []  # Mock due the new addition in the job_list.load()
-        mocked_job_list.get_waiting.return_value = []  # Mocked due the new addition in the job_list.load()
-        autosubmit = Autosubmit()
-        r = autosubmit.rocrate(_EXPID, path=Path(temp_dir))
-        assert r
 
 
 @patch('autosubmit.provenance.rocrate.BasicConfig')

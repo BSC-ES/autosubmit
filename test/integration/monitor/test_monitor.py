@@ -25,6 +25,7 @@ import pytest
 
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job_list import JobList
+from autosubmit.job.job_list_persistence import get_job_list_persistence
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.monitor.monitor import (
     Monitor
@@ -61,7 +62,7 @@ def test_generate_output(
     exp = autosubmit_exp(_EXPID, experiment_data={})
     exp_path = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR) / _EXPID
 
-    job_list_persistence = exp.autosubmit._get_job_list_persistence(_EXPID, exp.as_conf)
+    job_list_persistence = get_job_list_persistence(_EXPID, exp.as_conf)
     job_list = JobList(_EXPID, exp.as_conf, YAMLParserFactory(), job_list_persistence)
     date_list = exp.as_conf.get_date_list()
     # TODO: we can probably simplify our code, so that ``date_format`` is calculated more easily...
@@ -136,4 +137,3 @@ def test_generate_output(
         #       So txt format gives less information to the user, thus the 0 size.
         if output_format != 'txt':
             assert plots[0].stat().st_size > 0
-

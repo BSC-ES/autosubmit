@@ -17,9 +17,13 @@
 
 """Module containing functions to manage autosubmit's experiments."""
 
+import os
+import pwd
 import string
 from pathlib import Path
+from typing import Optional
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import db_common
 from autosubmit.log.log import Log, AutosubmitCritical
 
@@ -205,3 +209,31 @@ def create_required_folders(exp_id: str, exp_folder: Path) -> None:
     required_dirs = ["conf", "pkl", "tmp", "tmp/ASLOGS", f"tmp/LOG_{exp_id}", "plot", "status"]
     for required_dir in required_dirs:
         Path(exp_folder / required_dir).mkdir(mode=dir_mode)
+
+
+def check_ownership(expid, raise_error=False) -> tuple[bool, bool, Optional[str]]:
+    """Check if the user owns and if it is eadmin.
+
+    :return: the owner, eadmin, and current_owner
+    """
+    current_owner: Optional[str] = None
+    current_owner_id = Path(BasicConfig.LOCAL_ROOT_DIR, expid).stat().st_uid
+    try:
+        current_owner = pwd.getpwuid(current_owner_id).pw_name
+    except (TypeError, KeyError) as e:
+        Log.warning(f"Current owner of experiment {expid} could not be retrieved. The owner is no longer in the "
+                    f"system database: {str(e)}")
+
+    eadmin: bool = False
+    admin_user = "eadmin"  # to be improved in #944
+    current_user_id = os.getuid()
+    try:
+        eadmin = current_user_id == pwd.getpwnam(admin_user).pw_uid
+    except Exception as e:
+        Log.info(f"Autosubmit admin user: {admin_user} is not set: {str(e)}")
+
+    owner: bool = current_owner_id == current_user_id
+    if not owner and raise_error:
+        raise AutosubmitCritical(f"You don't own the experiment {expid}.", 7012)
+
+    return owner, eadmin, current_owner

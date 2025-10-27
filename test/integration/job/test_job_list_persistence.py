@@ -17,12 +17,12 @@
 
 """Integration tests for ``autosubmit.job.job_list_persistence``."""
 
-import pytest
-from networkx import DiGraph
 from pathlib import Path
 
-from autosubmit.autosubmit import Autosubmit
+import pytest
+from networkx import DiGraph
 
+from autosubmit.job.job_list_persistence import get_job_list_persistence
 
 _EXPID = 't000'
 
@@ -45,7 +45,7 @@ def test_job_list_persistence(as_db: str, autosubmit_exp):
     exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
     exp_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID)
 
-    job_list_pers = Autosubmit._get_job_list_persistence('job_list_persistence_postgres', exp.as_conf)
+    job_list_pers = get_job_list_persistence('job_list_persistence_postgres', exp.as_conf)
 
     graph = DiGraph(name="test_graph")
 

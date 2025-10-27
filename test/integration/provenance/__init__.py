@@ -15,23 +15,4 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Platform headers."""
-
-from typing import Any, Protocol, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from autosubmit.job.job import Job
-
-
-class PlatformHeader(Protocol):
-    """TODO: Replace this protocol by a proper class design for headers."""
-
-    SERIAL: str
-
-    PARALLEL: str
-
-    def get_queue_directive(self, job: 'Job', parameters: dict[str, Any]):
-        pass
-
-    def calculate_het_header(self, job: 'Job', parameters: dict[str, Any]):
-        pass
+"""Integration tests for provenance in Autosubmit."""
