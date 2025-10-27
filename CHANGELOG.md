@@ -26,6 +26,7 @@ release.
 - Fixed bug where an RO-Crate file would include itself in the archive, as well as other zip files.
   Now Autosubmit uses the pattern $expid-crate-$date-$time-$millisecond.zip, and ignores any ZIP files
   in the tmp/ASLOGS that start with $expid-crate and end with .zip #2692
+- Fixed 'NoneType' object has no attribute 'set' that would have set a 'NoneType' instead of a 'EventType' #2611 #2583
 
 **Enhancements:**
 

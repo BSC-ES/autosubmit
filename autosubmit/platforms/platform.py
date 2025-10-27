@@ -17,14 +17,13 @@
 
 import atexit
 import multiprocessing
-from multiprocessing.context import SpawnContext
 import os
 import queue  # only for the exception
 import time
 import traceback
 from contextlib import suppress
-from multiprocessing.synchronize import Event
 from multiprocessing.queues import Queue
+from multiprocessing.synchronize import Event
 # noinspection PyProtectedMember
 from os import _exit  # type: ignore
 from pathlib import Path
@@ -42,6 +41,7 @@ if TYPE_CHECKING:
     from autosubmit.job.job import Job
     from autosubmit.job.job_list import JobList
     from autosubmit.job.job_package_persistence import JobPackagePersistence
+    from multiprocessing.process import BaseProcess
 
 
 def _init_logs_log_process(as_conf: 'AutosubmitConfig', platform_name: str) -> None:
@@ -113,7 +113,7 @@ class CopyQueue(Queue):
         self.timeout = timeout
         super().__init__(maxsize, ctx=ctx)
 
-    def put(self, job: Any, block: bool = True, timeout: float = None) -> None:
+    def put(self, job: Any, block: bool = True, timeout: Optional[float] = None) -> None:
         """Puts a job into the queue if it is not a duplicate.
 
         :param job: The job to be added to the queue.
@@ -131,7 +131,7 @@ class Platform:
     Class to manage the connections to the different platforms.
     """
     # This is a list of the keep_alive events, used to send the signal outside the main loop of Autosubmit
-    worker_events = list()
+    worker_events: list[Event] = []
     # Shared lock between the main process and a retrieval log process
     lock = multiprocessing.Lock()
 
@@ -148,9 +148,10 @@ class Platform:
         :param auth_password: Optional password for two-factor authentication.
         :type auth_password: str or list, optional
         """
+        self.ctx = self.get_mp_context()
         self.connected = False
-        self.expid = expid  # type: str
-        self._name = name  # type: str
+        self.expid: str = expid
+        self._name: str = name
         self.config = config
         self.tmp_path = os.path.join(
             self.config.get("LOCAL_ROOT_DIR", ""), self.expid, self.config.get("LOCAL_TMP_DIR", ""))
@@ -209,12 +210,12 @@ class Platform:
             self.pw = None
         self.max_waiting_jobs = 20
         self.recovery_queue: Optional[Queue] = None
-        self.work_event = None
-        self.cleanup_event = None
-        self.log_retrieval_process_active = False
-        self.log_recovery_process = None
+        self.work_event: Optional[Event] = None
+        self.cleanup_event: Optional[Event] = None
+        self.log_retrieval_process_active: bool = False
+        self.log_recovery_process: Optional['BaseProcess'] = None
         self.keep_alive_timeout = 60 * 5  # Useful in case of kill -9
-        self.processed_wrapper_logs = set()
+        self.processed_wrapper_logs: set[str] = set()
         self.compress_remote_logs = False
         self.remote_logs_compress_type = "gzip"
         self.compression_level = 9
@@ -231,7 +232,7 @@ class Platform:
             self.compress_remote_logs = platform_config.get("COMPRESS_REMOTE_LOGS", False)
             self.remote_logs_compress_type = platform_config.get("REMOTE_LOGS_COMPRESS_TYPE", "gzip")
             self.compression_level = platform_config.get("COMPRESSION_LEVEL", 9)
-            
+
         self.log_queue_size = log_queue_size
         self.remote_log_dir = None
 
@@ -857,18 +858,18 @@ class Platform:
         This method sets the cleanup event to signal the log recovery process to finish,
         waits for the process to join with a timeout, and then resets all related variables.
         """
-        if self.cleanup_event:
+        if self.cleanup_event is not None:
             self.cleanup_event.set()  # Indicates to old child ( if reachable ) to finish.
-        if self.log_recovery_process:
+        if self.log_recovery_process is not None:
             # Waits for old child ( if reachable ) to finish. Timeout in case of it being blocked.
             self.log_recovery_process.join(timeout=60)
         # Resets everything related to the log recovery process.
-        self.recovery_queue = None
+        self.recovery_queue = self.ctx.Queue()
         self.log_retrieval_process_active = False
         self.remove_workers(self.work_event)
-        self.work_event = None
-        self.cleanup_event = None
-        self.log_recovery_process = None
+        self.work_event = self.ctx.Event()
+        self.cleanup_event = self.ctx.Event()
+        self.log_recovery_process = self.ctx.Process()
         self.processed_wrapper_logs = set()
 
     def load_process_info(self, platform):
@@ -899,23 +900,23 @@ class Platform:
             if not isinstance(self.config[key], dict) or key in ["PLATFORMS", "EXPERIMENT", "DEFAULT", "CONFIG"]:
                 platform.config[key] = self.config[key]
 
-    def prepare_process(self, ctx) -> 'Platform':
+    def prepare_process(self) -> 'Platform':
         new_platform = self.create_a_new_copy()
-        self.work_event = ctx.Event()
-        self.cleanup_event = ctx.Event()
+        self.work_event = self.ctx.Event()
+        self.cleanup_event = self.ctx.Event()
         Platform.update_workers(self.work_event)
         self.load_process_info(new_platform)
         if self.recovery_queue:
             del self.recovery_queue
         # Retrieval log process variables
-        self.recovery_queue = CopyQueue(ctx=ctx)
+        self.recovery_queue = CopyQueue(ctx=self.ctx)
         # Cleanup will be automatically prompt on control + c or a normal exit
         atexit.register(self.send_cleanup_signal)
         atexit.register(self.close_connection)
         return new_platform
 
-    def create_new_process(self, ctx: SpawnContext, new_platform: 'Platform', as_conf) -> None:
-        self.log_recovery_process = ctx.Process(
+    def create_new_process(self, new_platform: 'Platform', as_conf) -> None:
+        self.log_recovery_process = self.ctx.Process(
             target=recover_platform_job_logs_wrapper,
             args=(new_platform, self.recovery_queue, self.work_event, self.cleanup_event, as_conf),
             name=f"{self.name}_log_recovery")
@@ -942,16 +943,16 @@ class Platform:
                                                                                      "false")).lower() == "false"):
             if as_conf and as_conf.misc_data.get("AS_COMMAND", "").lower() == "run":
                 self.log_retrieval_process_active = True
-                ctx = self.get_mp_context()
-                new_platform = self.prepare_process(ctx)
-                self.create_new_process(ctx, new_platform, as_conf)
+                self.ctx = self.get_mp_context()
+                new_platform = self.prepare_process()
+                self.create_new_process(new_platform, as_conf)
                 self.join_new_process()
 
     def send_cleanup_signal(self) -> None:
         """Sends a cleanup signal to the log recovery process if it is alive.
         This function is executed by the atexit module
         """
-        if self.log_recovery_process and self.log_recovery_process.is_alive():
+        if self.log_recovery_process.is_alive():
             self.work_event.clear()
             self.cleanup_event.set()
             self.log_recovery_process.join(timeout=60)
@@ -1003,7 +1004,8 @@ class Platform:
                 break
         return process_log
 
-    def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any], as_conf: 'AutosubmitConfig') -> None:
+    def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any],
+                        as_conf: 'AutosubmitConfig') -> set[Any]:
         """Recovers log files for jobs from the recovery queue and retries failed jobs.
 
         :param identifier: Identifier for logging purposes.
@@ -1061,7 +1063,7 @@ class Platform:
         identifier = f"{self.name.lower()}(log_recovery):"
         try:
             Log.info(f"{identifier} Starting...")
-            jobs_pending_to_process = set()
+            jobs_pending_to_process: set = set()
             self.connected = False
             self.restore_connection(as_conf, log_recovery_process=True)
             Log.result(f"{identifier} successfully connected.")

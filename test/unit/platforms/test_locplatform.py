@@ -16,9 +16,9 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Unit tests for the Local Platform."""
+from pathlib import Path
 
 import pytest
-from pathlib import Path
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status

@@ -1859,17 +1859,15 @@ class JobList(object):
             return [job for job in completed_jobs if job.packed is False]
         return completed_jobs
 
-    def get_completed_failed_without_logs(self, platform: Any = None) -> List[Any]:
-        """Returns a list of completed or failed jobs without updated logs.
+    def get_completed_failed_without_logs(self) -> list[Any]:
+        """
+        Returns a list of completed or failed jobs without updated logs.
 
-        :param platform: Job platform, defaults to None.
-        :type platform: Platform
         :return: List of completed and failed jobs without updated logs.
         :rtype: List[Job]
         """
 
         completed_failed_jobs = [job for job in self._job_list if
-                                 (platform is None or job.platform.name == platform.name) and
                                  (job.status == Status.COMPLETED or job.status == Status.FAILED) and
                                  job.updated_log is False]
 

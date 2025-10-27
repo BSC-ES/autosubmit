@@ -657,3 +657,24 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
     autosubmit_exp('____')
 
     return backend
+
+
+def wait_child(timeout, retry=3):
+    """A parametrized fixture that will retry function X amount of times waiting for a child process to be executed.
+
+    In case it still fails after X retries an exception is thrown."""
+    def the_real_decorator(function):
+        def wrapper(*args, **kwargs):
+            retries = 0
+            while retries < retry:
+                try:
+                    value = function(*args, **kwargs)
+                    if value is None:
+                        return
+                except Exception:
+                    time.sleep(timeout)
+                    retries += 1
+
+        return wrapper
+
+    return the_real_decorator

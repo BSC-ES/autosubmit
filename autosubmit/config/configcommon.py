@@ -62,17 +62,17 @@ class AutosubmitConfig(object):
         self.last_experiment_data = {}
         self.data_loops = set()
 
-        self.current_loaded_files = dict()
+        self.current_loaded_files: dict = {}
         self.conf_folder_yaml = Path(BasicConfig.LOCAL_ROOT_DIR, expid, "conf")
         if not Path(BasicConfig.LOCAL_ROOT_DIR, expid, "conf").exists():
             raise IOError(f"Experiment {expid}/conf does not exist")
         self.wrong_config = defaultdict(list)
         self.warn_config = defaultdict(list)
-        self.dynamic_variables = dict()
-        self.special_dynamic_variables = dict()  # variables that will be substituted after all files is loaded
-        self.starter_conf = dict()
+        self.dynamic_variables: dict = {}
+        self.special_dynamic_variables: dict = {}  # variables that will be substituted after all files is loaded
+        self.starter_conf: dict = {}
         self.misc_files = []
-        self.misc_data = list()
+        self.misc_data: dict = {}
         self.default_parameters = {'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%',
                                    'M': '%M%', 'M_': '%M_%', 'm': '%m%', 'm_': '%m_%'}
 
@@ -117,7 +117,7 @@ class AutosubmitConfig(object):
             wrapper = {}
         return wrapper.get('EXPORT', self.experiment_data.get("WRAPPERS", {}).get("EXPORT", ""))
 
-    def get_project_submodules_depth(self) -> list:
+    def get_project_submodules_depth(self) -> list[int]:
         """Returns the max depth of submodule at the moment of cloning.
 
         Default is -1 (no limit).
@@ -131,8 +131,7 @@ class AutosubmitConfig(object):
             depth = [int(x) for x in unparsed_depth.split(",")]
         else:
             try:
-                depth = int(unparsed_depth)
-                depth = [depth]
+                depth = [int(unparsed_depth)]
             except TypeError:
                 Log.warning("PROJECT_SUBMODULES_DEPTH is not an integer neither a int. Using default value -1")
                 depth = []
@@ -906,7 +905,7 @@ class AutosubmitConfig(object):
             self,
             parameters: dict[str, Any] = None,
             max_deep: int = 25,
-            dict_keys_type: str = None,
+            dict_keys_type: str = '',
             in_the_end: bool = False,
     ) -> dict[str, Any]:
         """
@@ -931,7 +930,7 @@ class AutosubmitConfig(object):
         if parameters is None:
             parameters = self.deep_parameters_export(self.experiment_data, self.default_parameters)
 
-        if dict_keys_type is None:
+        if dict_keys_type == '':
             dict_keys_type = self.check_dict_keys_type(parameters)
 
         while len(dynamic_variables) > 0 and max_deep > 0:
@@ -2497,7 +2496,7 @@ class AutosubmitConfig(object):
 
     # based on https://github.com/cbirajdar/properties-to-yaml-converter/blob/master/properties_to_yaml.py
     @staticmethod
-    def ini_to_yaml(root_dir: Path, ini_file: str) -> None:
+    def ini_to_yaml(root_dir: Path, ini_file: Path) -> None:
         # Based on http://stackoverflow.com/a/3233356
         def update_dict(original_dict: dict, updated_dict: collections.abc.Mapping) -> dict:
             for k, v in updated_dict.items():
@@ -2532,7 +2531,7 @@ class AutosubmitConfig(object):
         config_dict = ConfigObj(input_file, stringify=True, list_values=False, interpolation=False, unrepr=False)
 
         # Store the result in yaml_dict
-        yaml_dict = {}
+        yaml_dict: dict = {}
 
         for key, value in config_dict.items():
             config_keys = key.split(".")
