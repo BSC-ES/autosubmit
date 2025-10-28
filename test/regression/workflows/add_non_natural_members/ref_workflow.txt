@@ -1,0 +1,8 @@
+## String representation of Job List [7]  ## 
+a00h_SYNCHRONIZE ~ [1 child] [READY] 
+|  a00h_20240102_fc00_CONFIG_SETUP ~ [3 children] [WAITING] 
+|  |  a00h_20240102_fc00_SIM [WAITING] 
+|  |  a00h_20240102_fc01_CONFIG_SETUP ~ [1 child] [WAITING] 
+|  |  |  a00h_20240102_fc01_SIM [WAITING] 
+|  |  a00h_20240102_fc02_CONFIG_SETUP ~ [1 child] [WAITING] 
+|  |  |  a00h_20240102_fc02_SIM [WAITING] 

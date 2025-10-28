@@ -1182,10 +1182,13 @@ class JobList(object):
                 dependencies_of_that_section.get(dependency.section)))
         else:
             filters_to_apply_of_parent = {}
+        # Possible_parents are those that match the filters_to_apply without taking into account redundancy. (filters: FROM_MEMBER, FROM_DATE, FROM_CHUNK, FROM_SPLIT, TO_MEMBER, TO_DATE, TO_CHUNK, TO_SPLIT)
         possible_parents = [possible_parent for possible_parent in dic_jobs.get_jobs_filtered(
             dependency.section, job, filters_to_apply, date, member, chunk,
             filters_to_apply_of_parent) if possible_parent.name != job.name]
         for parent in possible_parents:
+            # Ideally we want to avoid adding edges when the current job already has a path to the parent
+            # But, that is not solved in all cases. So, we use the problematic_dependencies set to track and prune those redundancy.
             edge_added = False
             if any_all_filter:
                 if (parent.chunk and parent.chunk != self.depends_on_previous_chunk.get(parent.section, parent.chunk) or
@@ -1202,10 +1205,11 @@ class JobList(object):
                 graph.add_edge(parent.name, job.name)
                 edge_added = True
             else:
-                if parent.name not in self.depends_on_previous_special_section.get(
-                        job.section, set()) or job.split > 0:
+                # In case we need to improve the perfomance while generating the workflow graph, this could be a point to check. (Workflows with splits and many dependencies).
+                if parent.name not in self.depends_on_previous_special_section.get(job.section, set()) or job.split > 0 or (job.section == parent.section and job.running != "chunk"):
                     graph.add_edge(parent.name, job.name)
                     edge_added = True
+
             if parent.section == job.section:
                 self.actual_job_depends_on_special_chunk = True
 

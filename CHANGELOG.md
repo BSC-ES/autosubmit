@@ -15,6 +15,7 @@ platform does not support wrappers anymore (it was used for testing).
   instead of the user-specified platform #2650
 - Fixes an issue with multi-day applications dependencies bug #2631
 - Fixes an issue with all-filter #2565
+- Fixes an issue when setting a dependency to a different date or member # 2466 ( #2518 partially)
 
 **Enhancements:**
 
