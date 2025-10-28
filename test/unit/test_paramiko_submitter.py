@@ -73,6 +73,5 @@ from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 def test_load_platforms(autosubmit_config, config):
     experiment_id = 'random-id'
     as_conf = autosubmit_config(experiment_id, config)
-    submitter = ParamikoSubmitter()
     with pytest.raises(AutosubmitCritical):
-        submitter.load_platforms(as_conf)
+        ParamikoSubmitter(as_conf=as_conf)

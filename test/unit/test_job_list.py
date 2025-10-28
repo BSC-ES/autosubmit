@@ -487,7 +487,7 @@ def test_create_dictionary(job_list, mocker, as_conf, empty_job_list):
     job_list.graph = graph
     # act
 
-    mocker.patch('autosubmit.job.job_list._get_submitter', autospec=True)
+    mocker.patch('autosubmit.job.job_list.ParamikoSubmitter', autospec=True)
     job_list.generate(
         as_conf=as_conf,
         date_list=date_list,
