@@ -363,9 +363,9 @@ class JobList(object):
 
     def _add_dependencies(
             self,
-            date_list: List[Any],
-            member_list: List[Any],
-            chunk_list: List[int],
+            date_list: list[Any],
+            member_list: list[Any],
+            chunk_list: list[int],
             dic_jobs: DicJobs,
             option: str = "DEPENDENCIES",
     ) -> None:
@@ -374,7 +374,7 @@ class JobList(object):
         Iterate experiment `JOBS` sections to:
         - build deep dependency maps (with and without distance metadata),
         - compute and attach edges for each job,
-        - add dependencies that couldn't (or not solved yet) be safetly added for later pruning,
+        - add dependencies that couldn't (or not solved yet) be safely added for later pruning,
         - add per-edge metadata to job objects.
 
         :param date_list: List of dates used by the experiment.
