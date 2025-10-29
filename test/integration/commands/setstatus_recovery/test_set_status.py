@@ -1,7 +1,7 @@
 from autosubmit.job.job_common import Status
 import pytest
 
-from build.lib.autosubmit.log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical
 
 
 @pytest.fixture(scope="function")
