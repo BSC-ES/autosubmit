@@ -2840,7 +2840,7 @@ class AutosubmitConfig(object):
             content = content.replace(match, parameters.get(match[1:-1], ""))
         return content
 
-    def get_current_wrapper(self, section):
+    def get_current_wrapper(self, section: str) -> dict:
         """Returns the wrapper configuration for a given job section.
 
         :param section: job section

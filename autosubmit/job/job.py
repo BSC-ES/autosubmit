@@ -2290,7 +2290,6 @@ class Job(object):
         for event in self.platform.worker_events:  # keep alive log retrieval workers.
             if not event.is_set():
                 event.set()
-        parameters.update(as_conf.default_parameters)
         return parameters
 
     def init_platform(self, as_conf: AutosubmitConfig) -> None:

@@ -1718,7 +1718,7 @@ def test_update_dict_parameters_invalid_script_language(platform_name: Optional[
     [None, "", "  ", "some-string", "a", "123", "True"],
     ids=["None", "empty", "spaces", "some-string", "a", "123", "True"]
 )
-def test_job_parameters(reservation: Optional[str], tmp_path: Path) -> None:
+def test_job_parameters(reservation: Optional[str], tmp_path: Path, autosubmit_config) -> None:
     """
     Parametrized test for job reservation propagation.
 
@@ -1768,8 +1768,7 @@ def test_job_parameters(reservation: Optional[str], tmp_path: Path) -> None:
     basic_config = FakeBasicConfig()
     basic_config.read()
     basic_config.LOCAL_ROOT_DIR = str(tmp_path)
-
-    config = AutosubmitConfig(expid, basic_config=basic_config, parser_factory=YAMLParserFactory())
+    config = autosubmit_config(expid, basic_config=basic_config)
     config.reload(True)
     parameters = config.load_parameters()
 
@@ -1963,6 +1962,7 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
         },
     }
     as_conf.experiment_data = as_conf.experiment_data | additional_experiment_data
+    # Needed to monkeypatch reload to avoid overwriting experiment_data ( the files doesn't exist in a unit-test)
     monkeypatch.setattr(as_conf, 'reload', lambda: None)
     job = Job(_EXPID, '1', Status.WAITING, 0)
     job.section = 'TEST_JOB_2'
