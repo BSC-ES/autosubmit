@@ -1799,8 +1799,7 @@ def test_job_parameters(reservation: Optional[str], tmp_path: Path, autosubmit_c
     config.reload(True)
     parameters = config.load_parameters()
 
-    job_list_obj = JobList(expid, config, YAMLParserFactory(),
-                           Autosubmit._get_job_list_persistence(expid, config))
+    job_list_obj = JobList(expid, config, YAMLParserFactory())
     job_list_obj.generate(
         as_conf=config,
         date_list=[],
@@ -1815,7 +1814,7 @@ def test_job_parameters(reservation: Optional[str], tmp_path: Path, autosubmit_c
         new=True,
         run_only_members=config.get_member_list(run_only=True),
         show_log=True,
-        create=True,
+        full_load=True,
     )
     job_list = job_list_obj.get_job_list()
     assert len(job_list) == 1
@@ -2158,8 +2157,10 @@ def experiment_data() -> dict:
             },
         },
         'WRAPPERS': {
-            'TYPE': 'vertical',
-            'JOBS_IN_WRAPPER': 'TEST_JOB&TEST_SPLIT',
+            'WRAPPER': {
+                'TYPE': 'vertical',
+                'JOBS_IN_WRAPPER': 'TEST_JOB&TEST_SPLIT',
+            }
         },
         'PLATFORMS': {
             'dummy_platform': {
@@ -2290,7 +2291,7 @@ def test_update_parameters(autosubmit_config, experiment_data):
                              'CURRENT_QUEUE': '',
                              'CURRENT_RESERVATION': '', 'CURRENT_RETRIALS': 3, 'CURRENT_ROOTDIR': 't001',
                              'CURRENT_RUNNING': 'chunk',
-                             'CURRENT_SCRATCH_DIR': '', 'CURRENT_TYPE': 'ps', 'CURRENT_USER': ''}
+                             'CURRENT_SCRATCH_DIR': '', 'CURRENT_TYPE': 'ps', 'CURRENT_USER': '', 'CURRENT_WRAPPER_TYPE': 'vertical', 'CURRENT_WRAPPER_JOBS_IN_WRAPPER': 'TEST_JOB&TEST_SPLIT'}
     for key, value in parameters.items():
         if key.startswith("CURRENT_"):
             assert value == expected_current_only[key]

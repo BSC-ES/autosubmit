@@ -1355,7 +1355,8 @@ class AutosubmitConfig(object):
 
         # Retrocompatibility
         if parser_data["STORAGE"].get('TYPE', "sqlite") in ['pkl', 'db']:
-            parser_data["STORAGE"] = 'sqlite'
+            parser_data["STORAGE"] = {}
+            parser_data["STORAGE"]['TYPE'] = 'sqlite'
 
         if parser_data["STORAGE"].get('TYPE', "sqlite") not in ['sqlite', 'postgres']:
             self.wrong_config["Autosubmit"] += [['storage',
@@ -2986,7 +2987,8 @@ class AutosubmitConfig(object):
         :return: wrapper configuration
         :rtype: dict
         """
-        for wrapper in self.experiment_data.get("WRAPPERS", {}).values():
-            if section in wrapper.get("JOBS_IN_WRAPPER", ""):
-                return wrapper
+        if isinstance(self.experiment_data.get("WRAPPERS", {}), dict):
+            for wrapper in self.experiment_data.get("WRAPPERS", {}).values():
+                if isinstance(wrapper, dict) and section in wrapper.get("JOBS_IN_WRAPPER", []):
+                    return wrapper
         return {}

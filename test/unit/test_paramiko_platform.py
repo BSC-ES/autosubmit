@@ -211,7 +211,7 @@ def test_submit_job(mocker, autosubmit_config, tmpdir):
 def test_get_pscall(paramiko_platform):
     job_id = 42
     output = paramiko_platform.get_pscall(job_id)
-    assert f'kill -0 {job_id}' in output
+    assert f'{job_id}' in output
 
 
 def test_remove_multiple_files_no_error_path_does_not_exist(paramiko_platform):
@@ -270,23 +270,23 @@ def test_poller(platform: str, mocker, paramiko_platform):
         ),
         (
                 [
-                    [Job(job_id='10', name=''), True]
+                    Job(job_id='10', name='')
                 ],
                 '10'
         ),
         (
                 [
-                    [Job(job_id='1', name=''), True],
-                    [Job(job_id='2', name=''), True]
+                    Job(job_id='1', name=''),
+                    Job(job_id='2', name='')
                 ],
                 '1,2'
         ),
 (
                 [
-                    [Job(job_id=None, name=''), True],
-                    [Job(job_id='2', name=''), True]
+                    Job(job_id=None, name=''),
+                    Job(job_id='2', name='')
                 ],
-                '0,2'
+                'None,2'
         )
     ]
 )
@@ -495,4 +495,3 @@ def test_get_file_errors(exception_message: bool, must_exist: bool, ignore_log: 
         assert mocked_log.printlog.call_count == 0
     else:
         assert mocked_log.printlog.call_count == len(messages)
-

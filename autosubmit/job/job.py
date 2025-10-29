@@ -1603,6 +1603,7 @@ class Job(object):
             ]:
                 parameters[f"CURRENT_{key.upper()}"] = value
 
+
         parameters["CURRENT_METRIC_FOLDER"] = self.get_metric_folder(as_conf=as_conf)
 
         self.update_placeholders(as_conf, parameters)

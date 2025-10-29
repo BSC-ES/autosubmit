@@ -919,12 +919,12 @@ class ParamikoPlatform(Platform):
         :return: A comma-separated string containing the job IDs.
         """
         job_list_cmd = ""
-        for job in job_list:
-            job_list_cmd += str(job.id) + ","
-        if job_list_cmd[-1] == ",":
-            job_list_cmd = job_list_cmd[:-1]
-
-        return ','.join(job_list_cmd)
+        if job_list:
+            for job in job_list:
+                job_list_cmd += str(job.id) + ","
+            if job_list_cmd[-1] == ",":
+                job_list_cmd = job_list_cmd[:-1]
+        return job_list_cmd
 
     def check_Alljobs(self, job_list: list["Job"], as_conf, retries=5):
         """
