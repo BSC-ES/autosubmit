@@ -1624,7 +1624,19 @@ class Job(object):
             parameters[f"CURRENT_{key.upper()}"] = value
 
         for key, value in as_conf.get_current_wrapper(self.section).items():
-            parameters[f"CURRENT_{key.upper()}"] = value
+            # Parameters that are wrapper exclusive should not be added
+            if key.lower() not in [
+                "type",
+                "jobs_in_wrapper",
+                "method",
+                "extend_wallclock",
+                "max_wrapped_h",
+                "max_wrapped_v",
+                "min_wrapped_h",
+                "min_wrapped_v",
+                "policy"
+            ]:
+                parameters[f"CURRENT_{key.upper()}"] = value
 
         parameters["CURRENT_METRIC_FOLDER"] = self.get_metric_folder(as_conf=as_conf)
 
