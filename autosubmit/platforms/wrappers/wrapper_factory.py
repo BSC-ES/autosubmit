@@ -65,11 +65,7 @@ class WrapperFactory(object):
                                                  wrapper_cmd, flags=re.IGNORECASE)
         for placeholder in placeholders_inside_wrapper:
             placeholder = placeholder[1:-1]
-            try:
-                value = str(wrapper_data.jobs[0].parameters.get(placeholder.upper(), ""))
-            except BaseException:
-                pass
-            value = ""
+            value = str(wrapper_data.jobs[0].parameters.get(placeholder.upper(), ""))
             if not value or value == "[]":
                 wrapper_cmd = re.sub('%(?<!%%)' + placeholder + '%(?!%%)', '', wrapper_cmd, flags=re.I)
             else:
