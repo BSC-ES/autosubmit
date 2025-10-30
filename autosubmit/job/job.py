@@ -232,6 +232,11 @@ class Job(object):
         else:  # Normalize data to store in the database
             job_data = dict([(k, getattr(self, k, None)) for k in PERSISTENT_ATTRIBUTES])
             job_data["status"] = Status.VALUE_TO_KEY[self.status]
+            # TODO why this is needed in the recovery test?
+            if not isinstance(self.local_logs, tuple):
+                self.local_logs = ('', '')
+            if not isinstance(self.remote_logs, tuple):
+                self.remote_logs = ('', '')
             job_data["local_logs_out"] = self.local_logs[0] if self.local_logs[0] else None
             job_data["local_logs_err"] = self.local_logs[1] if self.local_logs[1] else None
             job_data["remote_logs_out"] = self.remote_logs[0] if self.remote_logs[0] else ""
