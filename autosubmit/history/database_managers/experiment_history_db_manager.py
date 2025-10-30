@@ -492,8 +492,10 @@ class SqlAlchemyExperimentHistoryDbManager:
     """
 
     def __init__(self, options: dict):
-        job_data_file = options.get('jobdata_file', None)
-        jobdata_path = Path(options.get('jobdata_path', BasicConfig.DATABASE_CONN_URL))
+        default_file = None if BasicConfig.DATABASE_BACKEND == "postgres" else f"job_data_{options.get('expid',options.get('schema',None))}.db"
+        job_data_file = options.get('jobdata_file', default_file)
+        default_dir =  BasicConfig.DATABASE_CONN_URL if BasicConfig.DATABASE_BACKEND == "postgres" else BasicConfig.JOBDATA_DIR
+        jobdata_path = Path(options.get('jobdata_path', default_dir))
         if job_data_file:
             jobdata_path = jobdata_path / job_data_file
         connection_url = get_connection_url(jobdata_path)
@@ -523,7 +525,8 @@ class SqlAlchemyExperimentHistoryDbManager:
 
     def create_historical_database(self):
         with self.engine.connect() as conn:
-            conn.execute(CreateSchema(self.schema, if_not_exists=True))
+            if BasicConfig.DATABASE_BACKEND != "sqlite":
+                conn.execute(CreateSchema(self.schema, if_not_exists=True))
             conn.execute(CreateTable(get_table_with_schema(self.schema, ExperimentRunTable), if_not_exists=True))
             conn.execute(CreateTable(get_table_with_schema(self.schema, JobDataTable), if_not_exists=True))
             conn.commit()

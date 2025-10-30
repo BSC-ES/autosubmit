@@ -3023,27 +3023,25 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def online_recovery(as_conf, platforms) -> list:
-        # Connect to all platforms
-        # Fetch all completed files and return names
+    def online_recovery(as_conf, platforms, job_list, offline=False) -> list:
         completed_jobnames = set()
         for p in platforms:
             message = p.test_connection(as_conf)
             if not p.connected:
-                raise AutosubmitCritical(f"Couldn't connect to platform {p.name} during recovery: {message}", 7010)
-            completed_jobnames.update(p.get_completed_job_names())
+                if offline:
+                    Log.warning(f"Platform {p.name} is not reachable, proceeding with offline recovery for this platform")
+                    completed_jobnames.update(job_list.recover_all_completed_jobs_from_exp_history(p))
+                else:
+                    raise AutosubmitCritical(f"Couldn't connect to platform {p.name} during recovery: {message}", 7010)
+            else:
+                # Fetch completed jobs from platform
+                completed_jobnames.update(p.get_completed_job_names())
 
         return list(completed_jobnames)
 
     @staticmethod
-    def offline_recovery() -> list:
-        # Check JobDataTable
-        # Check which jobs have been completed and return names
-        # If a job has more than one run, the childs of run id > parent should be set to WAITING
-        Log.warning("Offline mode: No connection to the platforms will be established, using jobdata to recover the experiment")
-        # TODO: add the code
-        completed_jobnames = ""
-        return list(completed_jobnames)
+    def offline_recovery(job_list, platform: Platform = None) -> list[str]:
+        return job_list.recover_all_completed_jobs_from_exp_history(platform)
 
     @staticmethod
     def recovery(expid, noplot, save, all_jobs, hide, group_by=None, expand=list(), expand_status=list(), detail=False, force=False, offline=False):
@@ -3083,34 +3081,36 @@ class Autosubmit:
 
         platforms_to_test = set()
         for job in job_list.get_job_list():
-            job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", "").upper()
             job.submitter = submitter
             if not job.platform_name:
                 job.platform_name = hpcarch
             job.platform = platforms[job.platform_name]
             platforms_to_test.add(job.platform)
 
-        if offline:
-            completed_jobnames = Autosubmit.offline_recovery()
-        else:
-            completed_jobnames = Autosubmit.online_recovery(as_conf, platforms_to_test)
+        completed_jobnames = Autosubmit.online_recovery(as_conf, platforms_to_test, job_list, offline)
 
         current_active_jobs = job_list.get_in_queue()
         if current_active_jobs and not (force and save):
             raise AutosubmitCritical(f"Experiment can't be recovered due being {len(current_active_jobs)} "
                                      f"active jobs in your experiment, If you want to recover the experiment,"
-                                     f" please use the flag -f and all active jobs will be cancelled", 7012)
+                                     f" please use the flag -f and all active jobs will be cancelled. "
+                                     f"Be warned that -f and --offline won't cancel jobs if the connection can't be established", 7012)
 
         # TODO: https://github.com/BSC-ES/autosubmit/issues/1251 don't need force flag
         if force and save:
+            offline_jobs = []
             for job in current_active_jobs:
-                job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", "").upper()
-                if not job.platform_name:
-                    job.platform_name = hpcarch
-                # noinspection PyTypeChecker
-                job.platform = submitter.platforms[job.platform_name]
-            for job in current_active_jobs:
-                job.platform.send_command(f"{job.platform.cancel_cmd} {job.id}", ignore_log=True)
+                if offline and not job.platform.test_connection:
+                    offline_jobs.append(job.name)
+                else:
+                    job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", "").upper()
+                    if not job.platform_name:
+                        job.platform_name = hpcarch
+
+                    # noinspection PyTypeChecker
+                    job.platform = submitter.platforms[job.platform_name]
+                    job.platform.send_command(f"{job.platform.cancel_cmd} {job.id}", ignore_log=True)
+            Log.warning(f"Jobs {''.join(offline_jobs)} could not be cancelled due to offline mode.")
 
         output_type = as_conf.get_output_type()
         Log.info(f'Recovering experiment {expid}')
