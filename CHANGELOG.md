@@ -16,6 +16,7 @@ platform does not support wrappers anymore (it was used for testing).
 - Fixed bug that occured when having "CUSTOM_" placeholders in the header section of a wrapper #2669
 - Fixes an issue with multi-day applications dependencies bug #2631
 - Fixes an issue with all-filter #2565
+- Fixed issue where Autosubmit did not retry when there were networking issues in platforms #1369
 
 **Enhancements:**
 
@@ -153,7 +154,7 @@ the filter the jobs. Not using any value for `-fp` still returns all jobs.
 
 **Others:**
 - All autosubmit projects moved to Github.
-- Added Github actions for CI/CD.
+- Added GitHub actions for CI/CD.
 
 4.1.11 - Enhancements, New Features, Documentation, and Bug Fixes
 =================================================================
@@ -209,7 +210,6 @@ Others:
 - #1322: Autosubmit now has a DockerHub organization.
 - #1123: Profiler can now be stopped.
 
-
 4.1.10 - Hotfix
 ===============
 - Fixed an issue with the performance of the log retrieval.
@@ -225,14 +225,12 @@ Others:
 - Fixes an issue with dependency not being linked.
 - Docs improved.
 
-
 4.1.8 - Bug fixes.
 ==================
 - Fixed an issue with a socket connection left open.
 - Fixed an issue with log recovery being disabled by default.
 - Added exclusive parameter
 - Fixed some X11 routines called by default
-
 
 4.1.7 - X11, Migrate, script and Bug fixes
 ==========================================
@@ -280,9 +278,6 @@ Others:
 - Improved error clarity.
 - Added RO-Crate.
 - Added Calendar for splits.
-
-
-
 
 4.1.2 - Bug fixes
 =================
