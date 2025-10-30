@@ -5806,7 +5806,6 @@ class Autosubmit:
         except KeyError:
             raise AutosubmitCritical(f"Invalid status -fs. All values must match one "
                                      f"of {Status.VALUE_TO_KEY.keys()}", 7011)
-        expids: list[str] = []
         if all_expids:
             expid_list: list[str] = retrieve_expids()
         else:
