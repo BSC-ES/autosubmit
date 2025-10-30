@@ -33,7 +33,7 @@ import pytest
 from threading import Thread
 
 if TYPE_CHECKING:
-    from test.conftest import AutosubmitExperiment
+    pass
 
 _EXPID = 't000'
 """The experiment ID used throughout the test."""
