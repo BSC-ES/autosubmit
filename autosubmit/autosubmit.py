@@ -4743,7 +4743,7 @@ class Autosubmit:
             if not local_proj_dir_path.exists():
                 Path(local_proj_dir_path).mkdir(parents=True)
                 Path(project_destination).mkdir(parents=True)
-                Log.debug(f"The project folder {local_proj_dir} has been created.")
+                Log.debug(f"The project folder {local_proj_dir_path} has been created.")
                 copy_contents(Path(local_project_path), project_destination)
             else:
                 Log.info(f"Using project folder: {str(local_proj_dir_path)}")
