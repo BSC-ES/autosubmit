@@ -19,7 +19,7 @@ User Guide
    /userguide/user_mapping
    /userguide/templates
    /userguide/user_metrics/index
-   /userguide/log_compression
+   /userguide/log_operations
 
 Command list
 ============

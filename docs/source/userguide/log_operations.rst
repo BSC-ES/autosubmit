@@ -1,7 +1,7 @@
-Log compression
+Log operations
 =====================
 
-Autosubmit have some utilities to compress the log files that are created during the workflow execution.
+Autosubmit have some utilities to handle the log files that are created during the workflow execution. These utilities can help to save disk space and improve performance when dealing with large log files.
 
 
 Compressing logs from a remote job execution
@@ -46,3 +46,22 @@ The available configuration parameters are as follows:
       - Specify the compression type. Supported types are 'gzip' and 'xz'. Default is 'gzip'.
     * - ``COMPRESSION_LEVEL``
       - Specify the compression level (1-9). Default is 9.
+
+
+Removing log files after transfer
+--------------------------------------
+
+You can configure Autosubmit to remove log files from the remote platform after they have been successfully transferred to the local machine.
+
+.. code-block:: yaml
+
+    PLATFORMS:
+      MN5:
+        TYPE: <platform_type>
+        HOST: <host_name>
+        PROJECT: <project>
+        USER: <user>
+        SCRATCH: <scratch_dir>
+        MAX_WALLCLOCK: <HH:MM>
+        QUEUE: <hpc_queue>
+        REMOVE_LOG_FILES_ON_TRANSFER: true
