@@ -42,6 +42,7 @@ from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency
 from autosubmit.log.log import AutosubmitCritical, Log
+from autosubmit.platforms.platform import Platform
 
 
 class JobList(object):
@@ -4133,11 +4134,7 @@ class JobList(object):
         """
         Recover job_id and log name if missing from the database
         """
-        job_names = [
-            job.name
-            for job in self.get_job_list()
-            if job.status in [Status.COMPLETED, Status.READY, Status.QUEUING, Status.RUNNING] and (not job.local_logs[0] or not job.id)
-        ]
+        job_names = self._get_job_names(status=[Status.COMPLETED, Status.READY, Status.QUEUING, Status.RUNNING])
         # Recover job_id and log name if missing
         if job_names:
             exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
@@ -4151,6 +4148,30 @@ class JobList(object):
                     job.ready_date = datetime.datetime.fromtimestamp(jobs_data[job.name]["start"]).strftime('%Y%m%d%H%M%S')
                     # TODO: (new feature, another PR) If not last, update_log must be False so it can be recovered on the next autosubmit run ( check the run_id of all jobs somehow)
                     job.updated_log = True
+
+    def _get_job_names(self, status: Optional[list[int]] = None, platform: Platform = None) -> List[str]:
+        """Get a list of all job names in the job list.
+        :param status: Optional list of job statuses to filter by.
+        :type status: Optional[list[Status]]
+        :return: List of job names.
+        :rtype: List[str]
+        """
+        if status is None:
+            status = []
+        return [job.name for job in self.get_job_list() if job.status in status and ( not platform or job.platform_name == platform.name)]
+
+    def recover_all_completed_jobs_from_exp_history(self, platform: Platform = None) -> set[str]:
+        """Recover all completed jobs from experiment history"""
+
+        job_names = self._get_job_names(status=[Status.COMPLETED], platform=platform)
+        if job_names:
+            exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
+                                            historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR, force_sql_alchemy=True)
+            jobs_data = exp_history.manager.get_jobs_data(job_names)  # This gets only the last row
+
+            return set(jobs_data.keys())
+
+        return set()
 
     def update_db_wrappers(self):
         """
