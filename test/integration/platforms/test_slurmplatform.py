@@ -18,6 +18,7 @@
 """Integration tests for the Slurm platform."""
 
 from pathlib import Path
+import re
 from typing import TYPE_CHECKING
 
 import pytest
@@ -1022,3 +1023,87 @@ def test_compress_log_fail_command(
 
     result = exp.platform.compress_file("/some_log_file.log")
     assert result is None
+
+
+@pytest.mark.slurm
+@pytest.mark.parametrize(
+    "experiment_data",
+    [
+        {
+            "JOBS": {
+                "SIM": {
+                    "PLATFORM": _PLATFORM_NAME,
+                    "RUNNING": "once",
+                    "SCRIPT": 'echo "This is job ${SLURM_JOB_ID} EOM"',
+                },
+            },
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "127.0.0.1",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "REMOVE_LOG_FILES_ON_TRANSFER": True,
+                },
+            },
+        },
+        {
+            "JOBS": {
+                "SIM": {
+                    "PLATFORM": _PLATFORM_NAME,
+                    "RUNNING": "once",
+                    "SCRIPT": 'echo "This is job ${SLURM_JOB_ID} EOM"',
+                },
+            },
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "127.0.0.1",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "REMOVE_LOG_FILES_ON_TRANSFER": True,
+                    "COMPRESS_REMOTE_LOGS": True,
+                },
+            },
+        },
+    ],
+    ids=[
+        "Remove files on transfer",
+        "Remove files on transfer with compressed logs",
+    ],
+)
+def test_remove_files_on_transfer_slurm(
+    experiment_data: dict,
+    autosubmit_exp: "AutosubmitExperimentFixture",
+    slurm_server: "DockerContainer",
+):
+    _NEW_EXPID = "t444" # Use a different EXPID to avoid conflicts
+    exp = autosubmit_exp(_NEW_EXPID, experiment_data=experiment_data)
+    _create_slurm_platform(exp.expid, exp.as_conf)
+
+    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
+    exp.autosubmit.run_experiment(exp.expid)
+
+    remote_logs_dir = Path(
+        experiment_data["PLATFORMS"][_PLATFORM_NAME]["SCRATCH_DIR"],
+        experiment_data["PLATFORMS"][_PLATFORM_NAME]["PROJECT"],
+        experiment_data["PLATFORMS"][_PLATFORM_NAME]["USER"],
+        exp.expid,
+        f"LOG_{exp.expid}",
+    )
+
+    result = slurm_server.exec(f"ls {remote_logs_dir}")
+    filenames = result.output.decode().strip().split("\n")
+
+    for filename in filenames:
+        assert not bool(re.match(r".*\.(out|err)(\.(xz|gz))?$", filename))
