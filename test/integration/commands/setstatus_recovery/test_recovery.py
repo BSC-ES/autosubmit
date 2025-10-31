@@ -19,27 +19,27 @@ from autosubmit.history.database_managers.experiment_history_db_manager import S
 _EXPID = 't000'
 
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(scope="function")
 def as_exp(autosubmit_exp, general_data, experiment_data, jobs_data):
     config_data = general_data | experiment_data | jobs_data
     return autosubmit_exp(_EXPID, experiment_data=config_data, include_jobs=False, create=True)
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def submitter(as_exp):
     submitter = as_exp.autosubmit._get_submitter(as_exp.as_conf)
     submitter.load_platforms(as_exp.as_conf)
     return submitter
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def job_list(as_exp, submitter):
     return as_exp.autosubmit.load_job_list(
         as_exp.expid, as_exp.as_conf, new=False, full_load=True, submitter=submitter,
         check_failed_jobs=True)
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def prepare_scratch(tmp_path: Path, job_list, job_names_to_recover, slurm_server) -> Any:
     """
     Generates some completed and stat files in the scratch directory to simulate completed jobs.
@@ -66,13 +66,24 @@ def prepare_scratch(tmp_path: Path, job_list, job_names_to_recover, slurm_server
     slurm_server.exec(full_cmd)
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def job_names_to_recover(job_list):
     return [job.name for job in job_list.get_job_list() if job.split == 1]
 
 
+@pytest.mark.parametrize("active_jobs,force", [
+    (True, True),
+    (True, False),
+    (False, True),
+    (False, False),
+], ids=[
+    "Active_jobs&Force == recover_all",
+    "Active_jobs&No_Force == raise_error",
+    "No_Active_jobs&Force == recover_all",
+    "No_Active_jobs&No_Force == recover_all",
+])
 @pytest.mark.slurm
-def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_names_to_recover):
+def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_names_to_recover, active_jobs, force):
     """
     Test the recovery of an experiment.
 
@@ -81,28 +92,57 @@ def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_n
     :type as_exp: Any
     :type prepare_scratch: Any
     """
-
-    as_exp.autosubmit.recovery(
-        as_exp.expid,
-        noplot=True,
-        save=True,
-        all_jobs=True,
-        hide=False,
-        group_by=None,
-        expand=[],
-        expand_status=[],
-        detail=False,
-        force=False,
-        offline=False
-    )
     job_list_ = as_exp.autosubmit.load_job_list(
         as_exp.expid, as_exp.as_conf, new=False, full_load=True,
         check_failed_jobs=True)
 
-    completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
+    for job in job_list_.get_job_list():
+        if job.name in job_names_to_recover:
+            if active_jobs:
+                job.status = Status.RUNNING
+            else:
+                job.status = Status.WAITING
 
-    for name in job_names_to_recover:
-        assert name in completed_jobs
+    job_list_.save_jobs()
+
+    if active_jobs and not force:
+        with pytest.raises(AutosubmitCritical):
+            as_exp.autosubmit.recovery(
+                as_exp.expid,
+                noplot=True,
+                save=True,
+                all_jobs=True,
+                hide=False,
+                group_by=None,
+                expand=[],
+                expand_status=[],
+                detail=False,
+                force=force,
+                offline=False
+            )
+    else:
+        as_exp.autosubmit.recovery(
+            as_exp.expid,
+            noplot=True,
+            save=True,
+            all_jobs=True,
+            hide=False,
+            group_by=None,
+            expand=[],
+            expand_status=[],
+            detail=False,
+            force=force,
+            offline=False
+        )
+
+        job_list_ = as_exp.autosubmit.load_job_list(
+            as_exp.expid, as_exp.as_conf, new=False, full_load=True,
+            check_failed_jobs=True)
+
+        completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
+
+        for name in job_names_to_recover:
+            assert name in completed_jobs
 
 
 def _create_db_manager(db_path: Path):
@@ -110,28 +150,39 @@ def _create_db_manager(db_path: Path):
     return DbManager(connection_url=connection_url)
 
 
-def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover):
-    """
-    Test the offline recovery of an experiment.
-    :param as_exp: The Autosubmit experiment object.
-    :param prepare_scratch: Fixture to prepare the scratch directory.
-    """
+@pytest.mark.parametrize("active_jobs,force", [
+    (True, True),
+    (True, False),
+    (False, True),
+    (False, False),
+], ids=[
+    "Active_jobs&Force == recover_all",
+    "Active_jobs&No_Force == raise_error",
+    "No_Active_jobs&Force == recover_all",
+    "No_Active_jobs&No_Force == recover_all",
+])
+def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover, active_jobs, force):
+    job_names_to_recover = [name for name in job_names_to_recover if "LOCAL" not in name]
 
-    db_manager = SqlAlchemyExperimentHistoryDbManager(options={'expid':as_exp.expid, 'jobdata_file': f'job_data_{as_exp.expid}.db'})
+    db_manager = SqlAlchemyExperimentHistoryDbManager(options={'expid': as_exp.expid, 'jobdata_file': f'job_data_{as_exp.expid}.db'})
 
     db_manager.initialize()
-    job_list = as_exp.autosubmit.load_job_list(
+    job_list_ = as_exp.autosubmit.load_job_list(
         as_exp.expid, as_exp.as_conf, new=False, full_load=True,
         check_failed_jobs=True)
 
-    for job in job_list.get_job_list():
+    for job in job_list_.get_job_list():
         if job.name in job_names_to_recover:
-            job.status = Status.COMPLETED
+            if active_jobs:
+                job.status = Status.RUNNING
+            else:
+                job.status = Status.WAITING
+
         job_data_dc = JobData(_id=0,
                               counter=0,
                               job_name=job.name,
                               submit=11111,
-                              status=job.status,
+                              status="COMPLETED",
                               rowtype=0,
                               ncpus=0,
                               wallclock="00:01",
@@ -143,30 +194,83 @@ def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover):
                               platform=job.platform_name,
                               job_id=job.id,
                               children=None,
-                              run_id=99,
+                              run_id=1,
                               workflow_commit=None)
         db_manager._insert_job_data(job_data_dc)
+        job_data_dc = JobData(_id=0,
+                              counter=1,
+                              job_name=job.name,
+                              submit=11111,
+                              status="FAILED",
+                              rowtype=0,
+                              ncpus=0,
+                              wallclock="00:01",
+                              qos="debug",
+                              date=job.date,
+                              member=job.member,
+                              section=job.section,
+                              chunk=job.chunk,
+                              platform=job.platform_name,
+                              job_id=job.id,
+                              children=None,
+                              run_id=2,
+                              workflow_commit=None)
+        db_manager._insert_job_data(job_data_dc)
+        job_data_dc = JobData(_id=0,
+                              counter=2,
+                              job_name=job.name,
+                              submit=11111,
+                              status="COMPLETED",
+                              rowtype=0,
+                              ncpus=0,
+                              wallclock="00:01",
+                              qos="debug",
+                              date=job.date,
+                              member=job.member,
+                              section=job.section,
+                              chunk=job.chunk,
+                              platform=job.platform_name,
+                              job_id=job.id,
+                              children=None,
+                              run_id=3,
+                              workflow_commit=None)
+        db_manager._insert_job_data(job_data_dc)
+    job_list_.save_jobs()
+    if active_jobs and not force:
+        with pytest.raises(AutosubmitCritical):
+            as_exp.autosubmit.recovery(
+                as_exp.expid,
+                noplot=True,
+                save=True,
+                all_jobs=True,
+                hide=False,
+                group_by=None,
+                expand=[],
+                expand_status=[],
+                detail=False,
+                force=force,
+                offline=True
+            )
+    else:
+        as_exp.autosubmit.recovery(
+            as_exp.expid,
+            noplot=True,
+            save=True,
+            all_jobs=True,
+            hide=False,
+            group_by=None,
+            expand=[],
+            expand_status=[],
+            detail=False,
+            force=force,
+            offline=True
+        )
 
-    job_list.save_jobs()
-    as_exp.autosubmit.recovery(
-        as_exp.expid,
-        noplot=True,
-        save=True,
-        all_jobs=True,
-        hide=False,
-        group_by=None,
-        expand=[],
-        expand_status=[],
-        detail=False,
-        force=False,
-        offline=True
-    )
+        job_list_ = as_exp.autosubmit.load_job_list(
+            as_exp.expid, as_exp.as_conf, new=False, full_load=True,
+            check_failed_jobs=True)
 
-    job_list_ = as_exp.autosubmit.load_job_list(
-        as_exp.expid, as_exp.as_conf, new=False, full_load=True,
-        check_failed_jobs=True)
+        completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
 
-    completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
-
-    for name in job_names_to_recover:
-        assert name in completed_jobs
+        for name in job_names_to_recover:
+            assert name in completed_jobs

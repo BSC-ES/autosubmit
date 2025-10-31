@@ -3094,13 +3094,20 @@ class Autosubmit:
             raise AutosubmitCritical(f"Experiment can't be recovered due being {len(current_active_jobs)} "
                                      f"active jobs in your experiment, If you want to recover the experiment,"
                                      f" please use the flag -f and all active jobs will be cancelled. "
-                                     f"Be warned that -f and --offline won't cancel jobs if the connection can't be established", 7012)
-
+                                     f"Be warned that -f and --offline won't cancel jobs if the connection can't be established", 7053)
+        elif current_active_jobs and force and save and not offline:
+            all_connected = True
+            for p in platforms_to_test:
+                if not p.connected:
+                    all_connected = False
+                    Log.warning(f"Platform {p.name} is not reachable")
+            if not all_connected:
+                raise AutosubmitCritical("Some platforms are not reachable, cannot proceed with forced recovery. You can add --offline with -f to don't cancel jobs", 7050)
         # TODO: https://github.com/BSC-ES/autosubmit/issues/1251 don't need force flag
-        if force and save:
+        if save:
             offline_jobs = []
             for job in current_active_jobs:
-                if offline and not job.platform.test_connection:
+                if offline or not job.platform.connected:
                     offline_jobs.append(job.name)
                 else:
                     job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", "").upper()
@@ -3109,7 +3116,14 @@ class Autosubmit:
 
                     # noinspection PyTypeChecker
                     job.platform = submitter.platforms[job.platform_name]
-                    job.platform.send_command(f"{job.platform.cancel_cmd} {job.id}", ignore_log=True)
+                    try:
+                        job.platform.send_command(f"{job.platform.cancel_cmd} {job.id}", ignore_log=True)
+                    except AutosubmitError as e:
+                        # Not sure if this is the best way to check for invalid job id error for non-slurm
+                        if "invalid job id" in e.message.lower():
+                            Log.warning(f"Job {job.name} could not be cancelled because it was not found on the platform")
+                        else:
+                            Log.warning(f"Job {job.name} could not be cancelled: {e.message}")
             Log.warning(f"Jobs {''.join(offline_jobs)} could not be cancelled due to offline mode.")
 
         output_type = as_conf.get_output_type()

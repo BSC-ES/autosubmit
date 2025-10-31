@@ -837,14 +837,21 @@ class SqlAlchemyExperimentHistoryDbManager:
         max_counter = result.maxcounter
         return max_counter if max_counter else DEFAULT_MAX_COUNTER
 
-    def get_jobs_data(self, job_names) -> dict[str, Any]:
+    def get_jobs_data_last_row(self, job_names) -> dict[str, Any]:
         job_data_table = get_table_with_schema(self.schema, JobDataTable)
         jobs_data = self.select_jobs_data(job_data_table, job_names)
         jobs_data = [dict(job) for job in jobs_data]
         jobs_data_by_name = {}
+        counters = {}
         for job in jobs_data:
-            jobs_data_by_name[job['job_name']] = job
+            if not job['job_name'] in counters:
+                counters[job['job_name']] = job['counter']
+                jobs_data_by_name[job['job_name']] = job
+            elif job['counter'] > counters[job['job_name']]:
+                counters[job['job_name']] = job['counter']
+                jobs_data_by_name[job['job_name']] = job
         return jobs_data_by_name
+
 
     def select_jobs_data(self, table, job_names) -> List[tuple[str, Any]]:
         query = select(table).where(
