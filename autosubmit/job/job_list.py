@@ -4139,7 +4139,7 @@ class JobList(object):
         if job_names:
             exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                             historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR, force_sql_alchemy=True)
-            jobs_data = exp_history.manager.get_jobs_data(job_names)  # This gets only the last row
+            jobs_data = exp_history.manager.get_jobs_data_last_row(job_names)  # This gets only the last row
             for job in self.get_job_list():
                 if job.name in jobs_data:
                     job.id = int(jobs_data[job.name]["job_id"])
@@ -4151,6 +4151,7 @@ class JobList(object):
 
     def _get_job_names(self, status: Optional[list[int]] = None, platform: Platform = None) -> List[str]:
         """Get a list of all job names in the job list.
+
         :param status: Optional list of job statuses to filter by.
         :type status: Optional[list[Status]]
         :return: List of job names.
@@ -4158,18 +4159,17 @@ class JobList(object):
         """
         if status is None:
             status = []
-        return [job.name for job in self.get_job_list() if job.status in status and ( not platform or job.platform_name == platform.name)]
+        return [job.name for job in self.get_job_list() if (not status or job.status in status) and (not platform or job.platform_name == platform.name)]
 
     def recover_all_completed_jobs_from_exp_history(self, platform: Platform = None) -> set[str]:
         """Recover all completed jobs from experiment history"""
 
-        job_names = self._get_job_names(status=[Status.COMPLETED], platform=platform)
+        job_names = self._get_job_names(platform=platform)
         if job_names:
             exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                             historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR, force_sql_alchemy=True)
-            jobs_data = exp_history.manager.get_jobs_data(job_names)  # This gets only the last row
-
-            return set(jobs_data.keys())
+            jobs_data = exp_history.manager.get_jobs_data_last_row(job_names)  # This gets only the last row
+            return {name for name, data in jobs_data.items() if data["status"] == "COMPLETED"}
 
         return set()
 

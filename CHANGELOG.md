@@ -1,3 +1,20 @@
+### 4.2.0: Major release
+(provisional)
+This is a major release of Autosubmit that introduces significant changes in the management of jobs and dependencies. 
+The main highlight of this release is the introduction of a new database backend for the joblist using SQLAlchemy, which allows for better scalability in handling large workflows.
+This release also includes several bug fixes and enhancements to improve the overall user experience.
+
+**New Features:**
+- Introduced SQLAlchemy as the main database backend for joblist management, replacing the previous pickle-based system. This change allows for better scalability and flexibility in handling large workflows.
+- Added support for PostgreSQL as a database backend, in addition to the default SQLite. This provides users with more options for database management.
+- Improved the performance of job and dependency management, especially for large workflows with thousands of jobs.
+- [enhancement] Allow recovery to update current running/ready jobs #1251
+- TODO
+
+**Bug Fixes:**
+- TODO
+
+
 ### 4.1.16: Unreleased
 
 This release adds support to Postgres using SQLAlchemy, without removing the
