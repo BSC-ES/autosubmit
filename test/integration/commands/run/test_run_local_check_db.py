@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 # -- Tests
 
-@pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
+@pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,run_type", [
     # Success
     (dedent("""\
 
@@ -30,6 +30,32 @@ if TYPE_CHECKING:
             RUNNING: chunk
             wallclock: 00:01
     """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
+    (dedent("""\
+
+    EXPERIMENT:
+        NUMCHUNKS: '3'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World with id=Success"
+                as_checkpoint
+                as_checkpoint
+                sleep 1
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+        checkpoint_job:
+            SCRIPT: |
+                echo "This is a checkpoint job"
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            DEPENDENCIES:
+                job:
+                    STATUS: RUNNING
+                    FROM_STEP: 1
+            wallclock: 00:01
+    """), 6, "COMPLETED", "checkpoint"), # Test checkpoint functionality
+
 
     # Failure
     (dedent("""\
@@ -46,14 +72,13 @@ if TYPE_CHECKING:
             retrials: 2  
 
     """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
-], ids=["Success", "Failure"])
+], ids=["Success", "Checkpoint Test", "Failure"])
 def test_run_uninterrupted(
         autosubmit_exp,
         jobs_data: str,
         expected_db_entries,
         final_status,
-        wrapper_type,
-        slurm_server: 'DockerContainer',
+        run_type,
         prepare_scratch,
         common_conf,
 ):
@@ -107,6 +132,11 @@ def test_run_uninterrupted(
     except AssertionError:
         pytest.fail(e_msg)
 
+    if run_type == "checkpoint":
+        checkpoint_files = list(log_dir.rglob("*CHECKPOINT*"))
+        if not checkpoint_files:
+            pytest.fail(e_msg + f"No *CHECKPOINT* files found in {log_dir}\n")
+
 
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
@@ -146,7 +176,6 @@ def test_run_interrupted(
         expected_db_entries,
         final_status,
         wrapper_type,
-        slurm_server: 'DockerContainer',
         prepare_scratch,
         common_conf,
 ):

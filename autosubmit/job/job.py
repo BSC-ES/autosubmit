@@ -2170,8 +2170,6 @@ class Job(object):
             self.x11 = False if str(parameters.get("CURRENT_X11", False)).lower() == "false" else True
             self.notify_on = parameters.get("CURRENT_NOTIFY_ON", [])
             self.update_stat_file()
-            if self.checkpoint:  # To activate placeholder sustitution per <empty> in the template
-                parameters["AS_CHECKPOINT"] = self.checkpoint
             self.wchunkinc = as_conf.get_wchunkinc(self.section)
             self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT", {}).get("WORKFLOW_COMMIT", "")
 
@@ -2199,6 +2197,8 @@ class Job(object):
         parameters['PROJECT_TYPE'] = as_conf.get_project_type()
         parameters['X11'] = self.x11
         parameters['WORKFLOW_COMMIT'] = self.workflow_commit
+        parameters["AS_CHECKPOINT"] = self.checkpoint
+
         return parameters
 
     def update_job_variables_final_values(self, parameters: dict) -> None:
