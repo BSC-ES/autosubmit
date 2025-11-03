@@ -16,7 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/
 
 from datetime import datetime, timedelta
-from typing import Union
+from typing import Optional, Union
 
 from autosubmit.job.job import Job
 from autosubmit.statistics.jobs_stat import JobStat
@@ -32,8 +32,8 @@ class Statistics:
     def __init__(
             self,
             jobs: list[Job],
-            start: datetime,
-            end: datetime,
+            start: Optional[datetime],
+            end: Optional[datetime],
             queue_time_fix: dict[str, int],
             jobs_stat=None
     ) -> None:

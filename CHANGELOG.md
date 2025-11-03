@@ -13,11 +13,14 @@ platform does not support wrappers anymore (it was used for testing).
 - Fixed error when cleaning projects that use Git #2524
 - Fixed bug that occurred when copying experiments with different HPC platforms, where the incorrect platform was used 
   instead of the user-specified platform #2650
-- Fixed bug that occured when having "CUSTOM_" placeholders in the header section of a wrapper #2669
+- Fixed bug that occurred when having "CUSTOM_" placeholders in the header section of a wrapper #2669
 - Fixes an issue with multi-day applications dependencies bug #2631
 - Fixes an issue with all-filter #2565
 - Fixes an issue when setting a dependency to a different date or member # 2466 ( #2518 partially)
 - Fixes an issue with sections ignoring the MAX_WAITING_JOBS parameter #2613
+- Fixed bug where an RO-Crate file would include itself in the archive, as well as other zip files.
+  Now Autosubmit uses the pattern $expid-crate-$date-$time-$millisecond.zip, and ignores any ZIP files
+  in the tmp/ASLOGS that start with $expid-crate and end with .zip #2692
 
 **Enhancements:**
 
