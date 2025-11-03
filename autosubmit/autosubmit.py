@@ -3124,7 +3124,8 @@ class Autosubmit:
                             Log.warning(f"Job {job.name} could not be cancelled because it was not found on the platform")
                         else:
                             Log.warning(f"Job {job.name} could not be cancelled: {e.message}")
-            Log.warning(f"Jobs {''.join(offline_jobs)} could not be cancelled due to offline mode.")
+            if offline_jobs:
+                Log.warning(f"Jobs {''.join(offline_jobs)} could not be cancelled due to offline mode.")
 
         output_type = as_conf.get_output_type()
         Log.info(f'Recovering experiment {expid}')

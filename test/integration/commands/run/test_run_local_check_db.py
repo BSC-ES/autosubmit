@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 
 # -- Tests
 
-@pytest.mark.slurm
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
     (dedent("""\
@@ -59,7 +58,7 @@ def test_run_uninterrupted(
         common_conf,
 ):
     yaml = YAML(typ='rt')
-    as_exp = autosubmit_exp(experiment_data=common_conf | yaml.load(jobs_data), include_jobs=False, create=True)
+    as_exp = autosubmit_exp(_EXPID, experiment_data=common_conf | yaml.load(jobs_data), include_jobs=False, create=True)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -109,7 +108,6 @@ def test_run_uninterrupted(
         pytest.fail(e_msg)
 
 
-@pytest.mark.slurm
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
     (dedent("""\
@@ -153,7 +151,7 @@ def test_run_interrupted(
         common_conf,
 ):
     yaml = YAML(typ='rt')
-    as_exp = autosubmit_exp(experiment_data=common_conf | yaml.load(jobs_data), include_jobs=False, create=True)
+    as_exp = autosubmit_exp(_EXPID, experiment_data=common_conf | yaml.load(jobs_data), include_jobs=False, create=True)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
