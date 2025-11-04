@@ -19,7 +19,6 @@
 from pathlib import Path
 
 import pytest
-from numpy.ma.core import resize
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status

@@ -10,7 +10,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _EXPID, _check_files_recovered, _assert_db_fields, _assert_files_recovered, run_in_thread
 
 if TYPE_CHECKING:
-    from testcontainers.core.container import DockerContainer
+    pass
 
 
 # -- Tests

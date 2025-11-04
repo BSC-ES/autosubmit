@@ -5,13 +5,6 @@ from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.job.job_common import Status
 
 import pytest
-from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.db_common import get_autosubmit_version, _get_autosubmit_version, \
-    _update_experiment_description_version, _get_autosubmit_version_sqlalchemy, _last_name_used_sqlalchemy, \
-    check_db_path
-from autosubmit.database.db_common import get_connection_url, DbException, create_db, open_conn
-from autosubmit.database.db_manager import DbManager
-from autosubmit.database.tables import DBVersionTable, JobDataTable
 from autosubmit.log.log import AutosubmitCritical
 
 from autosubmit.history.database_managers.experiment_history_db_manager import SqlAlchemyExperimentHistoryDbManager

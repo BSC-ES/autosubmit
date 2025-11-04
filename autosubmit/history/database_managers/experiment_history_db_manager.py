@@ -844,7 +844,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         jobs_data_by_name = {}
         counters = {}
         for job in jobs_data:
-            if not job['job_name'] in counters:
+            if job['job_name'] not in counters:
                 counters[job['job_name']] = job['counter']
                 jobs_data_by_name[job['job_name']] = job
             elif job['counter'] > counters[job['job_name']]:

@@ -22,7 +22,6 @@ from textwrap import dedent
 from typing import TYPE_CHECKING
 
 import pytest
-from sqlalchemy import True_
 
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
