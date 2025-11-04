@@ -25,6 +25,7 @@ import pytest
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitError, AutosubmitCritical
+from autosubmit.platforms.locplatform import LocalPlatform
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException
 from autosubmit.platforms.psplatform import PsPlatform
@@ -495,3 +496,24 @@ def test_get_file_errors(exception_message: bool, must_exist: bool, ignore_log: 
         assert mocked_log.printlog.call_count == 0
     else:
         assert mocked_log.printlog.call_count == len(messages)
+
+
+@pytest.mark.parametrize("mode", ["all", "specific"])
+def test_get_completed_job_names(tmp_path, monkeypatch, mode):
+    """Test that completed job names are correctly retrieved from the remote platform."""
+    # Actually we want to test a paramiko function, but using local platform for simplicity with the "send_command" part.
+    platform = LocalPlatform(expid='t001', name='local', config={})
+    platform.remote_log_dir = tmp_path / 'remote_logs'
+    platform.remote_log_dir.mkdir(parents=True, exist_ok=True)
+    platform.connected = True
+    completed_jobs = ['job1_COMPLETED', 'job2_COMPLETED', 'job3_COMPLETED']
+    for job_file in completed_jobs:
+        (platform.remote_log_dir / job_file).touch()
+
+    if mode == "all":
+        job_names = platform.get_completed_job_names()
+        expected_job_names = ['job1', 'job2', 'job3']
+    else:
+        job_names = platform.get_completed_job_names(job_names=['job1', 'job3'])
+        expected_job_names = ['job1', 'job3']
+    assert set(job_names) == set(expected_job_names)
