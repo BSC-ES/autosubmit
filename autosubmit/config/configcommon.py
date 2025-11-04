@@ -1762,23 +1762,6 @@ class AutosubmitConfig(object):
         # Think of it as a tree with two branches that needs to be unified at each level
         return self.unify_conf(self.unify_conf(current_data_pre, current_data), current_data_post)
 
-    def load_list_parameter(self, parameter):
-        """
-        Loads a list parameter
-        :param parameter:
-        :return: list
-        """
-        if type(self.starter_conf[parameter]) is str:
-            if "," in self.starter_conf[parameter]:
-                list_parameters = self.starter_conf[parameter].split(",")
-            else:
-                list_parameters = [self.starter_conf[parameter]]
-        elif type(self.starter_conf[parameter]) is list:
-            list_parameters = self.starter_conf[parameter]
-        else:
-            list_parameters = list(self.starter_conf[parameter])
-        return [parameter.strip(" ") for parameter in list_parameters]
-
     @property
     def is_current_real_user_owner(self) -> bool:
         """
@@ -2949,13 +2932,14 @@ class AutosubmitConfig(object):
 
                 self.experiment_data["JOBS"][section_name]["SPLITS"] = splits
 
-    def get_wrapped_jobs(self, wrapper_name) -> list[str]:
-        """
-        Returns the jobs that should be wrapped for `wrapper_name`.
-        :return: jobs in wrapper
-        :param wrapper_name: name of the wrapper
-        :type wrapper_name: str
-        :rtype: list[str]
+    def get_wrapped_jobs(self) -> list[str]:
+        """Return the jobs that should be wrapped.
+
+        Read the `WRAPPERS.JOBS_IN_WRAPPER` value from `self.experiment_data` and
+        normalize it to a list of job names.
+
+        :return: Normalized list of job names.
+        :rtype: list[str].
         """
         jobs_in_wrapper = self.experiment_data.get("WRAPPERS", {}).get("JOBS_IN_WRAPPER", [])
         if isinstance(jobs_in_wrapper, str):
