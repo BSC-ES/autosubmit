@@ -841,48 +841,29 @@ class JobList(object):
                 self.graph.remove_edge(relation_to_delete[0], relation_to_delete[1])
 
     @staticmethod
-    def _parse_dependency_yaml_key(key: str) -> Tuple[str, Optional[int], Optional[str]]:
-        """
-        Parses a dependency key from the YAML configuration file.
-        The key can be in the format:
-        - section
-        - section-distance
-        - section+distance
-        - section*distance
-        - section?
-        - section-distance?
-        - section+distance?
-        - section*distance?
-        :param key: The dependency key to parse.
-        :return: A tuple containing the section name, distance (if any), and sign (if any).
-        :rtype: Tuple[str, Optional[int], Optional[str]]
-        """
-
-        distance = None
-        sign = None
-        section = key
-        if key[-1] == '?':
-            section = key[:-1]
-        if '-' in section:
-            sign = '-'
-        elif '+' in section:
-            sign = '+'
-        elif '*' in section:
-            sign = '*'
-
-        if sign:
-            section_split = section.split(sign)
-            section = section_split[0]
-            distance = int(section_split[1])
-        return section, distance, sign
-
-    @staticmethod
     def _manage_dependencies(dependencies_keys: dict, dic_jobs: DicJobs) -> dict[Any, Dependency]:
         parameters = dic_jobs.experiment_data["JOBS"]
         dependencies = dict()
         for key in list(dependencies_keys):
+            distance = None
             splits = None
-            section, distance, sign = JobList._parse_dependency_yaml_key(key)
+            sign = None
+            if '-' not in key and '+' not in key and '*' not in key and '?' not in key:
+                section = key
+            else:
+                if '?' in key:
+                    sign = '?'
+                    section = key[:-1]
+                else:
+                    if '-' in key:
+                        sign = '-'
+                    elif '+' in key:
+                        sign = '+'
+                    elif '*' in key:
+                        sign = '*'
+                    key_split = key.split(sign)
+                    section = key_split[0]
+                    distance = int(key_split[1])
             if parameters.get(section, None):
                 dependency_running_type = str(parameters[section].get('RUNNING', 'once')).lower()
                 delay = int(parameters[section].get('DELAY', -1))
@@ -1348,7 +1329,10 @@ class JobList(object):
         for key, dependency in dependencies.items():
             filters_to_apply = self._filter_current_job(job, copy.deepcopy(dependency.relationships))
             if "MIN_TRIGGER_STATUS" in filters_to_apply:
-                key, _, _ = JobList._parse_dependency_yaml_key(key)
+                if "-" in key:
+                    key = key.split("-")[0]
+                elif "+" in key:
+                    key = key.split("+")[0]
                 filters_to_apply_by_section[key] = filters_to_apply
         if not filters_to_apply_by_section:
             return
@@ -1579,7 +1563,7 @@ class JobList(object):
                 ):
                     continue
             if parent.section == job.section:
-                if not job.split or int(job.split) > 0:
+                if not job.splits or int(job.splits) > 0:
                     self.depends_on_previous_split[job.section] = int(parent.split)
             if self.actual_job_depends_on_previous_chunk and parent.section == job.section:
                 graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED", completion_status="WAITING")
@@ -1587,7 +1571,7 @@ class JobList(object):
             else:
                 # In case we need to improve the perfomance while generating the workflow graph, this could be a point to check. (Workflows with splits and many dependencies).
                 if parent.name not in self.depends_on_previous_special_section.get(
-                        job.section, set()) or job.split > 0:
+                        job.section, set()) or job.split > 0 or (job.section == parent.section and job.running != "chunk"):
                     graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED", completion_status="WAITING")
                     edge_added = True
 
