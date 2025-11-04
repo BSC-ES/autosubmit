@@ -499,7 +499,7 @@ def test_get_file_errors(exception_message: bool, must_exist: bool, ignore_log: 
 
 
 @pytest.mark.parametrize("mode", ["all", "specific"])
-def test_get_completed_job_names(tmp_path, monkeypatch, mode):
+def test_get_completed_job_names(tmp_path, mode):
     """Test that completed job names are correctly retrieved from the remote platform."""
     # Actually we want to test a paramiko function, but using local platform for simplicity with the "send_command" part.
     platform = LocalPlatform(expid='t001', name='local', config={})
