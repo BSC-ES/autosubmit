@@ -19,6 +19,7 @@
 from pathlib import Path
 
 import pytest
+from numpy.ma.core import resize
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
@@ -189,3 +190,28 @@ def test_submit_job(mocker, slurm_platform):
     slurm_platform._ssh_output = "10000\n"
     jobs_id = slurm_platform.submit_job(job, "dummy")
     assert jobs_id == 10000
+
+
+@pytest.mark.parametrize("exists", [True, False])
+def test_check_file_exists(mocker, slurm_platform, monkeypatch, tmp_path, exists):
+
+    # mocks to avoid connect to a remote platform (unit test)
+    monkeypatch.setattr(
+        slurm_platform,
+        "get_files_path",
+        lambda: str(tmp_path)
+    )
+
+    slurm_platform._ftpChannel = mocker.MagicMock()
+    slurm_platform._ftpChannel.stat = mocker.MagicMock()
+    if exists:
+        slurm_platform._ftpChannel.stat.return_value = exists
+    else:
+        slurm_platform._ftpChannel.stat.side_effect = FileNotFoundError
+
+    result = slurm_platform.check_file_exists("file.txt", max_retries=2, sleeptime=0)
+    assert result is exists
+
+    # Check that show_logs doesn't affect to the result
+    result = slurm_platform.check_file_exists("file.txt", show_logs=False, max_retries=2, sleeptime=0)
+    assert result is exists

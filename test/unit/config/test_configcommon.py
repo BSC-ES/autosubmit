@@ -22,6 +22,7 @@ from textwrap import dedent
 from typing import TYPE_CHECKING
 
 import pytest
+from sqlalchemy import True_
 
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
@@ -187,3 +188,336 @@ def test_check_conf_files_errors(error: Exception, expected: Exception,
     mocker.patch.object(as_conf, 'reload', side_effect=error)
     with pytest.raises(expected):
         as_conf.reload.side_effect = as_conf.check_conf_files()
+
+
+@pytest.mark.parametrize(
+    'exp_data, invalid_settings',
+    [
+        (
+                {
+                    "CONFIG": {
+                        "AUTOSUBMIT_VERSION": "4.1.12",
+                        "TOTALJOBS": 20,
+                        "MAXWAITINGJOBS": 20
+                    },
+                    "DEFAULT": {
+                        "EXPID": "",
+                        "HPCARCH": "",
+                        "CUSTOM_CONFIG": ""
+                    },
+                    "PROJECT": {
+                        "PROJECT_TYPE": "git",
+                        "PROJECT_DESTINATION": "git_project"
+                    },
+                    "GIT": {
+                        "PROJECT_ORIGIN": "",
+                        "PROJECT_BRANCH": "",
+                        "PROJECT_COMMIT": "",
+                        "PROJECT_SUBMODULES": "",
+                        "FETCH_SINGLE_BRANCH": True
+                    },
+                    "JOBS": {
+                        "JOB1": {
+                            "WALLCLOCK": "01:00",
+                            "PLATFORM": "test"
+                        }
+                    },
+                    "PLATFORMS": {
+                        "test": {
+                            "MAX_WALLCLOCK": "01:30"
+                        }
+                    },
+                },
+                [],
+        ),
+        (
+                {
+                    "CONFIG": {
+                        "AUTOSUBMIT_VERSION": "4.1.12",
+                        "TOTALJOBS": 20,
+                        "MAXWAITINGJOBS": 20
+                    },
+                    "DEFAULT": {
+                        "EXPID": "",
+                        "HPCARCH": "",
+                        "CUSTOM_CONFIG": ""
+                    },
+                    "PROJECT": {
+                        "PROJECT_TYPE": "git",
+                        "PROJECT_DESTINATION": "git_project"
+                    },
+                    "GIT": {
+                        "PROJECT_ORIGIN": "",
+                        "PROJECT_BRANCH": "",
+                        "PROJECT_COMMIT": "",
+                        "PROJECT_SUBMODULES": "",
+                        "FETCH_SINGLE_BRANCH": True
+                    },
+                    "JOBS": {
+                        "JOB1": {
+                            "WALLCLOCK": "01:00",
+                            "PLATFORM": "test"
+                        }
+                    },
+                    "PLATFORMS": {
+                        "test": {
+                            "MAX_WALLCLOCK": "01:30"
+                        }
+                    },
+                    "STORAGE": {
+                        "TYPE": "pkl",
+                    }
+                },
+                [],
+        ),
+        (
+                {
+                    "CONFIG": {
+                        "AUTOSUBMIT_VERSION": "4.1.12",
+                        "TOTALJOBS": 20,
+                        "MAXWAITINGJOBS": 20
+                    },
+                    "DEFAULT": {
+                        "EXPID": "",
+                        "HPCARCH": "",
+                        "CUSTOM_CONFIG": ""
+                    },
+                    "PROJECT": {
+                        "PROJECT_TYPE": "git",
+                        "PROJECT_DESTINATION": "git_project"
+                    },
+                    "GIT": {
+                        "PROJECT_ORIGIN": "",
+                        "PROJECT_BRANCH": "",
+                        "PROJECT_COMMIT": "",
+                        "PROJECT_SUBMODULES": "",
+                        "FETCH_SINGLE_BRANCH": True
+                    },
+                    "JOBS": {
+                        "JOB1": {
+                            "WALLCLOCK": "01:00",
+                            "PLATFORM": "test"
+                        }
+                    },
+                    "PLATFORMS": {
+                        "test": {
+                            "MAX_WALLCLOCK": "01:30"
+                        }
+                    },
+                    "STORAGE": {
+                        "TYPE": "invalid",
+                    }
+                },
+                ['STORAGE.TYPE'],
+        ),
+        (
+                {
+                    "CONFIG": {
+                        "AUTOSUBMIT_VERSION": "4.1.12",
+                    },
+                    "DEFAULT": {
+                        "EXPID": "",
+                        "HPCARCH": "",
+                        "CUSTOM_CONFIG": ""
+                    },
+                    "PROJECT": {
+                        "PROJECT_TYPE": "git",
+                        "PROJECT_DESTINATION": "git_project"
+                    },
+                    "GIT": {
+                        "PROJECT_ORIGIN": "",
+                        "PROJECT_BRANCH": "",
+                        "PROJECT_COMMIT": "",
+                        "PROJECT_SUBMODULES": "",
+                        "FETCH_SINGLE_BRANCH": True
+                    },
+                    "JOBS": {
+                        "JOB1": {
+                            "WALLCLOCK": "01:00",
+                            "PLATFORM": "test"
+                        }
+                    },
+                    "PLATFORMS": {
+                        "test": {
+                            "MAX_WALLCLOCK": "01:30"
+                        }
+                    },
+                    "STORAGE": {
+                        "TYPE": "sqlite",
+                    }
+                },
+                ['CONFIG.TOTALJOBS', 'CONFIG.MAXWAITINGJOBS', 'CONFIG.AUTOSUBMIT_VERSION'],
+        ),
+        (
+                {
+                    "CONFIG": {
+                        "AUTOSUBMIT_VERSION": "4.1.12",
+                        "TOTALJOBS": 20,
+                        "MAXWAITINGJOBS": 20
+                    },
+                    "DEFAULT": {
+                        "EXPID": "",
+                        "HPCARCH": "",
+                        "CUSTOM_CONFIG": ""
+                    },
+                    "PROJECT": {
+                        "PROJECT_TYPE": "git",
+                        "PROJECT_DESTINATION": "git_project"
+                    },
+                    "GIT": {
+                        "PROJECT_ORIGIN": "",
+                        "PROJECT_BRANCH": "",
+                        "PROJECT_COMMIT": "",
+                        "PROJECT_SUBMODULES": "",
+                        "FETCH_SINGLE_BRANCH": True
+                    },
+                    "JOBS": {
+                        "JOB1": {
+                            "WALLCLOCK": "01:00",
+                            "PLATFORM": "test"
+                        }
+                    },
+                    "PLATFORMS": {
+                        "test": {
+                            "MAX_WALLCLOCK": "01:30"
+                        }
+                    },
+                    "STORAGE": {
+                        "TYPE": "sqlite",
+                    },
+                    "MAIL": {
+                        "NOTIFICATIONS": True,
+                        "TO": ["valid_email_not_actually_exists@bsc.es", "another_valid_email_not_actually_exists@bsc.es"],
+                    }
+                },
+                [],
+        ),
+        (
+                {
+                    "CONFIG": {
+                        "AUTOSUBMIT_VERSION": "4.1.12",
+                        "TOTALJOBS": 20,
+                        "MAXWAITINGJOBS": 20
+                    },
+                    "DEFAULT": {
+                        "EXPID": "",
+                        "HPCARCH": "",
+                        "CUSTOM_CONFIG": ""
+                    },
+                    "PROJECT": {
+                        "PROJECT_TYPE": "git",
+                        "PROJECT_DESTINATION": "git_project"
+                    },
+                    "GIT": {
+                        "PROJECT_ORIGIN": "",
+                        "PROJECT_BRANCH": "",
+                        "PROJECT_COMMIT": "",
+                        "PROJECT_SUBMODULES": "",
+                        "FETCH_SINGLE_BRANCH": True
+                    },
+                    "JOBS": {
+                        "JOB1": {
+                            "WALLCLOCK": "01:00",
+                            "PLATFORM": "test"
+                        }
+                    },
+                    "PLATFORMS": {
+                        "test": {
+                            "MAX_WALLCLOCK": "01:30"
+                        }
+                    },
+                    "STORAGE": {
+                        "TYPE": "sqlite",
+                    },
+                    "MAIL": {
+                        "NOTIFICATIONS": True,
+                        "TO": "invalidbsc.es invalid2bsc.es",
+                    }
+                },
+                ["MAIL.TO"],
+        ),
+
+        (
+                {
+                    "CONFIG": {
+                        "AUTOSUBMIT_VERSION": "4.1.12",
+                        "TOTALJOBS": 20,
+                        "MAXWAITINGJOBS": 20
+                    },
+                    "DEFAULT": {
+                        "EXPID": "",
+                        "HPCARCH": "",
+                        "CUSTOM_CONFIG": ""
+                    },
+                    "PROJECT": {
+                        "PROJECT_TYPE": "git",
+                        "PROJECT_DESTINATION": "git_project"
+                    },
+                    "GIT": {
+                        "PROJECT_ORIGIN": "",
+                        "PROJECT_BRANCH": "",
+                        "PROJECT_COMMIT": "",
+                        "PROJECT_SUBMODULES": "",
+                        "FETCH_SINGLE_BRANCH": True
+                    },
+                    "JOBS": {
+                        "JOB1": {
+                            "WALLCLOCK": "01:00",
+                            "PLATFORM": "test"
+                        }
+                    },
+                    "PLATFORMS": {
+                        "test": {
+                            "MAX_WALLCLOCK": "01:30"
+                        }
+                    },
+                    "STORAGE": {
+                        "TYPE": "sqlite",
+                    },
+                    "MAIL": {
+                        "NOTIFICATIONS": True,
+                        "TO": "valid@bsc.es,invalid2bsc.es",
+                    }
+                },
+                ["MAIL.TO"],
+        ),
+
+    ],
+    ids=[
+        'valid_config_without_storage',
+        'valid_config_with_storage',
+        'invalid_storage_type',
+        'invalid_total_jobs_maxwaitingjobs,autosubmit_version',
+        'valid_mail_configuration',
+        'invalid_mail_to_no_at',
+        'invalid_mail_to_no_at_comma'
+    ], )
+def test_check_autosubmit_conf(autosubmit_config, exp_data, invalid_settings):
+    """Test that ``check_autosubmit_conf()`` works as expected."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data=exp_data)
+    as_conf.check_autosubmit_conf()
+
+    if not invalid_settings:
+        assert len(as_conf.wrong_config) == 0
+    else:
+        assert len(as_conf.wrong_config) > 0
+        # normalize for comparison
+        section_list = []
+        keys = []
+        # TODO for some reason this is a list of lists ( and the last list should be tuple?)
+        for weird_list in as_conf.wrong_config["Autosubmit"]:
+            section, key = weird_list
+            key = key[1].split(" ")[0].upper()
+            section_list.append(section.strip().upper())
+            keys.append(key.strip().upper())
+
+        for expected in invalid_settings:
+            if "." in expected:
+                items = expected.split(".")
+                section = items[0].upper()
+                keys = [item.upper() for item in items[1:]]
+                assert section in section_list
+                for key in keys:
+                    assert key in keys
+            else:
+                assert expected.upper() in section_list
