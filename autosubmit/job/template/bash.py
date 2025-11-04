@@ -26,7 +26,7 @@ _AS_BASH_HEADER = dedent("""\
 ###################
 # Autosubmit header
 ###################
-set -xvue
+set -xvu
 declare locale_to_set
 locale_to_set=$(locale -a | grep ^C.)
 export job_name_ptrn='%CURRENT_LOGDIR%/%JOBNAME%'

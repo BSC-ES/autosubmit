@@ -180,11 +180,11 @@ def run_in_thread(target: Callable[..., Any], *args, **kwargs) -> Thread:
     return thread
 
 
-def _check_db_fields(run_tmpdir: Path, expected_entries, final_status) -> dict[str, (bool, str)]:
+def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid) -> dict[str, (bool, str)]:
     """Check that the database contains the expected number of entries,
     and that all fields contain data after a completed run."""
     # Test database exists.
-    job_data_db = run_tmpdir / f'metadata/data/job_data_{_EXPID}.db'
+    job_data_db = run_tmpdir / f'metadata/data/job_data_{expid}.db'
     autosubmit_db = Path(run_tmpdir, "tests.db")
     db_check_list: dict = {
         "JOB_DATA_EXIST": (job_data_db.exists(), f"DB {str(job_data_db)} missing"),

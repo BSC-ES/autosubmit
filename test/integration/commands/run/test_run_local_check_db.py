@@ -7,10 +7,10 @@ from time import sleep
 
 from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
-from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _EXPID, _check_files_recovered, _assert_db_fields, _assert_files_recovered, run_in_thread
+from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, _assert_db_fields, _assert_files_recovered, run_in_thread
 
 if TYPE_CHECKING:
-    pass
+    from testcontainers.core.container import DockerContainer
 
 
 # -- Tests
@@ -56,7 +56,6 @@ if TYPE_CHECKING:
             wallclock: 00:01
     """), 6, "COMPLETED", "checkpoint"), # Test checkpoint functionality
 
-
     # Failure
     (dedent("""\
     EXPERIMENT:
@@ -83,7 +82,7 @@ def test_run_uninterrupted(
         common_conf,
 ):
     yaml = YAML(typ='rt')
-    as_exp = autosubmit_exp(_EXPID, experiment_data=common_conf | yaml.load(jobs_data), include_jobs=False, create=True)
+    as_exp = autosubmit_exp(experiment_data=common_conf | yaml.load(jobs_data), include_jobs=False, create=True)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -103,13 +102,13 @@ def test_run_uninterrupted(
         console_level="DEBUG"
     )
     # Run the experiment
-    exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
+    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
     _assert_exit_code(final_status, exit_code)
 
     # Check and display results
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status)
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid)
     e_msg = f"Current folder: {str(run_tmpdir)}\n"
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
     for check, value in db_check_list.items():
@@ -180,7 +179,7 @@ def test_run_interrupted(
         common_conf,
 ):
     yaml = YAML(typ='rt')
-    as_exp = autosubmit_exp(_EXPID, experiment_data=common_conf | yaml.load(jobs_data), include_jobs=False, create=True)
+    as_exp = autosubmit_exp(experiment_data=common_conf | yaml.load(jobs_data), include_jobs=False, create=True)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -189,24 +188,24 @@ def test_run_interrupted(
 
     # Run the experiment
     # This was not being interrupted, so we run it in a thread to simulate the interruption and then stop it.
-    run_in_thread(as_exp.autosubmit.run_experiment, expid=_EXPID)
+    run_in_thread(as_exp.autosubmit.run_experiment, expid=as_exp.expid)
     sleep(2)
     current_statuses = 'SUBMITTED, QUEUING, RUNNING'
     as_exp.autosubmit.stop(
         all_expids=False,
         cancel=False,
         current_status=current_statuses,
-        expids_string=_EXPID,
+        expids_string=as_exp.expid,
         force=True,
         force_all=True,
         status='FAILED')
 
-    exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
+    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
 
     # Check and display results
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status)
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid)
     _assert_db_fields(db_check_list)
 
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
