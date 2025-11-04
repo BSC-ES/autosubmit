@@ -139,7 +139,8 @@ def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_n
         for name in job_names_to_recover:
             assert name in completed_jobs
 
-@pytest.skip(reason="Offline recovery test is flaky, needs investigation. It always works when launched alone or with setstatus/recovery tests")
+
+@pytest.mark.skip(reason="Offline recovery test is flaky, needs investigation. It always works when launched alone or with setstatus/recovery tests")
 @pytest.mark.parametrize("active_jobs,force", [
     (True, True),
     (True, False),
