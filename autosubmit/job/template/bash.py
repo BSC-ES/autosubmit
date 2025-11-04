@@ -23,6 +23,9 @@ _DEFAULT_EXECUTABLE = "/bin/bash\n"
 """The default executable used when none provided."""
 
 _AS_BASH_HEADER = dedent("""\
+###################
+# Autosubmit header
+###################
 set -xvue
 declare locale_to_set
 locale_to_set=$(locale -a | grep ^C.)
@@ -31,9 +34,6 @@ export job_name_ptrn='%CURRENT_LOGDIR%/%JOBNAME%'
 r=0
 bash -e <<'__AS_CMD__'
 set -xve
-###################
-# Autosubmit header
-###################
 if [ -z "$locale_to_set" ] ; then
     # locale installed...
     export LC_ALL=$locale_to_set
