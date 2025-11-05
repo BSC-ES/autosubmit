@@ -424,7 +424,7 @@ class Platform(object):
                     save = True
                     if package.x11 != "true":
                         valid_packages_to_submit.append(package)
-                except (IOError, OSError) as e:
+                except (IOError, OSError):
                     if package.jobs[0].id != 0:
                         failed_packages.append(package.jobs[0].id)
                     continue

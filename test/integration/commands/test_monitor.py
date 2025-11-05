@@ -88,7 +88,7 @@ def test_monitor(autosubmit_exp, wrapper_type, min_trigger_status, from_step, ge
     # TODO: Show in the -d option, the wrapped jobs
     as_exp.autosubmit.monitor(
         as_exp.expid,
-        hide=True, # disables the open() of the pdf after generation
+        hide=True,  # disables the open() of the pdf after generation
         group_by=None,
         expand=[],
         expand_status=[],
