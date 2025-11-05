@@ -199,7 +199,7 @@ def test_jobs_in_wrapper_str(autosubmit_config):
     assert result == "job1_job2_job3"
 
 
-def test_job_package_submission(mocker, local):
+def test_job_package_submission(mocker, local, tmp_path):
     # N.B.: AS only calls ``_create_scripts`` if you have less jobs than threads.
     # So we simply set threads to be greater than the amount of jobs.
     jobs = [
@@ -213,10 +213,13 @@ def test_job_package_submission(mocker, local):
     mocker.patch('multiprocessing.cpu_count', return_value=len(jobs) + 1)
     mocker.patch("autosubmit.job.job.Job.update_parameters", return_value={})
     mocker.patch('autosubmit.job.job.Job._get_paramiko_template', return_value="empty")
+
     for job in jobs:
-        job._tmp_path = MagicMock()
-        job.file = "fake-file"
+        job._tmp_path = tmp_path
+        job.file = tmp_path / "fake-file"
         job.custom_directives = []
+        job.file.write_text("echo 'Hello World'")
+
 
     job_package = JobPackageSimple(jobs)
 
