@@ -29,6 +29,7 @@ release.
 - Fixes an issue when setting a dependency to a different date or member # 2466 ( #2518 partially)
 - Fixes an issue with recovery not being able to cancel active jobs #2695
 - Fixes an issue with SQLAlchemy not working correctly with the historical job_data.db #2695
+- Fixes an issue with infinite loop when additional files are not found #2468
 - Fixes an issue with sections ignoring the MAX_WAITING_JOBS parameter #2613
 - Fixed bug where an RO-Crate file would include itself in the archive, as well as other zip files.
   Now Autosubmit uses the pattern $expid-crate-$date-$time-$millisecond.zip, and ignores any ZIP files
