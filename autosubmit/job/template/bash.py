@@ -92,7 +92,7 @@ def as_body(body: str) -> str:
 
 r=0
 set +e
-bash -e <<__AS_CMD__
+bash -e <<"__AS_CMD__"
 set -xuve
 {body}
 __AS_CMD__
