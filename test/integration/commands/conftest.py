@@ -207,32 +207,36 @@ def wrapped_jobs(wrapper_type: str, structure: dict, size: dict) -> Dict[str, ob
     }
     if len(structure) > 0:
         complex = {
-            'JOB': {
-                'SCRIPT': "|"
-                          "sleep 0"
-                          "as_checkpoint"
-                          "as_checkpoint",
-                'RUNNING': 'chunk',
-                'WALLCLOCK': '00:01',
-                'PLATFORM': 'TEST_SLURM',
-                'CHECK': 'on_submission',
-                'PROCESSORS': '1',
-
-            },
-            'COMPLEX_WRAPPER': {
-                'SCRIPT': "|"
-                          "sleep 0",
-                'DEPENDENCIES': {
-                    'JOB': {
-                        'STATUS': structure['min_trigger_status'],
-                        'FROM_STEP': structure['from_step'],
+            'JOBS': {
+                'JOB': {
+                    'SCRIPT': "|"
+                              "sleep 0"
+                              "as_checkpoint"
+                              "as_checkpoint",
+                    'RUNNING': 'chunk',
+                    'DEPENDENCIES': {
+                        'JOB-1': {},
                     },
-                    'COMPLEX_WRAPPER-1': {},
+                    'WALLCLOCK': '00:01',
+                    'PLATFORM': 'TEST_SLURM',
+                    'CHECK': 'on_submission',
+                    'PROCESSORS': '1',
                 },
-                'RUNNING': 'chunk',
-                'WALLCLOCK': '00:01',
-                'PROCESSORS': '1',
-                'PLATFORM': 'TEST_SLURM',
+                'COMPLEX_WRAPPER': {
+                    'SCRIPT': "|"
+                              "sleep 0",
+                    'DEPENDENCIES': {
+                        'JOB': {
+                            'STATUS': structure['min_trigger_status'],
+                            'FROM_STEP': structure['from_step'],
+                        },
+                        'COMPLEX_WRAPPER-1': {},
+                    },
+                    'RUNNING': 'chunk',
+                    'WALLCLOCK': '00:01',
+                    'PROCESSORS': '1',
+                    'PLATFORM': 'TEST_SLURM',
+                },
             },
             'WRAPPERS': {
                 'COMPLEX_WRAPPER': {
@@ -245,4 +249,7 @@ def wrapped_jobs(wrapper_type: str, structure: dict, size: dict) -> Dict[str, ob
                 }
             }
         }
-    return mod_experiment_data | simple | complex
+    full_config = mod_experiment_data | simple
+    full_config['JOBS'].update(complex.get('JOBS', {}))
+    full_config['WRAPPERS'].update(complex.get('WRAPPERS', {}))
+    return full_config

@@ -935,6 +935,7 @@ class JobPackagerVertical(object):
             child_ = sorted_jobs[index]
             if child_.name != job.name and self._is_wrappable(child_):
                 child = child_
+                break
         return child, index+1
 
     def _is_wrappable(self, job):
@@ -952,7 +953,8 @@ class JobPackagerVertical(object):
             for parent in job.parents:
                 # First part of this conditional is true only if the parent is already on the wrapper package ( job_lists == current_wrapped jobs there )
                 # Second part is actually relevant, parents of a wrapper should be COMPLETED
-                if parent not in self.jobs_list and parent.status != Status.COMPLETED:
+                parent_is_being_wrapped_with_current_job = parent in self.jobs_list
+                if parent_is_being_wrapped_with_current_job and parent.status != Status.COMPLETED:
                     return False
             return True
         return False
