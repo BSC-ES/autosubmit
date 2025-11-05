@@ -26,6 +26,7 @@ import tarfile
 import time
 from contextlib import suppress
 from datetime import timedelta
+from pathlib import Path
 from threading import Thread
 from typing import Optional, TYPE_CHECKING
 
@@ -136,27 +137,57 @@ class JobPackageBase(object):
     def _create_common_script(self, filename: str = ""):
         pass  # pragma: no cover
 
-    def submit_unthreaded(self, configuration: 'AutosubmitConfig', only_generate: bool = False):
+    def check_job_files_exists(self, configuration: 'AutosubmitConfig', only_generate: bool) -> None:
+        """ Check that all job files exist in the project directory.
+        :param configuration: Autosubmit basic configuration.
+        :type configuration: AutosubmitConfig
+        :param only_generate: True to only generate scripts without submitting.
+        :type only_generate: bool
+        :return: None.
         """
-        :param configuration: Autosubmit basic configuration
-        :type configuration: AutosubmitConfig object
-        :param only_generate: True if coming from generate_scripts_andor_wrappers(). If true, only generates scripts; otherwise, submits.
-        :type only_generate: Boolean
-        """
+
+        if not configuration.get_project_type() or (configuration.get_project_type() and str(configuration.get_project_type()).lower() == "none"):
+            return
+
+        Log.debug("Checking job files existence")
+        project_dir = Path(configuration.get_project_dir())
+        # This self.jobs is actually only jobs in the package not all the loaded job_list.
         for job in self.jobs:
-            if only_generate and not os.path.exists(os.path.join(configuration.get_project_dir(), job.file)):
-                break
-            if not os.path.exists(os.path.join(configuration.get_project_dir(), job.file)):
-                if configuration.get_project_type().lower() != "none" and len(configuration.get_project_type()) > 0:
-                    raise AutosubmitCritical(
-                        "Template [ {0} ] using CHECK=On_submission has some empty variable {0}".format(job.name), 7014)
-            if not job.check_script(configuration, show_logs=job.check_warnings):
-                Log.warning(
-                    f'Script {job.name} has some empty variables. An empty value has substituted these variables')
-            else:
-                Log.result("Script {0} OK", job.name)
-            # looking for directives on jobs
-            self._custom_directives = self._custom_directives | set(job.custom_directives)
+            # When SCRIPT is defined, FILE is ignored.
+            if not job.script and job.file:
+                job_file_path = project_dir / job.file
+                if not job_file_path.exists():
+                    if only_generate:
+                        Log.warning(f"[section:{job.section}]: Job script:{job.file} does not exists, skipping check")
+                    else:
+                        raise AutosubmitCritical(f"[section:{job.section}]: Job script:{job.file} does not exists", 7014)
+
+            for additional_file in job.additional_files:
+                exists = not additional_file or (project_dir / additional_file).exists()
+                if not exists and only_generate:
+                    Log.warning(f"[section:{job.section}]: Additional file:{additional_file} does not exists, skipping check")
+                elif not exists and not only_generate:
+                    raise AutosubmitCritical(f"[section:{job.section}]: Additional file:{additional_file} does not exists", 7014)
+
+    def build_scripts(self, configuration: 'AutosubmitConfig', only_generate: bool = False) -> None:
+        """Submit jobs one by one without using threads.
+
+        :param configuration: Autosubmit basic configuration.
+        :type configuration: AutosubmitConfig
+        :param only_generate: True to only generate scripts without submitting.
+        :return: None.
+        """
+        Log.debug("Checking Scripts")
+        for job in self.jobs:
+            if job.file or job.script:
+                if not job.check_script(configuration, show_logs=job.check_warnings):
+                    Log.warning(
+                        f"Script {job.name} has some empty variables. An empty value has substituted these variables"
+                    )
+
+            self._custom_directives |= set(getattr(job, "custom_directives", []))
+
+        Log.debug("Building scripts")
         self._create_scripts(configuration)
 
     def submit(self, configuration: 'AutosubmitConfig', parameters: Optional[dict] = None, only_generate: bool = False, hold: bool = False):
@@ -185,13 +216,12 @@ class JobPackageBase(object):
             if len(self.jobs) < thread_number or str(
                     configuration.experiment_data.get("CONFIG", {}).get("ENABLE_WRAPPER_THREADS",
                                                                         "False")).lower() == "false":
-                self.submit_unthreaded(configuration, only_generate)
-                Log.debug("Creating Scripts")
-                self._create_scripts(configuration)
+                self.check_job_files_exists(configuration, only_generate)
+                self.build_scripts(configuration, only_generate)
             else:
+                # TODO: Not related to this PR, but this probably is not working correctly (nobody is using it)
                 lhandle = list()
                 for i in range(0, len(self.jobs), chunksize):
-                    Log.debug("Checking Scripts")
                     lhandle.append(
                         self.check_scripts(self.jobs[i:i + chunksize], configuration, parameters, only_generate, hold))
                 for dataThread in lhandle:

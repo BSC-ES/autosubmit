@@ -303,8 +303,8 @@ class TestWrappers:
         wrapper_limits["max_v"] = max_wrapped_jobs
         wrapper_limits["max_h"] = max_wrapped_jobs
         wrapper_limits["min"] = 2
-        wrapper_limits["min_v"] = 2
-        wrapper_limits["min_h"] = 2
+        wrapper_limits["min_v"] = 1
+        wrapper_limits["min_h"] = 1
         wrapper_limits["max_by_section"] = max_wrapped_job_by_section
 
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):

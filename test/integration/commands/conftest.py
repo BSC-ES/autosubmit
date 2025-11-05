@@ -7,7 +7,7 @@ from pathlib import Path
 def general_data(tmp_path: Path) -> Dict[str, object]:
     """
     Provides part of the `experiment_data` dictionary used by the
-    integration tests in `commands/setstatus_recovery`.
+    integration tests in `commands`.
 
     :param tmp_path: Temporary directory fixture from pytest.
     :type tmp_path: Path
@@ -68,7 +68,7 @@ def general_data(tmp_path: Path) -> Dict[str, object]:
 def experiment_data(tmp_path: Path) -> Dict[str, object]:
     """
     Provide part of the `experiment_data` dictionary used by the
-    integration tests in `commands/setstatus_recovery`.
+    integration tests in `commands`.
 
     :param tmp_path: Temporary directory fixture from pytest.
     :type tmp_path: Path
@@ -91,8 +91,8 @@ def experiment_data(tmp_path: Path) -> Dict[str, object]:
 @pytest.fixture(scope="function")
 def jobs_data(tmp_path: Path) -> Dict[str, object]:
     """
-    Provide a minimal but representative `jobs_data` dictionary used by the
-    integration tests in `commands/setstatus_recovery`.
+    Provide a representative `jobs` dictionary used by the
+    integration tests in `commands`.
 
     :param tmp_path: Temporary directory fixture from pytest.
     :type tmp_path: Path
@@ -151,3 +151,98 @@ def jobs_data(tmp_path: Path) -> Dict[str, object]:
             }
         }
     }
+
+
+def wrapped_jobs(wrapper_type: str, structure: dict, size: dict) -> Dict[str, object]:
+    """Provides a `jobs_data` dictionary with wrapped jobs used by the
+    integration tests in `commands`.
+
+    :param wrapper_type: The type of wrapper to use ['vertical', 'horizontal', 'vertical-horizontal', 'horizontal-vertical']
+    :type wrapper_type: str
+    :param structure: The structure of the wrapper [min_trigger_status, from_step]
+    :type structure: dict
+    :param size: The size limits of the wrapper [MAX_V, MAX_H, MIN_V, MIN_H]
+    :param size: dict
+    :return: A dictionary compatible with AutosubmitConfig.jobs_data
+    :rtype: Dict[str, object]
+    """
+    mod_experiment_data = {
+        'EXPERIMENT': {
+            'DATELIST': '20200101',
+            'MEMBERS': 'fc0 fc1',
+            'CHUNKSIZEUNIT': 'month',
+            'SPLITSIZEUNIT': 'day',
+            'CHUNKSIZE': 1,
+            'NUMCHUNKS': 2,
+            'CALENDAR': 'standard',
+        }
+    }
+    complex = {}
+    simple = {
+        'JOBS': {
+            'WRAPPED_JOB_SIMPLE': {
+                'SCRIPT': "|"
+                          "sleep 0",
+                'RUNNING': 'chunk',
+                'DEPENDENCIES': {
+                    'WRAPPED_JOB_SIMPLE-1': {},
+                },
+                'WALLCLOCK': '00:01',
+                'PLATFORM': 'TEST_SLURM',
+                'CHECK': 'on_submission',
+                'PROCESSORS': '1',
+
+            },
+        },
+        'WRAPPERS': {
+            'SIMPLE_WRAPPER': {
+                'TYPE': wrapper_type,
+                'JOBS_IN_WRAPPER': 'WRAPPED_JOB_SIMPLE',
+                'MAX_WRAPPED_V': size.get('MAX_V', 2),
+                'MAX_WRAPPED_H': size.get('MAX_H', 2),
+                'MIN_WRAPPED_V': size.get('MIN_V', 2),
+                'MIN_WRAPPED_H': size.get('MIN_H', 2),
+            },
+        }
+    }
+    if len(structure) > 0:
+        complex = {
+            'JOB': {
+                'SCRIPT': "|"
+                          "sleep 0"
+                          "as_checkpoint"
+                          "as_checkpoint",
+                'RUNNING': 'chunk',
+                'WALLCLOCK': '00:01',
+                'PLATFORM': 'TEST_SLURM',
+                'CHECK': 'on_submission',
+                'PROCESSORS': '1',
+
+            },
+            'COMPLEX_WRAPPER': {
+                'SCRIPT': "|"
+                          "sleep 0",
+                'DEPENDENCIES': {
+                    'JOB': {
+                        'STATUS': structure['min_trigger_status'],
+                        'FROM_STEP': structure['from_step'],
+                    },
+                    'COMPLEX_WRAPPER-1': {},
+                },
+                'RUNNING': 'chunk',
+                'WALLCLOCK': '00:01',
+                'PROCESSORS': '1',
+                'PLATFORM': 'TEST_SLURM',
+            },
+            'WRAPPERS': {
+                'COMPLEX_WRAPPER': {
+                    'TYPE': wrapper_type,
+                    'JOBS_IN_WRAPPER': 'COMPLEX_WRAPPER',
+                    'MAX_WRAPPED_V': size.get('MAX_V', 2),
+                    'MAX_WRAPPED_H': size.get('MAX_H', 2),
+                    'MIN_WRAPPED_V': size.get('MIN_V', 2),
+                    'MIN_WRAPPED_H': size.get('MIN_H', 2),
+                }
+            }
+        }
+    return mod_experiment_data | simple | complex

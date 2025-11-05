@@ -2826,17 +2826,10 @@ class Autosubmit:
 
         # WRAPPERS
         try:
-            if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrapper:
-                # Permissions
-                if BasicConfig.DATABASE_BACKEND == 'sqlite':
-                    os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "db", "job_packages_" + expid + ".db"), 0o644)
-                # Database modification
-                # reset wrapper table
-                # Load another job_list to go through that goes through the jobs, but we want to monitor the other one
-                Autosubmit.generate_scripts_andor_wrappers(as_conf, job_list, True)
-            job_list.load_wrappers()
-            if not job_list.packages_dict and check_wrapper:
-                job_list.load_wrappers(check_wrapper)
+            if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0:
+                Autosubmit.generate_scripts_andor_wrappers(
+                    as_conf, job_list, True)
+                job_list.load_wrappers(preview=check_wrapper)
         except BaseException as e:
             if profile:
                 profiler.stop()
@@ -4609,7 +4602,6 @@ class Autosubmit:
                                       as_conf.get_retrials(),
                                       as_conf.get_default_job_type(),
                                       wrapper_jobs, run_only_members=run_only_members, force=force, full_load=True)
-                    job_list.clear_wrappers_db(preview=True)
                     if str(rerun).lower() == "true":
                         job_list.rerun(as_conf.get_rerun_jobs(), as_conf)
                     else:
@@ -4646,11 +4638,13 @@ class Autosubmit:
                                                        expand_list=expand, expanded_status=status)
                             groups_dict = job_grouping.group_jobs()
                         # WRAPPERS
+                        if check_wrappers:
+                            job_list.clear_wrappers_db(preview=True)
+
                         if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrappers:
                             Autosubmit.generate_scripts_andor_wrappers(
                                 as_conf, job_list, True)
                         job_list.load_wrappers(preview=check_wrappers)
-                        job_list.clear_wrappers_db(preview=True)
                         Log.info("\nPlotting the jobs list...")
                         monitor_exp = Monitor(edge_info=job_list.graph_dict_by_job_name)
                         # if output is set, use output

@@ -623,8 +623,10 @@ class JobPackager(object):
             current_info.append(self._as_config)
 
             if self.wrapper_type[self.current_wrapper_section] == 'vertical':
+                wrapper_limits['min_h'] = 1
                 built_packages_tmp = self._build_vertical_packages(jobs, wrapper_limits, wrapper_info=current_info)
             elif self.wrapper_type[self.current_wrapper_section] == 'horizontal':
+                wrapper_limits['min_v'] = 1
                 built_packages_tmp = self._build_horizontal_packages(jobs, wrapper_limits, section,
                                                                      wrapper_info=current_info)
             elif self.wrapper_type[self.current_wrapper_section] in ['vertical-horizontal', 'horizontal-vertical']:
@@ -890,7 +892,7 @@ class JobPackagerVertical(object):
         :rtype: List() of Job Object
         """
         self.total_wallclock = job.wallclock  # reset total wallclock for package
-        stack = [(job, 1)]
+        stack = [(job, 0)]
         while stack:
             job, level = stack.pop()
             # Less verbose
@@ -904,7 +906,7 @@ class JobPackagerVertical(object):
                     self.wrapper_limits["max_by_section"][job.section] or len(self.jobs_list) >= self.wrapper_limits[
                 "max"]:
                 continue
-            child: Job = self.get_wrappable_child(job)
+            child, level = self.get_wrappable_child(job, level)
             if child is not None and len(str(child)) > 0:
                 child.update_parameters(wrapper_info[-1], set_attributes=True)
 
@@ -914,11 +916,26 @@ class JobPackagerVertical(object):
                     child.packed_during_building = True
                     child.level = level
                     self.jobs_list.append(child)
-                    stack.append((child, level + 1))
+                    stack.append((child, level))
         return self.jobs_list
 
-    def get_wrappable_child(self, job):
-        pass  # pragma: no cover
+    def get_wrappable_child(self, job: Job, level: int) -> Job:
+        """
+        Goes through the jobs with the same date and member as the input job, and returns the first that satisfies self._is_wrappable().
+
+        :param job: Job to be evaluated.
+        :type job: Job
+        :return: Job that is wrappable, or None if no such job is found.
+        :rtype: Optional[Any]
+        """
+        sorted_jobs = self.sorted_jobs
+        child = None
+        index = level
+        for index in range(level, len(sorted_jobs)):
+            child_ = sorted_jobs[index]
+            if child_.name != job.name and self._is_wrappable(child_):
+                child = child_
+        return child, index+1
 
     def _is_wrappable(self, job):
         """
@@ -982,7 +999,7 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
         # sort by chunk number
         self.index = 0
 
-    def get_wrappable_child(self, job: Job) -> Job:
+    def get_wrappable_child(self, job: Job, level: int) -> Job:
         """
         Goes through the jobs with the same date and member as the input job, and returns the first that satisfies self._is_wrappable().
 
@@ -993,13 +1010,13 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
         """
         sorted_jobs = self.sorted_jobs
         child = None
-        for index in range(self.index, len(sorted_jobs)):
+        index = level
+        for index in range(level, len(sorted_jobs)):
             child_ = sorted_jobs[index]
             if child_.name != job.name and self._is_wrappable(child_):
                 child = child_
-                self.index = index + 1
                 break
-        return child
+        return child, index+1
 
     def _is_wrappable(self, job):
         """
@@ -1016,7 +1033,8 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
             for parent in job.parents:
                 # First part of this conditional is true only if the parent is already on the wrapper package ( job_lists == current_wrapped jobs there )
                 # Second part is actually relevant, parents of a wrapper should be COMPLETED
-                if parent not in self.jobs_list and parent.status != Status.COMPLETED:
+                parent_is_being_wrapped_with_current_job = parent in self.jobs_list
+                if not parent_is_being_wrapped_with_current_job and parent.status != Status.COMPLETED:
                     return False
             return True
         return False
