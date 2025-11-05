@@ -32,8 +32,12 @@ from typing import Any, Callable
 import pytest
 from threading import Thread
 
-# TODO: This should come from a fixture to ensure that the expid is unique per test.
-_EXPID = 't100'
+from autosubmit.log.log import AutosubmitCritical
+
+if TYPE_CHECKING:
+    from test.integration.conftest import DockerContainer
+
+_EXPID = 't000'
 """The experiment ID used throughout the test."""
 
 
