@@ -143,22 +143,21 @@ def autosubmit_exp(
             experiment_data = {}
 
         is_postgres = hasattr(BasicConfig, 'DATABASE_BACKEND') and BasicConfig.DATABASE_BACKEND == 'postgres'
-        if is_postgres or not Path(BasicConfig.DB_PATH).exists():
-            autosubmit.install()
-            autosubmit.configure(
-                advanced=False,
-                database_path=BasicConfig.DB_DIR,  # type: ignore
-                database_filename=BasicConfig.DB_FILE,  # type: ignore
-                local_root_path=str(tmp_path),
-                platforms_conf_path=None,  # type: ignore
-                jobs_conf_path=None,  # type: ignore
-                smtp_hostname=None,  # type: ignore
-                mail_from=None,  # type: ignore
-                machine=False,
-                local=False,
-                database_backend="postgres" if is_postgres else "sqlite",
-                database_conn_url=BasicConfig.DATABASE_CONN_URL if is_postgres else ""
-            )
+        autosubmit.install()
+        autosubmit.configure(
+            advanced=False,
+            database_path=BasicConfig.DB_DIR if not is_postgres else "",  # type: ignore
+            database_filename=BasicConfig.DB_FILE if not is_postgres else "",  # type: ignore
+            local_root_path=str(tmp_path),
+            platforms_conf_path=None,  # type: ignore
+            jobs_conf_path=None,  # type: ignore
+            smtp_hostname=None,  # type: ignore
+            mail_from=None,  # type: ignore
+            machine=False,
+            local=False,
+            database_backend="postgres" if is_postgres else "sqlite",
+            database_conn_url=BasicConfig.DATABASE_CONN_URL if is_postgres else ""
+        )
 
         operational = False
         evaluation = False

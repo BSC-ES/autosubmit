@@ -7,6 +7,7 @@ from time import sleep
 
 from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.log.log import AutosubmitCritical
 from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, _assert_db_fields, _assert_files_recovered, run_in_thread
 
 if TYPE_CHECKING:
@@ -212,3 +213,64 @@ def test_run_interrupted(
     _assert_files_recovered(files_check_list)
 
     _assert_exit_code(final_status, exit_code)
+
+
+@pytest.mark.parametrize("jobs_data,final_status", [
+    (dedent("""\
+PROJECT:
+    PROJECT_TYPE: local
+    PROJECT_DIRECTORY: local_project
+LOCAL:
+    PROJECT_PATH: "tofill"
+JOBS:
+    job:
+        FILE: 
+            - "test.sh"
+            - "additional1.sh"
+            - "additional2.sh"
+        PLATFORM: local
+        RUNNING: once
+        wallclock: 00:01
+    """), "COMPLETED"),
+
+    (dedent("""\
+PROJECT:
+    PROJECT_TYPE: local
+    PROJECT_DIRECTORY: local_project
+LOCAL:
+    PROJECT_PATH: "tofill"
+JOBS:
+    job:
+        FILE: 
+            - "test.sh"
+            - "additional1.sh"
+            - "thisdoesntexists.sh"
+        PLATFORM: local
+        RUNNING: once
+        wallclock: 00:01
+"""), "FAILED"),
+], ids=["All files exist", "One file missing"])
+def test_run_with_additional_files(
+        autosubmit_exp: 'AutosubmitExperiment',
+        jobs_data: str,
+        final_status: str,
+):
+
+    project_path = Path(BasicConfig.LOCAL_ROOT_DIR) / "org_templates"
+    project_path.mkdir(parents=True, exist_ok=True)
+    with open(project_path / "test.sh", 'w') as f:
+        f.write('echo "main script."\n')
+    with open(project_path / "additional1.sh", 'w') as f:
+        f.write('echo "additional file 1."\n')
+    with open(project_path / "additional2.sh", 'w') as f:
+        f.write('echo "additional file 2."\n')
+
+    jobs_data = jobs_data.replace("tofill", str(project_path))
+    as_exp = autosubmit_exp(experiment_data=YAML(typ='rt').load(jobs_data), include_jobs=False, create=True)
+    as_exp.autosubmit._check_ownership_and_set_last_command(as_exp.as_conf, as_exp.expid, "run")
+    if final_status == "FAILED":
+        with pytest.raises(AutosubmitCritical):
+            as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    else:
+        exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+        _assert_exit_code(final_status, exit_code)
