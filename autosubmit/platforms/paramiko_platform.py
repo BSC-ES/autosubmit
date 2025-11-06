@@ -507,7 +507,7 @@ class ParamikoPlatform(Platform):
 
     def get_list_of_files(self):
         return self._ftpChannel.get(self.get_files_path)
-    
+
     def _chunked_md5(self, file_buffer: BufferedReader) -> str:
         """Calculate the MD5 checksum of a file in chunks to avoid high memory usage.
 
@@ -519,7 +519,7 @@ class ParamikoPlatform(Platform):
         for chunk in iter(lambda: file_buffer.read(CHUNK_SIZE), b""):
             md5_hash.update(chunk)
         return md5_hash.hexdigest()
-    
+
     def _checksum_validation(self, local_path: str, remote_path: str) -> bool:
         """Validates that the checksum of the local file matches the checksum of the remote file.
 
@@ -733,7 +733,6 @@ class ParamikoPlatform(Platform):
     def job_is_over_wallclock(self, job, job_status, cancel=False):
         if job.is_over_wallclock():
             try:
-                job.platform.get_completed_files(job.name)
                 job_status = job.check_completion(over_wallclock=True)
             except Exception as e:
                 job_status = Status.FAILED
@@ -747,6 +746,39 @@ class ParamikoPlatform(Platform):
                 except Exception as e:
                     Log.debug(f"Error cancelling job {job.id}: {str(e)}")
         return job_status
+
+    def get_completed_job_names(self, job_names_provided: Optional[list[str]] = None) -> list[str]:
+        """Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
+
+        :param job_names_provided: If provided, filters the results to include only these job names.
+        :type job_names_provided: Optional[List[str]]
+        :return: List of job names with COMPLETED files.
+        :rtype: List[str]
+        """
+        job_names = []
+        if self.expid in str(self.remote_log_dir):  # Ensure we are in the right experiment
+            if not job_names_provided:
+                cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_COMPLETED' -type f"
+            else:
+                patterns = ' -o '.join([f"-name '{name}_COMPLETED'" for name in job_names_provided])
+                cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {patterns} \\) -type f"
+            self.send_command(cmd)
+            output = self.get_ssh_output()
+            completed_files = output.strip().split('\n') if output else []
+            job_names = [Path(file).name.replace('_COMPLETED', '') for file in completed_files]
+        return job_names
+
+    def delete_failed_and_completed_names(self, job_names: list[str]) -> None:
+        """Deletes the COMPLETED and FAILED files for the given job names from the remote log directory.
+
+        :param job_names: List of job names whose COMPLETED and FAILED files should be deleted
+        :type job_names: List[str]
+        """
+        if job_names:
+            if self.expid in str(self.remote_log_dir):  # Ensure we are in the right experiment
+                job_name_str = ' -o -name '.join([f"'{name}_COMPLETED' -o -name '{name}_FAILED'" for name in job_names])
+                cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( -name {job_name_str} \\) -type f -delete"
+                self.send_command(cmd)
 
     def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
         """Checks job running status
@@ -1629,7 +1661,7 @@ class ParamikoPlatform(Platform):
         except Exception as e:
             Log.debug(f"Error reading file {src}: {str(e)}")
             return None
-        
+
     def compress_file(self, file_path):
         Log.debug(f"Compressing file {file_path} using {self.remote_logs_compress_type}")
         try:

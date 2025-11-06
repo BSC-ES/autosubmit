@@ -34,6 +34,7 @@ import autosubmit.database.db_structure as DbStructure
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.data_transfer import JobRow
+from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
@@ -42,6 +43,7 @@ from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency
 from autosubmit.job.job_utils import transitive_reduction
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
 
@@ -2631,6 +2633,13 @@ class JobList(object):
                         return log_recovered  # TODO: Change to return the tuple of (.out,.err) files
         return None
 
+    def check_completed_jobs_after_recovery(self):
+        for job in (job for job in self.get_job_list() if job.status == Status.COMPLETED):
+            if any(parent.status == Status.WAITING for parent in job.parents):
+                job.status = Status.WAITING
+                job.id = None
+                Log.info(f"Job {job.name} was marked as COMPLETED but has WAITING parents. Resetting to WAITING.")
+
     def update_list(self, as_conf: AutosubmitConfig, store_change: bool = True,
                     fromSetStatus: bool = False, submitter: object = None,
                     first_time: bool = False) -> bool:
@@ -3391,3 +3400,48 @@ class JobList(object):
             return datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
         else:
             return None
+
+    def recover_last_data(self):
+        """
+        Recover job_id and log name if missing from the database
+        """
+        job_names = self._get_job_names(status=[Status.COMPLETED, Status.READY, Status.QUEUING, Status.RUNNING])
+        # Recover job_id and log name if missing
+        if job_names:
+            exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
+                                            historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR, force_sql_alchemy=True)
+            jobs_data = exp_history.manager.get_jobs_data_last_row(job_names)  # This gets only the last row
+            for job in self.get_job_list():
+                if job.name in jobs_data:
+                    job.id = int(jobs_data[job.name]["job_id"])
+                    job.local_logs = jobs_data[job.name]["out"]
+                    job.remote_logs = jobs_data[job.name]["err"]
+                    job.ready_date = datetime.datetime.fromtimestamp(jobs_data[job.name]["start"]).strftime('%Y%m%d%H%M%S')
+                    if job.status in [Status.COMPLETED, Status.FAILED]:
+                        job.updated_log = True
+                    else:
+                        job.updated_log = False
+
+    def _get_job_names(self, status: Optional[list[int]] = None, platform: Platform = None) -> List[str]:
+        """Get a list of all job names in the job list.
+
+        :param status: Optional list of job statuses to filter by.
+        :type status: Optional[list[Status]]
+        :return: List of job names.
+        :rtype: List[str]
+        """
+        if status is None:
+            status = []
+        return [job.name for job in self.get_job_list() if (not status or job.status in status) and (not platform or job.platform_name == platform.name)]
+
+    def recover_all_completed_jobs_from_exp_history(self, platform: Platform = None) -> set[str]:
+        """Recover all completed jobs from experiment history"""
+
+        job_names = self._get_job_names(platform=platform)
+        if job_names:
+            exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
+                                            historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR, force_sql_alchemy=True)
+            jobs_data = exp_history.manager.get_jobs_data_last_row(job_names)  # This gets only the last row
+            return {name for name, data in jobs_data.items() if data["status"] == "COMPLETED"}
+
+        return set()

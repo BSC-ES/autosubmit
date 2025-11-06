@@ -22,18 +22,17 @@ import os
 import socket
 import time
 import uuid
+from contextlib import suppress
 from dataclasses import dataclass
-from fileinput import FileInput
 from getpass import getuser
 from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 from pwd import getpwnam
-from re import sub
 from subprocess import check_output
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 from time import time_ns
-from typing import cast, Any, ContextManager, Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING
+from typing import cast, Any, Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING
 
 import paramiko  # type: ignore
 import pytest
@@ -46,6 +45,7 @@ from testcontainers.postgres import PostgresContainer  # type: ignore
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import _create_ssh_client
@@ -134,9 +134,9 @@ def autosubmit_exp(
             expid: Optional[str] = None,
             experiment_data: Optional[dict] = None,
             wrapper: Optional[bool] = False,
-            reload: Optional[bool] = True,
             create: Optional[bool] = True,
             mock_last_name_used: Optional[bool] = True,
+            include_jobs: Optional[bool] = False,
             *_,
             **kwargs
     ) -> AutosubmitExperiment:
@@ -144,22 +144,22 @@ def autosubmit_exp(
             experiment_data = {}
 
         is_postgres = hasattr(BasicConfig, 'DATABASE_BACKEND') and BasicConfig.DATABASE_BACKEND == 'postgres'
-        if is_postgres or not Path(BasicConfig.DB_PATH).exists():
+        autosubmit.configure(
+            advanced=False,
+            database_path=BasicConfig.DB_DIR if not is_postgres else "",  # type: ignore
+            database_filename=BasicConfig.DB_FILE if not is_postgres else "",  # type: ignore
+            local_root_path=str(tmp_path),
+            platforms_conf_path=None,  # type: ignore
+            jobs_conf_path=None,  # type: ignore
+            smtp_hostname=None,  # type: ignore
+            mail_from=None,  # type: ignore
+            machine=False,
+            local=False,
+            database_backend="postgres" if is_postgres else "sqlite",
+            database_conn_url=BasicConfig.DATABASE_CONN_URL if is_postgres else ""
+        )
+        if not Path(BasicConfig.DB_PATH).exists() and not is_postgres:
             autosubmit.install()
-            autosubmit.configure(
-                advanced=False,
-                database_path=BasicConfig.DB_DIR,  # type: ignore
-                database_filename=BasicConfig.DB_FILE,  # type: ignore
-                local_root_path=str(tmp_path),
-                platforms_conf_path=None,  # type: ignore
-                jobs_conf_path=None,  # type: ignore
-                smtp_hostname=None,  # type: ignore
-                mail_from=None,  # type: ignore
-                machine=False,
-                local=False,
-                database_backend="postgres" if is_postgres else "sqlite",
-                database_conn_url=BasicConfig.DATABASE_CONN_URL if is_postgres else ""
-            )
 
         operational = False
         evaluation = False
@@ -171,25 +171,30 @@ def autosubmit_exp(
             operational = expid.startswith('o')
             evaluation = expid.startswith('e')
             testcase = expid.startswith('t')
-
-        expid = autosubmit.expid(
-            description="Pytest experiment (delete me)",
-            hpc="local",
-            copy_id="",
-            dummy=True,
-            minimal_configuration=False,
-            git_repo="",
-            git_branch="",
-            git_as_conf="",
-            operational=operational,
-            testcase=testcase,
-            evaluation=evaluation,
-            use_local_minimal=False
-        )
-        exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
+        # Reuse the same expid if already exists and reconfigure it
+        if expid and Path(tmp_path / expid).exists():
+            exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
+        else:
+            expid = autosubmit.expid(
+                description="Pytest experiment (delete me)",
+                hpc="local",
+                copy_id="",
+                dummy=True,
+                minimal_configuration=False,
+                git_repo="",
+                git_branch="",
+                git_as_conf="",
+                operational=operational,
+                testcase=testcase,
+                evaluation=evaluation,
+                use_local_minimal=False
+            )
+            exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
         conf_dir = exp_path / "conf"
         global_logs = Path(BasicConfig.GLOBAL_LOG_DIR)
         global_logs.mkdir(parents=True, exist_ok=True)
+        #TODO: Autosubmit.install issue https://github.com/BSC-ES/autosubmit/issues/1328
+        Path(BasicConfig.STRUCTURES_DIR).mkdir(parents=True, exist_ok=True)
         exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
         aslogs_dir = exp_tmp_dir / BasicConfig.LOCAL_ASLOG_DIR
         status_dir = exp_path / 'status'
@@ -200,35 +205,16 @@ def autosubmit_exp(
             expid=expid,
             basic_config=BasicConfig
         )
+        config.reload(force_load=True)
 
-        config.experiment_data = {**config.experiment_data, **experiment_data}
+        # Remove original files. So we can save a new file with all the memory modifications.
+        for f in conf_dir.iterdir():
+            if f.is_file():
+                f.unlink()
 
-        key_file = {
-            'JOBS': 'jobs',
-            'PLATFORMS': 'platforms',
-            'EXPERIMENT': 'expdef'
-        }
-
-        for key, input_lines in key_file.items():
-            if key in experiment_data:
-                mode = 'a' if key == 'EXPERIMENT' else 'w'
-                with open(conf_dir / f'{input_lines}_{expid}.yml', mode) as f:
-                    YAML().dump({key: experiment_data[key]}, f)
-
-        other_yaml = {
-            k: v for k, v in experiment_data.items()
-            if k not in key_file
-        }
-        if other_yaml:
-            with open(conf_dir / f'tests_{expid}.yml', 'w') as f:
-                YAML().dump(other_yaml, f)
-
-        if reload:
-            config.reload(force_load=True)
-
+        must_exists = ['DEFAULT', 'JOBS', 'PLATFORMS', 'CONFIG']
         # Default values for experiment data
         # TODO: This probably has a way to be initialized in config-parser?
-        must_exists = ['DEFAULT', 'JOBS', 'PLATFORMS', 'CONFIG']
         for must_exist in must_exists:
             if must_exist not in config.experiment_data:
                 config.experiment_data[must_exist] = {}
@@ -238,6 +224,25 @@ def autosubmit_exp(
                 config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = version('autosubmit')
             except PackageNotFoundError:
                 config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = ''
+
+        config.experiment_data['CONFIG']['SAFETYSLEEPTIME'] = 0
+        config.experiment_data['DEFAULT']['EXPID'] = expid
+
+        if not include_jobs:
+            config.experiment_data['JOBS'] = {}
+
+        # ensure that it is always the first file loaded by Autosubmit
+        with open(conf_dir / 'aaaaaabasic_structure.yml', 'w') as f:
+            YAML().dump(config.experiment_data, f)
+
+        other_yaml = {
+            k: v for k, v in experiment_data.items()
+        }
+        if other_yaml:
+            with open(conf_dir / 'additional_data.yml', 'w') as f:
+                YAML().dump(other_yaml, f)
+
+        config.reload(force_load=True)
 
         for arg, value in kwargs.items():
             setattr(config, arg, value)
@@ -257,29 +262,11 @@ def autosubmit_exp(
         submit_platform_script = aslogs_dir.joinpath('submit_local.sh')
         submit_platform_script.touch(exist_ok=True)
 
-        config.experiment_data['CONFIG']['SAFETYSLEEPTIME'] = 0
-        # TODO: would be nice if we had a way in Autosubmit Config Parser or
-        #       Autosubmit to define variables. We are replacing it
-        #       in other parts of the code, but without ``fileinput``.
-        # NOTE: the context manager is instantiated here, and we use ``cast`` as mypy
-        #       complains otherwise (maybe related to this mypy GH issue?
-        #       https://github.com/python/mypy/issues/18320).
-        file_input = cast(
-            ContextManager[str],
-            FileInput(conf_dir / f'autosubmit_{expid}.yml', inplace=True, backup='.bak')
-        )
-        with file_input as input_lines:
-            for line in input_lines:
-                if 'SAFETYSLEEPTIME' in line:
-                    print(sub(r'\d+', '0', line), end='')
-                else:
-                    print(line, end='')
-        # TODO: one test failed while moving things from unit to integration, but this shouldn't be
-        #       needed, especially if the disk has the valid value?
-        config.experiment_data['DEFAULT']['EXPID'] = expid
-
         if create:
             autosubmit.create(expid, noplot=True, hide=False, force=True, check_wrappers=wrapper)
+            config.set_last_as_command('create')
+        else:
+            config.set_last_as_command('expid')
 
         return AutosubmitExperiment(
             expid=expid,
@@ -624,6 +611,8 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
     if not autosubmitrc_file.exists():
         raise ValueError(f'Missing autosubmitrc file: {autosubmitrc_file}')
 
+    os.environ['AUTOSUBMIT_CONFIGURATION'] = str(autosubmitrc_file)
+
     if backend == 'postgres':
         # Replace the backend by postgres (default is sqlite)
         user = postgres_server.env['POSTGRES_USER']
@@ -662,12 +651,8 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
         raise ValueError(f'Unsupported database backend: {backend}')
 
     BasicConfig.read()
-
-    # DO NOT USE THIS EXPID!
-    # TODO: This function calls ``Autosubmit.install``, or we could call it here.
-    # Previous tests were using it and everything is working, but this doesn't
-    # smell very good. There might be a better way.
-    autosubmit_exp('____')
+    with suppress(AutosubmitCritical):  # ( TODO: check which functions call as_db twice or if this is used in combination other fixture that calls autosubmit.install)
+        autosubmit.install()
 
     return backend
 

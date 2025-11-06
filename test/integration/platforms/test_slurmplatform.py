@@ -837,7 +837,7 @@ def test_simple_workflow_compress_logs_slurm(
     """Test compressing remote logs in a simple workflow using Slurm."""
     with_wrapper = "WRAPPERS" in experiment_data
 
-    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, wrapper=with_wrapper)
+    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, wrapper=with_wrapper, include_jobs=False)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
@@ -930,7 +930,7 @@ def test_compress_log_missing_tool(
     slurm_server: "DockerContainer",
     mocker,
 ):
-    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
+    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, include_jobs=False)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")

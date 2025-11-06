@@ -34,7 +34,7 @@ _EXPID = "t123"
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_store_metric(as_db: str, autosubmit_exp, tmp_path: 'LocalPath'):
-    exp = autosubmit_exp(_EXPID)
+    exp = autosubmit_exp(_EXPID, include_jobs=True)
 
     user_metric_repository = UserMetricRepository(exp.expid)
     user_metric_repository.store_metric(

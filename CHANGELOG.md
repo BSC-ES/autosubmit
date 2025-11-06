@@ -22,6 +22,8 @@ release.
 - Fixes an issue with multi-day applications dependencies bug #2631
 - Fixes an issue with all-filter #2565
 - Fixes an issue when setting a dependency to a different date or member # 2466 ( #2518 partially)
+- Fixes an issue with recovery not being able to cancel active jobs #2695
+- Fixes an issue with SQLALCHEMY not working correctly with the historical job_data.db #2695
 - Fixes an issue with sections ignoring the MAX_WAITING_JOBS parameter #2613
 - Fixed bug where an RO-Crate file would include itself in the archive, as well as other zip files.
   Now Autosubmit uses the pattern $expid-crate-$date-$time-$millisecond.zip, and ignores any ZIP files
@@ -54,6 +56,10 @@ release.
 - Added automated citation instructions to the website landing page #2480
 - Improving the error message handling for incorrect YAML syntax (too cryptic) #2651
 - Added a platform option to remove remote log files of the job's output after log recovery #2655
+- COMPLETED files are now fetch instead of downloaded. #2695, #2559
+- Improved recovery command perfomance by fetching all the COMPLETED files in a single call. related to #2695, #2570, #2563
+- Added --offline flag to recovery command to avoid not raise an error when the platform is not reachable. related to #2695
+- Improved setstatus #2695
 - Deprecated `--notransitive` argument as that was not used anymore #2577
 - docstrings were made more uniform across several functions (should reflect in sphinx docs),
   fixed several ruff and mypy warnings, and did minor refactorings in the code like removing the
