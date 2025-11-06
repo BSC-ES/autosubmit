@@ -26,8 +26,7 @@ def submitter(as_exp):
 @pytest.fixture(scope="function")
 def job_list(as_exp, submitter):
     return as_exp.autosubmit.load_job_list(
-        as_exp.expid, as_exp.as_conf, new=False, full_load=True, submitter=submitter,
-        check_failed_jobs=True)
+        as_exp.expid, as_exp.as_conf, new=False)
 
 
 @pytest.fixture(scope="function")
@@ -88,8 +87,7 @@ def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_n
     :type prepare_scratch: Any
     """
     job_list_ = as_exp.autosubmit.load_job_list(
-        as_exp.expid, as_exp.as_conf, new=False, full_load=True,
-        check_failed_jobs=True)
+        as_exp.expid, as_exp.as_conf, new=False)
 
     for job in job_list_.get_job_list():
         if job.name in job_names_to_recover:
@@ -98,7 +96,7 @@ def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_n
             else:
                 job.status = Status.WAITING
 
-    job_list_.save_jobs()
+    job_list_.save()
 
     if active_jobs and not force:
         with pytest.raises(AutosubmitCritical):
@@ -140,7 +138,7 @@ def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_n
             assert name in completed_jobs
 
 
-@pytest.mark.skip(reason="Offline recovery test is flaky, needs investigation. It always works when launched alone or with setstatus/recovery tests")
+#@pytest.mark.skip(reason="Offline recovery test is flaky, needs investigation. It always works when launched alone or with setstatus/recovery tests")
 @pytest.mark.parametrize("active_jobs,force", [
     (True, True),
     (True, False),
@@ -156,30 +154,26 @@ def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover, act
     job_names_to_recover = [name for name in job_names_to_recover if "LOCAL" not in name]
     as_exp.as_conf.set_last_as_command('recovery')
 
-    as_exp.autosubmit._setup_log_files(
-        command="recovery",
-        expids=None,
-        expid=as_exp.expid,
-        owner=True,
-        tmp_path=tmp_path,
-        aslogs_path=tmp_path / as_exp.expid / "tmp" / "ASLOGS",
-        exp_path=tmp_path / as_exp.expid,
-        log_level="DEBUG",
-        console_level="DEBUG"
-    )
     db_manager = SqlAlchemyExperimentHistoryDbManager(options={'expid': as_exp.expid, 'jobdata_file': f'job_data_{as_exp.expid}.db'})
 
     db_manager.initialize()
     job_list_ = as_exp.autosubmit.load_job_list(
-        as_exp.expid, as_exp.as_conf, new=False, full_load=True,
-        check_failed_jobs=True)
+        as_exp.expid, as_exp.as_conf, new=False)
+
+
+    submitter = as_exp.autosubmit._get_submitter(as_exp.as_conf)
+    submitter.load_platforms(as_exp.as_conf)
+    platforms = submitter.platforms
 
     for job in job_list_.get_job_list():
+        if not job.platform:
+            job.platform = platforms[job.platform_name]
         if job.name in job_names_to_recover:
             if active_jobs:
                 job.status = Status.RUNNING
             else:
                 job.status = Status.WAITING
+
 
         job_data_dc = JobData(_id=0,
                               counter=0,
@@ -238,7 +232,7 @@ def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover, act
                               run_id=3,
                               workflow_commit=None)
         db_manager._insert_job_data(job_data_dc)
-    job_list_.save_jobs()
+    job_list_.save()
 
     if active_jobs and not force:
         with pytest.raises(AutosubmitCritical):
@@ -270,8 +264,7 @@ def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover, act
             offline=True
         )
         job_list__ = as_exp.autosubmit.load_job_list(
-            as_exp.expid, as_exp.as_conf, new=False, full_load=True,
-            check_failed_jobs=True)
+            as_exp.expid, as_exp.as_conf, new=False)
 
         completed_jobs = [job.name for job in job_list__.get_job_list() if job.status == Status.COMPLETED]
 
