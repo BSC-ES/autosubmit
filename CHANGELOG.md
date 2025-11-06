@@ -34,6 +34,8 @@ platform does not support wrappers anymore (it was used for testing).
 - Fixes an issue with multi-day applications dependencies bug #2631
 - Fixes an issue with all-filter #2565
 - Fixes an issue when setting a dependency to a different date or member # 2466 ( #2518 partially)
+- Fixes an issue with recovery not being able to cancel active jobs #2695
+- Fixes an issue with SQLALCHEMY not working correctly with the historical job_data.db #2695
 
 **Enhancements:**
 
@@ -60,6 +62,10 @@ platform does not support wrappers anymore (it was used for testing).
 - Added automated citation instructions to the website landing page #2480
 - Improving the error message handling for incorrect YAML syntax (too cryptic) #2651
 - Added a platform option to remove remote log files of the job's output after log recovery #2655
+- COMPLETED files are now fetch instead of downloaded. #2695, #2559
+- Improved recovery command perfomance by fetching all the COMPLETED files in a single call. related to #2695, #2570, #2563
+- Added --offline flag to recovery command to avoid not raise an error when the platform is not reachable. related to #2695
+- Improved setstatus #2695
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 

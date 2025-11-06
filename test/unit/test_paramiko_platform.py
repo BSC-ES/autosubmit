@@ -282,7 +282,7 @@ def test_poller(platform: str, mocker, paramiko_platform):
                 ],
                 '1,2'
         ),
-(
+        (
                 [
                     Job(job_id=None, name=''),
                     Job(job_id='2', name='')

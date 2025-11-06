@@ -57,7 +57,7 @@ def test_copy_experiment(type_flag: str, autosubmit_exp: Callable, autosubmit: A
     :return: None
     """
     autosubmit.install()
-    base_experiment = autosubmit_exp('t000', experiment_data={})
+    base_experiment = autosubmit_exp('t000', experiment_data={}, include_jobs=True)
 
     is_operational = type_flag == 'op'
     is_evaluation = type_flag == 'ev'

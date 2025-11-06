@@ -4130,8 +4130,10 @@ class JobList(object):
                     job.local_logs = jobs_data[job.name]["out"]
                     job.remote_logs = jobs_data[job.name]["err"]
                     job.ready_date = datetime.datetime.fromtimestamp(jobs_data[job.name]["start"]).strftime('%Y%m%d%H%M%S')
-                    # TODO: (new feature, another PR) If not last, update_log must be False so it can be recovered on the next autosubmit run ( check the run_id of all jobs somehow)
-                    job.updated_log = True
+                    if job.status in [Status.COMPLETED, Status.FAILED]:
+                        job.updated_log = True
+                    else:
+                        job.updated_log = False
 
     def _get_job_names(self, status: Optional[list[int]] = None, platform: Platform = None) -> List[str]:
         """Get a list of all job names in the job list.

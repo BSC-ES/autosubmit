@@ -109,7 +109,7 @@ def test_get_experiment_status_row_by_expid(tmp_path: 'LocalPath', as_db: str, a
         database_manager.get_experiment_status_row_by_expid(_EXPID)
 
     # Create the experiment, but it still will not have any experiment status
-    exp = autosubmit_exp(_EXPID)
+    exp = autosubmit_exp(_EXPID, include_jobs=True)
     experiment_status_row = database_manager.get_experiment_status_row_by_expid(exp.expid)
     assert experiment_status_row is None
 

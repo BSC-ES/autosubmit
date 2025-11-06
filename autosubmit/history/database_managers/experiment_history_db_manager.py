@@ -494,7 +494,7 @@ class SqlAlchemyExperimentHistoryDbManager:
     def __init__(self, options: dict):
         default_file = None if BasicConfig.DATABASE_BACKEND == "postgres" else f"job_data_{options.get('expid',options.get('schema',None))}.db"
         job_data_file = options.get('jobdata_file', default_file)
-        default_dir =  BasicConfig.DATABASE_CONN_URL if BasicConfig.DATABASE_BACKEND == "postgres" else BasicConfig.JOBDATA_DIR
+        default_dir = BasicConfig.DATABASE_CONN_URL if BasicConfig.DATABASE_BACKEND == "postgres" else BasicConfig.JOBDATA_DIR
         jobdata_path = Path(options.get('jobdata_path', default_dir))
         if job_data_file:
             jobdata_path = jobdata_path / job_data_file
@@ -852,8 +852,7 @@ class SqlAlchemyExperimentHistoryDbManager:
                 jobs_data_by_name[job['job_name']] = job
         return jobs_data_by_name
 
-
-    def select_jobs_data(self, table, job_names) -> List[tuple[str, Any]]:
+    def select_jobs_data(self, table, job_names) -> list[tuple[str, Any]]:
         query = select(table).where(
             and_(
                 table.c.last == 1,
@@ -864,7 +863,6 @@ class SqlAlchemyExperimentHistoryDbManager:
             rows = conn.execute(query).fetchall()
         columns = table.c.keys()
         return [tuple(zip(columns, row)) for row in rows]
-
 
 def create_experiment_history_db_manager(db_engine: str, **options: Any) -> ExperimentHistoryDatabaseManager:
     if db_engine == 'postgres':

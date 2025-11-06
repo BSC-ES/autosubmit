@@ -31,7 +31,7 @@ from pwd import getpwnam
 from subprocess import check_output
 from tempfile import TemporaryDirectory
 from time import time_ns
-from typing import cast, Any, ContextManager, Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING
+from typing import cast, Any, Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING
 
 import paramiko  # type: ignore
 import pytest
@@ -134,8 +134,8 @@ def autosubmit_exp(
             experiment_data: Optional[dict] = None,
             wrapper: Optional[bool] = False,
             create: Optional[bool] = True,
-            mock_last_name_used: Optional[bool] =True,
-            include_jobs = True,
+            mock_last_name_used: Optional[bool] = True,
+            include_jobs: Optional[bool] = False,
             *_,
             **kwargs
     ) -> AutosubmitExperiment:
@@ -143,7 +143,6 @@ def autosubmit_exp(
             experiment_data = {}
 
         is_postgres = hasattr(BasicConfig, 'DATABASE_BACKEND') and BasicConfig.DATABASE_BACKEND == 'postgres'
-        autosubmit.install()
         autosubmit.configure(
             advanced=False,
             database_path=BasicConfig.DB_DIR if not is_postgres else "",  # type: ignore
@@ -158,6 +157,8 @@ def autosubmit_exp(
             database_backend="postgres" if is_postgres else "sqlite",
             database_conn_url=BasicConfig.DATABASE_CONN_URL if is_postgres else ""
         )
+        if not Path(BasicConfig.DB_PATH).exists() and not is_postgres:
+            autosubmit.install()
 
         operational = False
         evaluation = False

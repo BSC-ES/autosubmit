@@ -3041,6 +3041,7 @@ class Autosubmit:
         """
         Method to check all active jobs. If COMPLETED file is found, job status will be changed to COMPLETED,
         otherwise it will be set to WAITING. It will also update the jobs list.
+
         :param expid: experiment identifier
         :param noplot: if True, no plot will be generated
         :param save: if True, changes will be saved to the job list
