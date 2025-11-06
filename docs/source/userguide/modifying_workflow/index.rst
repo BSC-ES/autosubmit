@@ -8,8 +8,6 @@ How to recover an experiment
 
 We utilize the recovery command to restart Autosubmit when it is killed in an ungraceful way. 
 
-.. warning:: You can only recover when the workflow is not running (i.e. there no QUEUING, SUBMITTED, or RUNNING tasks) 
-
 The recovery command will change the state of all the tasks that are (or can be) in READY status to COMPLETED if a completed file for that task is found. 
 
 To recover a running workflow, we must issue the recovery command with -f, so Autosubmit kills the tasks in remote before resetting their status.
@@ -24,14 +22,28 @@ Examples:
 
 ::
 
-    # check locally for completion files, do not kill running tasks, and do not commit changes
+    # check for completion files of the current active jobs ( SUBBMITED, QUEUING, RUNNING )
     autosubmit recovery <EXPID>
-    # commit to the previous states
+
+    # check for completion files of all jobs
+    autosubmit recovery <EXPID> --all
+
+    # Save changes
     autosubmit recovery <EXPID> -s
-    # check locally for completion file AND issue kill commands in remote
-    autosubmit recovery <EXPID> -f -s
+
+    # If there are active jobs, kill them in remote.
+    autosubmit recovery <EXPID> -f
+
+    # If some platform is not reachable, force the recovery without checking remote
+    autosubmit recovery <EXPID> --offline -f --all
+
     # check in remote for completion files
     autosubmit recovery <EXPID> --all -s
+
+    # Resume the experiment:
+    autosubmit create <EXPID> -np
+    autosubmit recovery <EXPID> -all -s [--offline] [-f]
+    autosubmit run <EXPID>
 
 Options:
 

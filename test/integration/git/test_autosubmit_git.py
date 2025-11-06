@@ -272,7 +272,7 @@ def test_git_operational_experiment_toggle_flag(
         experiment_data['CONFIG'] = {}
     experiment_data['CONFIG']['GIT_OPERATIONAL_CHECK_ENABLED'] = git_operational_check_enabled
 
-    as_exp = autosubmit_exp(expid, experiment_data)
+    as_exp = autosubmit_exp(expid, experiment_data, include_jobs=False)
     as_conf = as_exp.as_conf
     proj_dir = Path(as_conf.get_project_dir())
 
