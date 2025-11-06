@@ -2276,6 +2276,7 @@ class Autosubmit:
         :return: exit status
 
         """
+        import time
         # Start profiling if the flag has been used
         if profile:
             from .profiler.profiler import Profiler
@@ -2334,6 +2335,7 @@ class Autosubmit:
                 recovery_retrials = 0
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
                 while job_list.get_active():
+                    start = time.time()
                     try:
                         if Autosubmit.exit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
@@ -2407,7 +2409,10 @@ class Autosubmit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             job_list.save()
                             as_conf.save()
-                        time.sleep(safetysleeptime)
+                        time.sleep(0)
+                        end = time.time()
+                        iteration_time = end - start
+                        Log.debug("Iteration time: {0} seconds", iteration_time)
                     except AutosubmitError as ae:  # If an error is detected, restore all connections and job_list
                         Log.error("Trace: {0}", ae.trace)
                         Log.error("{1} [eCode={0}]", ae.code, ae.message)
