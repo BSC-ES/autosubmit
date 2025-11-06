@@ -251,7 +251,7 @@ JOBS:
 """), "FAILED"),
 ], ids=["All files exist", "One file missing"])
 def test_run_with_additional_files(
-        autosubmit_exp: 'AutosubmitExperiment',
+        autosubmit_exp,
         jobs_data: str,
         final_status: str,
 ):
