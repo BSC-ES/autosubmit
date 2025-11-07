@@ -694,32 +694,6 @@ class Platform(object):
                 job.current_checkpoint_step += 1
                 self.get_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}', False, ignore_log=True)
 
-    def get_completed_files(self, job_name, retries=0, recovery=False, wrapper_failed=False):
-        """
-        Get the COMPLETED file of the given job
-
-        :param wrapper_failed:
-        :param recovery:
-        :param job_name: name of the job
-        :type job_name: str
-        :param retries: Max number of tries to get the file
-        :type retries: int
-        :return: True if successful, false otherwise
-        :rtype: bool
-        """
-        if recovery:
-            retries = 5
-            for i in range(retries):
-                if self.get_file('{0}_COMPLETED'.format(job_name), False, ignore_log=recovery):
-                    return True
-            return False
-        if self.check_file_exists('{0}_COMPLETED'.format(job_name), wrapper_failed=wrapper_failed):
-            if self.get_file('{0}_COMPLETED'.format(job_name), True, wrapper_failed=wrapper_failed):
-                return True
-            else:
-                return False
-        else:
-            return False
 
     def remove_stat_file(self, job: Any) -> bool:
         """
@@ -1150,3 +1124,10 @@ class Platform(object):
         :return: path to the compressed file. None if compression failed.
         """
         raise NotImplementedError  # pragma: no cover
+
+    def get_completed_job_names(self, job_names_provided: Optional[list[str]] = None) -> list[str]:
+        """Get the names of the completed jobs on this platform.
+
+        :param job_names_provided: List of job names to check. If None, all jobs will be checked.
+        :return: List of completed job names.
+        """

@@ -735,7 +735,6 @@ class ParamikoPlatform(Platform):
     def job_is_over_wallclock(self, job, job_status, cancel=False):
         if job.is_over_wallclock():
             try:
-                job.platform.get_completed_files(job.name)
                 job_status = job.check_completion(over_wallclock=True)
             except Exception as e:
                 job_status = Status.FAILED

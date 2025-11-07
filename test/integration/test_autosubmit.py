@@ -358,7 +358,5 @@ def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
     'Correct FOR',
 ])
 def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict, context_mgr: 'AbstractContextManager'):
-    exp = autosubmit_exp('t000', experiment_data, reload=False, create=False, include_jobs=True)
-    as_conf = exp.as_conf
     with context_mgr:
-        as_conf.reload(force_load=True)
+        autosubmit_exp('t000', experiment_data, create=False, include_jobs=False)
