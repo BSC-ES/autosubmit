@@ -37,7 +37,6 @@ from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.database_managers import database_models as Models
 from autosubmit.history.database_managers.database_manager import (
     DatabaseManager,
-    DEFAULT_JOBDATA_DIR,
 )
 
 CURRENT_DB_VERSION = 19  # Update this if you change the database schema
@@ -51,12 +50,12 @@ class ExperimentHistoryDbManager(DatabaseManager):
     """ Manages actions directly on the database.
     """
 
-    def __init__(self, expid, jobdata_dir_path=DEFAULT_JOBDATA_DIR):
+    def __init__(self, options):
         """ Requires expid and jobdata_dir_path. """
-        super(ExperimentHistoryDbManager, self).__init__(expid, jobdata_dir_path=jobdata_dir_path)
+        super(ExperimentHistoryDbManager, self).__init__(options['expid'], jobdata_dir_path=BasicConfig.JOBDATA_DIR, local_root_dir_path=BasicConfig.LOCAL_ROOT_DIR)
         self._set_schema_changes()
         self._set_table_queries()
-        self.historicaldb_file_path = os.path.join(self.JOBDATA_DIR, "job_data_{0}.db".format(self.expid))  # type : str
+        self.historicaldb_file_path = str(Path(options.get('jobdata_dir_path', BasicConfig.JOBDATA_DIR)) / f"job_data_{options['expid']}.db")
 
     def initialize(self):
         if self.my_database_exists():
@@ -400,7 +399,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
         models = [Models.JobDataRow(*row) for row in job_data_rows][-1]
         return JobData.from_model(models)
 
-    def get_job_data_max_counter(self, job_name: str = None) -> int:
+    def get_job_data_max_counter(self, job_name: Optional[str] = None) -> int:
         """
         Get the maximum counter value from the `job_data` table. If a `job_name` is provided,
         the query will filter by that specific job name.
@@ -421,7 +420,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
         if not counter_result[0][0]:
             return DEFAULT_MAX_COUNTER
         else:
-            max_counter = Models.MaxCounterRow(*counter_result[0]).maxcounter
+            max_counter = Models.MaxCounter(*counter_result[0]).maxcounter
             return max_counter if max_counter else DEFAULT_MAX_COUNTER
 
     def _set_historical_pragma_version(self, version=10):
@@ -480,7 +479,7 @@ class ExperimentHistoryDatabaseManager(Protocol):
 
     def get_job_data_by_job_id_name(self, job_id: int, job_name: str): ...
 
-    def get_job_data_max_counter(self, job_name: str = None) -> int: ...
+    def get_job_data_max_counter(self, job_name: Optional[str] = None) -> int: ...
 
 
 class SqlAlchemyExperimentHistoryDbManager:
@@ -652,7 +651,8 @@ class SqlAlchemyExperimentHistoryDbManager:
             self._update_job_data_by_id(job_data_dc)
         return len(job_data_dcs)
 
-    def get_job_data_dc_unique_latest_by_job_name(self, job_name):
+    def get_job_data_dc_unique_latest_by_job_name(self, job_name: Optional[str]):
+        """ Returns JobData data class for the latest job_data_row with last=1 by job_name. """
         job_data_row_last = self._get_job_data_last_by_name(job_name)
         if len(job_data_row_last) > 0:
             return JobData.from_model(job_data_row_last[0])

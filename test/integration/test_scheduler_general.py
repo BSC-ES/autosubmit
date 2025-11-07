@@ -192,7 +192,7 @@ def test_scheduler_job_types(scheduler, job_type, autosubmit, autosubmit_exp: Ca
     :param job_type: Wrapped or not
     """
 
-    exp = autosubmit_exp()
+    exp = autosubmit_exp(include_jobs=True)
     expid = exp.expid
     as_conf: AutosubmitConfig = exp.as_conf
 

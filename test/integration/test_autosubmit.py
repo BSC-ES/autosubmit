@@ -306,7 +306,7 @@ def test_autosubmit_pklfix_no_backup(autosubmit_exp, mocker, tmp_path):
 
 
 def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
-    exp = autosubmit_exp(_EXPID)
+    exp = autosubmit_exp(_EXPID, include_jobs=True)
 
     pkl_path = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, exp.expid, 'pkl')
     current = pkl_path / f'job_list_{exp.expid}.pkl'
@@ -358,8 +358,7 @@ def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
     'Correct FOR',
 ])
 def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict, context_mgr: 'AbstractContextManager'):
-    exp = autosubmit_exp('t000', experiment_data, reload=False, create=False)
+    exp = autosubmit_exp('t000', experiment_data, reload=False, create=False, include_jobs=True)
     as_conf = exp.as_conf
     with context_mgr:
         as_conf.reload(force_load=True)
-

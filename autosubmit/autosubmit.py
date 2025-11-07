@@ -3070,14 +3070,10 @@ class Autosubmit:
         as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
         as_conf.check_conf_files(True)
         Log.info(f'Recovering experiment {expid}')
-        pkl_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl')
         job_list = Autosubmit.load_job_list(expid, as_conf, new=False, monitor=True)
-        current_active_jobs = job_list.get_in_queue()
-
         as_conf.check_conf_files(False)
 
         # Getting output type provided by the user in config, 'pdf' as default
-        output_type = as_conf.get_output_type()
         hpcarch = as_conf.get_platform()
 
         submitter = Autosubmit._get_submitter(as_conf)
@@ -3160,7 +3156,7 @@ class Autosubmit:
 
             if save:
                 job_list.recover_last_data()
-                job_list.save_jobs()
+                job_list.save()
             else:
                 Log.warning('Changes NOT saved to the jobList. Use -s option to save')
 
@@ -5460,7 +5456,7 @@ class Autosubmit:
                         job.update_parameters(as_conf, set_attributes=True, reset_logs=True)
 
                     job_list.recover_last_data()
-                    job_list.save_jobs()
+                    job_list.save()
                     exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                                     historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
                     exp_history.initialize_database()

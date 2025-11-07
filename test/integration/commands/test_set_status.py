@@ -1,3 +1,4 @@
+from autosubmit.history.database_managers.experiment_history_db_manager import SqlAlchemyExperimentHistoryDbManager
 from autosubmit.job.job_common import Status
 import pytest
 
@@ -12,8 +13,7 @@ def as_exp(autosubmit_exp, general_data, experiment_data, jobs_data):
 
 def reset(as_exp_, target="WAITING"):
     job_list_ = as_exp_.autosubmit.load_job_list(
-        as_exp_.expid, as_exp_.as_conf, new=False, full_load=True,
-        check_failed_jobs=True)
+        as_exp_.expid, as_exp_.as_conf, new=False)
 
     job_names = " ".join([job.name for job in job_list_.get_job_list()])
     do_setstatus(as_exp_, fl=job_names, target=target)
@@ -42,15 +42,15 @@ def do_setstatus(as_exp_, fl=None, fc=None, fct=None, ftcs=None, fs=None, target
         detail=False
     )
     return as_exp_.autosubmit.load_job_list(
-        as_exp_.expid, as_exp_.as_conf, new=False, full_load=True,
-        check_failed_jobs=True)
+        as_exp_.expid, as_exp_.as_conf, new=False)
 
 
 @pytest.mark.slurm
 @pytest.mark.parametrize("reset_target", ["RUNNING", "WAITING"], ids=["Online", "Offline"])
 def test_set_status(as_exp, slurm_server, reset_target):
     """Tests the setstatus command with various filters in an offline scenario."""
-
+    db_manager = SqlAlchemyExperimentHistoryDbManager(options={'expid': as_exp.expid, 'jobdata_file': f'job_data_{as_exp.expid}.db'})
+    db_manager.initialize()
     fl_filter_names = f"{as_exp.expid}_20200101_fc0_1_1_LOCALJOB {as_exp.expid}_20200101_fc0_1_1_PSJOB {as_exp.expid}_20200101_fc0_1_1_SLURMJOB"
     fc_filter = "[20200101 [ fc0 [1] ] ]"
     fct_filter = "[20200101 [ fc0 [1] ] ],LOCALJOB"

@@ -130,7 +130,7 @@ class CreateJobParametersPlatformFixture(Protocol):
 @pytest.fixture
 def create_job_parameters_platform(autosubmit_exp) -> CreateJobParametersPlatformFixture:
     def job_parameters_platform(experiment_data: dict) -> JobParametersPlatform:
-        exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
+        exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, include_jobs=True)
         slurm_platform: 'SlurmPlatform' = cast('SlurmPlatform', exp.platform)
 
         job = Job(f"{_EXPID}_SIM", 10000, Status.SUBMITTED, 0)

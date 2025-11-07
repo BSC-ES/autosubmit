@@ -22,13 +22,12 @@ import os
 import socket
 import time
 import uuid
+from contextlib import suppress
 from dataclasses import dataclass
-from fileinput import FileInput
 from getpass import getuser
 from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 from pwd import getpwnam
-from re import sub
 from subprocess import check_output
 from tempfile import TemporaryDirectory
 from time import time_ns
@@ -45,6 +44,7 @@ from testcontainers.postgres import PostgresContainer  # type: ignore
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import _create_ssh_client
@@ -143,7 +143,6 @@ def autosubmit_exp(
             experiment_data = {}
 
         is_postgres = hasattr(BasicConfig, 'DATABASE_BACKEND') and BasicConfig.DATABASE_BACKEND == 'postgres'
-        autosubmit.install()
         autosubmit.configure(
             advanced=False,
             database_path=BasicConfig.DB_DIR if not is_postgres else "",  # type: ignore
@@ -158,6 +157,8 @@ def autosubmit_exp(
             database_backend="postgres" if is_postgres else "sqlite",
             database_conn_url=BasicConfig.DATABASE_CONN_URL if is_postgres else ""
         )
+        if not Path(BasicConfig.DB_PATH).exists() and not is_postgres:
+            autosubmit.install()
 
         operational = False
         evaluation = False
@@ -594,6 +595,8 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
     if not autosubmitrc_file.exists():
         raise ValueError(f'Missing autosubmitrc file: {autosubmitrc_file}')
 
+    os.environ['AUTOSUBMIT_CONFIGURATION'] = str(autosubmitrc_file)
+
     if backend == 'postgres':
         # Replace the backend by postgres (default is sqlite)
         user = postgres_server.env['POSTGRES_USER']
@@ -632,11 +635,7 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
         raise ValueError(f'Unsupported database backend: {backend}')
 
     BasicConfig.read()
-
-    # DO NOT USE THIS EXPID!
-    # TODO: This function calls ``Autosubmit.install``, or we could call it here.
-    # Previous tests were using it and everything is working, but this doesn't
-    # smell very good. There might be a better way.
-    autosubmit_exp('____')
+    with suppress(AutosubmitCritical):  # ( TODO: check which functions call as_db twice or if this is used in combination other fixture that calls autosubmit.install)
+        autosubmit.install()
 
     return backend

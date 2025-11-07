@@ -2675,7 +2675,7 @@ class JobList(object):
         return None
 
     def check_completed_jobs_after_recovery(self):
-        for job in (job for job in self.job_list if job.status == Status.COMPLETED):
+        for job in (job for job in self.get_job_list() if job.status == Status.COMPLETED):
             if any(parent.status == Status.WAITING for parent in job.parents):
                 job.status = Status.WAITING
                 job.id = None
