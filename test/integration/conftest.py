@@ -31,7 +31,7 @@ from pwd import getpwnam
 from subprocess import check_output
 from tempfile import TemporaryDirectory
 from time import time_ns
-from typing import cast, Any, ContextManager, Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING
+from typing import cast, Any, Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING
 
 import paramiko  # type: ignore
 import pytest
