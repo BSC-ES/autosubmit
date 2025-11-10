@@ -2261,7 +2261,8 @@ class Autosubmit:
             if not p.log_recovery_process or not p.log_recovery_process.is_alive():
                 p.clean_log_recovery_process()
                 p.spawn_log_retrieval_process(as_conf)
-            p.work_event.set()
+            if p.work_event:
+                p.work_event.set()
 
     @staticmethod
     def run_experiment(expid, notransitive=False, start_time=None, start_after=None, run_only_members=None, profile=False) -> int:
@@ -2366,7 +2367,7 @@ class Autosubmit:
 
                             Log.info(f"Checking {len(platform_jobs)} jobs for platform {platform.name}")
                             # Check all non-wrapped jobs status for the current platform
-                            platform.check_Alljobs(platform_jobs, as_conf)
+                            platform.check_all_jobs(platform_jobs, as_conf)
                             # mail notification ( in case of changes )
                             for job, job_prev_status in jobs_to_check[platform.name]:
                                 if job_prev_status != job.update_status(as_conf):
@@ -2409,8 +2410,8 @@ class Autosubmit:
                             as_conf.save()
                         time.sleep(safetysleeptime)
                     except AutosubmitError as ae:  # If an error is detected, restore all connections and job_list
-                        Log.error("Trace: {0}", ae.trace)
-                        Log.error("{1} [eCode={0}]", ae.code, ae.message)
+                        Log.error(f"Trace: {ae.trace}")
+                        Log.error(f"{ae.message} [eCode={ae.code}]")
                         # No need to wait until the remote platform reconnection
                         recovery = False
                         as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())

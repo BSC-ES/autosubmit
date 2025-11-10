@@ -110,7 +110,7 @@ def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_p
     job.id = 'TEST'
     job.name = 'TEST'
     with pytest.raises(AutosubmitError) as cm:
-        platform.check_Alljobs(
+        platform.check_all_jobs(
             job_list=[[job, None]],
             as_conf=as_conf,
             retries=-1)
@@ -138,7 +138,7 @@ def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_p
     platform.get_queue_status = mocker.Mock(side_effect=None)
 
     with pytest.raises(AutosubmitError) as cm:
-        platform.check_Alljobs(
+        platform.check_all_jobs(
             job_list=[[job, None]],
             as_conf=as_conf,
             retries=1)

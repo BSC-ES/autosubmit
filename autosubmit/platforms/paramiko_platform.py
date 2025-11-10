@@ -879,7 +879,7 @@ class ParamikoPlatform(Platform):
 
         return ','.join(job_list_cmd)
 
-    def check_Alljobs(self, job_list: list[list['Job']], as_conf, retries=5):
+    def check_all_jobs(self, job_list: list[list['Job']], as_conf, retries=5):
         """
         Checks jobs running status
 
@@ -1506,6 +1506,9 @@ class ParamikoPlatform(Platform):
             if hasattr(self.header, 'get_exclusive_directive'):
                 header = header.replace(
                     '%EXCLUSIVE_DIRECTIVE%', self.header.get_exclusive_directive(job, parameters))
+            if hasattr(self.header, 'get_select_directive'):
+                header = header.replace(
+                    '%SELECT_DIRECTIVE%', self.header.get_select_directive(job, parameters))
             if hasattr(self.header, 'get_account_directive'):
                 header = header.replace(
                     '%ACCOUNT_DIRECTIVE%', self.header.get_account_directive(job, parameters))
