@@ -29,7 +29,6 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
 if TYPE_CHECKING:
