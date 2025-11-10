@@ -63,7 +63,7 @@ def prepare_scratch(as_exp, tmp_path: Path, job_list, job_names_to_recover, slur
 
 @pytest.fixture(scope="function")
 def job_names_to_recover(job_list):
-    return [job.name for job in job_list.get_job_list() if job.split == 1]
+    return [job.name for job in job_list.get_job_list() if job.split == 1 or job.split == 3]
 
 
 @pytest.mark.parametrize("active_jobs,force", [
@@ -143,7 +143,12 @@ def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_n
         completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
 
         for name in job_names_to_recover:
-            assert name in completed_jobs
+            # 2nd split is not completed, so the 3º split was marked as COMPLETED ( file found) and then WAITING
+            split_number = name.split('_')[-2]
+            if split_number == "3":
+                assert name not in completed_jobs
+            else:
+                assert name in completed_jobs
 
 
 @pytest.mark.parametrize("active_jobs,force", [
@@ -275,7 +280,13 @@ def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover, act
             completed_jobs = [job.name for job in job_list__.get_job_list() if job.status == Status.COMPLETED]
 
             for name in job_names_to_recover:
-                assert name in completed_jobs
+                # 2nd split is not completed, so the 3º split was marked as COMPLETED and then WAITING
+                split_number = name.split('_')[-2]
+                if split_number == "3":
+                    assert name not in completed_jobs
+                else:
+                    assert name in completed_jobs
+
     except BaseException as e:  # TODO fix this test to work in parallel
         print(str(e))
         pytest.xfail("Offline recovery test is flaky, needs investigation. It always works when launched alone or with setstatus/recovery tests")
