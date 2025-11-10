@@ -859,6 +859,7 @@ class AutosubmitConfig(object):
                             last_data_section[key] = value[name_index]
                             pass
                 except IndexError as e:
+                    Log.warning("Found TRACE in parse_data_loops 838 [2]")
                     Log.printlog(f"A job has an issue related to a FOR configuration. \n Please revise that the"
                                  f" number of elements matches, or if there is an unintended indentation."
                                  f"\n Trace: {str(e)}", Log.ERROR)
@@ -2571,7 +2572,7 @@ class AutosubmitConfig(object):
 
     # based on https://github.com/cbirajdar/properties-to-yaml-converter/blob/master/properties_to_yaml.py
     @staticmethod
-    def ini_to_yaml(root_dir: Path, ini_file: Path) -> None:
+    def ini_to_yaml(root_dir: Path, ini_file: str) -> None:
         # Based on http://stackoverflow.com/a/3233356
         def update_dict(original_dict: dict, updated_dict: collections.abc.Mapping) -> dict:
             for k, v in updated_dict.items():

@@ -82,6 +82,7 @@ def exit_from_error(e: BaseException) -> int:
     if is_autosubmit_error:
         e: Union[AutosubmitError, AutosubmitCritical] = e
         if e.trace:
+            Log.warning("Found TRACE in exit_from_error 85 [4]")
             Log.debug("Trace: {0}", str(e.trace))
         Log.critical("{1} [eCode={0}]", e.code, e.message)
         err_code = e.code
