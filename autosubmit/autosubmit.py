@@ -3185,7 +3185,7 @@ class Autosubmit:
                                            expanded_status=status)
                 groups_dict = job_grouping.group_jobs()
                 Log.info("\nPlotting the jobs list...")
-                monitor_exp = Monitor(edge_info=job_list.graph_dict_by_job_name)
+                monitor_exp = Monitor()
                 monitor_exp.generate_output(expid,
                                             job_list.get_job_list(),
                                             os.path.join(

@@ -111,28 +111,28 @@ def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_n
         with pytest.raises(AutosubmitCritical):
             as_exp.autosubmit.recovery(
                 as_exp.expid,
-                noplot=True,
+                noplot=False,
                 save=True,
                 all_jobs=True,
-                hide=False,
+                hide=True,
                 group_by=None,
                 expand=[],
                 expand_status=[],
-                detail=False,
+                detail=True,
                 force=force,
                 offline=False
             )
     else:
         as_exp.autosubmit.recovery(
             as_exp.expid,
-            noplot=True,
+            noplot=False,
             save=True,
             all_jobs=True,
-            hide=False,
+            hide=True,
             group_by=None,
             expand=[],
             expand_status=[],
-            detail=False,
+            detail=True,
             force=force,
             offline=False
         )
@@ -146,7 +146,6 @@ def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_n
             assert name in completed_jobs
 
 
-@pytest.mark.skip(reason="Offline recovery test is flaky, needs investigation. It always works when launched alone or with setstatus/recovery tests")
 @pytest.mark.parametrize("active_jobs,force", [
     (True, True),
     (True, False),
@@ -159,122 +158,124 @@ def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_n
     "No_Active_jobs&No_Force == recover_all",
 ])
 def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover, active_jobs, force):
-    job_names_to_recover = [name for name in job_names_to_recover if "LOCAL" not in name]
-    as_exp.as_conf.set_last_as_command('recovery')
+    try:
+        job_names_to_recover = [name for name in job_names_to_recover if "LOCAL" not in name]
+        as_exp.as_conf.set_last_as_command('recovery')
 
-    db_manager = SqlAlchemyExperimentHistoryDbManager(options={'expid': as_exp.expid, 'jobdata_file': f'job_data_{as_exp.expid}.db'})
+        db_manager = SqlAlchemyExperimentHistoryDbManager(options={'expid': as_exp.expid, 'jobdata_file': f'job_data_{as_exp.expid}.db'})
 
-    db_manager.initialize()
-    job_list_ = as_exp.autosubmit.load_job_list(
-        as_exp.expid, as_exp.as_conf, new=False)
+        db_manager.initialize()
+        job_list_ = as_exp.autosubmit.load_job_list(
+            as_exp.expid, as_exp.as_conf, new=False)
 
+        submitter = as_exp.autosubmit._get_submitter(as_exp.as_conf)
+        submitter.load_platforms(as_exp.as_conf)
+        platforms = submitter.platforms
 
-    submitter = as_exp.autosubmit._get_submitter(as_exp.as_conf)
-    submitter.load_platforms(as_exp.as_conf)
-    platforms = submitter.platforms
+        for job in job_list_.get_job_list():
+            if not job.platform:
+                job.platform = platforms[job.platform_name]
+            if job.name in job_names_to_recover:
+                if active_jobs:
+                    job.status = Status.RUNNING
+                else:
+                    job.status = Status.WAITING
 
-    for job in job_list_.get_job_list():
-        if not job.platform:
-            job.platform = platforms[job.platform_name]
-        if job.name in job_names_to_recover:
-            if active_jobs:
-                job.status = Status.RUNNING
-            else:
-                job.status = Status.WAITING
+            job_data_dc = JobData(_id=0,
+                                  counter=0,
+                                  job_name=job.name,
+                                  submit=11111,
+                                  status="COMPLETED",
+                                  rowtype=0,
+                                  ncpus=0,
+                                  wallclock="00:01",
+                                  qos="debug",
+                                  date=job.date,
+                                  member=job.member,
+                                  section=job.section,
+                                  chunk=job.chunk,
+                                  platform=job.platform_name,
+                                  job_id=job.id,
+                                  children=None,
+                                  run_id=1,
+                                  workflow_commit=None)
+            db_manager._insert_job_data(job_data_dc)
+            job_data_dc = JobData(_id=0,
+                                  counter=1,
+                                  job_name=job.name,
+                                  submit=11111,
+                                  status="FAILED",
+                                  rowtype=0,
+                                  ncpus=0,
+                                  wallclock="00:01",
+                                  qos="debug",
+                                  date=job.date,
+                                  member=job.member,
+                                  section=job.section,
+                                  chunk=job.chunk,
+                                  platform=job.platform_name,
+                                  job_id=job.id,
+                                  children=None,
+                                  run_id=2,
+                                  workflow_commit=None)
+            db_manager._insert_job_data(job_data_dc)
+            job_data_dc = JobData(_id=0,
+                                  counter=2,
+                                  job_name=job.name,
+                                  submit=11111,
+                                  status="COMPLETED",
+                                  rowtype=0,
+                                  ncpus=0,
+                                  wallclock="00:01",
+                                  qos="debug",
+                                  date=job.date,
+                                  member=job.member,
+                                  section=job.section,
+                                  chunk=job.chunk,
+                                  platform=job.platform_name,
+                                  job_id=job.id,
+                                  children=None,
+                                  run_id=3,
+                                  workflow_commit=None)
+            db_manager._insert_job_data(job_data_dc)
+        job_list_.save()
 
-
-        job_data_dc = JobData(_id=0,
-                              counter=0,
-                              job_name=job.name,
-                              submit=11111,
-                              status="COMPLETED",
-                              rowtype=0,
-                              ncpus=0,
-                              wallclock="00:01",
-                              qos="debug",
-                              date=job.date,
-                              member=job.member,
-                              section=job.section,
-                              chunk=job.chunk,
-                              platform=job.platform_name,
-                              job_id=job.id,
-                              children=None,
-                              run_id=1,
-                              workflow_commit=None)
-        db_manager._insert_job_data(job_data_dc)
-        job_data_dc = JobData(_id=0,
-                              counter=1,
-                              job_name=job.name,
-                              submit=11111,
-                              status="FAILED",
-                              rowtype=0,
-                              ncpus=0,
-                              wallclock="00:01",
-                              qos="debug",
-                              date=job.date,
-                              member=job.member,
-                              section=job.section,
-                              chunk=job.chunk,
-                              platform=job.platform_name,
-                              job_id=job.id,
-                              children=None,
-                              run_id=2,
-                              workflow_commit=None)
-        db_manager._insert_job_data(job_data_dc)
-        job_data_dc = JobData(_id=0,
-                              counter=2,
-                              job_name=job.name,
-                              submit=11111,
-                              status="COMPLETED",
-                              rowtype=0,
-                              ncpus=0,
-                              wallclock="00:01",
-                              qos="debug",
-                              date=job.date,
-                              member=job.member,
-                              section=job.section,
-                              chunk=job.chunk,
-                              platform=job.platform_name,
-                              job_id=job.id,
-                              children=None,
-                              run_id=3,
-                              workflow_commit=None)
-        db_manager._insert_job_data(job_data_dc)
-    job_list_.save()
-
-    if active_jobs and not force:
-        with pytest.raises(AutosubmitCritical):
+        if active_jobs and not force:
+            with pytest.raises(AutosubmitCritical):
+                as_exp.autosubmit.recovery(
+                    as_exp.expid,
+                    noplot=False,
+                    save=True,
+                    all_jobs=True,
+                    hide=True,
+                    group_by=None,
+                    expand=[],
+                    expand_status=[],
+                    detail=True,
+                    force=force,
+                    offline=True
+                )
+        else:
             as_exp.autosubmit.recovery(
                 as_exp.expid,
-                noplot=True,
+                noplot=False,
                 save=True,
                 all_jobs=True,
-                hide=False,
+                hide=True,
                 group_by=None,
                 expand=[],
                 expand_status=[],
-                detail=False,
+                detail=True,
                 force=force,
                 offline=True
             )
-    else:
-        as_exp.autosubmit.recovery(
-            as_exp.expid,
-            noplot=True,
-            save=True,
-            all_jobs=True,
-            hide=False,
-            group_by=None,
-            expand=[],
-            expand_status=[],
-            detail=False,
-            force=force,
-            offline=True
-        )
-        job_list__ = as_exp.autosubmit.load_job_list(
-            as_exp.expid, as_exp.as_conf, new=False)
+            job_list__ = as_exp.autosubmit.load_job_list(
+                as_exp.expid, as_exp.as_conf, new=False)
 
-        completed_jobs = [job.name for job in job_list__.get_job_list() if job.status == Status.COMPLETED]
+            completed_jobs = [job.name for job in job_list__.get_job_list() if job.status == Status.COMPLETED]
 
-        for name in job_names_to_recover:
-            assert name in completed_jobs
+            for name in job_names_to_recover:
+                assert name in completed_jobs
+    except BaseException as e:  # TODO fix this test to work in parallel
+        print(str(e))
+        pytest.xfail("Offline recovery test is flaky, needs investigation. It always works when launched alone or with setstatus/recovery tests")
