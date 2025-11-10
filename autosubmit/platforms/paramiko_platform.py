@@ -88,7 +88,7 @@ class ParamikoPlatform(Platform):
         self._ssh_output_err = ""
         self.connected = False
         self._default_queue = None
-        self.job_status = None
+        self.job_status: Optional[dict[str, list]] = None
         self._ssh: Optional[paramiko.SSHClient] = None
         self._ssh_config = None
         self._ssh_output = None

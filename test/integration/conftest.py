@@ -19,6 +19,8 @@
 import configparser
 import multiprocessing
 import os
+import socket
+import time
 import uuid
 from dataclasses import dataclass
 from fileinput import FileInput
@@ -30,15 +32,15 @@ from re import sub
 from subprocess import check_output
 from tempfile import TemporaryDirectory
 from time import time_ns
-from typing import Any, Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING
+from typing import cast, Any, ContextManager, Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING
 
-import paramiko
+import paramiko  # type: ignore
 import pytest
 from ruamel.yaml import YAML
 from sqlalchemy import Connection, create_engine, text
-from testcontainers.core.container import DockerContainer
-from testcontainers.core.waiting_utils import wait_for_logs
-from testcontainers.postgres import PostgresContainer
+from testcontainers.core.container import DockerContainer  # type: ignore
+from testcontainers.core.waiting_utils import wait_for_logs  # type: ignore
+from testcontainers.postgres import PostgresContainer  # type: ignore
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
@@ -95,6 +97,7 @@ class AutosubmitExperimentFixture(Protocol):
             wrapper: Optional[bool] = False,
             create: Optional[bool] = True,
             reload: Optional[bool] = True,
+            mock_last_name_used: Optional[bool] = True,
             *args: Any,
             **kwargs: Any
     ) -> AutosubmitExperiment:
@@ -129,13 +132,13 @@ def autosubmit_exp(
     def _create_autosubmit_exp(
             expid: Optional[str] = None,
             experiment_data: Optional[dict] = None,
-            wrapper=False,
-            reload=True,
-            create=True,
-            mock_last_name_used=True,
+            wrapper: Optional[bool] = False,
+            reload: Optional[bool] = True,
+            create: Optional[bool] = True,
+            mock_last_name_used: Optional[bool] =True,
             *_,
             **kwargs
-    ):
+    ) -> AutosubmitExperiment:
         if experiment_data is None:
             experiment_data = {}
 
@@ -205,10 +208,10 @@ def autosubmit_exp(
             'EXPERIMENT': 'expdef'
         }
 
-        for key, file in key_file.items():
+        for key, input_lines in key_file.items():
             if key in experiment_data:
                 mode = 'a' if key == 'EXPERIMENT' else 'w'
-                with open(conf_dir / f'{file}_{expid}.yml', mode) as f:
+                with open(conf_dir / f'{input_lines}_{expid}.yml', mode) as f:
                     YAML().dump({key: experiment_data[key]}, f)
 
         other_yaml = {
@@ -257,8 +260,15 @@ def autosubmit_exp(
         # TODO: would be nice if we had a way in Autosubmit Config Parser or
         #       Autosubmit to define variables. We are replacing it
         #       in other parts of the code, but without ``fileinput``.
-        with FileInput(conf_dir / f'autosubmit_{expid}.yml', inplace=True, backup='.bak') as file:
-            for line in file:
+        # NOTE: the context manager is instantiated here, and we use ``cast`` as mypy
+        #       complains otherwise (maybe related to this mypy GH issue?
+        #       https://github.com/python/mypy/issues/18320).
+        file_input = cast(
+            ContextManager[str],
+            FileInput(conf_dir / f'autosubmit_{expid}.yml', inplace=True, backup='.bak')
+        )
+        with file_input as input_lines:
+            for line in input_lines:
                 if 'SAFETYSLEEPTIME' in line:
                     print(sub(r'\d+', '0', line), end='')
                 else:
@@ -281,7 +291,7 @@ def autosubmit_exp(
             platform=platform
         )
 
-    return _create_autosubmit_exp
+    return cast(AutosubmitExperimentFixture, _create_autosubmit_exp)
 
 
 class MakeSSHClientFixture(Protocol):
@@ -400,6 +410,19 @@ def _markers_contain(request: "FixtureRequest", text: str) -> bool:
     return any(marker.name == text for marker in markers)
 
 
+def _wait_for_ssh_port(host, port, timeout=30):
+    """Tries to connect to host and port until it works or the timeout is reached."""
+    start = time.time()
+    while True:
+        try:
+            with socket.create_connection((host, port), timeout=2):
+                return
+        except OSError:
+            if time.time() - start > timeout:
+                raise TimeoutError(f"SSH not ready at {host}:{port}")
+            time.sleep(1)
+
+
 @pytest.fixture
 def ssh_server(mocker, tmp_path, request) -> DockerContainer:
     ssh_port = get_free_port()
@@ -425,7 +448,10 @@ def ssh_server(mocker, tmp_path, request) -> DockerContainer:
             .with_env('PASSWORD_ACCESS', 'true') \
             .with_env('MFA', str(mfa).lower()) \
             .with_bind_ports(2222, ssh_port) as container:
+        # This verifies that the server printed the line, not necessarily the port is available
         wait_for_logs(container, 'sshd is listening on port 2222')
+
+        _wait_for_ssh_port('localhost', ssh_port, 30)
 
         ssh_client = _make_ssh_client(ssh_port, _SSH_DOCKER_PASSWORD, None, mfa)
         mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
@@ -538,7 +564,7 @@ def postgres_server(request: 'FixtureRequest') -> Generator[PostgresContainer, N
     The container is available throughout the whole testing session.
     """
     mark_expression = request.config.option.markexpr
-    if mark_expression and 'postgres' not in mark_expression:
+    if mark_expression is not None and 'postgres' not in mark_expression:
         # print("Skipping Postgres setup because -m 'postgres' was not specified")
         yield None
     else:
