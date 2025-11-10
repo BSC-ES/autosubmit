@@ -22,6 +22,7 @@ import queue  # only for the exception
 import time
 import traceback
 from contextlib import suppress
+from multiprocessing.process import BaseProcess
 from multiprocessing.queues import Queue
 from multiprocessing.synchronize import Event
 # noinspection PyProtectedMember
@@ -41,7 +42,6 @@ if TYPE_CHECKING:
     from autosubmit.job.job import Job
     from autosubmit.job.job_list import JobList
     from autosubmit.job.job_package_persistence import JobPackagePersistence
-    from multiprocessing.process import BaseProcess
 
 
 def _init_logs_log_process(as_conf: 'AutosubmitConfig', platform_name: str) -> None:
