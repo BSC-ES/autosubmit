@@ -759,7 +759,7 @@ class ParamikoPlatform(Platform):
         """
         job_names = []
         if self.expid in str(self.remote_log_dir):  # Ensure we are in the right experiment
-            if not job_names:
+            if not job_names_provided:
                 cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_COMPLETED' -type f"
             else:
                 patterns = ' -o '.join([f"-name '{name}_COMPLETED'" for name in job_names_provided])

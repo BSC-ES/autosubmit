@@ -111,11 +111,11 @@ def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_n
         with pytest.raises(AutosubmitCritical):
             as_exp.autosubmit.recovery(
                 as_exp.expid,
-                noplot=False,
+                noplot=False,  # Just test that is called without errors
                 save=True,
                 all_jobs=True,
-                hide=True,
-                group_by=None,
+                hide=True,  # Just test that is called without errors
+                group_by="date",  # Just test that is called without errors
                 expand=[],
                 expand_status=[],
                 detail=True,
@@ -129,7 +129,7 @@ def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_n
             save=True,
             all_jobs=True,
             hide=True,
-            group_by=None,
+            group_by="date",
             expand=[],
             expand_status=[],
             detail=True,
@@ -253,7 +253,7 @@ def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover, act
                     save=True,
                     all_jobs=True,
                     hide=True,
-                    group_by=None,
+                    group_by="date",
                     expand=[],
                     expand_status=[],
                     detail=True,
@@ -267,7 +267,7 @@ def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover, act
                 save=True,
                 all_jobs=True,
                 hide=True,
-                group_by=None,
+                group_by="date",
                 expand=[],
                 expand_status=[],
                 detail=True,
