@@ -503,7 +503,7 @@ def test_get_completed_job_names(tmp_path, mode):
     """Test that completed job names are correctly retrieved from the remote platform."""
     # Actually we want to test a paramiko function, but using local platform for simplicity with the "send_command" part.
     platform = LocalPlatform(expid='t001', name='local', config={})
-    platform.remote_log_dir = tmp_path / 'remote_logs'
+    platform.remote_log_dir = tmp_path / 't001/remote_logs'
     platform.remote_log_dir.mkdir(parents=True, exist_ok=True)
     platform.connected = True
     completed_jobs = ['job1_COMPLETED', 'job2_COMPLETED', 'job3_COMPLETED']
@@ -514,6 +514,6 @@ def test_get_completed_job_names(tmp_path, mode):
         job_names = platform.get_completed_job_names()
         expected_job_names = ['job1', 'job2', 'job3']
     else:
-        job_names = platform.get_completed_job_names(job_names=['job1', 'job3'])
+        job_names = platform.get_completed_job_names(job_names_provided=['job1', 'job3'])
         expected_job_names = ['job1', 'job3']
     assert set(job_names) == set(expected_job_names)

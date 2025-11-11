@@ -18,7 +18,7 @@
 import os
 import textwrap
 from pathlib import Path
-from typing import Any, Optional, Protocol, cast, List
+from typing import Any, Optional, Protocol, cast
 
 from sqlalchemy import and_, func, inspect, desc, insert, select, update
 from sqlalchemy.schema import CreateTable, CreateSchema
