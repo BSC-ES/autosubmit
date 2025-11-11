@@ -1279,7 +1279,6 @@ class Job(object):
         # Update local logs
         self.local_logs = remote_logs
 
-
     def retrieve_external_retrials_logfiles(self):
         log_recovered = False
         self.remote_logs = self.get_new_remotelog_name()
@@ -1945,7 +1944,7 @@ class Job(object):
 
         return parameters
 
-    def update_wrapper_parameters(self,as_conf: AutosubmitConfig, parameters: dict) -> dict:
+    def update_wrapper_parameters(self, as_conf: AutosubmitConfig, parameters: dict) -> dict:
         wrappers = as_conf.experiment_data.get("WRAPPERS", {})
         if len(wrappers) > 0:
             parameters['WRAPPER'] = as_conf.get_wrapper_type()
@@ -2232,8 +2231,7 @@ class Job(object):
         self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT", {}).get("WORKFLOW_COMMIT", "")
 
     def update_placeholders(self, as_conf: AutosubmitConfig, parameters: dict, replace_by_empty=False) -> dict:
-        """
-        Find and substitute dynamic placeholders in `parameters` using the provided
+        """Find and substitute dynamic placeholders in `parameters` using the provided
         Autosubmit configuration helpers.
 
         :param as_conf: Autosubmit configuration object.
@@ -2245,12 +2243,25 @@ class Job(object):
         :return: Parameters with placeholders substituted.
         :rtype: dict
         """
+
         as_conf.deep_read_loops(parameters)
-        as_conf.substitute_dynamic_variables(parameters)
-        if replace_by_empty and as_conf.dynamic_variables:
-            for var in as_conf.dynamic_variables.keys():
-                parameters[var] = ""
-        as_conf.dynamic_variables = {}
+        # At this point, the ^ and not ^ is the same
+        for key, value in as_conf.special_dynamic_variables.items():
+            if isinstance(value, str):
+                as_conf.dynamic_variables[key] = value.replace('^', '')
+                parameters[key] = as_conf.dynamic_variables[key]
+            elif isinstance(value, list):
+                as_conf.dynamic_variables[key] = [v.replace('^', '') if isinstance(v, str) else v for v in value]
+                parameters[key] = as_conf.dynamic_variables[key]
+        as_conf.special_dynamic_variables = dict()
+
+        as_conf.substitute_dynamic_variables(parameters, in_the_end=False)
+
+        # Only replace CURRENT_ placeholders when requested and dynamic_variables exists.
+        if replace_by_empty:
+            for key in as_conf.dynamic_variables.keys():
+                parameters[key] = ""
+            as_conf.dynamic_variables = dict()
 
         return parameters
 
@@ -2508,7 +2519,6 @@ class Job(object):
         real_name = real_name.replace(f"{self.expid}_", "")
         return real_name
 
-
     def create_wrapped_script(self, as_conf: AutosubmitConfig, wrapper_tag='wrapped') -> str:
         parameters = self.update_parameters(as_conf, set_attributes=False)
         template_content = self.get_wrapped_content(as_conf, parameters)
@@ -2534,11 +2544,11 @@ class Job(object):
         """
         parameters = self.update_parameters(as_conf, set_attributes=False)
         template_content, additional_templates = self.update_content(as_conf, parameters)
-        variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content,flags=re.IGNORECASE)
+        variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content, flags=re.IGNORECASE)
         variables = [variable[1:-1] for variable in variables]
         variables = [variable for variable in variables if variable not in as_conf.default_parameters]
         for template in additional_templates:
-            variables_tmp = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template,flags=re.IGNORECASE)
+            variables_tmp = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template, flags=re.IGNORECASE)
             variables_tmp = [variable[1:-1] for variable in variables_tmp]
             variables_tmp = [variable for variable in variables_tmp if variable not in as_conf.default_parameters]
             variables.extend(variables_tmp)
@@ -2550,7 +2560,7 @@ class Job(object):
             if str(show_logs).lower() != "false":
                 Log.printlog("The following set of variables to be substituted in template script is not part "
                              "of parameters set, and will be replaced by a blank value: {0}".format(
-                                self.undefined_variables), 5013)
+                    self.undefined_variables), 5013)
                 if not set(variables).issuperset(set(parameters)):
                     Log.printlog(
                         f"The following set of variables are not being used in the templates: {str(set(parameters) - set(variables))}",
@@ -2567,7 +2577,7 @@ class Job(object):
         else:
             self.local_logs = (f"{self.name}.{self.submit_time_timestamp}.out",
                                f"{self.name}.{self.submit_time_timestamp}.err")
-        
+
     def check_compressed_local_logs(self) -> None:
         """
         Checks if the current local log files are compressed versions (.gz or .xz)
@@ -2670,7 +2680,7 @@ class Job(object):
         return True
 
     def write_vertical_time(
-        self, count: int = -1, first_submit_timestamp: str = ''
+            self, count: int = -1, first_submit_timestamp: str = ''
     ) -> None:
         self.update_start_time(count=count)
         self.update_local_logs(update_submit_time=False, count=count)

@@ -2187,6 +2187,10 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
                 "WRAPPER_HAS_PRIO": "%CURRENT_NOT_EXISTENT_PLACEHOLDER%",
             }
         },
+        "TESTDATES": {
+            "START_DATE": "%CHUNK_START_DATE%",
+            "START_DATE_WITH_SPECIAL": "%^CHUNK_START_DATE%",
+        },
         "PLATFORMS": {
             "TEST_SLURM": {
                 "ADD_PROJECT_TO_HOST": False,
@@ -2266,6 +2270,10 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
     assert parameters["CURRENT_JOB_HAS_PRIO"] == "whatever"
     assert parameters["CURRENT_WRAPPER_HAS_PRIO"] == "whatever_from_wrapper"
     assert parameters["CURRENT_PLATFORM_HAS_PRIO"] == "whatever_from_platform"
+    assert parameters["SDATE"] == "20200101"
+    assert parameters["TESTDATES.START_DATE"] == "20200101"
+    assert parameters["TESTDATES.START_DATE_WITH_SPECIAL"] == "20200101"
+    assert parameters["EXPERIMENT.DATELIST"] == 20200101
 
 
 def test_process_scheduler_parameters(local):
