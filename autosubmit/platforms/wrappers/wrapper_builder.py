@@ -65,6 +65,7 @@ class WrapperBuilder(object):
         if "wallclock_by_level" in list(kwargs.keys()):
             self.wallclock_by_level = kwargs['wallclock_by_level']
 
+
     def build_header(self):
         return textwrap.dedent(self.header_directive) + self.build_imports()
 
@@ -170,14 +171,17 @@ class PythonWrapperBuilder(WrapperBuilder):
                 Thread.__init__(self)
                 self.template = template
                 self.id_run = id_run
-
+                
             def run(self):
                 jobname = self.template.replace('.cmd', '')
-                out = str(self.template) + ".out." + str(0)
-                err = str(self.template) + ".err." + str(0)
+                out = f"{{os.getcwd()}}/{{str(self.template)}}.out.0"
+                err = f"{{os.getcwd()}}/{{str(self.template)}}.err.0"
+                template_path = f"{{os.getcwd()}}/{{jobname}}"
                 print(out+"\\n")
-                command = "./" + str(self.template) + " " + str(self.id_run) + " " + os.getcwd()
-                (self.status) = getstatusoutput(command + " > " + out + " 2> " + err)
+                print(err+"\\n")
+                command = f"chmod +x {{template_path}}; {{template_path}} > {{out}} 2> {{err}}"
+                print(command)
+                (self.status) = getstatusoutput(command)
         """).format('\n'.ljust(13))
 
     # hybrids
