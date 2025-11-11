@@ -34,6 +34,7 @@ release.
   Now Autosubmit uses the pattern $expid-crate-$date-$time-$millisecond.zip, and ignores any ZIP files
   in the tmp/ASLOGS that start with $expid-crate and end with .zip #2692
 - Fixed 'NoneType' object has no attribute 'set' that would have set a 'NoneType' instead of a 'EventType' #2611 #2583
+- Standardized the inner_job submission for non-vertical wrappers #1474
 - Fixes an issue with some placeholders not being replaced in templates #2426
 
 **Enhancements:**
