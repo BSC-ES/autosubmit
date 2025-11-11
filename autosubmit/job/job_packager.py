@@ -533,14 +533,13 @@ class JobPackager(object):
 
     def build_packages(self):
         # type: () -> List[JobPackageBase]
-        """
-        Returns the list of the built packages to be submitted
+        """Returns the list of the built packages to be submitted
 
         :return: List of packages depending on type of package, JobPackageVertical Object for 'vertical'.
         :rtype: List() of JobPackageVertical
         """
         packages_to_submit = list()
-        jobs_ready,ready = self.check_if_packages_are_ready_to_build()
+        jobs_ready, ready = self.check_if_packages_are_ready_to_build()
         if not ready:
             return []
         max_jobs_to_submit = min(self._max_wait_jobs_to_submit, self._max_jobs_to_submit)
@@ -552,7 +551,7 @@ class JobPackager(object):
                 if not event.is_set():
                     event.set()
 
-            if job.section not in section_jobs_to_submit: # This is to fix TOTAL_JOBS when is set at job_level # Only for non-wrapped jobs
+            if job.section not in section_jobs_to_submit:  # This is to fix TOTAL_JOBS when is set at job_level # Only for non-wrapped jobs
                 if int(job.max_waiting_jobs) != int(job.platform.max_waiting_jobs):
                     section_max_wait_jobs_to_submit = int(job.max_waiting_jobs) - int(self.waiting_jobs)
                 else:
@@ -568,6 +567,7 @@ class JobPackager(object):
                     section_max_wait_jobs_to_submit = self._max_wait_jobs_to_submit
 
                 section_jobs_to_submit = {job.section: min(section_max_wait_jobs_to_submit, section_max_jobs_to_submit)}
+                section_jobs_to_submit[job.section] = 0 if section_jobs_to_submit[job.section] < 0 else section_jobs_to_submit[job.section]
                 Log.result(f"Section:{job.section} can submit {section_jobs_to_submit[job.section]} jobs at this time")
         jobs_to_submit = sorted(
             jobs_ready, key=lambda k: k.priority, reverse=True)
