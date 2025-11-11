@@ -176,7 +176,7 @@ class PythonWrapperBuilder(WrapperBuilder):
                 jobname = self.template.replace('.cmd', '')
                 out = f"{{os.getcwd()}}/{{str(self.template)}}.out.0"
                 err = f"{{os.getcwd()}}/{{str(self.template)}}.err.0"
-                template_path = f"{{os.getcwd()}}/{{jobname}}"
+                template_path = f"{{os.getcwd()}}/{{self.template}}"
                 print(out+"\\n")
                 print(err+"\\n")
                 command = f"chmod +x {{template_path}}; {{template_path}} > {{out}} 2> {{err}}"
