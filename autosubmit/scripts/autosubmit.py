@@ -66,7 +66,7 @@ def exit_from_error(e: BaseException) -> int:
     err_code = 1
     trace = traceback.format_exc()
     try:
-        Log.debug(trace)
+        Log.critical(trace)
     except BaseException:
         print(trace)
 
