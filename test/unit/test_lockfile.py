@@ -33,7 +33,7 @@ def test_delete_lockfile(tmp_path):
     assert not fake_lock.exists()
 
 
-def test_log_debug_raises_error(mocker):
+def test_log_critical_raises_error(mocker):
     """TODO: this probably should never happen?"""
 
     def _fn():
@@ -46,9 +46,9 @@ def test_log_debug_raises_error(mocker):
         mocked_log = mocker.patch('autosubmit.scripts.autosubmit.Log')
         mocked_print = mocker.patch('autosubmit.scripts.autosubmit.print')
 
-        mocked_log.debug.side_effect = BaseException()
-
-        exit_from_error(e)
+        mocked_log.critical.side_effect = BaseException()
+        with pytest.raises(BaseException):
+            exit_from_error(e)
 
         assert mocked_print.called
 
@@ -60,11 +60,11 @@ _TEST_EXCEPTION.trace = 'a trace'
 @pytest.mark.parametrize(
     'exception,debug_calls,critical_calls,delete_called',
     [
-        (ValueError, 1, 1, True),
-        (BaseLockException, 1, 0, False),
-        (AutosubmitCritical, 1, 1, True),
-        (_TEST_EXCEPTION, 2, 1, True),
-        (AutosubmitError, 1, 1, True)
+        (ValueError, 0, 2, True),
+        (BaseLockException, 0, 1, False),
+        (AutosubmitCritical, 0, 2, True),
+        (_TEST_EXCEPTION, 1, 2, True),
+        (AutosubmitError, 0, 2, True)
     ],
     ids=[
         'normal_exception',
