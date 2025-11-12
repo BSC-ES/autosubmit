@@ -58,10 +58,18 @@ class JobsDbManager(DbManager):
         pkeys = ['name']
         self.upsert_many(table.name, persistent_data, pkeys)
 
-    def load_jobs(self, full_load, load_failed_jobs: bool = False, members: List = None) -> List[dict[str, Any]]:
+    def load_jobs(
+            self,
+            full_load: bool,
+            load_failed_jobs: bool = False,
+            only_not_updated_logs: bool = False,
+            members: Optional[List[Any]] = None
+    ) -> List[Dict[str, Any]]:
         table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
         self.create_table(table.name)
-        if full_load:
+        if only_not_updated_logs:
+            job_list = self.select_not_updated_log_jobs()
+        elif full_load:
             job_list = self.select_all_jobs()
         else:
             job_list = self.select_active_jobs(include_failed=load_failed_jobs, members=members)
@@ -70,6 +78,15 @@ class JobsDbManager(DbManager):
         job_list = [dict(job) for job in job_list]
         # return modificable list of dicts so it is easier to save later
         return job_list
+
+    def select_not_updated_log_jobs(self) -> List[Dict[str, Any]]:
+        """Return the jobs from the database that have not updated their logs.
+        """
+        table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
+
+        self.create_table(table.name)
+        job_list = self.select_where_with_columns(table, {'updated_log': False, 'status': [Status.COMPLETED, Status.FAILED, Status.SKIPPED]})
+        return [dict(job) for job in job_list]
 
     def load_job_by_name(self, job_name: str) -> dict[str, Any]:
         """

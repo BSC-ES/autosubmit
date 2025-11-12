@@ -2600,14 +2600,16 @@ class JobList(object):
             else:
                 raise AutosubmitCritical(f"Wrapper job with id {wrapper_id} not found in job_package_map", 7001)
 
-    def continue_run(self):
-        """
-        Loads the next possible jobs and edges from the database and checks if there are active jobs in the workflow.
-        Checks if there are active jobs in the workflow.
-        If there are active jobs, it returns True, otherwise it returns False.
+    def continue_run(self) -> bool:
+        """Loads the next possible jobs and edges from the database.
+
+        :rtype : bool
+        :return: True if there are active jobs to run, False otherwise.
         """
         for job in self.job_list:
             self.update_parents_edge_completeness(job)
+        self.update_log_status()
+        self.unload_completed_jobs()
         self._load_graph(full_load=False)
         for job in self.job_list:
             if not job.platform:
@@ -2615,8 +2617,6 @@ class JobList(object):
             if not job.updated:
                 job.update_parameters(self._as_conf, set_attributes=True, reset_logs=False if job.status in (
                         self._IN_SCHEDULER + self._FINAL_STATUSES) else True)
-
-        self.unload_completed_jobs()
         Log.debug(f"Jobs loaded: {len(self.job_list)}")
         Log.debug(f"Edges loaded: {len(self.graph_dict)}")
         self.update_wrappers_references()
@@ -2627,20 +2627,21 @@ class JobList(object):
         Unloads completed jobs and edges from the memory
         This method removes jobs that are in the completed state and logs are recovered.
         """
+
         jobs_to_unload = [
             job for job in self.job_list
-            if job.updated_log and (
+            if (
                     (job.status == Status.FAILED and job.fail_count >= job.retrials) or
-                    (job.status in self._FINAL_STATUSES)
+                    (job.status in [Status.COMPLETED, Status.SKIPPED])
             )
         ]
         for job in (job for job in jobs_to_unload):
             for parent in job.parents:
                 if self.graph.has_edge(parent.name, job.name):
                     self.graph.remove_edge(parent.name, job.name)
-                self.graph.remove_node(job.name)
             job.children = set()
             job.parents = set()
+            self.graph.remove_node(job.name)
             del job
 
     def get_active(self, platform=None, wrapper=False):
@@ -2764,21 +2765,30 @@ class JobList(object):
         """
         return sorted(self.job_list, key=lambda k: k.status)
 
-    def save_jobs(self):
-        """
-        Persists the job list
+    def save_jobs(self, jobs_to_save: Optional[List[Job]] = None):
+        """Persists the job list
         """
         if not self.disable_save:
             Log.info("Saving jobs to the database...")
-            self.update_status_log()
-            self.dbmanager.save_jobs(self.job_list)
+            if not jobs_to_save:
+                self.update_status_log()
+                self.dbmanager.save_jobs(self.job_list)
+            else:
+                self.dbmanager.save_jobs(jobs_to_save)
             Log.info("Jobs saved.")
 
-    def load_jobs(self, full_load, load_failed_jobs: bool = False) -> List[Job]:
+    def load_jobs(self, full_load: bool, load_failed_jobs: bool = False,
+                  only_not_updated_logs: bool = False) -> List[Job]:
+        """Load the job list from the database.
+
+        :param full_load: If True, load all jobs and edges; otherwise load only necessary ones.
+        :param load_failed_jobs: If True, include failed jobs in the load.
+        :param only_not_updated_logs: If True, load only jobs with not-updated logs.
+        :return: A list of loaded Job objects.
         """
-        Loads the job list
-        """
-        nodes = self.dbmanager.load_jobs(full_load, load_failed_jobs, members=self.run_members)
+        nodes = self.dbmanager.load_jobs(full_load, load_failed_jobs,
+                                         only_not_updated_logs=only_not_updated_logs,
+                                         members=self.run_members)
         self.total_size, self.completed_size, self.failed_size = self.dbmanager.get_job_list_size()
         return nodes
 
@@ -3010,33 +3020,53 @@ class JobList(object):
                     non_completed.append(parent)
         return non_completed, completed
 
-    def update_log_status(self, job: 'Job', as_conf, new_run=False):
+    def set_log_from_historical_db(self, jobs_to_recover: List[Job], last_run_id: bool = False) -> bool:
+        """Retrieve logs for jobs from historical database.
+
+        This method fetches the stdout and stderr logs for the specified jobs
+        from the historical database and updates the job objects accordingly.
+        :param jobs_to_recover: List of Job objects to recover logs for.
+        :type jobs_to_recover: List[Job]
+        :param last_run_id: If True, fetch logs from the last run ID.
+        :type last_run_id: bool
+        :return: True if logs were successfully recovered for all specified jobs, False otherwise.
+        :rtype: bool
         """
-        Updates the log err and log out.
+        exp_history = ExperimentHistory(self.expid, force_sql_alchemy=True)
+        job_names_to_recover = [job.name for job in jobs_to_recover]
+        jobs_data = exp_history.manager.get_jobs_data_last_row_by_name(job_names_to_recover, last_run_id=last_run_id)
+        jobs = [job for job in self.get_job_list() if job.name in jobs_data.keys()]
+        for job in jobs:
+            job.local_logs = (copy.copy(jobs_data[job.name]['out']), copy.copy(jobs_data[job.name]['err']))
+            job.remote_logs = (copy.copy(jobs_data[job.name]['out']), copy.copy(jobs_data[job.name]['err']))
+            job.updated_log = True
+        return len(set(jobs_data.keys()) & set(job_names_to_recover)) == len(job_names_to_recover)
+
+    def update_log_status(self, new_run: bool = False) -> bool:
+        """Update jobs' log recovered status.
+
+        Iterate over the current job list and mark jobs whose stdout/stderr logs
+        have been recovered.
+
+        :param as_conf: Optional AutosubmitConfig to use (falls back to self._as_conf).
+        :param new_run: If True, also mark the job as updated for a new run.
+        :type new_run: bool
+        :return: True if all jobs' logs were successfully recovered, False otherwise.
+        :rtype: bool
         """
-        # hasattr for backward compatibility (job.updated_logs is only for newer jobs,
-        # as the loaded ones may not have this set yet)
-        if not hasattr(job, "updated_log"):
-            job.updated_log = False
-        elif job.updated_log:
-            return
-        # X11 has it log written in the run.out file.
-        # No need to check for log files as there are none
-        if hasattr(job, "x11") and job.x11:
-            job.updated_log = True
-            return
-        log_recovered = self.check_if_log_is_recovered(job)
-        if log_recovered:
-            job.updated_log = True
-            # we only want the last one
-            err_filename = log_recovered.name.replace(".out", ".err")
-            job.local_logs = (log_recovered.name, err_filename)
-            job.updated_log = True
-        elif new_run and not job.updated_log and str(
-                as_conf.platforms_data.get(job.platform.name, {}).get('DISABLE_RECOVERY_THREADS',
-                                                                      "false")).lower() == "false":
-            job.platform.add_job_to_log_recover(job)
-        return log_recovered
+        if new_run:
+            # load all jobs without updated_log from db
+            jobs_to_recover = self.load_jobs(full_load=True, only_not_updated_logs=True)
+            # TODO: call to job.platform.add_job_to_log_recover(self) here
+        else:
+            jobs_to_recover = [job for job in self.job_list if not getattr(job, "updated_log", False) and not getattr(job, "x11", False) and job.status in self._FINAL_STATUSES]
+
+        all_jobs_recovered = True
+        if len(jobs_to_recover) > 0:
+            all_jobs_recovered = self.set_log_from_historical_db(jobs_to_recover, last_run_id=not new_run)
+            self.save_jobs(jobs_to_recover)
+
+        return all_jobs_recovered
 
     def check_if_log_is_recovered(self, job: Job) -> Path:
         """
@@ -4123,7 +4153,7 @@ class JobList(object):
         if job_names:
             exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                             historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR, force_sql_alchemy=True)
-            jobs_data = exp_history.manager.get_jobs_data_last_row(job_names)  # This gets only the last row
+            jobs_data = exp_history.manager.get_jobs_data_last_row_by_name(job_names)  # This gets only the last row
             for job in self.get_job_list():
                 if job.name in jobs_data:
                     job.id = int(jobs_data[job.name]["job_id"])
@@ -4154,7 +4184,7 @@ class JobList(object):
         if job_names:
             exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                             historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR, force_sql_alchemy=True)
-            jobs_data = exp_history.manager.get_jobs_data_last_row(job_names)  # This gets only the last row
+            jobs_data = exp_history.manager.get_jobs_data_last_row_by_name(job_names)  # This gets only the last row
             return {name for name, data in jobs_data.items() if data["status"] == "COMPLETED"}
 
         return set()

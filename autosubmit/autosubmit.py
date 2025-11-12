@@ -2242,12 +2242,8 @@ class Autosubmit:
         return job_list.total_size, safetysleeptime, default_retrials, check_wrapper_jobs_sleeptime
 
     @staticmethod
-    def check_logs_status(job_list: "JobList", as_conf, new_run):
-        for job in job_list.get_completed_failed_without_logs():
-            if new_run:
-                job.platform.spawn_log_retrieval_process(as_conf)
-
-            job_list.update_log_status(job, as_conf, new_run)
+    def check_logs_status(job_list: "JobList", new_run) -> bool:
+        return job_list.update_log_status(new_run)
 
     @staticmethod
     def refresh_log_recovery_process(platforms: list[Platform], as_conf: AutosubmitConfig) -> None:
@@ -2328,11 +2324,10 @@ class Autosubmit:
                 max_recovery_retrials = as_conf.experiment_data.get("CONFIG", {}).get("RECOVERY_RETRIALS",
                                                                                       3650)  # (72h - 122h )
                 recovery_retrials = 0
-                Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
+                Autosubmit.check_logs_status(job_list, new_run=True)
                 while job_list.continue_run():
                     try:
                         if Autosubmit.exit:
-                            Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             if job_list.get_failed():
                                 return 1
                             return 0
@@ -2394,7 +2389,6 @@ class Autosubmit:
                                          Log.INFO)
                             Log.warning("Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
                         if Autosubmit.exit:
-                            Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             job_list.save_jobs()
                             as_conf.save()
                         # TODO fix in another PR, this is a workaround to avoid having missmatching job_list and platform experiment_data
@@ -2502,13 +2496,11 @@ class Autosubmit:
                     if p.log_recovery_process:
                         p.cleanup_event.set()  # Send cleanup event
                         p.log_recovery_process.join()
-                Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
-                job_list.save_jobs()
-                if len(job_list.get_completed_failed_without_logs()) == 0:
+                if Autosubmit.check_logs_status(job_list, new_run=False):
                     Log.result("Autosubmit recovered all job logs.")
                 else:
-                    Log.warning(
-                        f"Autosubmit couldn't recover the following job logs: {[job.name for job in job_list.get_completed_failed_without_logs()]}")
+                    Log.warning("Autosubmit couldn't recover all job logs")
+
                 try:
                     exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                                     historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
