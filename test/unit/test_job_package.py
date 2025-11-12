@@ -22,7 +22,6 @@ from mock import MagicMock
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistenceDb
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical
 from autosubmit.job.job_packages import jobs_in_wrapper_str
 from autosubmit.config.yamlparser import YAMLParserFactory
@@ -105,7 +104,7 @@ def create_job_package_wrapper(jobs, as_conf):
 
 @pytest.fixture
 def joblist(tmp_path, as_conf):
-    job_list = JobList('a000', as_conf, YAMLParserFactory(), JobListPersistenceDb(as_conf.expid))
+    job_list = JobList('a000', as_conf, YAMLParserFactory())
     job_list._ordered_jobs_by_date_member["WRAPPERS"] = dict()
     return job_list
 
@@ -199,7 +198,7 @@ def test_jobs_in_wrapper_str(autosubmit_config):
     assert result == "job1_job2_job3"
 
 
-def test_job_package_submission(mocker, local):
+def test_job_package_submission(mocker, local, tmp_path):
     # N.B.: AS only calls ``_create_scripts`` if you have less jobs than threads.
     # So we simply set threads to be greater than the amount of jobs.
     jobs = [
@@ -213,10 +212,12 @@ def test_job_package_submission(mocker, local):
     mocker.patch('multiprocessing.cpu_count', return_value=len(jobs) + 1)
     mocker.patch("autosubmit.job.job.Job.update_parameters", return_value={})
     mocker.patch('autosubmit.job.job.Job._get_paramiko_template', return_value="empty")
+
     for job in jobs:
-        job._tmp_path = MagicMock()
-        job.file = "fake-file"
+        job._tmp_path = tmp_path
+        job.file = tmp_path / "fake-file"
         job.custom_directives = []
+        job.file.write_text("echo 'Hello World'")
 
     job_package = JobPackageSimple(jobs)
 

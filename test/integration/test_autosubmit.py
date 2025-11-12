@@ -19,18 +19,15 @@
 
 from contextlib import nullcontext as does_not_raise
 from os import R_OK, W_OK
-from pathlib import Path
-from shutil import copy
 from typing import TYPE_CHECKING
 
 import pytest
-
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
+
 from autosubmit.database.db_common import get_experiment_description
 from autosubmit.log.log import AutosubmitCritical
-from autosubmit.scripts.autosubmit import main
 
 if TYPE_CHECKING:
     from test.integration.conftest import AutosubmitExperimentFixture
@@ -293,39 +290,6 @@ def test_update_description(as_db: str, autosubmit, autosubmit_exp, mocker):
     assert new_description == get_experiment_description(exp.expid)[0][0]
 
 
-def test_autosubmit_pklfix_no_backup(autosubmit_exp, mocker, tmp_path):
-    exp = autosubmit_exp(_EXPID)
-    mocker.patch('sys.argv', ['autosubmit', 'pklfix', exp.expid])
-
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
-
-    assert 0 == main()
-
-    assert mocked_log.info.called
-    assert mocked_log.info.call_args[0][0].startswith('Backup file not found')
-
-
-def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
-    exp = autosubmit_exp(_EXPID)
-
-    pkl_path = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, exp.expid, 'pkl')
-    current = pkl_path / f'job_list_{exp.expid}.pkl'
-    backup = pkl_path / f'job_list_{exp.expid}_backup.pkl'
-
-    copy(current, backup)
-
-    mocker.patch('sys.argv', ['autosubmit', 'pklfix', exp.expid])
-
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
-
-    mocker.patch('autosubmit.autosubmit.Autosubmit._user_yes_no_query', return_value=True)
-
-    assert 0 == main()
-
-    assert mocked_log.result.called
-    assert mocked_log.result.call_args[0][0].startswith('Pkl restored')
-
-
 @pytest.mark.parametrize('experiment_data,context_mgr', [
     ({
          'JOBS': {
@@ -358,8 +322,5 @@ def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
     'Correct FOR',
 ])
 def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict, context_mgr: 'AbstractContextManager'):
-    exp = autosubmit_exp('t000', experiment_data, reload=False, create=False)
-    as_conf = exp.as_conf
     with context_mgr:
-        as_conf.reload(force_load=True)
-
+        autosubmit_exp('t000', experiment_data, include_jobs=False, create=True)

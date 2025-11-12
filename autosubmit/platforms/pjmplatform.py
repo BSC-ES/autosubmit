@@ -318,7 +318,6 @@ class PJMPlatform(ParamikoPlatform):
                 Log.printlog(f"Job {job.name} will be cancelled and set to FAILED as it was queuing due to {reason}",6000)
                 self.send_command(self.cancel_cmd + " {0}".format(job.id))
                 job.new_status = Status.FAILED
-                job.update_status(as_conf)
             elif reason.find('ASHOLD') != -1:
                 job.new_status = Status.HELD
                 if not job.hold:
@@ -344,12 +343,8 @@ class PJMPlatform(ParamikoPlatform):
         :rtype: str
         """
         job_list_cmd = ""
-        for job, job_prev_status in job_list:
-            if job.id is None:
-                job_str = "0"
-            else:
-                job_str = str(job.id)
-            job_list_cmd += job_str + "+"
+        for job in job_list:
+            job_list_cmd += str(job.id) + "+"
         if job_list_cmd[-1] == "+":
             job_list_cmd = job_list_cmd[:-1]
 
@@ -480,7 +475,7 @@ class PJMPlatform(ParamikoPlatform):
     def allocated_nodes():
         return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
 
-    def check_file_exists(self, filename, wrapper_failed=False, sleeptime=5, max_retries=3):
+    def check_file_exists(self, filename, wrapper_failed=False, sleeptime=5, max_retries=3, show_logs: bool = True):
         file_exist = False
         retries = 0
 
@@ -504,7 +499,8 @@ class PJMPlatform(ParamikoPlatform):
                         sleeptime = sleeptime + 5
                         retries = retries + 1
                 else:
-                    Log.printlog("remote logs {0} couldn't be recovered".format(filename), 6001)
+                    if show_logs:
+                        Log.printlog("remote logs {0} couldn't be recovered".format(filename), 6001)
                     file_exist = False  # won't exist
                     retries = 999  # no more retries
         return file_exist

@@ -130,7 +130,7 @@ class CreateJobParametersPlatformFixture(Protocol):
 @pytest.fixture
 def create_job_parameters_platform(autosubmit_exp) -> CreateJobParametersPlatformFixture:
     def job_parameters_platform(experiment_data: dict) -> JobParametersPlatform:
-        exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
+        exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, include_jobs=True)
         slurm_platform: 'SlurmPlatform' = cast('SlurmPlatform', exp.platform)
 
         job = Job(f"{_EXPID}_SIM", 10000, Status.SUBMITTED, 0)
@@ -627,3 +627,75 @@ def test_get_header_job_het(create_job_parameters_platform):
     #        object here (i.e. an integration test that loads everything from
     #        YAML configuration).
     assert header.count('hetjob') > 0
+
+
+@pytest.mark.docker
+@pytest.mark.parametrize(
+    'provided_jobs,real_completed_jobs,expected_result',
+    [
+        (['job1', 'job2', 'job3'], ['job1', 'job2'], ['job1', 'job2']),
+        ([], ['job1', 'job2'], ['job1', 'job2']),
+        (['job1', 'job2'], [], []),
+        ([], [], []),
+    ], ids=[
+        'Some jobs completed from provided list',
+        'All completed jobs when no provided list',
+        'No completed jobs from provided list',
+        'No completed jobs when no provided list'
+    ]
+)
+def test_get_completed_job_names(provided_jobs: list, real_completed_jobs: list,
+                                 expected_result: list, exp_platform_server: ExperimentPlatformServer):
+    as_conf = exp_platform_server.experiment.as_conf
+    platform = exp_platform_server.platform
+    platform.connect(as_conf, reconnect=False, log_recovery_process=False)
+    platform.remote_log_dir = f"/tmp/{platform.expid}/autosubmit_test_logs/"
+    platform.send_command(f"mkdir -p {platform.remote_log_dir}", ignore_log=True)
+    for job_name in real_completed_jobs:
+        completed_file = Path(platform.remote_log_dir) / f"{job_name}_COMPLETED"
+        platform.send_command(f"touch {completed_file}", ignore_log=True)
+
+    completed_jobs = platform.get_completed_job_names(
+        job_names_provided=provided_jobs
+    )
+
+    for job in expected_result:
+        assert job in completed_jobs
+
+
+@pytest.mark.docker
+@pytest.mark.parametrize(
+    'jobs_to_delete,real_completed_jobs,expected_result',
+    [
+        (['job1', 'job2', 'job3'], ['job1', 'job2'], []),
+        (['job1', 'job2'], ['job1', 'job2', 'job3'], ['job3']),
+        ([], ['job1', 'job2', 'job3'], ['job1', 'job2', 'job3']),
+        ([], [], []),
+    ], ids=[
+        'Delete some completed jobs from provided list',
+        'Delete all completed jobs from provided list',
+        'Delete no completed jobs when no provided list',
+        'Delete no completed jobs when no completed jobs'
+    ]
+)
+def test_deleted_failed_and_completed_names(jobs_to_delete: list, real_completed_jobs: list,
+                                            expected_result: list, exp_platform_server: ExperimentPlatformServer):
+    as_conf = exp_platform_server.experiment.as_conf
+    platform = exp_platform_server.platform
+    platform.connect(as_conf, reconnect=False, log_recovery_process=False)
+    platform.remote_log_dir = f"/tmp/{platform.expid}/autosubmit_test_logs/"
+    platform.send_command(f"mkdir -p {platform.remote_log_dir}", ignore_log=True)
+    for job_name in real_completed_jobs:
+        completed_file = Path(platform.remote_log_dir) / f"{job_name}_COMPLETED"
+        platform.send_command(f"touch {completed_file}", ignore_log=True)
+
+    platform.delete_failed_and_completed_names(
+        job_names=jobs_to_delete
+    )
+
+    # assert
+    platform.send_command(
+        f"ls -1 {platform.remote_log_dir}/*_COMPLETED | xargs -n1 basename", ignore_log=True
+    )
+    for job in expected_result:
+        assert job in platform.get_ssh_output()
