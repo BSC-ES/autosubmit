@@ -37,7 +37,6 @@ from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.database_managers import database_models as Models
 from autosubmit.history.database_managers.database_manager import (
     DatabaseManager,
-    DEFAULT_JOBDATA_DIR,
 )
 
 CURRENT_DB_VERSION = 19  # Update this if you change the database schema
@@ -51,12 +50,12 @@ class ExperimentHistoryDbManager(DatabaseManager):
     """ Manages actions directly on the database.
     """
 
-    def __init__(self, expid, jobdata_dir_path=DEFAULT_JOBDATA_DIR):
+    def __init__(self, options):
         """ Requires expid and jobdata_dir_path. """
-        super(ExperimentHistoryDbManager, self).__init__(expid, jobdata_dir_path=jobdata_dir_path)
+        super(ExperimentHistoryDbManager, self).__init__(options['expid'], jobdata_dir_path=BasicConfig.JOBDATA_DIR, local_root_dir_path=BasicConfig.LOCAL_ROOT_DIR)
         self._set_schema_changes()
         self._set_table_queries()
-        self.historicaldb_file_path = os.path.join(self.JOBDATA_DIR, "job_data_{0}.db".format(self.expid))  # type : str
+        self.historicaldb_file_path = str(Path(options.get('jobdata_dir_path', BasicConfig.JOBDATA_DIR)) / f"job_data_{options['expid']}.db")
 
     def initialize(self):
         if self.my_database_exists():
@@ -400,7 +399,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
         models = [Models.JobDataRow(*row) for row in job_data_rows][-1]
         return JobData.from_model(models)
 
-    def get_job_data_max_counter(self, job_name: str = None) -> int:
+    def get_job_data_max_counter(self, job_name: Optional[str] = None) -> int:
         """
         Get the maximum counter value from the `job_data` table. If a `job_name` is provided,
         the query will filter by that specific job name.
@@ -421,7 +420,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
         if not counter_result[0][0]:
             return DEFAULT_MAX_COUNTER
         else:
-            max_counter = Models.MaxCounterRow(*counter_result[0]).maxcounter
+            max_counter = Models.MaxCounter(*counter_result[0]).maxcounter
             return max_counter if max_counter else DEFAULT_MAX_COUNTER
 
     def _set_historical_pragma_version(self, version=10):
@@ -480,7 +479,7 @@ class ExperimentHistoryDatabaseManager(Protocol):
 
     def get_job_data_by_job_id_name(self, job_id: int, job_name: str): ...
 
-    def get_job_data_max_counter(self, job_name: str = None) -> int: ...
+    def get_job_data_max_counter(self, job_name: Optional[str] = None) -> int: ...
 
 
 class SqlAlchemyExperimentHistoryDbManager:
@@ -492,10 +491,16 @@ class SqlAlchemyExperimentHistoryDbManager:
       (i.e. no ``_set_schema_changes()`` nor ``_set_table_queries()``).
     """
 
-    def __init__(self, schema: Optional[str]):
-        connection_url = get_connection_url(Path(BasicConfig.DATABASE_CONN_URL))
+    def __init__(self, options: dict):
+        default_file = None if BasicConfig.DATABASE_BACKEND == "postgres" else f"job_data_{options.get('expid',options.get('schema',None))}.db"
+        job_data_file = options.get('jobdata_file', default_file)
+        default_dir = BasicConfig.DATABASE_CONN_URL if BasicConfig.DATABASE_BACKEND == "postgres" else BasicConfig.JOBDATA_DIR
+        jobdata_path = Path(options.get('jobdata_path', default_dir))
+        if job_data_file:
+            jobdata_path = jobdata_path / job_data_file
+        connection_url = get_connection_url(jobdata_path)
+        self.schema = options.get('schema', None)
         self.engine = session.create_engine(connection_url=connection_url)
-        self.schema = schema
 
     def initialize(self):
         # There is no update database in SQLAlchemy (yet), so we just create it.
@@ -520,7 +525,8 @@ class SqlAlchemyExperimentHistoryDbManager:
 
     def create_historical_database(self):
         with self.engine.connect() as conn:
-            conn.execute(CreateSchema(self.schema, if_not_exists=True))
+            if BasicConfig.DATABASE_BACKEND != "sqlite":
+                conn.execute(CreateSchema(self.schema, if_not_exists=True))
             conn.execute(CreateTable(get_table_with_schema(self.schema, ExperimentRunTable), if_not_exists=True))
             conn.execute(CreateTable(get_table_with_schema(self.schema, JobDataTable), if_not_exists=True))
             conn.commit()
@@ -645,7 +651,8 @@ class SqlAlchemyExperimentHistoryDbManager:
             self._update_job_data_by_id(job_data_dc)
         return len(job_data_dcs)
 
-    def get_job_data_dc_unique_latest_by_job_name(self, job_name):
+    def get_job_data_dc_unique_latest_by_job_name(self, job_name: Optional[str]):
+        """ Returns JobData data class for the latest job_data_row with last=1 by job_name. """
         job_data_row_last = self._get_job_data_last_by_name(job_name)
         if len(job_data_row_last) > 0:
             return JobData.from_model(job_data_row_last[0])
@@ -830,14 +837,40 @@ class SqlAlchemyExperimentHistoryDbManager:
         max_counter = result.maxcounter
         return max_counter if max_counter else DEFAULT_MAX_COUNTER
 
+    def get_jobs_data_last_row(self, job_names) -> dict[str, Any]:
+        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        jobs_data = self.select_jobs_data(job_data_table, job_names)
+        jobs_data = [dict(job) for job in jobs_data]
+        jobs_data_by_name = {}
+        counters = {}
+        for job in jobs_data:
+            if job['job_name'] not in counters:
+                counters[job['job_name']] = job['counter']
+                jobs_data_by_name[job['job_name']] = job
+            elif job['counter'] > counters[job['job_name']]:
+                counters[job['job_name']] = job['counter']
+                jobs_data_by_name[job['job_name']] = job
+        return jobs_data_by_name
+
+    def select_jobs_data(self, table, job_names) -> list[tuple[str, Any]]:
+        query = select(table).where(
+            and_(
+                table.c.last == 1,
+                table.c.job_name.in_(job_names)
+            )
+        )
+        with self.engine.connect() as conn:
+            rows = conn.execute(query).fetchall()
+        columns = table.c.keys()
+        return [tuple(zip(columns, row)) for row in rows]
 
 def create_experiment_history_db_manager(db_engine: str, **options: Any) -> ExperimentHistoryDatabaseManager:
     if db_engine == 'postgres':
-        return cast(ExperimentHistoryDatabaseManager, SqlAlchemyExperimentHistoryDbManager(options['schema']))
+        return cast(ExperimentHistoryDatabaseManager, SqlAlchemyExperimentHistoryDbManager(options))
     elif db_engine == 'sqlite':
-        return cast(ExperimentHistoryDatabaseManager, ExperimentHistoryDbManager(
-            options['schema'],
-            options.get('jobdata_dir_path', DEFAULT_JOBDATA_DIR)
-        ))
+        if options.get("force_sql_alchemy", False):
+            return cast(ExperimentHistoryDatabaseManager, SqlAlchemyExperimentHistoryDbManager(options))
+        else:
+            return cast(ExperimentHistoryDatabaseManager, ExperimentHistoryDbManager(options))
     else:
         raise ValueError(f"Invalid database engine: {db_engine}")

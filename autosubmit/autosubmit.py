@@ -344,7 +344,7 @@ class Autosubmit:
             subparser.add_argument(
                 '-np', '--noplot', action='store_true', default=False, help='omit plot')
             subparser.add_argument('--all', action="store_true", default=False,
-                                   help='Get completed files to synchronize pkl')
+                                   help='Get completed files to synchronize the graph')
             subparser.add_argument(
                 '-s', '--save', action="store_true", default=False, help='Save changes to disk')
             subparser.add_argument('--hide', action='store_true', default=False,
@@ -356,16 +356,14 @@ class Autosubmit:
                                         'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
             subparser.add_argument(
                 '-expand_status', type=str, help='Select the statuses to be expanded')
-            subparser.add_argument('-nt', '--notransitive', action='store_true',
-                                   default=False, help='Disable transitive reduction')
-            subparser.add_argument('-nl', '--no_recover_logs', action='store_true', default=False,
-                                   help='Disable logs recovery')
             subparser.add_argument('-d', '--detail', action='store_true',
                                    default=False, help='Show Job List view in terminal')
             subparser.add_argument('-f', '--force', action='store_true',
                                    default=False, help='Cancel active jobs ')
             subparser.add_argument('-v', '--update_version', action='store_true',
                                    default=False, help='Update experiment version')
+            subparser.add_argument('-off', '--offline', action='store_true',
+                                   default=False, help='Offline recovery')
             # Migrate
             subparser = subparsers.add_parser(
                 'migrate', description="Migrate experiments from current user to another")
@@ -762,8 +760,7 @@ class Autosubmit:
             return Autosubmit.clean(args.expid, args.project, args.plot, args.stats)
         elif args.command == 'recovery':
             return Autosubmit.recovery(args.expid, args.noplot, args.save, args.all, args.hide, args.group_by,
-                                       args.expand, args.expand_status, args.notransitive, args.no_recover_logs,
-                                       args.detail, args.force)
+                                       args.expand, args.expand_status, args.detail, args.force, args.offline)
         elif args.command == 'check':
             return Autosubmit.check(args.expid, args.notransitive)
         elif args.command == 'inspect':
@@ -3027,150 +3024,166 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def recovery(expid, noplot, save, all_jobs, hide, group_by=None, expand=list(), expand_status=list(),
-                 notransitive=False, no_recover_logs=False, detail=False, force=False):
-        """
-        Method to check all active jobs. If COMPLETED file is found, job status will be changed to COMPLETED,
+    def online_recovery(as_conf, platforms, job_list, offline=False) -> list:
+        completed_jobnames = set()
+        for p in platforms:
+            message = p.test_connection(as_conf)
+            if not p.connected:
+                if offline:
+                    Log.warning(f"Platform {p.name} is not reachable, proceeding with offline recovery for this platform")
+                    completed_jobnames.update(job_list.recover_all_completed_jobs_from_exp_history(p))
+                else:
+                    raise AutosubmitCritical(f"Couldn't connect to platform {p.name} during recovery: {message}", 7010)
+            else:
+                # Fetch completed jobs from platform
+                completed_jobnames.update(p.get_completed_job_names())
+
+        return list(completed_jobnames)
+
+
+    @staticmethod
+    def recovery(expid, noplot, save, all_jobs, hide, group_by=None, expand=list(), expand_status=list(), detail=False, force=False, offline=False):
+        """Method to check all active jobs.
+
+        If COMPLETED file is found, job status will be changed to COMPLETED,
         otherwise it will be set to WAITING. It will also update the jobs list.
 
-        :param detail:
-        :param no_recover_logs:
-        :param notransitive:
-        :param expand_status:
-        :param expand:
-        :param group_by:
-        :param noplot:
-        :param expid: identifier of the experiment to recover
-        :type expid: str
-        :param save: If true, recovery saves changes to the jobs list
-        :type save: bool
-        :param all_jobs: if True, it tries to get completed files for all jobs, not only active.
-        :type all_jobs: bool
-        :param hide: hides plot window
-        :type hide: bool
-        :param force: Allows to restore the workflow even if there are running jobs
-        :type force: bool
+        :param expid: experiment identifier
+        :param noplot: if True, no plot will be generated
+        :param save: if True, changes will be saved to the job list
+        :param all_jobs: if True, all jobs will be recovered, otherwise only active jobs
+        :param hide: if True, plot window will be hidden
+        :param group_by: workflow will only be written as text
+        :param expand: Filtering of jobs for its visualization
+        :param expand_status: Filtering of jobs for its visualization
+        :param detail: better text format representation but more expensive
+        :param force: if True, all active jobs will be cancelled before recovering the experiment
+        :param offline: if True, no connection to the platforms will be established
+        :return: True if recovery was successful, False otherwise
+        :rtype: bool
         """
-        try:
-            Autosubmit._check_ownership(expid, raise_error=True)
+        if not save:
+            Log.warning("Changes will be NOT saved to the jobList. Use -s option to save")
 
-            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
-
-            as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
-            as_conf.check_conf_files(True)
-
-            Log.info(f'Recovering experiment {expid}')
-            pkl_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl')
-            job_list = Autosubmit.load_job_list(
-                expid, as_conf, notransitive=notransitive, new=False, monitor=True)
-
-            current_active_jobs = job_list.get_in_queue()
-
-            as_conf.check_conf_files(False)
-
-            # Getting output type provided by the user in config, 'pdf' as default
-            output_type = as_conf.get_output_type()
-            hpcarch = as_conf.get_platform()
-
-            submitter = Autosubmit._get_submitter(as_conf)
-            submitter.load_platforms(as_conf)
-            if submitter.platforms is None:
-                return False
-            platforms = submitter.platforms
-
-            platforms_to_test = set()
-            if len(current_active_jobs) > 0:
-                if force and save:
-                    for job in current_active_jobs:
-                        job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", "").upper()
-                        if not job.platform_name:
-                            job.platform_name = hpcarch
-                        job.platform = submitter.platforms[job.platform_name]
-                        platforms_to_test.add(job.platform)
-                    for platform in platforms_to_test:
-                        platform.test_connection(as_conf)
-                    for job in current_active_jobs:
-                        job.platform.send_command(job.platform.cancel_cmd + " " + str(job.id), ignore_log=True)
-
-                if not force:
-                    raise AutosubmitCritical(f"Experiment can't be recovered due being {len(current_active_jobs)} "
-                                             f"active jobs in your experiment, If you want to recover the experiment,"
-                                             f" please use the flag -f and all active jobs will be cancelled",7000)
-            Log.debug("Job list restored from {0} files", pkl_dir)
-        except Exception:
-            raise
+        Autosubmit._check_ownership(expid, raise_error=True)
+        exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+        as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
+        as_conf.check_conf_files(True)
         Log.info(f'Recovering experiment {expid}')
-        try:
-            for job in job_list.get_job_list():
-                job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", "").upper()
-                job.submitter = submitter
-                if not job.platform_name:
-                    job.platform_name = hpcarch
-                # noinspection PyTypeChecker
-                job.platform = platforms[job.platform_name]
-                # noinspection PyTypeChecker
-                platforms_to_test.add(platforms[job.platform_name])
-            # establish the connection to all platforms
-            Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf)
+        job_list = Autosubmit.load_job_list(expid, as_conf, new=False, monitor=True)
+        as_conf.check_conf_files(False)
 
-            if all_jobs:
-                jobs_to_recover = job_list.get_job_list()
-            else:
-                jobs_to_recover = job_list.get_active()
-        except BaseException as e:
-            raise AutosubmitCritical(
-                "Couldn't restore the experiment platform, check if the filesystem is having issues", 7040, str(e))
+        # Getting output type provided by the user in config, 'pdf' as default
+        hpcarch = as_conf.get_platform()
 
-        Log.info("Looking for COMPLETED files")
+        submitter = Autosubmit._get_submitter(as_conf)
+        submitter.load_platforms(as_conf)
+        if submitter.platforms is None:
+            return False
+        platforms = submitter.platforms
+
+        platforms_to_test = set()
+        for job in job_list.get_job_list():
+            job.submitter = submitter
+            if not job.platform_name:
+                job.platform_name = hpcarch
+            job.platform = platforms[job.platform_name]
+            platforms_to_test.add(job.platform)
+
+        completed_jobnames = Autosubmit.online_recovery(as_conf, platforms_to_test, job_list, offline)
+
+        current_active_jobs = job_list.get_in_queue()
+        if current_active_jobs and not (force and save):
+            raise AutosubmitCritical(f"Experiment can't be recovered due being {len(current_active_jobs)} "
+                                     f"active jobs in your experiment, If you want to recover the experiment,"
+                                     f" please use the flag -f and all active jobs will be cancelled. "
+                                     f"Be warned that -f and --offline won't cancel jobs if the connection can't be established", 7053)
+        elif current_active_jobs and force and save and not offline:
+            all_connected = True
+            for p in platforms_to_test:
+                if not p.connected:
+                    all_connected = False
+                    Log.warning(f"Platform {p.name} is not reachable")
+            if not all_connected:
+                raise AutosubmitCritical("Some platforms are not reachable, cannot proceed with forced recovery. You can add --offline with -f to don't cancel jobs", 7050)
+        # TODO: https://github.com/BSC-ES/autosubmit/issues/1251 don't need force flag
+        if save:
+            offline_jobs = []
+            for job in current_active_jobs:
+                if offline or not job.platform.connected:
+                    offline_jobs.append(job.name)
+                else:
+                    job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", "").upper()
+                    if not job.platform_name:
+                        job.platform_name = hpcarch
+
+                    # noinspection PyTypeChecker
+                    job.platform = submitter.platforms[job.platform_name]
+                    try:
+                        job.platform.send_command(f"{job.platform.cancel_cmd} {job.id}", ignore_log=True)
+                    except AutosubmitError as e:
+                        # Not sure if this is the best way to check for invalid job id error for non-slurm
+                        if "invalid job id" in e.message.lower():
+                            Log.warning(f"Job {job.name} could not be cancelled because it was not found on the platform")
+                        else:
+                            Log.warning(f"Job {job.name} could not be cancelled: {e.message}")
+            if offline_jobs:
+                Log.warning(f"Jobs {''.join(offline_jobs)} could not be cancelled due to offline mode.")
+
+        output_type = as_conf.get_output_type()
+        Log.info(f'Recovering experiment {expid}')
+
+        if all_jobs:
+            jobs_to_recover = job_list.get_job_list()
+        else:
+            jobs_to_recover = job_list.get_active()
+
         try:
-            start = datetime.datetime.now()
             for job in jobs_to_recover:
-                if job.platform_name is None:
-                    job.platform_name = hpcarch
-                # noinspection PyTypeChecker
-                job.platform = platforms[job.platform_name]
-                if job.platform.get_completed_files(job.name, 0, recovery=True):
+                if job.name in completed_jobnames:
                     job.status = Status.COMPLETED
                     Log.info(f"CHANGED job '{job.name}' status to COMPLETED")
-                    job.recover_last_ready_date()
-                    job.recover_last_log_name()
+
                 elif job.status != Status.SUSPENDED:
                     job.status = Status.WAITING
                     job._fail_count = 0
                     Log.info(f"CHANGED job '{job.name}' status to WAITING")
-                # Update parameters with attributes is called in: build_packages, submit wrappers, and for every ready job. It shouldn't be necessary here.
-            end = datetime.datetime.now()
-            Log.info(f"Time spent: '{(end - start)}'")
+
+            job_list.check_completed_jobs_after_recovery()
+
             Log.info("Updating the jobs list")
             job_list.update_list(as_conf)
 
             if save:
+                job_list.recover_last_data()
                 job_list.save()
             else:
-                Log.warning(
-                    'Changes NOT saved to the jobList. Use -s option to save')
+                Log.warning('Changes NOT saved to the jobList. Use -s option to save')
 
             Log.result("Recovery finalized")
+
         except BaseException as e:
             raise AutosubmitCritical("Couldn't restore the experiment workflow", 7040, str(e))
 
         try:
-            packages = JobPackagePersistence(expid).load()
-
-            groups_dict = dict()
-            if group_by:
+            if not noplot:
+                packages = JobPackagePersistence(expid).load()
+                from .monitor.monitor import Monitor
                 status = list()
-                if expand_status:
-                    for s in expand_status.split():
-                        status.append(Autosubmit._get_status(s.upper()))
-
+                if group_by:
+                    if expand_status:
+                        if isinstance(expand_status, str):
+                            for s in expand_status.split():
+                                status.append(Autosubmit._get_status(s.upper()))
+                        elif isinstance(expand_status, list):
+                            for s in expand_status:
+                                status.append(Autosubmit._get_status(s.upper()))
+                        else:
+                            Log.warning("Grouping status has an invalid format, it should be a string or a list of strings")
                 job_grouping = JobGrouping(group_by, copy.deepcopy(job_list.get_job_list()), job_list,
                                            expand_list=expand,
                                            expanded_status=status)
                 groups_dict = job_grouping.group_jobs()
-
-            if not noplot:
-                from .monitor.monitor import Monitor
                 Log.info("\nPlotting the jobs list...")
                 monitor_exp = Monitor()
                 monitor_exp.generate_output(expid,
@@ -3182,23 +3195,13 @@ class Autosubmit:
                                             show=not hide,
                                             groups=groups_dict,
                                             job_list_object=job_list)
-
-            if detail:
-                Autosubmit.detail(job_list)
-            # Warnings about precedence completion
-            # time_0 = time.time()
-            notcompleted_parents_completed_jobs = [job for job in job_list.get_job_list(
-            ) if job.status == Status.COMPLETED and len(
-                [jobp for jobp in job.parents if jobp.status != Status.COMPLETED]) > 0]
-
-            if notcompleted_parents_completed_jobs and len(notcompleted_parents_completed_jobs) > 0:
-                Log.error(f"The following COMPLETED jobs depend on jobs that have not been COMPLETED (this can result "
-                          f"in unexpected behavior): {str([job.name for job in notcompleted_parents_completed_jobs])}")
-            # print("Warning calc took {0} seconds".format(time.time() - time_0))
         except BaseException as e:
             raise AutosubmitCritical(
                 "An error has occurred while printing the workflow status. Check if you have X11 redirection and an img viewer correctly set",
                 7000, str(e))
+
+        if detail:
+            Autosubmit.detail(job_list)
 
         return True
 
@@ -5235,7 +5238,8 @@ class Autosubmit:
         return final_list
 
     @staticmethod
-    def set_status(expid, noplot, save, final, filter_list, filter_chunks, filter_status, filter_section, filter_type_chunk, filter_type_chunk_split,
+    def set_status(expid, noplot, save, final, filter_list, filter_chunks, filter_status, filter_section,
+                   filter_type_chunk, filter_type_chunk_split,
                    hide, group_by=None,
                    expand=list(), expand_status=list(), notransitive=False, check_wrapper=False, detail=False):
         """
@@ -5259,6 +5263,8 @@ class Autosubmit:
         :param detail: detail
         :return:
         """
+        if filter_status:
+            filter_status = filter_status.upper()
         Autosubmit._check_ownership(expid, raise_error=True)
         exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
         tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -5309,13 +5315,14 @@ class Autosubmit:
                 definitive_platforms = list()
                 for platform in platforms_to_test:
                     try:
-                        Autosubmit.restore_platforms([platform],as_conf=as_conf)
+                        Autosubmit.restore_platforms([platform], as_conf=as_conf)
                         definitive_platforms.append(platform.name)
                     except Exception:
                         pass
                 ##### End of the ""function""
                 # This will raise an autosubmit critical if any of the filters has issues in the format specified by the user
-                Autosubmit._validate_set_status_filters(as_conf,job_list,filter_list,filter_chunks,filter_status,filter_section,filter_type_chunk, filter_type_chunk_split)
+                Autosubmit._validate_set_status_filters(as_conf, job_list, filter_list, filter_chunks, filter_status,
+                                                        filter_section, filter_type_chunk, filter_type_chunk_split)
                 #### Starts the filtering process ####
                 final_list = []
                 jobs_filtered = []
@@ -5408,9 +5415,9 @@ class Autosubmit:
                 # All filters should be in a function but no have time to do it
                 # filter_Type_chunk_split == filter_type_chunk, but with the split essentially is the same but not sure about of changing the name to the filter itself
                 if filter_type_chunk_split is not None:
-                    final_list.extend(Autosubmit._apply_ftc(job_list,filter_type_chunk_split))
+                    final_list.extend(Autosubmit._apply_ftc(job_list, filter_type_chunk_split))
                 if filter_type_chunk:
-                    final_list.extend(Autosubmit._apply_ftc(job_list,filter_type_chunk))
+                    final_list.extend(Autosubmit._apply_ftc(job_list, filter_type_chunk))
                 # Time to change status
                 final_list = list(set(final_list))
                 performed_changes = {}
@@ -5420,7 +5427,7 @@ class Autosubmit:
                     if job.status in [Status.QUEUING, Status.RUNNING,
                                       Status.SUBMITTED] and job.platform.name not in definitive_platforms:
                         Log.printlog(f"JOB: [{job.platform.name}] is ignored as the [{job.name}] platform is currently"
-                                     f" offline",6000)
+                                     f" offline", 6000)
                         continue
                     if job.status != final_status:
                         # Only real changes
@@ -5442,16 +5449,13 @@ class Autosubmit:
                 else:
                     Log.warning("No changes were performed.")
 
-
                 job_list.update_list(as_conf, False, True)
 
                 if save and wrongExpid == 0:
                     for job in final_list:
                         job.update_parameters(as_conf, set_attributes=True, reset_logs=True)
-                        if job.status in [Status.COMPLETED, Status.FAILED]:
-                            job.recover_last_ready_date()
-                            job.recover_last_log_name()
 
+                    job_list.recover_last_data()
                     job_list.save()
                     exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                                     historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
@@ -5464,7 +5468,7 @@ class Autosubmit:
                 else:
                     Log.printlog(
                         "Changes NOT saved to the JobList!!!!:  use -s option to save", 3000)
-                #Visualization stuff that should be in a function common to monitor , create, -cw flag, inspect and so on
+                # Visualization stuff that should be in a function common to monitor , create, -cw flag, inspect and so on
                 if not noplot:
                     from .monitor.monitor import Monitor
                     if as_conf.get_wrapper_type() != 'none' and check_wrapper:

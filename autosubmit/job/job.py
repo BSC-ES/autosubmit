@@ -1463,7 +1463,6 @@ class Job(object):
         if new_status == Status.COMPLETED:
             Log.debug(
                 "{0} job seems to have completed: checking...".format(self.name))
-            self._platform.get_completed_files(self.name, wrapper_failed=self.packed)
             self.check_completion()
         else:
             self.status = new_status
@@ -1484,8 +1483,6 @@ class Job(object):
         elif self.status == Status.UNKNOWN:
             Log.printlog("Job {0} is UNKNOWN. Checking completed files to confirm the failure...".format(
                 self.name), 3000)
-            self._platform.get_completed_files(
-                self.name, wrapper_failed=self.packed)
             self.check_completion(Status.UNKNOWN)
             if self.status == Status.UNKNOWN:
                 Log.printlog("Job {0} is UNKNOWN. Checking completed files to confirm the failure...".format(
@@ -1541,18 +1538,13 @@ class Job(object):
                 children += list(child.children)
 
     def check_completion(self, default_status=Status.FAILED, over_wallclock=False):
-        """
-        Check the presence of *COMPLETED* file.
-        Change status to COMPLETED if *COMPLETED* file exists and to FAILED otherwise.
+        """ Fetches the COMPLETED file from the platform and to COMPLETED if *COMPLETED* file exists and to FAILED otherwise.
 
         :param over_wallclock:
         :param default_status: status to set if job is not completed. By default, it is FAILED
         :type default_status: Status
         """
-        completed_file = os.path.join(str(self._tmp_path), self.name + '_COMPLETED')
-        completed_file_location = os.path.join(str(self._tmp_path), f"LOG_{self.expid}", self.name + '_COMPLETED')
-        # I'm not fan of this but, it is the only way of doing it without a rework.
-        if os.path.exists(completed_file) or os.path.exists(completed_file_location):
+        if self.platform.get_completed_job_names([self.name]):
             if not over_wallclock:
                 self.status = Status.COMPLETED
             else:
