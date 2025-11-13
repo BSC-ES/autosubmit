@@ -20,7 +20,9 @@ import re
 from autosubmit.platforms.wrappers.wrapper_builder import (
     WrapperDirector, PythonVerticalWrapperBuilder, PythonHorizontalWrapperBuilder,
     PythonHorizontalVerticalWrapperBuilder, PythonVerticalHorizontalWrapperBuilder, BashHorizontalWrapperBuilder,
-    BashVerticalWrapperBuilder, SrunHorizontalWrapperBuilder, SrunVerticalHorizontalWrapperBuilder
+    BashVerticalWrapperBuilder, SrunHorizontalWrapperBuilder, SrunVerticalHorizontalWrapperBuilder,
+    FluxHorizontalWrapperBuilder, FluxVerticalWrapperBuilder, FluxHorizontalVerticalWrapperBuilder,
+    FluxVerticalHorizontalWrapperBuilder
 )
 
 
@@ -165,21 +167,31 @@ class WrapperFactory(object):
 class SlurmWrapperFactory(WrapperFactory):
 
     def vertical_wrapper(self, **kwargs):
-        return PythonVerticalWrapperBuilder(**kwargs)
+        if kwargs["method"] == 'flux':
+            return FluxVerticalWrapperBuilder(**kwargs)
+        else:
+            return PythonVerticalWrapperBuilder(**kwargs)
 
     def horizontal_wrapper(self, **kwargs):
 
         if kwargs["method"] == 'srun':
             return SrunHorizontalWrapperBuilder(**kwargs)
+        elif kwargs["method"] == 'flux':
+            return FluxHorizontalWrapperBuilder(**kwargs)
         else:
             return PythonHorizontalWrapperBuilder(**kwargs)
 
     def hybrid_wrapper_horizontal_vertical(self, **kwargs):
-        return PythonHorizontalVerticalWrapperBuilder(**kwargs)
+        if kwargs["method"] == 'flux':
+            return FluxHorizontalVerticalWrapperBuilder(**kwargs)
+        else:
+            return PythonHorizontalVerticalWrapperBuilder(**kwargs)
 
     def hybrid_wrapper_vertical_horizontal(self, **kwargs):
         if kwargs["method"] == 'srun':
             return SrunVerticalHorizontalWrapperBuilder(**kwargs)
+        elif kwargs["method"] == 'flux':
+            return FluxVerticalHorizontalWrapperBuilder(**kwargs)
         else:
             return PythonVerticalHorizontalWrapperBuilder(**kwargs)
 
@@ -220,21 +232,31 @@ class SlurmWrapperFactory(WrapperFactory):
 class PJMWrapperFactory(WrapperFactory):
 
     def vertical_wrapper(self, **kwargs):
-        return PythonVerticalWrapperBuilder(**kwargs)
+        if kwargs["method"] == 'flux':
+            raise NotImplementedError(self.exception)   # pragma: no cover
+        else:
+            return PythonVerticalWrapperBuilder(**kwargs)
 
     def horizontal_wrapper(self, **kwargs):
 
         if kwargs["method"] == 'srun':
             return SrunHorizontalWrapperBuilder(**kwargs)
+        elif kwargs["method"] == 'flux':
+            raise NotImplementedError(self.exception)   # pragma: no cover
         else:
             return PythonHorizontalWrapperBuilder(**kwargs)
 
     def hybrid_wrapper_horizontal_vertical(self, **kwargs):
-        return PythonHorizontalVerticalWrapperBuilder(**kwargs)
+        if kwargs["method"] == 'flux':
+            raise NotImplementedError(self.exception)   # pragma: no cover
+        else:
+            return PythonHorizontalVerticalWrapperBuilder(**kwargs)
 
     def hybrid_wrapper_vertical_horizontal(self, **kwargs):
         if kwargs["method"] == 'srun':
             return SrunVerticalHorizontalWrapperBuilder(**kwargs)
+        elif kwargs["method"] == 'flux':
+            raise NotImplementedError(self.exception)   # pragma: no cover
         else:
             return PythonVerticalHorizontalWrapperBuilder(**kwargs)
 
@@ -272,10 +294,16 @@ class PJMWrapperFactory(WrapperFactory):
 class EcWrapperFactory(WrapperFactory):
 
     def vertical_wrapper(self, **kwargs):
-        return BashVerticalWrapperBuilder(**kwargs)
+        if kwargs["method"] == 'flux':
+            raise NotImplementedError(self.exception)   # pragma: no cover
+        else:
+            return BashVerticalWrapperBuilder(**kwargs)
 
     def horizontal_wrapper(self, **kwargs):
-        return BashHorizontalWrapperBuilder(**kwargs)
+        if kwargs["method"] == 'flux':
+            raise NotImplementedError(self.exception)   # pragma: no cover
+        else:
+            return BashHorizontalWrapperBuilder(**kwargs)
 
     def header_directives(self, **kwargs):
         return self.platform.wrapper_header(**kwargs)
