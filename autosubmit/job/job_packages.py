@@ -176,6 +176,9 @@ class JobPackageBase(object):
         try:
             if not only_generate:
                 Log.debug("Sending Files")
+                # TODO: [ENGINES] Here is where the files are sent to the platform as a compressed tar
+                # "WRAPPER_SCRIPTS.tar", together with the COMMON_SCRIPT, which is the wrapper script
+                # (AS_THREAD_*).
                 self._send_files()
                 Log.debug("Submitting")
                 self._do_submission(hold=hold)
@@ -290,7 +293,7 @@ class JobPackageSimpleWrapped(JobPackageSimple):
         super(JobPackageSimpleWrapped, self)._do_submission(job_scripts, hold=hold)
 
 
-class JobPackageArray(JobPackageBase):
+class JobPackageArray(JobPackageBase): # TODO: [ENGINES] Never used?
     """
     Class to manage an array-based package of jobs to be submitted by autosubmit
     """
@@ -422,7 +425,7 @@ class JobPackageThread(JobPackageBase):
         # depends on the type of wrapper
 
         self._jobs_resources = jobs_resources
-        self._wrapper_factory = self.platform.wrapper
+        self._wrapper_factory = self.platform.wrapper # TODO: [ENGINES] This is where the wrapper factory is assigned
         self.current_wrapper_section = wrapper_section
         self.inner_retrials = 0
         if not hasattr(self, "_num_processors"):
@@ -736,13 +739,12 @@ class JobPackageVertical(JobPackageThread):
     :type jobs:
     :param: dependency:
     """
-
     def __init__(self, jobs: list[Job], dependency=None, configuration: Optional['AutosubmitConfig'] = None,
-                 wrapper_section: str = "WRAPPERS", wrapper_info: Optional[list] = None):
+                 wrapper_section: str = "WRAPPERS", wrapper_info: Optional[list] = None, method: str = 'ASThread'):
         if wrapper_info is None:
             wrapper_info = []
         super(JobPackageVertical, self).__init__(jobs, dependency, configuration=configuration,
-                                                 wrapper_section=wrapper_section, wrapper_info=wrapper_info)
+                                                 wrapper_section=wrapper_section, wrapper_info=wrapper_info, method=method)
         for job in jobs:
             if int(job.processors) >= int(self._num_processors):
                 self._num_processors = job.processors
