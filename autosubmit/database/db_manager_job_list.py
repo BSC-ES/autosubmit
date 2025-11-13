@@ -49,11 +49,16 @@ class JobsDbManager(DbManager):
         self._FINAL_STATUSES = ['COMPLETED', 'FAILED']
         self.restore_path = Path(BasicConfig.LOCAL_ROOT_DIR) / 'db' / 'job_list.sql'
 
-    def save_jobs(self, job_list: List[Job]) -> None:
+    def save_jobs(self, job_list: List[Job], only_logs: bool = False) -> None:
         """Save the job list to the database. Normally this will save the current active jobs."""
         table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
         self.create_table(table.name)
         persistent_data = [job.__getstate__(log_process=False) for job in job_list]
+        if only_logs:
+            for job_data in persistent_data:
+                keys_to_remove = [key for key in job_data.keys() if key not in ('name', 'log', 'updated_log', 'local_logs_out', 'local_logs_err', 'remote_logs_out', 'remote_logs_err')]
+                for key in keys_to_remove:
+                    job_data.pop(key)
 
         pkeys = ['name']
         self.upsert_many(table.name, persistent_data, pkeys)

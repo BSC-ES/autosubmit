@@ -1042,6 +1042,7 @@ class Platform(object):
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
                 try:
                     job.retrieve_logfiles(raise_error=True)
+                    job.save_logfiles()
                 except Exception:
                     jobs_pending_to_process.add(job)
                     job._log_recovery_retries += 1
