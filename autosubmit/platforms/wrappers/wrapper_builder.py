@@ -121,6 +121,93 @@ class WrapperBuilder(object):
         padding = amount * ch
         return ''.join(padding + line for line in text.splitlines(True))
 
+class FluxWrapperBuilder(WrapperBuilder):
+    """
+    The FluxWrapperBuilder is the responsible for generating the wrapper script
+    that will be submitted to Slurm to initialize Flux and submit the inner jobs
+    to the Flux scheduler inside the allocation.
+    
+    This is a special implementation because we use Flux as a wrapper engine inside 
+    Slurm allocations.
+    """
+
+    # TODO: [ENGINES] Delete the following comment
+    """
+    La idea es que se genere un CMD para enviar a Slurm que inicialice la instancia de Flux
+    en la alocación correspondiente y lance los jobs individuales mediante un batch script.
+    En algún sitio necesitaremos conseguir que se generen los CMD individuales de los jobs
+    para ser ejecutados por Flux una vez inicializado. El SlurmPlatform se encarga de generar
+    los CMD individuales, así que probablemente sea en el SlurmHeader donde se deba hacer esa
+    llamada.
+    La cuestión es si necesitaríamos crear un FluxHeader. En ParamikoPlatform se usa el header.SERIAL
+    o header.PARALLEL de la plataforma correspondiente.
+    """
+
+    def build_imports(self):
+        return ""
+    
+    def build_job_thread(self):
+        return ""
+    
+    # TODO: [ENGINES] Delete hardcoded flux environment setup
+    def build_main(self):
+        return textwrap.dedent("""
+        # Dependency script generation
+        cat << 'EOF' > flux_runner.sh
+        #!/bin/bash
+                               
+        {0}
+        EOF
+
+        # Grant execution permission to the generated script
+        chmod +x flux_runner.sh
+
+        # Load user environment
+        module load miniconda
+                               
+        echo "Initializing conda environment"
+        source /apps/GPP/MINICONDA/24.1.2/etc/profile.d/conda.sh
+        echo "Conda environment initialized"
+                               
+        conda activate flux
+        conda info
+
+        # Instantiate Flux within the allocated resources and run the jobs
+        srun --cpu-bind=none flux start /usr/bin/bash flux_runner.sh
+        """).format(self._dependency_script(), '\n'.ljust(13))
+    
+    def _dependency_script(self):
+        pass  # pragma: no cover
+
+class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
+    # TODO: [ENGINES] Implement error handling, retrials, stat files, etc.
+    def _dependency_script(self):
+        script = ""
+        prev_job_id = ""
+        job_id = ""
+
+        for job_script in self.job_scripts:
+            job_id = "job_id_" + job_script.replace('.cmd', '')
+            if prev_job_id != "":
+                script += f"{job_id}=$(flux batch --dependency=afterany:${prev_job_id} {job_script})\n"
+            else:
+                script += f"{job_id}=$(flux batch {job_script})\n"
+
+            prev_job_id = job_id
+
+        return script
+    
+class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
+    def _dependency_script(self):
+        raise NotImplementedError(self.exception)   # pragma: no cover
+
+class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
+    def _dependency_script(self):
+        raise NotImplementedError(self.exception)   # pragma: no cover
+
+class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):    
+    def _dependency_script(self):
+        raise NotImplementedError(self.exception)   # pragma: no cover
 
 class PythonWrapperBuilder(WrapperBuilder):
     def get_random_alphanumeric_string(self,letters_count, digits_count):
