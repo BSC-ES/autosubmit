@@ -165,20 +165,20 @@ JobsTable = Table(
     Column("date_split", String),
     Column("max_checkpoint_step", Integer, nullable=False, default=0),
     Column("start_time", String),
-    Column("start_time_timestamp", Float),
-    Column("submit_time_timestamp", Float),
-    Column("finish_time_timestamp", Float),
+    Column("start_time_timestamp", Integer),
+    Column("submit_time_timestamp", Integer),
+    Column("finish_time_timestamp", Integer),
     Column("ready_date", String),
     Column("local_logs_out", String),  # tuple, to modify double value in two
     Column("local_logs_err", String),  # tuple, to modify double value in two
     Column("remote_logs_out", String),
     Column("remote_logs_err", String),
-    Column("updated_log", Boolean),
+    Column("updated_log", Integer),
     Column("packed", Boolean),
     Column("current_checkpoint_step", Integer, nullable=False, default=0),
     Column("platform_name", String),
-    Column("created", Text , nullable=False, default= lambda: datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S") ),
-    Column("modified", Text, nullable=False, default= lambda: datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S") )
+    Column("created", Text, nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")),
+    Column("modified", Text, nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
 )
 
 """Table that holds the structure of the experiment jobs."""
@@ -220,7 +220,7 @@ def create_wrapper_tables(name, metadata_obj_):
         Column("local_logs_err", String),  # TODO: We should recover the log from the remote at some point
         Column("remote_logs_out", String),  # TODO: We should recover the log from the remote at some point
         Column("remote_logs_err", String),  # TODO: We should recover the log from the remote at some point
-        Column("updated_log", Boolean),  # TODO: We should recover the log from the remote at some point
+        Column("updated_log", Integer),  # TODO: We should recover the log from the remote at some point
         Column("platform_name", String),
         Column("wallclock", String),
         Column("num_processors", Integer),

@@ -124,11 +124,15 @@ class EcPlatform(ParamikoPlatform):
         self._submit_cmd = ("ecaccess-job-submit -distant -queueName " + ec_queue + " " + self.host + ":" +
                             self.remote_log_dir + "/")
 
-    def check_Alljobs(self, job_list, as_conf, retries=5):
+    def check_Alljobs(self, job_list, as_conf, retries=5) -> bool:
+        save = False
         for job in job_list:
             self.check_job(job)
             if job.new_status != job.status:
                 job.update_status(as_conf)
+                save = True
+
+        return save
 
     def parse_job_output(self, output):
         job_state = output.split('\n')

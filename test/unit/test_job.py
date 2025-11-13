@@ -924,7 +924,7 @@ def test_update_stat_file():
     assert job.stat_file == "dummyname_STAT_"
 
 
-def test_pytest_check_script(mocker):
+def test_pytest_check_script(mocker, autosubmit_config):
     job = Job("job1", "1", Status.READY, 0)
     # arrange
     parameters = dict()
@@ -935,7 +935,8 @@ def test_pytest_check_script(mocker):
     mocker.patch("autosubmit.job.job.Job.update_content", return_value=(
         'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK%', 'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK%'))
     mocker.patch("autosubmit.job.job.Job.update_parameters", return_value=parameters)
-    job._init_runtime_parameters()
+    as_conf = autosubmit_config("t000", {})
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
 
     config = Mock(spec=AutosubmitConfig)
     config.default_parameters = {}
@@ -1019,21 +1020,22 @@ def test_reset_logs(autosubmit_config):
     }
     as_conf = autosubmit_config("t000", experiment_data)
     job = Job("job1", "1", Status.READY, 0)
-    job.reset_logs(as_conf)
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     assert job.workflow_commit == "dummy-commit"
-    assert job.updated_log is False
+    assert job.updated_log == 0
     assert job.packed_during_building is False
 
 
-def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_template_variable(mocker):
+def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_template_variable(mocker, autosubmit_config):
     job = Job("job1", "1", Status.READY, 0)
     # arrange
-    job._init_runtime_parameters()
+    as_conf = autosubmit_config("t000", {})
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     parameters = {}
     mocker.patch("autosubmit.job.job.Job.update_content",
                  return_value=('some-content: %UNBOUND%', 'some-content: %UNBOUND%'))
     mocker.patch("autosubmit.job.job.Job.update_parameters", return_value=parameters)
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
 
     config = Mock(spec=AutosubmitConfig)
     config.default_parameters = {}
@@ -1112,71 +1114,6 @@ def test_update_parameters_current_variables(autosubmit_config, experiment_data,
     _, _, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data)
     for key, value in expected_data.items():
         assert parameters[key] == value
-
-
-# @pytest.mark.parametrize('test_with_file, file_is_empty, last_line_empty', [
-#     (False, False, False),
-#     (True, True, False),
-#     (True, False, False),
-#     (True, False, True)
-# ], ids=["no file", "file is empty", "file is correct", "file last line is empty"])
-# def test_recover_last_ready_date(tmpdir, test_with_file, file_is_empty, last_line_empty):
-#     job = Job('dummy', '1', 0, 1)
-#     job._tmp_path = Path(tmpdir)
-#     stat_file = job._tmp_path.joinpath(f'{job.name}_TOTAL_STATS')
-#     ready_time = datetime.now() + timedelta(minutes=5)
-#     ready_date = int(ready_time.strftime("%Y%m%d%H%M%S"))
-#     expected_date = None
-#     if test_with_file:
-#         if file_is_empty:
-#             stat_file.touch()
-#             expected_date = datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
-#         else:
-#             if last_line_empty:
-#                 with stat_file.open('w') as f:
-#                     f.write(" ")
-#                 expected_date = datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
-#             else:
-#                 with stat_file.open('w') as f:
-#                     f.write(f"{ready_date} {ready_date} {ready_date} COMPLETED")
-#                 expected_date = str(ready_date)
-#     job.ready_date = None
-#     job.recover_last_ready_date()
-#     assert job.ready_date == expected_date
-#
-#
-# @pytest.mark.parametrize('test_with_logfiles, file_timestamp_greater_than_ready_date', [
-#     (False, False),
-#     (True, True),
-#     (True, False),
-# ], ids=["no file", "log timestamp >= ready_date", "log timestamp < ready_date"])
-# def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greater_than_ready_date):
-#     job = Job('dummy', '1', 0, 1)
-#     job._log_path = Path(tmpdir)
-#     expected_local_logs = (f"{job.name}.out.0", f"{job.name}.err.0")
-#     if test_with_logfiles:
-#         if file_timestamp_greater_than_ready_date:
-#             ready_time = datetime.now() - timedelta(minutes=5)
-#             job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
-#             log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
-#             expected_update_log = True
-#             expected_local_logs = (log_name.with_suffix('.out').name, log_name.with_suffix('.err').name)
-#         else:
-#             expected_update_log = False
-#             ready_time = datetime.now() + timedelta(minutes=5)
-#             job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
-#             log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
-#         log_name.with_suffix('.out').touch()
-#         log_name.with_suffix('.err').touch()
-#     else:
-#         expected_update_log = False
-#
-#     job.updated_log = False
-#     job.recover_last_log_name()
-#     assert job.updated_log == expected_update_log
-#     assert job.local_logs[0] == str(expected_local_logs[0])
-#     assert job.local_logs[1] == str(expected_local_logs[1])
-
 
 @pytest.mark.parametrize('experiment_data, attributes_to_check', [(
         {
@@ -1273,38 +1210,6 @@ def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines
         assert re.search(pattern, template_content, re.MULTILINE) is not None
 
 
-@pytest.mark.parametrize('experiment_data', [(
-        {
-            'JOBS': {
-                'RANDOM-SECTION': {
-                    'FILE': "test.sh",
-                    'PLATFORM': 'DUMMY_PLATFORM',
-                    'TEST': "rng",
-                },
-            },
-            'PLATFORMS': {
-                'dummy_platform': {
-                    'type': 'ps',
-                    'whatever': 'dummy_value',
-                    'whatever2': 'dummy_value2',
-                    'CUSTOM_DIRECTIVES': ['$SBATCH directive1', '$SBATCH directive2'],
-                },
-            },
-            'ROOTDIR': "asd",
-            'LOCAL_TMP_DIR': "asd",
-            'LOCAL_ROOT_DIR': "asd",
-            'LOCAL_ASLOG_DIR': "asd",
-        }
-)], ids=["Simple job"])
-def test_no_start_time(autosubmit_config, experiment_data):
-    job, as_conf, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data)
-    del job.start_time
-    as_conf.force_load = False
-    as_conf.data_changed = False
-    job.update_parameters(as_conf, set_attributes=True)
-    assert isinstance(job.start_time, datetime)
-
-
 def test_sub_job_instantiation(tmp_path, autosubmit_config):
     job = SubJob("dummy", package=None, queue=0, run=0, total=0, status="UNKNOWN")
 
@@ -1385,6 +1290,7 @@ def test_sub_job_manager(load_wrapper, tmp_path):
             status="COMPLETED"
         ))
 
+
     structure = [
         {
             "e_to": "a000_20000101_fc0_1_WRAPPED",
@@ -1431,7 +1337,6 @@ def test_update_parameters_reset_logs(autosubmit_config, tmpdir):
     )
     job = Job('DUMMY', '1', 0, 1)
     job.section = 'DUMMY_S'
-    job.log_recovered = True
     job.packed_during_building = True
     job.workflow_commit = "incorrect"
     job.update_parameters(as_conf, set_attributes=True, reset_logs=True)
@@ -1587,13 +1492,12 @@ def test_write_submit_time_ignore_exp_history(total_stats_exists: bool, autosubm
     expected_lines = 2 if total_stats_exists else 1
     assert len(total_stats.read_text().split('\n')) == expected_lines
 
-
 @pytest.mark.parametrize(
     'completed,existing_lines,count',
     [
-        (True, 'a\nb\n', -1),
+        (True, 'a\nb', -1),
         (True, None, -1),
-        (False, 'a\n', -1),
+        (False, 'a', -1),
         (False, None, 100)
     ],
     ids=[
@@ -1609,13 +1513,14 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
 
     It ignores what happens to the experiment history object."""
     mocker.patch('autosubmit.job.job.ExperimentHistory')
+    expected_lines_size = len(existing_lines.split('\n')) if existing_lines else 1
 
     as_conf = autosubmit_config(_EXPID, experiment_data={})
     tmp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, as_conf.basic_config.LOCAL_TMP_DIR)
 
     status = Status.COMPLETED if True else Status.WAITING
     job = Job(f'{_EXPID}_dummy', 1, status, 0)
-    job.finish_time_timestamp = time()
+    job.finish_time_timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
     job.platform = local
 
     total_stats = Path(tmp_path, f'{job.name}_TOTAL_STATS')
@@ -1632,12 +1537,8 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
     # When the file already exists, it will append new content. It must never
     # delete the existing lines, so this assertion just verifies the content
     # written previously (if any) was not removed.
-    if existing_lines:
-        lines = len(existing_lines.split('\n')) - 1
-    else:
-        lines = 0
-    expected_lines = lines + 1
-    assert len(total_stats.read_text().split('\n')) == expected_lines
+    lines_written = total_stats.read_text().split('\n')
+    assert len(lines_written) == expected_lines_size
 
 
 @pytest.mark.parametrize(
@@ -1672,10 +1573,10 @@ def test_process_scheduler_parameters_wallclock(wallclock: Optional[str], platfo
     as_conf = autosubmit_config(_EXPID, {})
 
     job = Job(_EXPID, '1', 'WAITING', 0, None)
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     job.het['HETSIZE'] = 1
     job.wallclock = wallclock
-    # FIXME: Job constructor and ``_init_runtime_parameters`` do not fully initialize the object!
+    # FIXME: Job constructor and ``init_runtime_parameters`` do not fully initialize the object!
     #        ``custom_directives`` appears to be initialized in one of the ``update_`` functions.
     #        This makes testing and maintaining the code harder (and more risky -- more bugs).
     job.custom_directives = []
@@ -1716,14 +1617,14 @@ def test_update_dict_parameters_invalid_script_language(platform_name: Optional[
         }
     })
     job = Job(_EXPID, '1', 'WAITING', 0, None)
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     # Here, the job type is still `BASH`! The value provided in the
     # configuration is not evaluated, so we need to fake it here.
     # But it only works with the ``Job`` has a ``.section``...
     job.type = 'NUCLEAR'
     # FIXME: Yet another issue with the code design here. The ``Job`` class
     #        constructor creates a partial object. Then you need to call
-    #        ``_init_runtime_parameters`` to initialize other values.
+    #        ``init_runtime_parameters`` to initialize other values.
     #        Then, other ``Job._update.*`` functions create more member
     #        attribute values. However, there are still other attributes of
     #        a ``Job`` that are only filled by ``DictJob``, like the
@@ -2317,3 +2218,47 @@ def test_process_scheduler_parameters(local):
 
     with pytest.raises(AutosubmitCritical):
         assert isinstance(job.process_scheduler_parameters(local, 0), AutosubmitCritical)
+
+
+def test_write_time(tmp_path, local):
+    job = Job(_EXPID, '1', 5, 0, None)
+    job.platform = local
+    job._tmp_path = tmp_path
+    total_stats = job._tmp_path / f'{job.name}_TOTAL_STATS'
+    job.submit_time_timestamp = "20240101000000"
+    job.start_time_timestamp = "20240101010001"
+    job.finish_time_timestamp = "20240101020002"
+    job._write_time("submit")
+    job.status = Status.COMPLETED
+    assert job.submit_time_timestamp in total_stats.read_text()
+    assert "start" in total_stats.read_text()
+    assert "end" in total_stats.read_text()
+    assert "status" in total_stats.read_text()
+    job._write_time("start")
+
+    assert job.submit_time_timestamp in total_stats.read_text()
+    assert job.start_time_timestamp in total_stats.read_text()
+    assert "end" in total_stats.read_text()
+    assert "status" in total_stats.read_text()
+    job._write_time("end")
+
+    assert job.submit_time_timestamp in total_stats.read_text()
+    assert job.start_time_timestamp in total_stats.read_text()
+    assert job.finish_time_timestamp in total_stats.read_text()
+    assert "status" in total_stats.read_text()
+
+    job._write_time("status")
+    assert job.submit_time_timestamp in total_stats.read_text()
+    assert job.start_time_timestamp in total_stats.read_text()
+    assert job.finish_time_timestamp in total_stats.read_text()
+    assert "COMPLETED" in total_stats.read_text()
+
+    assert "submit" not in total_stats.read_text()
+    assert "start" not in total_stats.read_text()
+    assert "end" not in total_stats.read_text()
+    assert "status" not in total_stats.read_text()
+
+    # expected lines
+    assert len(total_stats.read_text().split('\n')) == 1
+    job._write_time("submit")
+    assert len(total_stats.read_text().split('\n')) == 2

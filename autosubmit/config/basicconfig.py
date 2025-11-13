@@ -42,7 +42,6 @@ class BasicConfig:
         return pr
 
     DB_DIR = os.path.join(os.path.expanduser('~'), 'debug', 'autosubmit')
-    LOG_RECOVERY_TIMEOUT = 60
     STRUCTURES_DIR = os.path.join(
         '/esarchive', 'autosubmit', 'as_metadata', 'structures')
     GLOBAL_LOG_DIR = os.path.join(

@@ -30,7 +30,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Optional, TYPE_CHECKING
 
-from bscearth.utils.date import sum_str_hours
+from bscearth.utils.date import sum_str_hours, date2str
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
@@ -309,8 +309,7 @@ class JobPackageSimple(JobPackageBase):
         if len(job_scripts) == 0:
             job_scripts = self._job_scripts
         for job in self.jobs:
-            # This sets the log names but also the submission time for non-vertical wrapped jobs.
-            job.update_local_logs()
+            job.submit_time_timestamp = date2str(datetime.datetime.now(), 'S')
             # Clean previous run logs on local
             log_completed = os.path.join(self._tmp_path, job.name + '_COMPLETED')
             log_stat = os.path.join(self._tmp_path, job.name + '_STAT')
@@ -320,7 +319,6 @@ class JobPackageSimple(JobPackageBase):
                 os.remove(log_stat)
             self.platform.remove_stat_file(job)
             self.platform.remove_completed_file(job.name)
-
             # Submit job to the platform
             job.id = self.platform.submit_job(job, job_scripts[job.name], hold=hold, export=self.export)
             if job.id is None or not job.id:
@@ -419,7 +417,7 @@ class JobPackageArray(JobPackageBase):
         :type hold: bool
         """
         for job in self.jobs:
-            job.update_local_logs()
+            job.submit_time_timestamp = date2str(datetime.datetime.now(), 'S')
             self.platform.remove_stat_file(job)
             self.platform.remove_completed_file(job.name)
 
@@ -679,14 +677,14 @@ class JobPackageThread(JobPackageBase):
         if callable(getattr(self.platform, 'remove_multiple_files')):
             filenames = str()
             for job in self.jobs:
-                job.update_local_logs()
+                job.submit_time_timestamp = date2str(datetime.datetime.now(), 'S')
                 filenames += " " + self.platform.remote_log_dir + "/" + job.name + "_STAT " + \
                              self.platform.remote_log_dir + "/" + job.name + "_COMPLETED"
             self.platform.remove_multiple_files(filenames)
 
         else:
             for job in self.jobs:
-                job.update_local_logs()
+                job.submit_time_timestamp = date2str(datetime.datetime.now(), 'S')
                 self.platform.remove_stat_file(job)
                 self.platform.remove_completed_file(job.name)
                 if hold:
@@ -777,7 +775,7 @@ class JobPackageThreadWrapped(JobPackageThread):
         :type hold: bool
         """
         for job in self.jobs:
-            job.update_local_logs()
+            job.submit_time_timestamp = date2str(datetime.datetime.now(), 'S')
             self.platform.remove_stat_file(job)
             self.platform.remove_completed_file(job.name)
             if hold:

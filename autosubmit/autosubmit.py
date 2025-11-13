@@ -1969,6 +1969,7 @@ class Autosubmit:
             if save:
                 job_list.update_db_wrappers()
                 job_list.save_jobs()
+                job_list.save_edges()
 
         return wrapper_job
 
@@ -2131,11 +2132,8 @@ class Autosubmit:
                 check_failed_jobs=True)
             # New runs, reset failed status to waiting
             if not recover:
-                for job in job_list.job_list:
-                    job.fail_count = 0
-                    if job.status == Status.FAILED:
-                        Log.warning(f"Job {job.name} has failed in the previous run, resetting its status to WAITING")
-                        job.status = Status.WAITING
+                job_list.reset_jobs_on_first_run()
+
         except IOError as e:
             raise AutosubmitError(
                 "Job_list not found", 6016, str(e))
@@ -2154,19 +2152,8 @@ class Autosubmit:
         Autosubmit._load_parameters(
             as_conf, job_list, submitter.platforms)
         Log.debug("Checking experiment templates...")
-        hpcarch = as_conf.get_platform()
         # Load only platforms used by the experiment, by looking at JOBS.$JOB.PLATFORM. So Autosubmit only establishes connections to the machines that are used.
         # Also, it ignores platforms used by "COMPLETED/FAILED" jobs as they are no need any more. ( in case of recovery or run a workflow that were already running )
-        for job in job_list.get_job_list():
-            if job.platform_name is None or job.platform_name == "":
-                job.platform_name = hpcarch
-            # noinspection PyTypeChecker
-            try:
-                job.platform = submitter.platforms[job.platform_name.upper()]
-            except Exception:
-                raise AutosubmitCritical(f"hpcarch={job.platform_name} not found in the platforms configuration file",
-                                         7014)
-            # noinspection PyTypeChecker
         # This function, looks at %JOBS.$JOB.FILE% ( mandatory ) and %JOBS.$JOB.CHECK% ( default True ).
         # Checks the contents of the .sh/.py/r files and looks for AS placeholders.
         try:
@@ -2242,10 +2229,6 @@ class Autosubmit:
         return job_list.total_size, safetysleeptime, default_retrials, check_wrapper_jobs_sleeptime
 
     @staticmethod
-    def check_logs_status(job_list: "JobList", new_run) -> bool:
-        return job_list.update_log_status(new_run)
-
-    @staticmethod
     def refresh_log_recovery_process(platforms: list[Platform], as_conf: AutosubmitConfig) -> None:
         """Relaunch the log recovery processes for each platform if necessary."""
         for p in platforms:  # Send keep_alive signal
@@ -2304,7 +2287,6 @@ class Autosubmit:
                     Log.warning('Git operational check disabled by user')
 
                 Log.debug("Running main running loop")
-                did_run = False
                 #########################
                 # AUTOSUBMIT - MAIN LOOP
                 #########################
@@ -2324,56 +2306,54 @@ class Autosubmit:
                 max_recovery_retrials = as_conf.experiment_data.get("CONFIG", {}).get("RECOVERY_RETRIALS",
                                                                                       3650)  # (72h - 122h )
                 recovery_retrials = 0
-                Autosubmit.check_logs_status(job_list, new_run=True)
+                Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
+                job_list.recover_logs(new_run=True)
+                # Save metadata.
+                as_conf.save()
                 while job_list.continue_run():
                     try:
                         if Autosubmit.exit:
-                            if job_list.get_failed():
+                            if len(job_list.get_failed_from_db()) > 0:
                                 return 1
                             return 0
-                        Autosubmit.refresh_log_recovery_process(platforms_to_test, as_conf)
-                        did_run = True
-                        # reload parameters changes
-                        Log.debug("Reloading parameters...")
-                        try:
-                            # This function name is not clear after the transformation it received across years.
-                            # What it does, is to load and transform all as_conf.experiment_data into a 1D dict stored in job_list object.
-                            Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
-                        except BaseException as e:
-                            raise AutosubmitError("Config files seems to not be accessible", 6040, str(e))
                         total_jobs, safetysleeptime, default_retrials, check_wrapper_jobs_sleeptime = Autosubmit.get_iteration_info(
                             as_conf, job_list)
+                        Autosubmit.refresh_log_recovery_process(platforms_to_test, as_conf)
+
+                        # TODO fix in another PR, this is a workaround to avoid having missmatching job_list and platform experiment_data
+                        if as_conf.needs_reload():
+                            as_conf.reload()
+                            Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
+                            job_list.update_as_conf(as_conf)
+                            for p in platforms_to_test:
+                                p.update_as_conf(as_conf)
+
+                        # Submit ready jobs
+                        if len(job_list.get_ready()) > 0:
+                            Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, hold=False)
+                            save_jobs, save_edges = job_list.update_list(as_conf, submitter=submitter)
+                            if save_jobs:
+                                job_list.save_jobs()
+                            if save_edges:
+                                job_list.save_edges()
+
+                        # Check wrappers status and inner jobs
                         Autosubmit.check_wrappers(as_conf, job_list, expid)
-                        wrappers_id = job_list.get_wrappers_id()
+                        wrappers_id = job_list.get_wrappers_id_from_db()
+
                         # Check non-wrapped jobs
                         for p in platforms_to_test:
                             platform_jobs = [job for job in job_list.get_in_queue(p) if job.id not in wrappers_id]
                             if len(platform_jobs) == 0:
                                 continue
                             Log.info(f"Checking {len(platform_jobs)} jobs for platform {p.name}")
-                            p.check_Alljobs(platform_jobs, as_conf)
+
+                            if p.check_Alljobs(platform_jobs, as_conf):
+                                job_list.save_jobs()
+
                             for job in platform_jobs:
                                 if job.prev_status != job.status:
                                     Autosubmit.job_notify(as_conf, expid, job)
-                        del wrappers_id
-                        # Updates all workflow status with the new information.
-                        job_list.update_list(as_conf, submitter=submitter)
-                        job_list.save_jobs()
-                        # Submit jobs that are ready to run
-                        if len(job_list.get_ready()) > 0:
-                            Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, hold=False)
-                            job_list.update_list(as_conf, submitter=submitter)
-                            job_list.save_jobs()
-                        as_conf.save()
-
-                        # Submit jobs that are prepared to hold (if remote dependencies parameter are enabled)
-                        # This currently is not used as SLURM no longer allows to jobs to acquire priority while in hold state.
-                        # This only works for SLURM. ( Prepare status can not be achieved in other platforms )
-                        if as_conf.get_remote_dependencies() == "true" and len(job_list.get_prepared()) > 0:
-                            Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, hold=True)
-                            job_list.update_list(as_conf, submitter=submitter)
-                            job_list.save_jobs()
-                            as_conf.save()
 
                         # Safe spot to store changes
                         try:
@@ -2391,13 +2371,8 @@ class Autosubmit:
                         if Autosubmit.exit:
                             job_list.save_jobs()
                             as_conf.save()
-                        # TODO fix in another PR, this is a workaround to avoid having missmatching job_list and platform experiment_data
-                        if as_conf.needs_reload():
-                            as_conf.reload()
-                            job_list.update_as_conf(as_conf)
-                            for p in platforms_to_test:
-                                p.update_as_conf(as_conf)
-                        time.sleep(safetysleeptime)
+                        else:
+                            time.sleep(safetysleeptime)
 
                     except AutosubmitError as ae:  # If an error is detected, restore all connections and job_list
                         Log.error("Trace: {0}", ae.trace)
@@ -2481,25 +2456,11 @@ class Autosubmit:
                         raise  # If this happens, there is a bug in the code or an exception not-well caught
                 Log.result("No more jobs to run.")
                 # search hint - finished run
-                job_list.save_jobs()
-                if not did_run and len(
-                        job_list.get_completed_failed_without_logs()) > 0:  # Revise if there is any log unrecovered from previous run
-                    Log.info("Connecting to the platforms, to recover missing logs")
-                    submitter = Autosubmit._get_submitter(as_conf)
-                    submitter.load_platforms(as_conf)
-                    if submitter.platforms is None:
-                        raise AutosubmitCritical("No platforms configured!!!", 7014)
-                    platforms_to_test = [value for value in submitter.platforms.values()]
-                    Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf, expid=expid)
                 Log.info("Waiting for all logs to be updated")
                 for p in platforms_to_test:
                     if p.log_recovery_process:
                         p.cleanup_event.set()  # Send cleanup event
                         p.log_recovery_process.join()
-                if Autosubmit.check_logs_status(job_list, new_run=False):
-                    Log.result("Autosubmit recovered all job logs.")
-                else:
-                    Log.warning("Autosubmit couldn't recover all job logs")
 
                 try:
                     exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
@@ -2511,7 +2472,7 @@ class Autosubmit:
                     pass
                 for p in platforms_to_test:
                     p.closeConnection()
-                if len(job_list.get_failed()) > 0:
+                if len(job_list.get_failed_from_db()) > 0:
                     Log.info("Some jobs have failed and reached maximum retrials")
                 else:
                     Log.result("Run successful")
@@ -2539,7 +2500,7 @@ class Autosubmit:
 
         # Suppress in case ``job_list`` was not defined yet...
         with suppress(NameError):
-            if job_list.get_failed():
+            if len(job_list.get_failed_from_db()) > 0:
                 return 1
         return 0
 
@@ -2913,7 +2874,7 @@ class Autosubmit:
             db_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'db')
             job_list = Autosubmit.load_job_list(expid, as_conf, notransitive=notransitive, new=False)
             for job in job_list.get_job_list():
-                job._init_runtime_parameters()
+                job.init_runtime_parameters(as_conf, reset_logs=False, called_from_log_recovery=False)
                 job.update_dict_parameters(as_conf)
             Log.debug("Job list restored from {0} files", db_dir)
             jobs = StatisticsUtils.filter_by_section(job_list.get_job_list(), filter_type)
@@ -3140,6 +3101,7 @@ class Autosubmit:
             if save:
                 job_list.recover_last_data()
                 job_list.save_jobs()
+                job_list.save_edges()
             else:
                 Log.warning('Changes NOT saved to the jobList. Use -s option to save')
 

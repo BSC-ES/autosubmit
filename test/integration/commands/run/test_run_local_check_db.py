@@ -72,7 +72,11 @@ if TYPE_CHECKING:
             retrials: 2  
 
     """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
-], ids=["Success", "Checkpoint Test", "Failure"])
+], ids=[
+   "Success",
+   "Checkpoint Test",
+    "Failure",
+])
 def test_run_uninterrupted(
         autosubmit_exp,
         jobs_data: str,
@@ -81,6 +85,7 @@ def test_run_uninterrupted(
         run_type,
         prepare_scratch,
         common_conf,
+        redirect_log_info
 ):
     yaml = YAML(typ='rt')
     as_exp = autosubmit_exp(experiment_data=common_conf | yaml.load(jobs_data), include_jobs=False, create=True)
@@ -91,17 +96,17 @@ def test_run_uninterrupted(
     aslogs_path = Path(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
     as_conf.set_last_as_command('run')
 
-    as_exp.autosubmit._setup_log_files(
-        command="run",
-        expids=None,
-        expid=as_exp.expid,
-        owner=True,
-        tmp_path=tmp_path,
-        aslogs_path=aslogs_path,
-        exp_path=exp_path,
-        log_level="DEBUG",
-        console_level="DEBUG"
-    )
+    # as_exp.autosubmit._setup_log_files(
+    #     command="run",
+    #     expids=None,
+    #     expid=as_exp.expid,
+    #     owner=True,
+    #     tmp_path=tmp_path,
+    #     aslogs_path=aslogs_path,
+    #     exp_path=exp_path,
+    #     log_level="DEBUG",
+    #     console_level="DEBUG"
+    # )
     # Run the experiment
     exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
     _assert_exit_code(final_status, exit_code)

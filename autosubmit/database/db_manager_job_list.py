@@ -24,16 +24,17 @@ from sqlalchemy import and_, or_, select, desc, func
 from sqlalchemy.exc import IntegrityError
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager import DbManager
 from autosubmit.database.tables import ExperimentStructureTable, PreviewWrapperJobsTable, WrapperJobsTable, \
     PreviewWrapperInfoTable, WrapperInfoTable, SectionsStructureTable, get_table_from_name
 from autosubmit.database.tables import JobsTable, Table
-from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log
 
+
 if TYPE_CHECKING:
-    pass
+    from autosubmit.job.job import Job
 
 
 class JobsDbManager(DbManager):
@@ -43,49 +44,87 @@ class JobsDbManager(DbManager):
     as Postgres, Mongo, MySQL, etc.
     """
 
-    def __init__(self, connection_url: str, schema: Optional[str] = None) -> None:
-        super().__init__(connection_url, schema)
+    def __init__(self, schema: Optional[str] = None) -> None:
+        if BasicConfig.DATABASE_BACKEND == 'sqlite':
+            persistence_full_path = Path(Path(BasicConfig.LOCAL_ROOT_DIR, schema, "db"), Path("job_list.db"))
+        else:
+            persistence_full_path = None
+        super().__init__(get_connection_url(persistence_full_path), schema)
         self._ACTIVE_STATUSES = ['READY', 'SUBMITTED', 'QUEUING', 'HELD', 'RUNNING']
         self._FINAL_STATUSES = ['COMPLETED', 'FAILED']
         self.restore_path = Path(BasicConfig.LOCAL_ROOT_DIR) / 'db' / 'job_list.sql'
 
-    def save_jobs(self, job_list: List[Job]) -> None:
-        """Save the job list to the database. Normally this will save the current active jobs."""
+    def save_jobs(self, job_list: List["Job"]) -> None:
+        """Save the job list to the database.
+
+        :param job_list: List of Job objects to save to the database.
+        :type job_list: List[Job]
+
+        :return: None
+        :raises: May raise database-related exceptions during upsert operations.
+        """
+
         table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
         self.create_table(table.name)
         persistent_data = [job.__getstate__(log_process=False) for job in job_list]
-
         pkeys = ['name']
         self.upsert_many(table.name, persistent_data, pkeys)
 
-    def load_jobs(
-            self,
-            full_load: bool,
-            load_failed_jobs: bool = False,
-            only_not_updated_logs: bool = False,
-            members: Optional[List[Any]] = None
-    ) -> List[Dict[str, Any]]:
+    def save_job_log(self, job: "Job") -> None:
+        """Save only the log information of a single job to the database.
+
+        only update log-related fields (name, log, updated_log, local_logs_out, local_logs_err, remote_logs_out, remote_logs_err).
+
+        :param job: Job object whose log information is to be saved.
+        :type job: Job
+        :return: None
+        """
         table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
         self.create_table(table.name)
-        if only_not_updated_logs:
-            job_list = self.select_not_updated_log_jobs()
+        job_data: dict = job.__getstate__(log_process=False)
+        where: dict = {'name': job.name}
+        log_keys = {'name', 'log', 'updated_log', 'local_logs_out', 'local_logs_err', 'remote_logs_out', 'remote_logs_err'}
+        job_data = {k: v for k, v in job_data.items() if k in log_keys}
+
+        self.update_where(table.name, job_data, where)
+
+    def load_jobs(
+            self,
+            full_load: bool = False,
+            load_failed_jobs: bool = False,
+            only_finished: bool = False,
+            members: Optional[List[Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """Return a  list of jobs loaded from the database.
+
+        Load jobs according to the requested mode.
+
+        :param full_load: If True, load all jobs.
+        :param load_failed_jobs: If True, include failed jobs when loading active jobs.
+        :param only_finished: If True, load only finished jobs.
+        :param members: Optional list of member identifiers to filter jobs.
+        :return: A list of job dictionaries.
+        """
+        table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
+        self.create_table(table.name)
+        if only_finished:
+            job_list = self.select_finished_jobs()
         elif full_load:
             job_list = self.select_all_jobs()
         else:
             job_list = self.select_active_jobs(include_failed=load_failed_jobs, members=members)
             job_list.extend(self.select_children_jobs(job_list, members=members))
             job_list = set(job_list)  # remove duplicates
-        job_list = [dict(job) for job in job_list]
-        # return modificable list of dicts so it is easier to save later
-        return job_list
 
-    def select_not_updated_log_jobs(self) -> List[Dict[str, Any]]:
-        """Return the jobs from the database that have not updated their logs.
+        return [dict(job) for job in job_list]
+
+    def select_finished_jobs(self) -> List[Dict[str, Any]]:
+        """Return the jobs from the database that have finished.
         """
         table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
 
         self.create_table(table.name)
-        job_list = self.select_where_with_columns(table, {'updated_log': False, 'status': [Status.COMPLETED, Status.FAILED, Status.SKIPPED]})
+        job_list = self.select_where_with_columns(table, {'status': [Status.COMPLETED, Status.FAILED, Status.SKIPPED]})
         return [dict(job) for job in job_list]
 
     def load_job_by_name(self, job_name: str) -> dict[str, Any]:
@@ -530,7 +569,7 @@ class JobsDbManager(DbManager):
             values = {'status': Status.VALUE_TO_KEY[int(package['status'])]}
             self.update_where(wrapper_info_table.name, where, values)
 
-    def get_wrappers_id(self) -> List[int]:
+    def get_wrappers_id_from_db(self) -> List[int]:
         """
         Get the IDs of all wrapper jobs in the database.
 
@@ -541,3 +580,19 @@ class JobsDbManager(DbManager):
         self.create_table(wrapper_info_table.name)
         wrappers = self.select_all_with_columns(wrapper_info_table.name)
         return [wrapper[1] for wrapper in wrappers]
+
+
+    def get_failed_job_data(self) -> list[dict[str, Any]]:
+        """Get the names of jobs that have failed.
+
+        :return: List of job names that have failed.
+        :rtype: List[str]
+        """
+        table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
+
+        self.create_table(table.name)
+        job_list_data: list[dict[str, Any]] = [
+            dict(job) for job in self.select_where_with_columns(table, {'status': "FAILED"})
+        ]
+
+        return job_list_data

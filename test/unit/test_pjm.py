@@ -93,7 +93,7 @@ def create_packages(as_conf, pjm_platform):
         job.platform_name = pjm_platform.name
         job.processors = 2
         job.section = "dummysection"
-        job._init_runtime_parameters()
+        job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
         job.wallclock = "00:01"
     packages = [
         JobPackageSimple(simple_jobs),

@@ -36,6 +36,7 @@ from typing import Optional, Union, TYPE_CHECKING
 
 import Xlib.support.connect as xlib_connect
 import paramiko
+from bscearth.utils.date import date2str
 from paramiko.agent import Agent
 from paramiko.ssh_exception import (SSHException)
 
@@ -793,7 +794,7 @@ class ParamikoPlatform(Platform):
             if not job_names_provided:
                 cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_FAILED' -type f"
             else:
-                patterns = ' -o '.join([f"-name '{name}_FAILED'" for name in job_names])
+                patterns = ' -o '.join([f"-name '{name}_FAILED'" for name in job_names_provided])
                 cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {patterns} \\) -type f"
             self.send_command(cmd)
             output = self.get_ssh_output()
@@ -863,8 +864,8 @@ class ParamikoPlatform(Platform):
                 job_status = Status.RUNNING
                 if not is_wrapper:
                     if job.status != Status.RUNNING:
-                        job.start_time = datetime.datetime.now()  # URi: start time
-                    if job.start_time is not None and str(job.wrapper_type).lower() in ["simple", "none"]:
+                        job.start_time_timestamp = date2str(datetime.datetime.now(), 'S') # URi: start time
+                    if job.start_time_timestamp and str(job.wrapper_type).lower() in ["simple", "none"]:
                         wallclock = job.wallclock
                         if job.wallclock == "00:00" or job.wallclock is None:
                             wallclock = job.platform.max_wallclock
@@ -886,14 +887,13 @@ class ParamikoPlatform(Platform):
                 'check_job() The job id ({0}) status is {1}.', job_id, job_status)
 
         if job_status in [Status.FAILED, Status.COMPLETED, Status.UNKNOWN]:
-            job.updated_log = False
             if not job.start_time_timestamp:  # QUEUING -> COMPLETED ( under safetytime )
-                job.start_time_timestamp = int(time.time())
+                job.start_time_timestamp = date2str(datetime.datetime.now(), 'S')
             # Estimate Time for failed jobs, as they won't have the timestamp in the stat file
-            job.finish_time_timestamp = int(time.time())
+            job.finish_time_timestamp = date2str(datetime.datetime.now(), 'S')
         if job_status in [Status.RUNNING, Status.COMPLETED] and job.new_status in [Status.QUEUING, Status.SUBMITTED]:
             # backup for start time in case that the stat file is not found
-            job.start_time_timestamp = int(time.time())
+            job.start_time_timestamp = date2str(datetime.datetime.now(), 'S')
 
         if submit_hold_check:
             return job_status
@@ -929,7 +929,7 @@ class ParamikoPlatform(Platform):
                 job_list_cmd = job_list_cmd[:-1]
         return job_list_cmd
 
-    def check_Alljobs(self, job_list: list["Job"], as_conf, retries=5):
+    def check_Alljobs(self, job_list: list["Job"], as_conf, retries=5) -> bool:
         """
         Checks jobs running status
 
@@ -993,8 +993,8 @@ class ParamikoPlatform(Platform):
                 else:
                     job_status = job.status
                 if job.status != Status.RUNNING:
-                    job.start_time = datetime.datetime.now()  # URi: start time
-                if job.start_time is not None and str(job.wrapper_type).lower() == "none":
+                    job.start_time_timestamp = date2str(datetime.datetime.now(), 'S')
+                if job.start_time_timestamp and str(job.wrapper_type).lower() == "none":
                     wallclock = job.wallclock
                     if job.wallclock == "00:00":
                         wallclock = job.platform.max_wallclock
@@ -1031,10 +1031,13 @@ class ParamikoPlatform(Platform):
             # job.new_status=job_status
         if slurm_error:
             raise AutosubmitError(e_msg, 6000)
-
+        save = False
         for job in job_list:
             if job.new_status != job.status:
                 job.update_status(as_conf)
+                save = True
+
+        return save
 
     def get_jobid_by_jobname(self, job_name, retries=2):
         """
@@ -1257,8 +1260,6 @@ class ParamikoPlatform(Platform):
             timeout = 60
         else:
             timeout = 60 * 2
-        if not ignore_log:
-            Log.debug(f"send_command timeout used: {timeout} seconds (None = infinity)")
         stderr_readlines = []
         stdout_chunks = []
 

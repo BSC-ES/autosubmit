@@ -1,11 +1,11 @@
 from pathlib import Path
 from textwrap import dedent
+from time import sleep
 from typing import TYPE_CHECKING
 
 import pytest
-from time import sleep
-
 from ruamel.yaml import YAML
+
 from autosubmit.config.basicconfig import BasicConfig
 from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, _assert_db_fields, _assert_files_recovered, run_in_thread
 
@@ -257,6 +257,7 @@ def test_run_uninterrupted(
         slurm_server: 'DockerContainer',
         prepare_scratch,
         common_conf,
+        redirect_log_info
 ):
     yaml = YAML(typ='rt')
     as_exp = autosubmit_exp(experiment_data=common_conf | yaml.load(jobs_data), include_jobs=False, create=True)
@@ -266,18 +267,17 @@ def test_run_uninterrupted(
     log_dir = tmp_path / f"LOG_{as_exp.expid}"
     aslogs_path = Path(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
     as_conf.set_last_as_command('run')
-
-    as_exp.autosubmit._setup_log_files(
-        command="run",
-        expids=None,
-        expid=as_exp.expid,
-        owner=True,
-        tmp_path=tmp_path,
-        aslogs_path=aslogs_path,
-        exp_path=exp_path,
-        log_level="DEBUG",
-        console_level="DEBUG"
-    )
+    # as_exp.autosubmit._setup_log_files(
+    #     command="run",
+    #     expids=None,
+    #     expid=as_exp.expid,
+    #     owner=True,
+    #     tmp_path=tmp_path,
+    #     aslogs_path=aslogs_path,
+    #     exp_path=exp_path,
+    #     log_level="DEBUG",
+    #     console_level="DEBUG"
+    # )
     # Run the experiment
     exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
     _assert_exit_code(final_status, exit_code)

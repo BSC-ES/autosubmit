@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 
 import pytest
 
@@ -87,14 +87,14 @@ def new_packages(as_conf, dummy_jobs):
     return packages
 
 
-def setup_jobs(dummy_jobs, new_platform_mock):
+def setup_jobs(dummy_jobs, new_platform_mock, as_conf):
     for job in dummy_jobs:
         job._platform = new_platform_mock
         job.processors = 2
         job.section = "dummysection"
-        job._init_runtime_parameters()
+        job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
         job.wallclock = "00:01"
-        job.start_time = datetime.now() - timedelta(minutes=1)
+        job.start_time_timestamp = (datetime.now() - timedelta(minutes=1)).strftime('%Y%m%d%H%M%S')
 
 
 @pytest.mark.parametrize(
@@ -113,7 +113,7 @@ def setup_jobs(dummy_jobs, new_platform_mock):
 def test_check_wrapper_stored_status(setup_as_conf, new_job_list, new_platform_mock, initial_status, expected_status):
     dummy_jobs = [Job("dummy-1", 1, initial_status, 0), Job("dummy-2", 2, initial_status, 0),
                   Job("dummy-3", 3, initial_status, 0)]
-    setup_jobs(dummy_jobs, new_platform_mock)
+    setup_jobs(dummy_jobs, new_platform_mock, setup_as_conf)
 
     package = WrapperJob(
         "dummy_wrapper",
@@ -138,19 +138,21 @@ def test_check_wrapper_stored_status(setup_as_conf, new_job_list, new_platform_m
 
 
 
-def test_parse_time(new_platform_mock):
+def test_parse_time(new_platform_mock, autosubmit_config):
     job = Job("dummy-1", 1, Status.SUBMITTED, 0)
-    setup_jobs([job], new_platform_mock)
+    as_conf = autosubmit_config("t000", {})
+    setup_jobs([job], new_platform_mock, as_conf)
     assert job.parse_time("0000") is None
     assert job.parse_time("00:01") == timedelta(seconds=60)
 
 
-def test_is_over_wallclock(new_platform_mock):
+def test_is_over_wallclock(new_platform_mock, autosubmit_config):
     job = Job("dummy-1", 1, Status.SUBMITTED, 0)
-    setup_jobs([job], new_platform_mock)
+    as_conf = autosubmit_config("t000", {})
+    setup_jobs([job], new_platform_mock, as_conf)
     job.wallclock = "00:01"
     assert job.is_over_wallclock() is False
-    job.start_time = datetime.now() - timedelta(minutes=2)
+    job.start_time_timestamp = (datetime.now() - timedelta(minutes=2)).strftime('%Y%m%d%H%M%S')
     assert job.is_over_wallclock() is True
 
 
@@ -162,12 +164,13 @@ def test_is_over_wallclock(new_platform_mock):
 def test_platform_job_is_over_wallclock(setup_as_conf, new_platform_mock, platform_class, platform_name, mocker):
     platform_instance = platform_class("dummy", f"{platform_name}-dummy", setup_as_conf.experiment_data)
     job = Job("dummy-1", 1, Status.RUNNING, 0)
-    setup_jobs([job], platform_instance)
+    setup_jobs([job], platform_instance, setup_as_conf)
     job.wallclock = "00:01"
     platform_instance.get_completed_job_names = mocker.MagicMock(return_value=[])
     job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING)
     assert job_status == Status.RUNNING
-    job.start_time = datetime.now() - timedelta(minutes=2)
+    job.start_time_timestamp = (datetime.now() - timedelta(minutes=2)).strftime('%Y%m%d%H%M%S')
+
     platform_instance.get_completed_job_names = mocker.MagicMock(return_value=[])
     job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING)
     assert job_status == Status.FAILED
@@ -191,8 +194,8 @@ def test_platform_job_is_over_wallclock_force_failure(setup_as_conf, new_platfor
                                                       mocker):
     platform_instance = platform_class("dummy", f"{platform_name}-dummy", setup_as_conf.experiment_data)
     job = Job("dummy-1", 1, Status.RUNNING, 0)
-    setup_jobs([job], platform_instance)
-    job.start_time = datetime.now() - timedelta(minutes=2)
+    setup_jobs([job], platform_instance, setup_as_conf)
+    job.start_time_timestamp = (datetime.now() - timedelta(minutes=2)).strftime('%Y%m%d%H%M%S')
     job.platform.get_completed_files = mocker.MagicMock(side_effect=Exception("Error"))
     job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING, True)
     assert job_status == Status.FAILED

@@ -2051,7 +2051,7 @@ class TestWrappers:
         self.job_list._dic_jobs = DicJobs(date_list, member_list, chunk_list, "", 0, self.as_conf)
         self._manage_dependencies(sections_dict)
         for job in self.job_list.get_job_list():
-            job._init_runtime_parameters()
+            job.init_runtime_parameters(self.as_conf, reset_logs=True, called_from_log_recovery=False)
             # job.update_parameters = MagicMock()
 
     def _manage_dependencies(self, sections_dict):
@@ -2155,13 +2155,13 @@ def setup(autosubmit_config, tmpdir):
     job_list._platforms = [platform]
     # add some jobs to the job list
     job = Job("job1", "1", Status.COMPLETED, 0)
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     job.wallclock = "00:20"
     job.section = "SECTION1"
     job.platform = platform
     job_list.add_job(job)
     job = Job("job2", "2", Status.SUBMITTED, 0)
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     job.wallclock = "00:20"
     job.section = "SECTION1"
     job.platform = platform
@@ -2257,7 +2257,7 @@ def test_process_not_wrappeable_packages_no_more_remaining_jobs(setup, not_wrapp
             "strict_one_job", "mixed_one_job", "flexible_one_job"])
 def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wrappeable_package_info,
                                                                    packages_to_submit, max_jobs_to_submit, expected,
-                                                                   unparsed_policy):
+                                                                   unparsed_policy, autosubmit_config):
     job_packager, vertical_package = setup
     if unparsed_policy == "mixed_failed":
         policy = "mixed"
@@ -2277,7 +2277,8 @@ def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wr
     if unparsed_policy == "mixed_failed":
         vertical_package.jobs[0].fail_count = 1
     job = Job("job3", "3", Status.WAITING, 0)
-    job._init_runtime_parameters()
+    as_conf = autosubmit_config("random-id", {})
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     job.wallclock = "00:20"
     job.section = "SECTION1"
     job.platform = job_packager._platform

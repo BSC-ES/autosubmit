@@ -1,6 +1,33 @@
 import pytest
-from typing import Dict
+from typing import Dict, Any
 from pathlib import Path
+
+
+@pytest.fixture
+def redirect_log_info(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Redirect `Log` calls to a temporary file called `autosubmit.log` and return the file path.
+    """
+    from datetime import datetime
+
+    log_file = tmp_path / "autosubmit.log"
+
+    def _new_log_path(message: Any, *args: Any, **kwargs: Any) -> None:
+        timestamp = datetime.now().astimezone().isoformat()
+        with log_file.open("a", encoding="utf-8") as fh:
+            fh.write(f"{timestamp} {message}\n")
+
+    try:
+        from autosubmit.log.log import Log
+        monkeypatch.setattr(Log, "info", _new_log_path)
+        monkeypatch.setattr(Log, "debug", _new_log_path)
+        monkeypatch.setattr(Log, "warning", _new_log_path)
+        monkeypatch.setattr(Log, "error", _new_log_path)
+        monkeypatch.setattr(Log, "critical", _new_log_path)
+        monkeypatch.setattr(Log, "status", _new_log_path)
+    except Exception:
+        raise
+
+    return log_file
 
 
 @pytest.fixture(scope="function")
