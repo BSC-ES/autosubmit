@@ -125,3 +125,7 @@ def main():
     if type(return_value) is bool:
         return_value = 0 if return_value else 1
     return return_value
+
+# TODO: [ENGINES] Entry point for debugging in VSCode
+if __name__ == "__main__":
+    _exit(main())
