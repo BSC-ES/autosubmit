@@ -289,13 +289,14 @@ class SlurmHeader(object):
     """
         else:
             wr_header = self.calculate_wrapper_het_header(kwargs["wrapper_data"])
-        if kwargs["method"] == 'srun':
-            language = kwargs["executable"]
+
+        language = kwargs["executable"]
+
+        if kwargs["method"] == 'srun' or kwargs["method"] == 'flux':
             if language is None or len(language) == 0:
                 language = "#!/bin/bash"
             return language + wr_header
         else:
-            language = kwargs["executable"]
             if language is None or len(language) == 0 or "bash" in language:
                 language = "#!/usr/bin/env python3"
             return language + wr_header
