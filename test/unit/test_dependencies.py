@@ -608,7 +608,6 @@ def _init_special_conditions(joblist: JobList) -> Tuple[Job, Job, Job, dict, Job
     joblist.add_job(parent2)
     joblist.graph.add_edge(parent.name, job.name)
     joblist.graph.add_edge(parent2.name, job.name)
-    joblist._job_list = [parent, job]
     joblist.add_special_conditions(job, special_conditions, parent)
     special_conditions = {"MIN_TRIGGER_STATUS": "FAILED", "FROM_STEP": 0, "FAIL_OK": False}
     joblist.add_special_conditions(job, special_conditions, parent2)
@@ -692,7 +691,7 @@ def test_job_dict_get_jobs_filtered(mocker, joblist):
     job.splits = 2
     job.max_checkpoint_step = 0
     job_list = mocker.Mock(wraps=joblist)
-    job_list._job_list = [job]
+    job_list.job_list = [job]
     filters_to = {'SPLITS_TO': "1*\\1"}
     filters_to_of_parent = {'SPLITS_TO': 'previous'}
     natural_chunk = 1

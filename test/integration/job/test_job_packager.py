@@ -58,7 +58,6 @@ def create_packager(autosubmit_exp, autosubmit, local) -> CreatePackagerFixture:
             as_conf.get_retrials(),
             as_conf.get_default_job_type(),
             {},
-            run_only_members=[],
             full_load=True)
         for job in job_list.get_job_list():
             job.update_parameters(as_conf, set_attributes=True)

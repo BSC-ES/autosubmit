@@ -42,11 +42,11 @@ def platform(mocker):
 
 
 @pytest.fixture
-def jobs(platform) -> list[Job]:
+def jobs(platform, as_conf) -> list[Job]:
     jobs = [Job('dummy1', 0, Status.READY, 0),
             Job('dummy2', 0, Status.READY, 0)]
     for job in jobs:
-        job._init_runtime_parameters()
+        job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
 
     jobs[0].wallclock = "00:00"
     jobs[0]._threads = "1"

@@ -349,7 +349,7 @@ How to change the job status without stopping autosubmit
 
     This procedure allows you to modify the status of your jobs without having to stop Autosubmit.
 
-You must create a file in ``<experiments_directory>/<EXPID>/pkl/`` named:
+You must create a file in ``<experiments_directory>/<EXPID>/status/`` named:
 ::
 
     updated_list_<EXPID>.txt

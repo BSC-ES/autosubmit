@@ -24,7 +24,6 @@ from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
 from textwrap import dedent
-from time import time
 from typing import Optional
 
 import pytest
@@ -32,7 +31,6 @@ from bscearth.utils.date import date2str
 from mock import Mock, MagicMock  # type: ignore
 from mock.mock import patch  # type: ignore
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.configcommon import BasicConfig, YAMLParserFactory
 from autosubmit.job.job import Job
@@ -364,9 +362,7 @@ CONFIG:
                             date_format='M',
                             default_retrials=config.get_retrials(),
                             default_job_type=config.get_default_job_type(),
-                            wrapper_jobs={},
                             new=True,
-                            run_only_members=config.get_member_list(run_only=True),
                             show_log=True,
                             full_load=True,
                         )
@@ -445,216 +441,6 @@ CONFIG:
                                 final_script = file.read()  # type: ignore
                                 assert "%EXTENDED_HEADER%" not in final_script
                                 assert "%EXTENDED_TAILER%" not in final_script
-
-    def test_hetjob(self):
-        """
-        Test job platforms with a platform. Builds job and platform using YAML data, without mocks.
-        :return:
-        """
-        expid = "t000"
-        with tempfile.TemporaryDirectory() as temp_dir:
-            BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
-            Path(temp_dir, expid).mkdir()
-            for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                         f'{expid}/conf']:
-                Path(temp_dir, path).mkdir()
-            with open(Path(temp_dir, f'{expid}/conf/experiment_data.yml'), 'w+') as experiment_data:
-                experiment_data.write(dedent(f'''\
-                            CONFIG:
-                              RETRIALS: 0
-                            DEFAULT:
-                              EXPID: {expid}
-                              HPCARCH: test
-                            PLATFORMS:
-                              test:
-                                TYPE: slurm
-                                HOST: localhost
-                                PROJECT: abc
-                                QUEUE: debug
-                                USER: me
-                                SCRATCH_DIR: /anything/
-                                ADD_PROJECT_TO_HOST: False
-                                MAX_WALLCLOCK: '00:55'
-                                TEMP_DIR: ''
-                            '''))
-                experiment_data.flush()
-            # For could be added here to cover more configurations options
-            with open(Path(temp_dir, f'{expid}/conf/hetjob.yml'), 'w+') as hetjob:
-                hetjob.write(dedent('''\
-                            JOBS:
-                                HETJOB_A:
-                                    FILE: a
-                                    PLATFORM: test
-                                    RUNNING: once
-                                    WALLCLOCK: '00:30'
-                                    MEMORY:
-                                        - 0
-                                        - 0
-                                    NODES:
-                                        - 3
-                                        - 1
-                                    TASKS:
-                                        - 32
-                                        - 32
-                                    THREADS:
-                                        - 4
-                                        - 4
-                                    CUSTOM_DIRECTIVES:
-                                        - ['#SBATCH --export=ALL', '#SBATCH --distribution=block:cyclic', '#SBATCH --exclusive']
-                                        - ['#SBATCH --export=ALL', '#SBATCH --distribution=block:cyclic:fcyclic', '#SBATCH --exclusive']
-                '''))
-
-            basic_config = FakeBasicConfig()
-            basic_config.read()
-            basic_config.LOCAL_ROOT_DIR = str(temp_dir)
-
-            config = AutosubmitConfig(expid, basic_config=basic_config, parser_factory=YAMLParserFactory())
-            config.reload(True)
-            parameters = config.load_parameters()
-            job_list_obj = JobList(expid, config, YAMLParserFactory(),
-                                   Autosubmit._get_job_list_persistence(expid, config))
-
-            job_list_obj.generate(
-                as_conf=config,
-                date_list=[],
-                member_list=[],
-                num_chunks=1,
-                chunk_ini=1,
-                parameters=parameters,
-                date_format='M',
-                default_retrials=config.get_retrials(),
-                default_job_type=config.get_default_job_type(),
-                wrapper_jobs={},
-                new=True,
-                run_only_members=[],
-                # config.get_member_list(run_only=True),
-                show_log=True,
-                create=True,
-            )
-
-            job_list = job_list_obj.get_job_list()
-            assert 1 == len(job_list)
-
-            submitter = ParamikoSubmitter(as_conf=config)
-
-            hpcarch = config.get_platform()
-            for job in job_list:
-                if job.platform_name == "" or job.platform_name is None:
-                    job.platform_name = hpcarch
-                job.platform = submitter.platforms[job.platform_name]
-
-            job = job_list[0]
-
-            # This is the final header
-            parameters = job.update_parameters(config, set_attributes=True)
-            job.update_content(config, parameters)
-
-            # Asserts the script is valid. There shouldn't be variables in the script that aren't in the parameters.
-            checked = job.check_script(config, parameters)
-            assert checked
-
-    def test_job_parameters(self):
-        """Test job platforms with a platform. Builds job and platform using YAML data, without mocks.
-
-        Actually one mock, but that's for something in the AutosubmitConfigParser that can
-        be modified to remove the need of that mock.
-        """
-
-        expid = 't000'
-
-        for reservation in [None, '', '  ', 'some-string', 'a', '123', 'True']:
-            reservation_string = '' if not reservation else f'RESERVATION: "{reservation}"'
-            with tempfile.TemporaryDirectory() as temp_dir:
-                BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
-                Path(temp_dir, expid).mkdir()
-                # FIXME: Not sure why but the submitted and Slurm were using the $expid/tmp/ASLOGS folder?
-                for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                             f'{expid}/conf']:
-                    Path(temp_dir, path).mkdir()
-                with open(Path(temp_dir, f'{expid}/conf/minimal.yml'), 'w+') as minimal:
-                    minimal.write(dedent(f'''\
-                    CONFIG:
-                      RETRIALS: 0
-                    DEFAULT:
-                      EXPID: {expid}
-                      HPCARCH: test
-                    JOBS:
-                      A:
-                        FILE: a
-                        PLATFORM: test
-                        RUNNING: once
-                        {reservation_string}
-                    PLATFORMS:
-                      test:
-                        TYPE: slurm
-                        HOST: localhost
-                        PROJECT: abc
-                        QUEUE: debug
-                        USER: me
-                        SCRATCH_DIR: /anything/
-                        ADD_PROJECT_TO_HOST: False
-                        MAX_WALLCLOCK: '00:55'
-                        TEMP_DIR: ''
-                    '''))
-                    minimal.flush()
-
-                basic_config = FakeBasicConfig()
-                basic_config.read()
-                basic_config.LOCAL_ROOT_DIR = str(temp_dir)
-
-                config = AutosubmitConfig(expid, basic_config=basic_config, parser_factory=YAMLParserFactory())
-                config.reload(True)
-                parameters = config.load_parameters()
-
-                job_list_obj = JobList(expid, config, YAMLParserFactory(),
-                                       Autosubmit._get_job_list_persistence(expid, config))
-                job_list_obj.generate(
-                    as_conf=config,
-                    date_list=[],
-                    member_list=[],
-                    num_chunks=1,
-                    chunk_ini=1,
-                    parameters=parameters,
-                    date_format='M',
-                    default_retrials=config.get_retrials(),
-                    default_job_type=config.get_default_job_type(),
-                    wrapper_jobs={},
-                    new=True,
-                    run_only_members=config.get_member_list(run_only=True),
-                    show_log=True,
-                    create=True,
-                )
-                job_list = job_list_obj.get_job_list()
-                assert 1 == len(job_list)
-
-                submitter = ParamikoSubmitter(as_conf=config)
-
-                hpcarch = config.get_platform()
-                for job in job_list:
-                    if job.platform_name == "" or job.platform_name is None:
-                        job.platform_name = hpcarch
-                    job.platform = submitter.platforms[job.platform_name]
-
-                job = job_list[0]
-                parameters = job.update_parameters(config, set_attributes=True)
-                # Asserts the script is valid.
-                checked = job.check_script(config, parameters)
-                assert checked
-
-                # Asserts the configuration value is propagated as-is to the job parameters.
-                # Finally, asserts the header created is correct.
-                if not reservation:
-                    assert 'JOBS.A.RESERVATION' not in parameters
-                    template_content, additional_templates = job.update_content(config, parameters)
-                    assert not additional_templates
-
-                    assert '#SBATCH --reservation' not in template_content
-                else:
-                    assert reservation == parameters['JOBS.A.RESERVATION']
-
-                    template_content, additional_templates = job.update_content(config, parameters)
-                    assert not additional_templates
-                    assert f'#SBATCH --reservation={reservation}' in template_content
 
     def test_total_processors(self):
         for test in [
@@ -875,9 +661,7 @@ CONFIG:
                 date_format='',
                 default_retrials=config.get_retrials(),
                 default_job_type=config.get_default_job_type(),
-                wrapper_jobs={},
                 new=True,
-                run_only_members=config.get_member_list(run_only=True),
                 show_log=True,
                 full_load=True,
             )
@@ -1013,7 +797,7 @@ def test_update_stat_file():
     assert job.stat_file == "dummyname_STAT_"
 
 
-def test_pytest_check_script(mocker):
+def test_pytest_check_script(mocker, autosubmit_config):
     job = Job("job1", "1", Status.READY, 0)
     # arrange
     parameters = dict()
@@ -1024,7 +808,8 @@ def test_pytest_check_script(mocker):
     mocker.patch("autosubmit.job.job.Job.update_content", return_value=(
         'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK%', 'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK%'))
     mocker.patch("autosubmit.job.job.Job.update_parameters", return_value=parameters)
-    job._init_runtime_parameters()
+    as_conf = autosubmit_config("t000", {})
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
 
     config = Mock(spec=AutosubmitConfig)
     config.default_parameters = {}
@@ -1108,21 +893,22 @@ def test_reset_logs(autosubmit_config):
     }
     as_conf = autosubmit_config("t000", experiment_data)
     job = Job("job1", "1", Status.READY, 0)
-    job.reset_logs(as_conf)
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     assert job.workflow_commit == "dummy-commit"
-    assert job.updated_log is False
+    assert job.updated_log == 0
     assert job.packed_during_building is False
 
 
-def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_template_variable(mocker):
+def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_template_variable(mocker, autosubmit_config):
     job = Job("job1", "1", Status.READY, 0)
     # arrange
-    job._init_runtime_parameters()
+    as_conf = autosubmit_config("t000", {})
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     parameters = {}
     mocker.patch("autosubmit.job.job.Job.update_content",
                  return_value=('some-content: %UNBOUND%', 'some-content: %UNBOUND%'))
     mocker.patch("autosubmit.job.job.Job.update_parameters", return_value=parameters)
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
 
     config = Mock(spec=AutosubmitConfig)
     config.default_parameters = {}
@@ -1201,70 +987,6 @@ def test_update_parameters_current_variables(autosubmit_config, experiment_data,
     _, _, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data)
     for key, value in expected_data.items():
         assert parameters[key] == value
-
-
-# @pytest.mark.parametrize('test_with_file, file_is_empty, last_line_empty', [
-#     (False, False, False),
-#     (True, True, False),
-#     (True, False, False),
-#     (True, False, True)
-# ], ids=["no file", "file is empty", "file is correct", "file last line is empty"])
-# def test_recover_last_ready_date(tmpdir, test_with_file, file_is_empty, last_line_empty):
-#     job = Job('dummy', '1', 0, 1)
-#     job._tmp_path = Path(tmpdir)
-#     stat_file = job._tmp_path.joinpath(f'{job.name}_TOTAL_STATS')
-#     ready_time = datetime.now() + timedelta(minutes=5)
-#     ready_date = int(ready_time.strftime("%Y%m%d%H%M%S"))
-#     expected_date = None
-#     if test_with_file:
-#         if file_is_empty:
-#             stat_file.touch()
-#             expected_date = datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
-#         else:
-#             if last_line_empty:
-#                 with stat_file.open('w') as f:
-#                     f.write(" ")
-#                 expected_date = datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
-#             else:
-#                 with stat_file.open('w') as f:
-#                     f.write(f"{ready_date} {ready_date} {ready_date} COMPLETED")
-#                 expected_date = str(ready_date)
-#     job.ready_date = None
-#     job.recover_last_ready_date()
-#     assert job.ready_date == expected_date
-#
-#
-# @pytest.mark.parametrize('test_with_logfiles, file_timestamp_greater_than_ready_date', [
-#     (False, False),
-#     (True, True),
-#     (True, False),
-# ], ids=["no file", "log timestamp >= ready_date", "log timestamp < ready_date"])
-# def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greater_than_ready_date):
-#     job = Job('dummy', '1', 0, 1)
-#     job._log_path = Path(tmpdir)
-#     expected_local_logs = (f"{job.name}.out.0", f"{job.name}.err.0")
-#     if test_with_logfiles:
-#         if file_timestamp_greater_than_ready_date:
-#             ready_time = datetime.now() - timedelta(minutes=5)
-#             job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
-#             log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
-#             expected_update_log = True
-#             expected_local_logs = (log_name.with_suffix('.out').name, log_name.with_suffix('.err').name)
-#         else:
-#             expected_update_log = False
-#             ready_time = datetime.now() + timedelta(minutes=5)
-#             job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
-#             log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
-#         log_name.with_suffix('.out').touch()
-#         log_name.with_suffix('.err').touch()
-#     else:
-#         expected_update_log = False
-#
-#     job.updated_log = False
-#     job.recover_last_log_name()
-#     assert job.updated_log == expected_update_log
-#     assert job.local_logs[0] == str(expected_local_logs[0])
-#     assert job.local_logs[1] == str(expected_local_logs[1])
 
 
 @pytest.mark.parametrize('experiment_data, attributes_to_check', [(
@@ -1360,38 +1082,6 @@ def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines
     for directive in result_by_lines:
         pattern = r'^\s*' + re.escape(directive) + r'\s*$'  # Match Start line, match directive, match end line
         assert re.search(pattern, template_content, re.MULTILINE) is not None
-
-
-@pytest.mark.parametrize('experiment_data', [(
-        {
-            'JOBS': {
-                'RANDOM-SECTION': {
-                    'FILE': "test.sh",
-                    'PLATFORM': 'DUMMY_PLATFORM',
-                    'TEST': "rng",
-                },
-            },
-            'PLATFORMS': {
-                'dummy_platform': {
-                    'type': 'ps',
-                    'whatever': 'dummy_value',
-                    'whatever2': 'dummy_value2',
-                    'CUSTOM_DIRECTIVES': ['$SBATCH directive1', '$SBATCH directive2'],
-                },
-            },
-            'ROOTDIR': "asd",
-            'LOCAL_TMP_DIR': "asd",
-            'LOCAL_ROOT_DIR': "asd",
-            'LOCAL_ASLOG_DIR': "asd",
-        }
-)], ids=["Simple job"])
-def test_no_start_time(autosubmit_config, experiment_data):
-    job, as_conf, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data)
-    del job.start_time
-    as_conf.force_load = False
-    as_conf.data_changed = False
-    job.update_parameters(as_conf, set_attributes=True)
-    assert isinstance(job.start_time, datetime)
 
 
 def test_sub_job_instantiation(tmp_path, autosubmit_config):
@@ -1521,7 +1211,6 @@ def test_update_parameters_reset_logs(autosubmit_config, tmpdir):
     )
     job = Job('DUMMY', '1', 0, 1)
     job.section = 'DUMMY_S'
-    job.log_recovered = True
     job.packed_during_building = True
     job.workflow_commit = "incorrect"
     job.update_parameters(as_conf, set_attributes=True, reset_logs=True)
@@ -1681,9 +1370,9 @@ def test_write_submit_time_ignore_exp_history(total_stats_exists: bool, autosubm
 @pytest.mark.parametrize(
     'completed,existing_lines,count',
     [
-        (True, 'a\nb\n', -1),
+        (True, 'a\nb', -1),
         (True, None, -1),
-        (False, 'a\n', -1),
+        (False, 'a', -1),
         (False, None, 100)
     ],
     ids=[
@@ -1699,13 +1388,14 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
 
     It ignores what happens to the experiment history object."""
     mocker.patch('autosubmit.job.job.ExperimentHistory')
+    expected_lines_size = len(existing_lines.split('\n')) if existing_lines else 1
 
     as_conf = autosubmit_config(_EXPID, experiment_data={})
     tmp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, as_conf.basic_config.LOCAL_TMP_DIR)
 
     status = Status.COMPLETED if True else Status.WAITING
     job = Job(f'{_EXPID}_dummy', 1, status, 0)
-    job.finish_time_timestamp = time()
+    job.finish_time_timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
     job.platform = local
 
     total_stats = Path(tmp_path, f'{job.name}_TOTAL_STATS')
@@ -1722,12 +1412,8 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
     # When the file already exists, it will append new content. It must never
     # delete the existing lines, so this assertion just verifies the content
     # written previously (if any) was not removed.
-    if existing_lines:
-        lines = len(existing_lines.split('\n')) - 1
-    else:
-        lines = 0
-    expected_lines = lines + 1
-    assert len(total_stats.read_text().split('\n')) == expected_lines
+    lines_written = total_stats.read_text().split('\n')
+    assert len(lines_written) == expected_lines_size
 
 
 def test_job_repr():
@@ -1801,10 +1487,6 @@ def test_job_getters_setters():
     del job._long_name
     assert job.long_name == 'name'
 
-    assert job.log_recovered is False
-    job.log_recovered = True
-    assert job.log_recovered
-
     assert job.remote_logs == ('', '')
     job.remote_logs = ('a.err', 'b.err')
     assert job.remote_logs == ('a.err', 'b.err')
@@ -1838,13 +1520,11 @@ def test_update_status_logs(status: Status, autosubmit_config, mocker):
 
     assert job.status == Status.WAITING
 
-    mocked_log = mocker.patch('autosubmit.job.job.Log')
+    mocker.patch('autosubmit.job.job.Log')
 
     job.update_status(as_conf=as_conf, failed_file=False)
 
     assert job.status == status
-
-    assert mocked_log.info.call_args_list[0][0][0] == f'Job {job.name} is {Status.VALUE_TO_KEY[status].upper()}'
 
 
 @pytest.mark.parametrize(
@@ -1877,7 +1557,7 @@ def test_update_status_completed(has_completed_files: bool, job_id: str, autosub
             }
         }
     })
-    job = Job(as_conf.expid, job_id, status=Status.WAITING, priority=0, loaded_data=None)
+    job = Job("test", job_id, status=Status.WAITING, priority=0, loaded_data=None)
     job.platform_name = platform_name
     job.new_status = Status.COMPLETED
 
@@ -1887,7 +1567,7 @@ def test_update_status_completed(has_completed_files: bool, job_id: str, autosub
 
     assert job.status == Status.WAITING
 
-    mocked_log = mocker.patch('autosubmit.job.job.Log')
+    mocker.patch('autosubmit.job.job.Log')
 
     if has_completed_files:
         job_completed_file = Path(
@@ -1901,31 +1581,9 @@ def test_update_status_completed(has_completed_files: bool, job_id: str, autosub
         job.update_status(as_conf=as_conf, failed_file=False)
         assert job.status == Status.COMPLETED
 
-        assert mocked_log.result.call_args_list[0][0][0] == f'Job {job.name} is COMPLETED'
-
-        if job_id == '0':
-            assert job.updated_log
-        else:
-            assert job.platform.recovery_queue.put.called  # type: ignore
     else:
         job.update_status(as_conf=as_conf, failed_file=False)
         assert job.status == Status.FAILED
-
-
-def test_wrapper_job_cancel_failed_wrapper_job_error(autosubmit_config, mocker):
-    """Test that an exception raised in ``cancel_failed_wrapper_job`` logs correctly."""
-    as_conf = autosubmit_config(_EXPID, {})
-    platform = mocker.MagicMock()
-    error_message = 'fatal error'
-    platform.send_command.side_effect = Exception(error_message)
-    wrapper_job = WrapperJob(_EXPID, 1, 'WAITING', 0, [], '00:30', platform, as_conf, False)
-
-    mocked_log = mocker.patch('autosubmit.job.job.Log')
-
-    wrapper_job.cancel_failed_wrapper_job()
-
-    assert mocked_log.info.called
-    assert error_message in mocked_log.info.call_args_list[0][0][0]
 
 
 @pytest.mark.parametrize(
@@ -1960,10 +1618,10 @@ def test_process_scheduler_parameters_wallclock(wallclock: Optional[str], platfo
     as_conf = autosubmit_config(_EXPID, {})
 
     job = Job(_EXPID, '1', 'WAITING', 0, None)
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     job.het['HETSIZE'] = 1
     job.wallclock = wallclock
-    # FIXME: Job constructor and ``_init_runtime_parameters`` do not fully initialize the object!
+    # FIXME: Job constructor and ``init_runtime_parameters`` do not fully initialize the object!
     #        ``custom_directives`` appears to be initialized in one of the ``update_`` functions.
     #        This makes testing and maintaining the code harder (and more risky -- more bugs).
     job.custom_directives = []
@@ -2004,14 +1662,14 @@ def test_update_dict_parameters_invalid_script_language(platform_name: Optional[
         }
     })
     job = Job(_EXPID, '1', 'WAITING', 0, None)
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     # Here, the job type is still `BASH`! The value provided in the
     # configuration is not evaluated, so we need to fake it here.
     # But it only works with the ``Job`` has a ``.section``...
     job.type = 'NUCLEAR'
     # FIXME: Yet another issue with the code design here. The ``Job`` class
     #        constructor creates a partial object. Then you need to call
-    #        ``_init_runtime_parameters`` to initialize other values.
+    #        ``init_runtime_parameters`` to initialize other values.
     #        Then, other ``Job._update.*`` functions create more member
     #        attribute values. However, there are still other attributes of
     #        a ``Job`` that are only filled by ``DictJob``, like the
@@ -2028,116 +1686,7 @@ def test_update_dict_parameters_invalid_script_language(platform_name: Optional[
     else:
         assert job.platform_name == platform_name.upper()
 
-
-@pytest.mark.parametrize(
-    "reservation",
-    [None, "", "  ", "some-string", "a", "123", "True"],
-    ids=["None", "empty", "spaces", "some-string", "a", "123", "True"]
-)
-def test_job_parameters(reservation: Optional[str], tmp_path: Path, autosubmit_config) -> None:
-    """
-    Parametrized test for job reservation propagation.
-
-    :param reservation: reservation value from configuration (may be None or string)
-    :type reservation: Optional[str]
-    :param tmp_path: pytest tmp path fixture
-    :type tmp_path: Path
-    """
-    expid = "t000"
-    reservation_string = "" if not reservation else f'RESERVATION: "{reservation}"'
-
-    # prepare experiment tree
-    BasicConfig.LOCAL_ROOT_DIR = str(tmp_path)
-    Path(tmp_path, expid).mkdir()
-    for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                 f'{expid}/conf']:
-        Path(tmp_path, path).mkdir()
-
-    # create minimal configuration
-    conf_path = Path(tmp_path, f'{expid}/conf/minimal.yml')
-    conf_path.write_text(dedent(f'''\
-        CONFIG:
-          RETRIALS: 0
-        DEFAULT:
-          EXPID: {expid}
-          HPCARCH: test
-        JOBS:
-          A:
-            FILE: a
-            PLATFORM: test
-            RUNNING: once
-            {reservation_string}
-        PLATFORMS:
-          test:
-            TYPE: slurm
-            HOST: localhost
-            PROJECT: abc
-            QUEUE: debug
-            USER: me
-            SCRATCH_DIR: /anything/
-            ADD_PROJECT_TO_HOST: False
-            MAX_WALLCLOCK: '00:55'
-            TEMP_DIR: ''
-    '''))
-
-    # bootstrap config and generate jobs
-    basic_config = FakeBasicConfig()
-    basic_config.read()
-    basic_config.LOCAL_ROOT_DIR = str(tmp_path)
-    config = autosubmit_config(expid, basic_config=basic_config)
-    config.reload(True)
-    parameters = config.load_parameters()
-
-    job_list_obj = JobList(expid, config, YAMLParserFactory())
-    job_list_obj.generate(
-        as_conf=config,
-        date_list=[],
-        member_list=[],
-        num_chunks=1,
-        chunk_ini=1,
-        parameters=parameters,
-        date_format='M',
-        default_retrials=config.get_retrials(),
-        default_job_type=config.get_default_job_type(),
-        wrapper_jobs={},
-        new=True,
-        run_only_members=config.get_member_list(run_only=True),
-        show_log=True,
-        full_load=True,
-    )
-    job_list = job_list_obj.get_job_list()
-    assert len(job_list) == 1
-
-    submitter = Autosubmit._get_submitter(config)
-    submitter.load_platforms(config)
-
-    hpcarch = config.get_platform()
-    for job in job_list:
-        if job.platform_name == "" or job.platform_name is None:
-            job.platform_name = hpcarch
-        job.platform = submitter.platforms[job.platform_name]
-
-    job = job_list[0]
-    parameters = job.update_parameters(config, set_attributes=True)
-
-    # script validity
-    assert job.check_script(config, parameters)
-
-    # reservation propagation assertions
-    if not reservation:
-        assert 'JOBS.A.RESERVATION' not in parameters
-        template_content, additional_templates = job.update_content(config, parameters)
-        assert not additional_templates
-        assert '#SBATCH --reservation' not in template_content
-    else:
-        assert reservation == parameters['JOBS.A.RESERVATION']
-        template_content, additional_templates = job.update_content(config, parameters)
-        assert not additional_templates
-        assert f'#SBATCH --reservation={reservation}' in template_content
-
-
 def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch):
-
     as_conf = autosubmit_config('t000', {})
 
     additional_experiment_data = {
@@ -2318,8 +1867,7 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
     assert parameters["TESTDATES.START_DATE_INT"] == '[[20200101]]'
 
 
-@pytest.mark.parametrize('log_process', [True, False], ids=["with log_process", "without log_process"])
-def test_set_state(log_process):
+def test_set_state():
     state = {
         '_name': 'test_job',
         'undefined_variables': [],
@@ -2330,79 +1878,48 @@ def test_set_state(log_process):
         '_local_logs_err': "from_database",
         '_remote_logs_out': "from_database",
         '_remote_logs_err': "from_database",
-        '_status': Status.COMPLETED if log_process else "COMPLETED",
-        'status': Status.COMPLETED if log_process else "COMPLETED",
-        'date': datetime.strptime("20230815", "%Y%m%d") if log_process else "2023-08-15"
+        '_status': "COMPLETED",
+        'status': "COMPLETED",
+        'date': "2023-08-15"
     }
 
     job = Job('blank', 1, Status.WAITING, 0)
-    job.__setstate__(state, log_process=log_process)
+    job.__setstate__(state)
     assert job.name == 'test_job'
     assert job.file == 'test_job.sh'
     assert job.status == Status.COMPLETED
     assert job.date == datetime.strptime("20230815", "%Y%m%d")
-    assert job.local_logs == ("from_log_process.out.local", "from_log_process.err.local") if log_process else \
-        ("from_database", "from_database")
-    assert job.remote_logs == ("from_log_process.out.remote", "from_log_process.err.remote") if log_process else \
-        ("from_database", "from_database")
+    assert job.local_logs == ("from_database", "from_database")
+    assert job.remote_logs == ("from_database", "from_database")
 
 
-@pytest.mark.parametrize('log_process', [True, False], ids=["with log_process", "without log_process"])
-def test_get_state(log_process):
+def test_get_state():
     job = Job('test_job', 1, Status.COMPLETED, 0)
     job.file = 'test_job.sh'
     job.date = datetime.strptime("20230815", "%Y%m%d")
     job.local_logs = ("from_local.out", "from_local.err")
     job.remote_logs = ("from_remote.out", "from_remote.err")
 
-    state = job.__getstate__(log_process=log_process)
-    if log_process:  # we pass the obj through pickle, so all should remain the same
-        assert state['_name'] == 'test_job'
-        assert state['file'] == 'test_job.sh'
-        assert state['_status'] == Status.COMPLETED
-        assert state['date'] == datetime.strptime("20230815", "%Y%m%d")
-        assert state['_local_logs'] == ("from_local.out", "from_local.err")
-        assert state['_remote_logs'] == ("from_remote.out", "from_remote.err")
-    else:  # db
-        assert state['name'] == 'test_job'
-        assert state.get('file') is None  # Load from yml file, later
-        assert state['status'] == "COMPLETED"
-        assert state['date'] == "2023-08-15T00:00:00"  # ISO format, which will be parsed when loading
-        assert state['local_logs_out'] == "from_local.out"
-        assert state['local_logs_err'] == "from_local.err"
-        assert state['remote_logs_out'] == "from_remote.out"
-        assert state['remote_logs_err'] == "from_remote.err"
+    state = job.__getstate__()
+    assert state['name'] == 'test_job'
+    assert state.get('file') is None  # Load from yml file, later
+    assert state['status'] == "COMPLETED"
+    assert state['date'] == "2023-08-15T00:00:00"  # ISO format, which will be parsed when loading
+    assert state['local_logs_out'] == "from_local.out"
+    assert state['local_logs_err'] == "from_local.err"
+    assert state['remote_logs_out'] == "from_remote.out"
+    assert state['remote_logs_err'] == "from_remote.err"
 
 
-@pytest.mark.parametrize('loaded_data, log_process', [(True, True), (None, False),
-                                                      (True, False), (False, True)],
-                         ids=["with loaded_data and log_process", "without loaded_data and without log_process",
-                              "with loaded_data and without log_process", "without loaded_data and with log_process"])
-def test_init(loaded_data, log_process):
-    # Using __init_ directly so it shows as covered
-    if loaded_data and log_process:
-        state = {
-            '_name': 'test_job',
-            'undefined_variables': [],
-            'file': 'test_job.sh',
-            '_local_logs': ("from_log_process.out.local", "from_log_process.err.local"),
-            '_remote_logs': ("from_log_process.out.remote", "from_log_process.err.remote"),
-            '_local_logs_out': "from_database",
-            '_local_logs_err': "from_database",
-            '_remote_logs_out': "from_database",
-            '_remote_logs_err': "from_database",
-            '_status': Status.COMPLETED,
-            'date': datetime.strptime("20230815", "%Y%m%d")
-        }
-        job = Job(None, None, None, None, loaded_data=None, log_process=None)
-        job.__init__(None, None, None, None, loaded_data=state, log_process=log_process)
-        assert job.name == 'test_job'
-        assert job.file == 'test_job.sh'
-        assert job.status == Status.COMPLETED
-        assert job.date == datetime.strptime("20230815", "%Y%m%d")
-        assert job.local_logs == ("from_log_process.out.local", "from_log_process.err.local")
-        assert job.remote_logs == ("from_log_process.out.remote", "from_log_process.err.remote")
-    elif loaded_data and not log_process:
+@pytest.mark.parametrize('loaded_data',
+                         [
+                             None,
+                             True,
+                         ],
+                         ids=["without loaded_data",
+                              "with loaded_data"])
+def test_init(loaded_data):
+    if loaded_data:
         state = {
             '_name': 'test_job',
             'undefined_variables': [],
@@ -2415,16 +1932,16 @@ def test_init(loaded_data, log_process):
             'status': "COMPLETED",
             'date': "2023-08-15T00:00:00"
         }
-        job = Job(None, None, None, None, loaded_data=None, log_process=None)
-        job.__init__(None, None, None, None, loaded_data=state, log_process=False)
+        job = Job(None, None, None, None, loaded_data=None)
+        job.__init__(None, None, None, None, loaded_data=state)
         assert job.name == 'test_job'
         assert job.status == Status.COMPLETED
         assert job.date == datetime.strptime("20230815", "%Y%m%d")
         assert job.local_logs == ("from_database", "from_database")
         assert job.remote_logs == ("from_database", "from_database")
     else:
-        job = Job(None, None, None, None, loaded_data=None, log_process=None)
-        job.__init__('test_job', 1, Status.COMPLETED, 0, loaded_data=None, log_process=log_process)
+        job = Job(None, None, None, None, loaded_data=None)
+        job.__init__('test_job', 1, Status.COMPLETED, 0, loaded_data=None)
         assert job.name == 'test_job'
         assert job.file is None
         assert job.status == Status.COMPLETED
@@ -2598,7 +2115,8 @@ def test_update_parameters(autosubmit_config, experiment_data):
                              'CURRENT_QUEUE': '',
                              'CURRENT_RESERVATION': '', 'CURRENT_RETRIALS': 3, 'CURRENT_ROOTDIR': 't001',
                              'CURRENT_RUNNING': 'chunk',
-                             'CURRENT_SCRATCH_DIR': '', 'CURRENT_TYPE': 'ps', 'CURRENT_USER': '', 'CURRENT_WRAPPER_TYPE': 'vertical', 'CURRENT_WRAPPER_JOBS_IN_WRAPPER': 'TEST_JOB&TEST_SPLIT'}
+                             'CURRENT_SCRATCH_DIR': '', 'CURRENT_TYPE': 'ps', 'CURRENT_USER': '', 'CURRENT_WRAPPER_TYPE': 'vertical',
+                             'CURRENT_WRAPPER_JOBS_IN_WRAPPER': 'TEST_JOB&TEST_SPLIT'}
     for key, value in parameters.items():
         if key.startswith("CURRENT_"):
             assert value == expected_current_only[key]
@@ -2624,6 +2142,50 @@ def test_process_scheduler_parameters(local):
 
     with pytest.raises(AutosubmitCritical):
         assert isinstance(job.process_scheduler_parameters(local, 0), AutosubmitCritical)
+
+
+def test_write_time(tmp_path, local):
+    job = Job(_EXPID, '1', 5, 0, None)
+    job.platform = local
+    job._tmp_path = tmp_path
+    total_stats = job._tmp_path / f'{job.name}_TOTAL_STATS'
+    job.submit_time_timestamp = "20240101000000"
+    job.start_time_timestamp = "20240101010001"
+    job.finish_time_timestamp = "20240101020002"
+    job._write_time("submit")
+    job.status = Status.COMPLETED
+    assert job.submit_time_timestamp in total_stats.read_text()
+    assert "start" in total_stats.read_text()
+    assert "end" in total_stats.read_text()
+    assert "status" in total_stats.read_text()
+    job._write_time("start")
+
+    assert job.submit_time_timestamp in total_stats.read_text()
+    assert job.start_time_timestamp in total_stats.read_text()
+    assert "end" in total_stats.read_text()
+    assert "status" in total_stats.read_text()
+    job._write_time("end")
+
+    assert job.submit_time_timestamp in total_stats.read_text()
+    assert job.start_time_timestamp in total_stats.read_text()
+    assert job.finish_time_timestamp in total_stats.read_text()
+    assert "status" in total_stats.read_text()
+
+    job._write_time("status")
+    assert job.submit_time_timestamp in total_stats.read_text()
+    assert job.start_time_timestamp in total_stats.read_text()
+    assert job.finish_time_timestamp in total_stats.read_text()
+    assert "COMPLETED" in total_stats.read_text()
+
+    assert "submit" not in total_stats.read_text()
+    assert "start" not in total_stats.read_text()
+    assert "end" not in total_stats.read_text()
+    assert "status" not in total_stats.read_text()
+
+    # expected lines
+    assert len(total_stats.read_text().split('\n')) == 1
+    job._write_time("submit")
+    assert len(total_stats.read_text().split('\n')) == 2
 
 
 @pytest.mark.parametrize("create_jobs", [[1, 2]], indirect=True)

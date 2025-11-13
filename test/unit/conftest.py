@@ -107,8 +107,8 @@ def autosubmit_config(
         Path(aslogs_dir).mkdir(exist_ok=True)
         Path(conf_dir).mkdir(exist_ok=True)
         # <expid>/db
-        pkl_dir = exp_path / "db"
-        Path(pkl_dir).mkdir(exist_ok=True)
+        db_dir = exp_path / "db"
+        Path(db_dir).mkdir(exist_ok=True)
         # ~/autosubmit/autosubmit.db
         is_postgres = hasattr(BasicConfig, 'DATABASE_BACKEND') and BasicConfig.DATABASE_BACKEND == 'postgres'
         db_path = Path(BasicConfig.DB_PATH)

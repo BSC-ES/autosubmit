@@ -17,6 +17,7 @@
 
 import datetime
 import re
+from typing import Union, Optional
 
 from bscearth.utils.date import date2str
 
@@ -25,7 +26,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical
 
 
-class DicJobs: # To rename to JobBuilder or something like that
+class DicJobs: # Not accurate name, to rename to JobBuilder or something in these lines
     """
     Class to create and build jobs from conf file and to find jobs by start date, member and chunk
 
@@ -63,16 +64,12 @@ class DicJobs: # To rename to JobBuilder or something like that
     def job_list(self, job_list):
         self._job_list = job_list
 
-    def read_section(self, section, priority, default_job_type):
-        """
-        Read a section from jobs conf and creates all jobs for it
+    def read_section(self, section: str, priority: int, default_job_type: str) -> None:
+        """Read a section from jobs conf and creates all jobs for it.
 
-        :param default_job_type: default type for jobs
-        :type default_job_type: str
-        :param section: section to read, and it's info
-        :type section: tuple(str,dict)
-        :param priority: priority for the jobs
-        :type priority: int
+        :param section: Section to read.
+        :param priority: Priority for the jobs.
+        :param default_job_type: Default type for jobs.
         """
         parameters = self.experiment_data["JOBS"]
         splits = parameters[section].get("SPLITS", -1)
@@ -209,7 +206,28 @@ class DicJobs: # To rename to JobBuilder or something like that
                                                         default_job_type,
                                                         self._dic[section][date][member][chunk])
 
-    def _create_jobs_split(self, splits, section, date, member, chunk, priority, default_job_type, section_data):
+    def _create_jobs_split(
+        self,
+        splits: Union[int, dict[str, list[int]]],
+        section: str,
+        date: Optional[datetime.datetime],
+        member: Optional[str],
+        chunk: Optional[int],
+        priority: int,
+        default_job_type: str,
+        section_data: list[Job],
+    ) -> None:
+        """Generate split-specific jobs for the requested section.
+
+        :param splits: Number of splits or mapping of date strings to chunk splits.
+        :param section: Section name associated with the jobs.
+        :param date: Start date used for naming and indexing.
+        :param member: Member identifier used for naming and indexing.
+        :param chunk: Chunk identifier used for naming and indexing.
+        :param priority: Priority assigned to the created jobs.
+        :param default_job_type: Default job type to assign.
+        :param section_data: Collection that receives the generated jobs.
+        """
         if isinstance(splits, dict):
             date_str = date2str(date, self._date_format)
             splits_list = [-1] if splits[date_str][chunk-1] <= 0 else range(1, splits[date_str][chunk-1] + 1)
@@ -232,6 +250,7 @@ class DicJobs: # To rename to JobBuilder or something like that
             current_jobs.append(next_level_jobs)
         return current_jobs
 
+    # TODO: For another PR, This is a perfomance hotspot to consider while generating a new job_list with splits
     def get_jobs_filtered(self, section, job, filters_to, natural_date, natural_member, natural_chunk,
                           filters_to_of_parent):
         #  datetime.strptime("20020201", "%Y%m%d")
@@ -271,18 +290,18 @@ class DicJobs: # To rename to JobBuilder or something like that
                 else:
                     if job.running == "once":
                         for key in jobs.keys():
-                            if type(jobs.get(key, None)) is list:
+                            if type(jobs.get(key, None)) is list:  # TODO
                                 for aux_job in jobs[key]:
                                     final_jobs_list.append(aux_job)
-                            elif type(jobs.get(key, None)) is Job:
+                            elif type(jobs.get(key, None)) is Job:  # TODO
                                 final_jobs_list.append(jobs[key])
                             elif type(jobs.get(key, None)) is dict:
                                 jobs_aux = self.update_jobs_filtered(jobs_aux, jobs[key])
                     elif jobs.get(job.date, None):
-                        if type(jobs.get(natural_date, None)) is list:
+                        if type(jobs.get(natural_date, None)) is list:  # TODO
                             for aux_job in jobs[natural_date]:
                                 final_jobs_list.append(aux_job)
-                        elif type(jobs.get(natural_date, None)) is Job:
+                        elif type(jobs.get(natural_date, None)) is Job:  # TODO
                             final_jobs_list.append(jobs[natural_date])
                         elif type(jobs.get(natural_date, None)) is dict:
                             jobs_aux = self.update_jobs_filtered(jobs_aux, jobs[natural_date])

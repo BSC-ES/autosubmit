@@ -72,7 +72,11 @@ if TYPE_CHECKING:
             retrials: 2  
 
     """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
-], ids=["Success", "Checkpoint Test", "Failure"])
+], ids=[
+   "Success",
+   "Checkpoint Test",
+    "Failure",
+])
 def test_run_uninterrupted(
         autosubmit_exp,
         jobs_data: str,
@@ -80,28 +84,29 @@ def test_run_uninterrupted(
         final_status,
         run_type,
         prepare_scratch,
-        common_conf,
+        general_data,
+        redirect_log_info
 ):
     yaml = YAML(typ='rt')
-    as_exp = autosubmit_exp(experiment_data=common_conf | yaml.load(jobs_data), include_jobs=False, create=True)
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
     log_dir = tmp_path / f"LOG_{as_exp.expid}"
-    aslogs_path = Path(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
+    Path(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
     as_conf.set_last_as_command('run')
 
-    as_exp.autosubmit._setup_log_files(
-        command="run",
-        expids=None,
-        expid=as_exp.expid,
-        owner=True,
-        tmp_path=tmp_path,
-        aslogs_path=aslogs_path,
-        exp_path=exp_path,
-        log_level="DEBUG",
-        console_level="DEBUG"
-    )
+    # as_exp.autosubmit._setup_log_files(
+    #     command="run",
+    #     expids=None,
+    #     expid=as_exp.expid,
+    #     owner=True,
+    #     tmp_path=tmp_path,
+    #     aslogs_path=aslogs_path,
+    #     exp_path=exp_path,
+    #     log_level="DEBUG",
+    #     console_level="DEBUG"
+    # )
     # Run the experiment
     exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
     _assert_exit_code(final_status, exit_code)
@@ -177,10 +182,10 @@ def test_run_interrupted(
         final_status,
         wrapper_type,
         prepare_scratch,
-        common_conf,
+        general_data,
 ):
     yaml = YAML(typ='rt')
-    as_exp = autosubmit_exp(experiment_data=common_conf | yaml.load(jobs_data), include_jobs=False, create=True)
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -196,7 +201,7 @@ def test_run_interrupted(
         all_expids=False,
         cancel=False,
         current_status=current_statuses,
-        expids_string=as_exp.expid,
+        expids=as_exp.expid,
         force=True,
         force_all=True,
         status='FAILED')

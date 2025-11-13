@@ -56,20 +56,19 @@ def test_handle_job_status_line_parametrized(line, check_inner_job_wallclock, ex
             num_processors=1,
             platform=mocker.Mock(),
             as_config=mocker.Mock(),
-            hold=False,
             check_inner_job_wallclock_return=check_inner_job_wallclock
         )
         if not line:
             jobs_dict = OrderedDict()
             wrapper_job.running_jobs_start = {}
-            wrapper_job._handle_job_status_line(line, jobs_dict, False)
+            wrapper_job._handle_job_status_line(line, jobs_dict)
             continue
         job_name = line.split()[0]
         job = DummyJob(job_name)
         job.wrapper_type = wrapper_type
         jobs_dict = OrderedDict([(job_name, job)])
         wrapper_job.running_jobs_start = {}
-        wrapper_job._handle_job_status_line(line, jobs_dict, False)
+        wrapper_job._handle_job_status_line(line, jobs_dict)
         assert job.new_status == expected_status, f"Failed for line={line}, wrapper_type={wrapper_type}"
         if expect_in_running_jobs_start and line:
             assert job in wrapper_job.running_jobs_start

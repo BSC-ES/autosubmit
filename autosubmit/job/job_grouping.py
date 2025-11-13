@@ -242,10 +242,14 @@ class JobGrouping(object):
                         groups.append(group_name)
         return synchronized
 
-    def _automatic_grouping(self, groups_map):
-        # A deep copy of the job_list, deletes all the property methods ( I don't know why ) In any case it is not neccesary to do so
+    def _automatic_grouping(self, groups_map: dict[str, str]) -> dict[str, list[str]]:
+        """Build automatic chunk-based groups and normalize group mappings.
+
+        :param groups_map: Mapping of temporary group names to their merged counterparts.
+        :return: Mapping of job names to the list of resolved groups.
+        """
         split_groups, split_groups_status = self._create_splits_groups()
-        # Apparently, the splits_groups depletes the self.jobs, so we need to restore it
+        # TODO: (See why) Apparently, the splits_groups depletes the self.jobs, so we need to restore it
         self.jobs = self.job_list.job_list
         blacklist = list()
         jobs_group_dict = dict()

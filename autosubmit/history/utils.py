@@ -18,6 +18,7 @@
 
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Union
 
 DATETIME_FORMAT = '%Y-%m-%d-%H:%M:%S'
@@ -62,12 +63,18 @@ def create_file_with_full_permissions(path: str) -> None:
     os.open(path, os.O_WRONLY | os.O_CREAT, 0o777)
 
 
-def create_path_if_not_exists(path):
-    # type : (str) -> bool
-    if not os.path.exists(path):
-        os.makedirs(path)
-        return True
-    return False
+def create_path_if_not_exists(path: str) -> bool:
+    """Create the directory if it does not exist.
+
+    :param path: Directory path to ensure.
+    :return: ``True`` when the directory is created, ``False`` if it already exists.
+    :raises OSError: If the directory cannot be created.
+    """
+    directory = Path(path)
+    if directory.exists():
+        return False
+    directory.mkdir(parents=True, exist_ok=True)
+    return True
 
 
 class SupportedStatus:

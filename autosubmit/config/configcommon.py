@@ -544,9 +544,10 @@ class AutosubmitConfig(object):
         return data
 
     @staticmethod
-    def _normalize_storage(data):
-        """
-        Normalize the storage section to a consistent format.
+    def _normalize_storage(data: dict[str, Any]) -> None:
+        """Normalize the storage section to a consistent lowercase type.
+
+        :param data: Experiment configuration dictionary to normalize in place.
         """
         storage = data.get("STORAGE", {})
         storage_type = storage.get("TYPE", "sqlite").lower()
@@ -641,8 +642,7 @@ class AutosubmitConfig(object):
 
     @staticmethod
     def _normalize_dependencies(dependencies: Union[str, dict]) -> dict:
-        """
-        Normalize the dependencies to a consistent format.
+        """Normalize the dependencies to a consistent format.
 
         This function takes a string or dictionary of dependencies and normalizes them to a dictionary format.
         If the input is a string, it splits the string by spaces and converts each dependency to uppercase.
@@ -1090,7 +1090,7 @@ class AutosubmitConfig(object):
         for i, key in enumerate(filter(None, keys)):
             matches = list(re.finditer(pattern, key, flags=re.IGNORECASE))[::-1]
             if in_the_end and "^" in key:
-                pattern_special_variables = '%\^[a-zA-Z0-9_.-]*%' # noqa
+                pattern_special_variables = '%\^[a-zA-Z0-9_.-]*%'
                 matches.extend(list(re.finditer(pattern_special_variables, key, flags=re.IGNORECASE))[::-1])
             for match in matches:
                 value = self._get_substituted_value(key, match, parameters, start_long, dict_keys_type)
@@ -1184,7 +1184,7 @@ class AutosubmitConfig(object):
             # Pattern to search a string starting with % and ending with % allowing the chars [],._ to exist in the middle
             dynamic_var_pattern = '%[a-zA-Z0-9_.-]*%'
             # Pattern to search a string starting with %^ and ending with %
-            special_dynamic_var_pattern = '%\^[a-zA-Z0-9_.-]*%' # noqa
+            special_dynamic_var_pattern = '%\^[a-zA-Z0-9_.-]*%'
 
             if not isinstance(val, collections.abc.Mapping) and re.search(dynamic_var_pattern, str(val),
                                                                           flags=re.IGNORECASE) is not None:
@@ -1777,10 +1777,7 @@ class AutosubmitConfig(object):
 
     @property
     def is_current_logged_user_owner(self) -> bool:
-        """
-        Check if the current user is the owner of the experiment folder
-        :return: bool
-        """
+        """Check if the current user is the owner of the experiment folder."""
         if self.experiment_data.get("ROOTDIR", None):
             rootdir_path = Path(self.experiment_data["ROOTDIR"])
             return rootdir_path.exists() and rootdir_path.owner() == os.environ.get("USER", None)
@@ -1874,7 +1871,6 @@ class AutosubmitConfig(object):
                 self.misc_data = self.unify_conf(self.misc_data,
                                                  self.load_config_file(self.misc_data, Path(filename), load_misc=True))
             self.load_current_hpcarch_parameters()
-
             self.load_workflow_commit()
             self.calculate_auto_splits()
             self.dynamic_variables = {}
@@ -2274,8 +2270,7 @@ class AutosubmitConfig(object):
         return self.get_section(['SVN', 'PROJECT_REVISION'])
 
     def get_local_project_path(self) -> Path:
-        """
-        Gets path to origin for local project
+        """Gets path to origin for local project
 
         :return: path to local project
         :rtype: Path
@@ -2496,8 +2491,7 @@ class AutosubmitConfig(object):
         return str(self.get_section(['CONFIG', 'AUTOSUBMIT_VERSION'], ""))
 
     def get_total_jobs(self):
-        """
-        Returns max number of running jobs  from autosubmit's config file
+        """Returns max number of running jobs  from autosubmit's config file
 
         :return: max number of running jobs
         :rtype: int
@@ -2541,8 +2535,7 @@ class AutosubmitConfig(object):
         return self.get_section(['CONFIG', 'MAX_PROCESSORS'], -1)
 
     def get_max_waiting_jobs(self):
-        """
-        Returns max number of waiting jobs from autosubmit's config file
+        """Returns max number of waiting jobs from autosubmit's config file
 
         :return: main platforms
         :rtype: int
@@ -2565,13 +2558,13 @@ class AutosubmitConfig(object):
         """
         return int(self.get_section(['CONFIG', 'SAFETYSLEEPTIME'], 10))
 
-    def set_safetysleeptime(self, sleep_time):
-        """
-        Sets autosubmit's version in autosubmit's config file
+    def set_safetysleeptime(self, sleep_time: int):
+        """Sets autosubmit's version in autosubmit's config file
 
         :param sleep_time: value to set
         :type sleep_time: int
         """
+
         content = open(self._conf_parser_file).read()
         content = content.replace(re.search('SAFETYSLEEPTIME:.*', content).group(0), "SAFETYSLEEPTIME: %d" % sleep_time)
         open(self._conf_parser_file, 'w').write(content)
@@ -2757,9 +2750,7 @@ class AutosubmitConfig(object):
          :return: wrapper check time
          :rtype: int
          """
-        wrapper = self.experiment_data.get("WRAPPERS", {})
-
-        return wrapper.get("CHECK_TIME_WRAPPER", 0)
+        return self.experiment_data.get("WRAPPERS", {}).get("CHECK_TIME_WRAPPER", 0)
 
     def get_wrapper_machinefiles(self, wrapper=None) -> str:
         """Returns the strategy for creating the machinefiles in wrapper jobs.
@@ -2804,7 +2795,7 @@ class AutosubmitConfig(object):
         return self.get_section(['COMMUNICATIONS', 'API'], 'paramiko')
 
     def get_storage_type(self) -> str:
-        """Returns the storage system from autosubmit's config file. db by default.
+        """Returns the storage system from autosubmit's config file. Sqlite by default.
 
         :return: communications library
         """
@@ -2813,7 +2804,7 @@ class AutosubmitConfig(object):
     @staticmethod
     def is_valid_mail_address(mail_address):
         if re.match('^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})$', mail_address,
-                    flags=re.IGNORECASE): # noqa
+                    flags=re.IGNORECASE):
             return True
         else:
             return False
@@ -2929,6 +2920,9 @@ class AutosubmitConfig(object):
         return content
 
     def calculate_auto_splits(self):
+        """Calculate automatic splits for chunked jobs.
+        Takes the "auto" value in the "SPLITS" key of chunked jobs and replaces it by a dict containing the number of splits by each month
+        """
         datelist = self.experiment_data.get("EXPERIMENT", {}).get("DATELIST", "")
         chunks = int(self.experiment_data.get("EXPERIMENT", {}).get("NUMCHUNKS", 1))
         if not datelist or not chunks:

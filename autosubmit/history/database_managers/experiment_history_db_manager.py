@@ -52,7 +52,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
 
     def __init__(self, expid: str, jobdata_dir_path=BasicConfig.JOBDATA_DIR):
         """ Requires expid and jobdata_dir_path. """
-        super(ExperimentHistoryDbManager, self).__init__(options['expid'], jobdata_dir_path=BasicConfig.JOBDATA_DIR, local_root_dir_path=BasicConfig.LOCAL_ROOT_DIR)
+        super(ExperimentHistoryDbManager, self).__init__(expid, jobdata_dir_path=jobdata_dir_path)
         self._set_schema_changes()
         self._set_table_queries()
         self.historicaldb_file_path = str(Path(jobdata_dir_path) / f"job_data_{expid}.db")
@@ -140,6 +140,8 @@ class ExperimentHistoryDbManager(DatabaseManager):
             children TEXT,
             platform_output TEXT,
             workflow_commit TEXT,
+            split TEXT,
+            splits TEXT,
             UNIQUE(counter,job_name)
             );
             ''')
@@ -311,8 +313,8 @@ class ExperimentHistoryDbManager(DatabaseManager):
                 submit, start, finish, status, rowtype, ncpus, 
                 wallclock, qos, energy, date, section, member, chunk, last, 
                 platform, job_id, extra_data, nnodes, run_id, MaxRSS, AveRSS, 
-                out, err, rowstatus, children, platform_output, workflow_commit) 
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
+                out, err, rowstatus, children, platform_output, workflow_commit, split, splits) 
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
         arguments = (job_data.counter, job_data.job_name, HUtils.get_current_datetime(), HUtils.get_current_datetime(),
                      job_data.submit, job_data.start, job_data.finish, job_data.status, job_data.rowtype,
                      job_data.ncpus,
@@ -321,7 +323,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
                      job_data.platform, job_data.job_id, job_data.extra_data, job_data.nnodes, job_data.run_id,
                      job_data.MaxRSS, job_data.AveRSS,
                      job_data.out, job_data.err, job_data.rowstatus, job_data.children, job_data.platform_output,
-                     job_data.workflow_commit)
+                     job_data.workflow_commit, job_data.split, job_data.splits)
         return self.insert_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
 
     def _insert_experiment_run(self, experiment_run):
@@ -357,13 +359,13 @@ class ExperimentHistoryDbManager(DatabaseManager):
         statement = ''' UPDATE job_data SET last=?, submit=?, start=?, finish=?, modified=?, 
                     job_id=?, status=?, energy=?, extra_data=?, 
                     nnodes=?, ncpus=?, rowstatus=?, out=?, err=?, 
-                    children=?, platform_output=?, id=?, workflow_commit=? WHERE id=?'''
+                    children=?, platform_output=?, id=?, workflow_commit=?, split=?, splits=? WHERE id=?'''
         # noinspection PyProtectedMember
         arguments = (
             job_data_dc.last, job_data_dc.submit, job_data_dc.start, job_data_dc.finish, HUtils.get_current_datetime(),
             job_data_dc.job_id, job_data_dc.status, job_data_dc.energy, job_data_dc.extra_data,
             job_data_dc.nnodes, job_data_dc.ncpus, job_data_dc.rowstatus, job_data_dc.out, job_data_dc.err,
-            job_data_dc.children, job_data_dc.platform_output, job_data_dc._id, job_data_dc.workflow_commit, job_data_dc._id
+            job_data_dc.children, job_data_dc.platform_output, job_data_dc._id, job_data_dc.workflow_commit, job_data_dc.split, job_data_dc.splits, job_data_dc._id
         )
         self.execute_statement_with_arguments_on_dbfile(self.historicaldb_file_path, statement, arguments)
 
@@ -610,6 +612,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
 
     def _get_experiment_run_with_max_id(self):
+        """ Get Models.ExperimentRunRow for the maximum id run. """
         experiment_run_table = get_table_with_schema(self.schema, ExperimentRunTable)
         query = (
             select(experiment_run_table).
@@ -622,15 +625,16 @@ class SqlAlchemyExperimentHistoryDbManager:
                 raise Exception("No Experiment Runs registered.")
         return Models.ExperimentRunRow(*row)
 
-    def _get_max_experiment_run_id(self):
+    def _get_max_experiment_run_id(self) -> int:
+        """Get the maximum experiment run ID from the experiment_run table."""
         experiment_run_table = get_table_with_schema(self.schema, ExperimentRunTable)
         query = select(func.max(experiment_run_table.c.run_id))
         with self.engine.connect() as conn:
             result = conn.execute(query).first()
         return result[0] if result and result[0] is not None else 0
 
-
     def is_there_a_last_experiment_run(self):
+        """Return ``True`` if there is at least one experiment run in the database. ``False`` otherwise."""
         experiment_run_table = get_table_with_schema(self.schema, ExperimentRunTable)
         query = (
             select(experiment_run_table).

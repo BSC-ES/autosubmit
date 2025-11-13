@@ -39,7 +39,6 @@ def do_setstatus(as_exp_, fl=None, fc=None, fct=None, ftcs=None, fs=None, ft=Non
         group_by=None,
         expand=[],
         expand_status=[],
-        notransitive=False,
         check_wrapper=False,
         detail=False
     )

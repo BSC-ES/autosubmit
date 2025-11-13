@@ -22,7 +22,6 @@ from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.database.tables import WrapperJobsTable, get_table_from_name, JobsTable, ExperimentStructureTable
 from autosubmit.job.job import Job
@@ -34,19 +33,19 @@ raw_job_list = [
      'name': 'a01f_REMOTE_SETUP', 'packed': False, 'platform_name': None, 'priority': 1, 'ready_date': None,
      'remote_logs_err': None, 'remote_logs_out': None, 'script_name': 'a01f_REMOTE_SETUP.cmd',
      'section': 'REMOTE_SETUP', 'split': -1, 'splits': -1, 'start_time': None, 'start_time_timestamp': None,
-     'status': 'WAITING', 'submit_time_timestamp': None, 'synchronize': None, 'updated_log': False},
+     'status': 'WAITING', 'submit_time_timestamp': None, 'synchronize': None, 'updated_log': 0},
     {'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None, 'finish_time_timestamp': None,
      'frequency': None, 'id': 0, 'local_logs_err': None, 'local_logs_out': None, 'max_checkpoint_step': 0,
      'name': 'a01f_LOCAL_SETUP', 'packed': False, 'platform_name': None, 'priority': 0, 'ready_date': None,
      'remote_logs_err': None, 'remote_logs_out': None, 'script_name': 'a01f_LOCAL_SETUP.cmd', 'section': 'LOCAL_SETUP',
      'split': -1, 'splits': -1, 'start_time': None, 'start_time_timestamp': None, 'status': 'READY',
-     'submit_time_timestamp': None, 'synchronize': None, 'updated_log': False},
+     'submit_time_timestamp': None, 'synchronize': None, 'updated_log': 0},
     {'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None, 'finish_time_timestamp': None,
      'frequency': None, 'id': 0, 'local_logs_err': None, 'local_logs_out': None, 'max_checkpoint_step': 0,
      'name': 'a01f_20000101_fc0_INI', 'packed': False, 'platform_name': None, 'priority': 0, 'ready_date': None,
      'remote_logs_err': None, 'remote_logs_out': None, 'script_name': 'a01f_20000101_fc0_INI.cmd', 'section': 'INI',
      'split': -1, 'splits': -1, 'start_time': None, 'start_time_timestamp': None, 'status': 'WAITING',
-     'submit_time_timestamp': None, 'synchronize': None, 'updated_log': False},
+     'submit_time_timestamp': None, 'synchronize': None, 'updated_log': 0},
     # {'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None, 'finish_time_timestamp': None,
     #  'frequency': None, 'id': 0, 'local_logs_err': None, 'local_logs_out': None, 'max_checkpoint_step': 0,
     #  'name': 'a01f_SIM', 'packed': False, 'platform_name': None, 'priority': 0, 'ready_date': None,
@@ -202,9 +201,10 @@ def generate_job_list(as_conf, db_manager) -> JobList:
     return job_list
 
 
-def _create_db_manager(db_path: Path = None, schema: str = None) -> JobsDbManager:
-    connection_url = get_connection_url(db_path=db_path)
-    return JobsDbManager(connection_url=connection_url, schema=schema)
+def _create_db_manager(schema: str = None) -> JobsDbManager:
+    db_path = Path(BasicConfig.LOCAL_ROOT_DIR) / schema / "db"
+    db_path.mkdir(parents=True, exist_ok=True)
+    return JobsDbManager(schema=schema)
 
 
 @pytest.mark.parametrize(
@@ -217,11 +217,8 @@ def test_db_job_list_edges(
         as_db: str,
         _expid: str
 ):
-    db_path = tmp_path
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
-    else:
-        db_manager = _create_db_manager(schema=_expid)
+
+    db_manager = _create_db_manager(schema=_expid)
 
     raw_graph_edges_local = raw_graph_edges
 
@@ -259,11 +256,9 @@ def test_db_job_list_edges(
 )
 def test_db_job_list_jobs(tmp_path: Path, full_load: bool, as_db: str, autosubmit_exp, _expid: str):
     as_exp = autosubmit_exp(_expid)
-    db_path = tmp_path
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
-    else:
-        db_manager = _create_db_manager(schema=f"{_expid}")
+
+    db_manager = _create_db_manager(_expid)
+
     job_list = generate_job_list(as_exp.as_conf, db_manager)
     job_list.save_jobs()
     job_list.save_edges()
@@ -313,12 +308,8 @@ def test_db_job_list_jobs_and_edges_together(
     :param _expid: Experiment ID fixture
     :type _expid: str
     """
-    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    db_path = exp_path / "db"
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
-    else:
-        db_manager = _create_db_manager(schema=_expid)
+
+    db_manager = _create_db_manager(schema=_expid)
 
     # Create and save original job list with jobs and edges
     job_list = generate_job_list(as_exp.as_conf, db_manager)
@@ -366,12 +357,9 @@ def test_select_latest_inner_jobs(
         _expid: str,
         as_exp: Any,
 ):
-    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    db_path = exp_path / "db"
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
-    else:
-        db_manager = _create_db_manager(schema=_expid)
+    Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+
+    db_manager = _create_db_manager(schema=_expid)
 
     job_list = generate_job_list(as_exp.as_conf, db_manager)
     job_list.save_jobs()
@@ -387,7 +375,7 @@ def test_select_latest_inner_jobs(
         "local_logs_err": None,
         "remote_logs_out": None,
         "remote_logs_err": None,
-        "updated_log": True,
+        "updated_log": 1,
         "platform_name": "test_platform",
         "wallclock": "01:00",
         "num_processors": "4",
@@ -450,12 +438,9 @@ def test_load_job_by_name(
         _expid: str,
         as_exp: Any,
 ):
-    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    db_path = exp_path / "db"
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
-    else:
-        db_manager = _create_db_manager(schema=_expid)
+    Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+
+    db_manager = _create_db_manager(schema=_expid)
 
     # Generate and save some jobs
     job_list = generate_job_list(as_exp.as_conf, db_manager)
@@ -491,11 +476,9 @@ def test_load_wrapper(
         as_exp: Any,
 ):
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    db_path = exp_path / "db"
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
-    else:
-        db_manager = _create_db_manager(schema=_expid)
+    exp_path / "db"
+
+    db_manager = _create_db_manager(schema=_expid)
 
     # Generate and save some jobs
     job_list = generate_job_list(as_exp.as_conf, db_manager)
@@ -514,7 +497,7 @@ def test_load_wrapper(
         "local_logs_err": None,
         "remote_logs_out": None,
         "remote_logs_err": None,
-        "updated_log": True,
+        "updated_log": 1,
         "platform_name": "test_platform",
         "wallclock": "01:00",
         "num_processors": "4",
@@ -548,7 +531,7 @@ def test_load_wrapper(
         assert wrapper['wallclock'] == "01:00"
         assert wrapper['num_processors'] == 4
         assert wrapper['type'] == '0'
-        assert wrapper['updated_log'] is True
+        assert wrapper['updated_log'] > 0
         assert wrapper['sections'] is None
         assert wrapper['method'] is None
     for inner_job in un_mapped_inner_jobs:
@@ -572,12 +555,9 @@ def test_clear_unused_nodes(
     :param as_exp.as_conf: Fixture to create a test configuration
     :type as_exp.as_conf: Callable
     """
-    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    db_path = exp_path / "db"
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
-    else:
-        db_manager = _create_db_manager(schema=_expid)
+    Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+
+    db_manager = _create_db_manager(schema=_expid)
 
     job_list = generate_job_list(as_exp.as_conf, db_manager)
 
@@ -590,7 +570,7 @@ def test_clear_unused_nodes(
             'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
             'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
             'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': False, 'member': None
+            'synchronize': None, 'updated_log': 0, 'member': None
         }),
         Job(loaded_data={
             'chunk': 10, 'current_checkpoint_step': 0, 'date': "2000-01-01", 'date_split': None,
@@ -600,7 +580,7 @@ def test_clear_unused_nodes(
             'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
             'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
             'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': False, 'member': 'fc0'
+            'synchronize': None, 'updated_log': 0, 'member': 'fc0'
         }),
         Job(loaded_data={
             'chunk': 1, 'current_checkpoint_step': 0, 'date': '2000-01-01', 'date_split': None,
@@ -610,7 +590,7 @@ def test_clear_unused_nodes(
             'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
             'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
             'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': False, 'member': 'fc0'
+            'synchronize': None, 'updated_log': 0, 'member': 'fc0'
         }),
         Job(loaded_data={
             'chunk': 1, 'current_checkpoint_step': 0, 'date': '2000-12-31', 'date_split': None,
@@ -620,7 +600,7 @@ def test_clear_unused_nodes(
             'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
             'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
             'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': False, 'member': 'fc0'
+            'synchronize': None, 'updated_log': 0, 'member': 'fc0'
         }),
         Job(loaded_data={
             'chunk': 1, 'current_checkpoint_step': 0, 'date': '2000-01-01', 'date_split': None,
@@ -630,7 +610,7 @@ def test_clear_unused_nodes(
             'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
             'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
             'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': False, 'member': 'fc2'
+            'synchronize': None, 'updated_log': 0, 'member': 'fc2'
         }),
         Job(loaded_data={
             'chunk': 1, 'current_checkpoint_step': 0, 'date': '2000-01-01', 'date_split': None,
@@ -640,7 +620,7 @@ def test_clear_unused_nodes(
             'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
             'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
             'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': False, 'member': 'fc0'
+            'synchronize': None, 'updated_log': 0, 'member': 'fc0'
         })
     ]
 
@@ -693,14 +673,11 @@ def test_clear_unused_nodes(
 def test_backup_and_restore(monkeypatch, tmp_path, _expid, as_db, as_exp: Any):
     """" Test backup of database and restore it afterwards. """
 
-    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    db_path = exp_path / "db"
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
-    else:
-        db_manager = _create_db_manager(schema=_expid)
+    Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+    if as_db != 'sqlite':
         # TODO: not implemented
         return 0
+    db_manager = _create_db_manager(schema=_expid)
     # Create tables
     jobs_table = get_table_from_name(schema=db_manager.schema, table_name=JobsTable.name)
     edges_table = get_table_from_name(schema=db_manager.schema, table_name=ExperimentStructureTable.name)
@@ -717,7 +694,7 @@ def test_backup_and_restore(monkeypatch, tmp_path, _expid, as_db, as_exp: Any):
         'priority': 0, 'ready_date': None, 'remote_logs_err': None,
         'remote_logs_out': None, 'start_time': None,
         'start_time_timestamp': None, 'submit_time_timestamp': None,
-        'synchronize': None, 'updated_log': False, 'member': None
+        'synchronize': None, 'updated_log': 0, 'member': None
     }
     db_manager.insert(jobs_table.name, sample_job)
     sample_edge = {
@@ -1371,15 +1348,10 @@ def test_with_createcw_command_differences(
         }
     )
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    db_path = exp_path / "db"
     conf_dir = exp_path / 'conf'
     unified_data: Dict[str, Dict] = fixed_data | mutable_experiment_wrappers | mutable_jobs
     _init_test(as_exp, conf_dir, unified_data)
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'job_list.db'))
-    else:
-        db_manager = _create_db_manager(schema=_expid)
-
+    db_manager = _create_db_manager(schema=_expid)
     exit_code = as_exp.autosubmit.create(_expid, noplot=True, hide=False, force=True, check_wrappers=True)
     _assert_exit_code("SUCCESS", exit_code)
     once_sections = []

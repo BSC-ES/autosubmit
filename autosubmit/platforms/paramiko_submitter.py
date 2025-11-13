@@ -31,7 +31,6 @@ from autosubmit.platforms.paramiko_platform import ParamikoPlatformException
 from autosubmit.platforms.pjmplatform import PJMPlatform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from autosubmit.platforms.submitter import Submitter
 from .platform import Platform
 
 if TYPE_CHECKING:
@@ -118,8 +117,8 @@ class ParamikoSubmitter:
 
     @property
     def platforms_object(self) -> list[Platform]:
-        """
-        Returns a list of all the platforms objects used by the experiment.
+        """Returns a list of all the platforms objects used by the experiment.
+
         :return: List of platform objects
         :rtype: list[Platform]
         """

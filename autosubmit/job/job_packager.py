@@ -274,13 +274,16 @@ class JobPackager(object):
                             packages_to_submit.append(package)
                             max_jobs_to_submit = max_jobs_to_submit - 1
                 continue
-            for job in p.jobs:
-                if job.fail_count > 0:
-                    failed_innerjobs = True
-                    break
+            # The only policy where it matters if an innerjob has failed or not is the "strict" one
+            if p.wrapper_policy == "strict":
+                for job in p.jobs:
+                    if job.fail_count > 0:
+                        failed_innerjobs = True
+                        break
 
             min_v, min_h, balanced = self.check_real_package_wrapper_limits(p)
             # if the quantity is enough, make the wrapper
+            # Removed the failed_innerjobs that caused flexible and mixed wrappers to submit wrappeable jobs alone
             if len(p.jobs) >= wrapper_limits["real_min"] and min_v >= wrapper_limits["min_v"] and min_h >= \
                     wrapper_limits["min_h"] and not failed_innerjobs:
                 for job in p.jobs:
@@ -745,8 +748,7 @@ class JobPackager(object):
         return packages
 
     def _build_vertical_packages(self, section_list, wrapper_limits, wrapper_info={}):
-        """
-        Builds Vertical-Mixed or Vertical
+        """Builds Vertical-Mixed or Vertical
 
         :param section_list: Jobs defined as wrappable belonging to a common section.\n
         :type section_list: List() of Job Objects. \n
@@ -922,8 +924,7 @@ class JobPackagerVertical(object):
         return self.jobs_list
 
     def get_wrappable_child(self, job: Job, level: int) -> Job:
-        """
-        Goes through the jobs with the same date and member as the input job, and returns the first that satisfies self._is_wrappable().
+        """Goes through the jobs with the same date and member as the input job, and returns the first that satisfies self._is_wrappable().
 
         :param job: Job to be evaluated.
         :type job: Job
@@ -1004,8 +1005,7 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
         self.index = 0
 
     def get_wrappable_child(self, job: Job, level: int) -> Job:
-        """
-        Goes through the jobs with the same date and member as the input job, and returns the first that satisfies self._is_wrappable().
+        """Goes through the jobs with the same date and member as the input job, and returns the first that satisfies self._is_wrappable().
 
         :param job: Job to be evaluated.
         :type job: Job
