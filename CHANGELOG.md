@@ -43,6 +43,7 @@
 - Slurm tests in CICD are using a new container by @giovtorres #2871
 - Fixed main-loop iteration message handling singular/plural and reducing number of line breaks #2969
 - Updated `Defining the workflow` documentation section #2954
+- Now Autosubmit supports the 'Flux' wrapping method, submitting the jobs to a Flux instance running inside a Slurm allocation [#2697](https://github.com/BSC-ES/autosubmit/issues/2697)
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
