@@ -245,7 +245,6 @@ class Job(object):
         self._tmp_path = os.path.join(
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
         self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
-        self._platform = None
         self.check = 'true'
         self.check_warnings = False
         self.packed = False
