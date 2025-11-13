@@ -2649,6 +2649,8 @@ class Autosubmit:
             for platform in platforms_to_test:
                 packager = JobPackager(as_conf, platform, job_list, hold=hold)
                 packages_to_submit = packager.build_packages()
+                
+                #### TODO: [ENGINES] CREO QUE AQUI GENERA EL SCRIPT DEL WRAPPER. O ES ARRIBA? ES UN SCRIPT PYTHON
                 save_1, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = platform.submit_ready_jobs(as_conf,
                                                                                                               job_list,
                                                                                                               packages_persistence,
@@ -2664,6 +2666,7 @@ class Autosubmit:
                 save_2 = False
                 if platform.type.lower() in ["slurm", "pjm"] and not inspect and not only_wrappers:
                     # Process the script generated in submit_ready_jobs
+                    # TODO: [ENGINES] The script is submitted to Slurm here
                     save_2, valid_packages_to_submit = platform.process_batch_ready_jobs(valid_packages_to_submit,
                                                                                          failed_packages,
                                                                                          error_message="", hold=hold)
