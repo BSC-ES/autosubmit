@@ -29,11 +29,11 @@ import os
 import subprocess
 from pathlib import Path
 from textwrap import dedent
-from typing import List, Tuple, Union, Dict, Any
+from typing import Any, Callable, Optional, Union, cast
 
-from rocrate.model.contextentity import ContextEntity
-from rocrate.rocrate import ROCrate, File
-from rocrate.utils import iso_now
+from rocrate.model.contextentity import ContextEntity  # type: ignore
+from rocrate.rocrate import ROCrate, File  # type: ignore
+from rocrate.utils import iso_now  # type: ignore
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
@@ -89,26 +89,29 @@ DEFAULT_EXPORTED_KEYS = [
 ]
 
 
-def _add_dir_and_files(crate: ROCrate, base_path: Path, relative_path: str, encoding_format: str = None) -> None:
-    """Add a directory and its files into the RO-Crate.
+def _add_files(crate: ROCrate, base_path: Path, relative_path: str, expid: str,
+               encoding_format: Optional[str] = None) -> None:
+    """Add all files of a directory into the RO-Crate.
+
+    Ignores existing crate archives.
 
     :param crate: the RO-Crate instance.
     :param base_path: the base path for the files being added.
     :param relative_path: the relative path (to the ``base_path``).
+    :param expid: the experiment identifier, used to exclude previously created RO-Crate archives.
     :param encoding_format: the encoding format (if any).
     """
     folder = Path(base_path, relative_path)
     for root, dirs, files in os.walk(folder, topdown=True):
         for file in files:
             file_path = Path(root, file)
+            if file.startswith(f'{expid}-crate') and file.endswith('.zip'):
+                continue
             _add_file(crate, base_path, file_path, encoding_format)
-    crate.add_dataset(
-        source=folder,
-        dest_path=folder.relative_to(base_path)
-    )
 
 
-def _add_file(crate: ROCrate, base_path: Union[Path, None], file_path: Path, encoding_format: str = None, use_uri: bool = False, **args: Any) -> Any:
+def _add_file(crate: ROCrate, base_path: Optional[Path], file_path: Path, encoding_format: Optional[str] = None,
+              use_uri: bool = False, **args: Any) -> Any:
     """Add a file into the RO-Crate.
 
     :param crate: the RO-Crate instance.
@@ -159,13 +162,11 @@ def _add_file(crate: ROCrate, base_path: Union[Path, None], file_path: Path, enc
     return None
 
 
-def _get_action_status(jobs: List[Job]) -> str:
+def _get_action_status(jobs: list[Job]) -> str:
     """Get the status of the workflow action.
 
     :param jobs: list of jobs, used to infer the current workflow/action status.
-    :type jobs: List[str]
     :return: a valid RO-Crate and Schema.org action status.
-    :rtype: str
     """
     if not jobs:
         return 'PotentialActionStatus'
@@ -179,13 +180,11 @@ def _get_action_status(jobs: List[Job]) -> str:
     return 'PotentialActionStatus'
 
 
-def _get_git_branch_and_commit(project_path: str) -> Tuple[str, str]:
+def _get_git_branch_and_commit(project_path: str) -> tuple[str, str]:
     """FIXME: workaround for: https://earth.bsc.es/gitlab/ces/autosubmit4-config-parser/-/merge_requests/2/diffs.
 
     :param project_path: the complete path for the Git project path.
-    :type project_path: str
     :return: a tuple where the first element is the branch, and the second the commit hash
-    :rtype: Tuple[str, str]
     """
     try:
         output = subprocess.check_output(
@@ -206,18 +205,15 @@ def _get_git_branch_and_commit(project_path: str) -> Tuple[str, str]:
 
 
 # Add Autosubmit Project to the RO-Crate.
-def _get_project_entity(as_configuration: AutosubmitConfig, crate: ROCrate) -> Union[ContextEntity, None]:
+def _get_project_entity(as_configuration: AutosubmitConfig, crate: ROCrate) -> ContextEntity:
     """Return a ``SoftwareSourceCode``, a specialized object from
     ``CreativeEntity`` that contains a ``codeRepository`` property
     that points to the location of files used by the Autosubmit
     workflow. Ref: https://schema.org/SoftwareSourceCode
 
     :param as_configuration: Autosubmit configuration object
-    :type as_configuration: AutosubmitConfig
     :param crate: RO-Crate object
-    :type crate: ROCrate
     :return: an entity that can be added into the RO-Crate.
-    :rtype: Union[ContextEntity, None]
     """
     project = as_configuration.experiment_data['PROJECT']
     project_type = project['PROJECT_TYPE'].upper()
@@ -292,8 +288,8 @@ def _create_parameter(crate, parameter_name, parameter_value, formal_parameter, 
 
 def create_rocrate_archive(
         as_conf: AutosubmitConfig,
-        rocrate_json: Dict[str, Any],
-        jobs: List[Job],
+        rocrate_json: dict[str, Any],
+        jobs: list[Job],
         start_time: Union[str, None],
         end_time: Union[str, None],
         path: Path) -> ROCrate:
@@ -303,19 +299,12 @@ def create_rocrate_archive(
     to locate the directories with perspective provenance.
 
     :param as_conf: Autosubmit configuration
-    :type as_conf: AutosubmitConfig
     :param rocrate_json: RO-Crate JSON patch provided by the user
-    :type rocrate_json: Dict[str, Any]
     :param jobs: List of Autosubmit jobs
-    :type jobs: List[Job]
     :param start_time: Workflow run start time
-    :type start_time: Union[str, None]
     :param end_time: Workflow run end time
-    :type end_time: Union[str, None]
     :param path: path to save the RO-Crate in
-    :type path: Path
     :return: ``True`` is the archive was created successful, ``False`` otherwise
-    :rtype: object()bool
     """
     workflow_configuration = as_conf.experiment_data
     expid = workflow_configuration['DEFAULT']['EXPID']
@@ -340,6 +329,7 @@ def create_rocrate_archive(
 
     crate = ROCrate()
     crate.root_dataset.properties().update({
+        'name': expid,
         'conformsTo': root_profiles
     })
     for profile in PROFILES:
@@ -347,10 +337,12 @@ def create_rocrate_archive(
 
     Log.info('Creating RO-Crate archive...')
 
+    # Add original YAML configuration.
+    crate.add_dataset(source=Path(experiment_path, "conf"), dest_path="conf")
+
     # Create workflow configuration (prospective provenance)
     main_entity = crate.add_workflow(
         source=unified_yaml_configuration,
-        dest_path=unified_yaml_configuration.relative_to(experiment_path),
         main=True,
         lang="Autosubmit",
         lang_version=as_version,
@@ -364,38 +356,39 @@ def create_rocrate_archive(
     crate.description = get_experiment_description(expid)[0][0]
 
     # Add files generated after its execution (retrospective provenance)
-
-    # Add original YAML configuration.
-    _add_dir_and_files(crate, experiment_path, "conf")
     # Some external files could have been loaded too. That's why we use the
     # ``as_conf.current_loaded_files`` dictionary instead (name: mtime).
     experiment_configuration_path = Path(experiment_path, "conf")
     for config_entry in as_conf.current_loaded_files.keys():
         config_entry_path = Path(config_entry)
+        if not config_entry_path.is_file():
+            continue
         # We do not want to add the entries under <EXPID>/conf/ again.
         if experiment_configuration_path in config_entry_path.parents:
             continue
 
+        base_path = experiment_path if experiment_path in config_entry_path.parents else None
+
         # Everything else is added as absolute URI, as it might be
         # a file like ``/etc/fstab``, or a private configuration from
         # the project.
-        if config_entry_path.is_dir():
-            crate.add_dataset(source=config_entry_path.as_uri())
-        else:
-            _add_file(crate, None, config_entry_path, encoding_format=None, use_uri=True)
+        use_uri = base_path is None
+        _add_file(crate, base_path, config_entry_path, encoding_format=None, use_uri=use_uri)
     # Add log files.
-    _add_dir_and_files(crate, experiment_path, BasicConfig.LOCAL_TMP_DIR, "text/plain")
+    _add_files(crate, experiment_path, BasicConfig.LOCAL_TMP_DIR, expid, "text/plain")
     # Add plots files.
-    _add_dir_and_files(crate, experiment_path, "plot")
+    _add_files(crate, experiment_path, "plot", expid)
     # Add status files.
-    _add_dir_and_files(crate, experiment_path, "status")
+    _add_files(crate, experiment_path, "status", expid, "text/plain")
     # Add SQLite DB and pickle files.
-    _add_dir_and_files(crate, experiment_path, "pkl", "application/binary")
+    _add_files(crate, experiment_path, "pkl", expid, "application/octet-stream")
 
     # Register Workflow Run RO-Crate (WRROC) profile. This code was adapted from COMPSs and StreamFlow.
     #
-    # See: https://gitlab.bsc.es/wdc/compss/framework/-/blob/9cc5a8a5ba76457cf9b71d698bb77b8fa0aa0c9c/compss/runtime/scripts/system/provenance/generate_COMPSs_RO-Crate.py
-    #      https://github.com/alpha-unito/streamflow/blob/c04089b0c16d74f50c4380c8648f271dfd702b9d/streamflow/provenance/run_crate.py
+    # See: https://gitlab.bsc.es/wdc/compss/framework/-/blob/9cc5a8a5ba76457cf9b71d698bb77b8fa0aa0c9c/compss/runtime/
+    #      scripts/system/provenance/generate_COMPSs_RO-Crate.py
+    #      https://github.com/alpha-unito/streamflow/blob/c04089b0c16d74f50c4380c8648f271dfd702b9d/streamflow/
+    #      provenance/run_crate.py
     #      https://www.researchobject.org/workflow-run-crate/
     #      https://about.workflowhub.eu/Workflow-RO-Crate/
     # NOTE: A ``CreateAction`` can have an agent, pointing to the author
@@ -421,15 +414,15 @@ def create_rocrate_archive(
 
     # Here we add the Autosubmit project as ``SoftwareCode``, and as part (``isPartOf``)
     # of the RO-Crate main ``SoftwareCode`` entity.
-    try:
-        project_entity = _get_project_entity(as_conf, crate)
-        crate.add(project_entity)
-        main_entity.append_to('hasPart', {'@id': project_entity['@id']})
-    except ValueError as e:
-        raise AutosubmitCritical("Failed to read the Autosubmit Project for RO-Crate...", 7014, str(e))
+    # try:
+    #     project_entity = _get_project_entity(as_conf, crate)
+    #     crate.add(project_entity)
+    #     main_entity.append_to('hasPart', {'@id': project_entity['@id']})
+    # except ValueError as e:
+    #     raise AutosubmitCritical("Failed to read the Autosubmit Project for RO-Crate...", 7014, str(e))
 
     # inputs and outputs
-    # FIXME: Blocked by: https://earth.bsc.es/gitlab/es/autosubmit/-/issues/1045
+    # FIXME: Blocked by: https://github.com/BSC-ES/autosubmit/issues/2511
     # TODO: Need to add input and output to ``main_entity``.
     #       "input": [ { "@id": "#id-param" }, {}, ... ]
     #       Oh, and "output" in the same way.
@@ -496,8 +489,12 @@ def create_rocrate_archive(
                     f"Could not locate a type in RO-Crate for parameter {param_name} type {python_type}", 7014)
             # The formal parameters are added to the workflow (main entity).
             additional_type = PARAMETER_TYPES_MAP[python_type]
-            if type(additional_type) is not str:
-                additional_type = PARAMETER_TYPES_MAP[python_type](additional_type)
+            # If the ``additional_type`` returned from the dictionary ``PARAMETER_TYPES_MAP`` is
+            # a string, this mean we found a type that must be string-ized (e.g. a dict or a list).
+            # Otherwise, RO-Crate library will complain it cannot figure out how to serialize it.
+            if additional_type is str:
+                e_v = cast(Callable, additional_type)(e_v)
+                additional_type = 'Text'
             formal_parameter = _create_formal_parameter(
                 crate,
                 param_name,
@@ -519,11 +516,8 @@ def create_rocrate_archive(
     # Outputs.
     project_path = Path(workflow_configuration['ROOTDIR'], 'proj',
                         workflow_configuration['PROJECT']['PROJECT_DESTINATION'])
-    # NOTE: Do **NOT** pass ``source=project_path`` or ro-crate-py will copy the whole
-    #       proj folder into the exported RO-Crate (which can have several GB's).
-    crate.add_dataset(
-        dest_path=project_path.relative_to(experiment_path)
-    )
+    project_entity = _get_project_entity(as_conf, crate)
+    crate.add(project_entity)
     for output_pattern in outs:
         for output_file in project_path.rglob(output_pattern):
             Log.debug(f'Create output parameter for {output_file}')
@@ -557,7 +551,7 @@ def create_rocrate_archive(
             crate.add_or_update_jsonld(jsonld_node)
 
     # Write RO-Crate ZIP.
-    date = datetime.datetime.today().strftime('%Y%m%d-%H%M%S')
-    crate.write_zip(Path(path, f"{expid}-{date}.zip"))
+    date = datetime.datetime.today().strftime('%Y%m%d-%H%M%S-%f')
+    crate.write_zip(Path(path, f"{expid}-crate-{date}.zip"))
     Log.info(f'RO-Crate archive written to {experiment_path}')
     return crate

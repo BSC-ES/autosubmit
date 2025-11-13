@@ -4217,7 +4217,7 @@ class Autosubmit:
         dump_file_path = os.path.join(BasicConfig.JOBDATA_DIR, dump_file_name)
         bash_command = f'cat {dump_file_path} | sqlite3 {database_path}'
         try:
-            if  os.path.exists(database_path):
+            if os.path.exists(database_path):
                 os.popen(f"mv {database_path} {corrupted_db_path}").read()
                 time.sleep(1)
                 Log.info("Original database moved.")
@@ -4238,16 +4238,15 @@ class Autosubmit:
             Log.critical(str(exp))
 
     @staticmethod
-    def rocrate(expid, path: Path):
-        """
-        Produces an RO-Crate archive for an Autosubmit experiment.
+    def rocrate(expid: str, path: Path) -> bool:
+        """Produces an RO-Crate archive for an Autosubmit experiment.
+
+        Skips other crate ZIP archive files in ``tmp/ASLOGS``. It ignores
+        files that start with ``<EXPID>-crate`` and end with ``.zip``.
 
         :param expid: experiment ID
-        :type expid: str
         :param path: path to save the RO-Crate in
-        :type path: Path
         :return: ``True`` if successful, ``False`` otherwise
-        :rtype: bool
         """
         from autosubmit.statistics.statistics import Statistics
         from textwrap import dedent
@@ -4260,7 +4259,8 @@ class Autosubmit:
 
         # Load the rocrate prepopulated file, or raise an error and write the template.
         # Similar to what COMPSs does.
-        # See: https://github.com/bsc-wdc/compss/blob/9e79542eef60afa9e288e7246e697bd7ac42db08/compss/runtime/scripts/system/provenance/generate_COMPSs_RO-Crate.py
+        # See: https://github.com/bsc-wdc/compss/blob/9e79542eef60afa9e288e7246e697bd7ac42db08/compss/runtime/scripts/
+        #      system/provenance/generate_COMPSs_RO-Crate.py
         rocrate_json = workflow_configuration.get('ROCRATE', None)
         if not rocrate_json:
             Log.error(dedent('''\
@@ -4319,7 +4319,8 @@ class Autosubmit:
             end_time = exp_stats.jobs_stat[0].finish_time.replace(microsecond=0).isoformat()
 
         from autosubmit.provenance.rocrate import create_rocrate_archive
-        return create_rocrate_archive(as_conf, rocrate_json, jobs, start_time, end_time, path)
+        crate = create_rocrate_archive(as_conf, rocrate_json, jobs, start_time, end_time, path)
+        return crate is not None
 
     @staticmethod
     def provenance(expid: str, rocrate: bool = False) -> None:
