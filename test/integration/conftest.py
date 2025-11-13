@@ -192,7 +192,8 @@ def autosubmit_exp(
         conf_dir = exp_path / "conf"
         global_logs = Path(BasicConfig.GLOBAL_LOG_DIR)
         global_logs.mkdir(parents=True, exist_ok=True)
-        Path(BasicConfig.STRUCTURES_DIR).mkdir(parents=True, exist_ok=True) # TODO: to remove when autosubmit.install is able to create these folders
+        #TODO: Autosubmit.install issue https://github.com/BSC-ES/autosubmit/issues/1328
+        Path(BasicConfig.STRUCTURES_DIR).mkdir(parents=True, exist_ok=True)
         exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
         aslogs_dir = exp_tmp_dir / BasicConfig.LOCAL_ASLOG_DIR
         status_dir = exp_path / 'status'
