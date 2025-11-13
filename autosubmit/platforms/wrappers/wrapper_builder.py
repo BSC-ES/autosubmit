@@ -18,6 +18,7 @@ import os
 import random
 import string
 import textwrap
+from autosubmit.log.log import AutosubmitCritical
 
 from typing import List
 
@@ -153,6 +154,9 @@ class FluxWrapperBuilder(WrapperBuilder):
     
     # TODO: [ENGINES] Delete hardcoded flux environment setup
     def build_main(self):
+        if not self.job_scripts:
+            raise AutosubmitCritical("No job scripts found for building the Flux wrapper.", )
+        
         return textwrap.dedent("""
         # Dependency script generation
         cat << 'EOF' > flux_runner.sh
@@ -166,11 +170,7 @@ class FluxWrapperBuilder(WrapperBuilder):
 
         # Load user environment
         module load miniconda
-                               
-        echo "Initializing conda environment"
         source /apps/GPP/MINICONDA/24.1.2/etc/profile.d/conda.sh
-        echo "Conda environment initialized"
-                               
         conda activate flux
         conda info
 
