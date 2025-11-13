@@ -200,8 +200,14 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
         return script
     
 class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
+    # TODO: [ENGINES] Implement error handling, retrials, stat files, etc.
     def _dependency_script(self):
-        raise NotImplementedError(self.exception)   # pragma: no cover
+        script = ""
+
+        for job_script in self.job_scripts:
+            script += f"$(flux batch {job_script})\n"
+
+        return script
 
 class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
     def _dependency_script(self):
