@@ -27,7 +27,7 @@ import time
 from contextlib import suppress
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import List, TYPE_CHECKING, Optional
 
 from bscearth.utils.date import date2str, sum_str_hours
 
@@ -216,6 +216,16 @@ class JobPackageBase:
     def send_files(self):
         """ Send local files to the platform. """
 
+    def _assign_wrapper_method_to_jobs(self, jobs: List[Job], wrapper_method: str) -> None:
+        """
+        Assign the wrapper method to each job in the list.
+
+        :param jobs: List of jobs.
+        :param wrapper_method: Wrapper method to be assigned.
+        """
+        for job in jobs:
+            job.wrapper_method = wrapper_method
+
     def process_jobs_to_submit(self, job_id: int) -> None:
         for job in self.jobs:
             job.submit_time_timestamp = date2str(datetime.datetime.now(), 'S')
@@ -238,6 +248,9 @@ class JobPackageSimple(JobPackageBase):
         self._job_scripts = {}
         self.export = jobs[0].export
         self.name = jobs[0].name
+
+        # Simple jobs may have been in a wrapper previously, so we reset the wrapper method.
+        self._assign_wrapper_method_to_jobs(jobs, None)
 
     def _create_scripts(self, configuration: 'AutosubmitConfig'):
         for job in self.jobs:
@@ -311,6 +324,7 @@ class JobPackageThread(JobPackageBase):
             self.wrapper_method = wrapper_info[2]
             self.jobs_in_wrapper = wrapper_info[3]
             self.extensible_wallclock = wrapper_info[4]
+            self.custom_env_setup = wrapper_info[5]
         else:
             self.wrapper_type = None
             self.wrapper_policy = None
@@ -323,8 +337,7 @@ class JobPackageThread(JobPackageBase):
         self._common_script = None
         self.executable = None
 
-        self._wallclock = '00:00'
-        # depends on the type of wrapper
+        self._wallclock = '00:00' # depends on the type of wrapper
 
         self._jobs_resources = jobs_resources
         self._wrapper_factory = self.platform.wrapper
@@ -424,6 +437,9 @@ class JobPackageThread(JobPackageBase):
         self.parameters["EXECUTABLE"] = self.executable  # have to look
         self.method = method
         self.is_wrapped = True
+
+        # Assign wrapper method to jobs so that they can be assigned their platform or the wrapper engine later
+        self._assign_wrapper_method_to_jobs(jobs, method)
 
     @property
     def _jobs_scripts(self):
@@ -573,11 +589,11 @@ class JobPackageVertical(JobPackageThread):
     :param: dependency:
     """
     def __init__(self, jobs: list[Job], dependency=None, configuration: Optional['AutosubmitConfig'] = None,
-                 wrapper_section: str = "WRAPPERS", wrapper_info: Optional[list] = None):
+                 wrapper_section: str = "WRAPPERS", wrapper_info: Optional[list] = None, method: str = 'ASThread'):
         if wrapper_info is None:
             wrapper_info = []
         super(JobPackageVertical, self).__init__(jobs, dependency, configuration=configuration,
-                                                 wrapper_section=wrapper_section, wrapper_info=wrapper_info)
+                                                 wrapper_section=wrapper_section, wrapper_info=wrapper_info, method=method)
         for job in jobs:
             if int(job.processors) >= int(self._num_processors):
                 self._num_processors = job.processors

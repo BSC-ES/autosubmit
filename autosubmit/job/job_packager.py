@@ -420,6 +420,8 @@ class JobPackager(object):
         Log.warning("There are no more jobs of this section to form a wrapper, submitting the remaining jobs")
         if len(p.jobs) == 1:
             p.jobs[0].wrapper_type = "Simple"
+            # TODO: Here I could insert the code to reverse the wrapper method to None
+            # p.jobs[0].wrapper_method = self.wrapper_method
             packages_to_submit.append(JobPackageSimple([p.jobs[0]]))
         else:
             packages_to_submit.append(p) # TODO: [ENGINES] Why is it submitted as a wrapper if it does not respect the wrapper limits?
@@ -893,7 +895,8 @@ class JobPackager(object):
                     jobs_list = job_vertical_packager.build_vertical_package(job, wrapper_info)
                     packages.append(JobPackageVertical(jobs_list, configuration=self._as_config,
                                                        wrapper_section=self.current_wrapper_section,
-                                                       wrapper_info=wrapper_info))
+                                                       wrapper_info=wrapper_info,
+                                                       method=self.wrapper_method[self.current_wrapper_section]))
             else:
                 break
         return packages

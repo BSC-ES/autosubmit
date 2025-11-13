@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import collections
 import copy
 import inspect
 import shutil
@@ -2133,6 +2134,8 @@ class FakeBasicConfig:
     LOCAL_PROJ_DIR = '/dummy/local/proj/dir'
     DEFAULT_PLATFORMS_CONF = ''
     DEFAULT_JOBS_CONF = ''
+
+
 @pytest.fixture(scope='function')
 def setup(autosubmit_config, tmpdir):
     experiment_id = 'random-id'
@@ -2372,14 +2375,14 @@ def test_process_not_wrappeable_packages_remaining_blocked_by_package(
 
 def test_build_imports():
     kwargs: dict = {'header_directive': True, 'jobs_scripts': ["test"], 'threads': 2, 'num_processors': True,
-                    'num_processors_value': True, 'expid': True, 'name': 'test_wrapper'}
+                    'num_processors_value': True, 'expid': True, 'wrapper_data': wrapper_data, 'name': 'test_wrapper'}
     vh_wrapper = SrunVerticalHorizontalWrapperBuilder(**kwargs).build_imports()
     assert type(vh_wrapper) is str and '("t" "e" "s" "t" )' in vh_wrapper
 
 
-def test_build_srun_launcher():
+def test_build_srun_launcher(wrapper_data):
     kwargs: dict = {'header_directive': True, 'jobs_scripts': ["test"], 'threads': 2, 'num_processors': True,
-                    'num_processors_value': True, 'expid': True, 'name': 'test_wrapper'}
+                    'num_processors_value': True, 'expid': True, 'wrapper_data': wrapper_data, 'name': 'test_wrapper'}
     vh_wrapper = SrunVerticalHorizontalWrapperBuilder(**kwargs).build_srun_launcher("job1, job2, job3, job4, job5")
     assert type(vh_wrapper) is str and "job1, job2, job3, job4, job5" in vh_wrapper
 
@@ -2397,7 +2400,7 @@ def test_build_srun_launcher():
 #                   }
 #     header.calculate_wrapper_het_header(wr_job=wr_job)
 @pytest.fixture
-def wrapper_builder() -> PythonVerticalWrapperBuilder:
+def wrapper_builder(wrapper_data) -> PythonVerticalWrapperBuilder:
     """Return a :class:`PythonVerticalWrapperBuilder` for unit testing launcher/thread code.
     :return: Configured builder instance.
     :rtype: PythonVerticalWrapperBuilder
@@ -2415,6 +2418,7 @@ def wrapper_builder() -> PythonVerticalWrapperBuilder:
         allocated_nodes='',
         wallclock_by_level='3600',
         working_dir='/tmp',
+        wrapper_data=wrapper_data,
     )
 def test_build_imports_contains_wrapper_failed_and_completed_ids(
     wrapper_builder: PythonVerticalWrapperBuilder,
@@ -2449,7 +2453,7 @@ def test_build_sequential_threads_launcher(
     )
     imports = wrapper_builder.build_imports()
     assert assertion(launcher, imports)
-def test_base_sequential_threads_launcher_has_completion_awareness() -> None:
+def test_base_sequential_threads_launcher_has_completion_awareness(wrapper_data) -> None:
     """PythonWrapperBuilder (base/horizontal) launcher must reference COMPLETED/FAILED markers.
     :rtype: None
     """
@@ -2462,6 +2466,7 @@ def test_base_sequential_threads_launcher_has_completion_awareness() -> None:
         expid='a000',
         name='test_wrapper',
         working_dir='/tmp',
+        wrapper_data=wrapper_data,
     )
     launcher = builder.build_sequential_threads_launcher(
         'scripts', 'JobThread(scripts[i], i)', footer=True

@@ -65,6 +65,7 @@ class WrapperBuilder(object):
         self.machinefiles_indent = 0
         self.exit_thread = ''
         self.fail_count = kwargs.get('fail_count', 0)
+        self.custom_env_setup = kwargs['wrapper_data'].custom_env_setup
 
         if "wallclock_by_level" in list(kwargs.keys()):
             self.wallclock_by_level = kwargs['wallclock_by_level']
