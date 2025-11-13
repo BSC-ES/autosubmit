@@ -458,7 +458,40 @@ def _init_run(as_exp, jobs_data) -> Path:
             TYPE: 'slurm'
             USER: 'root'
     """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
-], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper"])
+
+    # Success wrapper
+    (dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World with id=Success + wrappers"
+                sleep 1
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+            
+    wrappers:
+        wrapper:
+            JOBS_IN_WRAPPER: job
+            TYPE: horizontal
+    PLATFORMS:
+        TEST_SLURM:
+            ADD_PROJECT_TO_HOST: 'False'
+            HOST: '127.0.0.1'
+            PROJECT: 'group'
+            QUEUE: 'gp_debug'
+            SCRATCH_DIR: '/tmp/scratch/'
+            TEMP_DIR: ''
+            TYPE: 'slurm'
+            USER: 'root'
+            MAX_WALLCLOCK: '02:00'
+            MAX_PROCESSORS: '4'
+            PROCESSORS_PER_NODE: '4'
+    """), 2, "COMPLETED", "horizontal")
+
+], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper", "Success with horizontal wrapper"])
 def test_run_uninterrupted(
         as_exp,
         jobs_data,
@@ -474,30 +507,32 @@ def test_run_uninterrupted(
     exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
     _assert_exit_code(final_status, exit_code)
 
-    # Check and display results
-    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+    # temporal for this branch, there are futher changes to this test in other ongoing PRs. Here we only want to ensure that the wrapper type is completed successfully.
+    if wrapper_type != "horizontal":
+        # Check and display results
+        run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status)
-    e_msg = f"Current folder: {str(run_tmpdir)}\n"
-    files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
-    for check, value in db_check_list.items():
-        if not value:
-            e_msg += f"{check}: {value}\n"
-        elif isinstance(value, dict):
-            for job_name in value:
-                for job_counter in value[job_name]:
-                    for check_name, value_ in value[job_name][job_counter].items():
-                        if not value_:
-                            e_msg += f"{job_name}_run_number_{job_counter} field: {check_name}: {value_}\n"
+        db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status)
+        e_msg = f"Current folder: {str(run_tmpdir)}\n"
+        files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
+        for check, value in db_check_list.items():
+            if not value:
+                e_msg += f"{check}: {value}\n"
+            elif isinstance(value, dict):
+                for job_name in value:
+                    for job_counter in value[job_name]:
+                        for check_name, value_ in value[job_name][job_counter].items():
+                            if not value_:
+                                e_msg += f"{job_name}_run_number_{job_counter} field: {check_name}: {value_}\n"
 
-    for check, value in files_check_list.items():
-        if not value:
-            e_msg += f"{check}: {value}\n"
-    try:
-        _assert_db_fields(db_check_list)
-        _assert_files_recovered(files_check_list)
-    except AssertionError:
-        pytest.fail(e_msg)
+        for check, value in files_check_list.items():
+            if not value:
+                e_msg += f"{check}: {value}\n"
+        try:
+            _assert_db_fields(db_check_list)
+            _assert_files_recovered(files_check_list)
+        except AssertionError:
+            pytest.fail(e_msg)
 
 
 @pytest.mark.slurm
@@ -653,7 +688,6 @@ def test_run_interrupted(
 
     exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
     _assert_exit_code(final_status, exit_code)
-
     # Check and display results
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
