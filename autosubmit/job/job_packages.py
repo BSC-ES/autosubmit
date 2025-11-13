@@ -82,7 +82,7 @@ class JobPackageBase(object):
         self._threads = '0'
         try:
             self._tmp_path = jobs[0]._tmp_path
-            self._platform = jobs[0]._platform
+            self._platform = jobs[0]._platform # TODO: [ENGINES] Here is where the package platform is assigned
             self._custom_directives = set()
             for job in jobs:
                 if job._platform.name != self._platform.name or job.platform is None:
@@ -157,7 +157,7 @@ class JobPackageBase(object):
                 Log.result("Script {0} OK", job.name)
             # looking for directives on jobs
             self._custom_directives = self._custom_directives | set(job.custom_directives)
-        self._create_scripts(configuration)
+        self._create_scripts(configuration) # TODO: [ENGINES] Duplicated. Solved by Dani in PR #2693, pending review
 
     def submit(self, configuration: 'AutosubmitConfig', parameters: Optional[dict] = None, only_generate: bool = False, hold: bool = False):
         """
@@ -185,8 +185,11 @@ class JobPackageBase(object):
             if len(self.jobs) < thread_number or str(
                     configuration.experiment_data.get("CONFIG", {}).get("ENABLE_WRAPPER_THREADS",
                                                                         "False")).lower() == "false":
+                # TODO: [ENGINES] This function (should) check the scripts validity
                 self.submit_unthreaded(configuration, only_generate)
                 Log.debug("Creating Scripts")
+                # TODO: [ENGINES] Here is where the scripts are created. Both the common script and 
+                # the individual job ones.
                 self._create_scripts(configuration)
             else:
                 lhandle = list()
@@ -209,6 +212,9 @@ class JobPackageBase(object):
         try:
             if not only_generate:
                 Log.debug("Sending Files")
+                # TODO: [ENGINES] Here is where the files are sent to the platform as a compressed tar
+                # "WRAPPER_SCRIPTS.tar", together with the COMMON_SCRIPT, which is the wrapper script
+                # (AS_THREAD_*).
                 self._send_files()
                 Log.debug("Submitting")
                 self._do_submission(hold=hold)
@@ -321,7 +327,7 @@ class JobPackageSimpleWrapped(JobPackageSimple):
         super(JobPackageSimpleWrapped, self)._do_submission(job_scripts, hold=hold)
 
 
-class JobPackageArray(JobPackageBase):
+class JobPackageArray(JobPackageBase): # TODO: [ENGINES] Never used?
     """
     Class to manage an array-based package of jobs to be submitted by autosubmit
     """
@@ -452,7 +458,7 @@ class JobPackageThread(JobPackageBase):
         # depends on the type of wrapper
 
         self._jobs_resources = jobs_resources
-        self._wrapper_factory = self.platform.wrapper
+        self._wrapper_factory = self.platform.wrapper # TODO: [ENGINES] This is where the wrapper factory is assigned
         self.current_wrapper_section = wrapper_section
         self.inner_retrials = 0
         if not hasattr(self, "_num_processors"):
@@ -761,13 +767,12 @@ class JobPackageVertical(JobPackageThread):
     :type jobs:
     :param: dependency:
     """
-
     def __init__(self, jobs: list[Job], dependency=None, configuration: Optional['AutosubmitConfig'] = None,
-                 wrapper_section: str = "WRAPPERS", wrapper_info: Optional[list] = None):
+                 wrapper_section: str = "WRAPPERS", wrapper_info: Optional[list] = None, method: str = 'ASThread'):
         if wrapper_info is None:
             wrapper_info = []
         super(JobPackageVertical, self).__init__(jobs, dependency, configuration=configuration,
-                                                 wrapper_section=wrapper_section, wrapper_info=wrapper_info)
+                                                 wrapper_section=wrapper_section, wrapper_info=wrapper_info, method=method)
         for job in jobs:
             if int(job.processors) >= int(self._num_processors):
                 self._num_processors = job.processors
