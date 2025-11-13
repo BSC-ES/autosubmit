@@ -58,6 +58,7 @@
 - Slurm tests in CICD are using a new container by @giovtorres #2871
 - Fixed main-loop iteration message handling singular/plural and reducing number of line breaks #2969
 - Updated `Defining the workflow` documentation section #2954
+<<<<<<< HEAD
 - Improving the handling of leakages that were happening when dealing with queues and processes #2900
 - Added batch canceling to the `setstatus` command #2919
 - verbosity adjusted #2976
@@ -73,6 +74,7 @@
 - Jobs now validated individually via STAT files in check_jobs to confirm completion or failure, for both wrapped and non-wrapped jobs #3007
 - Expanded ECPlatform, paramiko platform support, and platform code cleanup #3007
 - Changed JOBS_IN_WRAPPER unknown job from critical error to warning #3006
+- Now Autosubmit supports delegated wrappers. This enables the in situ management of wrappers on HPC platforms. The new 'Flux' wrapping method is now available for delegated wrappers [#2968](https://github.com/BSC-ES/autosubmit/issues/2968)
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
