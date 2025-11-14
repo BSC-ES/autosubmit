@@ -29,6 +29,7 @@ class WrapperDirector:
     """
     def __init__(self):
         self._builder = None
+        self.exception = "This type of wrapper is not supported for this platform"
 
     def construct(self, builder):
         self._builder = builder
@@ -203,7 +204,7 @@ class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
         script = ""
 
         for job_script in self.job_scripts:
-            script += f"$(flux batch {job_script})\n"
+            script += f"flux batch {job_script}\n"
 
         return script
 
