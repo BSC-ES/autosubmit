@@ -55,8 +55,8 @@ class WrapperFactory(object):
             kwargs['reservation'] = self.reservation(wrapper_data.reservation)
 
         kwargs["executable"] = wrapper_data.executable
-
         kwargs['header_directive'] = self.header_directives(**kwargs)
+        kwargs['working_dir'] = self.platform.remote_log_dir
         wrapper_cmd = self.wrapper_director.construct(wrapper_builder(**kwargs))
 
         # look for placeholders inside constructed ( CURRENT_ variables )
