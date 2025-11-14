@@ -163,10 +163,11 @@ class JobPackageBase(object):
 
             for additional_file in job.additional_files:
                 exists = not additional_file or (project_dir / additional_file).exists()
-                if not exists and only_generate:
+                if not exists:
+                    if only_generate:
+                        raise AutosubmitCritical(f"[section:{job.section}]: Additional file:{additional_file} does not exists", 7014)
                     Log.warning(f"[section:{job.section}]: Additional file:{additional_file} does not exists, skipping check")
-                elif not exists and not only_generate:
-                    raise AutosubmitCritical(f"[section:{job.section}]: Additional file:{additional_file} does not exists", 7014)
+                    
 
     def build_scripts(self, configuration: 'AutosubmitConfig') -> None:
         """Submit jobs one by one without using threads.
