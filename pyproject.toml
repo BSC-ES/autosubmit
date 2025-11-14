@@ -86,7 +86,8 @@ tests = [
     "pytest-mock",
     "ruff==0.14.5",
     "pytest-xdist",
-    "testcontainers"
+    "testcontainers",
+    "pytest-timeout"
 ]
 docs = [
     "livereload",
