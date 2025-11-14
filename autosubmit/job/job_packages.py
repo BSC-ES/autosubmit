@@ -176,11 +176,10 @@ class JobPackageBase(object):
         """
         Log.debug("Checking Scripts")
         for job in self.jobs:
-            if job.file or job.script:
-                if not job.check_script(configuration, show_logs=job.check_warnings):
-                    Log.warning(
-                            f"Script {job.name} has some empty variables. An empty value has substituted these variables"
-                        )
+            if (job.file or job.script) and not job.check_script(configuration, show_logs=job.check_warnings):
+                Log.warning(
+                    f"Script {job.name} has some empty variables. An empty value has substituted these variables"
+                )
 
             self._custom_directives |= set(getattr(job, "custom_directives", []))
 
