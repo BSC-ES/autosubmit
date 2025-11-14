@@ -26,7 +26,7 @@ from contextlib import suppress
 from multiprocessing.synchronize import Event
 from multiprocessing.queues import Queue
 # noinspection PyProtectedMember
-from os import _exit
+from os import _exit  # type: ignore
 from pathlib import Path
 from typing import Any, Optional, Union, TYPE_CHECKING
 

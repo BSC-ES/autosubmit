@@ -187,7 +187,8 @@ The extend_wallclock parameter allow the users to provide extra headroom for the
 Retrials
 ^^^^^^^^
 
-The retrials parameter allows the users to enable or disable the wrapper's retrial mechanism. This value overrides the general tasks defined. 
+This parameter allows the users to enable or disable the wrapper's retrying mechanism.
+This value overrides the general tasks defined.
 
 Vertical wrappers will retry the jobs without resubmitting the wrapper. 
 
