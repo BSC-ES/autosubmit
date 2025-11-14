@@ -32,6 +32,8 @@ from typing import Any, TYPE_CHECKING
 
 import pytest
 
+from autosubmit.log.log import AutosubmitCritical
+
 if TYPE_CHECKING:
     from testcontainers.core.container import DockerContainer
     from test.conftest import AutosubmitExperiment
@@ -315,7 +317,10 @@ def _init_run(as_exp, jobs_data) -> Path:
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
     exp_path = run_tmpdir / _EXPID
-    jobs_path = exp_path / f"conf/jobs_{_EXPID}.yml"
+    org_jobs_path = exp_path / f"conf/jobs_{_EXPID}.yml"
+    if org_jobs_path.exists():
+        org_jobs_path.unlink()
+    jobs_path = exp_path / f"conf/zjobs_{_EXPID}.yml"  # ensure the jobs file is the last to load
     with jobs_path.open('w') as f:
         f.write(jobs_data)
 
@@ -662,3 +667,88 @@ def test_run_interrupted(
 
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
     _assert_files_recovered(files_check_list)
+
+
+@pytest.mark.timeout(300)
+@pytest.mark.slurm
+@pytest.mark.parametrize("jobs_data,final_status", [
+    (dedent("""\
+PROJECT:
+    PROJECT_TYPE: local
+    PROJECT_DIRECTORY: local_project
+LOCAL:
+    PROJECT_PATH: "tofill"
+JOBS:
+    job:
+        FILE: 
+            - "test.sh"
+            - "additional1.sh"
+            - "additional2.sh"
+        PLATFORM: TEST_SLURM
+        RUNNING: once
+        wallclock: 00:01
+PLATFORMS:
+    TEST_SLURM:
+        ADD_PROJECT_TO_HOST: 'False'
+        HOST: '127.0.0.1'
+        MAX_WALLCLOCK: '00:03'
+        PROJECT: 'group'
+        QUEUE: 'gp_debug'
+        SCRATCH_DIR: '/tmp/scratch/'
+        TEMP_DIR: ''
+        TYPE: 'slurm'
+        USER: 'root'
+    """), "COMPLETED"),
+
+    (dedent("""\
+PROJECT:
+    PROJECT_TYPE: local
+    PROJECT_DIRECTORY: local_project
+LOCAL:
+    PROJECT_PATH: "tofill"
+JOBS:
+    job:
+        FILE: 
+            - "test.sh"
+            - "additional1.sh"
+            - "thisdoesntexists.sh"
+        PLATFORM: TEST_SLURM
+        RUNNING: once
+        wallclock: 00:01
+PLATFORMS:
+    TEST_SLURM:
+        ADD_PROJECT_TO_HOST: 'False'
+        HOST: '127.0.0.1'
+        MAX_WALLCLOCK: '00:03'
+        PROJECT: 'group'
+        QUEUE: 'gp_debug'
+        SCRATCH_DIR: '/tmp/scratch/'
+        TEMP_DIR: ''
+        TYPE: 'slurm'
+        USER: 'root'
+"""), "FAILED"),
+], ids=["All files exist", "One file missing"])
+def test_run_with_additional_files(
+        jobs_data: str,
+        final_status: str,
+        as_exp: 'AutosubmitExperiment',
+        slurm_server: 'DockerContainer'
+):
+    project_path = Path(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR) / "org_templates"
+    jobs_data = jobs_data.replace("tofill", str(project_path))
+    project_path.mkdir(parents=True, exist_ok=True)
+    with open(project_path / "test.sh", 'w') as f:
+        f.write('echo "main script."\n')
+    with open(project_path / "additional1.sh", 'w') as f:
+        f.write('echo "additional file 1."\n')
+    with open(project_path / "additional2.sh", 'w') as f:
+        f.write('echo "additional file 2."\n')
+
+    _init_run(as_exp, jobs_data)
+    as_exp.autosubmit.create(_EXPID, noplot=True, hide=True)
+    if final_status == "FAILED":
+        with pytest.raises(AutosubmitCritical):
+            as_exp.autosubmit.run_experiment(expid=_EXPID)
+    else:
+        exit_code = as_exp.autosubmit.run_experiment(expid=_EXPID)
+        _assert_exit_code(final_status, exit_code)
