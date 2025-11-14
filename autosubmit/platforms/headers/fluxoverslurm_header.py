@@ -63,10 +63,10 @@ class FluxOverSlurmHeader(object):
         """
         if het > -1 and len(job.het['NODES']) > 0:
             if job.het['NODES'][het] != '':
-                return "FLUX --nodes={0}".format(job.het['NODES'][het])
+                return "FLUX --nodes {0}".format(job.het['NODES'][het])
         else:
             if parameters['NODES'] != '':
-                return "FLUX --nodes={0}".format(parameters['NODES'])
+                return "FLUX --nodes {0}".format(parameters['NODES'])
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
@@ -93,10 +93,10 @@ class FluxOverSlurmHeader(object):
         # There is no threads per task, so directive is empty
         if het > -1 and len(job.het['NUMTHREADS']) > 0:
             if job.het['NUMTHREADS'][het] != '':
-                return "FLUX --cores-per-slot={0}".format(job.het['NUMTHREADS'][het])
+                return "FLUX --cores-per-slot {0}".format(job.het['NUMTHREADS'][het])
         else:
             if parameters['NUMTHREADS'] != '':
-                return "FLUX --cores-per-slot={0}".format(parameters['NUMTHREADS'])
+                return "FLUX --cores-per-slot {0}".format(parameters['NUMTHREADS'])
         return ""
 
     def get_custom_directives(self, job, parameters, het=-1):
@@ -122,8 +122,8 @@ class FluxOverSlurmHeader(object):
 #%NUMPROC_DIRECTIVE%
 #FLUX --time-limit %WALLCLOCK%:00
 #FLUX --job-name %JOBNAME%
-#FLUX --output=%CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%OUT_LOG_DIRECTIVE%
-#FLUX --error=%CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%ERR_LOG_DIRECTIVE%
+#FLUX --output %CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%OUT_LOG_DIRECTIVE%
+#FLUX --error %CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%ERR_LOG_DIRECTIVE%
 #
 ###############################################################################
            """)
