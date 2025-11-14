@@ -20,10 +20,12 @@
 from pathlib import Path
 
 from autosubmit.scripts.autosubmit import main
+from test.integration.conftest import sleep
 
 _EXPID = 't000'
 
 
+@sleep(1)
 def test_autosubmit_commands_help(autosubmit_exp, mocker):
     """Test that the monitor is called for stats with a simple job list.
 

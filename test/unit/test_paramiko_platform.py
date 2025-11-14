@@ -99,8 +99,8 @@ def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_p
     mocker.patch('autosubmit.platforms.paramiko_platform.sleep')
 
     platform = paramiko_platform
-    platform.get_checkAlljobs_cmd = mocker.Mock()
-    platform.get_checkAlljobs_cmd.side_effect = ['ls']
+    platform.get_check_all_jobs_cmd = mocker.Mock()
+    platform.get_check_all_jobs_cmd.side_effect = ['ls']
     platform.send_command = mocker.Mock()
     ae = AutosubmitError(message='Test', code=123, trace='ERR!')
     platform.send_command.side_effect = ae
@@ -110,7 +110,7 @@ def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_p
     job.id = 'TEST'
     job.name = 'TEST'
     with pytest.raises(AutosubmitError) as cm:
-        platform.check_Alljobs(
+        platform.check_all_jobs(
             job_list=[[job, None]],
             as_conf=as_conf,
             retries=-1)
@@ -123,8 +123,8 @@ def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_p
     mocker.patch('autosubmit.platforms.paramiko_platform.sleep')
 
     platform = paramiko_platform
-    platform.get_checkAlljobs_cmd = mocker.Mock()
-    platform.get_checkAlljobs_cmd.side_effect = ['ls']
+    platform.get_check_all_jobs_cmd = mocker.Mock()
+    platform.get_check_all_jobs_cmd.side_effect = ['ls']
     platform.send_command = mocker.Mock()
     ae = AutosubmitError(message='Test', code=123, trace='ERR!')
     platform.send_command.side_effect = [None, ae]
@@ -138,7 +138,7 @@ def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_p
     platform.get_queue_status = mocker.Mock(side_effect=None)
 
     with pytest.raises(AutosubmitError) as cm:
-        platform.check_Alljobs(
+        platform.check_all_jobs(
             job_list=[[job, None]],
             as_conf=as_conf,
             retries=1)

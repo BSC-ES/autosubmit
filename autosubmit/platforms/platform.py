@@ -234,7 +234,7 @@ class Platform(object):
             self.compress_remote_logs = platform_config.get("COMPRESS_REMOTE_LOGS", False)
             self.remote_logs_compress_type = platform_config.get("REMOTE_LOGS_COMPRESS_TYPE", "gzip")
             self.compression_level = platform_config.get("COMPRESSION_LEVEL", 9)
-            
+
         self.log_queue_size = log_queue_size
         self.remote_log_dir = None
 

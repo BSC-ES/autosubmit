@@ -25,8 +25,7 @@ class SlurmHeader(object):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_queue_directive(self, job, parameters, het=-1):
-        """
-        Returns queue directive for the specified job
+        """Returns queue directive for the specified job
 
         :param job: job to create queue directive for
         :type job: Job
@@ -43,8 +42,7 @@ class SlurmHeader(object):
         return ""
 
     def get_proccesors_directive(self, job, parameters, het=-1):
-        """
-        Returns processors directive for the specified job
+        """Returns processors directive for the specified job
 
         :param job: job to create processors directive for
         :type job: Job
@@ -71,8 +69,7 @@ class SlurmHeader(object):
             return "SBATCH -n {0}".format(job.processors)
 
     def get_partition_directive(self, job, parameters, het=-1):
-        """
-        Returns partition directive for the specified job
+        """Returns partition directive for the specified job
 
         :param job: job to create partition directive for
         :type job: Job
@@ -89,8 +86,7 @@ class SlurmHeader(object):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_account_directive(self, job, parameters, het=-1):
-        """
-        Returns account directive for the specified job
+        """Returns account directive for the specified job
 
         :param job: job to create account directive for
         :type job: Job
@@ -106,8 +102,7 @@ class SlurmHeader(object):
         return ""
 
     def get_exclusive_directive(self, job, parameters, het=-1):
-        """
-        Returns account directive for the specified job
+        """Returns account directive for the specified job
 
         :param job: job to create account directive for
         :type job: Job
@@ -123,8 +118,8 @@ class SlurmHeader(object):
         return ""
 
     def get_nodes_directive(self, job, parameters, het=-1):
-        """
-        Returns nodes directive for the specified job
+        """Returns nodes directive for the specified job
+
         :param job: job to create nodes directive for
         :type job: Job
         :return: nodes directive
@@ -140,8 +135,7 @@ class SlurmHeader(object):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_memory_directive(self, job, parameters, het=-1):
-        """
-        Returns memory directive for the specified job
+        """Returns memory directive for the specified job
 
         :param job: job to create memory directive for
         :type job: Job
@@ -158,8 +152,7 @@ class SlurmHeader(object):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_memory_per_task_directive(self, job, parameters, het=-1):
-        """
-        Returns memory per task directive for the specified job
+        """Returns memory per task directive for the specified job
 
         :param job: job to create memory per task directive for
         :type job: Job
@@ -175,8 +168,7 @@ class SlurmHeader(object):
         return ""
 
     def get_threads_per_task(self, job, parameters, het=-1):
-        """
-        Returns threads per task directive for the specified job
+        """Returns threads per task directive for the specified job
 
         :param job: job to create threads per task directive for
         :type job: Job
@@ -195,8 +187,8 @@ class SlurmHeader(object):
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
 
     def get_reservation_directive(self, job, parameters, het=-1):
-        """
-        Returns reservation directive for the specified job
+        """Returns reservation directive for the specified job
+
         :param job:
         :param het:
         :return:
@@ -211,8 +203,7 @@ class SlurmHeader(object):
         return ""
 
     def get_custom_directives(self, job, parameters, het=-1):
-        """
-        Returns custom directives for the specified job
+        """Returns custom directives for the specified job
 
         :param job: job to create custom directive for
         :type job: Job
@@ -229,8 +220,7 @@ class SlurmHeader(object):
         return ""
 
     def get_tasks_per_node(self, job, parameters, het=-1):
-        """
-        Returns memory per task directive for the specified job
+        """Returns memory per task directive for the specified job
 
         :param job: job to create tasks per node directive for
         :type job: Job

@@ -2760,9 +2760,7 @@ class Job(object):
                 return True
         return False
 
-    def synchronize_logs(
-        self, platform: "Platform", remote_logs, local_logs, last=True
-    ):
+    def synchronize_logs(self, platform: "Platform", remote_logs, local_logs, last=True):
         platform.move_file(remote_logs[0], local_logs[0], True)  # .out
         platform.move_file(remote_logs[1], local_logs[1], True)  # .err
         if last and local_logs[0] != "":

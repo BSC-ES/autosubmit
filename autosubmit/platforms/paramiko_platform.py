@@ -139,7 +139,7 @@ class ParamikoPlatform(Platform):
         return self._wrapper
 
     def reset(self):
-        self.closeConnection()
+        self.close_connection()
         self.connected = False
         self._ssh = None
         self._ssh_config = None
@@ -384,7 +384,7 @@ class ParamikoPlatform(Platform):
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, timeout=60, banner_timeout=60)
                         except Exception as e:
-                            Log.warning('SSH connect failed, will try again disabling RSA algorithms'
+                            Log.warning('SSH connect failed, will try again disabling RSA algorithms '
                                         f'sha-256 and sha-512, error: {str(e)}')
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, timeout=60, banner_timeout=60,
@@ -700,7 +700,7 @@ class ParamikoPlatform(Platform):
         self.send_command(check_energy_cmd)
         return self.get_ssh_output()
 
-    def submit_Script(self, hold=False):
+    def submit_script(self, hold=False):
         """
         Sends a Submit file Script, exec in platform and retrieve the Jobs_ID.
 
@@ -778,17 +778,17 @@ class ParamikoPlatform(Platform):
             job.new_status = job_status
         sleep_time = 5
         sleep(2)
-        self.send_command(self.get_checkjob_cmd(job_id))
+        self.send_command(self.get_check_job_cmd(job_id))
         while self.get_ssh_output().strip(" ") == "" and retries > 0:
             retries = retries - 1
-            Log.debug('Retrying check job command: {0}', self.get_checkjob_cmd(job_id))
+            Log.debug('Retrying check job command: {0}', self.get_check_job_cmd(job_id))
             Log.debug('retries left {0}', retries)
             Log.debug('Will be retrying in {0} seconds', sleep_time)
             sleep(sleep_time)
             sleep_time = sleep_time + 5
-            self.send_command(self.get_checkjob_cmd(job_id))
+            self.send_command(self.get_check_job_cmd(job_id))
         if retries >= 0:
-            Log.debug('Successful check job command: {0}', self.get_checkjob_cmd(job_id))
+            Log.debug('Successful check job command: {0}', self.get_check_job_cmd(job_id))
             job_status = self.parse_job_output(
                 self.get_ssh_output()).strip("\n")
             # URi: define status list in HPC Queue Class
@@ -828,7 +828,7 @@ class ParamikoPlatform(Platform):
                 job_status = Status.UNKNOWN
         else:
             Log.error(
-                " check_job(), job is not on the queue system. Output was: {0}", self.get_checkjob_cmd(job_id))
+                " check_job(), job is not on the queue system. Output was: {0}", self.get_check_job_cmd(job_id))
             job_status = Status.UNKNOWN
             Log.error(
                 'check_job() The job id ({0}) status is {1}.', job_id, job_status)
@@ -879,7 +879,7 @@ class ParamikoPlatform(Platform):
 
         return ','.join(job_list_cmd)
 
-    def check_Alljobs(self, job_list: list[list['Job']], as_conf, retries=5):
+    def check_all_jobs(self, job_list: list[list['Job']], as_conf, retries=5):
         """
         Checks jobs running status
 
@@ -894,7 +894,7 @@ class ParamikoPlatform(Platform):
         """
         as_conf.get_copy_remote_logs()
         job_list_cmd = self.parse_joblist(job_list)
-        cmd = self.get_checkAlljobs_cmd(job_list_cmd)
+        cmd = self.get_check_all_jobs_cmd(job_list_cmd)
         sleep_time = 5
         sleep(sleep_time)
         slurm_error = False
@@ -927,12 +927,12 @@ class ParamikoPlatform(Platform):
             for job, job_prev_status in job_list:
                 if not slurm_error:
                     job_id = job.id
-                    job_status = self.parse_Alljobs_output(job_list_status, job_id)
+                    job_status = self.parse_all_jobs_output(job_list_status, job_id)
                     while len(job_status) <= 0 <= retries:
                         retries -= 1
                         self.send_command(cmd)
                         job_list_status = self.get_ssh_output()
-                        job_status = self.parse_Alljobs_output(job_list_status, job_id)
+                        job_status = self.parse_all_jobs_output(job_list_status, job_id)
                         if len(job_status) <= 0:
                             Log.debug('Retrying check job command: {0}', cmd)
                             Log.debug('retries left {0}', retries)
@@ -1020,7 +1020,7 @@ class ParamikoPlatform(Platform):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_checkjob_cmd(self, job_id):
+    def get_check_job_cmd(self, job_id):
         """
         Returns command to check job status on remote platforms
 
@@ -1031,7 +1031,7 @@ class ParamikoPlatform(Platform):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_checkAlljobs_cmd(self, jobs_id):
+    def get_check_all_jobs_cmd(self, jobs_id):
         """
         Returns command to check jobs status on remote platforms
 
@@ -1119,7 +1119,7 @@ class ParamikoPlatform(Platform):
                             del self.channels[fd]
 
     def exec_command(
-            self, command, bufsize=-1, timeout=30, get_pty=False, retries=3, x11=False
+            self, command, bufsize=-1, timeout=30, retries=3, x11=False
     ) -> Union[tuple[paramiko.Channel, paramiko.Channel, paramiko.Channel], tuple[bool, bool, bool]]:
         """
         Execute a command on the SSH server.  A new `.Channel` is opened and
@@ -1129,7 +1129,6 @@ class ParamikoPlatform(Platform):
 
         :param x11:
         :param retries:
-        :param get_pty:
         :param command: the command to execute.
         :type command: str
         :param bufsize: interpreted the same way as by the built-in ``file()`` function in Python.
@@ -1333,7 +1332,7 @@ class ParamikoPlatform(Platform):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def parse_Alljobs_output(self, output, job_id):
+    def parse_all_jobs_output(self, output, job_id):
         """
         Parses check jobs command output, so it can be interpreted by autosubmit
 
@@ -1507,6 +1506,9 @@ class ParamikoPlatform(Platform):
             if hasattr(self.header, 'get_exclusive_directive'):
                 header = header.replace(
                     '%EXCLUSIVE_DIRECTIVE%', self.header.get_exclusive_directive(job, parameters))
+            if hasattr(self.header, 'get_select_directive'):
+                header = header.replace(
+                    '%SELECT_DIRECTIVE%', self.header.get_select_directive(job, parameters))
             if hasattr(self.header, 'get_account_directive'):
                 header = header.replace(
                     '%ACCOUNT_DIRECTIVE%', self.header.get_account_directive(job, parameters))
@@ -1530,7 +1532,7 @@ class ParamikoPlatform(Platform):
                     '%HYPERTHREADING_DIRECTIVE%', self.header.get_hyperthreading_directive(job, parameters))
         return header
 
-    def closeConnection(self):
+    def close_connection(self):
         # Ensure to delete all references to the ssh connection, so that it frees all the file descriptors
         with suppress(Exception):
             if self._ftpChannel:
