@@ -42,6 +42,7 @@ from autosubmit.job.job_utils import get_job_package_code, get_split_size_unit, 
 from autosubmit.job.metrics_processor import UserMetricProcessor
 from autosubmit.job.template import get_template_snippet, Language
 from autosubmit.log.log import Log, AutosubmitCritical
+from autosubmit.platforms.fluxoverslurm import FluxOverSlurmPlatform
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
@@ -130,7 +131,7 @@ class Job(object):
     """
 
     __slots__ = (
-        'rerun_only', 'delay_end', 'wrapper_type', '_wrapper_queue',
+        'rerun_only', 'delay_end', 'wrapper_type', 'wrapper_method', '_wrapper_queue',
         '_platform', '_queue', '_partition', 'retry_delay', '_section',
         '_wallclock', 'wchunkinc', '_tasks', '_nodes',
         '_threads', '_processors', '_memory', '_memory_per_task', '_chunk',
@@ -141,7 +142,7 @@ class Job(object):
         'file', 'additional_files', 'executable', '_local_logs',
         '_remote_logs', 'script_name', 'stat_file', '_status', 'prev_status',
         'new_status', 'priority', '_parents', '_children', '_fail_count', 'expid',
-        'parameters', '_tmp_path', '_log_path', '_platform', 'check',
+        'parameters', '_tmp_path', '_log_path', 'check',
         'check_warnings', '_packed', 'hold', 'distance_weight', 'level', '_export',
         '_dependencies', 'running', 'start_time', 'ext_header_path', 'ext_tailer_path',
         'edge_info', 'total_jobs', 'max_waiting_jobs', 'exclusive', '_retrials',
@@ -192,6 +193,7 @@ class Job(object):
         self.rerun_only = False
         self.delay_end = None
         self.wrapper_type = None
+        self.wrapper_method = None
         self._wrapper_queue = None
         self._platform = None
         self._queue = None
@@ -309,6 +311,7 @@ class Job(object):
         self.rerun_only = False
         self.delay_end = None
         self.wrapper_type = None
+        self.wrapper_method = None
         self._wrapper_queue = None
         self._queue = None
         self._partition = None
@@ -2379,7 +2382,10 @@ class Job(object):
         return self._get_paramiko_template(snippet, template, parameters)
 
     def _get_paramiko_template(self, snippet: 'TemplateSnippet', template, parameters) -> str:
-        current_platform = self._platform
+        if self.wrapper_method == 'flux':
+            current_platform = FluxOverSlurmPlatform()
+        else:
+            current_platform = self._platform
         return ''.join([
             snippet.as_header(current_platform.get_header(self, parameters), self.executable),
             snippet.as_body(template),
