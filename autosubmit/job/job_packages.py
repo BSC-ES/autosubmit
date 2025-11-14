@@ -155,8 +155,7 @@ class JobPackageBase(object):
         for job in self.jobs:
             # When SCRIPT is defined, FILE is ignored.
             if not job.script and job.file:
-                job_file_path = project_dir / job.file
-                if not job_file_path.exists():
+                if not (project_dir / job.file).exists():
                     if not only_generate:
                         raise AutosubmitCritical(f"[section:{job.section}]: Job script:{job.file} does not exists", 7014)
                     Log.warning(f"[section:{job.section}]: Job script:{job.file} does not exists, skipping check")
