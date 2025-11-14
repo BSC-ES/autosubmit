@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2017-2020 Earth Sciences Department, BSC-CNS
+# Copyright 2017-2025 Earth Sciences Department, BSC-CNS
 
 # This file is part of Autosubmit.
 
@@ -230,7 +230,7 @@ class SlurmHeader(object):
 
     def get_tasks_per_node(self, job, parameters, het=-1):
         """
-        Returns memory per task directive for the specified job
+        Returns tasks per node directive for the specified job
 
         :param job: job to create tasks per node directive for
         :type job: Job
