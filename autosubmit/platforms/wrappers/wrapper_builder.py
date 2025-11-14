@@ -65,6 +65,7 @@ class WrapperBuilder(object):
         self.machinefiles_name = ''
         self.machinefiles_indent = 0
         self.exit_thread = ''
+        self.jobs = kwargs['wrapper_data'].jobs
         if "wallclock_by_level" in list(kwargs.keys()):
             self.wallclock_by_level = kwargs['wallclock_by_level']
         self.working_dir = kwargs.get('working_dir', '')
@@ -176,11 +177,17 @@ class FluxWrapperBuilder(WrapperBuilder):
         conda info
 
         # Instantiate Flux within the allocated resources and run the jobs
-        srun --cpu-bind=none flux start /usr/bin/bash flux_runner.sh
+        srun --cpu-bind=none flux start --verbose=2 /usr/bin/bash flux_runner.sh
         """).format(self._dependency_script(), '\n'.ljust(13))
     
     def _dependency_script(self):
         pass  # pragma: no cover
+
+    def _get_job_from_name(self, job_name: str):
+        for job in self.jobs:
+            if job.name == job_name:
+                return job
+        return None
 
 class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
     # TODO: [ENGINES] Implement error handling, retrials, stat files, etc.
@@ -190,13 +197,19 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
         job_id = ""
 
         for job_script in self.job_scripts:
-            job_id = "job_id_" + job_script.replace('.cmd', '')
+            job_name = job_script.replace('.cmd', '')
+            job_id = "job_" + job_name
+            processors = self._get_job_from_name(job_name).processors
+
             if prev_job_id != "":
-                script += f"{job_id}=$(flux batch --dependency=afterany:${prev_job_id} {job_script})\n"
+                script += f"{job_id}=$(flux batch --nslots={processors} --dependency=afterany:${prev_job_id} {job_script})\n"
             else:
-                script += f"{job_id}=$(flux batch {job_script})\n"
+                script += f"{job_id}=$(flux batch --nslots={processors} {job_script})\n"
 
             prev_job_id = job_id
+
+        script += "flux resource list\n" # TODO: [ENGINES] Delete this line after testing
+        script += "flux queue drain\n"
 
         return script
     
@@ -206,7 +219,12 @@ class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
         script = ""
 
         for job_script in self.job_scripts:
-            script += f"flux batch {job_script}\n"
+            job_name = job_script.replace('.cmd', '')
+            processors = self._get_job_from_name(job_name).processors
+            script += f"flux batch --nslots={processors} {job_script}\n"
+
+        script += "flux resource list\n" # TODO: [ENGINES] Delete this line after testing
+        script += "flux queue drain\n"
 
         return script
 
