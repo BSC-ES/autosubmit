@@ -18,6 +18,7 @@
 import random
 import string
 import textwrap
+from autosubmit.log.log import AutosubmitCritical
 
 from typing import List
 
@@ -28,6 +29,7 @@ class WrapperDirector:
     """
     def __init__(self):
         self._builder = None
+        self.exception = "This type of wrapper is not supported for this platform"
 
     def construct(self, builder):
         self._builder = builder
@@ -62,6 +64,7 @@ class WrapperBuilder(object):
         self.machinefiles_name = ''
         self.machinefiles_indent = 0
         self.exit_thread = ''
+        self.jobs = kwargs['wrapper_data'].jobs
         if "wallclock_by_level" in list(kwargs.keys()):
             self.wallclock_by_level = kwargs['wallclock_by_level']
 
@@ -121,6 +124,115 @@ class WrapperBuilder(object):
         padding = amount * ch
         return ''.join(padding + line for line in text.splitlines(True))
 
+class FluxWrapperBuilder(WrapperBuilder):
+    """
+    The FluxWrapperBuilder is the responsible for generating the wrapper script
+    that will be submitted to Slurm to initialize Flux and submit the inner jobs
+    to the Flux scheduler inside the allocation.
+    
+    This is a special implementation because we use Flux as a wrapper engine inside 
+    Slurm allocations.
+    """
+
+    # TODO: [ENGINES] Delete the following comment
+    """
+    La idea es que se genere un CMD para enviar a Slurm que inicialice la instancia de Flux
+    en la alocación correspondiente y lance los jobs individuales mediante un batch script.
+    En algún sitio necesitaremos conseguir que se generen los CMD individuales de los jobs
+    para ser ejecutados por Flux una vez inicializado. El SlurmPlatform se encarga de generar
+    los CMD individuales, así que probablemente sea en el SlurmHeader donde se deba hacer esa
+    llamada.
+    La cuestión es si necesitaríamos crear un FluxHeader. En ParamikoPlatform se usa el header.SERIAL
+    o header.PARALLEL de la plataforma correspondiente.
+    """
+
+    def build_imports(self):
+        return ""
+    
+    def build_job_thread(self):
+        return ""
+    
+    # TODO: [ENGINES] Delete hardcoded flux environment setup
+    def build_main(self):
+        if not self.job_scripts:
+            raise AutosubmitCritical("No job scripts found for building the Flux wrapper.", )
+        
+        return textwrap.dedent("""
+        # Dependency script generation
+        cat << 'EOF' > flux_runner.sh
+        #!/bin/bash
+                               
+        {0}
+        EOF
+
+        # Grant execution permission to the generated script
+        chmod +x flux_runner.sh
+
+        # Load user environment
+        module load miniconda
+        source /apps/GPP/MINICONDA/24.1.2/etc/profile.d/conda.sh
+        conda activate flux
+        conda info
+
+        # Instantiate Flux within the allocated resources and run the jobs
+        srun --cpu-bind=none flux start --verbose=2 /usr/bin/bash flux_runner.sh
+        """).format(self._dependency_script(), '\n'.ljust(13))
+    
+    def _dependency_script(self):
+        pass  # pragma: no cover
+
+    def _get_job_from_name(self, job_name: str):
+        for job in self.jobs:
+            if job.name == job_name:
+                return job
+        return None
+
+class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
+    # TODO: [ENGINES] Implement error handling, retrials, stat files, etc.
+    def _dependency_script(self):
+        script = ""
+        prev_job_id = ""
+        job_id = ""
+
+        for job_script in self.job_scripts:
+            job_name = job_script.replace('.cmd', '')
+            job_id = "job_" + job_name
+            processors = self._get_job_from_name(job_name).processors
+
+            if prev_job_id != "":
+                script += f"{job_id}=$(flux batch --nslots={processors} --dependency=afterany:${prev_job_id} {job_script})\n"
+            else:
+                script += f"{job_id}=$(flux batch --nslots={processors} {job_script})\n"
+
+            prev_job_id = job_id
+
+        script += "flux resource list\n" # TODO: [ENGINES] Delete this line after testing
+        script += "flux queue drain\n"
+
+        return script
+    
+class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
+    # TODO: [ENGINES] Implement error handling, retrials, stat files, etc.
+    def _dependency_script(self):
+        script = ""
+
+        for job_script in self.job_scripts:
+            job_name = job_script.replace('.cmd', '')
+            processors = self._get_job_from_name(job_name).processors
+            script += f"flux batch --nslots={processors} {job_script}\n"
+
+        script += "flux resource list\n" # TODO: [ENGINES] Delete this line after testing
+        script += "flux queue drain\n"
+
+        return script
+
+class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
+    def _dependency_script(self):
+        raise NotImplementedError(self.exception)   # pragma: no cover
+
+class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):    
+    def _dependency_script(self):
+        raise NotImplementedError(self.exception)   # pragma: no cover
 
 class PythonWrapperBuilder(WrapperBuilder):
     def get_random_alphanumeric_string(self,letters_count, digits_count):
