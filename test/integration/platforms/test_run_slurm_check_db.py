@@ -669,6 +669,7 @@ def test_run_interrupted(
     _assert_files_recovered(files_check_list)
 
 
+@pytest.mark.timeout(300)
 @pytest.mark.slurm
 @pytest.mark.parametrize("jobs_data,final_status", [
     (dedent("""\
