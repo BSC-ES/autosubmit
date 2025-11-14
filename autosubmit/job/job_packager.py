@@ -311,6 +311,8 @@ class JobPackager(object):
         Log.warning("There are no more jobs of this section to form a wrapper, submitting the remaining jobs")
         if len(p.jobs) == 1:
             p.jobs[0].wrapper_type = "Simple"
+            # TODO: Here I could insert the code to reverse the wrapper method to None
+            # p.jobs[0].wrapper_method = self.wrapper_method
             packages_to_submit.append(JobPackageSimple([p.jobs[0]]))
         else:
             packages_to_submit.append(p)
@@ -707,7 +709,7 @@ class JobPackager(object):
                 jobs_resources = horizontal_packager.components_dict
             jobs_resources['MACHINEFILES'] = machinefile_function
             current_package = JobPackageHorizontal(
-                package_jobs, jobs_resources=jobs_resources, method=self.wrapper_method[self.current_wrapper_section], configuration=self._as_config, wrapper_section=self.current_wrapper_section)
+                package_jobs, jobs_resources=jobs_resources, method=self.wrapper_method[self.current_wrapper_section], configuration=self._as_config, wrapper_section=self.current_wrapper_section, wrapper_info=wrapper_info)
             packages.append(current_package)
 
         return packages
@@ -779,7 +781,7 @@ class JobPackager(object):
                 for job in current_package[level]:
                     job.level = level
         return JobPackageHorizontalVertical(current_package, max_procs, total_wallclock,
-                                            jobs_resources=jobs_resources, configuration=self._as_config, wrapper_section=self.current_wrapper_section)
+                                            jobs_resources=jobs_resources, configuration=self._as_config, wrapper_section=self.current_wrapper_section, wrapper_info=wrapper_info, method=self.wrapper_method[self.current_wrapper_section])
 
     def _build_vertical_horizontal_package(self, horizontal_packager, jobs_resources, wrapper_info):
         total_wallclock = '00:00'
@@ -807,7 +809,7 @@ class JobPackager(object):
                 for job in current_package[level]:
                     job.level = level
         return JobPackageVerticalHorizontal(current_package, total_processors, total_wallclock,
-                                            jobs_resources=jobs_resources, method=self.wrapper_method[self.current_wrapper_section], configuration=self._as_config, wrapper_section=self.current_wrapper_section )
+                                            jobs_resources=jobs_resources, method=self.wrapper_method[self.current_wrapper_section], configuration=self._as_config, wrapper_section=self.current_wrapper_section, wrapper_info=wrapper_info)
 
 
 # TODO: Rename and unite JobPackerVerticalMixed to JobPackerVertical since
