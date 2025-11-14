@@ -24,16 +24,17 @@ from sqlalchemy import and_, or_, select, desc, func
 from sqlalchemy.exc import IntegrityError
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager import DbManager
 from autosubmit.database.tables import ExperimentStructureTable, PreviewWrapperJobsTable, WrapperJobsTable, \
     PreviewWrapperInfoTable, WrapperInfoTable, SectionsStructureTable, get_table_from_name
 from autosubmit.database.tables import JobsTable, Table
-from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log
 
+
 if TYPE_CHECKING:
-    pass
+    from autosubmit.job.job import Job
 
 
 class JobsDbManager(DbManager):
@@ -43,14 +44,37 @@ class JobsDbManager(DbManager):
     as Postgres, Mongo, MySQL, etc.
     """
 
-    def __init__(self, connection_url: str, schema: Optional[str] = None) -> None:
-        super().__init__(connection_url, schema)
+    def __init__(self, schema: Optional[str] = None) -> None:
+        if BasicConfig.DATABASE_BACKEND == 'sqlite':
+            persistence_full_path = Path(Path(BasicConfig.LOCAL_ROOT_DIR, schema, "db"), Path("job_list.db"))
+        else:
+            persistence_full_path = None
+        super().__init__(get_connection_url(persistence_full_path), schema)
         self._ACTIVE_STATUSES = ['READY', 'SUBMITTED', 'QUEUING', 'HELD', 'RUNNING']
         self._FINAL_STATUSES = ['COMPLETED', 'FAILED']
         self.restore_path = Path(BasicConfig.LOCAL_ROOT_DIR) / 'db' / 'job_list.sql'
 
-    def save_jobs(self, job_list: List[Job], only_logs: bool = False) -> None:
-        """Save the job list to the database. Normally this will save the current active jobs."""
+    def save_jobs(self, job_list: List["Job"], only_logs: bool = False) -> None:
+        """Save the job list to the database.
+
+        This method persists job information to the database.
+        It supports both full job state persistence and log-only updates.
+
+        :param job_list: List of Job objects to save to the database.
+        :type job_list: List[Job]
+        :param only_logs: If True, only update log-related fields (name, log, updated_log,
+                          local_logs_out, local_logs_err, remote_logs_out, remote_logs_err).
+                          If False, save all job state information.
+        :type only_logs: bool
+        :return: None
+        :raises: May raise database-related exceptions during upsert operations.
+
+        .. note::
+           - Uses upsert operation with 'name' as the primary key.
+           - Job state is serialized using `job.__getstate__(log_process=False)`.
+           - When `only_logs=True`, only log-related attributes are updated to minimize database writes.
+        """
+
         table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
         self.create_table(table.name)
         persistent_data = [job.__getstate__(log_process=False) for job in job_list]
@@ -546,3 +570,7 @@ class JobsDbManager(DbManager):
         self.create_table(wrapper_info_table.name)
         wrappers = self.select_all_with_columns(wrapper_info_table.name)
         return [wrapper[1] for wrapper in wrappers]
+
+    def save_log_files(self, job):
+        """Save log and updated log attributes into the db."""
+        self.save_jobs([job], only_logs=True)

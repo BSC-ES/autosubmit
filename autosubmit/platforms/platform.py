@@ -32,6 +32,8 @@ from typing import Any, Optional, Union, TYPE_CHECKING
 
 import setproctitle
 
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
@@ -39,7 +41,6 @@ from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.job.job_packages import JobPackageBase
-
 
 
 def _init_logs_log_process(as_conf, platform_name):
@@ -77,6 +78,7 @@ def recover_platform_job_logs_wrapper(
     platform.recovery_queue = recovery_queue
     platform.work_event = worker_event
     platform.cleanup_event = cleanup_event
+    BasicConfig.read()
     as_conf.experiment_data = {
         "AS_ENV_PLATFORMS_PATH": as_conf.experiment_data.get("AS_ENV_PLATFORMS_PATH", None),
         "AS_ENV_SSH_CONFIG_PATH": as_conf.experiment_data.get("AS_ENV_SSH_CONFIG_PATH", None),
@@ -87,6 +89,7 @@ def recover_platform_job_logs_wrapper(
         "LOG_RECOVERY_FILE_LEVEL": as_conf.experiment_data.get("CONFIG", {}).get("LOG_RECOVERY_FILE_LEVEL",
                                                                                  "EVERYTHING"),
     }
+
     _init_logs_log_process(as_conf, platform.name)
     platform.recover_platform_job_logs(as_conf)
     _exit(
@@ -686,7 +689,6 @@ class Platform(object):
                 job.current_checkpoint_step += 1
                 self.get_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}', False, ignore_log=True)
 
-
     def remove_stat_file(self, job: Any) -> bool:
         """
         Removes STAT files from remote.
@@ -1021,14 +1023,14 @@ class Platform(object):
                 break
         return process_log
 
-    def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any], as_conf: 'AutosubmitConfig') -> None:
-        """
-        Recovers log files for jobs from the recovery queue and retries failed jobs.
+    def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any], as_conf: 'AutosubmitConfig', jobs_db_manager: 'JobsDbManager' = None) -> set[Any]:
+        """Recover log files for jobs and persist job state.
 
-        :param identifier: Identifier for logging purposes.
-        :param jobs_pending_to_process: Set of jobs that had issues during log retrieval.
-        :param as_conf: The Autosubmit configuration object containing experiment data.
-        :return: Updated set of jobs pending to process.
+        :param identifier: Identifier string used in log messages.
+        :param jobs_pending_to_process: Jobs that previously failed during log recovery.
+        :param as_conf: Autosubmit configuration for reconnecting platforms.
+        :param jobs_db_manager: Optional jobs DB manager to use for persistence.
+        :return: Updated set of jobs still pending log recovery.
         """
         while not self.recovery_queue.empty():
             try:
@@ -1042,7 +1044,7 @@ class Platform(object):
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
                 try:
                     job.retrieve_logfiles(raise_error=True)
-                    job.save_logfiles()
+                    jobs_db_manager.save_log_files(job)
                 except Exception:
                     jobs_pending_to_process.add(job)
                     job._log_recovery_retries += 1
@@ -1061,6 +1063,7 @@ class Platform(object):
             job._log_recovery_retries += 1
             try:
                 job.retrieve_logfiles(raise_error=True)
+                jobs_db_manager.save_log_files(job)
                 job._log_recovery_retries += 1
                 Log.result(
                     f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
@@ -1084,6 +1087,7 @@ class Platform(object):
         """
         setproctitle.setproctitle(f"autosubmit log {self.expid} recovery {self.name.lower()}")
         identifier = f"{self.name.lower()}(log_recovery):"
+        jobs_db_manager = JobsDbManager(schema=self.expid)
         try:
             Log.info(f"{identifier} Starting...")
             jobs_pending_to_process = set()
@@ -1094,9 +1098,9 @@ class Platform(object):
             # Keep alive signal timeout is 5 minutes, but the sleeptime is 60 seconds.
             self.keep_alive_timeout = max(log_recovery_timeout * 5, 60 * 5)
             while self.wait_for_work(sleep_time=max(log_recovery_timeout, 60)):
-                jobs_pending_to_process = self.recover_job_log(identifier, jobs_pending_to_process, as_conf)
+                jobs_pending_to_process = self.recover_job_log(identifier, jobs_pending_to_process, as_conf, jobs_db_manager)
                 if self.cleanup_event.is_set():  # Check if the main process is waiting for this child to end.
-                    self.recover_job_log(identifier, jobs_pending_to_process, as_conf)
+                    self.recover_job_log(identifier, jobs_pending_to_process, as_conf, jobs_db_manager)
                     break
         except Exception as e:
             Log.error(f"{identifier} {e}")

@@ -34,8 +34,6 @@ from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_da
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.database.db_common import get_connection_url
-from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job import job_utils
@@ -1369,18 +1367,6 @@ class Job(object):
             self.write_submit_time()
             self.write_start_time(count=self.fail_count)
             self.write_end_time(self.status == Status.COMPLETED, self.fail_count)
-
-    def save_logfiles(self) -> None:
-        """Save log and updated log attributes into the db."""
-        if BasicConfig.DATABASE_BACKEND == 'sqlite':
-            persistence_full_path = Path(BasicConfig.LOCAL_ROOT_DIR, self.expid, "db") / Path("job_list.db")
-            schema = None
-        else:
-            persistence_full_path = None
-            schema = self.expid
-
-        dbmanager = JobsDbManager(get_connection_url(persistence_full_path), schema=schema)
-        dbmanager.save_jobs([self])
 
     def retrieve_logfiles(self, raise_error: bool = False) -> None:
         """

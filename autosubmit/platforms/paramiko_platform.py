@@ -793,7 +793,7 @@ class ParamikoPlatform(Platform):
             if not job_names_provided:
                 cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_FAILED' -type f"
             else:
-                patterns = ' -o '.join([f"-name '{name}_FAILED'" for name in job_names])
+                patterns = ' -o '.join([f"-name '{name}_FAILED'" for name in job_names_provided])
                 cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {patterns} \\) -type f"
             self.send_command(cmd)
             output = self.get_ssh_output()

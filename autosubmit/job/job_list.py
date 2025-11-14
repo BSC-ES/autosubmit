@@ -32,7 +32,6 @@ from networkx import DiGraph
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.history.experiment_history import ExperimentHistory
@@ -52,15 +51,7 @@ class JobList(object):
     """
 
     def __init__(self, expid, config, parser_factory, run_mode=False, disable_save=False, submitter=None):
-        if BasicConfig.DATABASE_BACKEND == 'sqlite':
-            self._persistence_path = Path(BasicConfig.LOCAL_ROOT_DIR, expid, "db")
-            self._persistence_file = Path("job_list.db")
-            self._persistence_full_path = Path(self._persistence_path, self._persistence_file)
-        else:
-            self._persistence_path = None
-            self._persistence_file = None
-            self._persistence_full_path = None
-        self._update_file = "updated_list_" + expid + ".txt"
+        self._update_file = Path("updated_list_" + expid + ".txt")
         self._failed_file = "failed_job_list_" + expid + ".txt"
         self._expid = expid
         self._as_conf = config
@@ -83,8 +74,7 @@ class JobList(object):
         self.depends_on_previous_split = dict()
         self.path_to_logs = Path(BasicConfig.LOCAL_ROOT_DIR,
                                  self.expid, BasicConfig.LOCAL_TMP_DIR, f'LOG_{self.expid}')
-        self.dbmanager = JobsDbManager(get_connection_url(self._persistence_full_path),
-                                       schema=expid)
+        self.dbmanager = JobsDbManager(schema=self.expid)
         self.run_mode = run_mode
         self._INACTIVE_STATUSES = [Status.DELAYED, Status.SUSPENDED, Status.WAITING]
         self._ACTIVE_STATUSES = [Status.READY, Status.SUBMITTED, Status.QUEUING,
@@ -98,6 +88,8 @@ class JobList(object):
         self.disable_save = disable_save
         self.submitter = submitter
         self.check_wrapper_fake_ids = set()
+        self._set_status_path = Path(BasicConfig.LOCAL_ROOT_DIR / Path(self.expid) / "status")
+        self._update_file_path = self._set_status_path / self._update_file
 
     @property
     def graph_dict(self):
@@ -2860,28 +2852,62 @@ class JobList(object):
                 except Exception:
                     Log.debug(f"Couldn't print job status for job {job.name}")
 
-    def update_from_file(self, store_change=True):
-        """
-        Updates jobs list on the fly from and update file
-        :param store_change: if True, renames the update
-        file to avoid reloading it at the next iteration
-        """
+    def update_from_file(self, store_change: bool = True) -> None:
+        """Update jobs status  from an external status file.
 
-        if self._persistence_path and os.path.exists(os.path.join(self._persistence_path, self._update_file)):
-            Log.info(f"Loading updated list: {os.path.join(self._persistence_path, self._update_file)}")
-            for line in open(os.path.join(self._persistence_path, self._update_file)):
-                if line.strip() == '':
-                    continue
-                job = self.get_job_by_name(line.split()[0])
-                if job:
-                    job.status = self._stat_val.retval(line.split()[1])
-                    job._fail_count = 0
-            now = localtime()
-            output_date = strftime("%Y%m%d_%H%M", now)
-            if store_change:
-                move(os.path.join(self._persistence_path, self._update_file),
-                     os.path.join(self._persistence_path, self._update_file +
-                                  "_" + output_date))
+        Reads job status updates from a file and applies them to the job list.
+        If `store_change` is True, the update file is archived after processing.
+
+        :param store_change: If True, rename the update file after processing to prevent reloading.
+        :raises FileNotFoundError: If the status directory cannot be created.
+        :raises ValueError: If a line in the update file has invalid format.
+        """
+        # TODO: Warn users that this file has changed it's location ( from pkl/ -> status/)
+
+        if not self._update_file_path.exists():
+            return
+
+        Log.info(f"Loading updated list: {self._update_file_path.name}")
+        try:
+            with open(self._update_file_path, 'r', encoding='utf-8') as f:
+                for line_num, line in enumerate(f, start=1):
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+
+                    parts = line.split()
+                    if len(parts) < 2:
+                        Log.warning(f"Skipping invalid line {line_num} in {self._update_file_path.name}: '{line}'")
+                        continue
+
+                    job_name, status_str = parts[0], parts[1]
+                    status_str = status_str.upper()
+
+                    if status_str not in Status.VALUE_TO_KEY:
+                        Log.warning(f"Invalid status '{status_str}' on line {line_num}")
+                        continue
+
+                    job = self.get_job_by_name(job_name)
+
+                    if not job:
+                        Log.warning(f"Job '{job_name}' not found (line {line_num})")
+                        continue
+
+                    try:
+                        new_status = self._stat_val.retval(status_str)
+                        job.status = new_status
+                        job._fail_count = 0
+                        Log.result(f"Updated job '{job_name}' to status '{status_str}'")
+                    except (ValueError, AttributeError) as e:
+                        Log.warning(f"Invalid status '{status_str}' for job '{job_name}' (line {line_num}): {e}")
+        except (IOError, OSError) as e:
+            Log.warning(f"Failed to read update file {self._update_file_path}: {e}")
+
+        if store_change:
+            output_date = strftime("%Y%m%d_%H%M", localtime())
+            archived_file_path = self._set_status_path / f"{self._update_file}_{output_date}"
+            self._update_file_path.rename(archived_file_path)
+            Log.result(f"Renamed update file to prevent reloading in each iteration: {archived_file_path.name}")
 
     def get_skippable_jobs(self, jobs_in_wrapper):
         job_list_skip = [job for job in self.get_job_list() if job.skippable == "true" and
@@ -3057,7 +3083,9 @@ class JobList(object):
         if new_run:
             # load all jobs without updated_log from db
             jobs_to_recover = self.load_jobs(full_load=True, only_not_updated_logs=True)
-            # TODO: call to job.platform.add_job_to_log_recover(self) here
+            for job in jobs_to_recover:
+                job.platform.add_job_to_log_recover(job)
+
         else:
             jobs_to_recover = [job for job in self.job_list if not getattr(job, "updated_log", False) and not getattr(job, "x11", False) and job.status in self._FINAL_STATUSES]
 
