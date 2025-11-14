@@ -145,9 +145,8 @@ def test_wait_until_timeout(prepare_test, local, as_conf, mocker, cleanup_event,
     mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     local.keep_alive_timeout = 2
     max_items = 1
-    ctx = local.get_mp_context()
-    local.prepare_process(ctx)
-    local.recovery_queue = CopyQueue(ctx=ctx)
+    local.prepare_process()
+    local.recovery_queue = CopyQueue(ctx=local.ctx)
     local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
     local.work_event.set() if work_event else local.work_event.clear()
     if recovery_queue_full:
@@ -173,9 +172,8 @@ def test_wait_for_work(prepare_test, local, as_conf, mocker, cleanup_event, work
     mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     local.keep_alive_timeout = 2
     max_items = 1
-    ctx = local.get_mp_context()
-    local.prepare_process(ctx)
-    local.recovery_queue = CopyQueue(ctx=ctx)
+    local.prepare_process()
+    local.recovery_queue = CopyQueue(ctx=local.ctx)
     local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
     local.work_event.set() if work_event else local.work_event.clear()
     if recovery_queue_full:
@@ -201,9 +199,8 @@ def test_wait_mandatory_time(prepare_test, local, as_conf, mocker, cleanup_event
     mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     local.keep_alive_timeout = 2
     max_items = 1
-    ctx = local.get_mp_context()
-    local.prepare_process(ctx)
-    local.recovery_queue = CopyQueue(ctx=ctx)
+    local.prepare_process()
+    local.recovery_queue = CopyQueue(ctx=local.ctx)
     local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
     local.work_event.set() if work_event else local.work_event.clear()
     if recovery_queue_full:
@@ -216,9 +213,8 @@ def test_wait_mandatory_time(prepare_test, local, as_conf, mocker, cleanup_event
 def test_unique_elements(local, mocker):
     mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     max_items = 3
-    ctx = local.get_mp_context()
-    local.prepare_process(ctx)
-    local.recovery_queue = CopyQueue(ctx=ctx)
+    local.prepare_process()
+    local.recovery_queue = CopyQueue(ctx=local.ctx)
     for i in range(max_items):
         local.recovery_queue.put(Job(f'rng{i}', f'000{i}', Status.COMPLETED, 0))
     for i in range(max_items):
