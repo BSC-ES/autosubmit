@@ -2502,7 +2502,6 @@ class Autosubmit:
                 if job_names_with_missing_logs:
                     Log.warning(f"Autosubmit couldn't recover all job logs for the following jobs: "
                                 f"{job_names_with_missing_logs}")
-
                 try:
                     exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                                     historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
@@ -2513,7 +2512,7 @@ class Autosubmit:
                     pass
                 for p in platforms_to_test:
                     p.closeConnection()
-                if len(job_list.get_failed()) > 0:
+                if len(job_list.get_failed_from_db()) > 0:
                     Log.info("Some jobs have failed and reached maximum retrials")
                 else:
                     Log.result("Run successful")
@@ -2541,7 +2540,7 @@ class Autosubmit:
 
         # Suppress in case ``job_list`` was not defined yet...
         with suppress(NameError):
-            if job_list.get_failed():
+            if len(job_list.get_failed_from_db()) > 0:
                 return 1
         return 0
 

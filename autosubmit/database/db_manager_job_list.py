@@ -587,3 +587,18 @@ class JobsDbManager(DbManager):
         )
 
         return [job['name'] for job in job_list_data]
+
+    def get_failed_job_data(self) -> list[dict[str, Any]]:
+        """Get the names of jobs that have failed.
+
+        :return: List of job names that have failed.
+        :rtype: List[str]
+        """
+        table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
+
+        self.create_table(table.name)
+        job_list_data: list[dict[str, Any]] = [
+            dict(job) for job in self.select_where_with_columns(table, {'status': "FAILED"})
+        ]
+
+        return job_list_data

@@ -280,7 +280,7 @@ def test_run_uninterrupted(
     )
     # Run the experiment
     exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
-    _assert_exit_code(final_status, exit_code)
+
 
     # Check and display results
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
@@ -305,6 +305,7 @@ def test_run_uninterrupted(
     try:
         _assert_db_fields(db_check_list)
         _assert_files_recovered(files_check_list)
+        _assert_exit_code(final_status, exit_code)
     except AssertionError:
         pytest.fail(e_msg)
 

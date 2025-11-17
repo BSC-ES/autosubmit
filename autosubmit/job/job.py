@@ -2586,7 +2586,7 @@ class Job(object):
 
         It doesn't write if hold is True.
         """
-        # TODO: revise this
+        # TODO: revise what is happening with these casts because before it was not neccesary
         data_time = ["", int(datetime.datetime.strptime(str(int(self.submit_time_timestamp)), "%Y%m%d%H%M%S").timestamp())]
         path = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
         if os.path.exists(path):

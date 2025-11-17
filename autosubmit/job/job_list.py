@@ -4211,3 +4211,6 @@ class JobList(object):
         :rtype: List[str]
         """
         return self.dbmanager.get_missing_logs()
+
+    def get_failed_from_db(self):
+        return self.dbmanager.get_failed_job_data()
