@@ -30,7 +30,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Optional, TYPE_CHECKING
 
-from bscearth.utils.date import sum_str_hours
+from bscearth.utils.date import sum_str_hours, date2str
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status

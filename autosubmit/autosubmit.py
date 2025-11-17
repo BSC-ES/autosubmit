@@ -2136,6 +2136,7 @@ class Autosubmit:
                     if job.status == Status.FAILED:
                         Log.warning(f"Job {job.name} has failed in the previous run, resetting its status to WAITING")
                         job.status = Status.WAITING
+                        job.init_runtime_parameters(as_conf, reset_logs=True)
         except IOError as e:
             raise AutosubmitError(
                 "Job_list not found", 6016, str(e))
@@ -2181,6 +2182,7 @@ class Autosubmit:
         if as_conf.experiment_data.get("WRAPPERS", None) is not None:
             Log.debug("Processing job packages")
             job_list.load_wrappers()
+            Autosubmit.check_wrappers(as_conf, job_list, expid)
         if recover:
             Log.info("Recovering wrappers... Done")
 
@@ -2242,8 +2244,8 @@ class Autosubmit:
         return job_list.total_size, safetysleeptime, default_retrials, check_wrapper_jobs_sleeptime
 
     @staticmethod
-    def check_logs_status(job_list: "JobList", new_run) -> bool:
-        return job_list.update_log_status(new_run)
+    def check_logs_status(job_list) -> str:
+        return job_list.get_missing_logs()
 
     @staticmethod
     def refresh_log_recovery_process(platforms: list[Platform], as_conf: AutosubmitConfig) -> None:
@@ -2324,7 +2326,7 @@ class Autosubmit:
                 max_recovery_retrials = as_conf.experiment_data.get("CONFIG", {}).get("RECOVERY_RETRIALS",
                                                                                       3650)  # (72h - 122h )
                 recovery_retrials = 0
-                Autosubmit.check_logs_status(job_list, new_run=True)
+                job_list.update_log_status(new_run=True)
                 while job_list.continue_run():
                     try:
                         if Autosubmit.exit:
@@ -2357,13 +2359,13 @@ class Autosubmit:
                                     Autosubmit.job_notify(as_conf, expid, job)
                         del wrappers_id
                         # Updates all workflow status with the new information.
-                        job_list.update_list(as_conf, submitter=submitter)
-                        job_list.save_jobs()
+                        if job_list.update_list(as_conf, submitter=submitter):
+                            job_list.save_jobs()
                         # Submit jobs that are ready to run
                         if len(job_list.get_ready()) > 0:
                             Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, hold=False)
-                            job_list.update_list(as_conf, submitter=submitter)
-                            job_list.save_jobs()
+                            if job_list.update_list(as_conf, submitter=submitter):
+                                job_list.save_jobs()
                         as_conf.save()
 
                         # Submit jobs that are prepared to hold (if remote dependencies parameter are enabled)
@@ -2371,8 +2373,8 @@ class Autosubmit:
                         # This only works for SLURM. ( Prepare status can not be achieved in other platforms )
                         if as_conf.get_remote_dependencies() == "true" and len(job_list.get_prepared()) > 0:
                             Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, hold=True)
-                            job_list.update_list(as_conf, submitter=submitter)
-                            job_list.save_jobs()
+                            if job_list.update_list(as_conf, submitter=submitter):
+                                job_list.save_jobs()
                             as_conf.save()
 
                         # Safe spot to store changes
@@ -2496,10 +2498,10 @@ class Autosubmit:
                     if p.log_recovery_process:
                         p.cleanup_event.set()  # Send cleanup event
                         p.log_recovery_process.join()
-                if Autosubmit.check_logs_status(job_list, new_run=False):
-                    Log.result("Autosubmit recovered all job logs.")
-                else:
-                    Log.warning("Autosubmit couldn't recover all job logs")
+                job_names_with_missing_logs = Autosubmit.check_logs_status(job_list)
+                if job_names_with_missing_logs:
+                    Log.warning(f"Autosubmit couldn't recover all job logs for the following jobs: "
+                                f"{job_names_with_missing_logs}")
 
                 try:
                     exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
@@ -2913,7 +2915,7 @@ class Autosubmit:
             db_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'db')
             job_list = Autosubmit.load_job_list(expid, as_conf, notransitive=notransitive, new=False)
             for job in job_list.get_job_list():
-                job._init_runtime_parameters()
+                job.init_runtime_parameters()
                 job.update_dict_parameters(as_conf)
             Log.debug("Job list restored from {0} files", db_dir)
             jobs = StatisticsUtils.filter_by_section(job_list.get_job_list(), filter_type)

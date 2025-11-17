@@ -385,7 +385,7 @@ class JobList(object):
                 self._as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
             )
         if connect_to_platform:
-            self._assign_platforms(self._as_conf, job, create=False, new=False)
+            job.assign_platform(create=False, new=False)
 
     def _load_graph(self, full_load: bool, load_failed_jobs: bool = False) -> bool:
         """
@@ -553,7 +553,7 @@ class JobList(object):
         self.save_edges()
         self.save_sections()
         for job in self.job_list:
-            self._assign_platforms(as_conf, job, create, new)
+            job.assign_platform(create, new)
         Log.info("Save completed.")
 
     def build_sections_data_to_store(self) -> List[Dict[str, Any]]:
@@ -660,11 +660,6 @@ class JobList(object):
                 str(e),
             )
 
-    def _assign_platforms(self, as_conf: AutosubmitConfig, job: Job, create: bool, new: bool) -> None:
-        if create or new:
-            job.reset_logs(as_conf)
-        if self.submitter and job.platform_name and job.platform_name in self.submitter.platforms:
-            job.platform = self.submitter.platforms[job.platform_name]
 
     def clear_generate(self):
         self.dependency_map = {}
@@ -2600,12 +2595,13 @@ class JobList(object):
         """
         for job in self.job_list:
             self.update_parents_edge_completeness(job)
+        # moved here, so the logs are not overwritten during an iteration
         self.update_log_status()
         self.unload_completed_jobs()
         self._load_graph(full_load=False)
         for job in self.job_list:
             if not job.platform:
-                self._assign_platforms(self._as_conf, job, create=False, new=False)
+                job.assign_platform(create=False, new=False)
             if not job.updated:
                 job.update_parameters(self._as_conf, set_attributes=True, reset_logs=False if job.status in (
                         self._IN_SCHEDULER + self._FINAL_STATUSES) else True)
@@ -2615,8 +2611,8 @@ class JobList(object):
         return len(self.get_active()) > 0
 
     def unload_completed_jobs(self):
-        """
-        Unloads completed jobs and edges from the memory
+        """Unloads completed jobs and edges from the memory
+
         This method removes jobs that are in the completed state and logs are recovered.
         """
 
@@ -3046,55 +3042,26 @@ class JobList(object):
                     non_completed.append(parent)
         return non_completed, completed
 
-    def set_log_from_historical_db(self, jobs_to_recover: List[Job], last_run_id: bool = False) -> bool:
-        """Retrieve logs for jobs from historical database.
-
-        This method fetches the stdout and stderr logs for the specified jobs
-        from the historical database and updates the job objects accordingly.
-        :param jobs_to_recover: List of Job objects to recover logs for.
-        :type jobs_to_recover: List[Job]
-        :param last_run_id: If True, fetch logs from the last run ID.
-        :type last_run_id: bool
-        :return: True if logs were successfully recovered for all specified jobs, False otherwise.
-        :rtype: bool
-        """
-        exp_history = ExperimentHistory(self.expid, force_sql_alchemy=True)
-        job_names_to_recover = [job.name for job in jobs_to_recover]
-        jobs_data = exp_history.manager.get_jobs_data_last_row_by_name(job_names_to_recover, last_run_id=last_run_id)
-        jobs = [job for job in self.get_job_list() if job.name in jobs_data.keys()]
-        for job in jobs:
-            job.local_logs = (copy.copy(jobs_data[job.name]['out']), copy.copy(jobs_data[job.name]['err']))
-            job.remote_logs = (copy.copy(jobs_data[job.name]['out']), copy.copy(jobs_data[job.name]['err']))
-            job.updated_log = True
-        return len(set(jobs_data.keys()) & set(job_names_to_recover)) == len(job_names_to_recover)
-
-    def update_log_status(self, new_run: bool = False) -> bool:
+    def update_log_status(self, new_run: bool = False):
         """Update jobs' log recovered status.
 
         Iterate over the current job list and mark jobs whose stdout/stderr logs
         have been recovered.
 
-        :param as_conf: Optional AutosubmitConfig to use (falls back to self._as_conf).
         :param new_run: If True, also mark the job as updated for a new run.
         :type new_run: bool
-        :return: True if all jobs' logs were successfully recovered, False otherwise.
-        :rtype: bool
         """
         if new_run:
             # load all jobs without updated_log from db
             jobs_to_recover = self.load_jobs(full_load=True, only_not_updated_logs=True)
-            for job in jobs_to_recover:
-                job.platform.add_job_to_log_recover(job)
-
         else:
             jobs_to_recover = [job for job in self.job_list if not getattr(job, "updated_log", False) and not getattr(job, "x11", False) and job.status in self._FINAL_STATUSES]
 
-        all_jobs_recovered = True
-        if len(jobs_to_recover) > 0:
-            all_jobs_recovered = self.set_log_from_historical_db(jobs_to_recover, last_run_id=not new_run)
-            self.save_jobs(jobs_to_recover)
-
-        return all_jobs_recovered
+        for job in jobs_to_recover:
+            if str(self._as_conf.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "true":
+                job.retrieve_logfiles()
+            else:
+                job.platform.add_job_to_log_recover(job)
 
     def check_if_log_is_recovered(self, job: Job) -> Path:
         """
@@ -3175,7 +3142,10 @@ class JobList(object):
             save |= self._skip_jobs(as_conf)
         for job in self.get_ready():
             self.update_parents_edge_completeness(job)
+            job.id = 0
             job.set_ready_date()
+            job.updated_log = False
+
         self.update_two_step_jobs()
 
         Log.debug('Update finished')
@@ -3554,13 +3524,10 @@ class JobList(object):
             self.dbmanager.save_wrappers(wrappers, preview=preview)
 
     def load_wrappers(self, preview: bool = False) -> None:
-        """
-        Load wrapper jobs and their inner jobs from the database, and populate the job package map.
+        """ Load wrapper jobs and their inner jobs from the database, and populate the job package map.
 
         :param preview: If True, load wrappers in preview mode.
         :type preview: bool
-        :param job_list: Optional list of jobs to filter the loaded wrappers.
-        :type job_list: Any
 
         :return: None
         :rtype: None
@@ -3587,8 +3554,10 @@ class JobList(object):
                     job = self.get_job_by_name(job_name)
                     if not job:
                         job = self.load_job_by_name(job_name)
-                    wrappers_info[package_name]["job_list"].append(job)
-                self.packages_dict[package_name] = wrappers_info[package_name]["job_list"]
+                    if job.id == wrappers_info[package_name]["id"]:
+                        wrappers_info[package_name]["job_list"].append(job)
+                if wrappers_info[package_name]["job_list"]:
+                    self.packages_dict[package_name] = wrappers_info[package_name]["job_list"]
         # Create WrapperJob objects and populate job_package_map
         from ..job.job import WrapperJob
         for wrapper_info in wrappers_info.values():
@@ -4153,7 +4122,6 @@ class JobList(object):
         :return: Updated JobList object.
         :rtype: JobList
         """
-        # if packages_dict attr is in job_list
         for wrapper_job in self.job_package_map.values():
             # Ordered by higher priority status
             wrapper_status = wrapper_job.status
@@ -4235,3 +4203,11 @@ class JobList(object):
         :rtype: List[int]
         """
         return [id for _, id in self.dbmanager.get_wrappers_id()]
+
+    def get_missing_logs(self):
+        """Get a list of jobs with missing logs from the database.
+
+        :return: List of job names with missing logs.
+        :rtype: List[str]
+        """
+        return self.dbmanager.get_missing_logs()

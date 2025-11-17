@@ -1036,20 +1036,20 @@ class Platform(object):
             try:
                 from autosubmit.job.job import Job
                 job = Job(loaded_data=self.recovery_queue.get(timeout=1), log_process=True)
-                if not job.local_logs[0]:
-                    Log.debug(f"{identifier} Job '{job.name}_{job.fail_count}' has no local log file name")
-                    job.update_local_logs(update_submit_time=False)
-                job.platform_name = self.name  # Change the original platform to this process platform.
+                job.update_local_logs()
+                job.platform_name = self.name  # Change the original platform to this process platform.º
                 job.platform = self
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
                 try:
                     job.retrieve_logfiles(raise_error=True)
-                    jobs_db_manager.save_log_files(job)
+                    # TODO: Maybe redundant (log_recovered), now that we're saving here
+                    job.updated_log = job.log_recovered
+                    jobs_db_manager.save_job_log(job)
                 except Exception:
                     jobs_pending_to_process.add(job)
                     job._log_recovery_retries += 1
                     Log.warning(
-                        f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry:'{job.fail_count}'.")
+                        f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry:'{job.fail_count}")
             except queue.Empty:
                 pass
 
@@ -1063,7 +1063,7 @@ class Platform(object):
             job._log_recovery_retries += 1
             try:
                 job.retrieve_logfiles(raise_error=True)
-                jobs_db_manager.save_log_files(job)
+                jobs_db_manager.save_job_log(job)
                 job._log_recovery_retries += 1
                 Log.result(
                     f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")

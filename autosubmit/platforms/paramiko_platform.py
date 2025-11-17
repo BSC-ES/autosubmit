@@ -1257,8 +1257,6 @@ class ParamikoPlatform(Platform):
             timeout = 60
         else:
             timeout = 60 * 2
-        if not ignore_log:
-            Log.debug(f"send_command timeout used: {timeout} seconds (None = infinity)")
         stderr_readlines = []
         stdout_chunks = []
 

@@ -373,8 +373,18 @@ class Job(object):
         self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
         self.updated = False
 
-    def _init_runtime_parameters(self):
-        # hetjobs
+    def init_runtime_parameters(self, as_conf: AutosubmitConfig, reset_logs: bool) -> None:
+        """Initialize runtime parameters for the job.
+
+        Sets default values for job execution parameters including tasks, nodes,
+        threads, processors, memory, reservations, and checkpoint steps. Optionally
+        resets log-related attributes if requested.
+
+        :param as_conf: Autosubmit configuration object containing job settings.
+        :type as_conf: AutosubmitConfig
+        :param reset_logs: Whether to reset log-related attributes.
+        :type reset_logs: bool
+        """
         self.het = {'HETSIZE': 0}
         self._tasks = '0'
         self._nodes = ""
@@ -382,7 +392,6 @@ class Job(object):
         self._processors = '1'
         self._memory = ''
         self._memory_per_task = ''
-        self.start_time_timestamp = time.time()
         self.processors_per_node = ""
         self.script_name = self.name + ".cmd"
         self.stat_file = f"{self.script_name[:-4]}_STAT_"
@@ -391,11 +400,19 @@ class Job(object):
         self.max_checkpoint_step = 0
         self.exclusive = ""
         self.export = ""
-        self.local_logs = ('', '')
-        self.remote_logs = ('', '')
         self.dependencies = ""
         self.packed_during_building = False
         self.packed = False
+        if self.status == Status.WAITING:
+            self.id = 0
+        elif self.status == Status.READY:
+            self.id = 0
+            self.start_time_timestamp = self.start_time_timestamp if self.start_time_timestamp else time.time()
+
+        self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT", {}).get("WORKFLOW_COMMIT", "")
+        if reset_logs:
+            self.reset_logs()
+
 
     @property  # type: ignore
     def wallclock_in_seconds(self):
@@ -1295,6 +1312,15 @@ class Job(object):
 
 
     def retrieve_external_retrials_logfiles(self):
+        """Retrieve log files for external retrials (retry managed by main autosubmit process, not the wrapper.cmd).
+
+        Attempts to retrieve remote log files for the current job retry.
+        This method is used when the job is outside a vertical wrapper and
+        needs to fetch logs from the platform.
+
+        :return: True if log files were successfully retrieved, False otherwise.
+        :rtype: bool
+        """
         log_recovered = False
         self.remote_logs = self.get_new_remotelog_name()
         if not self.remote_logs:
@@ -1323,7 +1349,7 @@ class Job(object):
         last_retrial = 0
         for i in range(0, int(self.retrials + 1)):
             # Update local logs to give a name to the recovered log
-            self.update_local_logs(count=i, update_submit_time=False)
+            self.update_local_logs(count=i)
 
             # Backup the remote log name in case that the log couldn't be recovered.
             backup_log = copy.copy(self.remote_logs)
@@ -1361,7 +1387,7 @@ class Job(object):
                 self.inc_fail_count()
         else:
             # Update local logs without updating the submit time
-            self.update_local_logs(update_submit_time=False)
+            self.update_local_logs()
             self.check_compressed_local_logs()
             self.platform.get_stat_file(self)
             self.write_submit_time()
@@ -1477,13 +1503,6 @@ class Job(object):
             Log.result(f"Job {self.name} changed from {self.status_str} to {Status.VALUE_TO_KEY.get(self.new_status, 'UNKNOWN')}")
             Log.status(f"Job {self.name} and id: {self.id} is {self.status_str}")
             self.status = self.new_status
-
-        if self.status in [Status.FAILED, Status.COMPLETED, Status.UNKNOWN]:
-            if str(as_conf.platforms_data.get(self.platform.name, {}).get('DISABLE_RECOVERY_THREADS',
-                                                                          "false")).lower() == "true":
-                self.retrieve_logfiles(self.platform)
-            else:
-                self.platform.add_job_to_log_recover(self)
 
         # Read and store metrics here
         try:
@@ -2230,10 +2249,9 @@ class Job(object):
         self.retrials = parameters["RETRIALS"]
         self.reservation = parameters["RESERVATION"]
 
-    def reset_logs(self, as_conf: AutosubmitConfig) -> None:
+    def reset_logs(self) -> None:
         self.log_recovered = False
-        self.packed_during_building = False
-        self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT", {}).get("WORKFLOW_COMMIT", "")
+        self.updated_log = False
 
     def update_placeholders(self, as_conf: AutosubmitConfig, parameters: dict, replace_by_empty=False) -> dict:
         """
@@ -2273,18 +2291,12 @@ class Job(object):
         :type reset_logs: bool
         :return: None
         """
-        # if parameters_updated and not as_conf.needs_reload():
-        #    continue
         if not set_attributes and as_conf.needs_reload():
             set_attributes = True
 
         if set_attributes:
             as_conf.reload()
-            if reset_logs:
-                self.reset_logs(as_conf)
-            self._init_runtime_parameters()
-            if not hasattr(self, "start_time"):
-                self.start_time = datetime.datetime.now()
+            self.init_runtime_parameters(as_conf, reset_logs)
             # Parameters that affect to all the rest of parameters
             self.update_dict_parameters(as_conf)
         self.init_platform(as_conf)
@@ -2560,8 +2572,8 @@ class Job(object):
 
         return out
 
-    def update_local_logs(self, count: int = -1, update_submit_time: bool = True) -> None:
-        if update_submit_time:
+    def update_local_logs(self, count: int = -1) -> None:
+        if not self.submit_time_timestamp:
             self.submit_time_timestamp = date2str(datetime.datetime.now(), 'S')
         if count > 0:
             self.local_logs = (f"{self.name}.{self.submit_time_timestamp}.out_retrial_{count}",
@@ -2592,15 +2604,15 @@ class Job(object):
 
         It doesn't write if hold is True.
         """
-        data_time = ["", int(datetime.datetime.strptime(self.submit_time_timestamp, "%Y%m%d%H%M%S").timestamp())]
+        data_time = ["", int(datetime.datetime.strptime(str(self.submit_time_timestamp), "%Y%m%d%H%M%S").timestamp())]
         path = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
         if os.path.exists(path):
             with open(path, 'a') as f:
                 f.write('\n')
-                f.write(self.submit_time_timestamp)
+                f.write(str(self.submit_time_timestamp))
         else:
             with open(path, 'w') as f:
-                f.write(self.submit_time_timestamp)
+                f.write(str(self.submit_time_timestamp))
 
         # Writing database
         exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
@@ -2675,7 +2687,7 @@ class Job(object):
         self, count: int = -1, first_submit_timestamp: str = ''
     ) -> None:
         self.update_start_time(count=count)
-        self.update_local_logs(update_submit_time=False, count=count)
+        self.update_local_logs(count=count)
         self.fix_local_logs_timestamps(first_submit_timestamp, self.submit_time_timestamp)
         self.check_compressed_local_logs()
         self.write_submit_time()
@@ -2825,6 +2837,11 @@ class Job(object):
                     self.ready_date = datetime.datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
                     Log.debug(f"Failed to recover ready date for the job {self.name}")
 
+    def assign_platform(self, create: bool, new: bool) -> None:
+        if create or new:
+            self.reset_logs()
+        if self.submitter and self.platform_name and self.platform_name in self.submitter.platforms:
+            self.platform = self.submitter.platforms[self.platform_name]
 
 class WrapperJob(Job):
     """Defines a wrapper from a package.

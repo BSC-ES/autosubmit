@@ -54,38 +54,39 @@ class JobsDbManager(DbManager):
         self._FINAL_STATUSES = ['COMPLETED', 'FAILED']
         self.restore_path = Path(BasicConfig.LOCAL_ROOT_DIR) / 'db' / 'job_list.sql'
 
-    def save_jobs(self, job_list: List["Job"], only_logs: bool = False) -> None:
+    def save_jobs(self, job_list: List["Job"]) -> None:
         """Save the job list to the database.
-
-        This method persists job information to the database.
-        It supports both full job state persistence and log-only updates.
 
         :param job_list: List of Job objects to save to the database.
         :type job_list: List[Job]
-        :param only_logs: If True, only update log-related fields (name, log, updated_log,
-                          local_logs_out, local_logs_err, remote_logs_out, remote_logs_err).
-                          If False, save all job state information.
-        :type only_logs: bool
+
         :return: None
         :raises: May raise database-related exceptions during upsert operations.
-
-        .. note::
-           - Uses upsert operation with 'name' as the primary key.
-           - Job state is serialized using `job.__getstate__(log_process=False)`.
-           - When `only_logs=True`, only log-related attributes are updated to minimize database writes.
         """
 
         table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
         self.create_table(table.name)
         persistent_data = [job.__getstate__(log_process=False) for job in job_list]
-        if only_logs:
-            for job_data in persistent_data:
-                keys_to_remove = [key for key in job_data.keys() if key not in ('name', 'log', 'updated_log', 'local_logs_out', 'local_logs_err', 'remote_logs_out', 'remote_logs_err')]
-                for key in keys_to_remove:
-                    job_data.pop(key)
-
         pkeys = ['name']
         self.upsert_many(table.name, persistent_data, pkeys)
+
+    def save_job_log(self, job: "Job") -> None:
+        """Save only the log information of a single job to the database.
+
+        only update log-related fields (name, log, updated_log, local_logs_out, local_logs_err, remote_logs_out, remote_logs_err).
+
+        :param job: Job object whose log information is to be saved.
+        :type job: Job
+        :return: None
+        """
+        table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
+        self.create_table(table.name)
+        job_data: dict = job.__getstate__(log_process=False)
+        where: dict = {'name': job.name}
+        log_keys = {'name', 'log', 'updated_log', 'local_logs_out', 'local_logs_err', 'remote_logs_out', 'remote_logs_err'}
+        job_data = {k: v for k, v in job_data.items() if k in log_keys}
+
+        self.update_where(table.name, job_data, where)
 
     def load_jobs(
             self,
@@ -571,6 +572,18 @@ class JobsDbManager(DbManager):
         wrappers = self.select_all_with_columns(wrapper_info_table.name)
         return [wrapper[1] for wrapper in wrappers]
 
-    def save_log_files(self, job):
-        """Save log and updated log attributes into the db."""
-        self.save_jobs([job], only_logs=True)
+    def get_missing_logs(self) -> List[str]:
+        """Get the names of jobs that are completed but have not updated their logs.
+
+        :return: List of job names with missing logs.
+        :rtype: List[str]
+        """
+        table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
+
+        self.create_table(table.name)
+        job_list_data = self.select_where_with_columns(
+            table,
+            {'updated_log': False, 'status': [Status.COMPLETED, Status.FAILED, Status.SKIPPED]}
+        )
+
+        return [job['name'] for job in job_list_data]
