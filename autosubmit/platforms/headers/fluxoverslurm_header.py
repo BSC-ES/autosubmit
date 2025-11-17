@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2017-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
 
 # This file is part of Autosubmit.
 
@@ -119,11 +119,8 @@ class FluxOverSlurmHeader(object):
 #
 #%THREADS_PER_TASK_DIRECTIVE%
 #%NODES_DIRECTIVE%
-#%NUMPROC_DIRECTIVE%
 #FLUX --time-limit %WALLCLOCK%:00
 #FLUX --job-name %JOBNAME%
-#FLUX --output %CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%OUT_LOG_DIRECTIVE%
-#FLUX --error %CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%ERR_LOG_DIRECTIVE%
 #
 ###############################################################################
            """)
