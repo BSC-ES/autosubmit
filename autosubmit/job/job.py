@@ -178,7 +178,7 @@ class Job(object):
         'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        '_log_recovered', 'packed_during_building', 'workflow_commit', 'updated'
+         'packed_during_building', 'workflow_commit', 'updated'
     )
 
     def __setstate__(self, state, log_process=False):
@@ -333,8 +333,6 @@ class Job(object):
         # hetjobs
         self.het = None
         self.updated_log = False
-        self._log_recovered = False
-        self.log_recovered = False
         self.submit_time_timestamp = None  # for wrappers, all jobs inside a wrapper are submitted at the same time
         self.start_time_timestamp = None
         self.finish_time_timestamp = None  # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
@@ -825,18 +823,6 @@ class Job(object):
         self._status = status
 
     @property  # type: ignore
-    @autosubmit_parameter(name='log_recovered')
-    def log_recovered(self):
-        return self._log_recovered
-
-    @log_recovered.setter
-    def log_recovered(self, log_recovered):
-        """
-        Sets the log_recovered
-        """
-        self._log_recovered = log_recovered
-
-    @property  # type: ignore
     def status_str(self):
         """
         String representation of the current status
@@ -1323,18 +1309,15 @@ class Job(object):
         """
         log_recovered = False
         self.remote_logs = self.get_new_remotelog_name()
-        if not self.remote_logs:
-            self.log_recovered = False
-        else:
-            if self.check_remote_log_exists():
-                try:
-                    self._sync_retrieve_logfiles()
-                    log_recovered = True
-                except BaseException as exc:
-                    Log.warning(
-                        f"Failed to retrieve log files for job {self.name} e=6002: {str(exc)}"
-                    )
-                    log_recovered = False
+        if self.check_remote_log_exists():
+            try:
+                self._sync_retrieve_logfiles()
+                log_recovered = True
+            except BaseException as exc:
+                Log.warning(
+                    f"Failed to retrieve log files for job {self.name} e=6002: {str(exc)}"
+                )
+                log_recovered = False
         return log_recovered
 
     def retrieve_internal_retrials_logfiles(self) -> Tuple[int, bool]:
@@ -1422,7 +1405,7 @@ class Job(object):
             else:
                 Log.result(
                     f"{self.platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{self.fail_count}'.")
-        self.log_recovered = log_recovered
+        self.updated_log = log_recovered
 
     def _max_possible_wallclock(self):
         if self.platform and self.platform.max_wallclock:
@@ -2250,7 +2233,6 @@ class Job(object):
         self.reservation = parameters["RESERVATION"]
 
     def reset_logs(self) -> None:
-        self.log_recovered = False
         self.updated_log = False
 
     def update_placeholders(self, as_conf: AutosubmitConfig, parameters: dict, replace_by_empty=False) -> dict:
@@ -2604,15 +2586,16 @@ class Job(object):
 
         It doesn't write if hold is True.
         """
-        data_time = ["", int(datetime.datetime.strptime(str(self.submit_time_timestamp), "%Y%m%d%H%M%S").timestamp())]
+        # TODO: revise this
+        data_time = ["", int(datetime.datetime.strptime(str(int(self.submit_time_timestamp)), "%Y%m%d%H%M%S").timestamp())]
         path = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
         if os.path.exists(path):
             with open(path, 'a') as f:
                 f.write('\n')
-                f.write(str(self.submit_time_timestamp))
+                f.write(str(int(self.submit_time_timestamp)))
         else:
             with open(path, 'w') as f:
-                f.write(str(self.submit_time_timestamp))
+                f.write(str(int(self.submit_time_timestamp)))
 
         # Writing database
         exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,

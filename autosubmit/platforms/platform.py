@@ -1042,10 +1042,8 @@ class Platform(object):
                 job._log_recovery_retries = 0  # Reset the log recovery retries.
                 try:
                     job.retrieve_logfiles(raise_error=True)
-                    # TODO: Maybe redundant (log_recovered), now that we're saving here
-                    job.updated_log = job.log_recovered
                     jobs_db_manager.save_job_log(job)
-                except Exception:
+                except Exception as e:
                     jobs_pending_to_process.add(job)
                     job._log_recovery_retries += 1
                     Log.warning(
