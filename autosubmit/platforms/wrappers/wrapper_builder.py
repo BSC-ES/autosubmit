@@ -166,7 +166,7 @@ class FluxWrapperBuilder(WrapperBuilder):
 
         # Instantiate Flux within the allocated resources and run the jobs
         srun --cpu-bind=none flux start --verbose=2 /usr/bin/bash flux_runner.sh
-        """).format(self._generate_flux_script(), '\n'.ljust(13))
+        """).format(self._generate_flux_script(), self._custom_environmet_setup(), '\n'.ljust(13))
     
     def _generate_flux_script(self):
         """
