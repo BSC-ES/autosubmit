@@ -307,8 +307,67 @@ class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
         """).format(self.processors, ' '.join(str(s) for s in self.job_scripts), '\n'.ljust(13))
 
 class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
+    # TODO: [ENGINES] Check error handling behavior
+    # TODO: [ENGINES] Delete the "flux resource list" after testing
+    # TODO: [ENGINES] Observe what happens if a single job arrives. Is it inside another list?
+    # TODO: [ENGINES] Should multi-section wrappers be supported?
     def _generate_flux_script(self):
-        raise NotImplementedError(self.exception)   # pragma: no cover
+        scripts_str = ''
+        for i, job_section in enumerate(self.job_scripts):
+            scripts_str += f"""scripts[{i}]="{' '.join(str(s) for s in job_section).strip()}"\n"""
+
+        processors_str = 'declare -A processors=( '
+        processors_str += ' '.join(f'[{job_section}]={self.processors_per_section.get(job_section)}' for job_section in self.processors_per_section.keys()) + ' )'
+
+
+        return textwrap.dedent("""
+        # Job scripts per inner vertical wrapper
+        declare -A scripts
+        {1}
+
+        # Processors per section
+        {0}
+
+        execute_vertical_wrapper()
+        {{
+            scripts=$1
+            for job_script in $scripts; do
+                job_name=$(basename "$job_script" .cmd)
+                job_section=${{job_name##*_}}
+                output_log="${{job_name}}.cmd.out.0"
+                error_log="${{job_name}}.cmd.err.0"
+
+                # Submit the job
+                job_id=$(flux batch --nslots=${{processors[$job_section]}} --output=$output_log --error=$error_log --flags=waitable $job_script)
+
+                # Wait for the job to finish
+                flux job wait $job_id
+
+                # Check if the job completed successfully
+                if [ -f "${{job_name}}_COMPLETED" ]; then
+                    echo "The job $job_name has been COMPLETED"
+                else
+                    echo "The job $job_name has FAILED"
+                    touch "${{job_name}}_FAILED"
+                    touch "WRAPPER_FAILED"
+                    return 1
+                fi
+            done
+
+            return 0
+        }}
+                               
+        # Execute vertical wrappers in parallel
+        for i in "${{!scripts[@]}}"; do
+            execute_vertical_wrapper "${{scripts[$i]}}" &
+        done
+
+        # Wait for all vertical wrappers (subprocesses) to finish
+        wait
+
+        # Debug commands
+        # flux resource list
+        """).format(processors_str, scripts_str, '\n'.ljust(13))
 
 class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
     def _generate_flux_script(self):
