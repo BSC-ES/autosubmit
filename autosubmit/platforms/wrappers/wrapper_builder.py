@@ -18,6 +18,7 @@
 import random
 import string
 import textwrap
+from autosubmit.log.log import AutosubmitCritical
 
 from typing import List
 
@@ -28,6 +29,7 @@ class WrapperDirector:
     """
     def __init__(self):
         self._builder = None
+        self.exception = "This type of wrapper is not supported for this platform"
 
     def construct(self, builder):
         self._builder = builder
@@ -68,7 +70,7 @@ class WrapperBuilder(object):
     def build_header(self):
         return textwrap.dedent(self.header_directive) + self.build_imports()
 
-    def build_imports(self) -> str:
+    def build_imports(self):
         pass  # pragma: no cover
 
     def build_job_thread(self):
@@ -121,6 +123,255 @@ class WrapperBuilder(object):
         padding = amount * ch
         return ''.join(padding + line for line in text.splitlines(True))
 
+class FluxWrapperBuilder(WrapperBuilder):
+    # TODO: [ENGINES] Command "flux start" is being called multiple times. Solve (?)
+    # TODO: [ENGINES] Is it necessary to pass the run_id to the inner jobs?
+    """
+    The FluxWrapperBuilder is the responsible for generating the wrapper script
+    that will be submitted to Slurm to initialize Flux and submit the inner jobs
+    to the Flux scheduler inside the allocation.
+    
+    This is a special implementation because we use Flux as a wrapper engine inside 
+    Slurm allocations, not as a platform.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.processors_per_section = self._get_processors()
+
+    def build_imports(self):
+        return ""
+    
+    def build_job_thread(self):
+        return ""
+    
+    # TODO: [ENGINES] Delete hardcoded flux environment setup
+    def build_main(self):
+        if not self.job_scripts:
+            raise AutosubmitCritical("No job scripts found for building the Flux wrapper.", )
+        
+        return textwrap.dedent("""
+        # Flux script generation
+        cat << 'EOF' > flux_runner.sh
+        #!/bin/bash
+        {0}
+        EOF
+
+        # Grant execution permission to the generated script
+        chmod +x flux_runner.sh
+
+        # Load user environment
+        {1}
+
+        # Instantiate Flux within the allocated resources and run the jobs
+        srun --cpu-bind=none flux start --verbose=2 /usr/bin/bash flux_runner.sh
+        """).format(self._generate_flux_script(), self._custom_environmet_setup(), '\n'.ljust(13))
+    
+    def _generate_flux_script(self):
+        """
+        Each Flux wrapper type implements its own script given the dependencies
+        of its inner jobs.
+        """
+        pass  # pragma: no cover
+
+    def _custom_environmet_setup(self):
+        return textwrap.dedent(
+            """module load miniconda
+            source /apps/GPP/MINICONDA/24.1.2/etc/profile.d/conda.sh
+            conda activate flux
+            conda info
+            """).format('\n'.ljust(13))
+
+    def _get_processors(self):
+        """
+        Get processors per section from jobs_resources
+        
+        :return: dict with processors per section
+        :rtype: dict
+        """
+        processors_per_section = {}
+        for key, value in self.jobs_resources.items():
+            if isinstance(value, dict) and 'PROCESSORS' in value:
+                processors_per_section[key] = value['PROCESSORS']
+        return processors_per_section
+
+
+class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
+    # TODO: [ENGINES] Check error handling and retrial behavior
+    # TODO: [ENGINES] Delete the "flux resource list" after testing
+    # TODO: [ENGINES] Should multi-section wrappers be supported?
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        section = self.job_scripts[0].replace('.cmd', '').split('_')[-1]
+        self.processors = self.processors_per_section.get(section, None)
+
+    def _generate_flux_script(self):
+        return textwrap.dedent("""
+        processors={0}
+        max_retries={2}
+        scripts="{1}"
+
+        for job_script in $scripts; do
+            fail_count=0
+            completed=0
+
+            while [ $fail_count -le $max_retries ] && [ $completed -eq 0 ]; do
+                # Job info
+                job_name=$(basename "$job_script" .cmd)
+                output_log="${{job_name}}.cmd.out.${{fail_count}}"
+                error_log="${{job_name}}.cmd.err.${{fail_count}}"
+
+                # Submit the job
+                job_id=$(flux batch --nslots=$processors --output=$output_log --error=$error_log --flags=waitable $job_script)
+
+                # Wait for the job to finish
+                flux job wait $job_id
+
+                # Create the STAT file
+                start=$(flux job info $job_id eventlog | grep '"name":"start"' | sed -n 's/.*"timestamp":\\([^,}}]*\\).*/\\1/p')
+                finish=$(flux job info $job_id eventlog | grep '"name":"finish"' | sed -n 's/.*"timestamp":\\([^,}}]*\\).*/\\1/p')
+                stat_filename="${{job_name}}_STAT_${{fail_count}}"
+                echo "${{start%.*}}" > $stat_filename
+                echo "${{finish%.*}}" >> $stat_filename
+
+                # Check if the job completed successfully
+                if [ -f "${{job_name}}_COMPLETED" ]; then
+                    echo "The job $job_name has been COMPLETED"
+                    completed=1
+                else
+                    echo "The job $job_name has FAILED"
+                    fail_count=$((fail_count + 1))
+                fi
+            done
+
+            if [ $completed -eq 0 ]; then
+                touch "${{job_name}}_FAILED"
+                touch "WRAPPER_FAILED"
+                exit 1
+            fi
+        done
+
+        # Debug commands
+        # flux resource list
+        """).format(self.processors, ' '.join(str(s) for s in self.job_scripts), self.retrials, '\n'.ljust(13))
+    
+class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
+    # TODO: [ENGINES] Check error handling behavior
+    # TODO: [ENGINES] Should WRAPPER_FAILED file be created inmediately when any job fails or later?
+    # TODO: [ENGINES] Why horizontal wrappers always force retrial count to 0 when naming the output files?
+    # TODO: [ENGINES] Delete the "flux resource list" after testing
+    # TODO: [ENGINES] Should multi-section wrappers be supported?
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        section = self.job_scripts[0].replace('.cmd', '').split('_')[-1]
+        self.processors = self.processors_per_section.get(section, None)
+
+    def _generate_flux_script(self):
+        return textwrap.dedent("""
+        declare -A job_ids
+        processors={0}
+        scripts="{1}"
+
+        # Submit the jobs
+        for job_script in $scripts; do
+            job_name=$(basename "$job_script" .cmd)
+            output_log="${{job_name}}.cmd.out.0"
+            error_log="${{job_name}}.cmd.err.0"
+
+            job_ids[$job_name]=$(flux batch --nslots=$processors --output=$output_log --error=$error_log --flags=waitable $job_script)
+        done
+
+        # Wait for the jobs to finish
+        wrapper_failed=0
+        for job_script in $scripts; do
+            job_name=$(basename "$job_script" .cmd)
+            job_id=${{job_ids[$job_name]}}
+            flux job wait $job_id
+
+            # Check if the job completed successfully
+            if [ -f "${{job_name}}_COMPLETED" ]; then
+                echo "The job $job_name has been COMPLETED"
+            else
+                echo "The job $job_name has FAILED"
+                touch "${{job_name}}_FAILED"
+                wrapper_failed=1
+            fi
+        done
+
+        if [ $wrapper_failed -eq 1 ]; then
+            touch "WRAPPER_FAILED"
+            exit 1
+        fi
+
+        # Debug commands
+        # flux resource list
+        """).format(self.processors, ' '.join(str(s) for s in self.job_scripts), '\n'.ljust(13))
+
+class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
+    # TODO: [ENGINES] Check error handling behavior
+    # TODO: [ENGINES] Delete the "flux resource list" after testing
+    # TODO: [ENGINES] Observe what happens if a single job arrives. Is it inside another list?
+    # TODO: [ENGINES] Should multi-section wrappers be supported?
+    def _generate_flux_script(self):
+        scripts_str = ''
+        for i, job_section in enumerate(self.job_scripts):
+            scripts_str += f"""scripts[{i}]="{' '.join(str(s) for s in job_section).strip()}"\n"""
+
+        processors_str = 'declare -A processors=( '
+        processors_str += ' '.join(f'[{job_section}]={self.processors_per_section.get(job_section)}' for job_section in self.processors_per_section.keys()) + ' )'
+
+
+        return textwrap.dedent("""
+        # Job scripts per inner vertical wrapper
+        declare -A scripts
+        {1}
+
+        # Processors per section
+        {0}
+
+        execute_vertical_wrapper()
+        {{
+            scripts=$1
+            for job_script in $scripts; do
+                job_name=$(basename "$job_script" .cmd)
+                job_section=${{job_name##*_}}
+                output_log="${{job_name}}.cmd.out.0"
+                error_log="${{job_name}}.cmd.err.0"
+
+                # Submit the job
+                job_id=$(flux batch --nslots=${{processors[$job_section]}} --output=$output_log --error=$error_log --flags=waitable $job_script)
+
+                # Wait for the job to finish
+                flux job wait $job_id
+
+                # Check if the job completed successfully
+                if [ -f "${{job_name}}_COMPLETED" ]; then
+                    echo "The job $job_name has been COMPLETED"
+                else
+                    echo "The job $job_name has FAILED"
+                    touch "${{job_name}}_FAILED"
+                    touch "WRAPPER_FAILED"
+                    return 1
+                fi
+            done
+
+            return 0
+        }}
+                               
+        # Execute vertical wrappers in parallel
+        for i in "${{!scripts[@]}}"; do
+            execute_vertical_wrapper "${{scripts[$i]}}" &
+        done
+
+        # Wait for all vertical wrappers (subprocesses) to finish
+        wait
+
+        # Debug commands
+        # flux resource list
+        """).format(processors_str, scripts_str, '\n'.ljust(13))
+
+class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
+    def _generate_flux_script(self):
+        raise NotImplementedError(self.exception)   # pragma: no cover
 
 class PythonWrapperBuilder(WrapperBuilder):
     def get_random_alphanumeric_string(self,letters_count, digits_count):
