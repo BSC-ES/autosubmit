@@ -72,7 +72,7 @@ class WrapperBuilder(object):
     def build_header(self):
         return textwrap.dedent(self.header_directive) + self.build_imports()
 
-    def build_imports(self) -> str:
+    def build_imports(self):
         pass  # pragma: no cover
 
     def build_job_thread(self):
@@ -127,6 +127,7 @@ class WrapperBuilder(object):
 
 class FluxWrapperBuilder(WrapperBuilder):
     # TODO: [ENGINES] Command "flux start" is being called multiple times. Solve (?)
+    # TODO: [ENGINES] Is it necessary to pass the run_id to the inner jobs?
     """
     The FluxWrapperBuilder is the responsible for generating the wrapper script
     that will be submitted to Slurm to initialize Flux and submit the inner jobs
@@ -137,7 +138,7 @@ class FluxWrapperBuilder(WrapperBuilder):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.processors = self._get_processors()
+        self.processors_per_section = self._get_processors()
 
     def build_imports(self):
         return ""
@@ -183,12 +184,28 @@ class FluxWrapperBuilder(WrapperBuilder):
             """).format('\n'.ljust(13))
 
     def _get_processors(self):
-        section = self.job_scripts[0].replace('.cmd', '').split('_')[-1]
-        return self.jobs_resources[section]['PROCESSORS']
+        """
+        Get processors per section from jobs_resources
+        
+        :return: dict with processors per section
+        :rtype: dict
+        """
+        processors_per_section = {}
+        for key, value in self.jobs_resources.items():
+            if isinstance(value, dict) and 'PROCESSORS' in value:
+                processors_per_section[key] = value['PROCESSORS']
+        return processors_per_section
+
 
 class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
     # TODO: [ENGINES] Check error handling and retrial behavior
     # TODO: [ENGINES] Delete the "flux resource list" after testing
+    # TODO: [ENGINES] Should multi-section wrappers be supported?
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        section = self.job_scripts[0].replace('.cmd', '').split('_')[-1]
+        self.processors = self.processors_per_section.get(section, None)
+
     def _generate_flux_script(self):
         return textwrap.dedent("""
         processors={0}
@@ -244,6 +261,12 @@ class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
     # TODO: [ENGINES] Should WRAPPER_FAILED file be created inmediately when any job fails or later?
     # TODO: [ENGINES] Why horizontal wrappers always force retrial count to 0 when naming the output files?
     # TODO: [ENGINES] Delete the "flux resource list" after testing
+    # TODO: [ENGINES] Should multi-section wrappers be supported?
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        section = self.job_scripts[0].replace('.cmd', '').split('_')[-1]
+        self.processors = self.processors_per_section.get(section, None)
+
     def _generate_flux_script(self):
         return textwrap.dedent("""
         declare -A job_ids
@@ -285,12 +308,12 @@ class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
         # flux resource list
         """).format(self.processors, ' '.join(str(s) for s in self.job_scripts), '\n'.ljust(13))
 
-class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
-    def _dependency_script(self):
+class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
+    def _generate_flux_script(self):
         raise NotImplementedError(self.exception)   # pragma: no cover
 
-class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):    
-    def _dependency_script(self):
+class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
+    def _generate_flux_script(self):
         raise NotImplementedError(self.exception)   # pragma: no cover
 
 class PythonWrapperBuilder(WrapperBuilder):
