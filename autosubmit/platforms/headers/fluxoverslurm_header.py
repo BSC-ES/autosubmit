@@ -100,7 +100,7 @@ class FluxOverSlurmHeader(object):
         return ""
 
     def get_custom_directives(self, job, parameters, het=-1):
-        Log.warning(f"Jobs within a wrapper using the Flux method do not currently support custom directives.")
+        Log.warning("Jobs within a wrapper using the Flux method do not currently support custom directives.")
         return ""
 
     def get_tasks_per_node(self, job, parameters, het=-1):
