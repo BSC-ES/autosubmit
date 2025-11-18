@@ -137,7 +137,7 @@ def create_packages(as_conf, slurm_platform):
         job.platform_name = slurm_platform.name
         job.processors = 2
         job.section = "dummysection"
-        job._init_runtime_parameters()
+        job.init_runtime_parameters(as_conf, reset_logs=True)
         job.wallclock = "00:01"
     packages = [
         JobPackageSimple(simple_jobs),

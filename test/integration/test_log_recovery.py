@@ -100,7 +100,7 @@ def test_log_recovery_recover_log(prepare_test, local, mocker, as_conf):
     job.platform = local
     job.platform_name = 'local'
     job.local_logs = ("t000.cmd.out.moved", "t000.cmd.err.moved")
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True)
     local.work_event.set()
     local.add_job_to_log_recover(job)
     local.cleanup_event.set()

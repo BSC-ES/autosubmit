@@ -560,7 +560,7 @@ class JobsDbManager(DbManager):
             values = {'status': Status.VALUE_TO_KEY[int(package['status'])]}
             self.update_where(wrapper_info_table.name, where, values)
 
-    def get_wrappers_id(self) -> List[int]:
+    def get_wrappers_id_from_db(self) -> List[int]:
         """
         Get the IDs of all wrapper jobs in the database.
 

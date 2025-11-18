@@ -179,24 +179,14 @@ class DbManager:
             conn.commit()
         return result.rowcount
 
-    def upsert_many(
-            self,
-            table_name: str,
-            data: List[Dict[str, Any]],
-            conflict_cols: List[str],
-            exclude_cols: Optional[List[str]] = None,
-            batch_size: int = 1000
-    ) -> int:
+    def upsert_many(self, table_name: str, data: List[Dict[str, Any]], conflict_cols: List[str], batch_size: int = 1000) -> int:
         """Perform an upsert (update or insert) operation.
-
-        Updates existing rows on conflict or inserts new rows. Optionally excludes
-        specific columns from being updated on conflict.
+        First delete the affected rows
+        then insert the new data.
 
         :param table_name: Name of the table.
         :param data: List of dictionaries containing the data to upsert.
-        :param conflict_cols: List of columns to check for conflicts (unique/primary keys).
-        :param exclude_cols: Optional list of columns to exclude from updates on conflict.
-        :param batch_size: Number of rows to process per batch (default: 1000).
+        :param conflict_cols: List of columns to check for conflicts. ( unique keys and primary keys )
         :return: Number of rows affected.
         :raises ValueError: If data is empty or unsupported dialect.
         """
@@ -204,11 +194,9 @@ class DbManager:
             return 0
 
         table: Table = get_table_from_name(schema=self.schema, table_name=table_name)
-        if not exclude_cols:
-            exclude_cols = []
-        excluded = set(conflict_cols) | set(exclude_cols)
-        update_cols = [col for col in data[0].keys() if col not in excluded]
+        update_cols = [col for col in data[0].keys() if col not in conflict_cols]
 
+        # NOTE general insert doesn't have on_conflict
         if self.engine.dialect.name == "postgresql":
             insert_stmt = pg_insert(table)
         elif self.engine.dialect.name == "sqlite":
@@ -216,6 +204,7 @@ class DbManager:
         else:
             raise ValueError(f"Unsupported dialect: {self.engine.dialect.name}")
 
+        # add on_conflict clause
         update_stmt = insert_stmt.on_conflict_do_update(
             index_elements=conflict_cols,
             set_={col: getattr(insert_stmt.excluded, col) for col in update_cols}

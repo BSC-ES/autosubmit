@@ -202,9 +202,10 @@ def generate_job_list(as_conf, db_manager) -> JobList:
     return job_list
 
 
-def _create_db_manager(db_path: Path = None, schema: str = None) -> JobsDbManager:
-    connection_url = get_connection_url(db_path=db_path)
-    return JobsDbManager(connection_url=connection_url, schema=schema)
+def _create_db_manager(schema: str = None) -> JobsDbManager:
+    db_path = Path(BasicConfig.LOCAL_ROOT_DIR) / schema / "db"
+    db_path.mkdir(parents=True, exist_ok=True)
+    return JobsDbManager(schema=schema)
 
 
 @pytest.mark.parametrize(
@@ -217,11 +218,8 @@ def test_db_job_list_edges(
         as_db: str,
         _expid: str
 ):
-    db_path = tmp_path
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
-    else:
-        db_manager = _create_db_manager(schema=_expid)
+
+    db_manager = _create_db_manager(schema=_expid)
 
     raw_graph_edges_local = raw_graph_edges
 
@@ -259,11 +257,9 @@ def test_db_job_list_edges(
 )
 def test_db_job_list_jobs(tmp_path: Path, full_load: bool, as_db: str, autosubmit_exp, _expid: str):
     as_exp = autosubmit_exp(_expid)
-    db_path = tmp_path
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
-    else:
-        db_manager = _create_db_manager(schema=f"{_expid}")
+
+    db_manager = _create_db_manager(_expid)
+
     job_list = generate_job_list(as_exp.as_conf, db_manager)
     job_list.save_jobs()
     job_list.save_edges()
@@ -313,12 +309,8 @@ def test_db_job_list_jobs_and_edges_together(
     :param _expid: Experiment ID fixture
     :type _expid: str
     """
-    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    db_path = exp_path / "db"
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
-    else:
-        db_manager = _create_db_manager(schema=_expid)
+
+    db_manager = _create_db_manager(schema=_expid)
 
     # Create and save original job list with jobs and edges
     job_list = generate_job_list(as_exp.as_conf, db_manager)
@@ -367,11 +359,8 @@ def test_select_latest_inner_jobs(
         as_exp: Any,
 ):
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    db_path = exp_path / "db"
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
-    else:
-        db_manager = _create_db_manager(schema=_expid)
+
+    db_manager = _create_db_manager(schema=_expid)
 
     job_list = generate_job_list(as_exp.as_conf, db_manager)
     job_list.save_jobs()
@@ -451,11 +440,8 @@ def test_load_job_by_name(
         as_exp: Any,
 ):
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    db_path = exp_path / "db"
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
-    else:
-        db_manager = _create_db_manager(schema=_expid)
+
+    db_manager = _create_db_manager(schema=_expid)
 
     # Generate and save some jobs
     job_list = generate_job_list(as_exp.as_conf, db_manager)
@@ -492,10 +478,8 @@ def test_load_wrapper(
 ):
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
     db_path = exp_path / "db"
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
-    else:
-        db_manager = _create_db_manager(schema=_expid)
+
+    db_manager = _create_db_manager(schema=_expid)
 
     # Generate and save some jobs
     job_list = generate_job_list(as_exp.as_conf, db_manager)
@@ -573,11 +557,8 @@ def test_clear_unused_nodes(
     :type as_exp.as_conf: Callable
     """
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    db_path = exp_path / "db"
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
-    else:
-        db_manager = _create_db_manager(schema=_expid)
+
+    db_manager = _create_db_manager(schema=_expid)
 
     job_list = generate_job_list(as_exp.as_conf, db_manager)
 
@@ -694,13 +675,10 @@ def test_backup_and_restore(monkeypatch, tmp_path, _expid, as_db, as_exp: Any):
     """" Test backup of database and restore it afterwards. """
 
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    db_path = exp_path / "db"
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'tests.db'))
-    else:
-        db_manager = _create_db_manager(schema=_expid)
+    if as_db != 'sqlite':
         # TODO: not implemented
         return 0
+    db_manager = _create_db_manager(schema=_expid)
     # Create tables
     jobs_table = get_table_from_name(schema=db_manager.schema, table_name=JobsTable.name)
     edges_table = get_table_from_name(schema=db_manager.schema, table_name=ExperimentStructureTable.name)
@@ -1371,15 +1349,10 @@ def test_with_createcw_command_differences(
         }
     )
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    db_path = exp_path / "db"
     conf_dir = exp_path / 'conf'
     unified_data: Dict[str, Dict] = fixed_data | mutable_experiment_wrappers | mutable_jobs
     _init_test(as_exp, conf_dir, unified_data)
-    if as_db == 'sqlite':
-        db_manager = _create_db_manager(Path(db_path, 'job_list.db'))
-    else:
-        db_manager = _create_db_manager(schema=_expid)
-
+    db_manager = _create_db_manager(schema=_expid)
     exit_code = as_exp.autosubmit.create(_expid, noplot=True, hide=False, force=True, check_wrappers=True)
     _assert_exit_code("SUCCESS", exit_code)
     once_sections = []

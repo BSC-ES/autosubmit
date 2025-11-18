@@ -385,7 +385,7 @@ class JobList(object):
                 self._as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
             )
         if connect_to_platform:
-            job.assign_platform(create=False, new=False)
+            job.assign_platform(self.submitter, create=False, new=False)
 
     def _load_graph(self, full_load: bool, load_failed_jobs: bool = False) -> bool:
         """
@@ -553,7 +553,7 @@ class JobList(object):
         self.save_edges()
         self.save_sections()
         for job in self.job_list:
-            job.assign_platform(create, new)
+            job.assign_platform(self.submitter, create, new)
         Log.info("Save completed.")
 
     def build_sections_data_to_store(self) -> List[Dict[str, Any]]:
@@ -2593,16 +2593,15 @@ class JobList(object):
         :rtype : bool
         :return: True if there are active jobs to run, False otherwise.
         """
+
         for job in self.job_list:
             self.update_parents_edge_completeness(job)
-        # moved here, so the logs are not overwritten during an iteration
-        self.update_log_status()
+        self.recover_logs()
         self.unload_completed_jobs()
         self._load_graph(full_load=False)
         for job in self.job_list:
-            if not job.platform:
-                job.assign_platform(create=False, new=False)
             if not job.updated:
+                job.submitter = self.submitter
                 job.update_parameters(self._as_conf, set_attributes=True, reset_logs=False if job.status in (
                         self._IN_SCHEDULER + self._FINAL_STATUSES) else True)
         Log.debug(f"Jobs loaded: {len(self.job_list)}")
@@ -2756,6 +2755,7 @@ class JobList(object):
     def save_jobs(self, jobs_to_save: Optional[List[Job]] = None):
         """Persists the job list
         """
+
         if not self.disable_save:
             Log.info("Saving jobs to the database...")
             if not jobs_to_save:
@@ -3042,7 +3042,7 @@ class JobList(object):
                     non_completed.append(parent)
         return non_completed, completed
 
-    def update_log_status(self, new_run: bool = False):
+    def recover_logs(self, new_run: bool = False):
         """Update jobs' log recovered status.
 
         Iterate over the current job list and mark jobs whose stdout/stderr logs
@@ -3056,7 +3056,9 @@ class JobList(object):
             jobs_to_recover = self.load_jobs(full_load=True, only_not_updated_logs=True)
         else:
             jobs_to_recover = [job for job in self.job_list if not getattr(job, "updated_log", False) and not getattr(job, "x11", False) and job.status in self._FINAL_STATUSES]
-
+            # Save finished jobs
+            if jobs_to_recover:
+                self.save_jobs()
         for job in jobs_to_recover:
             if str(self._as_conf.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "true":
                 job.retrieve_logfiles()
@@ -3130,10 +3132,7 @@ class JobList(object):
         if self.update_from_file(store_change):
             save = store_change
         Log.debug('Updating FAILED jobs')
-        if not first_time:
-            save |= self._update_failed_jobs(as_conf)
-        else:
-            self._reset_jobs_on_first_run()
+        save |= self._update_failed_jobs(as_conf)
         save |= self._handle_special_checkpoint_jobs()
         save |= self._sync_completed_jobs()
         if not fromSetStatus:
@@ -3247,7 +3246,7 @@ class JobList(object):
                 save = True
         return save
 
-    def _reset_jobs_on_first_run(self) -> None:
+    def reset_jobs_on_first_run(self) -> None:
         """
         Reset fail count for jobs in WAITING, READY, DELAYED, or PREPARED status.
         """
@@ -3256,7 +3255,7 @@ class JobList(object):
             job.fail_count = 0
             if job.status == Status.FAILED:
                 job.status = Status.WAITING
-                job.id = None
+                job.id = 0
                 Log.debug(f"Resetting job: {job.name} status to: WAITING on first run...")
 
     def _handle_special_checkpoint_jobs(self) -> bool:
@@ -4196,13 +4195,13 @@ class JobList(object):
             if wrappers:
                 self.dbmanager.update_wrapper_status(wrappers)
 
-    def get_wrappers_id(self) -> List[int]:
+    def get_wrappers_id_from_db(self) -> List[int]:
         """
         Get a list of all wrapper job IDs from the database.
         :return: List of wrapper job IDs.
         :rtype: List[int]
         """
-        return [id for _, id in self.dbmanager.get_wrappers_id()]
+        return [id for _, id in self.dbmanager.get_wrappers_id_from_db()]
 
     def get_missing_logs(self):
         """Get a list of jobs with missing logs from the database.

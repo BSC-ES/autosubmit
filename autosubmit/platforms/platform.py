@@ -782,7 +782,7 @@ class Platform(object):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def check_Alljobs(self, job_list: list[Any], as_conf, retries=5):
+    def check_Alljobs(self, job_list: list[Any], as_conf, retries=5) -> bool:
         """
         Checks jobs running status
 

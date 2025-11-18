@@ -401,16 +401,17 @@ class Job(object):
         self.dependencies = ""
         self.packed_during_building = False
         self.packed = False
+
         if self.status == Status.WAITING:
             self.id = 0
         elif self.status == Status.READY:
             self.id = 0
+            self.start_time = datetime.datetime.now()
             self.start_time_timestamp = self.start_time_timestamp if self.start_time_timestamp else time.time()
 
         self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT", {}).get("WORKFLOW_COMMIT", "")
         if reset_logs:
             self.reset_logs()
-
 
     @property  # type: ignore
     def wallclock_in_seconds(self):
@@ -2275,13 +2276,14 @@ class Job(object):
         """
         if not set_attributes and as_conf.needs_reload():
             set_attributes = True
+            as_conf.save()
 
         if set_attributes:
             as_conf.reload()
             self.init_runtime_parameters(as_conf, reset_logs)
             # Parameters that affect to all the rest of parameters
             self.update_dict_parameters(as_conf)
-        self.init_platform(as_conf)
+        #self.init_platform(as_conf)
         parameters = as_conf.load_parameters()
         parameters = self.update_current_parameters(as_conf, parameters)
         parameters = self.update_job_parameters(as_conf, parameters, set_attributes)
@@ -2555,8 +2557,6 @@ class Job(object):
         return out
 
     def update_local_logs(self, count: int = -1) -> None:
-        if not self.submit_time_timestamp:
-            self.submit_time_timestamp = date2str(datetime.datetime.now(), 'S')
         if count > 0:
             self.local_logs = (f"{self.name}.{self.submit_time_timestamp}.out_retrial_{count}",
                                f"{self.name}.{self.submit_time_timestamp}.err_retrial_{count}")
@@ -2586,16 +2586,15 @@ class Job(object):
 
         It doesn't write if hold is True.
         """
-        # TODO: revise what is happening with these casts because before it was not neccesary
-        data_time = ["", int(datetime.datetime.strptime(str(int(self.submit_time_timestamp)), "%Y%m%d%H%M%S").timestamp())]
+        data_time = ["", int(datetime.datetime.strptime(self.submit_time_timestamp, "%Y%m%d%H%M%S").timestamp())]
         path = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
         if os.path.exists(path):
             with open(path, 'a') as f:
                 f.write('\n')
-                f.write(str(int(self.submit_time_timestamp)))
+                f.write(self.submit_time_timestamp)
         else:
             with open(path, 'w') as f:
-                f.write(str(int(self.submit_time_timestamp)))
+                f.write(self.submit_time_timestamp)
 
         # Writing database
         exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
@@ -2820,7 +2819,8 @@ class Job(object):
                     self.ready_date = datetime.datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
                     Log.debug(f"Failed to recover ready date for the job {self.name}")
 
-    def assign_platform(self, create: bool, new: bool) -> None:
+    def assign_platform(self, submitter, create: bool, new: bool) -> None:
+        self.submitter = submitter
         if create or new:
             self.reset_logs()
         if self.submitter and self.platform_name and self.platform_name in self.submitter.platforms:

@@ -549,7 +549,7 @@ def postgres_server(request: 'FixtureRequest') -> Generator[PostgresContainer, N
     The container is available throughout the whole testing session.
     """
     mark_expression = request.config.option.markexpr
-    if mark_expression is not None and 'postgres' not in mark_expression:
+    if mark_expression is not None and 'postgres' not in mark_expression and mark_expression != "":
         # print("Skipping Postgres setup because -m 'postgres' was not specified")
         yield None
     else:

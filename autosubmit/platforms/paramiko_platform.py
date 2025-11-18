@@ -929,7 +929,7 @@ class ParamikoPlatform(Platform):
                 job_list_cmd = job_list_cmd[:-1]
         return job_list_cmd
 
-    def check_Alljobs(self, job_list: list["Job"], as_conf, retries=5):
+    def check_Alljobs(self, job_list: list["Job"], as_conf, retries=5) -> bool:
         """
         Checks jobs running status
 
@@ -1031,10 +1031,13 @@ class ParamikoPlatform(Platform):
             # job.new_status=job_status
         if slurm_error:
             raise AutosubmitError(e_msg, 6000)
-
+        save = False
         for job in job_list:
             if job.new_status != job.status:
                 job.update_status(as_conf)
+                save = True
+
+        return save
 
     def get_jobid_by_jobname(self, job_name, retries=2):
         """

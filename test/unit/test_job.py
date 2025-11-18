@@ -924,7 +924,7 @@ def test_update_stat_file():
     assert job.stat_file == "dummyname_STAT_"
 
 
-def test_pytest_check_script(mocker):
+def test_pytest_check_script(mocker, autosubmit_config):
     job = Job("job1", "1", Status.READY, 0)
     # arrange
     parameters = dict()
@@ -935,7 +935,8 @@ def test_pytest_check_script(mocker):
     mocker.patch("autosubmit.job.job.Job.update_content", return_value=(
         'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK%', 'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK%'))
     mocker.patch("autosubmit.job.job.Job.update_parameters", return_value=parameters)
-    job._init_runtime_parameters()
+    as_conf = autosubmit_config("t000", {})
+    job.init_runtime_parameters(as_conf, reset_logs=True)
 
     config = Mock(spec=AutosubmitConfig)
     config.default_parameters = {}
@@ -1019,21 +1020,22 @@ def test_reset_logs(autosubmit_config):
     }
     as_conf = autosubmit_config("t000", experiment_data)
     job = Job("job1", "1", Status.READY, 0)
-    job.reset_logs(as_conf)
+    job.init_runtime_parameters(as_conf, reset_logs=True)
     assert job.workflow_commit == "dummy-commit"
     assert job.updated_log is False
     assert job.packed_during_building is False
 
 
-def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_template_variable(mocker):
+def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_template_variable(mocker, autosubmit_config):
     job = Job("job1", "1", Status.READY, 0)
     # arrange
-    job._init_runtime_parameters()
+    as_conf = autosubmit_config("t000", {})
+    job.init_runtime_parameters(as_conf, reset_logs=True)
     parameters = {}
     mocker.patch("autosubmit.job.job.Job.update_content",
                  return_value=('some-content: %UNBOUND%', 'some-content: %UNBOUND%'))
     mocker.patch("autosubmit.job.job.Job.update_parameters", return_value=parameters)
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True)
 
     config = Mock(spec=AutosubmitConfig)
     config.default_parameters = {}
@@ -1273,36 +1275,73 @@ def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines
         assert re.search(pattern, template_content, re.MULTILINE) is not None
 
 
-@pytest.mark.parametrize('experiment_data', [(
-        {
-            'JOBS': {
-                'RANDOM-SECTION': {
-                    'FILE': "test.sh",
-                    'PLATFORM': 'DUMMY_PLATFORM',
-                    'TEST': "rng",
+# python
+@pytest.mark.parametrize(
+    'experiment_data, job_status',
+    [
+        (
+            {
+                'JOBS': {
+                    'RANDOM-SECTION': {
+                        'FILE': "test.sh",
+                        'PLATFORM': 'DUMMY_PLATFORM',
+                        'TEST': "rng",
+                    },
                 },
-            },
-            'PLATFORMS': {
-                'dummy_platform': {
-                    'type': 'ps',
-                    'whatever': 'dummy_value',
-                    'whatever2': 'dummy_value2',
-                    'CUSTOM_DIRECTIVES': ['$SBATCH directive1', '$SBATCH directive2'],
+                'PLATFORMS': {
+                    'dummy_platform': {
+                        'type': 'ps',
+                        'whatever': 'dummy_value',
+                        'whatever2': 'dummy_value2',
+                        'CUSTOM_DIRECTIVES': ['$SBATCH directive1', '$SBATCH directive2'],
+                    },
                 },
+                'ROOTDIR': "asd",
+                'LOCAL_TMP_DIR': "asd",
+                'LOCAL_ROOT_DIR': "asd",
+                'LOCAL_ASLOG_DIR': "asd",
             },
-            'ROOTDIR': "asd",
-            'LOCAL_TMP_DIR': "asd",
-            'LOCAL_ROOT_DIR': "asd",
-            'LOCAL_ASLOG_DIR': "asd",
-        }
-)], ids=["Simple job"])
-def test_no_start_time(autosubmit_config, experiment_data):
+            Status.WAITING,
+        ),
+        (
+            {
+                'JOBS': {
+                    'RANDOM-SECTION': {
+                        'FILE': "test.sh",
+                        'PLATFORM': 'DUMMY_PLATFORM',
+                        'TEST': "rng",
+                    },
+                },
+                'PLATFORMS': {
+                    'dummy_platform': {
+                        'type': 'ps',
+                        'whatever': 'dummy_value',
+                        'whatever2': 'dummy_value2',
+                        'CUSTOM_DIRECTIVES': ['$SBATCH directive1', '$SBATCH directive2'],
+                    },
+                },
+                'ROOTDIR': "asd",
+                'LOCAL_TMP_DIR': "asd",
+                'LOCAL_ROOT_DIR': "asd",
+                'LOCAL_ASLOG_DIR': "asd",
+            },
+            Status.READY,
+        ),
+    ],
+    ids=["Simple job | waiting", "Simple job | ready"],
+)
+def test_no_start_time(autosubmit_config, experiment_data, job_status):
     job, as_conf, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data)
     del job.start_time
     as_conf.force_load = False
     as_conf.data_changed = False
+    job.status = job_status
     job.update_parameters(as_conf, set_attributes=True)
-    assert isinstance(job.start_time, datetime)
+    if job.status == Status.WAITING:
+        assert not hasattr(job, 'start_time')
+    else:
+        assert isinstance(job.start_time, datetime)
+
 
 
 def test_sub_job_instantiation(tmp_path, autosubmit_config):
@@ -1431,7 +1470,6 @@ def test_update_parameters_reset_logs(autosubmit_config, tmpdir):
     )
     job = Job('DUMMY', '1', 0, 1)
     job.section = 'DUMMY_S'
-    job.log_recovered = True
     job.packed_during_building = True
     job.workflow_commit = "incorrect"
     job.update_parameters(as_conf, set_attributes=True, reset_logs=True)
@@ -1672,10 +1710,10 @@ def test_process_scheduler_parameters_wallclock(wallclock: Optional[str], platfo
     as_conf = autosubmit_config(_EXPID, {})
 
     job = Job(_EXPID, '1', 'WAITING', 0, None)
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True)
     job.het['HETSIZE'] = 1
     job.wallclock = wallclock
-    # FIXME: Job constructor and ``_init_runtime_parameters`` do not fully initialize the object!
+    # FIXME: Job constructor and ``init_runtime_parameters`` do not fully initialize the object!
     #        ``custom_directives`` appears to be initialized in one of the ``update_`` functions.
     #        This makes testing and maintaining the code harder (and more risky -- more bugs).
     job.custom_directives = []
@@ -1716,14 +1754,14 @@ def test_update_dict_parameters_invalid_script_language(platform_name: Optional[
         }
     })
     job = Job(_EXPID, '1', 'WAITING', 0, None)
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True)
     # Here, the job type is still `BASH`! The value provided in the
     # configuration is not evaluated, so we need to fake it here.
     # But it only works with the ``Job`` has a ``.section``...
     job.type = 'NUCLEAR'
     # FIXME: Yet another issue with the code design here. The ``Job`` class
     #        constructor creates a partial object. Then you need to call
-    #        ``_init_runtime_parameters`` to initialize other values.
+    #        ``init_runtime_parameters`` to initialize other values.
     #        Then, other ``Job._update.*`` functions create more member
     #        attribute values. However, there are still other attributes of
     #        a ``Job`` that are only filled by ``DictJob``, like the
