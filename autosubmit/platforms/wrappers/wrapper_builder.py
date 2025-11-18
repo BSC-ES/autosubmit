@@ -133,7 +133,7 @@ class FluxWrapperBuilder(WrapperBuilder):
     to the Flux scheduler inside the allocation.
     
     This is a special implementation because we use Flux as a wrapper engine inside 
-    Slurm allocations.
+    Slurm allocations, not as a platform.
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -161,10 +161,7 @@ class FluxWrapperBuilder(WrapperBuilder):
         chmod +x flux_runner.sh
 
         # Load user environment
-        module load miniconda
-        source /apps/GPP/MINICONDA/24.1.2/etc/profile.d/conda.sh
-        conda activate flux
-        conda info
+        {1}
 
         # Instantiate Flux within the allocated resources and run the jobs
         srun --cpu-bind=none flux start --verbose=2 /usr/bin/bash flux_runner.sh
@@ -176,6 +173,14 @@ class FluxWrapperBuilder(WrapperBuilder):
         of its inner jobs.
         """
         pass  # pragma: no cover
+
+    def _custom_environmet_setup(self):
+        return textwrap.dedent(
+            """module load miniconda
+            source /apps/GPP/MINICONDA/24.1.2/etc/profile.d/conda.sh
+            conda activate flux
+            conda info
+            """).format('\n'.ljust(13))
 
     def _get_processors(self):
         section = self.job_scripts[0].replace('.cmd', '').split('_')[-1]
