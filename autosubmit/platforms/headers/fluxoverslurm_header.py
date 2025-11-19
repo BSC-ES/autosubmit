@@ -43,7 +43,7 @@ class FluxOverSlurmHeader(object):
                 het] == '1' and int(job_nodes) > 0:
                 return ""
             else:
-                return "FLUX --nslots {0}".format(job.het['PROCESSORS'][het])
+                return "FLUX: --nslots {0}".format(job.het['PROCESSORS'][het])
         if job.nodes == "":
             job_nodes = 0
         else:
@@ -51,7 +51,7 @@ class FluxOverSlurmHeader(object):
         if job.processors == '' or job.processors == '1' and int(job_nodes) > 0:
             return ""
         else:
-            return "FLUX --nslots {0}".format(job.processors)
+            return "FLUX: --nslots {0}".format(job.processors)
 
     def get_nodes_directive(self, job, parameters, het=-1):
         """
@@ -63,10 +63,10 @@ class FluxOverSlurmHeader(object):
         """
         if het > -1 and len(job.het['NODES']) > 0:
             if job.het['NODES'][het] != '':
-                return "FLUX --nodes {0}".format(job.het['NODES'][het])
+                return "FLUX: --nodes {0}".format(job.het['NODES'][het])
         else:
             if parameters['NODES'] != '':
-                return "FLUX --nodes {0}".format(parameters['NODES'])
+                return "FLUX: --nodes {0}".format(parameters['NODES'])
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
@@ -93,10 +93,10 @@ class FluxOverSlurmHeader(object):
         # There is no threads per task, so directive is empty
         if het > -1 and len(job.het['NUMTHREADS']) > 0:
             if job.het['NUMTHREADS'][het] != '':
-                return "FLUX --cores-per-slot {0}".format(job.het['NUMTHREADS'][het])
+                return "FLUX: --cores-per-slot {0}".format(job.het['NUMTHREADS'][het])
         else:
             if parameters['NUMTHREADS'] != '':
-                return "FLUX --cores-per-slot {0}".format(parameters['NUMTHREADS'])
+                return "FLUX: --cores-per-slot {0}".format(parameters['NUMTHREADS'])
         return ""
 
     def get_custom_directives(self, job, parameters, het=-1):
@@ -104,12 +104,54 @@ class FluxOverSlurmHeader(object):
         return ""
 
     def get_tasks_per_node(self, job, parameters, het=-1):
-        # TODO: [ENGINES] Implement this method
-        Log.warning("Directive 'tasks-per-node' is not currently supported for Flux jobs. Ignoring it")
+        """
+        Returns tasks per node directive for the specified job
+
+        :param job: job to create tasks per node directive for
+        :type job: Job
+        :return: tasks per node directive
+        :rtype: str
+        """
+        if het > -1 and len(job.het['TASKS']) > 0:
+            if int(job.het['TASKS'][het]):
+                return "FLUX: --tasks-per-node={0}".format(job.het['TASKS'][het])
+        elif int(parameters['TASKS']) > 0:
+                return "FLUX: --tasks-per-node={0}".format(parameters['TASKS'])
         return ""
     
     def calculate_het_header(self, job, parameters):
         Log.warning("Heterogeneous configurations are not currently supported for Flux jobs. Ignoring them")
+        return ""
+    
+    def get_wallclock_directive(self, job, parameters):
+        """
+        Returns wallclock directive for the specified job
+
+        :param job: job to create wallclock directive for
+        :type job: Job
+        :return: wallclock directive
+        :rtype: str
+        """
+        wallclock = parameters['WALLCLOCK']
+        h, m = wallclock.split(':')
+        wallclock = int(h) * 60 + int(m)
+        return "FLUX: --time-limit {0}m".format(wallclock)
+
+    def get_exclusive_directive(self, job, parameters, het=-1):
+        """
+        Returns account directive for the specified job
+
+        :param job: job to create account directive for
+        :type job: Job
+        :return: account directive
+        :rtype: str
+        """
+        # TODO: [ENGINES] Flux does not admit exclusive nodes if "nodes" are not specified
+        if self.get_nodes_directive(job, parameters, het) == "":
+            Log.warning("""Flux does not admit exclusive nodes if "nodes" are not specified. Ignoring it""")
+
+        if str(parameters['EXCLUSIVE']).lower() == 'true':
+            return "FLUX: --exclusive"
         return ""
 
     SERIAL = textwrap.dedent("""\
@@ -117,10 +159,14 @@ class FluxOverSlurmHeader(object):
 #                   %TASKTYPE% %DEFAULT.EXPID% EXPERIMENT
 ###############################################################################
 #
-#%THREADS_PER_TASK_DIRECTIVE%
-#%NODES_DIRECTIVE%
-#FLUX --time-limit %WALLCLOCK%:00
-#FLUX --job-name %JOBNAME%
+# %NUMPROC_DIRECTIVE%
+# %THREADS_PER_TASK_DIRECTIVE%
+# %NODES_DIRECTIVE%
+# %WALLCLOCK_DIRECTIVE%
+# %TASKS_PER_NODE_DIRECTIVE%
+# FLUX: --job-name %JOBNAME%
+# FLUX: --output %CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%OUT_LOG_DIRECTIVE%
+# FLUX: --error %CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%ERR_LOG_DIRECTIVE%
 #
 ###############################################################################
            """)
