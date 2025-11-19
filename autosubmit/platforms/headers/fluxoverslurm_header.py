@@ -172,3 +172,5 @@ class FluxOverSlurmHeader(object):
            """)
 
     PARALLEL = SERIAL # TODO: [ENGINES] Differentiate serial and parallel headers if needed later
+
+# TODO: [ENGINES] --output and --error directives will be overwritten in the wrapper builders
