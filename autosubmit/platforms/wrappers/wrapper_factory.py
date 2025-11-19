@@ -223,7 +223,6 @@ class PJMWrapperFactory(WrapperFactory):
         return PythonVerticalWrapperBuilder(**kwargs)
 
     def horizontal_wrapper(self, **kwargs):
-
         if kwargs["method"] == 'srun':
             return SrunHorizontalWrapperBuilder(**kwargs)
         else:

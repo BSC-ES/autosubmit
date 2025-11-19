@@ -249,7 +249,7 @@ class EcPlatform(ParamikoPlatform):
                                                                                        filename)), 6005, str(e))
         return True
 
-    def move_file(self, src, dest, must_exist=False):
+    def move_file(self, src: str, dest: str, must_exist=False) -> bool:
         command = (f"ecaccess-file-move {self.host}:{os.path.join(self.remote_log_dir, src)} "
                    f"{self.host}:{os.path.join(self.remote_log_dir, dest)}")
         try:

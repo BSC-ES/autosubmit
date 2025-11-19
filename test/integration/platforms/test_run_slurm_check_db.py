@@ -45,6 +45,7 @@ _EXPID = 't000'
 
 @pytest.fixture
 def as_exp(autosubmit_exp):
+    """Create test experiment."""
     exp = autosubmit_exp(_EXPID, experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'none',
@@ -309,7 +310,7 @@ def _assert_files_recovered(files_check_list):
         assert files_check_list[check_name]
 
 
-def _init_run(as_exp, jobs_data) -> Path:
+def _init_run(as_exp, jobs_data: str) -> Path:
     as_conf = as_exp.as_conf
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
@@ -670,3 +671,82 @@ def test_run_interrupted(
 
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
     _assert_files_recovered(files_check_list)
+
+
+@pytest.mark.slurm
+def test_run_bug_save_wrapper_crashes(as_exp, mocker):
+    """In issue 2463, JIRA 794 of DestinE, users reported getting an exception
+    ``'list' object has no attribute 'status'``.
+
+    It appears to be caused by a combination of states of database and pickle,
+    and there could be more than one possible scenario to trigger this issue.
+
+    We identified one, where ``JobList.save_wrappers`` crashed before the
+    job packages databases were populated. The job list persisted to disk as
+    pickle was saved with its jobs ``SUBMITTED``, which then caused a subsequent
+    ``run`` command to trigger this exception (note, that the run is executed
+    without a ``recovery``, which is not quite what happened in other cases).
+
+    This test simulates that scenario. It was written using ``master`` of
+    4.1.15+, then applied to the pull request #2474. The issue of accessing
+    ``status`` of a Python ``list`` object has also been fixed in that pull
+    request -- the fix was postponed to see if we could locate the root
+    cause, even though this may not be the root cause.
+
+    Ref:
+
+    * https://github.com/BSC-ES/autosubmit/issues/2463
+    * https://jira.eduuni.fi/browse/CSCDESTINCLIMADT-794
+    """
+    _init_run(as_exp, dedent("""\
+        JOBS:
+          SIM:
+            PLATFORM: LOCAL_DOCKER
+            RUNNING: chunk
+            SCRIPT: |
+              # Fails on the second and third chunks
+              CHUNK="%CHUNK%"
+              if [ "$CHUNK" -eq 1 ]
+              then
+                echo "OK!"
+              else
+                echo "Uh oh"
+                crashit!
+              fi
+            DEPENDENCIES:
+              SIM-1: {}
+            WALLCLOCK: 00:10
+            RETRIALS: 5
+        WRAPPERS:
+          WRAPPER_V:
+            TYPE: vertical
+            JOBS_IN_WRAPPER: SIM
+            RETRIALS: 1
+        PLATFORMS:
+          LOCAL_DOCKER:
+            ADD_PROJECT_TO_HOST: False
+            HOST: 'localDocker'
+            MAX_WALLCLOCK: '00:30'
+            PROJECT: 'group'
+            QUEUE: 'gp_debug'
+            SCRATCH_DIR: '/tmp/scratch/'
+            TEMP_DIR: ''
+            TYPE: 'slurm'
+            USER: 'root'
+            MAX_PROCESSORS: 10
+            PROCESSORS_PER_NODE: 10
+        """))
+
+    from autosubmit.job.job_list import JobList
+    mocked_job_list_save_wrappers = mocker.patch.object(JobList, 'save_wrappers', side_effect=ValueError)
+
+    with pytest.raises(ValueError):
+        as_exp.autosubmit.run_experiment(expid=_EXPID)
+
+    mocked_job_list_save_wrappers.reset_mock()
+
+    # NOTE: On ``master`` before the fix (commit d635461f4ecac42985ba584e2cbfa65223ea2151),
+    #       this fails instead of raising ``ValueError``, showing the same exception
+    #       reported by users, ``AttributeError: 'list' object has no attribute 'status'``.
+    with pytest.raises(ValueError):
+        as_exp.autosubmit.run_experiment(expid=_EXPID)

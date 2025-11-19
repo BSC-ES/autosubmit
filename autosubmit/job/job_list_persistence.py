@@ -26,64 +26,56 @@ from sys import setrecursionlimit, getrecursionlimit
 from typing import TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
-
 from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager import DbManager
 from autosubmit.database.tables import JobPklTable
-from autosubmit.log.log import Log
+from autosubmit.log.log import Log, AutosubmitCritical
 
 if TYPE_CHECKING:
+    from autosubmit.config.configcommon import AutosubmitConfig
+    from autosubmit.job.job import Job
+    from autosubmit.job.job_list import JobList
     from networkx import DiGraph
 
 
 class JobListPersistence(object):
-    """
-    Class to manage the persistence of the job lists
+    """Class to manage the persistence of the job lists."""
 
-    """
+    def save(self, persistence_path: str, persistence_file: str, job_list: list['Job'], graph: 'DiGraph') -> None:
+        """Persists a job list.
 
-    def save(self, persistence_path, persistence_file, job_list, graph):
-        """
-        Persists a job list
-        :param job_list: JobList
-        :param persistence_file: str
-        :param persistence_path: str
-        :param graph: DiGraph
+        :param job_list: List of Autosubmit Jobs.
+        :param persistence_path: The path to the persistence database.
+        :param persistence_file: The name of the persistence database file.
+        :param graph: NetworkX graph object.
         """
         raise NotImplementedError  # pragma: no cover
 
-    def load(self, persistence_path, persistence_file):
-        """
-        Loads a job list from persistence
-        :param persistence_file: str
-        :param persistence_path: str
+    def load(self, persistence_path, persistence_file) -> 'JobList':
+        """Loads a job list from persistence.
 
+        :param persistence_path: The path to the persistence database.
+        :param persistence_file: The name of the persistence database file.
         """
         raise NotImplementedError  # pragma: no cover
 
     def pkl_exists(self, persistence_path, persistence_file):
+        """Check if a pkl file exists.
+
+        :param persistence_path: The path to the persistence database.
+        :param persistence_file: The name of the persistence database file.
         """
-        Check if a pkl file exists
-        :param persistence_file: str
-        :param persistence_path: str
-        """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
 
 class JobListPersistencePkl(JobListPersistence):
-    """
-    Class to manage the pickle persistence of the job lists
+    """Class to manage the pickle persistence of the job lists."""
 
-    """
+    def load(self, persistence_path: str, persistence_file: str):
+        """Loads a job list from a pkl file.
 
-    EXT = '.pkl'
-
-    def load(self, persistence_path, persistence_file):
-        """
-        Loads a job list from a pkl file
-        :param persistence_file: str
-        :param persistence_path: str
-
+        :param persistence_path: The path to the persistence database.
+        :param persistence_file: The name of the persistence database file.
         """
         path = os.path.join(persistence_path, persistence_file + '.pkl')
         path_tmp = os.path.join(persistence_path[:-3]+"tmp", persistence_file + f'.pkl.tmp_{os.urandom(8).hex()}')
@@ -110,20 +102,18 @@ class JobListPersistencePkl(JobListPersistence):
 
             return job_list
 
-    def save(self, persistence_path, persistence_file, job_list, graph: 'DiGraph'):
-        """
-        Persists a job list in a pkl file
-        :param job_list: JobList
-        :param persistence_file: str
-        :param persistence_path: str
-        :param graph: networkx graph object
-        :type graph: DiGraph
-        """
+    def save(self, persistence_path: str, persistence_file: str, job_list: list['Job'], graph: 'DiGraph'):
+        """Persists a job list in a pickle pkl file.
 
-        path = os.path.join(persistence_path, persistence_file + '.pkl' + '.tmp')
+        :param persistence_path: The path to the persistence database.
+        :param persistence_file: The name of the persistence database file.
+        :param job_list: List of Autosubmit Jobs.
+        :param graph: NetworkX graph object.
+        """
+        path = Path(persistence_path, f'{persistence_file}.pkl.tmp')
         with suppress(FileNotFoundError, PermissionError):
-            os.remove(path)
-        Log.debug("Saving JobList: " + str(path))
+            path.unlink(missing_ok=True)
+        Log.debug(f"Saving JobList: {str(path)}")
         with open(path, 'wb') as fd:
             current_limit = getrecursionlimit()
             setrecursionlimit(100000)
@@ -131,17 +121,21 @@ class JobListPersistencePkl(JobListPersistence):
             setrecursionlimit(current_limit)
             # profiler shows memory leak if we remove this.
             gc.collect()
-        os.replace(path, path[:-4])
-        Log.debug(f'JobList saved in {path[:-4]}')
+
+        path_tmp_name = str(path)
+        path_name = path_tmp_name[:-4]
+
+        os.replace(path_tmp_name, path_name)
+        Log.debug(f'JobList saved in {path_name}')
 
     def pkl_exists(self, persistence_path, persistence_file):
+        """Check if a pkl file exists.
+
+        :param persistence_path: The path to the persistence database.
+        :param persistence_file: The name of the persistence database file.
         """
-        Check if a pkl file exists
-        :param persistence_file: str
-        :param persistence_path: str
-        """
-        path = os.path.join(persistence_path, persistence_file + '.pkl')
-        return os.path.exists(path)
+        path = Path(persistence_path, persistence_file + '.pkl')
+        return path.exists()
 
 
 class JobListPersistenceDb(JobListPersistence):
@@ -160,8 +154,8 @@ class JobListPersistenceDb(JobListPersistence):
     def load(self, persistence_path, persistence_file):
         """Loads a job list from a database.
 
-        :param persistence_file: str
-        :param persistence_path: str
+        :param persistence_path: The path to the persistence database.
+        :param persistence_file: The name of the persistence database file.
         """
         row = self.db_manager.select_first_where(
             JobPklTable.name,
@@ -176,8 +170,8 @@ class JobListPersistenceDb(JobListPersistence):
         """Persists a job list in a database.
 
         :param job_list: JobList
-        :param persistence_file: str
-        :param persistence_path: str
+        :param persistence_path: The path to the persistence database.
+        :param persistence_file: The name of the persistence database file.
         :param graph: networkx graph object
         :type graph: DiGraph
         """
@@ -210,9 +204,22 @@ class JobListPersistenceDb(JobListPersistence):
     def pkl_exists(self, persistence_path, persistence_file):
         """Check if a pickle file exists.
 
-        :param persistence_file: str
-        :param persistence_path: str
+        :param persistence_path: The path to the persistence database.
+        :param persistence_file: The name of the persistence database file.
         """
         return self.db_manager.select_first_where(
             JobPklTable.name, {'expid': self.expid}
         ) is not None
+
+
+def get_job_list_persistence(expid: str, as_conf: 'AutosubmitConfig') -> JobListPersistence:
+    """Return the persistence object for a ``JobList`` based on what is configured in Autosubmit."""
+    storage_type = as_conf.get_storage_type()
+
+    if storage_type not in ('pkl', 'db'):
+        raise AutosubmitCritical('Storage type not known', 7014)
+
+    if storage_type == 'pkl':
+        return JobListPersistencePkl()
+    elif storage_type == 'db':
+        return JobListPersistenceDb(expid)

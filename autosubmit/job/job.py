@@ -28,7 +28,7 @@ from functools import reduce
 from pathlib import Path
 from threading import Thread
 from time import sleep
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import cast, Optional, TYPE_CHECKING
 
 from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, subs_dates
 
@@ -46,6 +46,7 @@ from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
 if TYPE_CHECKING:
     from autosubmit.platforms.platform import Platform
+    from autosubmit.platforms.slurmplatform import SlurmPlatform
     from autosubmit.job.template import TemplateSnippet
 
 Log.get_logger("Autosubmit")
@@ -248,7 +249,7 @@ class Job(object):
         self.check = 'true'
         self.check_warnings = False
         self.packed = False
-        self.hold = False # type: bool
+        self.hold = False  # type: bool
         self.distance_weight = 0
         self.level = 0
         self._export = "none"
@@ -883,9 +884,9 @@ class Job(object):
     @partition.setter
     def partition(self, value):
         """
-        Sets the partion to be used by the job.
+        Sets the partition to be used by the job.
 
-        :param value: partion to set
+        :param value: partition to set
         :type value: HPCPlatform
         """
         self._partition = value
@@ -1279,7 +1280,6 @@ class Job(object):
         # Update local logs
         self.local_logs = remote_logs
 
-
     def retrieve_external_retrials_logfiles(self):
         log_recovered = False
         self.remote_logs = self.get_new_remotelog_name()
@@ -1297,7 +1297,7 @@ class Job(object):
                     log_recovered = False
         return log_recovered
 
-    def retrieve_internal_retrials_logfiles(self) -> Tuple[int, bool]:
+    def retrieve_internal_retrials_logfiles(self) -> tuple[int, bool]:
         """
         Retrieves internal retrials log files for the given platform.
         This function is used when the job is inside a vertical wrapper.
@@ -1415,7 +1415,8 @@ class Job(object):
 
     @staticmethod
     def parse_time(wallclock):
-        if not isinstance(wallclock, str):  # TODO This is a workaround for the time being, just defined for tests passing without more issues
+        if not isinstance(wallclock,
+                          str):  # TODO This is a workaround for the time being, just defined for tests passing without more issues
             return datetime.timedelta(24 * 60 * 60)
         regex = re.compile(r'(((?P<hours>\d+):)((?P<minutes>\d+)))(:(?P<seconds>\d+))?')
         parts = regex.match(wallclock)
@@ -1454,8 +1455,10 @@ class Job(object):
         new_status = self.new_status
         if new_status == Status.COMPLETED:
             Log.debug(f"{self.name} job seems to have completed: checking...")
-            self._platform.get_completed_files(self.name, wrapper_failed=self.packed)
-            self.check_completion()
+            if not self._platform.get_completed_files(self.name, wrapper_failed=self.packed):
+                Log.debug("Failed to get platform's completed files")
+            completion_status = self.check_completion()
+            Log.debug(f"Completion status: {completion_status}")
         else:
             self.status = new_status
 
@@ -1847,7 +1850,8 @@ class Job(object):
                     try:
                         self.custom_directives = json.loads(self.custom_directives)
                     except (ValueError, TypeError) as e:
-                        raise AutosubmitCritical(f"Error parsing custom directives: '{self.custom_directives}: {e}'", 6000)
+                        raise AutosubmitCritical(f"Error parsing custom directives: '{self.custom_directives}: {e}'",
+                                                 6000)
 
             if len(self.het['CUSTOM_DIRECTIVES']) < self.het['HETSIZE']:
                 for x in range(self.het['HETSIZE'] - len(self.het['CUSTOM_DIRECTIVES'])):
@@ -1857,7 +1861,7 @@ class Job(object):
 
             for x in range(self.het['HETSIZE']):
                 self.het['CUSTOM_DIRECTIVES'].append(self.custom_directives)
-        # Ignore the heterogeneous parameters if the cores or nodes are no specefied as a list
+        # Ignore the heterogeneous parameters if the cores or nodes are not specified as a list
         if self.het['HETSIZE'] == 1:
             self.het = dict()
         if not self.wallclock:
@@ -1870,7 +1874,8 @@ class Job(object):
         # Increasing according to chunk
         self.wallclock = increase_wallclock_by_chunk(self.wallclock, self.wchunkinc, chunk)
 
-    def update_platform_associated_parameters(self, as_conf: AutosubmitConfig, parameters: dict, chunk, set_attributes) -> dict:
+    def update_platform_associated_parameters(self, as_conf: AutosubmitConfig, parameters: dict, chunk,
+                                              set_attributes) -> dict:
         if set_attributes:
             self.x11_options = str(parameters.get("CURRENT_X11_OPTIONS", ""))
             self.ec_queue = str(parameters.get("CURRENT_EC_QUEUE", ""))
@@ -1934,7 +1939,8 @@ class Job(object):
             parameters['EXTENDED_HEADER'] = self.read_header_tailer_script(self.ext_header_path, as_conf, True)
             parameters['EXTENDED_TAILER'] = self.read_header_tailer_script(self.ext_tailer_path, as_conf, False)
         elif self.ext_header_path or self.ext_tailer_path:
-            Log.warning(f"An extended header or tailer is defined in {self._section}, but it is ignored in dummy projects.")
+            Log.warning(
+                f"An extended header or tailer is defined in {self._section}, but it is ignored in dummy projects.")
         else:
             parameters['EXTENDED_HEADER'] = ""
             parameters['EXTENDED_TAILER'] = ""
@@ -1945,7 +1951,7 @@ class Job(object):
 
         return parameters
 
-    def update_wrapper_parameters(self,as_conf: AutosubmitConfig, parameters: dict) -> dict:
+    def update_wrapper_parameters(self, as_conf: AutosubmitConfig, parameters: dict) -> dict:
         wrappers = as_conf.experiment_data.get("WRAPPERS", {})
         if len(wrappers) > 0:
             parameters['WRAPPER'] = as_conf.get_wrapper_type()
@@ -2168,7 +2174,8 @@ class Job(object):
             self.x11 = False if str(parameters.get("CURRENT_X11", False)).lower() == "false" else True
             self.notify_on = parameters.get("CURRENT_NOTIFY_ON", [])
             self.update_stat_file()
-            if self.checkpoint:  # To activate placeholder sustitution per <empty> in the template
+            # To activate placeholder substitution by <empty> in the template
+            if self.checkpoint:
                 parameters["AS_CHECKPOINT"] = self.checkpoint
             self.wchunkinc = as_conf.get_wchunkinc(self.section)
 
@@ -2508,7 +2515,6 @@ class Job(object):
         real_name = real_name.replace(f"{self.expid}_", "")
         return real_name
 
-
     def create_wrapped_script(self, as_conf: AutosubmitConfig, wrapper_tag='wrapped') -> str:
         parameters = self.update_parameters(as_conf, set_attributes=False)
         template_content = self.get_wrapped_content(as_conf, parameters)
@@ -2534,11 +2540,11 @@ class Job(object):
         """
         parameters = self.update_parameters(as_conf, set_attributes=False)
         template_content, additional_templates = self.update_content(as_conf, parameters)
-        variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content,flags=re.IGNORECASE)
+        variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content, flags=re.IGNORECASE)
         variables = [variable[1:-1] for variable in variables]
         variables = [variable for variable in variables if variable not in as_conf.default_parameters]
         for template in additional_templates:
-            variables_tmp = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template,flags=re.IGNORECASE)
+            variables_tmp = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template, flags=re.IGNORECASE)
             variables_tmp = [variable[1:-1] for variable in variables_tmp]
             variables_tmp = [variable for variable in variables_tmp if variable not in as_conf.default_parameters]
             variables.extend(variables_tmp)
@@ -2550,7 +2556,7 @@ class Job(object):
             if str(show_logs).lower() != "false":
                 Log.printlog("The following set of variables to be substituted in template script is not part "
                              "of parameters set, and will be replaced by a blank value: {0}".format(
-                                self.undefined_variables), 5013)
+                    self.undefined_variables), 5013)
                 if not set(variables).issuperset(set(parameters)):
                     Log.printlog(
                         f"The following set of variables are not being used in the templates: {str(set(parameters) - set(variables))}",
@@ -2567,7 +2573,7 @@ class Job(object):
         else:
             self.local_logs = (f"{self.name}.{self.submit_time_timestamp}.out",
                                f"{self.name}.{self.submit_time_timestamp}.err")
-        
+
     def check_compressed_local_logs(self) -> None:
         """
         Checks if the current local log files are compressed versions (.gz or .xz)
@@ -2670,7 +2676,7 @@ class Job(object):
         return True
 
     def write_vertical_time(
-        self, count: int = -1, first_submit_timestamp: str = ''
+            self, count: int = -1, first_submit_timestamp: str = ''
     ) -> None:
         self.update_start_time(count=count)
         self.update_local_logs(update_submit_time=False, count=count)
@@ -2777,15 +2783,16 @@ class Job(object):
             self.remote_logs = copy.deepcopy(local_logs)
 
     def _recover_last_log_name_from_filesystem(self) -> bool:
-        """
-        Recovers the log name for the job from the filesystem.
+        """Recovers the log name for the job from the filesystem.
+
         :return: True if the log name was already recovered, False otherwise
-        :rtype: bool
         """
-        log_name: Optional[list[Path]] = sorted(list(self._log_path.glob(f"{self.name}*")), key=lambda x: x.stat().st_mtime)
+        log_name: Optional[list[Path]] = sorted(list(self._log_path.glob(f"{self.name}*")),
+                                                key=lambda x: x.stat().st_mtime)
         log_name_path = log_name[-1] if log_name else None
         if log_name_path:
-            file_timestamp = int(datetime.datetime.fromtimestamp(log_name_path.stat().st_mtime).strftime("%Y%m%d%H%M%S"))
+            file_timestamp = int(
+                datetime.datetime.fromtimestamp(log_name_path.stat().st_mtime).strftime("%Y%m%d%H%M%S"))
             if self.ready_date and file_timestamp >= int(self.ready_date):
                 self.local_logs = (log_name_path.with_suffix(".out").name, log_name_path.with_suffix(".err").name)
                 self.remote_logs = copy.deepcopy(self.local_logs)
@@ -2795,17 +2802,14 @@ class Job(object):
         return False
 
     def recover_last_log_name(self):
-        """
-        Recovers the last log name for the job
-        """
+        """Recovers the last log name for the job."""
         if not self.updated_log:
             self.updated_log = self._recover_last_log_name_from_filesystem()
-            # TODO: After PostgreSQL migration, implement _recover_last_log_from_db() to retrieve the last log from the database.
+            # TODO: After PostgreSQL migration, implement _recover_last_log_from_db()
+            #       to retrieve the last log from the database.
 
     def recover_last_ready_date(self) -> None:
-        """
-        Recovers the last ready date for this job
-        """
+        """Recovers the last ready date for this job."""
         if not self.ready_date:
             stat_file = Path(f"{self._tmp_path}/{self.name}_TOTAL_STATS")
             if stat_file.exists():
@@ -2845,7 +2849,7 @@ class WrapperJob(Job):
             job_id: int,
             status: str,
             priority: int,
-            job_list: List[Job],
+            job_list: list[Job],
             total_wallclock: str,
             platform: 'ParamikoPlatform',
             as_config: AutosubmitConfig,
@@ -2912,7 +2916,7 @@ class WrapperJob(Job):
             # Log.info("Wrapper {0} is {1}".format(self.name, Status().VALUE_TO_KEY[self.status]))
             # This will update the status from submitted or hold to running
             # (if safety timer is high enough or queue is fast enough)
-            if prev_status in [Status.SUBMITTED]:
+            if prev_status == Status.SUBMITTED:
                 for job in self.job_list:
                     job.status = Status.QUEUING
             self._check_running_jobs()  # Check and update inner_jobs status that are eligible
@@ -2946,10 +2950,12 @@ class WrapperJob(Job):
                         still_running = False
             else:
                 still_running = False
+            # TODO: Probably we don't need  ``still_running`` if we move the
+            #       ``self.cancel.failed_wrapper_job()`` call to where it's set to ``False``?
             if not still_running:
                 self.cancel_failed_wrapper_job()
 
-    def check_inner_jobs_completed(self, jobs: List[Job]) -> None:
+    def check_inner_jobs_completed(self, jobs: list[Job]) -> None:
         """Will get all the jobs that the status are not completed and check if it was completed or not.
 
         :param jobs: Jobs inside the wrapper
@@ -2988,12 +2994,10 @@ class WrapperJob(Job):
 
         :param prev_status: previous status of a job
         """
-        reason = str()
         if self._platform.type == 'slurm':
-            self._platform.send_command(
-                self._platform.get_queue_status_cmd(self.id))
-            reason = self._platform.parse_queue_reason(
-                self._platform._ssh_output, self.id)
+            platform = cast('SlurmPlatform', self._platform)
+            platform.send_command(platform.get_queue_status_cmd(self.id))
+            reason = platform.parse_queue_reason(platform._ssh_output, self.id)
             if self._queuing_reason_cancel(reason):
                 Log.printlog(f"Job {self.name} will be cancelled and set to FAILED as it was queuing due to {reason}",
                              6009)
@@ -3007,7 +3011,7 @@ class WrapperJob(Job):
                 if self.hold == "false":
                     # SHOULD BE MORE CLASS
                     # GET_scontrol release but not sure if this can be implemented on others PLATFORMS
-                    self._platform.send_command("scontrol release " + f"{self.id}")
+                    platform.send_command("scontrol release " + f"{self.id}")
                     self.new_status = Status.QUEUING
                     for job in self.job_list:
                         job.hold = self.hold
@@ -3020,8 +3024,7 @@ class WrapperJob(Job):
             elif reason == '(JobHeldAdmin)':
                 Log.debug(
                     f"Job {self.name} Failed to be HELD, canceling... ", )
-                self._platform.send_command(
-                    self._platform.cancel_cmd + f" {self.id}")
+                platform.send_command(platform.cancel_cmd + f" {self.id}")
                 self.status = Status.WAITING
             else:
                 Log.info(f"Job {self.name} is QUEUING {reason}")

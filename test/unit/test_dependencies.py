@@ -1,17 +1,34 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+from datetime import datetime
+
 import mock
 import pytest
-from datetime import datetime
 from mock.mock import MagicMock
 from networkx import DiGraph
 
-from autosubmit.autosubmit import Autosubmit
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistenceDb
+from autosubmit.job.job_list_persistence import JobListPersistenceDb, get_job_list_persistence
 from autosubmit.job.job_utils import Dependency
-from autosubmit.config.yamlparser import YAMLParserFactory
 
 _MEMBER_LIST = ["fc1", "fc2", "fc3", "fc4", "fc5", "fc6", "fc7", "fc8", "fc9", "fc10"]
 _CHUNK_LIST = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -767,7 +784,7 @@ def test_normalize_auto_keyword(as_conf, mocker):
         as_conf.expid,
         as_conf,
         YAMLParserFactory(),
-        Autosubmit._get_job_list_persistence(as_conf.expid, as_conf)
+        get_job_list_persistence(as_conf.expid, as_conf)
     )
     dependency = Dependency("test")
 

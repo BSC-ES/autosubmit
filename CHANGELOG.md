@@ -26,6 +26,7 @@ release.
 - Fixed bug where an RO-Crate file would include itself in the archive, as well as other zip files.
   Now Autosubmit uses the pattern $expid-crate-$date-$time-$millisecond.zip, and ignores any ZIP files
   in the tmp/ASLOGS that start with $expid-crate and end with .zip #2692
+- Fixed "Unexpected error: 'list' object has no attribute 'status'" when running experiments #2463
 
 **Enhancements:**
 
@@ -168,7 +169,7 @@ the filter the jobs. Not using any value for `-fp` still returns all jobs.
 
 **Others:**
 - All autosubmit projects moved to Github.
-- Added Github actions for CI/CD.
+- Added GitHub actions for CI/CD.
 
 4.1.11 - Enhancements, New Features, Documentation, and Bug Fixes
 =================================================================
@@ -240,14 +241,12 @@ Others:
 - Fixes an issue with dependency not being linked.
 - Docs improved.
 
-
 4.1.8 - Bug fixes.
 ==================
 - Fixed an issue with a socket connection left open.
 - Fixed an issue with log recovery being disabled by default.
 - Added exclusive parameter
 - Fixed some X11 routines called by default
-
 
 4.1.7 - X11, Migrate, script and Bug fixes
 ==========================================
@@ -295,9 +294,6 @@ Others:
 - Improved error clarity.
 - Added RO-Crate.
 - Added Calendar for splits.
-
-
-
 
 4.1.2 - Bug fixes
 =================

@@ -108,6 +108,7 @@ class ParamikoPlatform(Platform):
         self._wrapper = None
         self.remote_log_dir = ""
         # self.get_job_energy_cmd = ""
+        self.local_x11_display = None
         self._init_local_x11_display()
 
         self.remove_log_files_on_transfer = False
@@ -137,7 +138,7 @@ class ParamikoPlatform(Platform):
         """
         return self._wrapper
 
-    def reset(self):
+    def reset(self) -> None:
         self.close_connection()
         self.connected = False
         self._ssh = None
@@ -503,7 +504,7 @@ class ParamikoPlatform(Platform):
 
     def get_list_of_files(self):
         return self._ftpChannel.get(self.get_files_path)
-    
+
     def _chunked_md5(self, file_buffer: BufferedReader) -> str:
         """Calculate the MD5 checksum of a file in chunks to avoid high memory usage.
 
@@ -515,7 +516,7 @@ class ParamikoPlatform(Platform):
         for chunk in iter(lambda: file_buffer.read(CHUNK_SIZE), b""):
             md5_hash.update(chunk)
         return md5_hash.hexdigest()
-    
+
     def _checksum_validation(self, local_path: str, remote_path: str) -> bool:
         """Validates that the checksum of the local file matches the checksum of the remote file.
 
@@ -561,9 +562,9 @@ class ParamikoPlatform(Platform):
             # Remove file from remote if configured and checksum matches
             is_log_file = bool(re.match(r".*\.(out|err)(\.(xz|gz))?$", filename))
             if (
-                is_log_file
-                and self.remove_log_files_on_transfer
-                and self._checksum_validation(file_path, remote_path)
+                    is_log_file
+                    and self.remove_log_files_on_transfer
+                    and self._checksum_validation(file_path, remote_path)
             ):
                 try:
                     self._ftpChannel.remove(remote_path)
@@ -633,6 +634,7 @@ class ParamikoPlatform(Platform):
                 self._ftpChannel.rename(src, dest)
             return True
         except IOError as e:
+            # TODO: Probably a bug here. We need to update the test and this part.
             if str(e) in "Garbage":
                 raise AutosubmitError(f'File {os.path.join(path_root, src)} does not exists, something went '
                                       f'wrong with the platform', 6004, str(e))
@@ -640,7 +642,6 @@ class ParamikoPlatform(Platform):
                 raise AutosubmitError(f"File {os.path.join(path_root, src)} does not exists", 6004, str(e))
             else:
                 Log.debug(f"File {path_root} doesn't exists ")
-                return False
         except Exception as e:
             if str(e) in "Garbage":
                 raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exists', 6004, str(e))
@@ -648,7 +649,7 @@ class ParamikoPlatform(Platform):
                 raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exists", 6004, str(e))
             else:
                 Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
-                return False
+        return False
 
     def submit_job(self, job, script_name, hold=False, export="none"):
         """Submit a job from a given job object.
@@ -766,8 +767,7 @@ class ParamikoPlatform(Platform):
         job_id = job.id
         job_status = Status.UNKNOWN
         if type(job_id) is not int and type(job_id) is not str:
-            Log.error(
-                f'check_job() The job id ({job_id}) is not an integer neither a string.')
+            Log.error(f'check_job() The job id ({job_id}) is not an integer neither a string.')
             job.new_status = job_status
         sleep_time = 5
         sleep(2)
@@ -821,7 +821,7 @@ class ParamikoPlatform(Platform):
                 job_status = Status.UNKNOWN
         else:
             Log.error(
-                f" check_job(), job is not on the queue system. Output was: {self.get_check_job_cmd(job_id)}" )
+                f" check_job(), job is not on the queue system. Output was: {self.get_check_job_cmd(job_id)}")
             job_status = Status.UNKNOWN
             Log.error(
                 f'check_job() The job id ({job_id}) status is {job_status}.')
@@ -836,10 +836,13 @@ class ParamikoPlatform(Platform):
             # backup for start time in case that the stat file is not found
             job.start_time_timestamp = int(time.time())
 
+        # FIXME: It's strange that this argument is passed to this function, but used only here,
+        #        to decide whether the job status is returned or not. It sounds safe to always
+        #        return the status, simplifying code, tests, docs, maintenance in general...
         if submit_hold_check:
             return job_status
-        else:
-            job.new_status = job_status
+        job.new_status = job_status
+        return None
 
     def _check_jobid_in_queue(self, ssh_output, job_list_cmd):
         """
@@ -1459,7 +1462,7 @@ class ParamikoPlatform(Platform):
 
         :param job: The job.
         :param parameters: Parameters dictionary.
-        :return: Job header.
+        :return: Header to use for the job.
         """
         if not job.packed or str(job.wrapper_type).lower() != "vertical":
             out_filename = f"{job.name}.cmd.out.{job.fail_count}"
@@ -1626,7 +1629,7 @@ class ParamikoPlatform(Platform):
         except Exception as e:
             Log.debug(f"Error reading file {src}: {str(e)}")
             return None
-        
+
     def compress_file(self, file_path):
         Log.debug(f"Compressing file {file_path} using {self.remote_logs_compress_type}")
         try:

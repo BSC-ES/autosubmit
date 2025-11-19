@@ -28,7 +28,7 @@ from multiprocessing.queues import Queue
 # noinspection PyProtectedMember
 from os import _exit  # type: ignore
 from pathlib import Path
-from typing import Any, Optional, Union, TYPE_CHECKING
+from typing import cast, Any, Optional, Union, TYPE_CHECKING
 
 import setproctitle
 
@@ -68,9 +68,6 @@ def recover_platform_job_logs_wrapper(
     :param worker_event: An event to signal work availability.
     :param cleanup_event: An event to signal cleanup operations.
     :param as_conf: The Autosubmit configuration object containing experiment data.
-    :type as_conf: AutosubmitConfig
-    :return: None
-    :rtype: None
     """
     platform.recovery_queue = recovery_queue
     platform.work_event = worker_event
@@ -231,13 +228,13 @@ class Platform:
             self.compress_remote_logs = platform_config.get("COMPRESS_REMOTE_LOGS", False)
             self.remote_logs_compress_type = platform_config.get("REMOTE_LOGS_COMPRESS_TYPE", "gzip")
             self.compression_level = platform_config.get("COMPRESSION_LEVEL", 9)
-            
+
         self.log_queue_size = log_queue_size
         self.remote_log_dir = None
 
     @classmethod
     def update_workers(cls, event_worker):
-        # This is visible on all instances simultaneosly. Is to send the keep alive signal.
+        # This is visible on all instances simultaneously. Is to send the keep alive signal.
         cls.worker_events.append(event_worker)
 
     @classmethod
@@ -369,25 +366,28 @@ class Platform:
     def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
         return True, valid_packages_to_submit
 
-    def submit_ready_jobs(self, as_conf: 'AutosubmitConfig', job_list: 'JobList',
-                          packages_persistence: 'JobPackagePersistence', packages_to_submit: list['JobPackageBase'],
-                          inspect=False, only_wrappers=False, hold=False):
-        """Gets READY jobs and send them to the platforms if there is available space on the queues.
+    def submit_ready_jobs(
+            self,
+            as_conf: 'AutosubmitConfig',
+            job_list: 'JobList',
+            packages_persistence: JobPackagePersistence,
+            packages_to_submit: list['JobPackageBase'],
+            inspect=False,
+            only_wrappers=False,
+            hold=False
+    ) -> tuple[bool, list[str], str, list['JobPackageBase'], bool]:
+        """Gets ``READY`` jobs and send them to the platforms if there is available space on the queues.
 
-        :param hold:
-        :param packages_to_submit:
         :param as_conf: autosubmit config object
-        :type as_conf: AutosubmitConfig object
         :param job_list: job list to check
-        :type job_list: JobList object
         :param packages_persistence: Handles database per experiment.
-        :type packages_persistence: JobPackagePersistence object
+        :param packages_to_submit:
         :param inspect: True if coming from generate_scripts_andor_wrappers().
-        :type inspect: Boolean
         :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw.
-        :type only_wrappers: Boolean
-        :return: True if at least one job was submitted, False otherwise \n
-        :rtype: Boolean
+        :param hold:
+        :return: A tuple with True if at least one job was submitted, False otherwise, the list of
+            failed packages, the error message if any, the valid packages to submit, and any job
+            ready to be submitted.
         """
         any_job_submitted = False
         save = False
@@ -409,10 +409,15 @@ class Platform:
                     if hasattr(package, "name"):
                         job_list.packages_dict[package.name] = package.jobs
                         from ..job.job import WrapperJob
-                        wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.READY, 0,
-                                                 package.jobs, package._wallclock, package.platform, as_conf, hold)
+                        package: 'JobPackageThread' = cast('JobPackageThread', package)
+                        wrapper_platform: 'ParamikoPlatform' = cast('ParamikoPlatform', package.platform)
+                        # noinspection PyProtectedMember
+                        wrapper_job = WrapperJob(
+                            package.name, package.jobs[0].id, Status.READY, 0, package.jobs, package._wallclock,
+                            wrapper_platform, as_conf, hold)
                         job_list.job_package_map[package.jobs[0].id] = wrapper_job
                         packages_persistence.save(package, inspect)
+                    # noinspection PyProtectedMember
                     for innerJob in package._jobs:
                         any_job_submitted = True
                         # Setting status to COMPLETED, so it does not get stuck in the loop that calls this function
@@ -448,7 +453,9 @@ class Platform:
                                 if job_tmp.section not in error_msg:
                                     error_msg += job_tmp.section + "&"
                             if e.message.lower().find("bad parameters") != -1:
-                                error_message += f"\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {error_msg[:-1]}"
+                                error_message += ("\ncheck that {1} platform has set the correct scheduler. "
+                                                  "Sections that could be affected: {0}").format(
+                                    error_msg[:-1], self.name)
                             else:
                                 error_message += f"\ncheck that {self.name} platform has set the correct scheduler. Sections that could be affected: {error_msg[:-1]}"
                     except AutosubmitCritical:
@@ -458,12 +465,16 @@ class Platform:
                         raise
             except Exception:
                 raise
+        # FIXME: If we can infer this value based on whether the ``valid_packages_to_submit`` is truthy,
+        #        then users can do that too, or infer it some other way -- i.e. we can probably drop that
+        #        value from the returned tuple, maybe even return a single type in the future or build a
+        #        dataclass or similar (easier for types/test).
         if valid_packages_to_submit:
             any_job_submitted = True
         return save, failed_packages, error_message, valid_packages_to_submit, any_job_submitted
 
     @property
-    def serial_platform(self):
+    def serial_platform(self) -> 'Platform':
         """Platform to use for serial jobs.
 
         :return: platform's object
@@ -474,7 +485,7 @@ class Platform:
         return self._serial_platform
 
     @serial_platform.setter
-    def serial_platform(self, value):
+    def serial_platform(self, value: 'Platform'):
         self._serial_platform = value
 
     @property
@@ -591,13 +602,12 @@ class Platform:
         """
         raise NotImplementedError  # pragma: no cover
 
-    def move_file(self, src, dest):
+    def move_file(self, src: str, dest: str, must_exist=False) -> bool:
         """Moves a file on the platform.
 
         :param src: source name
-        :type src: str
         :param dest: destination name
-        :type dest: str
+        :param must_exist: Whether the file should be moved if it does not exist.
         """
         raise NotImplementedError  # pragma: no cover
 
@@ -653,7 +663,7 @@ class Platform:
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_checkpoint_files(self, job):
+    def get_checkpoint_files(self, job: 'Job'):
         """Get all the checkpoint files of a job.
 
         :param job: Get the checkpoint files
@@ -767,27 +777,22 @@ class Platform:
             path = Path(self.remote_log_dir)
         return str(path)
 
-    def submit_job(self, job: 'Job', script_name: str, hold: bool = False, export: str = "none"):
+    def submit_job(self, job: Optional['Job'], script_name: str, hold: bool = False, export: str = "none"):
         """Submit a job from a given job object.
 
         :param job: job object
-        :type job: autosubmit.job.job.Job
         :param script_name: job script's name
-        :rtype script_name: str
         :param hold: if True, the job will be submitted in hold state
-        :type hold: bool
         :param export: export environment variables
-        :type export: str
         :return: job id for the submitted job
-        :rtype: int
         """
         raise NotImplementedError  # pragma: no cover
 
-    def check_all_jobs(self, job_list: list['Job'], as_conf:'AutosubmitConfig', retries: int = 5):
+    def check_all_jobs(self, job_list: list['Job'], as_conf: 'AutosubmitConfig', retries: int = 5):
         for job, job_prev_status in job_list:
             self.check_job(job)
 
-    def check_job(self, job: 'Job', default_status: str = Status.COMPLETED, retries:int = 5,
+    def check_job(self, job: 'Job', default_status: str = Status.COMPLETED, retries: int = 5,
                   submit_hold_check: bool = False, is_wrapper: bool = False):
         """Checks job running status.
 
@@ -813,7 +818,7 @@ class Platform:
         :param complete_path: complete path to the file, includes filename
         :type complete_path: str
         """
-        return NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def generate_submit_script(self) -> None:
         """Opens Submit script file. """
@@ -1031,7 +1036,7 @@ class Platform:
         if len(jobs_pending_to_process) > 0:  # Restore the connection if there was an issue with one or more jobs.
             self.restore_connection(as_conf, log_recovery_process=True)
 
-        # This second while is to keep retring the failed jobs.
+        # This second while is to keep retrying the failed jobs.
         # With the unique queue, the main process won't send the job again, so we have to store it here.
         while len(jobs_pending_to_process) > 0:  # jobs that had any issue during the log retrieval
             job = jobs_pending_to_process.pop()
@@ -1048,8 +1053,8 @@ class Platform:
             Log.result(
                 f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
         if len(jobs_pending_to_process) > 0:
-            self.restore_connection(as_conf,
-                                    log_recovery_process=True)  # Restore the connection if there was an issue with one or more jobs.
+            # Restore the connection if there was an issue with one or more jobs.
+            self.restore_connection(as_conf, log_recovery_process=True)
 
         return jobs_pending_to_process
 

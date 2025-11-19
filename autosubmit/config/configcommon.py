@@ -1599,14 +1599,14 @@ class AutosubmitConfig(object):
                 if 'horizontal' in self.get_wrapper_type(wrapper_values):
                     if not self.experiment_data["PLATFORMS"][platform_name].get('PROCESSORS_PER_NODE', None):
                         self.wrong_config["WRAPPERS"] += [
-                            [wrapper_name, "PROCESSORS_PER_NODE no exist in the horizontal-wrapper platform"]]
+                            [wrapper_name, "PROCESSORS_PER_NODE does not exist in the horizontal-wrapper platform"]]
                     if not self.experiment_data["PLATFORMS"][platform_name].get('MAX_PROCESSORS', ""):
                         self.wrong_config["WRAPPERS"] += [[wrapper_name,
-                                                           "MAX_PROCESSORS no exist in the horizontal-wrapper platform"]]
+                                                           "MAX_PROCESSORS does not exist in the horizontal-wrapper platform"]]
                 if 'vertical' in self.get_wrapper_type(wrapper_values):
                     if not self.experiment_data.get("PLATFORMS", {}).get(platform_name, {}).get('MAX_WALLCLOCK', ""):
                         self.wrong_config["WRAPPERS"] += [[wrapper_name,
-                                                           "MAX_WALLCLOCK no exist in the vertical-wrapper platform"]]
+                                                           "MAX_WALLCLOCK does not exist in the vertical-wrapper platform"]]
             if "WRAPPERS" not in self.wrong_config:
                 if not no_log:
                     Log.result('wrappers OK')
@@ -2497,7 +2497,7 @@ class AutosubmitConfig(object):
 
     # based on https://github.com/cbirajdar/properties-to-yaml-converter/blob/master/properties_to_yaml.py
     @staticmethod
-    def ini_to_yaml(root_dir: Path, ini_file: str) -> None:
+    def ini_to_yaml(root_dir: Path, ini_file: Union[str, Path]) -> None:
         # Based on http://stackoverflow.com/a/3233356
         def update_dict(original_dict: dict, updated_dict: collections.abc.Mapping) -> dict:
             for k, v in updated_dict.items():
@@ -2564,6 +2564,8 @@ class AutosubmitConfig(object):
         """
         # Disabled, forced to "false" not working anymore in newer slurm versions.
         # return str(self.get_section(['CONFIG', 'PRESUBMISSION'], "false")).lower()
+        # FIXME: deprecate and/or remove PRESUBMISSION as it's not working on Slurm now?
+        #        https://github.com/BSC-ES/autosubmit/issues/2548
         return "false"
 
     def get_wrapper_type(self, wrapper=None) -> Optional[str]:

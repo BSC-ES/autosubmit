@@ -280,15 +280,12 @@ class LocalPlatform(ParamikoPlatform):
             return False
         return True
 
-    def move_file(self, src, dest, must_exist=False):
-        """Moves a file on the platform (includes .err and .out)
+    def move_file(self, src: str, dest: str, must_exist=False) -> bool:
+        """Moves a file on the platform (includes .err and .out).
 
         :param src: source name.
-        :type src: str
         :param dest: destination name.
-        :type dest: str
         :param must_exist: ignore if file exist or not.
-        :type must_exist: bool
         """
         path_root = ""
         try:
@@ -300,7 +297,6 @@ class LocalPlatform(ParamikoPlatform):
                 raise AutosubmitError(f"File {os.path.join(path_root, src)} does not exists", 6004, str(e))
             else:
                 Log.debug(f"File {path_root} doesn't exists ")
-                return False
         except Exception as e:
             if str(e) in "Garbage":
                 raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exists', 6004, str(e))
@@ -308,7 +304,7 @@ class LocalPlatform(ParamikoPlatform):
                 raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exists", 6004, str(e))
             else:
                 Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
-                return False
+        return False
 
     def get_ssh_output(self):
         return self._ssh_output

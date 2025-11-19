@@ -140,8 +140,10 @@ def calendar_split_size_isvalid(date_str, split_size, split_unit,
 def calendar_chunk_section(exp_data, section, date, chunk) -> int:
     """
     Calendar for chunks
+    :param exp_data:
     :param section:
-    :param parameters:
+    :param date:
+    :param chunk:
     :return: int
     """
     # next_auto_date = date

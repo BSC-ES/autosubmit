@@ -22,6 +22,7 @@ import pytest
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
+from autosubmit.job.job_list_persistence import get_job_list_persistence
 from autosubmit.job.job_packager import JobPackager
 
 _EXPID = 't000'
@@ -46,7 +47,7 @@ def create_packager(autosubmit_exp, autosubmit, local) -> CreatePackagerFixture:
         as_conf = exp.as_conf
         parameters = as_conf.load_parameters()
 
-        job_list_persistence = autosubmit._get_job_list_persistence(_EXPID, as_conf)
+        job_list_persistence = get_job_list_persistence(_EXPID, as_conf)
         job_list = JobList(_EXPID, exp.as_conf, YAMLParserFactory(), job_list_persistence)
 
         job_list.generate(
