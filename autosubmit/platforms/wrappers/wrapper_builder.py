@@ -124,6 +124,7 @@ class WrapperBuilder(object):
 
 class FluxWrapperBuilder(WrapperBuilder):
     # TODO: [ENGINES] Command "flux start" is being called multiple times. Solve (?)
+    # TODO: [ENGINES] "nslots" are now in the job headers, so they can be deleted from here
     # TODO: [ENGINES] Is it necessary to pass the run_id to the inner jobs?
     """
     The FluxWrapperBuilder is the responsible for generating the wrapper script
