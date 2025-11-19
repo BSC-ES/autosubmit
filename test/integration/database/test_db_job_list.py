@@ -34,19 +34,19 @@ raw_job_list = [
      'name': 'a01f_REMOTE_SETUP', 'packed': False, 'platform_name': None, 'priority': 1, 'ready_date': None,
      'remote_logs_err': None, 'remote_logs_out': None, 'script_name': 'a01f_REMOTE_SETUP.cmd',
      'section': 'REMOTE_SETUP', 'split': -1, 'splits': -1, 'start_time': None, 'start_time_timestamp': None,
-     'status': 'WAITING', 'submit_time_timestamp': None, 'synchronize': None, 'updated_log': False},
+     'status': 'WAITING', 'submit_time_timestamp': None, 'synchronize': None, 'updated_log': 0},
     {'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None, 'finish_time_timestamp': None,
      'frequency': None, 'id': 0, 'local_logs_err': None, 'local_logs_out': None, 'max_checkpoint_step': 0,
      'name': 'a01f_LOCAL_SETUP', 'packed': False, 'platform_name': None, 'priority': 0, 'ready_date': None,
      'remote_logs_err': None, 'remote_logs_out': None, 'script_name': 'a01f_LOCAL_SETUP.cmd', 'section': 'LOCAL_SETUP',
      'split': -1, 'splits': -1, 'start_time': None, 'start_time_timestamp': None, 'status': 'READY',
-     'submit_time_timestamp': None, 'synchronize': None, 'updated_log': False},
+     'submit_time_timestamp': None, 'synchronize': None, 'updated_log': 0},
     {'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None, 'finish_time_timestamp': None,
      'frequency': None, 'id': 0, 'local_logs_err': None, 'local_logs_out': None, 'max_checkpoint_step': 0,
      'name': 'a01f_20000101_fc0_INI', 'packed': False, 'platform_name': None, 'priority': 0, 'ready_date': None,
      'remote_logs_err': None, 'remote_logs_out': None, 'script_name': 'a01f_20000101_fc0_INI.cmd', 'section': 'INI',
      'split': -1, 'splits': -1, 'start_time': None, 'start_time_timestamp': None, 'status': 'WAITING',
-     'submit_time_timestamp': None, 'synchronize': None, 'updated_log': False},
+     'submit_time_timestamp': None, 'synchronize': None, 'updated_log': 0},
     # {'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None, 'finish_time_timestamp': None,
     #  'frequency': None, 'id': 0, 'local_logs_err': None, 'local_logs_out': None, 'max_checkpoint_step': 0,
     #  'name': 'a01f_SIM', 'packed': False, 'platform_name': None, 'priority': 0, 'ready_date': None,
@@ -376,7 +376,7 @@ def test_select_latest_inner_jobs(
         "local_logs_err": None,
         "remote_logs_out": None,
         "remote_logs_err": None,
-        "updated_log": True,
+        "updated_log": 1,
         "platform_name": "test_platform",
         "wallclock": "01:00",
         "num_processors": "4",
@@ -498,7 +498,7 @@ def test_load_wrapper(
         "local_logs_err": None,
         "remote_logs_out": None,
         "remote_logs_err": None,
-        "updated_log": True,
+        "updated_log": 1,
         "platform_name": "test_platform",
         "wallclock": "01:00",
         "num_processors": "4",
@@ -532,7 +532,7 @@ def test_load_wrapper(
         assert wrapper['wallclock'] == "01:00"
         assert wrapper['num_processors'] == 4
         assert wrapper['type'] == '0'
-        assert wrapper['updated_log'] is True
+        assert wrapper['updated_log'] > 0
         assert wrapper['sections'] is None
         assert wrapper['method'] is None
     for inner_job in un_mapped_inner_jobs:
@@ -571,7 +571,7 @@ def test_clear_unused_nodes(
             'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
             'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
             'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': False, 'member': None
+            'synchronize': None, 'updated_log': 0, 'member': None
         }),
         Job(loaded_data={
             'chunk': 10, 'current_checkpoint_step': 0, 'date': "2000-01-01", 'date_split': None,
@@ -581,7 +581,7 @@ def test_clear_unused_nodes(
             'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
             'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
             'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': False, 'member': 'fc0'
+            'synchronize': None, 'updated_log': 0, 'member': 'fc0'
         }),
         Job(loaded_data={
             'chunk': 1, 'current_checkpoint_step': 0, 'date': '2000-01-01', 'date_split': None,
@@ -591,7 +591,7 @@ def test_clear_unused_nodes(
             'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
             'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
             'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': False, 'member': 'fc0'
+            'synchronize': None, 'updated_log': 0, 'member': 'fc0'
         }),
         Job(loaded_data={
             'chunk': 1, 'current_checkpoint_step': 0, 'date': '2000-12-31', 'date_split': None,
@@ -601,7 +601,7 @@ def test_clear_unused_nodes(
             'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
             'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
             'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': False, 'member': 'fc0'
+            'synchronize': None, 'updated_log': 0, 'member': 'fc0'
         }),
         Job(loaded_data={
             'chunk': 1, 'current_checkpoint_step': 0, 'date': '2000-01-01', 'date_split': None,
@@ -611,7 +611,7 @@ def test_clear_unused_nodes(
             'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
             'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
             'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': False, 'member': 'fc2'
+            'synchronize': None, 'updated_log': 0, 'member': 'fc2'
         }),
         Job(loaded_data={
             'chunk': 1, 'current_checkpoint_step': 0, 'date': '2000-01-01', 'date_split': None,
@@ -621,7 +621,7 @@ def test_clear_unused_nodes(
             'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
             'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
             'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': False, 'member': 'fc0'
+            'synchronize': None, 'updated_log': 0, 'member': 'fc0'
         })
     ]
 
@@ -695,7 +695,7 @@ def test_backup_and_restore(monkeypatch, tmp_path, _expid, as_db, as_exp: Any):
         'priority': 0, 'ready_date': None, 'remote_logs_err': None,
         'remote_logs_out': None, 'start_time': None,
         'start_time_timestamp': None, 'submit_time_timestamp': None,
-        'synchronize': None, 'updated_log': False, 'member': None
+        'synchronize': None, 'updated_log': 0, 'member': None
     }
     db_manager.insert(jobs_table.name, sample_job)
     sample_edge = {

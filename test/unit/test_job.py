@@ -1022,7 +1022,7 @@ def test_reset_logs(autosubmit_config):
     job = Job("job1", "1", Status.READY, 0)
     job.init_runtime_parameters(as_conf, reset_logs=True)
     assert job.workflow_commit == "dummy-commit"
-    assert job.updated_log is False
+    assert job.updated_log == 0
     assert job.packed_during_building is False
 
 
@@ -1114,71 +1114,6 @@ def test_update_parameters_current_variables(autosubmit_config, experiment_data,
     _, _, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data)
     for key, value in expected_data.items():
         assert parameters[key] == value
-
-
-# @pytest.mark.parametrize('test_with_file, file_is_empty, last_line_empty', [
-#     (False, False, False),
-#     (True, True, False),
-#     (True, False, False),
-#     (True, False, True)
-# ], ids=["no file", "file is empty", "file is correct", "file last line is empty"])
-# def test_recover_last_ready_date(tmpdir, test_with_file, file_is_empty, last_line_empty):
-#     job = Job('dummy', '1', 0, 1)
-#     job._tmp_path = Path(tmpdir)
-#     stat_file = job._tmp_path.joinpath(f'{job.name}_TOTAL_STATS')
-#     ready_time = datetime.now() + timedelta(minutes=5)
-#     ready_date = int(ready_time.strftime("%Y%m%d%H%M%S"))
-#     expected_date = None
-#     if test_with_file:
-#         if file_is_empty:
-#             stat_file.touch()
-#             expected_date = datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
-#         else:
-#             if last_line_empty:
-#                 with stat_file.open('w') as f:
-#                     f.write(" ")
-#                 expected_date = datetime.fromtimestamp(stat_file.stat().st_mtime).strftime('%Y%m%d%H%M%S')
-#             else:
-#                 with stat_file.open('w') as f:
-#                     f.write(f"{ready_date} {ready_date} {ready_date} COMPLETED")
-#                 expected_date = str(ready_date)
-#     job.ready_date = None
-#     job.recover_last_ready_date()
-#     assert job.ready_date == expected_date
-#
-#
-# @pytest.mark.parametrize('test_with_logfiles, file_timestamp_greater_than_ready_date', [
-#     (False, False),
-#     (True, True),
-#     (True, False),
-# ], ids=["no file", "log timestamp >= ready_date", "log timestamp < ready_date"])
-# def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greater_than_ready_date):
-#     job = Job('dummy', '1', 0, 1)
-#     job._log_path = Path(tmpdir)
-#     expected_local_logs = (f"{job.name}.out.0", f"{job.name}.err.0")
-#     if test_with_logfiles:
-#         if file_timestamp_greater_than_ready_date:
-#             ready_time = datetime.now() - timedelta(minutes=5)
-#             job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
-#             log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
-#             expected_update_log = True
-#             expected_local_logs = (log_name.with_suffix('.out').name, log_name.with_suffix('.err').name)
-#         else:
-#             expected_update_log = False
-#             ready_time = datetime.now() + timedelta(minutes=5)
-#             job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
-#             log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
-#         log_name.with_suffix('.out').touch()
-#         log_name.with_suffix('.err').touch()
-#     else:
-#         expected_update_log = False
-#
-#     job.updated_log = False
-#     job.recover_last_log_name()
-#     assert job.updated_log == expected_update_log
-#     assert job.local_logs[0] == str(expected_local_logs[0])
-#     assert job.local_logs[1] == str(expected_local_logs[1])
-
 
 @pytest.mark.parametrize('experiment_data, attributes_to_check', [(
         {
@@ -1423,6 +1358,7 @@ def test_sub_job_manager(load_wrapper, tmp_path):
             total=len(packages_dict[packages_map[job.id].name]) if job.id in packages_map else 0,
             status="COMPLETED"
         ))
+
 
     structure = [
         {

@@ -35,6 +35,7 @@ from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.history.experiment_history import ExperimentHistory
+from autosubmit.job import job_utils
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
@@ -628,21 +629,16 @@ class JobList(object):
                     tmp_loaded_jobs = []
                     can_be_loaded = True
                     for edge in parents:
-                        job = self.get_job_by_name(edge["e_from"])
-                        if not job:
-                            job = self.load_job_by_name(edge["e_from"])
-                        if job:
-                            if job.section == section:
-                                tmp_loaded_jobs.append(job)
-                            elif job.section != section and edge["COMPLETION_STATUS"] != "COMPLETED":
-                                # If the job is not in the current section and is not completed, it cannot be loaded
-                                can_be_loaded = False
-                                break
-                            else:
-                                can_be_loaded = False
-                                break
-                        if can_be_loaded:
-                            self.add_job(self.load_job_by_name(wrappable_job))
+                        p_job = self.get_job_by_name(edge["e_from"])
+                        if not p_job:
+                            p_job = self.load_job_by_name(edge["e_from"])
+                        if p_job and p_job.section != section and edge["COMPLETION_STATUS"] != "COMPLETED":
+                            # If the job is not in the current section and is not completed, it cannot be loaded
+                            can_be_loaded = False
+                            break
+
+                    if can_be_loaded:
+                        self.add_job(self.load_job_by_name(wrappable_job))
 
     def process_wrapper_jobs(self, wrapper_section: str, inner_sections: list[str]) -> None:
         self.load_inner_jobs_by_section(inner_sections)
@@ -2170,23 +2166,6 @@ class JobList(object):
             return [job for job in completed_jobs if job.packed is False]
         return completed_jobs
 
-    def get_completed_failed_without_logs(self, platform: Any = None) -> List[Any]:
-        """
-        Returns a list of completed or failed jobs without updated logs.
-
-        :param platform: Job platform, defaults to None.
-        :type platform: Platform
-        :return: List of completed and failed jobs without updated logs.
-        :rtype: List[Job]
-        """
-
-        completed_failed_jobs = [job for job in self.job_list if
-                                 (platform is None or job.platform.name == platform.name) and
-                                 (job.status == Status.COMPLETED or job.status == Status.FAILED) and
-                                 job.updated_log is False]
-
-        return completed_failed_jobs
-
     def get_uncompleted(self, platform=None, wrapper=False):
         """
         Returns a list of completed jobs
@@ -2593,12 +2572,16 @@ class JobList(object):
         :rtype : bool
         :return: True if there are active jobs to run, False otherwise.
         """
-
-        for job in self.job_list:
-            self.update_parents_edge_completeness(job)
+        # Updates job_list
         self.recover_logs()
-        self.unload_completed_jobs()
+        save_jobs, save_edges = self.update_list(self._as_conf, submitter=self.submitter)
+        if save_jobs:
+            self.save_jobs()
+        if save_edges:
+            self.save_edges()
+
         self._load_graph(full_load=False)
+        self.unload_finished_jobs()
         for job in self.job_list:
             if not job.updated:
                 job.submitter = self.submitter
@@ -2609,17 +2592,17 @@ class JobList(object):
         self.update_wrappers_references()
         return len(self.get_active()) > 0
 
-    def unload_completed_jobs(self):
-        """Unloads completed jobs and edges from the memory
-
-        This method removes jobs that are in the completed state and logs are recovered.
-        """
-
+    def unload_finished_jobs(self):
+        """Unloads finished jobs and edges from the memory"""
         jobs_to_unload = [
             job for job in self.job_list
             if (
-                    (job.status == Status.FAILED and job.fail_count >= job.retrials) or
-                    (job.status in [Status.COMPLETED, Status.SKIPPED])
+                    (job.status == Status.FAILED
+                     and job.fail_count >= job.retrials
+                     and job.log_recovery_call_count > job.fail_count)
+                    or
+                    (job.status in (Status.COMPLETED, Status.SKIPPED)
+                     and job.log_recovery_call_count > job.fail_count)
             )
         ]
         for job in (job for job in jobs_to_unload):
@@ -2765,17 +2748,23 @@ class JobList(object):
                 self.dbmanager.save_jobs(jobs_to_save)
             Log.info("Jobs saved.")
 
-    def load_jobs(self, full_load: bool, load_failed_jobs: bool = False,
-                  only_not_updated_logs: bool = False) -> List[Job]:
-        """Load the job list from the database.
+    def load_jobs(self, full_load: bool = False, load_failed_jobs: bool = False,
+                  only_finished: bool = False) -> List[Job]:
+        """Load jobs from the database.
 
-        :param full_load: If True, load all jobs and edges; otherwise load only necessary ones.
-        :param load_failed_jobs: If True, include failed jobs in the load.
-        :param only_not_updated_logs: If True, load only jobs with not-updated logs.
-        :return: A list of loaded Job objects.
+        Load job nodes from persistent storage into memory and return them as a list
+        of ``Job`` instances.
+
+        :param full_load: If ``True``, load all jobs and edges; otherwise load only the
+            subset necessary for continued execution.
+        :param load_failed_jobs: If ``True``, include jobs in failed states when loading.
+        :param only_finished: If ``True``, load only finished jobs (completed, failed or skipped).
+        :return: A list of loaded ``Job`` objects.
+        :rtype: List[Job]
+        :raises Exception: If a database access error occurs while loading jobs.
         """
         nodes = self.dbmanager.load_jobs(full_load, load_failed_jobs,
-                                         only_not_updated_logs=only_not_updated_logs,
+                                         only_finished=only_finished,
                                          members=self.run_members)
         self.total_size, self.completed_size, self.failed_size = self.dbmanager.get_job_list_size()
         return nodes
@@ -2949,6 +2938,7 @@ class JobList(object):
             parents_nodes = {parent_name: self.graph.nodes[parent_name]["job"] for parent_name in
                              parents_edge_info.keys()}
             non_completed, completed = self._count_parents_status(current_job, parents_edge_info, parents_nodes)
+            self._update_db_edges_completion_status(completed, non_completed, current_job)
             if len(non_completed) == 0 and len(completed) > 0:
                 # If all parents are completed, we can run the job
                 jobs_to_check.append(current_job)
@@ -3040,7 +3030,37 @@ class JobList(object):
                         non_completed.append(parent)
                 else:
                     non_completed.append(parent)
+
         return non_completed, completed
+
+    def _update_db_edges_completion_status(self, finished_parents: List[Job], non_finished_parents: List[Job], child: Job) -> None:
+        """ Update the completion status of edges in the database.
+
+        :param finished_parents: List of parent jobs that have finished.
+        :type finished_parents: List[Job]
+        :param non_finished_parents: List of parent jobs that have not finished.
+        :type non_finished_parents: List[Job]
+        :param child: The child job whose edges are being updated.
+        :type child: Job
+        """
+        for parent in finished_parents:
+            self.graph.edges[parent.name, child.name]['completion_status'] = "COMPLETED"
+
+        for parent in non_finished_parents:
+            status = "RUNNING" if parent.status == Status.RUNNING else "WAITING"
+            self.graph.edges[parent.name, child.name]['completion_status'] = status
+
+    def _recover_log(self, job: Job) -> None:
+        """Recover the log for a given job.
+        :param job: The job object to recover the log for.
+        :type job: Job
+        """
+        if str(self._as_conf.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "true":
+            job.retrieve_logfiles()
+        else:
+            job.platform.add_job_to_log_recover(job)
+
+        job.log_recovery_call_count += 1
 
     def recover_logs(self, new_run: bool = False):
         """Update jobs' log recovered status.
@@ -3053,49 +3073,21 @@ class JobList(object):
         """
         if new_run:
             # load all jobs without updated_log from db
-            jobs_to_recover = self.load_jobs(full_load=True, only_not_updated_logs=True)
+            jobs_to_recover = self.load_jobs(full_load=True, only_finished=True)
+            for job in jobs_to_recover:
+                ref_fail_count = copy.copy(job.fail_count)
+                # Updated_log indicates the last downloaded log
+                # Failed jobs could missed some log in between if run was force stopped
+                job.fail_count = copy.copy(job.updated_log)
+                for i in range(job.updated_log, ref_fail_count):
+                    self._recover_log(job)
+                    job.fail_count += 1
+                job.fail_count = ref_fail_count
+
         else:
-            jobs_to_recover = [job for job in self.job_list if not getattr(job, "updated_log", False) and not getattr(job, "x11", False) and job.status in self._FINAL_STATUSES]
-            # Save finished jobs
-            if jobs_to_recover:
-                self.save_jobs()
-        for job in jobs_to_recover:
-            if str(self._as_conf.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "true":
-                job.retrieve_logfiles()
-            else:
-                job.platform.add_job_to_log_recover(job)
-
-    def check_if_log_is_recovered(self, job: Job) -> Path:
-        """
-        Check if the log is recovered.
-
-        Conditions:
-        - File must exist.
-        - File timestamp should be greater than the job ready_date,
-        otherwise it is from a previous run.
-
-        :param job: The job object to check the log for.
-        :type job: Job
-        :return: The path to the recovered log file if found, otherwise None.
-        :rtype: Path
-        """
-
-        if not hasattr(job, "updated_log") or not job.updated_log:
-            job_log_files = self.path_to_logs.glob(f"{job.name}.*")
-            for log_recovered in job_log_files:
-                match = re.match(
-                    rf"{re.escape(job.name)}" + r"\.(\d{14})\.(out)(.gz|.xz)?$",
-                    log_recovered.name,
-                )
-                if match:
-                    file_timestamp = int(
-                        datetime.datetime.fromtimestamp(
-                            log_recovered.stat().st_mtime
-                        ).strftime("%Y%m%d%H%M%S")
-                    )
-                    if job.ready_date and file_timestamp >= int(job.ready_date):
-                        return log_recovered  # TODO: Change to return the tuple of (.out,.err) files
-        return None
+            jobs_to_recover = [job for job in self.job_list if not getattr(job, "x11", False) and job.status in self._FINAL_STATUSES and job.log_recovery_call_count <= job.fail_count]
+            for job in jobs_to_recover:
+                self._recover_log(job)
 
     def check_completed_jobs_after_recovery(self):
         for job in (job for job in self.job_list if job.status == Status.COMPLETED):
@@ -3128,27 +3120,29 @@ class JobList(object):
         :return: True if any job status was updated, False otherwise.
         :rtype: bool
         """
-        save = False
+        save_jobs = False
         if self.update_from_file(store_change):
-            save = store_change
+            save_jobs = store_change
         Log.debug('Updating FAILED jobs')
-        save |= self._update_failed_jobs(as_conf)
-        save |= self._handle_special_checkpoint_jobs()
-        save |= self._sync_completed_jobs()
+        save_jobs |= self._update_failed_jobs(as_conf)
+        save_jobs_, save_edges = self._handle_special_checkpoint_jobs()
+        save_jobs |= save_jobs_
+        save_jobs |= self._sync_completed_jobs()
         if not fromSetStatus:
-            save |= self._update_waiting_and_delayed_jobs(as_conf)
-            save |= self._update_held_jobs(as_conf)
-            save |= self._skip_jobs(as_conf)
+            save_jobs |= self._update_waiting_and_delayed_jobs(as_conf)
+            save_jobs |= self._update_held_jobs(as_conf)
+            save_jobs |= self._skip_jobs(as_conf)
         for job in self.get_ready():
-            self.update_parents_edge_completeness(job)
+            save_edges = True
             job.id = 0
+            self._update_db_edges_completion_status(job.parents, [], job)
             job.set_ready_date()
-            job.updated_log = False
+            job.updated_log = 0
 
         self.update_two_step_jobs()
 
         Log.debug('Update finished')
-        return save
+        return save_jobs, save_edges
 
     def is_wrapper_still_running(self, job: Job) -> bool:
         """
@@ -3164,32 +3158,6 @@ class JobList(object):
             job.packed = True
         return job.packed
 
-    def update_parents_edge_completeness(self, job: Job) -> None:
-        """
-        Update the 'completed' status of all edges from each parent to the given job.
-
-        :param job: The job whose parent edges will be updated.
-        :type job: Job
-        """
-
-        for parent in job.parents:
-            self.update_edge_completed(
-                e_from=parent.name,
-                e_to=job.name,
-                status=job.status
-            )
-
-    def update_edge_completed(self, e_from: str, e_to: str, status: int) -> None:
-        """
-        Update the 'completed' status of the edge between two jobs in the graph.
-
-        :param e_from: Name of the parent job.
-        :type e_from: str
-        :param e_to: Name of the child job.
-        :type e_to: str
-        """
-        if e_from in self.graph_dict and e_to in self.graph_dict[e_from]:
-            self.graph_dict[e_from][e_to]["COMPLETION_STATUS"] = status
 
     def _update_failed_jobs(self, as_conf: AutosubmitConfig) -> bool:
         """
@@ -3258,21 +3226,19 @@ class JobList(object):
                 job.id = 0
                 Log.debug(f"Resetting job: {job.name} status to: WAITING on first run...")
 
-    def _handle_special_checkpoint_jobs(self) -> bool:
-        """
-        Set jobs that fulfill special checkpoint conditions to READY.
+    def _handle_special_checkpoint_jobs(self) -> Tuple[bool, bool]:
+        """Set jobs that fulfill special checkpoint conditions to READY.
 
-        :return: True if any job status was updated, False otherwise.
-        :rtype: bool
+        Return a tuple with two booleans: (save_jobs, save_edges).
         """
-        save = False
+        save_all = False
         for job in self.check_special_status():
             job.status = Status.READY
             job.id = None
             job.wrapper_type = None
-            save = True
+            save_all = True
             Log.debug(f"JOB: {job.name} was set to READY all parents are in the desired status.")
-        return save
+        return save_all, save_all
 
     def _sync_completed_jobs(self) -> bool:
         """
@@ -3597,7 +3563,7 @@ class JobList(object):
             "local_logs_err": getattr(wrapper_job, "local_logs_err", None),
             "remote_logs_out": getattr(wrapper_job, "remote_logs_out", None),
             "remote_logs_err": getattr(wrapper_job, "remote_logs_err", None),
-            "updated_log": getattr(wrapper_job, "updated_log", None),
+            "updated_log": getattr(wrapper_job, "updated_log", 0),
             "platform_name": wrapper_job.platform.name if wrapper_job.platform else None,
             "wallclock": wrapper_job.wallclock,
             "num_processors": wrapper_job.num_processors,
@@ -4155,10 +4121,6 @@ class JobList(object):
                     job.local_logs = jobs_data[job.name]["out"]
                     job.remote_logs = jobs_data[job.name]["err"]
                     job.ready_date = datetime.datetime.fromtimestamp(jobs_data[job.name]["start"]).strftime('%Y%m%d%H%M%S')
-                    if job.status in [Status.COMPLETED, Status.FAILED]:
-                        job.updated_log = True
-                    else:
-                        job.updated_log = False
 
     def _get_job_names(self, status: Optional[list[int]] = None, platform: Platform = None) -> List[str]:
         """Get a list of all job names in the job list.
@@ -4202,14 +4164,6 @@ class JobList(object):
         :rtype: List[int]
         """
         return [id for _, id in self.dbmanager.get_wrappers_id_from_db()]
-
-    def get_missing_logs(self):
-        """Get a list of jobs with missing logs from the database.
-
-        :return: List of job names with missing logs.
-        :rtype: List[str]
-        """
-        return self.dbmanager.get_missing_logs()
 
     def get_failed_from_db(self):
         return self.dbmanager.get_failed_job_data()

@@ -419,7 +419,7 @@ class Platform(object):
                         any_job_submitted = True
                         # Setting status to COMPLETED, so it does not get stuck in the loop that calls this function
                         innerJob.status = Status.COMPLETED
-                        innerJob.updated_log = False
+                        innerJob.updated_log = 0
 
                 # If called from RUN or inspect command
                 try:
@@ -839,7 +839,7 @@ class Platform(object):
         else:
             Log.warning(
                 f"Job {job.name} and retry number:{job.fail_count} has no job id. Autosubmit will no record this retry.")
-            job.updated_log = True
+            job.updated_log += 1
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """Establishes an SSH connection to the host.

@@ -178,7 +178,7 @@ class Job(object):
         'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-         'packed_during_building', 'workflow_commit', 'updated'
+         'packed_during_building', 'workflow_commit', 'updated', 'log_recovery_call_count'
     )
 
     def __setstate__(self, state, log_process=False):
@@ -332,7 +332,7 @@ class Job(object):
         self.delete_when_edgeless = False
         # hetjobs
         self.het = None
-        self.updated_log = False
+        self.updated_log = 0
         self.submit_time_timestamp = None  # for wrappers, all jobs inside a wrapper are submitted at the same time
         self.start_time_timestamp = None
         self.finish_time_timestamp = None  # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
@@ -370,6 +370,7 @@ class Job(object):
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
         self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
         self.updated = False
+        self.log_recovery_call_count = copy.copy(self.updated_log)
 
     def init_runtime_parameters(self, as_conf: AutosubmitConfig, reset_logs: bool) -> None:
         """Initialize runtime parameters for the job.
@@ -1038,7 +1039,7 @@ class Job(object):
         """
         Sets the ready start date for the job
         """
-        self.updated_log = False
+        self.updated_log = 0
         self.ready_date = int(time.strftime("%Y%m%d%H%M%S"))
 
     def inc_fail_count(self):
@@ -1406,7 +1407,7 @@ class Job(object):
             else:
                 Log.result(
                     f"{self.platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{self.fail_count}'.")
-        self.updated_log = log_recovered
+        self.updated_log = self.updated_log + 1 if log_recovered else self.updated_log
 
     def _max_possible_wallclock(self):
         if self.platform and self.platform.max_wallclock:
@@ -2234,7 +2235,7 @@ class Job(object):
         self.reservation = parameters["RESERVATION"]
 
     def reset_logs(self) -> None:
-        self.updated_log = False
+        self.updated_log = 0
 
     def update_placeholders(self, as_conf: AutosubmitConfig, parameters: dict, replace_by_empty=False) -> dict:
         """
@@ -2283,7 +2284,7 @@ class Job(object):
             self.init_runtime_parameters(as_conf, reset_logs)
             # Parameters that affect to all the rest of parameters
             self.update_dict_parameters(as_conf)
-        #self.init_platform(as_conf)
+        self.init_platform(as_conf)
         parameters = as_conf.load_parameters()
         parameters = self.update_current_parameters(as_conf, parameters)
         parameters = self.update_job_parameters(as_conf, parameters, set_attributes)
@@ -2301,12 +2302,20 @@ class Job(object):
         return parameters
 
     def init_platform(self, as_conf: AutosubmitConfig) -> None:
+        """Initialize the job's platform.
+
+        The submitter comes from the job_list.submitter during an autosubmit run/inspect, but if not, it is created here.
+
+        :param as_conf: Autosubmit configuration.
+        """
+        if not self.submitter:
+            self.submitter = job_utils._get_submitter(as_conf)
+            self.submitter.load_platforms(as_conf)
+
         if not self.platform:
-            submitter = job_utils._get_submitter(as_conf)
-            submitter.load_platforms(as_conf)
             if not self.platform_name:
                 self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
-            self.platform = submitter.platforms.get(self.platform_name)
+            self.platform = self.submitter.platforms.get(self.platform_name)
 
     def update_content_extra(self, as_conf: AutosubmitConfig, files: list[str]) -> list[str]:
         additional_templates = []
@@ -2773,32 +2782,6 @@ class Job(object):
         if last and local_logs[0] != "":
             self.local_logs = local_logs
             self.remote_logs = copy.deepcopy(local_logs)
-
-    def _recover_last_log_name_from_filesystem(self) -> bool:
-        """
-        Recovers the log name for the job from the filesystem.
-        :return: True if the log name was already recovered, False otherwise
-        :rtype: bool
-        """
-        log_name: Optional[list[Path]] = sorted(list(self._log_path.glob(f"{self.name}*")), key=lambda x: x.stat().st_mtime)
-        log_name_path = log_name[-1] if log_name else None
-        if log_name_path:
-            file_timestamp = int(datetime.datetime.fromtimestamp(log_name_path.stat().st_mtime).strftime("%Y%m%d%H%M%S"))
-            if self.ready_date and file_timestamp >= int(self.ready_date):
-                self.local_logs = (log_name_path.with_suffix(".out").name, log_name_path.with_suffix(".err").name)
-                self.remote_logs = copy.deepcopy(self.local_logs)
-                return True
-        self.local_logs = (f"{self.name}.out.{self._fail_count}", f"{self.name}.err.{self._fail_count}")
-        self.remote_logs = copy.deepcopy(self.local_logs)
-        return False
-
-    def recover_last_log_name(self):
-        """
-        Recovers the last log name for the job
-        """
-        if not self.updated_log:
-            self.updated_log = self._recover_last_log_name_from_filesystem()
-            # TODO: After PostgreSQL migration, implement _recover_last_log_from_db() to retrieve the last log from the database.
 
     def recover_last_ready_date(self) -> None:
         """

@@ -886,7 +886,6 @@ class ParamikoPlatform(Platform):
                 'check_job() The job id ({0}) status is {1}.', job_id, job_status)
 
         if job_status in [Status.FAILED, Status.COMPLETED, Status.UNKNOWN]:
-            job.updated_log = False
             if not job.start_time_timestamp:  # QUEUING -> COMPLETED ( under safetytime )
                 job.start_time_timestamp = int(time.time())
             # Estimate Time for failed jobs, as they won't have the timestamp in the stat file

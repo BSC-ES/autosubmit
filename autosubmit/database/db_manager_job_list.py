@@ -90,32 +90,41 @@ class JobsDbManager(DbManager):
 
     def load_jobs(
             self,
-            full_load: bool,
+            full_load: bool = False,
             load_failed_jobs: bool = False,
-            only_not_updated_logs: bool = False,
+            only_finished: bool = False,
             members: Optional[List[Any]] = None
     ) -> List[Dict[str, Any]]:
+        """Return a  list of jobs loaded from the database.
+
+        Load jobs according to the requested mode.
+
+        :param full_load: If True, load all jobs.
+        :param load_failed_jobs: If True, include failed jobs when loading active jobs.
+        :param only_finished: If True, load only finished jobs.
+        :param members: Optional list of member identifiers to filter jobs.
+        :return: A list of job dictionaries.
+        """
         table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
         self.create_table(table.name)
-        if only_not_updated_logs:
-            job_list = self.select_not_updated_log_jobs()
+        if only_finished:
+            job_list = self.select_finished_jobs()
         elif full_load:
             job_list = self.select_all_jobs()
         else:
             job_list = self.select_active_jobs(include_failed=load_failed_jobs, members=members)
             job_list.extend(self.select_children_jobs(job_list, members=members))
             job_list = set(job_list)  # remove duplicates
-        job_list = [dict(job) for job in job_list]
-        # return modificable list of dicts so it is easier to save later
-        return job_list
 
-    def select_not_updated_log_jobs(self) -> List[Dict[str, Any]]:
-        """Return the jobs from the database that have not updated their logs.
+        return [dict(job) for job in job_list]
+
+    def select_finished_jobs(self) -> List[Dict[str, Any]]:
+        """Return the jobs from the database that have finished.
         """
         table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
 
         self.create_table(table.name)
-        job_list = self.select_where_with_columns(table, {'updated_log': False, 'status': [Status.COMPLETED, Status.FAILED, Status.SKIPPED]})
+        job_list = self.select_where_with_columns(table, {'status': [Status.COMPLETED, Status.FAILED, Status.SKIPPED]})
         return [dict(job) for job in job_list]
 
     def load_job_by_name(self, job_name: str) -> dict[str, Any]:
@@ -572,21 +581,6 @@ class JobsDbManager(DbManager):
         wrappers = self.select_all_with_columns(wrapper_info_table.name)
         return [wrapper[1] for wrapper in wrappers]
 
-    def get_missing_logs(self) -> List[str]:
-        """Get the names of jobs that are completed but have not updated their logs.
-
-        :return: List of job names with missing logs.
-        :rtype: List[str]
-        """
-        table: Table = get_table_from_name(schema=self.schema, table_name=JobsTable.name)
-
-        self.create_table(table.name)
-        job_list_data = self.select_where_with_columns(
-            table,
-            {'updated_log': False, 'status': [Status.COMPLETED, Status.FAILED, Status.SKIPPED]}
-        )
-
-        return [job['name'] for job in job_list_data]
 
     def get_failed_job_data(self) -> list[dict[str, Any]]:
         """Get the names of jobs that have failed.

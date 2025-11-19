@@ -1969,6 +1969,7 @@ class Autosubmit:
             if save:
                 job_list.update_db_wrappers()
                 job_list.save_jobs()
+                job_list.save_edges()
 
         return wrapper_job
 
@@ -2228,10 +2229,6 @@ class Autosubmit:
         return job_list.total_size, safetysleeptime, default_retrials, check_wrapper_jobs_sleeptime
 
     @staticmethod
-    def check_logs_status(job_list) -> str:
-        return job_list.get_missing_logs()
-
-    @staticmethod
     def refresh_log_recovery_process(platforms: list[Platform], as_conf: AutosubmitConfig) -> None:
         """Relaunch the log recovery processes for each platform if necessary."""
         for p in platforms:  # Send keep_alive signal
@@ -2290,7 +2287,6 @@ class Autosubmit:
                     Log.warning('Git operational check disabled by user')
 
                 Log.debug("Running main running loop")
-                did_run = False
                 #########################
                 # AUTOSUBMIT - MAIN LOOP
                 #########################
@@ -2315,7 +2311,6 @@ class Autosubmit:
                 # Save metadata.
                 as_conf.save()
                 while job_list.continue_run():
-                    did_run = True
                     try:
                         if Autosubmit.exit:
                             if len(job_list.get_failed_from_db()) > 0:
@@ -2333,15 +2328,14 @@ class Autosubmit:
                             for p in platforms_to_test:
                                 p.update_as_conf(as_conf)
 
-                        # Updates job_list
-                        if job_list.update_list(as_conf, submitter=submitter):
-                            job_list.save_jobs()
-
                         # Submit ready jobs
                         if len(job_list.get_ready()) > 0:
                             Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, hold=False)
-                            if job_list.update_list(as_conf, submitter=submitter):
+                            save_jobs, save_edges = job_list.update_list(as_conf, submitter=submitter)
+                            if save_jobs:
                                 job_list.save_jobs()
+                            if save_edges:
+                                job_list.save_edges()
 
                         # Check wrappers status and inner jobs
                         Autosubmit.check_wrappers(as_conf, job_list, expid)
@@ -2462,25 +2456,12 @@ class Autosubmit:
                         raise  # If this happens, there is a bug in the code or an exception not-well caught
                 Log.result("No more jobs to run.")
                 # search hint - finished run
-                job_list.save_jobs()
-                if not did_run and len(
-                        job_list.get_completed_failed_without_logs()) > 0:  # Revise if there is any log unrecovered from previous run
-                    Log.info("Connecting to the platforms, to recover missing logs")
-                    submitter = Autosubmit._get_submitter(as_conf)
-                    submitter.load_platforms(as_conf)
-                    if submitter.platforms is None:
-                        raise AutosubmitCritical("No platforms configured!!!", 7014)
-                    platforms_to_test = [value for value in submitter.platforms.values()]
-                    Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf, expid=expid)
                 Log.info("Waiting for all logs to be updated")
                 for p in platforms_to_test:
                     if p.log_recovery_process:
                         p.cleanup_event.set()  # Send cleanup event
                         p.log_recovery_process.join()
-                job_names_with_missing_logs = Autosubmit.check_logs_status(job_list)
-                if job_names_with_missing_logs:
-                    Log.warning(f"Autosubmit couldn't recover all job logs for the following jobs: "
-                                f"{job_names_with_missing_logs}")
+
                 try:
                     exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                                     historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
@@ -3120,6 +3101,7 @@ class Autosubmit:
             if save:
                 job_list.recover_last_data()
                 job_list.save_jobs()
+                job_list.save_edges()
             else:
                 Log.warning('Changes NOT saved to the jobList. Use -s option to save')
 
