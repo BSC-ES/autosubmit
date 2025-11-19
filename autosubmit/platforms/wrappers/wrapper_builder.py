@@ -29,7 +29,6 @@ class WrapperDirector:
     """
     def __init__(self):
         self._builder = None
-        self.exception = "This type of wrapper is not supported for this platform"
 
     def construct(self, builder):
         self._builder = builder
@@ -284,8 +283,7 @@ class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
         wrapper_failed=0
         for job_script in $scripts; do
             job_name=$(basename "$job_script" .cmd)
-            job_id=${{job_ids[$job_name]}}
-            flux job wait $job_id
+            flux job wait ${{job_ids[$job_name]}}
 
             # Check if the job completed successfully
             if [ -f "${{job_name}}_COMPLETED" ]; then
@@ -318,7 +316,6 @@ class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
 
         processors_str = 'declare -A processors=( '
         processors_str += ' '.join(f'[{job_section}]={self.processors_per_section.get(job_section)}' for job_section in self.processors_per_section.keys()) + ' )'
-
 
         return textwrap.dedent("""
         # Job scripts per inner vertical wrapper
@@ -356,9 +353,9 @@ class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
 
             return 0
         }}
-                               
+
         # Execute vertical wrappers in parallel
-        for i in "${{!scripts[@]}}"; do
+        for ((i = 0; i < ${{#scripts[@]}}; i++)); do
             execute_vertical_wrapper "${{scripts[$i]}}" &
         done
 
@@ -371,7 +368,69 @@ class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
 
 class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
     def _generate_flux_script(self):
-        raise NotImplementedError(self.exception)   # pragma: no cover
+        scripts_str = ''
+        for i, job_section in enumerate(self.job_scripts):
+            scripts_str += f"""scripts[{i}]="{' '.join(str(s) for s in job_section).strip()}"\n"""
+
+        processors_str = 'declare -A processors=( '
+        processors_str += ' '.join(f'[{job_section}]={self.processors_per_section.get(job_section)}' for job_section in self.processors_per_section.keys()) + ' )'
+
+        return textwrap.dedent("""
+        # Job scripts per inner horizontal wrapper
+        declare -A job_ids
+        declare -A scripts
+        {1}
+
+        # Processors per section
+        {0}
+
+        execute_horizontal_wrapper()
+        {{
+            scripts=$1
+
+            # Submit the jobs
+            for job_script in $scripts; do
+                job_name=$(basename "$job_script" .cmd)
+                job_section=${{job_name##*_}}
+                output_log="${{job_name}}.cmd.out.0"
+                error_log="${{job_name}}.cmd.err.0"
+
+                job_ids[$job_name]=$(flux batch --nslots=${{processors[$job_section]}} --output=$output_log --error=$error_log --flags=waitable $job_script)
+            done
+
+            # Wait for the jobs to finish
+            wrapper_failed=0
+            for job_script in $scripts; do
+                job_name=$(basename "$job_script" .cmd)
+                flux job wait ${{job_ids[$job_name]}}
+
+                # Check if the job completed successfully
+                if [ -f "${{job_name}}_COMPLETED" ]; then
+                    echo "The job $job_name has been COMPLETED"
+                else
+                    echo "The job $job_name has FAILED"
+                    touch "${{job_name}}_FAILED"
+                    wrapper_failed=1
+                fi
+            done
+
+            if [ $wrapper_failed -eq 1 ]; then
+                touch "WRAPPER_FAILED"
+            fi
+        }}
+
+        # Execute horizontal wrappers
+        for ((i = 0; i < ${{#scripts[@]}}; i++)); do
+            execute_horizontal_wrapper "${{scripts[$i]}}"
+
+            if [ -f "WRAPPER_FAILED" ]; then
+                exit 1
+            fi
+        done
+
+        # Debug commands
+        # flux resource list
+        """).format(processors_str, scripts_str, '\n'.ljust(13))
 
 class PythonWrapperBuilder(WrapperBuilder):
     def get_random_alphanumeric_string(self,letters_count, digits_count):
