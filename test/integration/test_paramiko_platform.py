@@ -406,7 +406,7 @@ def test_fs_operations(exp_platform_server: 'ExperimentPlatformServer', request)
 
     exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
 
-    file_not_found = Path('/app', 'this-file-does-not-exist')
+    file_not_found = Path('/app', test_name, 'this-file-does-not-exist')
 
     assert exp_platform_server.platform.send_file(local_file.name)
 
