@@ -33,8 +33,7 @@ import pytest
 from threading import Thread
 
 if TYPE_CHECKING:
-    from test.integration.conftest import DockerContainer
-    from test.conftest import AutosubmitExperiment
+    pass
 
 # TODO: This should come from a fixture to ensure that the expid is unique per test.
 _EXPID = 't100'
