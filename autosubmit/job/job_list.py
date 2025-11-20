@@ -385,10 +385,10 @@ class JobList(object):
         :param option: Dependency option key.
         """
         jobs_data = dic_jobs.experiment_data.get("JOBS", {})
-        problematic_jobs = {}
+        problematic_jobs: dict = {}
         # map dependencies
-        self.dependency_map = dict()
-        self.dependency_map_with_distances = dict()
+        self.dependency_map = {}
+        self.dependency_map_with_distances = {}
 
         for section in jobs_data.keys():
             self.dependency_map[section] = self._deep_map_dependencies(section,
@@ -413,9 +413,9 @@ class JobList(object):
 
         for job_section in (section for section in jobs_data.keys()):
             # Changes when all jobs of a section are added
-            self.depends_on_previous_chunk = dict()
-            self.depends_on_previous_split = dict()
-            self.depends_on_previous_special_section = dict()
+            self.depends_on_previous_chunk = {}
+            self.depends_on_previous_split = {}
+            self.depends_on_previous_special_section: dict[str, set] = {}
             self.actual_job_depends_on_previous_chunk = False
             self.actual_job_depends_on_previous_member = False
             # No changes, no need to recalculate dependencies
@@ -425,7 +425,6 @@ class JobList(object):
             # call function if dependencies_key is not None
             dependencies = JobList._manage_dependencies(dependencies_keys, dic_jobs) \
                 if dependencies_keys else {}
-            self.job_names = set()
             for job in (job for job in dic_jobs.get_jobs(job_section, sort_string=True)):
                 self.actual_job_depends_on_special_chunk = False
                 if dependencies:
@@ -685,7 +684,7 @@ class JobList(object):
             filters = [{}]
         return filters
 
-    def _check_dates(self, relationships: Dict, current_job: Job) -> {}:
+    def _check_dates(self, relationships: Dict, current_job: Job) -> dict:
         """
         Check if the current_job_value is included in the filter_from and retrieve filter_to value
         :param relationships: Remaining filters to apply.
@@ -744,7 +743,7 @@ class JobList(object):
         filters_to_apply = self._unify_to_filters(filters_to_apply)
         return filters_to_apply
 
-    def _check_chunks(self, relationships: Dict, current_job: Job) -> {}:
+    def _check_chunks(self, relationships: Dict, current_job: Job) -> dict:
         """
         Check if the current_job_value is included in the filter_from and retrieve filter_to value
         :param relationships: Remaining filters to apply.
@@ -777,7 +776,7 @@ class JobList(object):
         filters_to_apply = self._unify_to_filters(filters_to_apply, current_job.splits)
         return filters_to_apply
 
-    def _unify_to_filter(self, unified_filter, filter_to, filter_type, splits=None) -> {}:
+    def _unify_to_filter(self, unified_filter, filter_to, filter_type, splits=None) -> dict:
         """
         Unify filter_to filters into a single dictionary
         :param unified_filter: Single dictionary with all filters_to
@@ -798,10 +797,10 @@ class JobList(object):
             aux = str(filter_to.pop(filter_type, None))
             if aux:
                 if "," in aux:
-                    aux = aux.split(",")
+                    aux_split = aux.split(",")
                 else:
-                    aux = [aux]
-                for element in aux:
+                    aux_split = [aux]
+                for element in aux_split:
                     if element == "":
                         continue
                     # Get only the first alphanumeric part and [:] chars
@@ -1278,7 +1277,6 @@ class JobList(object):
                 auto_chunk = int(job_name_separated[3]) + int(dependency.distance)
             if auto_chunk < 1:
                 auto_chunk = int(job_name_separated[3])
-            auto_chunk = str(auto_chunk)
             # Get first split of the given chunk
             auto_job_name = ("_".join(job_name_separated[:3]) +
                              f"_{auto_chunk}_1_{dependency.section}")
@@ -1332,10 +1330,9 @@ class JobList(object):
         # Initialize variables
         distances_of_current_section = {}
         distances_of_current_section_member = {}
-        problematic_dependencies = set()
-        special_dependencies = set()
-        dependencies_to_del = set()
-        dependencies_non_natural_to_del = set()
+        problematic_dependencies: set[str] = set()
+        special_dependencies: set[Any] = set()
+        dependencies_to_del: set[str] = set()
         max_distance = 0
         dependencies_keys_without_special_chars = []
 
@@ -1448,8 +1445,6 @@ class JobList(object):
                                                         member_list,
                                                         special_dependencies, problematic_dependencies))
             else:
-                if key in dependencies_non_natural_to_del:
-                    continue
                 natural_sections.append(key)
 
         for key in natural_sections:
@@ -2306,7 +2301,7 @@ class JobList(object):
 
     def get_in_queue_grouped_id(self, platform) -> dict[int, List[Job]]:
         jobs = self.get_in_queue(platform)
-        jobs_by_id = dict()
+        jobs_by_id: dict = {}
         for job in jobs:
             if job.id not in jobs_by_id:
                 jobs_by_id[job.id] = list()
@@ -2513,8 +2508,8 @@ class JobList(object):
 
         :returns: jobs_to_check - Jobs that fulfill the special conditions.
         """
-        jobs_to_check = []
-        jobs_to_skip = []
+        jobs_to_check: list = []
+        jobs_to_skip: list = []
         for target_status, sorted_job_list in self.jobs_edges.items():
             if target_status == "ALL":
                 continue
@@ -2599,7 +2594,7 @@ class JobList(object):
             job.platform.add_job_to_log_recover(job)
         return log_recovered
 
-    def check_if_log_is_recovered(self, job: Job) -> Path:
+    def check_if_log_is_recovered(self, job: Job) -> Optional[Path]:
         """
         Check if the log is recovered.
 
@@ -2632,7 +2627,7 @@ class JobList(object):
         return None
 
     def update_list(self, as_conf: AutosubmitConfig, store_change: bool = True,
-                    fromSetStatus: bool = False, submitter: object = None,
+                    from_set_status: bool = False, submitter: object = None,
                     first_time: bool = False) -> bool:
         """
         Updates job list, resetting failed jobs and changing to READY
@@ -2640,7 +2635,7 @@ class JobList(object):
 
         :param first_time:
         :param submitter:
-        :param fromSetStatus:
+        :param from_set_status:
         :param store_change:
         :param as_conf: autosubmit config object
         :type as_conf: AutosubmitConfig
@@ -2714,7 +2709,7 @@ class JobList(object):
             job.status = Status.READY
             # Run start time in format (YYYYMMDDHH:MM:SS) from current time
             job.id = None
-            job.wrapper_type = None
+            job.wrapper_type = ''
             save = True
             Log.debug(f"Special condition fulfilled for job {job.name}")
         # if waiting jobs has all parents completed change its State to READY
@@ -2742,8 +2737,7 @@ class JobList(object):
                         Log.debug(f"Resetting sync job: {job.name} status to: WAITING "
                                   "for parents completion...")
         Log.debug('Updating WAITING jobs')
-        if not fromSetStatus:
-            all_parents_completed = []
+        if not from_set_status:
             for job in self.get_delayed():
                 if datetime.datetime.now() >= job.delay_end:
                     job.status = Status.READY
@@ -2760,8 +2754,6 @@ class JobList(object):
                     job.status = Status.READY
                     job.hold = False
                     Log.debug(f"Setting job: {job.name} status to: READY (all parents completed)...")
-                    if as_conf.get_remote_dependencies() == "true":
-                        all_parents_completed.append(job.name)
                 if job.status != Status.READY:
                     if len(tmp3) != len(job.parents):
                         if len(tmp2) == len(job.parents):
@@ -2781,8 +2773,6 @@ class JobList(object):
                                 Log.debug(f"Setting job: {job.name} status to: READY "
                                           "(conditional jobs are completed/failed)...")
                                 break
-                            if as_conf.get_remote_dependencies() == "true":
-                                all_parents_completed.append(job.name)
                     else:
                         if len(tmp3) == 1 and len(job.parents) == 1:
                             for parent in job.parents:
@@ -2793,69 +2783,6 @@ class JobList(object):
                                     Log.debug(f"Setting job: {job.name} status to: READY"
                                               " (conditional jobs are completed/failed)...")
                                     break
-            if as_conf.get_remote_dependencies() == "true":
-                for job in self.get_prepared():
-                    tmp2 = [parent for parent in job.parents if
-                            parent.status == Status.COMPLETED or parent.status == Status.SKIPPED
-                            or parent.status == Status.FAILED]
-                    tmp3 = [parent for parent in job.parents if
-                            parent.status == Status.SKIPPED or parent.status == Status.FAILED]
-                    if len(tmp2) == len(job.parents) and len(tmp3) != len(job.parents):
-                        job.status = Status.READY
-                        # Run start time in format (YYYYMMDDHH:MM:SS) from current time
-                        job.hold = False
-                        save = True
-                        Log.debug("A job in prepared status has all parent completed, job:"
-                                  f"{job.name} status set to: READY ...")
-                Log.debug('Updating WAITING jobs eligible for be prepared')
-                # Setup job name should be a variable
-                for job in self.get_waiting_remote_dependencies('slurm'):
-                    if job.name not in all_parents_completed:
-                        tmp = [parent for parent in job.parents if (
-                                (parent.status == Status.SKIPPED or parent.status == Status.COMPLETED
-                                 or parent.status == Status.QUEUING or parent.status == Status.RUNNING)
-                                and "setup" not in parent.name.lower())]
-                        if len(tmp) == len(job.parents):
-                            job.status = Status.PREPARED
-                            job.hold = True
-                            Log.debug(
-                                f"Setting job: {job.name} status to: Prepared for be held ("
-                                "all parents queuing, running or completed)...")
-
-                Log.debug('Updating Held jobs')
-                if self.job_package_map:
-                    held_jobs = [job for job in self.get_held_jobs() if (
-                            job.id not in list(self.job_package_map.keys()))]
-                    held_jobs += [wrapper_job for wrapper_job in list(self.job_package_map.values())
-                                  if wrapper_job.status == Status.HELD]
-                else:
-                    held_jobs = self.get_held_jobs()
-
-                for job in held_jobs:
-                    # Wrappers and inner jobs
-                    if self.job_package_map and job.id in list(self.job_package_map.keys()):
-                        hold_wrapper = False
-                        for inner_job in job.job_list:
-                            valid_parents = [parent
-                                             for parent in inner_job.parents if parent not in job.job_list]
-                            tmp = [parent
-                                   for parent in valid_parents if parent.status == Status.COMPLETED]
-                            if len(tmp) < len(valid_parents):
-                                hold_wrapper = True
-                        job.hold = hold_wrapper
-                        if not job.hold:
-                            for inner_job in job.job_list:
-                                inner_job.hold = False
-                            Log.debug(
-                                f"Setting job: {job.name} status to: Queuing (all parents completed)...")
-                    else:  # Non-wrapped jobs
-                        tmp = [
-                            parent for parent in job.parents if parent.status == Status.COMPLETED]
-                        if len(tmp) == len(job.parents):
-                            job.hold = False
-                            Log.debug(f"Setting job: {job.name} status to: Queuing (all parents completed)...")
-                        else:
-                            job.hold = True
             jobs_to_skip = self.get_skippable_jobs(
                 as_conf.get_wrapper_jobs())  # Get A Dict with all jobs that are listed as skippable
 
@@ -3090,7 +3017,7 @@ class JobList(object):
         for job in all_jobs:
             if len(job.parents) == 0:
                 roots.append(job)
-        visited = list()
+        visited: list[str] = []
         # print(root)
         # root exists
         for root in roots:
@@ -3262,13 +3189,9 @@ class JobList(object):
         and the text that represents it
         :rtype: int, int, str
         """
-        status = "NA"
         energy = 0
         seconds_queued = 0
         seconds_running = 0
-        submit_time = datetime.timedelta()
-        start_time = datetime.timedelta()
-        finish_time = datetime.timedelta()
 
         try:
             # Getting data from new job database
@@ -3290,7 +3213,7 @@ class JobList(object):
                                 t_start = c_start if t_start > c_start else t_start
                                 job_data.start = t_start
 
-                        if seconds is False:
+                        if not seconds:
                             queue_time = math.ceil(
                                 job_data.queuing_time() / 60)
                             running_time = math.ceil(
