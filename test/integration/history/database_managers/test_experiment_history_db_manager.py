@@ -44,11 +44,10 @@ _EXPID = 't0123'
 def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
     """Test history database manager using the old (SQLite) and new (SQLAlchemy) implementations."""
     _EXPID = "test_schema_history"
-    options = {"schema": _EXPID}
+    options = {"expid": _EXPID}
     is_sqlalchemy = as_db != "sqlite"
     tmp_test_dir = os.path.join(str(tmp_path), "test_experiment_history_db_manager")
     os.mkdir(tmp_test_dir)
-    options["expid"] = _EXPID
     if not is_sqlalchemy:
         # N.B.: We do it here, as we don't know the temporary path name until the fixture exists,
         #       and because it's harmless to the Postgres test to have the tmp_path fixture.
@@ -63,7 +62,7 @@ def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
     assert database_manager.my_database_exists()
 
     # Test that .db file was created or not depending on the database engine
-    db_file_path = Path(tmp_test_dir, f"job_data_{options['schema']}.db")
+    db_file_path = Path(tmp_test_dir, f"job_data_{options['expid']}.db")
     if is_sqlalchemy:
         assert not Path(db_file_path).exists()
     else:
@@ -252,7 +251,6 @@ def test_sqlite_is_header_ready_db_version_no_db(autosubmit_exp, tmp_path):
     data_folder = Path(tmp_path, 'metadata/data')
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
-        schema=exp.expid,
         expid=exp.expid,
         jobdata_dir_path=str(data_folder / 'wrong-folder')
     ))
