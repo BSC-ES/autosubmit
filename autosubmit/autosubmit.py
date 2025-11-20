@@ -3112,8 +3112,6 @@ class Autosubmit:
 
         submitter = Autosubmit._get_submitter(as_conf)
         submitter.load_platforms(as_conf)
-        if submitter.platforms is None:
-            return False
         platforms = submitter.platforms
 
         platforms_to_test = set()
@@ -3147,10 +3145,7 @@ class Autosubmit:
                 if offline or not job.platform.connected:
                     offline_jobs.append(job.name)
                 else:
-                    job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", "").upper()
-                    if not job.platform_name:
-                        job.platform_name = hpcarch
-
+                    job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", hpcarch).upper()
                     # noinspection PyTypeChecker
                     job.platform = submitter.platforms[job.platform_name]
                     try:
@@ -3199,6 +3194,8 @@ class Autosubmit:
         except Exception as e:
             raise AutosubmitCritical("Couldn't restore the experiment workflow", 7040, str(e))
 
+        # The expand/group was not covered before, in this PR it was just moved from be mandatory to optional
+        # Added TRY EXCEPT for plotting and detail to avoid recovery failure (as the jobs were recovered)
         try:
             if not noplot:
                 packages = JobPackagePersistence(expid).load()
@@ -3224,15 +3221,14 @@ class Autosubmit:
                     expid, job_list.get_job_list(), os.path.join(exp_path, "/tmp/LOG_", expid),
                     output_format=output_type, packages=packages, show=not hide, groups=groups_dict,
                     job_list_object=job_list)
-        except BaseException as e:
-            raise AutosubmitCritical(
-                "An error has occurred while printing the workflow status."
-                "Check if you have X11 redirection and an img viewer correctly set",
-                7000, str(e)
-            )
-
-        if detail:
-            Autosubmit.detail(job_list)
+        except Exception as e:
+            Log.warning(f"An error has occurred while plotting the jobs list after recovery. "
+                        "Check if you have X11 redirection and an img viewer correctly set. Trace: {str(e)}")
+        try:
+            if detail:
+                Autosubmit.detail(job_list)
+        except Exception as e:
+            Log.warning(f"An error has occurred while generating the detailed view of the jobs after recovery. Trace: {str(e)}")
 
         return True
 
