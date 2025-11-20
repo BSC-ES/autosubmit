@@ -157,7 +157,7 @@ def test_run_interrupted(
         all_expids=False,
         cancel=False,
         current_status=current_statuses,
-        expids_string=as_exp.expid,
+        expids=as_exp.expid,
         force=True,
         force_all=True,
         status='FAILED')

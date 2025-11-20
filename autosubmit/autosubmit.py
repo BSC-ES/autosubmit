@@ -77,6 +77,7 @@ from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmit.migrate.migrate import Migrate
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
+from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 
@@ -3031,10 +3032,23 @@ class Autosubmit:
                                      str(e))
         return True
 
-    # recovery check
-
     @staticmethod
-    def online_recovery(as_conf, platforms, job_list, offline=False) -> list:
+    def online_recovery(as_conf: AutosubmitConfig, platforms: list[ParamikoPlatform], job_list: JobList, offline: bool = False) -> list[str]:
+        """Return a list of completed job names recovered from the given platforms.
+
+        Test each platform connection and collect completed job names. If a platform
+        is not reachable and ``offline`` is True, recover completed jobs from the
+        experiment history for that platform. On unrecoverable connection errors
+        raise ``AutosubmitCritical``.
+
+        :param as_conf: Autosubmit configuration object.
+        :param platforms: Sequence of Platform objects to query.
+        :param job_list: JobList used to recover completed jobs when offline.
+        :param offline: If True, proceed with offline recovery when a platform is not reachable.
+        :return: List of completed job names (may be empty).
+        :raises AutosubmitCritical: If a platform is unreachable and offline is False,
+                                    or if fetching completed job names fails.
+        """
         completed_jobnames = set()
         for p in platforms:
             message = p.test_connection(as_conf)
@@ -3050,27 +3064,37 @@ class Autosubmit:
 
         return list(completed_jobnames)
 
-
     @staticmethod
-    def recovery(expid, noplot, save, all_jobs, hide, group_by=None, expand=list(), expand_status=list(), detail=False, force=False, offline=False):
-        """Method to check all active jobs.
+    def recovery(
+            expid: str,
+            noplot: bool,
+            save: bool,
+            all_jobs: bool,
+            hide: bool,
+            group_by: Optional[str] = None,
+            expand: Optional[list[str]] = None,
+            expand_status: Optional[list[str]] = None,
+            detail: bool = False,
+            force: bool = False,
+            offline: bool = False,
+    ) -> bool:
+        """Recover job statuses for an experiment and update the job list.
 
-        If COMPLETED file is found, job status will be changed to COMPLETED,
-        otherwise it will be set to WAITING. It will also update the jobs list.
+        Return True when the recovery completed successfully.
 
-        :param expid: experiment identifier
-        :param noplot: if True, no plot will be generated
-        :param save: if True, changes will be saved to the job list
-        :param all_jobs: if True, all jobs will be recovered, otherwise only active jobs
-        :param hide: if True, plot window will be hidden
-        :param group_by: workflow will only be written as text
-        :param expand: Filtering of jobs for its visualization
-        :param expand_status: Filtering of jobs for its visualization
-        :param detail: better text format representation but more expensive
-        :param force: if True, all active jobs will be cancelled before recovering the experiment
-        :param offline: if True, no connection to the platforms will be established
-        :return: True if recovery was successful, False otherwise
-        :rtype: bool
+        :param expid: Experiment identifier.
+        :param noplot: If True, do not generate a plot.
+        :param save: If True, persist changes to the job list.
+        :param all_jobs: If True, recover all jobs; otherwise only active jobs.
+        :param hide: If True, hide GUI/windows when generating plots.
+        :param group_by: Optional grouping key for display.
+        :param expand: Optional list of job names/sections to expand in the view.
+        :param expand_status: Optional list of statuses to expand in the view.
+        :param detail: If True, produce a more detailed (and more expensive) textual representation.
+        :param force: If True, cancel active jobs before recovery.
+        :param offline: If True, avoid connecting to remote platforms and use offline recovery.
+        :return: True if recovery ran successfully, False otherwise.
+        :raises AutosubmitCritical: On configuration/IO failures.
         """
         if not save:
             Log.warning("Changes will be NOT saved to the jobList. Use -s option to save")
