@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import cast, Generator, Optional, Protocol, Union, TYPE_CHECKING
 
 import pytest
+from paramiko import ChannelFile  # type: ignore[import]
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
@@ -107,7 +108,8 @@ def exp_platform_server(autosubmit_exp, ssh_server, request) -> ExperimentPlatfo
     #       to maintain and test).
     submitter = ParamikoSubmitter(as_conf=exp.as_conf)
 
-    ps_platform: 'PsPlatform' = submitter.platforms[_PLATFORM_NAME]
+    assert submitter.platforms
+    ps_platform: 'PsPlatform' = cast('PsPlatform', submitter.platforms[_PLATFORM_NAME])
 
     return ExperimentPlatformServer(exp, ps_platform, ssh_server)
 
@@ -123,14 +125,15 @@ class CreateJobParametersPlatformFixture(Protocol):
 
     def __call__(
             self,
-            experiment_data: Optional[dict] = None
+            experiment_data: Optional[dict] = None,
+            /
     ) -> JobParametersPlatform:
         ...
 
 
 @pytest.fixture
 def create_job_parameters_platform(autosubmit_exp) -> CreateJobParametersPlatformFixture:
-    def job_parameters_platform(experiment_data: dict) -> JobParametersPlatform:
+    def job_parameters_platform(experiment_data: Optional[dict] = None) -> JobParametersPlatform:
         exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
         slurm_platform: 'SlurmPlatform' = cast('SlurmPlatform', exp.platform)
 
@@ -237,8 +240,8 @@ def test_send_file_errors(exp_platform_server: ExperimentPlatformServer):
     ]
 )
 @pytest.mark.docker
-def test_send_command(cmd: str, error: Optional, x11_enabled: bool, mfa_enabled: bool, request: pytest.FixtureRequest,
-                      mocker):
+def test_send_command(cmd: str, error: Optional[Exception], x11_enabled: bool, mfa_enabled: bool,
+                      request: pytest.FixtureRequest, mocker):
     """This test opens an SSH connection (via sftp) and sends a command."""
     if x11_enabled:
         request.applymarker('x11')
@@ -258,7 +261,7 @@ def test_send_command(cmd: str, error: Optional, x11_enabled: bool, mfa_enabled:
 
     if error:
         assert exp_platform_server.platform.get_ssh_output_err() == ''
-        with pytest.raises(error):
+        with pytest.raises(error):  # type: ignore
             exp_platform_server.platform.send_command(cmd, ignore_log=False, x11=x11_enabled)
 
         stderr = exp_platform_server.platform.get_ssh_output_err()
@@ -282,6 +285,7 @@ def test_exec_command(exp_platform_server: 'ExperimentPlatformServer'):
     assert stdin is not False
     assert stderr is not False
     # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
+    assert isinstance(stdout, ChannelFile)
     assert user == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
 
 
@@ -310,6 +314,7 @@ def test_exec_command_invalid_command(command: str, expected: str, x11: bool, re
     exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
 
     stdin, stdout, stderr = exp_platform_server.platform.exec_command(command, x11=x11)
+    assert isinstance(stdout, ChannelFile)
     assert stdin is not False
     assert stderr is not False
     # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
@@ -327,6 +332,7 @@ def test_exec_command_after_a_reset(exp_platform_server: 'ExperimentPlatformServ
     exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
 
     stdin, stdout, stderr = exp_platform_server.platform.exec_command('whoami')
+    assert isinstance(stdout, ChannelFile)
     assert stdin is not False
     assert stderr is not False
     # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
@@ -358,6 +364,7 @@ def test_exec_command_ssh_session_not_active(x11: bool, retries: int, command: s
     #       But while that's OK, we can also avoid mocking by simply
     #       closing the connection.
 
+    assert exp_platform_server.platform.transport
     exp_platform_server.platform.transport.close()
 
     stdin, stdout, stderr = exp_platform_server.platform.exec_command(
@@ -367,6 +374,7 @@ def test_exec_command_ssh_session_not_active(x11: bool, retries: int, command: s
     )
 
     # This will be true iff the ``ps_platform.restore_connection(None)`` ran without errors.
+    assert isinstance(stdout, ChannelFile)
     assert stdin is not False
     assert stderr is not False
     # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
@@ -406,16 +414,19 @@ def test_fs_operations(exp_platform_server: 'ExperimentPlatformServer', request)
 
     exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
 
-    file_not_found = Path('/app', 'this-file-does-not-exist')
+    file_not_found = Path('/app', test_name, 'this-file-does-not-exist')
 
     assert exp_platform_server.platform.send_file(local_file.name)
 
     contents = exp_platform_server.platform.read_file(str(remote_file))
+    assert contents
     assert contents.decode('UTF-8').strip() == text
-    assert None is exp_platform_server.platform.read_file(str(file_not_found))
+    assert exp_platform_server.platform.read_file(str(file_not_found)) is None
 
-    assert exp_platform_server.platform.get_file_size(str(remote_file)) > 0
-    assert None is exp_platform_server.platform.get_file_size(str(file_not_found))
+    file_size: Optional[int] = exp_platform_server.platform.get_file_size(str(remote_file))
+    assert file_size
+    assert file_size > 0
+    assert exp_platform_server.platform.get_file_size(str(file_not_found)) is None
 
     assert exp_platform_server.platform.check_absolute_file_exists(str(remote_file))
     assert not exp_platform_server.platform.check_absolute_file_exists(str(file_not_found))
@@ -463,6 +474,7 @@ def test_exec_command_with_x11(x11_enabled: bool, user_or_false: Union[str, bool
     if type(user_or_false) is bool:
         assert user_or_false == stdout
     else:
+        assert isinstance(stdout, ChannelFile)
         assert user_or_false == stdout.readline().decode('UTF-8').strip()
 
 
@@ -482,6 +494,9 @@ def test_xclock(exp_platform_server: ExperimentPlatformServer):
     assert ps_platform.local_x11_display
 
     _, stdout, stderr = ps_platform.exec_command('timeout 1 xclock', x11=True)
+
+    assert isinstance(stdout, ChannelFile)
+    assert isinstance(stderr, ChannelFile)
 
     assert ''.join(stdout.readlines()) == ''
     assert ''.join(stderr.readlines()) == ''
