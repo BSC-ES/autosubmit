@@ -26,7 +26,14 @@ _AS_BASH_HEADER = dedent("""\
         ###################
         # Autosubmit header
         ###################
+set -xvu
+declare locale_to_set
         locale_to_set=$(locale -a | grep ^C.)
+export job_name_ptrn='%CURRENT_LOGDIR%/%JOBNAME%'
+
+r=0
+bash -e <<'__AS_CMD__'
+set -xve
         if [ -z "$locale_to_set" ] ; then
             # locale installed...
             export LC_ALL=$locale_to_set
@@ -39,27 +46,35 @@ _AS_BASH_HEADER = dedent("""\
                 export LC_ALL=C
             fi 
         fi
-
-        set -xuve
-        job_name_ptrn='%CURRENT_LOGDIR%/%JOBNAME%'
         echo $(date +%s) > ${job_name_ptrn}_STAT_%FAIL_COUNT%
 
         ################### 
         # AS CHECKPOINT FUNCTION
         ###################
         # Creates a new checkpoint file upon call based on the current numbers of calls to the function
-
-        AS_CHECKPOINT_CALLS=0
         function as_checkpoint {
             AS_CHECKPOINT_CALLS=$((AS_CHECKPOINT_CALLS+1))
             touch ${job_name_ptrn}_CHECKPOINT_${AS_CHECKPOINT_CALLS}
         }
+AS_CHECKPOINT_CALLS=0
         %EXTENDED_HEADER%
-        
+set -u
         """)
 """Autosubmit Bash header."""
 
 _AS_BASH_TAILER = dedent("""\
+__AS_CMD__
+r=$?
+
+# Write the finish time in the job _STAT_
+echo $(date +%s) >> ${job_name_ptrn}_STAT_%FAIL_COUNT%
+
+# If the user-provided script failed, we exit here with the same exit code;
+# otherwise, we let the execution of the tailer happen, where the _COMPLETED
+# file will be created.
+if [ $r -ne 0 ]; then
+    exit $r
+fi
         %EXTENDED_TAILER%
         ###################
         # Autosubmit tailer
@@ -89,25 +104,9 @@ def as_body(body: str) -> str:
 ###################
 # Autosubmit job
 ###################
-
-r=0
-set +e
-bash -e <<__AS_CMD__
-set -xuve
 {body}
-__AS_CMD__
 
-r=$?
-
-# Write the finish time in the job _STAT_
-echo $(date +%s) >> ${{job_name_ptrn}}_STAT_%FAIL_COUNT%
-
-# If the user-provided script failed, we exit here with the same exit code;
-# otherwise, we let the execution of the tailer happen, where the _COMPLETED
-# file will be created.
-if [ $r -ne 0 ]; then
-    exit $r
-fi""")
+""")
 
 
 def as_tailer() -> str:
