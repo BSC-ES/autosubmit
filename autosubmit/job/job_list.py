@@ -2743,7 +2743,6 @@ class JobList(object):
                                   "for parents completion...")
         Log.debug('Updating WAITING jobs')
         if not fromSetStatus:
-            all_parents_completed = []
             for job in self.get_delayed():
                 if datetime.datetime.now() >= job.delay_end:
                     job.status = Status.READY
