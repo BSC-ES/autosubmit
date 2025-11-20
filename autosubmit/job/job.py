@@ -2331,15 +2331,6 @@ class Job(object):
                 if as_conf.get_project_type().lower() != "none" and len(as_conf.get_project_type()) > 0:
                     template_file = open(os.path.join(as_conf.get_project_dir(), self.file), 'r')
                     template = ''
-                    if as_conf.get_remote_dependencies() == "true":
-                        if self.type == Language.BASH:
-                            template = 'sleep 5' + "\n"
-                        elif self.type == Language.PYTHON2:
-                            template = 'time.sleep(5)' + "\n"
-                        elif self.type == Language.PYTHON3 or self.type == Language.PYTHON:
-                            template = 'time.sleep(5)' + "\n"
-                        elif self.type == Language.R:
-                            template = 'Sys.sleep(5)' + "\n"
                     template += template_file.read()
                     template_file.close()
                 else:

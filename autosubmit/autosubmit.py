@@ -1952,9 +1952,8 @@ class Autosubmit:
         jobs_to_check: dict[str, list[list[Job]]] = dict()
         job_changes_tracker: dict[str, tuple[Status, Status]] = dict()
         for platform_to_test in platforms_to_test:
-            queuing_jobs = job_list.get_in_queue_grouped_id(platform_to_test)
             Log.debug(f'Checking jobs for platform={platform_to_test.name}')
-            for job_id, job in queuing_jobs.items():
+            for job_id, job in job_list.get_in_queue_grouped_id(platform_to_test).items():
                 # Check Wrappers one-by-one
                 if job_list.job_package_map and job_id in job_list.job_package_map:
                     wrapper_job, save = Autosubmit.manage_wrapper_job(as_conf, job_list, platform_to_test,
@@ -2408,15 +2407,6 @@ class Autosubmit:
                             job_list.save()
                             as_conf.save()
 
-                        # Submit jobs that are prepared to hold (if remote dependencies parameter are enabled)
-                        # This currently is not used as SLURM no longer allows to jobs to acquire priority while in hold state.
-                        # This only works for SLURM. ( Prepare status can not be achieved in other platforms )
-                        if as_conf.get_remote_dependencies() == "true" and len(job_list.get_prepared()) > 0:
-                            Autosubmit.submit_ready_jobs(
-                                as_conf, job_list, platforms_to_test, packages_persistence, hold=True)
-                            job_list.update_list(as_conf, submitter=submitter)
-                            job_list.save()
-                            as_conf.save()
                         # Safe spot to store changes
                         try:
                             exp_history = Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker,

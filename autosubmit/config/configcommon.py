@@ -2554,17 +2554,6 @@ class AutosubmitConfig(object):
         yaml.dump(final_dict, yaml_file)
         ini_file.rename(Path(root_dir, ini_file.stem + ".yml"))
 
-    # noinspection PyMethodMayBeStatic
-    def get_remote_dependencies(self) -> str:
-        """Returns if the user has enabled the PRESUBMISSION configuration parameter from autosubmit's config file.
-
-        :return: if remote dependencies
-        :rtype: string
-        """
-        # Disabled, forced to "false" not working anymore in newer slurm versions.
-        # return str(self.get_section(['CONFIG', 'PRESUBMISSION'], "false")).lower()
-        return "false"
-
     def get_wrapper_type(self, wrapper=None) -> Optional[str]:
         """Returns what kind of wrapper (VERTICAL, MIXED-VERTICAL, HORIZONTAL, HYBRID, MULTI NONE) the user
         has configured in the autosubmit's config.

@@ -31,6 +31,7 @@ from pwd import getpwnam
 from re import sub
 from subprocess import check_output
 from tempfile import TemporaryDirectory
+from textwrap import dedent
 from time import time_ns
 from typing import cast, Any, ContextManager, Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING
 
@@ -334,6 +335,8 @@ def _make_ssh_client(ssh_port: int, password: Optional[str], key: Optional[Union
             kwargs['port'] = ssh_port
         if 'password' not in kwargs:
             kwargs['password'] = password
+            kwargs['look_for_keys'] = False
+            kwargs['allow_agent'] = False
         if len(args) > 1:
             # tuple to list, and then replace the port...
             args = [x for x in args]
@@ -457,11 +460,21 @@ def ssh_server(mocker, tmp_path, request) -> Generator[DockerContainer, None, No
         ssh_client = _make_ssh_client(ssh_port, _SSH_DOCKER_PASSWORD, None, mfa)
         mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
 
+        ssh_config = Path(tmp_path, '.ssh/ssh_config')
+        ssh_config.parent.mkdir(exist_ok=True, parents=True)
+        ssh_config.touch()
+        ssh_config.write_text(dedent(f"""\
+        Host localhost
+            Hostname localhost
+            User {user}
+            ForwardX11 yes
+            Port 22
+        """))
         if mfa:
             # It uses a Transport and not an SSH client directly. Ideally, we would be able
             # to use just one way
             original_paramiko_config = paramiko.SSHConfig()
-            with open(Path('~/.ssh/config').expanduser()) as f:
+            with open(ssh_config) as f:
                 original_paramiko_config.parse(f)
             modified_config = original_paramiko_config.lookup('localhost')
             modified_config['port'] = f'{ssh_port}'

@@ -2304,7 +2304,7 @@ class JobList(object):
                     jobs.append(job)
         return jobs
 
-    def get_in_queue_grouped_id(self, platform) -> dict[int, List[Job]]:
+    def get_in_queue_grouped_id(self, platform) -> dict[int, list[Job]]:
         jobs = self.get_in_queue(platform)
         jobs_by_id = dict()
         for job in jobs:
@@ -2743,7 +2743,6 @@ class JobList(object):
                                   "for parents completion...")
         Log.debug('Updating WAITING jobs')
         if not fromSetStatus:
-            all_parents_completed = []
             for job in self.get_delayed():
                 if datetime.datetime.now() >= job.delay_end:
                     job.status = Status.READY
@@ -2760,8 +2759,6 @@ class JobList(object):
                     job.status = Status.READY
                     job.hold = False
                     Log.debug(f"Setting job: {job.name} status to: READY (all parents completed)...")
-                    if as_conf.get_remote_dependencies() == "true":
-                        all_parents_completed.append(job.name)
                 if job.status != Status.READY:
                     if len(tmp3) != len(job.parents):
                         if len(tmp2) == len(job.parents):
@@ -2781,8 +2778,6 @@ class JobList(object):
                                 Log.debug(f"Setting job: {job.name} status to: READY "
                                           "(conditional jobs are completed/failed)...")
                                 break
-                            if as_conf.get_remote_dependencies() == "true":
-                                all_parents_completed.append(job.name)
                     else:
                         if len(tmp3) == 1 and len(job.parents) == 1:
                             for parent in job.parents:
@@ -2793,69 +2788,6 @@ class JobList(object):
                                     Log.debug(f"Setting job: {job.name} status to: READY"
                                               " (conditional jobs are completed/failed)...")
                                     break
-            if as_conf.get_remote_dependencies() == "true":
-                for job in self.get_prepared():
-                    tmp2 = [parent for parent in job.parents if
-                            parent.status == Status.COMPLETED or parent.status == Status.SKIPPED
-                            or parent.status == Status.FAILED]
-                    tmp3 = [parent for parent in job.parents if
-                            parent.status == Status.SKIPPED or parent.status == Status.FAILED]
-                    if len(tmp2) == len(job.parents) and len(tmp3) != len(job.parents):
-                        job.status = Status.READY
-                        # Run start time in format (YYYYMMDDHH:MM:SS) from current time
-                        job.hold = False
-                        save = True
-                        Log.debug("A job in prepared status has all parent completed, job:"
-                                  f"{job.name} status set to: READY ...")
-                Log.debug('Updating WAITING jobs eligible for be prepared')
-                # Setup job name should be a variable
-                for job in self.get_waiting_remote_dependencies('slurm'):
-                    if job.name not in all_parents_completed:
-                        tmp = [parent for parent in job.parents if (
-                                (parent.status == Status.SKIPPED or parent.status == Status.COMPLETED
-                                 or parent.status == Status.QUEUING or parent.status == Status.RUNNING)
-                                and "setup" not in parent.name.lower())]
-                        if len(tmp) == len(job.parents):
-                            job.status = Status.PREPARED
-                            job.hold = True
-                            Log.debug(
-                                f"Setting job: {job.name} status to: Prepared for be held ("
-                                "all parents queuing, running or completed)...")
-
-                Log.debug('Updating Held jobs')
-                if self.job_package_map:
-                    held_jobs = [job for job in self.get_held_jobs() if (
-                            job.id not in list(self.job_package_map.keys()))]
-                    held_jobs += [wrapper_job for wrapper_job in list(self.job_package_map.values())
-                                  if wrapper_job.status == Status.HELD]
-                else:
-                    held_jobs = self.get_held_jobs()
-
-                for job in held_jobs:
-                    # Wrappers and inner jobs
-                    if self.job_package_map and job.id in list(self.job_package_map.keys()):
-                        hold_wrapper = False
-                        for inner_job in job.job_list:
-                            valid_parents = [parent
-                                             for parent in inner_job.parents if parent not in job.job_list]
-                            tmp = [parent
-                                   for parent in valid_parents if parent.status == Status.COMPLETED]
-                            if len(tmp) < len(valid_parents):
-                                hold_wrapper = True
-                        job.hold = hold_wrapper
-                        if not job.hold:
-                            for inner_job in job.job_list:
-                                inner_job.hold = False
-                            Log.debug(
-                                f"Setting job: {job.name} status to: Queuing (all parents completed)...")
-                    else:  # Non-wrapped jobs
-                        tmp = [
-                            parent for parent in job.parents if parent.status == Status.COMPLETED]
-                        if len(tmp) == len(job.parents):
-                            job.hold = False
-                            Log.debug(f"Setting job: {job.name} status to: Queuing (all parents completed)...")
-                        else:
-                            job.hold = True
             jobs_to_skip = self.get_skippable_jobs(
                 as_conf.get_wrapper_jobs())  # Get A Dict with all jobs that are listed as skippable
 
