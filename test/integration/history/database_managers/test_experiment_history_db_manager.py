@@ -43,7 +43,8 @@ _EXPID = 't0123'
 @pytest.mark.postgres
 def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
     """Test history database manager using the old (SQLite) and new (SQLAlchemy) implementations."""
-    options = {"schema": "test_schema_history"}
+    _EXPID = "test_schema_history"
+    options = {"expid": _EXPID}
     is_sqlalchemy = as_db != "sqlite"
     tmp_test_dir = os.path.join(str(tmp_path), "test_experiment_history_db_manager")
     os.mkdir(tmp_test_dir)
@@ -61,13 +62,11 @@ def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
     assert database_manager.my_database_exists()
 
     # Test that .db file was created or not depending on the database engine
-    db_file_path = os.path.join(
-        str(tmp_test_dir), "job_data_{0}.db".format(options["schema"])
-    )
+    db_file_path = Path(tmp_test_dir, f"job_data_{options['expid']}.db")
     if is_sqlalchemy:
-        assert not os.path.exists(db_file_path)
+        assert not Path(db_file_path).exists()
     else:
-        assert os.path.exists(db_file_path)
+        assert Path(db_file_path).exists()
 
     # Test experiment run history methods
     # Test run insertion
@@ -146,6 +145,7 @@ def test_sqlite_initialize_no_db(autosubmit_exp, mocker, tmp_path):
     db_manager = create_experiment_history_db_manager(
         'sqlite',
         schema=exp.expid,
+        expid=exp.expid,
         jobdata_dir_path=str(wrong_folder)
     )
     create_historical_database_spy = mocker.spy(db_manager, "create_historical_database")
@@ -165,6 +165,7 @@ def test_sqlite_initialize_wrong_version(autosubmit_exp, mocker, tmp_path, monke
     db_manager = create_experiment_history_db_manager(
         'sqlite',
         schema=exp.expid,
+        expid=exp.expid,
         jobdata_dir_path=str(data_folder)
     )
     create_historical_database_spy = mocker.spy(db_manager, "create_historical_database")
@@ -190,6 +191,7 @@ def test_sqlite_initialize_db_exists(autosubmit_exp, mocker, tmp_path):
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
         schema=exp.expid,
+        expid=exp.expid,
         jobdata_dir_path=str(data_folder)
     ))
     create_historical_database_spy = mocker.spy(db_manager, "create_historical_database")
@@ -209,6 +211,7 @@ def test_sqlite_is_current_version_db_exists(autosubmit_exp, tmp_path):
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
         schema=exp.expid,
+        expid=exp.expid,
         jobdata_dir_path=str(data_folder)
     ))
 
@@ -221,6 +224,7 @@ def test_sqlite_is_current_version_no_db(autosubmit_exp, tmp_path):
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
         schema=exp.expid,
+        expid=exp.expid,
         jobdata_dir_path=str(data_folder / 'wrong-folder')
     ))
 
@@ -230,11 +234,12 @@ def test_sqlite_is_current_version_no_db(autosubmit_exp, tmp_path):
 def test_sqlite_is_header_ready_db_version_db_exists(autosubmit_exp, tmp_path):
     exp = autosubmit_exp(_EXPID, experiment_data={})
     data_folder = Path(tmp_path, 'metadata/data')
-    db_file = data_folder / f'job_data_{_EXPID}.db'
+    db_file = data_folder
     Path(db_file).touch()
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
         schema=exp.expid,
+        expid=exp.expid,
         jobdata_dir_path=str(data_folder)
     ))
 
@@ -246,7 +251,7 @@ def test_sqlite_is_header_ready_db_version_no_db(autosubmit_exp, tmp_path):
     data_folder = Path(tmp_path, 'metadata/data')
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
-        schema=exp.expid,
+        expid=exp.expid,
         jobdata_dir_path=str(data_folder / 'wrong-folder')
     ))
 
@@ -261,6 +266,7 @@ def test_get_job_data_by_job_id_name(as_db: str, autosubmit_exp):
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         as_db,
         schema=exp.expid,
+        expid=exp.expid,
         jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
     ))
     db_manager.initialize()
@@ -299,6 +305,7 @@ def test_get_job_data_max_counter(as_db: str, job_name: str, counters: list[int]
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         as_db,
         schema=exp.expid,
+        expid=exp.expid,
         jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
     ))
     db_manager.initialize()
@@ -333,6 +340,7 @@ def test_get_all_last_job_data_dcs(as_db: str, lasts: list[bool], request, autos
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         as_db,
         schema=exp.expid,
+        expid=exp.expid,
         jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
     ))
     db_manager.initialize()
@@ -368,6 +376,7 @@ def test_get_job_data_dcs_last_by_wrapper_code(as_db: str, wrapper_code: int, nu
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         as_db,
         schema=exp.expid,
+        expid=exp.expid,
         jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
     ))
     db_manager.initialize()
@@ -393,6 +402,7 @@ def test_get_job_data_dc_unique_latest_by_job_name(as_db: str, autosubmit_exp):
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         as_db,
         schema=exp.expid,
+        expid=exp.expid,
         jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
     ))
     db_manager.initialize()
@@ -420,6 +430,7 @@ def test_update_job_data_dc_by_job_id_name(as_db: str, autosubmit_exp):
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         as_db,
         schema=exp.expid,
+        expid=exp.expid,
         jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
     ))
     db_manager.initialize()
@@ -452,6 +463,7 @@ def test_update_list_job_data_dc_by_each_id(as_db: str, autosubmit_exp):
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         as_db,
         schema=exp.expid,
+        expid=exp.expid,
         jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
     ))
     db_manager.initialize()
@@ -496,6 +508,7 @@ def test_sqlite_pragma_version(autosubmit_exp, tmp_path: 'LocalPath'):
     db_manager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
         schema=exp.expid,
+        expid=exp.expid,
         jobdata_dir_path=str(data_folder)
     ))
 

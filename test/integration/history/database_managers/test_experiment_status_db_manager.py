@@ -109,14 +109,11 @@ def test_get_experiment_status_row_by_expid(tmp_path: 'LocalPath', as_db: str, a
         database_manager.get_experiment_status_row_by_expid(_EXPID)
 
     # Create the experiment, but it still will not have any experiment status
-    exp = autosubmit_exp(_EXPID)
+    exp = autosubmit_exp(_EXPID, include_jobs=True)
     experiment_status_row = database_manager.get_experiment_status_row_by_expid(exp.expid)
     assert experiment_status_row is None
 
-    # NOTE: This is 2, because we have the ____ expid created by the fixture
-    # TODO: This needs to be updated later, either to make this test query for the ID,
-    #       and/or sort out the mess with this ____ expid.
-    experiment_db_id = 2
+    experiment_db_id = 1
     last_row_id = database_manager.create_exp_status(experiment_db_id, exp.expid, Status.SUBMITTED)
     assert last_row_id > 0
 

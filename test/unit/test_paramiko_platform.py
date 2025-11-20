@@ -281,7 +281,7 @@ def test_poller(platform: str, mocker, paramiko_platform):
                 ],
                 '1,2'
         ),
-(
+        (
                 [
                     [Job(job_id=None, name=''), True],
                     [Job(job_id='2', name=''), True]
@@ -495,4 +495,3 @@ def test_get_file_errors(exception_message: bool, must_exist: bool, ignore_log: 
         assert mocked_log.printlog.call_count == 0
     else:
         assert mocked_log.printlog.call_count == len(messages)
-

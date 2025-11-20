@@ -35,17 +35,22 @@ SECONDS_WAIT_PLATFORM = 60
 
 
 class ExperimentHistory:
-    def __init__(self, expid, jobdata_dir_path=DEFAULT_JOBDATA_DIR, historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR):
+    def __init__(self, expid, jobdata_dir_path=DEFAULT_JOBDATA_DIR, historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR, force_sql_alchemy=False):
+        # Unused arguments, but I didn't want to change every call to this class in this PR
         self.expid = expid
         BasicConfig.read()
         self._log = Logging(expid, BasicConfig.HISTORICAL_LOG_DIR)
         self._job_data_dir_path = BasicConfig.JOBDATA_DIR
+        self._job_data_file = f"job_data_{expid}.db" if BasicConfig.DATABASE_BACKEND == "sqlite" else ""
         self._historiclog_dir_path = BasicConfig.HISTORICAL_LOG_DIR
+        self.force_sql_alchemy = force_sql_alchemy
         self.manager: Optional[ExperimentHistoryDatabaseManager] = None
         try:
             options = {
-                'jobdata_dir_path': BasicConfig.JOBDATA_DIR,
-                'schema': self.expid
+                'expid': self.expid,
+                'jobdata_path': self._job_data_dir_path,
+                'jobdata_file': self._job_data_file,
+                'force_sql_alchemy': self.force_sql_alchemy  # tmp, the idea is to move everything to sqlalchemy
             }
             self.manager = create_experiment_history_db_manager(BasicConfig.DATABASE_BACKEND, **options)
         except Exception as exp:

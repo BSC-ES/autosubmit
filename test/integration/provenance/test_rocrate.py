@@ -86,7 +86,7 @@ def test_custom_config_loaded_file(autosubmit_exp, tmp_path):
                 ]
             })
         }
-    })
+    }, include_jobs=True)
 
     jobs = []
     start_time = ''
@@ -158,7 +158,7 @@ def test_rocrate(tmp_path, autosubmit_exp):
                 ]
             })
         }
-    })
+    }, include_jobs=False)
 
     as_conf = exp.as_conf
     rocrate_json = exp.as_conf.experiment_data['ROCRATE']
@@ -357,7 +357,7 @@ def test_rocrate_main(autosubmit_exp, tmp_path):
                 ]
             })
         }
-    })
+    }, include_jobs=True)
 
     autosubmit = exp.autosubmit
     r = autosubmit.rocrate(_EXPID, path=tmp_path)
