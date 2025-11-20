@@ -347,11 +347,15 @@ class ParamikoPlatform(Platform):
             self._init_local_x11_display()
             self._ssh = _create_ssh_client()
             self._ssh_config = paramiko.SSHConfig()
-            if as_conf:
-                self.map_user_config_file(as_conf)
+            user_ssh_config = Path("~/.ssh/config").expanduser()
+            if user_ssh_config.is_file():
+                if as_conf:
+                    self.map_user_config_file(as_conf)
+                else:
+                    with open(os.path.expanduser("~/.ssh/config"), "r") as fd:
+                        self._ssh_config.parse(fd)
             else:
-                with open(os.path.expanduser("~/.ssh/config"), "r") as fd:
-                    self._ssh_config.parse(fd)
+                Log.debug("No user SSH config file found")
 
             self._host_config = self._ssh_config.lookup(self.host)
             if "," in self._host_config['hostname']:
