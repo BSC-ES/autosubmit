@@ -129,7 +129,7 @@ class CopyQueue(Queue):
         :param timeout: Timeout for blocking operations. Defaults to None.
         :type timeout: float
         """
-        super().put(job.__getstate__(log_process=True), block, timeout)
+        super().put(job.name, block, timeout)
 
 
 class Platform(object):
@@ -1023,60 +1023,22 @@ class Platform(object):
                 break
         return process_log
 
-    def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any], as_conf: 'AutosubmitConfig', jobs_db_manager: 'JobsDbManager' = None) -> set[Any]:
+    def recover_job_log(self, jobs_db_manager: 'JobsDbManager' = None) -> set[Any]:
         """Recover log files for jobs and persist job state.
 
-        :param identifier: Identifier string used in log messages.
-        :param jobs_pending_to_process: Jobs that previously failed during log recovery.
-        :param as_conf: Autosubmit configuration for reconnecting platforms.
         :param jobs_db_manager: Optional jobs DB manager to use for persistence.
         :return: Updated set of jobs still pending log recovery.
         """
+        from autosubmit.job.job import Job
+
         while not self.recovery_queue.empty():
-            try:
-                from autosubmit.job.job import Job
-                job = Job(loaded_data=self.recovery_queue.get(timeout=1), log_process=True)
-                job.update_local_logs()
-                job.platform_name = self.name  # Change the original platform to this process platform.º
-                job.platform = self
-                job._log_recovery_retries = 0  # Reset the log recovery retries.
-                try:
-                    job.retrieve_logfiles(raise_error=True)
-                    jobs_db_manager.save_job_log(job)
-                except Exception as e:
-                    jobs_pending_to_process.add(job)
-                    job._log_recovery_retries += 1
-                    Log.warning(
-                        f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry:'{job.fail_count}")
-            except queue.Empty:
-                pass
-
-        if len(jobs_pending_to_process) > 0:  # Restore the connection if there was an issue with one or more jobs.
-            self.restore_connection(as_conf, log_recovery_process=True)
-
-        # This second while is to keep retring the failed jobs.
-        # With the unique queue, the main process won't send the job again, so we have to store it here.
-        while len(jobs_pending_to_process) > 0:  # jobs that had any issue during the log retrieval
-            job = jobs_pending_to_process.pop()
-            job._log_recovery_retries += 1
-            try:
-                job.retrieve_logfiles(raise_error=True)
-                jobs_db_manager.save_job_log(job)
-                job._log_recovery_retries += 1
-                Log.result(
-                    f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
-            except Exception as e:
-                Log.debug(str(e))
-                if job._log_recovery_retries < 5:
-                    jobs_pending_to_process.add(job)
-                Log.warning(
-                    f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry '{job.fail_count}'.")
-
-        if len(jobs_pending_to_process) > 0:
-            self.restore_connection(as_conf,
-                                    log_recovery_process=True)  # Restore the connection if there was an issue with one or more jobs.
-
-        return jobs_pending_to_process
+            job_name = self.recovery_queue.get(timeout=1)
+            job = Job(loaded_data=jobs_db_manager.load_job_by_name(job_name))
+            job.update_local_logs()
+            job.platform_name = self.name  # Change the original platform to this process platform.º
+            job.platform = self
+            job.retrieve_logfiles(raise_error=True)
+            jobs_db_manager.save_job_log(job)
 
     def recover_platform_job_logs(self, as_conf: 'AutosubmitConfig') -> None:
         """
@@ -1088,7 +1050,6 @@ class Platform(object):
         jobs_db_manager = JobsDbManager(schema=self.expid)
         try:
             Log.info(f"{identifier} Starting...")
-            jobs_pending_to_process = set()
             self.connected = False
             self.restore_connection(as_conf, log_recovery_process=True)
             Log.result(f"{identifier} successfully connected.")
@@ -1096,10 +1057,13 @@ class Platform(object):
             # Keep alive signal timeout is 5 minutes, but the sleeptime is 60 seconds.
             self.keep_alive_timeout = max(log_recovery_timeout * 5, 60 * 5)
             while self.wait_for_work(sleep_time=max(log_recovery_timeout, 60)):
-                jobs_pending_to_process = self.recover_job_log(identifier, jobs_pending_to_process, as_conf, jobs_db_manager)
-                if self.cleanup_event.is_set():  # Check if the main process is waiting for this child to end.
-                    self.recover_job_log(identifier, jobs_pending_to_process, as_conf, jobs_db_manager)
-                    break
+                try:
+                    self.recover_job_log(jobs_db_manager)
+                    if self.cleanup_event.is_set():  # Check if the main process is waiting for this child to end.
+                        self.recover_job_log(jobs_db_manager)
+                except BaseException as e:
+                    self.restore_connection(as_conf, log_recovery_process=True)
+
         except Exception as e:
             Log.error(f"{identifier} {e}")
             Log.debug(traceback.format_exc())

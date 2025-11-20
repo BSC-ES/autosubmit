@@ -173,7 +173,7 @@ class Job(object):
         'current_checkpoint_step', 'max_checkpoint_step', 'reservation',
         'delete_when_edgeless', 'het', 'updated_log',
         'submit_time_timestamp', 'start_time_timestamp', 'finish_time_timestamp',
-        '_script', '_log_recovery_retries', 'ready_date', 'wrapper_name',
+        '_script', 'ready_date', 'wrapper_name',
         'is_wrapper', '_wallclock_in_seconds', '_notify_on', '_processors_per_node',
         'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
@@ -337,7 +337,6 @@ class Job(object):
         self.start_time_timestamp = None
         self.finish_time_timestamp = None  # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
         self._script = None  # Inline code to be executed
-        self._log_recovery_retries = None
         self.ready_date = None
         self.wrapper_name = None
         self.is_wrapper = False
@@ -1320,6 +1319,9 @@ class Job(object):
                     f"Failed to retrieve log files for job {self.name} e=6002: {str(exc)}"
                 )
                 log_recovered = False
+        if not log_recovered:
+            Log.debug(f"Remote log files {self.remote_logs} do not exist for job {self.name}")
+            log_recovered = False
         return log_recovered
 
     def retrieve_internal_retrials_logfiles(self) -> Tuple[int, bool]:
@@ -1379,7 +1381,7 @@ class Job(object):
             self.write_start_time(count=self.fail_count)
             self.write_end_time(self.status == Status.COMPLETED, self.fail_count)
 
-    def retrieve_logfiles(self, raise_error: bool = False) -> None:
+    def retrieve_logfiles(self, raise_error: bool = False) -> bool:
         """
         Retrieves log files from remote host.
 
@@ -1408,6 +1410,8 @@ class Job(object):
                 Log.result(
                     f"{self.platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{self.fail_count}'.")
         self.updated_log = self.updated_log + 1 if log_recovered else self.updated_log
+        Log.debug(f"update_log value for job {self.name} is {self.updated_log}")
+        return log_recovered
 
     def _max_possible_wallclock(self):
         if self.platform and self.platform.max_wallclock:

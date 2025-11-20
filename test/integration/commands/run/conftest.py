@@ -123,6 +123,32 @@ def prepare_scratch(tmp_path: Path) -> Any:
     (real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
 
 
+@pytest.fixture
+def redirect_log_info(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Redirect `Log` calls to a temporary file called `autosubmit.log` and return the file path.
+    """
+    from datetime import datetime
+
+    log_file = tmp_path / "autosubmit.log"
+
+    def _new_log_path(message: Any, *args: Any, **kwargs: Any) -> None:
+        timestamp = datetime.now().astimezone().isoformat()
+        with log_file.open("a", encoding="utf-8") as fh:
+            fh.write(f"{timestamp} {message}\n")
+
+    try:
+        from autosubmit.log.log import Log
+        monkeypatch.setattr(Log, "info", _new_log_path)
+        monkeypatch.setattr(Log, "debug", _new_log_path)
+        monkeypatch.setattr(Log, "warning", _new_log_path)
+        monkeypatch.setattr(Log, "error", _new_log_path)
+        monkeypatch.setattr(Log, "critical", _new_log_path)
+        monkeypatch.setattr(Log, "status", _new_log_path)
+    except Exception:
+        raise
+
+    return log_file
+
 # --- Internal utility functions.
 def _print_db_results(db_check_list, rows_as_dicts, run_tmpdir):
     """
