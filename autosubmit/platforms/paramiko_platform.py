@@ -98,7 +98,7 @@ class ParamikoPlatform(Platform):
         self._host_config_id = None
         self.submit_cmd = ""
         self._ftpChannel: Optional[paramiko.SFTPClient] = None
-        self.transport = None
+        self.transport: Optional[paramiko.Transport] = None
         self.channels = {}
         if sys.platform != "linux":
             self.poller = select.kqueue()
@@ -1159,8 +1159,7 @@ class ParamikoPlatform(Platform):
                     self.restore_connection(None)
                 timeout = timeout + 60
                 retries = retries - 1
-        if retries <= 0:
-            return False, False, False
+        return False, False, False
 
     def send_command_non_blocking(self, command, ignore_log):
         thread = threading.Thread(target=self.send_command, args=(command, ignore_log))

@@ -110,7 +110,7 @@ class ParamikoSubmitter:
 
     def __init__(self, as_conf: 'AutosubmitConfig', auth_password: Optional[str] = None,
                        local_auth_password=None):
-        self.platforms = None
+        self.platforms: Optional[dict[str, 'ParamikoPlatform']] = None
         self.load_platforms(as_conf=as_conf, auth_password=auth_password, local_auth_password=local_auth_password)
 
     def load_local_platform(self, as_conf: 'AutosubmitConfig', experiment_data: Optional[dict] = None,
