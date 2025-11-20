@@ -1,3 +1,4 @@
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.database_managers.experiment_history_db_manager import SqlAlchemyExperimentHistoryDbManager
 from autosubmit.job.job_common import Status
 import pytest
@@ -48,7 +49,7 @@ def do_setstatus(as_exp_, fl=None, fc=None, fct=None, ftcs=None, fs=None, target
 @pytest.mark.parametrize("reset_target", ["RUNNING", "WAITING"], ids=["Online", "Offline"])
 def test_set_status(as_exp, slurm_server, reset_target):
     """Tests the setstatus command with various filters in an offline scenario."""
-    db_manager = SqlAlchemyExperimentHistoryDbManager(options={'expid': as_exp.expid, 'jobdata_file': f'job_data_{as_exp.expid}.db'})
+    db_manager = SqlAlchemyExperimentHistoryDbManager(as_exp.expid, BasicConfig.JOBDATA_DIR, f'job_data_{as_exp.expid}.db')
     db_manager.initialize()
     fl_filter_names = f"{as_exp.expid}_20200101_fc0_1_1_LOCALJOB {as_exp.expid}_20200101_fc0_1_1_PSJOB {as_exp.expid}_20200101_fc0_1_1_SLURMJOB"
     fc_filter = "[20200101 [ fc0 [1] ] ]"

@@ -17,13 +17,14 @@
 
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     create_experiment_history_db_manager, SqlAlchemyExperimentHistoryDbManager
 )
 
 
 def test_create_experiment_history_db_manager_invalid():
-    with pytest.raises(ValueError):
+    with pytest.raises(KeyError, ValueError):
         create_experiment_history_db_manager('banana')
 
 
@@ -31,7 +32,7 @@ def test_functions_not_implemented(mocker):
     """Confirm that we do not implement a few functions for Postgres."""
     mocker.patch('autosubmit.history.database_managers.experiment_history_db_manager.get_connection_url')
     mocker.patch('autosubmit.history.database_managers.experiment_history_db_manager.session')
-    db_manager = SqlAlchemyExperimentHistoryDbManager({'schema': None})
+    db_manager = SqlAlchemyExperimentHistoryDbManager(None, BasicConfig.JOBDATA_DIR)
     # NOTE: These are all parameter-less.
     for fn in [
         'is_header_ready_db_version',

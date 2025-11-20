@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.job.job_common import Status
 
@@ -88,8 +89,7 @@ def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_n
     """
     job_list_ = as_exp.autosubmit.load_job_list(
         as_exp.expid, as_exp.as_conf, new=False)
-
-    db_manager = SqlAlchemyExperimentHistoryDbManager(options={'expid': as_exp.expid, 'jobdata_file': f'job_data_{as_exp.expid}.db'})
+    db_manager = SqlAlchemyExperimentHistoryDbManager(as_exp.expid, BasicConfig.JOBDATA_DIR, f'job_data_{as_exp.expid}.db')
     db_manager.initialize()
     # Save fails if platform is not set ( in 4.2 this is not the case )
     submitter = as_exp.autosubmit._get_submitter(as_exp.as_conf)
@@ -167,7 +167,7 @@ def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover, act
         job_names_to_recover = [name for name in job_names_to_recover if "LOCAL" not in name]
         as_exp.as_conf.set_last_as_command('recovery')
 
-        db_manager = SqlAlchemyExperimentHistoryDbManager(options={'expid': as_exp.expid, 'jobdata_file': f'job_data_{as_exp.expid}.db'})
+        db_manager = SqlAlchemyExperimentHistoryDbManager(as_exp.expid, BasicConfig.JOBDATA_DIR, f'job_data_{as_exp.expid}.db')
 
         db_manager.initialize()
         job_list_ = as_exp.autosubmit.load_job_list(

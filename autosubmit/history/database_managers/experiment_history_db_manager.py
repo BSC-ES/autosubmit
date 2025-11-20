@@ -38,6 +38,7 @@ from autosubmit.history.database_managers import database_models as Models
 from autosubmit.history.database_managers.database_manager import (
     DatabaseManager,
 )
+from autosubmit.log.log import AutosubmitCritical
 
 CURRENT_DB_VERSION = 19  # Update this if you change the database schema
 DB_EXPERIMENT_HEADER_SCHEMA_CHANGES = 14
@@ -50,12 +51,12 @@ class ExperimentHistoryDbManager(DatabaseManager):
     """ Manages actions directly on the database.
     """
 
-    def __init__(self, options):
+    def __init__(self, expid: str, jobdata_dir_path=BasicConfig.JOBDATA_DIR):
         """ Requires expid and jobdata_dir_path. """
-        super(ExperimentHistoryDbManager, self).__init__(options['expid'], jobdata_dir_path=BasicConfig.JOBDATA_DIR, local_root_dir_path=BasicConfig.LOCAL_ROOT_DIR)
+        super(ExperimentHistoryDbManager, self).__init__(expid, jobdata_dir_path=jobdata_dir_path)
         self._set_schema_changes()
         self._set_table_queries()
-        self.historicaldb_file_path = str(Path(options.get('jobdata_dir_path', BasicConfig.JOBDATA_DIR)) / f"job_data_{options['expid']}.db")
+        self.historicaldb_file_path = str(Path(jobdata_dir_path) / f"job_data_{expid}.db")
 
     def initialize(self):
         if self.my_database_exists():
@@ -491,15 +492,35 @@ class SqlAlchemyExperimentHistoryDbManager:
       (i.e. no ``_set_schema_changes()`` nor ``_set_table_queries()``).
     """
 
-    def __init__(self, options: dict):
-        default_file = None if BasicConfig.DATABASE_BACKEND == "postgres" else f"job_data_{options.get('expid',options.get('schema',None))}.db"
-        job_data_file = options.get('jobdata_file', default_file)
-        default_dir = BasicConfig.DATABASE_CONN_URL if BasicConfig.DATABASE_BACKEND == "postgres" else BasicConfig.JOBDATA_DIR
-        jobdata_path = Path(options.get('jobdata_path', default_dir))
-        if job_data_file:
-            jobdata_path = jobdata_path / job_data_file
-        connection_url = get_connection_url(jobdata_path)
-        self.schema = options.get('schema', None)
+    def __init__(
+            self,
+            schema: str,
+            jobdata_path: str,
+            jobdata_file: Optional[str] = None,
+    ) -> None:
+        """Initialize the SQLAlchemy experiment-history manager.
+
+        :param schema: DB schema name.
+        :param jobdata_path: Directory (sqlite) or URL Path (postgres).
+        :param jobdata_file: Optional DB filename (used for sqlite; ignored for Postgres).
+        """
+        if BasicConfig.DATABASE_BACKEND == "postgres":
+            default_base = BasicConfig.DATABASE_CONN_URL
+        else:
+            default_base = BasicConfig.JOBDATA_DIR
+
+        base = jobdata_path if jobdata_path is not None else default_base
+
+        # For sqlite we expect a filesystem path; for postgres we expect a connection URL.
+        if BasicConfig.DATABASE_BACKEND == "postgres":
+            connection_url = get_connection_url(base)
+            self.schema = schema
+        else:
+            file_name = jobdata_file if jobdata_file is not None else f"job_data_{schema}.db"
+            db_path = Path(base) / file_name
+            connection_url = get_connection_url(db_path)
+            self.schema = None
+
         self.engine = session.create_engine(connection_url=connection_url)
 
     def initialize(self):
@@ -651,8 +672,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             self._update_job_data_by_id(job_data_dc)
         return len(job_data_dcs)
 
-    def get_job_data_dc_unique_latest_by_job_name(self, job_name: Optional[str]):
-        """ Returns JobData data class for the latest job_data_row with last=1 by job_name. """
+    def get_job_data_dc_unique_latest_by_job_name(self, job_name):
         job_data_row_last = self._get_job_data_last_by_name(job_name)
         if len(job_data_row_last) > 0:
             return JobData.from_model(job_data_row_last[0])
@@ -864,13 +884,14 @@ class SqlAlchemyExperimentHistoryDbManager:
         columns = table.c.keys()
         return [tuple(zip(columns, row)) for row in rows]
 
+
 def create_experiment_history_db_manager(db_engine: str, **options: Any) -> ExperimentHistoryDatabaseManager:
-    if db_engine == 'postgres':
-        return cast(ExperimentHistoryDatabaseManager, SqlAlchemyExperimentHistoryDbManager(options))
+    use_sql_alchemy = options.get("force_sql_alchemy", False) or db_engine == 'postgres'
+    jobdata_dir_path = options.get("jobdata_dir_path", BasicConfig.JOBDATA_DIR)
+    if use_sql_alchemy:
+        job_data_file = options.get("jobdata_file", None)
+        return cast(ExperimentHistoryDatabaseManager, SqlAlchemyExperimentHistoryDbManager(options["expid"], jobdata_dir_path, job_data_file))
     elif db_engine == 'sqlite':
-        if options.get("force_sql_alchemy", False):
-            return cast(ExperimentHistoryDatabaseManager, SqlAlchemyExperimentHistoryDbManager(options))
-        else:
-            return cast(ExperimentHistoryDatabaseManager, ExperimentHistoryDbManager(options))
+        return cast(ExperimentHistoryDatabaseManager, ExperimentHistoryDbManager(options["expid"], jobdata_dir_path))
     else:
         raise ValueError(f"Invalid database engine: {db_engine}")
