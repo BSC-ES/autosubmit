@@ -5260,59 +5260,75 @@ class Autosubmit:
 
         :param job_list: JobList object
         :param filter_chunks: filter chunks
+        :return: list of jobs matching the filter
         """
-        def _prune_jobs(matching_jobs: list[Job], members: list[str], dates: list[str], chunks: int) -> list[Job]:
-            """Return jobs from *matching_jobs* that match the given members, dates and chunk limits.
 
-            - If \"ANY\" is present in *members*, member and chunk checks are skipped.
-            - If \"ANY\" is present in *dates*, date checks are skipped.
+        def _setup_prune(json_filter: dict[str, Any]) -> tuple[list[str], list[str], int]:
+            """Setup dates, members and chunks from json_filter.
+
+            :param json_filter: json filter with dates, members and chunks
+            :return: tuple of (dates, members, chunks)
             """
-            any_member = "ANY" in members
-            any_date = "ANY" in dates
+            dates = []
+            members = []
+            chunks = 0
+            for d_json in json_filter['sds']:
+                if "ANY" == str(d_json['sd']).upper():
+                    return [], [], len(job_list._chunk_list)
+                dates.append(d_json['sd'])
+                for m_json in d_json['ms']:
+                    members.append(m_json['m'])
+                    if str(m_json['cs'][0]).upper() == "ANY":
+                        chunks = len(job_list._chunk_list)
+                    else:
+                        chunks = max(len(m_json['cs']), chunks)
+            chunks = min(chunks, len(job_list._chunk_list))
+            return dates, members, chunks
 
-            def matches(job: Job) -> bool:
-                """Return True if *job* passes member, chunk and date checks."""
-                if not any_member:
-                    if not (getattr(job, "member", None) and job.member.upper() in members):
-                        return False
-                    if not (getattr(job, "chunk", None) and job.chunk <= chunks):
-                        return False
-                if not any_date:
-                    if not (getattr(job, "date", None) and date2str(job.date, "D") in dates):
-                        return False
-                return True
-
-            return [job for job in matching_jobs if matches(job)]
+        def _prune_jobs(jobs: list[Job], dates: list[str], members: list[str], chunks: int) -> list[Job]:
+            """Return jobs from *jobs* that match the given members, dates and chunk limits.
+            :param jobs: list of jobs to prune
+            :param dates: list of dates to match
+            :param members: list of members to match
+            :param chunks: maximum chunk number to match
+            :return: pruned list of jobs
+            """
+            if "ANY" in dates:
+                return jobs
+            else:
+                return [j for j in jobs if
+                        (
+                            (j.date and date2str(j.date, "D") in dates)
+                            and (j.member and (("ANY" in members) or (j.member.upper() in members)))
+                            and (not j.synchronize or (j.chunk and j.chunk <= chunks))
+                        )
+                        ]
 
         final_list = []
-        filter_chunks = filter_chunks.upper()
-        sections = filter_chunks.split(",")[1:]
-        sections = [sect.strip(" ,") for sect in sections]
-        if "ANY" in sections:
-            matching_jobs = job_list.get_job_list()
-        else:
-            matching_jobs = [job for job in job_list.get_job_list() if job.section in sections]
 
-        fc = filter_chunks
-        # Any located in chunks part
+        if not filter_chunks or not isinstance(filter_chunks, str):
+            return []
+
+        filter_chunks = filter_chunks.upper()
+        matching_jobs = job_list.get_job_list()
+        if "," in filter_chunks:
+            splitted_filters = filter_chunks.split(",")
+            fc = splitted_filters[0]
+            sections = splitted_filters[1:]
+            sections = [sect.strip(" ,") for sect in sections]
+            if "ANY" not in sections:
+                matching_jobs = [job for job in matching_jobs if job.section in sections]
+        else:
+            fc = filter_chunks
+
         if str(fc).upper() != "ANY":
             data = json.loads(Autosubmit._create_json(fc))
 
             # Prune jobs by selected dates, members, chunks
-            dates = []
-            members = []
-            chunks = 0
-            for date_json in data['sds']:
-                dates.append(date_json['sd'])
-                for member_json in date_json['ms']:
-                    members.append(member_json['m'])
-                    if str(member_json['cs'][0]).upper() == "ANY":
-                        chunks = len(job_list._chunk_list)
-                    else:
-                        chunks = max(len(member_json['cs']), chunks)
-            chunks = min(chunks, len(job_list._chunk_list))
-            matching_jobs = _prune_jobs(matching_jobs, members, dates, chunks)
+            filtered_dates, filtered_members, filtered_chunks = _setup_prune(data)
+            matching_jobs = _prune_jobs(matching_jobs, filtered_dates, filtered_members, filtered_chunks)
 
+            # Now, build final list according to the structure in data
             for date_json in data['sds']:
                 date = date_json['sd']
                 jobs_of_this_date = [j for j in matching_jobs if date2str(j.date, "D") == date]
