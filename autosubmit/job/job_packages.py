@@ -455,6 +455,7 @@ class JobPackageThread(JobPackageBase):
             self.wrapper_method = wrapper_info[2]
             self.jobs_in_wrapper = wrapper_info[3]
             self.extensible_wallclock = wrapper_info[4]
+            self.custom_env_setup = wrapper_info[5]
         else:
             self.wrapper_type = None
             self.wrapper_policy = None

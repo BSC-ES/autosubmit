@@ -65,6 +65,7 @@ class JobPackager(object):
         self.jobs_in_wrapper = dict()
         self.extensible_wallclock = dict()
         self.wrapper_info = list()
+        self.custom_env_setup = dict()
         self.calculate_job_limits(platform)
         self.special_variables = dict()
         self.wrappers_with_error = {}
@@ -81,7 +82,8 @@ class JobPackager(object):
                     self.wrapper_method[wrapper_section] = self._as_config.get_wrapper_method(wrapper_data).lower()
                 self.jobs_in_wrapper[wrapper_section] = self._as_config.get_wrapper_jobs(wrapper_data)
                 self.extensible_wallclock[wrapper_section] = self._as_config.get_extensible_wallclock(wrapper_data)
-        self.wrapper_info = [self.wrapper_type,self.wrapper_policy,self.wrapper_method,self.jobs_in_wrapper,self.extensible_wallclock] # to pass to job_packages
+                self.custom_env_setup[wrapper_section] = self._as_config.get_custom_env_setup(wrapper_data)
+        self.wrapper_info = [self.wrapper_type,self.wrapper_policy,self.wrapper_method,self.jobs_in_wrapper,self.extensible_wallclock,self.custom_env_setup] # to pass to job_packages
         Log.debug("Number of jobs available: {0}", self._max_wait_jobs_to_submit)
         if self.hold:
             Log.debug("Number of jobs prepared: {0}", len(jobs_list.get_prepared(platform)))

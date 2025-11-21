@@ -63,6 +63,7 @@ class WrapperBuilder(object):
         self.machinefiles_name = ''
         self.machinefiles_indent = 0
         self.exit_thread = ''
+        self.custom_env_setup = kwargs['wrapper_data'].custom_env_setup
         if "wallclock_by_level" in list(kwargs.keys()):
             self.wallclock_by_level = kwargs['wallclock_by_level']
 
@@ -171,12 +172,12 @@ class FluxWrapperBuilder(WrapperBuilder):
 
     def _custom_environmet_setup(self):
         # TODO: [ENGINES] Delete hardcoded flux environment setup
+        commands = self.custom_env_setup
+        if commands == '':
+            commands = "# No commands provided"
         return textwrap.dedent("""\
-            module load miniconda
-            source /apps/GPP/MINICONDA/24.1.2/etc/profile.d/conda.sh
-            conda activate flux
-            conda info
-            """).format('\n'.ljust(0))
+            {0}
+            """).format(commands, '\n'.ljust(0))
 
 class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
     # TODO: [ENGINES] Check retrial behavior
