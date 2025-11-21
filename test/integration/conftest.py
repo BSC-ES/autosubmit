@@ -658,7 +658,6 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
 
     return backend
 
-
 def wait_child(timeout, retry=3):
     """A parametrized fixture that will retry function X amount of times waiting for a child process to be executed.
 

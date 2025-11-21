@@ -27,6 +27,7 @@ from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmit.platforms.ecplatform import EcPlatform
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.paramiko_platform import ParamikoPlatformException
+from autosubmit.platforms.pbsplatform import PBSPlatform
 from autosubmit.platforms.pjmplatform import PJMPlatform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
@@ -100,6 +101,8 @@ def _get_platform_by_type(platform_type: str, expid: str, platform_name: str, ex
         return SlurmPlatform(expid, platform_name, experiment_data, auth_password=auth_password)
     elif platform_type == 'pjm':
         return PJMPlatform(expid, platform_name, experiment_data)
+    elif platform_type == 'pbs':
+        return PBSPlatform(expid, platform_name, experiment_data)
 
     return None
 
