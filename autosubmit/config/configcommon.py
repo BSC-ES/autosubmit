@@ -2661,6 +2661,16 @@ class AutosubmitConfig(object):
             wrapper = {}
         return wrapper.get('POLICY', self.experiment_data.get("WRAPPERS", {}).get("POLICY", 'flexible'))
 
+    def get_custom_env_setup(self, wrapper=None):
+        """Returns custom environment setup commands for a wrapper that runs with a wrapper engine.
+
+        :return: wrapper type (or none)
+        :rtype: string
+        """
+        if wrapper is None:
+            wrapper = {}
+        return wrapper.get('CUSTOM_ENV_SETUP', self.experiment_data.get("WRAPPERS", {}).get("CUSTOM_ENV_SETUP", ''))
+
     def get_wrappers(self):
         """Returns the jobs that should be wrapped, configured in the autosubmit's config.
 
