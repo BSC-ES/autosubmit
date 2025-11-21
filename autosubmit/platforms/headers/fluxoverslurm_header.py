@@ -27,23 +27,13 @@ class FluxOverSlurmHeader(object):
 
     def get_proccesors_directive(self, job, parameters, het=-1):
         """
-        Returns processors directive for the specified job
+        Returns processors directive for the specified job.
 
         :param job: job to create processors directive for
         :type job: Job
         :return: processors directive
         :rtype: str
         """
-        if het > -1 and len(job.het['NODES']) > 0:
-            if job.het['NODES'][het] == '':
-                job_nodes = 0
-            else:
-                job_nodes = job.het['NODES'][het]
-            if len(job.het['PROCESSORS']) == 0 or job.het['PROCESSORS'][het] == '' or job.het['PROCESSORS'][
-                het] == '1' and int(job_nodes) > 0:
-                return ""
-            else:
-                return "FLUX: --nslots {0}".format(job.het['PROCESSORS'][het])
         if job.nodes == "":
             job_nodes = 0
         else:
@@ -55,52 +45,41 @@ class FluxOverSlurmHeader(object):
 
     def get_nodes_directive(self, job, parameters, het=-1):
         """
-        Returns nodes directive for the specified job
+        Returns nodes directive for the specified job.
         :param job: job to create nodes directive for
         :type job: Job
         :return: nodes directive
         :rtype: str
         """
-        if het > -1 and len(job.het['NODES']) > 0:
-            if job.het['NODES'][het] != '':
-                return "FLUX: --nodes {0}".format(job.het['NODES'][het])
+        if parameters['NODES'] != '':
+            return "FLUX: --nodes {0}".format(parameters['NODES'])
         else:
-            if parameters['NODES'] != '':
-                return "FLUX: --nodes {0}".format(parameters['NODES'])
-        return ""
+            return ""
 
-    # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_memory_directive(self, job, parameters, het=-1):
-        # TODO: [ENGINES] Implement this method
-        Log.warning("Directive 'mem' is not currently supported for Flux jobs. Ignoring it")
+        Log.warning("Directive 'mem' is not supported for Flux jobs. Ignoring it")
         return ""
 
-    # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_memory_per_task_directive(self, job, parameters, het=-1):
-        # TODO: [ENGINES] Implement this method
-        Log.warning("Directive 'mem-per-cpu' is not currently supported for Flux jobs. Ignoring it")
+        Log.warning("Directive 'mem-per-cpu' is not supported for Flux jobs. Ignoring it")
         return ""
     
     def get_threads_per_task(self, job, parameters, het=-1):
         """
-        Returns threads per task directive for the specified job
+        Returns threads per task directive for the specified job.
 
         :param job: job to create threads per task directive for
         :type job: Job
         :return: threads per task directive
         :rtype: str
         """
-        # There is no threads per task, so directive is empty
-        if het > -1 and len(job.het['NUMTHREADS']) > 0:
-            if job.het['NUMTHREADS'][het] != '':
-                return "FLUX: --cores-per-slot {0}".format(job.het['NUMTHREADS'][het])
+        if parameters['NUMTHREADS'] != '':
+            return "FLUX: --cores-per-slot {0}".format(parameters['NUMTHREADS'])
         else:
-            if parameters['NUMTHREADS'] != '':
-                return "FLUX: --cores-per-slot {0}".format(parameters['NUMTHREADS'])
-        return ""
+            return ""
 
     def get_custom_directives(self, job, parameters, het=-1):
-        Log.warning("Jobs within a wrapper using the Flux method do not currently support custom directives.")
+        Log.warning("Jobs within a wrapper using the Flux method do not support custom directives.")
         return ""
 
     def get_tasks_per_node(self, job, parameters, het=-1):
@@ -109,12 +88,13 @@ class FluxOverSlurmHeader(object):
         return ""
     
     def calculate_het_header(self, job, parameters):
-        Log.warning("Heterogeneous configurations are not currently supported for Flux jobs. Ignoring them")
-        return ""
+        # TODO: [ENGINES] Implement heterogeneous jobs for Flux
+        raise NotImplementedError("Heterogeneous configurations are not currently supported for Flux jobs.")
     
     def get_wallclock_directive(self, job, parameters):
         """
-        Returns wallclock directive for the specified job
+        Returns wallclock directive for the specified job.
+        Assumes wallclock is given in HH:MM format.
 
         :param job: job to create wallclock directive for
         :type job: Job
@@ -128,7 +108,7 @@ class FluxOverSlurmHeader(object):
 
     def get_exclusive_directive(self, job, parameters, het=-1):
         """
-        Returns account directive for the specified job
+        Returns account directive for the specified job.
 
         :param job: job to create account directive for
         :type job: Job
