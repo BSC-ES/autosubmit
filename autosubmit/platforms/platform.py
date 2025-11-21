@@ -858,9 +858,9 @@ class Platform:
         This method sets the cleanup event to signal the log recovery process to finish,
         waits for the process to join with a timeout, and then resets all related variables.
         """
-        if self.cleanup_event is not None:
+        if self.cleanup_event:
             self.cleanup_event.set()  # Indicates to old child ( if reachable ) to finish.
-        if self.log_recovery_process is not None:
+        if self.log_recovery_process and self.log_recovery_process.is_alive():
             # Waits for old child ( if reachable ) to finish. Timeout in case of it being blocked.
             self.log_recovery_process.join(timeout=60)
         # Resets everything related to the log recovery process.
