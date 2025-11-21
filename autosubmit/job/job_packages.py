@@ -76,12 +76,11 @@ class JobPackageBase(object):
         self._threads = '0'
         try:
             self._tmp_path = jobs[0]._tmp_path
-            self._platform = jobs[0]._platform # TODO: [ENGINES] Here is where the package platform is assigned
+            self._platform = jobs[0]._platform
             self._custom_directives = set()
             for job in jobs:
                 if job._platform.name != self._platform.name or job.platform is None:
                     raise Exception('Only one valid platform per package')
-                # TODO: [ENGINES] Here I could assign the wrapper method to the jobs in the package
         except IndexError:
             raise Exception('No jobs given')
 
@@ -489,7 +488,7 @@ class JobPackageThread(JobPackageBase):
         self._wallclock = '00:00' # depends on the type of wrapper
 
         self._jobs_resources = jobs_resources
-        self._wrapper_factory = self.platform.wrapper # TODO: [ENGINES] This is where the wrapper factory is assigned
+        self._wrapper_factory = self.platform.wrapper
         self.current_wrapper_section = wrapper_section
         self.inner_retrials = 0
         if not hasattr(self, "_num_processors"):
