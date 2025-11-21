@@ -22,7 +22,7 @@ import os
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
-from typing import Union, TYPE_CHECKING
+from typing import Union, TYPE_CHECKING, Optional
 
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.job.job_common import Status
@@ -93,57 +93,27 @@ class PBSPlatform(ParamikoPlatform):
         :param parameters: Parameters dictionary.
         :return: Job header.
         """
-        if not job.packed or str(job.wrapper_type).lower() != "vertical":
-            out_filename = f"{job.name}.cmd.out.{job.fail_count}"
-            err_filename = f"{job.name}.cmd.err.{job.fail_count}"
-        else:
-            out_filename = f"{job.name}.cmd.out"
-            err_filename = f"{job.name}.cmd.err"
 
         header = self.header.SERIAL
+        header = header.replace('%OUT_LOG_DIRECTIVE%', f"{job.name}.cmd.out")
+        header = header.replace('%ERR_LOG_DIRECTIVE%', f"{job.name}.cmd.err")
 
-        header = header.replace('%OUT_LOG_DIRECTIVE%', out_filename)
-        header = header.replace('%ERR_LOG_DIRECTIVE%', err_filename)
         if job.het.get("HETSIZE", 0) <= 1:
             if hasattr(self.header, 'get_queue_directive'):
                 header = header.replace(
                     '%QUEUE_DIRECTIVE%', self.header.get_queue_directive(job, parameters))
-            if hasattr(self.header, 'get_proccesors_directive'):
-                header = header.replace(
-                    '%NUMPROC_DIRECTIVE%', self.header.get_proccesors_directive(job, parameters))
-            if hasattr(self.header, 'get_partition_directive'):
-                header = header.replace(
-                    '%PARTITION_DIRECTIVE%', self.header.get_partition_directive(job, parameters))
             if hasattr(self.header, 'get_tasks_per_node'):
                 header = header.replace(
                     '%TASKS_PER_NODE_DIRECTIVE%', self.header.get_tasks_per_node(job, parameters))
             if hasattr(self.header, 'get_threads_per_task'):
                 header = header.replace(
                     '%THREADS_PER_TASK_DIRECTIVE%', self.header.get_threads_per_task(job, parameters))
-            if job.x11:
-                header = header.replace(
-                    '%X11%', "SBATCH --x11=batch")
-            else:
-                header = header.replace(
-                    '%X11%', "")
-            if hasattr(self.header, 'get_scratch_free_space'):
-                header = header.replace(
-                    '%SCRATCH_FREE_SPACE_DIRECTIVE%', self.header.get_scratch_free_space(job, parameters))
             if hasattr(self.header, 'get_custom_directives'):
                 header = header.replace(
                     '%CUSTOM_DIRECTIVES%', self.header.get_custom_directives(job, parameters))
-            if hasattr(self.header, 'get_exclusive_directive'):
-                header = header.replace(
-                    '%EXCLUSIVE_DIRECTIVE%', self.header.get_exclusive_directive(job, parameters))
-            if hasattr(self.header, 'get_select_directive'):
-                header = header.replace(
-                    '%SELECT_DIRECTIVE%', self.header.get_select_directive(job, parameters))
             if hasattr(self.header, 'get_account_directive'):
                 header = header.replace(
                     '%ACCOUNT_DIRECTIVE%', self.header.get_account_directive(job, parameters))
-            if hasattr(self.header, 'get_shape_directive'):
-                header = header.replace(
-                    '%SHAPE_DIRECTIVE%', self.header.get_shape_directive(job, parameters))
             if hasattr(self.header, 'get_nodes_directive'):
                 header = header.replace(
                     '%NODES_DIRECTIVE%', self.header.get_nodes_directive(job, parameters))
@@ -156,26 +126,7 @@ class PBSPlatform(ParamikoPlatform):
             if hasattr(self.header, 'get_memory_per_task_directive'):
                 header = header.replace(
                     '%MEMORY_PER_TASK_DIRECTIVE%', self.header.get_memory_per_task_directive(job, parameters))
-            if hasattr(self.header, 'get_hyperthreading_directive'):
-                header = header.replace(
-                    '%HYPERTHREADING_DIRECTIVE%', self.header.get_hyperthreading_directive(job, parameters))
         return header
-
-    def get_submit_cmd_x11(self, args: str, script_name: str) -> str:
-        """
-        Returns the submit command for the platform.
-
-        :param args: Arguments to be used in the construction of the submit command.
-        :type args: str
-        :param script_name: Name of the file to be referenced.
-        :type script_name: str
-
-        :return: Command PBS to allocate jobs
-        :rtype: str
-        """
-        cmd = f'qsub {args} {self._submit_cmd_x11}/{script_name}'
-        Log.debug(f"qsub command: {cmd}")
-        return cmd
 
     def generate_new_name_submit_script_file(self) -> None:
         """
@@ -209,7 +160,7 @@ class PBSPlatform(ParamikoPlatform):
                 duplicated_jobs_already_checked = False
                 platform = valid_packages_to_submit[0].jobs[0].platform
                 try:
-                    jobs_id = self.submit_script(hold=hold)
+                    jobs_id = self.submit_script()
                 except AutosubmitError as e:
                     job_names = []
                     duplicated_jobs_already_checked = True
@@ -221,9 +172,9 @@ class PBSPlatform(ParamikoPlatform):
                                 job_names.append(package_.jobs[0].name)  # job_name
                         Log.error(f'TRACE:{e.trace}\n{e.message} JOBS:{job_names}')
                         for job_name in job_names:
-                            jobid = self.get_jobid_by_jobname(job_name)
-                            # cancel bad submitted job if jobid is encountered
-                            for id_ in jobid:
+                            jobs_id = self.get_jobs_id_by_job_name(job_name)
+                            # cancel bad submitted job if jobs_id is encountered
+                            for id_ in jobs_id:
                                 self.send_command(self.cancel_job(id_))
                     jobs_id = None
                     self.connected = False
@@ -271,9 +222,9 @@ class PBSPlatform(ParamikoPlatform):
                         6015, f"Jobs_id {jobs_id}")
                 if hold:
                     sleep(10)
-                jobid_index = 0
+                jobs_id_index = 0
                 for package in valid_packages_to_submit:
-                    current_package_id = str(jobs_id[jobid_index])
+                    current_package_id = str(jobs_id[jobs_id_index])
                     if hold:
                         retries = 5
                         package.jobs[0].id = current_package_id
@@ -285,7 +236,7 @@ class PBSPlatform(ParamikoPlatform):
                                 retries = retries - 1
                                 package.jobs[0].platform.send_command(
                                     package.jobs[0].platform.cancel_cmd + f" {current_package_id}")
-                                jobid_index += 1
+                                jobs_id_index += 1
                                 continue
                         except Exception:
                             failed_packages.append(current_package_id)
@@ -294,18 +245,18 @@ class PBSPlatform(ParamikoPlatform):
                     # Check if there are duplicated job_name
                     if not duplicated_jobs_already_checked:
                         job_name = package.name if hasattr(package, "name") else package.jobs[0].name
-                        jobid = self.get_jobid_by_jobname(job_name)
-                        if len(jobid) > 1:  # Cancel each job that is not the associated
+                        jobs_id = self.get_jobs_id_by_job_name(job_name)
+                        if len(jobs_id) > 1:  # Cancel each job that is not the associated
                             ids_to_check = [package.jobs[0].id]
                             if package.jobs[0].het:
                                 for i in range(1, package.jobs[0].het.get("HETSIZE", 1)):  # noqa
                                     ids_to_check.append(str(int(ids_to_check[0]) + i))
                             # TODO to optimize cancel all jobs at once
-                            for id_ in [jobid for jobid in jobid if jobid not in ids_to_check]:
+                            for id_ in [jobs_id for jobs_id in jobs_id if jobs_id not in ids_to_check]:
                                 self.send_command(self.cancel_job(id_))
                                 Log.debug(f'Job {id_} with the assigned name: {job_name} has been cancelled')
                             Log.debug(f'Job {package.jobs[0].id} with the assigned name: {job_name} has been submitted')
-                    jobid_index += 1
+                    jobs_id_index += 1
                 if len(failed_packages) > 0:
                     for job_id in failed_packages:
                         platform.send_command(platform.cancel_cmd + f" {job_id}")
@@ -341,7 +292,7 @@ class PBSPlatform(ParamikoPlatform):
         self._submit_script_path.chmod(mode=0o750)
         return str(self._submit_script_path)
 
-    def submit_job(self, job: 'Job', script_name: str, hold: bool = False, export: str = "none") -> None:
+    def submit_job(self, job: 'Job', script_name: str, hold: bool = False, export: str = "none") -> Optional[int]:
         """
         Submit a job from a given job object.
 
@@ -357,23 +308,36 @@ class PBSPlatform(ParamikoPlatform):
         :return: job id for the submitted job.
         :rtype: int
         """
-        self.get_submit_cmd(script_name, job, hold=hold, export=export)
+        if job is None or not job:
+            x11 = False
+        else:
+            x11 = job.x11
+        if not x11:
+            self.get_submit_cmd(script_name, job, hold=hold, export=export)
+            return None
+        cmd = self.get_submit_cmd(script_name, job, hold=hold, export=export)
+        if cmd is None:
+            return None
+        if self.send_command(cmd, x11=x11):
+            job_id = self.get_submitted_job_id(self.get_ssh_output(), x11=x11)
+            if job:
+                Log.result(f"Job: {job.name} submitted with job_id: {str(job_id).strip()} and workflow commit: "
+                           f"{job.workflow_commit}")
+            return int(job_id)
         return None
 
-    def submit_script(self, hold: bool = False) -> Union[list[int], int]:
+    def submit_script(self) -> Union[list[int], int]:
         """
         Sends a Submit file Script with sbatch instructions, execute it in the platform and
         retrieves the Jobs_ID of all jobs at once.
 
-        :param hold: Submit a job in held status. Held jobs will only earn priority status if the
-            remote machine allows it.
-        :type hold: bool
         :return: job id for submitted jobs.
         :rtype: Union[List[int], int]
         """
         try:
             self.send_file(self.get_submit_script(), False)
-            cmd = os.path.join(self.get_files_path(), self._submit_script_path.name)
+            cmd = os.path.join(self.get_files_path(),
+                               os.path.basename(self._submit_script_path))
             # remove file after submission
             cmd = f"{cmd} ; rm {cmd}"
             try:
@@ -526,25 +490,18 @@ class PBSPlatform(ParamikoPlatform):
             export = ""
         else:
             export += " ; "
-        if job is None or not job:
-            x11 = False
-        else:
-            x11 = job.x11
 
-        if not x11:
-            with suppress(Exception):
-                lang = locale.getlocale()[1]
+        with suppress(Exception):
+            lang = locale.getlocale()[1]
+            if lang is None:
+                lang = locale.getdefaultlocale()[1]
                 if lang is None:
-                    lang = locale.getdefaultlocale()[1]
-                    if lang is None:
-                        lang = 'UTF-8'
-                with open(self._submit_script_path, "ab") as submit_script_file:
-                    if not hold:
-                        submit_script_file.write((export + self._submit_cmd + job_script + "\n").encode(lang))
-                    else:
-                        submit_script_file.write((export + self._submit_hold_cmd + job_script + "\n").encode(lang))
-        else:
-            return export + self.get_submit_cmd_x11(job.x11_options.strip(""), job_script.strip(""))
+                    lang = 'UTF-8'
+            with open(self._submit_script_path, "ab") as submit_script_file:
+                if not hold:
+                    submit_script_file.write((export + self._submit_cmd + job_script + "\n").encode(lang))
+                else:
+                    submit_script_file.write((export + self._submit_hold_cmd + job_script + "\n").encode(lang))
 
     def get_check_job_cmd(self, job_id: str) -> list[str]:  # noqa
         """
@@ -572,7 +529,7 @@ class PBSPlatform(ParamikoPlatform):
         jobs_id = jobs_id.replace('{', '').replace('}', '').replace(',', ' ')
         return f"qstat {jobs_id} | awk" + " '{print $1, $3}' &&" + f"qstat -H {jobs_id} | awk" + " '{print $1, $3}'"
 
-    def get_jobid_by_jobname(self, job_name, retries=2):
+    def get_jobs_id_by_job_name(self, job_name, retries=2):
         """
         Get job id by job name
 
@@ -583,7 +540,7 @@ class PBSPlatform(ParamikoPlatform):
         """
         # sleep(5)
         job_ids = ""
-        cmd = self.get_jobid_by_jobname_cmd(job_name)
+        cmd = self.get_jobs_id_by_job_name_cmd(job_name)
         self.send_command(cmd)
         job_id_name = self.get_ssh_output()
         while len(job_id_name) <= 0 < retries:
@@ -624,7 +581,7 @@ class PBSPlatform(ParamikoPlatform):
         job_id = job_id.replace('{', '').replace('}', '').replace(',', ' ')
         return f"qstat {job_id} && echo \"BREAK\" && " + f"qstat -H {job_id}"
 
-    def get_jobid_by_jobname_cmd(self, job_name: str) -> str:  # noqa
+    def get_jobs_id_by_job_name_cmd(self, job_name: str) -> str:  # noqa
         """
         Looks for a job based on its name.
 
@@ -667,14 +624,14 @@ class PBSPlatform(ParamikoPlatform):
             return ''.join(reason)
         return reason  # noqa F501
 
-    def get_queue_status(self, in_queue_jobs: list['Job'], list_queue_jobid: str, as_conf: AutosubmitConfig) -> None:
+    def get_queue_status(self, in_queue_jobs: list['Job'], list_queue_jobs_id: str, as_conf: AutosubmitConfig) -> None:
         """
         get_queue_status
 
         :param in_queue_jobs: List of Job.
         :type in_queue_jobs: list[Job]
-        :param list_queue_jobid: List of Job IDs concatenated.
-        :type list_queue_jobid: str
+        :param list_queue_jobs_id: List of Job IDs concatenated.
+        :type list_queue_jobs_id: str
         :param as_conf: experiment configuration.
         :type as_conf: autosubmit.config.AutosubmitConfig
 
@@ -682,7 +639,7 @@ class PBSPlatform(ParamikoPlatform):
         """
         if not in_queue_jobs:
             return
-        cmd = self.get_queue_status_cmd(list_queue_jobid)
+        cmd = self.get_queue_status_cmd(list_queue_jobs_id)
         self.send_command(cmd)
         queue_status = self._ssh_output
         for job in in_queue_jobs:

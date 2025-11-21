@@ -53,21 +53,6 @@ class PBSHeader(object):
             return '\n'.join(str(s) for s in parameters['CUSTOM_DIRECTIVES'])
         return ""
 
-    @staticmethod
-    def get_partition_directive(job, parameters, het=-1):
-        """Returns partition directive for the specified job
-
-        :param parameters:
-        :param job: job to create partition directive for
-        :type job: Job
-        :param het:
-        :return: partition directive
-        :rtype: str
-        """
-        if job.partition != '':
-            return f"PBS -q={parameters['CURRENT_QUEUE']}"
-        return ""
-
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_account_directive(self, job, parameters, het=-1):
         """Returns account directive for the specified job
