@@ -104,19 +104,8 @@ class FluxOverSlurmHeader(object):
         return ""
 
     def get_tasks_per_node(self, job, parameters, het=-1):
-        """
-        Returns tasks per node directive for the specified job
-
-        :param job: job to create tasks per node directive for
-        :type job: Job
-        :return: tasks per node directive
-        :rtype: str
-        """
-        if het > -1 and len(job.het['TASKS']) > 0:
-            if int(job.het['TASKS'][het]):
-                return "FLUX: --tasks-per-node={0}".format(job.het['TASKS'][het])
-        elif int(parameters['TASKS']) > 0:
-                return "FLUX: --tasks-per-node={0}".format(parameters['TASKS'])
+        # TODO: [ENGINES] Implement this method
+        Log.warning("Directive 'tasks-per-node' is not currently supported for Flux jobs. Ignoring it")
         return ""
     
     def calculate_het_header(self, job, parameters):
@@ -163,7 +152,6 @@ class FluxOverSlurmHeader(object):
 # %THREADS_PER_TASK_DIRECTIVE%
 # %NODES_DIRECTIVE%
 # %WALLCLOCK_DIRECTIVE%
-# %TASKS_PER_NODE_DIRECTIVE%
 # FLUX: --job-name %JOBNAME%
 # FLUX: --output %CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%OUT_LOG_DIRECTIVE%
 # FLUX: --error %CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%ERR_LOG_DIRECTIVE%
