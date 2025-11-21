@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import datetime
-import getpass
 import hashlib
 import locale
 import logging
@@ -148,7 +147,8 @@ class ParamikoPlatform(Platform):
         self._ssh: Optional[paramiko.SSHClient] = None
         self._ssh_config = None
         self._ssh_output = None
-        self._host_config = None
+        self._user_config_file = None
+        self._host_config: Optional[dict] = None
         self._host_config_id = None
         self.submit_cmd = ""
         self._ftpChannel: Optional[paramiko.SFTPClient] = None
@@ -311,31 +311,6 @@ class ParamikoPlatform(Platform):
             return False
         return True
 
-    # NOTE: do not remove title, instructions, as these are in the callback signature for 2FA
-    # noinspection PyUnusedLocal
-    def interactive_auth_handler(self, title, instructions, prompt_list):
-        answers = []
-        # Walk the list of prompts that the server sent that we need to answer
-        twofactor_nonpush = None
-        two_factor_prompts = ["token", "2fa", "otp", "code"]
-
-        for prompt_, _ in prompt_list:
-            prompt = str(prompt_).strip().lower()
-            # str() used to make sure that we're dealing with a string rather than a unicode string
-            # strip() used to get rid of any padding spaces sent by the server
-            if "password" in prompt:
-                answers.append(self.pw)
-            elif any(token in prompt for token in two_factor_prompts):
-                if self.two_factor_method == "push":
-                    answers.append("")
-                elif self.two_factor_method == "token":
-                    # Sometimes the server may ask for the 2FA code more than once this is to avoid asking the
-                    # user again. If it is wrong, just run again autosubmit run because the issue could be in
-                    # the password step.
-                    if twofactor_nonpush is None:
-                        twofactor_nonpush = input("Please type the 2FA/OTP/token code: ")
-                    answers.append(twofactor_nonpush)
-        return tuple(answers)
 
     def write_jobid(self, jobid: str, complete_path: str) -> None:
         try:
@@ -433,14 +408,14 @@ class ParamikoPlatform(Platform):
                 Log.warning("2FA is enabled, this is an experimental feature and it may not work as expected")
                 Log.warning("nohup can't be used as the password will be asked")
                 Log.warning("If you are using a token, please type the token code when asked")
-                if self.pw is None:
-                    self.pw = getpass.getpass(f"Password for {self.name}: ")
                 if self.two_factor_method == "push":
                     Log.warning("Please check your phone to complete the 2FA PUSH authentication")
                 self.transport = paramiko.Transport((self._host_config['hostname'], port))
                 self.transport.start_client()
                 try:
-                    self.transport.auth_interactive(self.user, self.interactive_auth_handler)
+                    self.transport.auth_publickey(self.user, paramiko.Ed25519Key.from_private_key_file(self._host_config_id[0]))
+                    self.transport.auth_interactive_dumb(self.user)
+                    self.transport.open_session()
                 except Exception as e:
                     Log.printlog(f"2FA authentication failed: {str(e)}", 7000)
                     raise
