@@ -4977,70 +4977,6 @@ class Autosubmit:
                 "Error in the supplied input for -ft.", 7011, job_validation_message)
 
     @staticmethod
-    def _validate_chunks(as_conf, filter_chunks):
-        fc_validation_message = "## -fc Validation Message ##"
-        fc_filter_is_correct = True
-        selected_sections = filter_chunks.split(",")[1:]
-        selected_formula = filter_chunks.split(",")[0]
-        current_sections = as_conf.jobs_data
-        fc_deserialized_json = object()
-        # Starting Validation
-        if len(str(selected_sections).strip()) == 0:
-            fc_filter_is_correct = False
-            fc_validation_message += "\n\tMust include a section (job type)."
-        else:
-            for section in selected_sections:
-                # section = section.strip()
-                # Validating empty sections
-                if len(str(section).strip()) == 0:
-                    fc_filter_is_correct = False
-                    fc_validation_message += "\n\tEmpty sections are not accepted."
-                    break
-                # Validating existing sections
-                # Retrieve experiment data
-
-                if section not in current_sections:
-                    fc_filter_is_correct = False
-                    fc_validation_message += "\n\tSection " + section + \
-                                             " does not exist in experiment. Remember not to include blank spaces."
-
-        # Validating chunk formula
-        if len(selected_formula) == 0:
-            fc_filter_is_correct = False
-            fc_validation_message += "\n\tA formula for chunk filtering has not been provided."
-
-        # If everything is fine until this point
-        if fc_filter_is_correct is True:
-            # Retrieve experiment data
-            current_dates = str(as_conf.experiment_data["EXPERIMENT"]["DATELIST"]).split()
-            current_members = as_conf.get_member_list()
-            # Parse json
-            try:
-                fc_deserialized_json = json.loads(
-                    Autosubmit._create_json(selected_formula))
-            except Exception:
-                fc_filter_is_correct = False
-                fc_validation_message += "\n\tProvided chunk formula does not have the right format. Were you trying to use another option?"
-            if fc_filter_is_correct is True:
-                for startingDate in fc_deserialized_json['sds']:
-                    if startingDate['sd'] not in current_dates:
-                        fc_filter_is_correct = False
-                        fc_validation_message += "\n\tStarting date " + \
-                                                 startingDate['sd'] + \
-                                                 " does not exist in experiment."
-                    for member in startingDate['ms']:
-                        if member['m'] not in current_members and member['m'].lower() != "any":
-                            fc_filter_is_correct = False
-                            fc_validation_message += "\n\tMember " + \
-                                                     member['m'] + \
-                                                     " does not exist in experiment."
-
-        # Ending validation
-        if fc_filter_is_correct is False:
-            raise AutosubmitCritical(
-                "Error in the supplied input for -fc.", 7011, fc_validation_message)
-
-    @staticmethod
     def _validate_status(job_list, filter_status):
         status_validation_error = False
         status_validation_message = "\n## Status Validation Message ##"
@@ -5068,62 +5004,53 @@ class Autosubmit:
             raise AutosubmitCritical("Error in the supplied input for -fs.", 7011, status_validation_message)
 
     @staticmethod
-    def _validate_type_chunk(as_conf, filter_type_chunk):
+    def _validate_chunk_section_split(as_conf, filter_string):
         # Change status by section, member, and chunk; freely.
         # Including inner validation. Trying to make it independent.
         # 19601101 [ fc0 [1 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3
-        validation_message = "## -ftc Validation Message ##"
+        validation_message = "## -fc // -ftc // -ftcs Validation Message ##"
         filter_is_correct = True
-        selected_sections = filter_type_chunk.split(",")[1:]
-        selected_formula = filter_type_chunk.split(",")[0]
-        # Starting Validation
-        if len(str(selected_sections).strip()) == 0:
-            filter_is_correct = False
-            validation_message += "\n\tMust include a section (job type). If you want to apply the changes to all sections, include 'Any'."
+
+        filter_parts = filter_string.split(",")
+        if len(filter_parts) >= 2:
+            chunk_splits_formula = filter_parts[0].strip()
+            selected_sections = [s.upper().strip() for s in filter_parts[1:]]
         else:
+            chunk_splits_formula = filter_string.strip()
+            selected_sections = []
+
+        # Validate sections
+        if "ANY" not in selected_sections:
             for section in selected_sections:
-                # Validating empty sections
                 if len(str(section).strip()) == 0:
                     filter_is_correct = False
                     validation_message += "\n\tEmpty sections are not accepted."
-                    break
-                # Validating existing sections
-                # Retrieve experiment data
-                current_sections = as_conf.jobs_data
-                if section not in current_sections and section != "Any":
+
+                if section not in as_conf.jobs_data.keys():
                     filter_is_correct = False
-                    validation_message += "\n\tSection " + \
-                                          section + " does not exist in experiment."
+                    validation_message += f"\n\tSection {section} does not exist in experiment."
 
         # Validating chunk formula
-        if len(selected_formula) == 0:
+        if len(chunk_splits_formula) == 0:
             filter_is_correct = False
             validation_message += "\n\tA formula for chunk filtering has not been provided. If you want to change all chunks, include 'Any'."
 
-        if filter_is_correct is False:
+        if not filter_is_correct:
             raise AutosubmitCritical(
-                "Error in the supplied input for -ftc.", 7011, validation_message)
+                "Error in the supplied input for -fc // -ftc // -ftcs.", 7011, validation_message)
 
     @staticmethod
-    def _validate_chunk_split(as_conf, filter_chunk_split):
-        # new filter
-        pass
-
-    @staticmethod
-    def _validate_set_status_filters(as_conf, job_list, filter_list, filter_chunks, filter_status, filter_section,
-                                     filter_type_chunk, filter_chunk_split):
-        if filter_section is not None:
+    def _validate_set_status_filters(as_conf, job_list, filter_list, filter_chunk_section_split, filter_status, filter_section):
+        if filter_section:
             Autosubmit._validate_section(as_conf, filter_section)
-        if filter_list is not None:
+        if filter_list:
             Autosubmit._validate_list(as_conf, job_list, filter_list)
-        if filter_chunks is not None:
-            Autosubmit._validate_chunks(as_conf, filter_chunks)
-        if filter_status is not None:
+
+        if filter_status:
             Autosubmit._validate_status(job_list, filter_status)
-        if filter_type_chunk is not None:
-            Autosubmit._validate_type_chunk(as_conf, filter_type_chunk)
-        if filter_chunk_split is not None:
-            Autosubmit._validate_chunk_split(as_conf, filter_chunk_split)
+
+        if filter_chunk_section_split:
+            Autosubmit._validate_chunk_split(as_conf, filter_chunk_section_split)
 
     @staticmethod
     def _apply_ftc(job_list: JobList, filter_type_chunk_split: str) -> list[Job]:
@@ -5248,7 +5175,7 @@ class Autosubmit:
         return final_list
 
     @staticmethod
-    def select_jobs_by_chunks(job_list: "JobList",
+    def select_jobs_by_chunks_splits(job_list: "JobList",
                               filter_chunks: str) -> list[Job]:
         """Select jobs from *job_list* according to *filter_chunks* specification.
 
@@ -5367,6 +5294,11 @@ class Autosubmit:
         """
         if filter_status:
             filter_status = filter_status.upper()
+        # TODO: Normalize some filters that are the same ( To avoid changing the usage ... FIX in another PR)
+        filter_chunk_section_split = None
+        for f in [filter_chunks, filter_type_chunk, filter_type_chunk_split]:
+            filter_chunk_section_split = f if f else filter_chunk_section_split
+
         Autosubmit._check_ownership(expid, raise_error=True)
         exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
         tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -5379,7 +5311,7 @@ class Autosubmit:
                 Log.debug(f'Save: {save}')
                 Log.debug(f'Final status: {final}')
                 Log.debug(f'List of jobs to change: {filter_list}')
-                Log.debug(f'Chunks to change: {filter_chunks}')
+                Log.debug(f'Chunks to change: {filter_chunk_section_split}')
                 Log.debug(f'Status of jobs to change: {filter_status}')
                 Log.debug(f'Sections to change: {filter_section}')
 
@@ -5422,8 +5354,8 @@ class Autosubmit:
                         pass
                 ##### End of the ""function""
                 # This will raise an autosubmit critical if any of the filters has issues in the format specified by the user
-                Autosubmit._validate_set_status_filters(as_conf, job_list, filter_list, filter_chunks, filter_status,
-                                                        filter_section, filter_type_chunk, filter_type_chunk_split)
+                Autosubmit._validate_set_status_filters(as_conf, job_list, filter_list, filter_chunk_section_split, filter_status,
+                                                        filter_section)
                 #### Starts the filtering process ####
                 Log.info("Filtering jobs...")
                 final_list = []
@@ -5444,7 +5376,7 @@ class Autosubmit:
                     start = time.time()
                     Log.debug(f"Filtering jobs with chunks {filter_chunks}")
                     # The extend is because the code was thought to have multiple filters at the same time
-                    final_list.extend(Autosubmit.select_jobs_by_chunks(job_list, filter_chunks))
+                    final_list.extend(Autosubmit.select_jobs_by_chunks_splits(job_list, filter_chunks))
                     final_list = list(set(final_list))
                     Log.info(f"Chunk filtering took {time.time() - start:.2f} seconds.")
 
