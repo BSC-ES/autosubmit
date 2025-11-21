@@ -116,12 +116,12 @@ def remote_platform(autosubmit_config, autosubmit):
         }
     })
 
-    yml_file = Path(__file__).resolve().parents[1] / "files/fake-jobs.yml"
+    yml_file = Path(__file__).resolve().parents[2] / "files/fake-jobs.yml"
     factory = YAMLParserFactory()
     parser = factory.create_parser()
     parser.data = parser.load(yml_file)
     as_conf.experiment_data.update(parser.data)
-    yml_file = Path(__file__).resolve().parents[1] / "files/fake-platforms.yml"
+    yml_file = Path(__file__).resolve().parents[2] / "files/fake-platforms.yml"
     factory = YAMLParserFactory()
     parser = factory.create_parser()
     parser.data = parser.load(yml_file)

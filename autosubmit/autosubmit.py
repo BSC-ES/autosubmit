@@ -2295,7 +2295,7 @@ class Autosubmit:
                     Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf, expid=expid)
                 Log.info("Waiting for all logs to be updated")
                 for p in platforms_to_test:
-                    if p.log_recovery_process:
+                    if p.log_recovery_process and p.log_recovery_process.is_alive():
                         p.cleanup_event.set()  # Send cleanup event
                         p.log_recovery_process.join()
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
