@@ -167,6 +167,7 @@ class FluxOverSlurmHeader(object):
 # FLUX: --job-name %JOBNAME%
 # FLUX: --output %CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%OUT_LOG_DIRECTIVE%
 # FLUX: --error %CURRENT_SCRATCH_DIR%/%CURRENT_PROJ_DIR%/%CURRENT_USER%/%DEFAULT.EXPID%/LOG_%DEFAULT.EXPID%/%ERR_LOG_DIRECTIVE%
+# FLUX: --flags waitable
 #
 ###############################################################################
            """)
