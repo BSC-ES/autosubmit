@@ -3231,8 +3231,8 @@ class Autosubmit:
                     expid, job_list.get_job_list(), os.path.join(exp_path, "/tmp/LOG_", expid),
                     output_format=output_type, packages=packages, show=not hide, groups=groups_dict,
                     job_list_object=job_list)
-        except Exception as e:
-            Log.warning(f"An error has occurred while plotting the jobs list after recovery. "
+        except Exception:
+            Log.warning("An error has occurred while plotting the jobs list after recovery. "
                         "Check if you have X11 redirection and an img viewer correctly set. Trace: {str(e)}")
         try:
             if detail:
@@ -5298,6 +5298,7 @@ class Autosubmit:
 
         def _prune_jobs(jobs: list[Job], dates: list[str], members: list[str], chunks: int) -> list[Job]:
             """Return jobs from *jobs* that match the given members, dates and chunk limits.
+
             :param jobs: list of jobs to prune
             :param dates: list of dates to match
             :param members: list of members to match
@@ -5315,11 +5316,10 @@ class Autosubmit:
                         )
                         ]
 
-        final_list = []
-
         if not filter_chunks or not isinstance(filter_chunks, str):
             return []
 
+        final_list = []
         filter_chunks = filter_chunks.upper()
         matching_jobs = job_list.get_job_list()
         if "," in filter_chunks:
@@ -5436,9 +5436,8 @@ class Autosubmit:
                 Autosubmit._validate_set_status_filters(as_conf, job_list, filter_list, filter_chunks, filter_status,
                                                         filter_section, filter_type_chunk, filter_type_chunk_split)
                 #### Starts the filtering process ####
-                Log.info(f"Filtering jobs...")
+                Log.info("Filtering jobs...")
                 final_list = []
-                jobs_filtered = []
                 final_status = Autosubmit._get_status(final)
                 # I have the impression that whoever did this function thought about the possibility of having multiple filters at the same time
                 # But, as it was, it is not possible to have multiple filters at the same time due to the way the code is written
