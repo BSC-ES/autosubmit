@@ -5248,6 +5248,83 @@ class Autosubmit:
         return final_list
 
     @staticmethod
+    def select_jobs_by_chunks(job_list: "JobList",
+                              filter_chunks: str) -> list[Job]:
+        """Select jobs from *job_list* according to *filter_chunks* specification.
+
+        Format is:
+            - "ANY" to select all jobs with chunks in all sections
+            - "ANY,ANY" to select all jobs with chunks in all sections
+            - "ANY",SECTION1,SECTION2" to select all jobs with chunks in SECTION1 and SECTION2
+            - "DATE1,[MEMBER1|MEMBER2|ANY],[CHUNK1|CHUNK2|...],DATE2,[MEMBER1|MEMBER2|ANY],[CHUNK1|CHUNK2|...],...,SECTION1,SECTION2"
+
+        :param job_list: JobList object
+        :param filter_chunks: filter chunks
+        """
+        def _prune_jobs(matching_jobs: list[Job], members: list[str], dates: list[str], chunks: int) -> list[Job]:
+            """Return jobs from *matching_jobs* that match the given members, dates and chunk limits.
+
+            - If \"ANY\" is present in *members*, member and chunk checks are skipped.
+            - If \"ANY\" is present in *dates*, date checks are skipped.
+            """
+            any_member = "ANY" in members
+            any_date = "ANY" in dates
+
+            def matches(job: Job) -> bool:
+                """Return True if *job* passes member, chunk and date checks."""
+                if not any_member:
+                    if not (getattr(job, "member", None) and job.member.upper() in members):
+                        return False
+                    if not (getattr(job, "chunk", None) and job.chunk <= chunks):
+                        return False
+                if not any_date:
+                    if not (getattr(job, "date", None) and date2str(job.date, "D") in dates):
+                        return False
+                return True
+
+            return [job for job in matching_jobs if matches(job)]
+
+        final_list = []
+        filter_chunks = filter_chunks.upper()
+        sections = filter_chunks.split(",")[1:]
+        sections = [sect.strip(" ,") for sect in sections]
+        if "ANY" in sections:
+            matching_jobs = job_list.get_job_list()
+        else:
+            matching_jobs = [job for job in job_list.get_job_list() if job.section in sections]
+
+        fc = filter_chunks
+        # Any located in chunks part
+        if str(fc).upper() != "ANY":
+            data = json.loads(Autosubmit._create_json(fc))
+
+            # Prune jobs by selected dates, members, chunks
+            dates = []
+            members = []
+            chunks = 0
+            for date_json in data['sds']:
+                dates.append(date_json['sd'])
+                for member_json in date_json['ms']:
+                    members.append(member_json['m'])
+                    if str(member_json['cs'][0]).upper() == "ANY":
+                        chunks = len(job_list._chunk_list)
+                    else:
+                        chunks = max(len(member_json['cs']), chunks)
+            chunks = min(chunks, len(job_list._chunk_list))
+            matching_jobs = _prune_jobs(matching_jobs, members, dates, chunks)
+
+            for date_json in data['sds']:
+                date = date_json['sd']
+                jobs_of_this_date = [j for j in matching_jobs if date2str(j.date, "D") == date]
+                for member_json in date_json['ms']:
+                    member = member_json['m']
+                    jobs_of_this_member = [j for j in jobs_of_this_date if j.member.upper() == member]
+                    chunks_of_this_member = len(member_json['cs']) if "ANY" != str(member_json['cs'][0]).upper() else len(job_list._chunk_list)
+                    final_list.extend([job for job in jobs_of_this_member if job.chunk <= chunks_of_this_member or job.synchronize])
+
+        return final_list
+
+    @staticmethod
     def set_status(expid: str, noplot: bool, save: bool, final: str, filter_list: str, filter_chunks: str,
                    filter_status: str, filter_section: str, filter_type_chunk: str, filter_type_chunk_split: str,
                    hide: bool, group_by: Optional[str] = None, expand: Optional[list] = None,
@@ -5332,6 +5409,7 @@ class Autosubmit:
                 Autosubmit._validate_set_status_filters(as_conf, job_list, filter_list, filter_chunks, filter_status,
                                                         filter_section, filter_type_chunk, filter_type_chunk_split)
                 #### Starts the filtering process ####
+                Log.info(f"Filtering jobs...")
                 final_list = []
                 jobs_filtered = []
                 final_status = Autosubmit._get_status(final)
@@ -5348,49 +5426,13 @@ class Autosubmit:
                                 if job.section == section:
                                     final_list.append(job)
                 if filter_chunks:
-                    ft = filter_chunks.split(",")[1:]
-                    # Any located in section part
-                    if str(ft).upper() == "ANY":
-                        for job in job_list.get_job_list():
-                            final_list.append(job)
-                        for job in job_list.get_job_list():
-                            if job.section == section:
-                                if filter_chunks:
-                                    jobs_filtered.append(job)
-                    if len(jobs_filtered) == 0:
-                        jobs_filtered = job_list.get_job_list()
-                    fc = filter_chunks
-                    # Any located in chunks part
-                    if str(fc).upper() == "ANY":
-                        for job in jobs_filtered:
-                            final_list.append(job)
-                    else:
-                        data = json.loads(Autosubmit._create_json(fc))
-                        for date_json in data['sds']:
-                            date = date_json['sd']
-                            if len(str(date)) < 9:
-                                format_ = "D"
-                            elif len(str(date)) < 11:
-                                format_ = "H"
-                            elif len(str(date)) < 13:
-                                format_ = "M"
-                            elif len(str(date)) < 15:
-                                format_ = "S"
-                            else:
-                                format_ = "D"
-                            jobs_date = [j for j in jobs_filtered if date2str(
-                                j.date, format_) == date]
+                    start = time.time()
+                    Log.debug(f"Filtering jobs with chunks {filter_chunks}")
+                    # The extend is because the code was thought to have multiple filters at the same time
+                    final_list.extend(Autosubmit.select_jobs_by_chunks(job_list, filter_chunks))
+                    final_list = list(set(final_list))
+                    Log.info(f"Chunk filtering took {time.time() - start:.2f} seconds.")
 
-                            for member_json in date_json['ms']:
-                                member = member_json['m']
-                                jobs_member = [j for j in jobs_date if j.member == member]
-
-                                for chunk_json in member_json['cs']:
-                                    chunk = int(chunk_json)
-                                    for job in [j for j in jobs_date if j.chunk == chunk and j.synchronize is not None]:
-                                        final_list.append(job)
-                                    for job in [j for j in jobs_member if j.chunk == chunk]:
-                                        final_list.append(job)
                 if filter_status:
                     status_list = filter_status.split()
                     Log.debug(f"Filtering jobs with status {filter_status}")
@@ -5428,6 +5470,7 @@ class Autosubmit:
                 # Time to change status
                 final_list = list(set(final_list))
                 performed_changes = {}
+                Log.info(f"The selected number of jobs to change is: {len(final_list)}")
                 for job in final_list:
                     if final_status in [Status.WAITING, Status.PREPARED, Status.DELAYED, Status.READY]:
                         job.fail_count = 0
@@ -5455,15 +5498,17 @@ class Autosubmit:
                                 status_change=performed_changes))
                 else:
                     Log.warning("No changes were performed.")
-
+                Log.info(f"Updating JobList for experiment {expid}...")
                 job_list.update_list(as_conf, False, True)
-
+                start = time.time()
                 if save and wrongExpid == 0:
                     for job in final_list:
                         job.update_parameters(as_conf, set_attributes=True, reset_logs=True)
                     if final.upper() in [Status.COMPLETED, Status.FAILED, Status.SKIPPED]:
                         job_list.recover_last_data(final_list)
                     job_list.save()
+                    end = time.time()
+                    Log.info(f"JobList saved in {end - start:.2f} seconds.")
                     exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                                     historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
                     exp_history.initialize_database()
