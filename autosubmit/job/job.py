@@ -1618,6 +1618,7 @@ class Job(object):
                 "min_wrapped_h",
                 "min_wrapped_v",
                 "policy"
+                "custom_env_setup"
             ]:
                 parameters[f"CURRENT_{key.upper()}"] = value
 
