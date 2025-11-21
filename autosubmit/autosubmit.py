@@ -2650,7 +2650,7 @@ class Autosubmit:
                 packager = JobPackager(as_conf, platform, job_list, hold=hold)
                 packages_to_submit = packager.build_packages()
                 
-                #### TODO: [ENGINES] CREO QUE AQUI GENERA EL SCRIPT DEL WRAPPER. O ES ARRIBA? ES UN SCRIPT PYTHON
+                #### TODO: [ENGINES] Here is where the scripts are created and submitted
                 save_1, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = platform.submit_ready_jobs(as_conf,
                                                                                                               job_list,
                                                                                                               packages_persistence,

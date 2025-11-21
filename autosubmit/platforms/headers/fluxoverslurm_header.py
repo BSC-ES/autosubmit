@@ -135,7 +135,6 @@ class FluxOverSlurmHeader(object):
         :return: account directive
         :rtype: str
         """
-        # TODO: [ENGINES] Flux does not admit exclusive nodes if "nodes" are not specified
         if self.get_nodes_directive(job, parameters, het) == "":
             Log.warning("""Flux does not admit exclusive nodes if "nodes" are not specified. Ignoring it""")
 
