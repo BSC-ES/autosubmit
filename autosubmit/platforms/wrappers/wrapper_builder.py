@@ -125,8 +125,8 @@ class WrapperBuilder(object):
         return ''.join(padding + line for line in text.splitlines(True))
 
 class FluxWrapperBuilder(WrapperBuilder):
-    # TODO: [ENGINES] Command "flux start" is being called multiple times. Solve (?)
-    # TODO: [ENGINES] "nslots" are now in the job headers, so they can be deleted from here
+    # TODO: [ENGINES] Check error handling behavior
+    # TODO: [ENGINES] Command "flux start" is being called multiple times
     # TODO: [ENGINES] Is it necessary to pass the run_id to the inner jobs?
     """
     The FluxWrapperBuilder is the responsible for generating the wrapper script
@@ -143,7 +143,6 @@ class FluxWrapperBuilder(WrapperBuilder):
     def build_job_thread(self):
         return ""
     
-    # TODO: [ENGINES] Delete hardcoded flux environment setup
     def build_main(self):
         if not self.job_scripts:
             raise AutosubmitCritical("No job scripts found for building the Flux wrapper.", )
@@ -173,6 +172,7 @@ class FluxWrapperBuilder(WrapperBuilder):
         pass  # pragma: no cover
 
     def _custom_environmet_setup(self):
+        # TODO: [ENGINES] Delete hardcoded flux environment setup
         return textwrap.dedent("""\
             module load miniconda
             source /apps/GPP/MINICONDA/24.1.2/etc/profile.d/conda.sh
@@ -181,10 +181,7 @@ class FluxWrapperBuilder(WrapperBuilder):
             """).format('\n'.ljust(0))
 
 class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
-    # TODO: [ENGINES] Check error handling and retrial behavior
-    # TODO: [ENGINES] Delete the "flux resource list" after testing
-    # TODO: [ENGINES] Should multi-section wrappers be supported?
-
+    # TODO: [ENGINES] Check retrial behavior
     def _generate_flux_script(self):
         return textwrap.dedent("""
         max_retries={1}
@@ -229,18 +226,9 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
                 exit 1
             fi
         done
-
-        # Debug commands
-        # flux resource list
         """).format(' '.join(str(s) for s in self.job_scripts), self.retrials, '\n'.ljust(13))
     
 class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
-    # TODO: [ENGINES] Check error handling behavior
-    # TODO: [ENGINES] Should WRAPPER_FAILED file be created inmediately when any job fails or later?
-    # TODO: [ENGINES] Why horizontal wrappers always force retrial count to 0 when naming the output files?
-    # TODO: [ENGINES] Delete the "flux resource list" after testing
-    # TODO: [ENGINES] Should multi-section wrappers be supported?
-
     def _generate_flux_script(self):
         return textwrap.dedent("""
         declare -A job_ids
@@ -275,14 +263,9 @@ class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
             touch "WRAPPER_FAILED"
             exit 1
         fi
-
-        # Debug commands
-        # flux resource list
         """).format(' '.join(str(s) for s in self.job_scripts), '\n'.ljust(13))
 
 class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
-    # TODO: [ENGINES] Check error handling behavior
-    # TODO: [ENGINES] Delete the "flux resource list" after testing
     # TODO: [ENGINES] Observe what happens if a single job arrives. Is it inside another list?
     def _generate_flux_script(self):
         scripts_str = ''
@@ -329,9 +312,6 @@ class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
 
         # Wait for all vertical wrappers (subprocesses) to finish
         wait
-
-        # Debug commands
-        # flux resource list
         """).format(scripts_str, '\n'.ljust(13))
 
 class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
@@ -388,9 +368,6 @@ class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
                 exit 1
             fi
         done
-
-        # Debug commands
-        # flux resource list
         """).format(scripts_str, '\n'.ljust(13))
 
 class PythonWrapperBuilder(WrapperBuilder):
