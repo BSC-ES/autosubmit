@@ -54,7 +54,7 @@ def test_set_status(as_exp, slurm_server, reset_target):
     fl_filter_names = f"{as_exp.expid}_20200101_fc0_1_1_LOCALJOB {as_exp.expid}_20200101_fc0_1_1_PSJOB {as_exp.expid}_20200101_fc0_1_1_SLURMJOB"
     fc_filter = "[20200101 [ fc0 [1] ] ]"
     fct_filter = "[20200101 [ fc0 [1] ] ],LOCALJOB"
-    ftcs_filter = "[20200101 [ fc0 [1] ] ],LOCALJOB,2"
+    ftcs_filter = "[20200101 [ fc0 [1] ] ],LOCALJOB [2]"
     fs = "WAITING"
     target = "COMPLETED"
 

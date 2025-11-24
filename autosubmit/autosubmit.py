@@ -5403,11 +5403,11 @@ class Autosubmit:
                 else:
                     selected_members = {member_json[member].upper()}
 
-                selected_chunks = member_json[chunks] if "ANY" != str(member_json[chunks][-1]).upper() else job_list._chunk_list
+                selected_chunks = member_json[chunks] if "ANY" != str(member_json[chunks][-1]).upper() else [str(chunks) for chunks in job_list._chunk_list]
                 final_list.extend([job for job in matching_jobs if
                                    (not job.date or date2str(job.date).upper() in selected_dates) and
                                    (not job.member or job.member.upper() in selected_members) and
-                                   (not job.chunk or job.synchronize or job.chunk in selected_chunks)])
+                                   (not job.chunk or job.synchronize or str(job.chunk) in selected_chunks)])
         return final_list
 
     @staticmethod
@@ -5474,6 +5474,7 @@ class Autosubmit:
         # TODO: unify filters. There is already an issue for that
         # TODO: Normalize some filters that are the same ( To avoid changing the usage ... FIX in another PR)
         filter_chunk_section_split = None
+        # TODO: TMP fix until the previous TODO is resolved. Select the one that is filled
         for f in [filter_chunks, filter_type_chunk, filter_type_chunk_split]:
             filter_chunk_section_split = f if f else filter_chunk_section_split
 
@@ -5553,7 +5554,7 @@ class Autosubmit:
                 # TODO: unify filters in the args. There is already an issue for that
                 if filter_chunks or filter_type_chunk or filter_chunk_section_split:
                     start = time.time()
-                    # The extend is because the code was thought to have multiple filters at the same time
+                    # The extend is because the code was thought to have multiple filters at the same time (but it is not possible for some combinations)
                     final_list.extend(Autosubmit.filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split))
                     final_list = list(set(final_list))
                     Log.info(f"Chunk filtering took {time.time() - start:.2f} seconds.")
