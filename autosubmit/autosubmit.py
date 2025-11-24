@@ -5004,40 +5004,141 @@ class Autosubmit:
             raise AutosubmitCritical("Error in the supplied input for -fs.", 7011, status_validation_message)
 
     @staticmethod
-    def _validate_chunk_section_split(as_conf, filter_string):
-        # Change status by section, member, and chunk; freely.
-        # Including inner validation. Trying to make it independent.
-        # 19601101 [ fc0 [1 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3
+    def _validate_chunk_formula(chunk_formula: str, validation_message: str) -> str:
+        """Validate chunk formula syntax.
+
+        [ 19900101 [ fc0 [ Any ] fc1 [1 2] ] 19950101 [ fc0 [1-10] ] ]
+        19900101 [ fc0 [ Any ] fc1 [1 2] ]
+        19950101 [ fc0 [1-10] ]
+
+        :param chunk_formula: Chunk formula string.
+        :param validation_message: Message to append validation errors to.
+        """
+
+        if not chunk_formula:
+            validation_message += "\n\tMissing chunk formula before the first comma."
+            return validation_message
+
+        json_data = json.loads(Autosubmit._create_json(chunk_formula))
+        dates = 'sds'
+        members = 'ms'
+        chunks = 'cs'
+        date = 'sd'
+        member = 'm'
+
+        sections = []
+        json_validation_message = ""
+        for date_entry in json_data[dates]:
+            try:
+                date_str = date_entry[date]
+            except KeyError:
+                json_validation_message += "\n\tMissing DATE in chunk formula."
+                continue
+            for member_entry in date_entry[members]:
+                try:
+                    member_str = member_entry[member]
+                except KeyError:
+                    json_validation_message += "\n\tMissing MEMBER in chunk formula."
+                    continue
+                try:
+                    chunks_str = str(len(member_entry[chunks])) if "ANY" not in member_entry[chunks] else "ANY"
+                except KeyError:
+                    json_validation_message += "\n\tMissing CHUNKS in chunk formula."
+                    continue
+                section_str = f"{date_str} [ {member_str} [ {chunks_str} ] ]"
+                sections.append(section_str)
+        if json_validation_message:
+            validation_message += "\n\tMust follow chunk formula structure: [ DATE [ MEMBER [ CHUNKS ] ... ] ... ]"
+            validation_message += json_validation_message
+
+        for section in sections:
+            brackets_left = section.count('[')
+            brackets_right = section.count(']')
+            if brackets_left != brackets_right:
+                validation_message += "\n\tUnbalanced brackets in chunk formula."
+            if brackets_left < 2:
+                validation_message += f"\n\tIncomplete chunk formula structure. Revise the amount of opening brackets '[' in section: {section}."
+            if brackets_right < 2:
+                validation_message += f"\n\tIncomplete chunk formula structure. Revise the amount of closing brackets ']' in section: {section}."
+
+        return validation_message
+
+    @staticmethod
+    def _validate_section_split_formula(section_split_formula: str, validation_message: str) -> str:
+        """Validate section/split formula syntax.
+
+        SIM [ Any ], SIM2 [1 2] ], SIM3
+
+        :param section_split_formula: section_split_formula string.
+        :param validation_message: Message to append validation errors to.
+        """
+
+        if not section_split_formula:
+            return validation_message
+
+        for section in [section.strip() for section in section_split_formula.split(",") if section.strip()]:
+            if '[' not in section and ']' not in section:
+                continue
+            else:
+                brackets_left = section.count('[')
+                brackets_right = section.count(']')
+                if brackets_left != brackets_right:
+                    validation_message += "\n\tUnbalanced brackets in section/split formula."
+
+                if brackets_left > 1:
+                    validation_message += f"\n\tToo many opening brackets '[' in section/split entry: {section}."
+                if brackets_right > 1:
+                    validation_message += f"\n\tToo many closing brackets ']' in section/split entry: {section}."
+
+        return validation_message
+
+    @staticmethod
+    def _validate_chunk_section_split(filter_string: str) -> None:
+        """Validate a chunk/section/split filter string for commands using -fc/-ftc/-ftcs.
+
+        Validate that the filter string contains a chunk formula and, optionally,
+        a comma-separated list of section names. Section names are checked
+        case-insensitively against the keys in ``as_conf.jobs_data``.
+
+        Splits are also optional and must be included in the Section part of the formula.
+
+        [ chunk_splits_formula, section1 [splits], section2 [splits], ... ]
+
+        Example:
+
+        [ 19900101 [ fc0 [ Any ] fc1 [1 2] ] 19950101 [ fc0 [1-10] ], SIM [ Any ], SIM2 [1 2] ]
+
+        :param filter_string: Filter string with form '<chunk_split_formula>[,<SECTION>[<splits>],...]'.
+        :raises AutosubmitCritical: If the input is malformed or references unknown sections.
+        """
+
         validation_message = "## -fc // -ftc // -ftcs Validation Message ##"
-        filter_is_correct = True
 
-        filter_parts = filter_string.split(",")
-        if len(filter_parts) >= 2:
-            chunk_splits_formula = filter_parts[0].strip()
-            selected_sections = [s.upper().strip() for s in filter_parts[1:]]
-        else:
-            chunk_splits_formula = filter_string.strip()
-            selected_sections = []
+        if not filter_string or not filter_string.strip():
+            raise AutosubmitCritical("Error in the supplied input for -fc // -ftc // -ftcs.", 7011, validation_message)
 
-        # Validate sections
-        if "ANY" not in selected_sections:
-            for section in selected_sections:
-                if len(str(section).strip()) == 0:
-                    filter_is_correct = False
-                    validation_message += "\n\tEmpty sections are not accepted."
+        filter_string = filter_string.upper().strip()
 
-                if section not in as_conf.jobs_data.keys():
-                    filter_is_correct = False
-                    validation_message += f"\n\tSection {section} does not exist in experiment."
+        level = 0
+        for i, ch in enumerate(filter_string):
+            if ch == '[':
+                level += 1
+            elif ch == ']':
+                level -= 1
+                if level < 0:
+                    validation_message += f"\n\tUnexpected ']' at position {i}."
+        if level != 0:
+            validation_message += "\n\tUnbalanced brackets in filter string."
 
-        # Validating chunk formula
-        if len(chunk_splits_formula) == 0:
-            filter_is_correct = False
-            validation_message += "\n\tA formula for chunk filtering has not been provided. If you want to change all chunks, include 'Any'."
+        filter_string_parts = filter_string.split(',')
+        chunk_formula = filter_string_parts[0].strip()
+        section_split_formula = ",".join(filter_string_parts[1:]) if len(filter_string_parts) > 1 else ''
 
-        if not filter_is_correct:
-            raise AutosubmitCritical(
-                "Error in the supplied input for -fc // -ftc // -ftcs.", 7011, validation_message)
+        validation_message = Autosubmit._validate_chunk_formula(chunk_formula, validation_message)
+        validation_message = Autosubmit._validate_section_split_formula(section_split_formula, validation_message)
+
+        if validation_message != "## -fc // -ftc // -ftcs Validation Message ##":
+            raise AutosubmitCritical("Error in the supplied input for -fc // -ftc // -ftcs.", 7011, validation_message)
 
     @staticmethod
     def _validate_set_status_filters(as_conf, job_list, filter_list, filter_chunk_section_split, filter_status, filter_section):
@@ -5050,7 +5151,7 @@ class Autosubmit:
             Autosubmit._validate_status(job_list, filter_status)
 
         if filter_chunk_section_split:
-            Autosubmit._validate_chunk_split(as_conf, filter_chunk_section_split)
+            Autosubmit._validate_chunk_section_split(filter_chunk_section_split)
 
     @staticmethod
     def _apply_ftc(job_list: JobList, filter_type_chunk_split: str) -> list[Job]:
@@ -5175,97 +5276,173 @@ class Autosubmit:
         return final_list
 
     @staticmethod
-    def select_jobs_by_chunks_splits(job_list: "JobList",
-                              filter_chunks: str) -> list[Job]:
+    def _split_match(j, split_list) -> bool:
+        return not j.splits or int(j.splits) < 2 or not split_list or str(j.split) in split_list
+
+    @staticmethod
+    def _setup_prune(json_filter: dict[str, Any], job_list) -> tuple[list[str], list[str], int]:
+        """Quick prune to help reduce the number of jobs to be checked later on.
+
+        Setup dates, members and chunks from json_filter.
+
+        :param json_filter: json filter with dates, members and chunks
+        :return: tuple of (dates, members, chunks)
+        """
+        dates = []
+        members = []
+        max_chunks = 0
+        for d_json in json_filter['sds']:
+            if "ANY" == str(d_json['sd']).upper():
+                return [], [], len(job_list._chunk_list)
+            dates.append(d_json['sd'])
+            for m_json in d_json['ms']:
+                members.append(m_json['m'])
+                if "ANY" in str(m_json['cs'][-1]).upper():
+                    max_chunks = job_list._chunk_list[-1]
+                else:
+                    max_chunks = max(int(m_json['cs'][-1]), max_chunks)
+        max_chunks = min(max_chunks, job_list._chunk_list[-1])
+        chunks = list(range(1, max_chunks+1))
+
+        return list(set(dates)), list(set(members)), chunks
+
+    @staticmethod
+    def _filter_sections_splits(filter_section_splits: str, jobs: list[Job]) -> list[Job]:
+        """Filter jobs by sections and splits.
+        :param filter_section_splits: filter sections and splits
+        :param jobs: list of jobs
+        :return: list of jobs matching the filter
+        """
+        section_matching_jobs: list[Job] = []
+        for section in filter_section_splits:
+            section_name = section.strip().split("[")[0].strip()
+            job_splits = []
+            if "[" in section and "]" in section:
+                job_splits_str = section.strip().split("[")[1].strip(" ]")
+                # splits: can be: [ 1:15 ] [ 1-15 ] [ 1 2 3 4 5 6 ] [ Any ]
+                if "ANY" in job_splits_str.upper() or not job_splits_str.strip():
+                    job_splits = "ANY"
+                else:
+                    for job_split in job_splits_str.split():
+                        job_split = job_split.strip()
+                        start = None
+                        end = None
+                        if job_split.find("-") != -1:
+                            start = job_split.split("-")[0]
+                            end = job_split.split("-")[1]
+                        elif job_split.find(":") != -1:
+                            start = job_split.split(":")[0]
+                            end = job_split.split(":")[1]
+                        if start and end:
+                            job_splits += [str(i) for i in range(int(start), int(end) + 1)]
+                        else:
+                            job_splits.append(str(job_split))
+                        if not job_splits:
+                            job_splits = "ANY"
+
+            if section_name == "ANY":
+                section_matching_jobs.extend([j for j in jobs if Autosubmit._split_match(j, job_splits)])
+            else:
+                section_matching_jobs.extend([j for j in jobs if j.section == section_name and Autosubmit._split_match(j, job_splits)])
+
+            section_matching_jobs = list(set(section_matching_jobs))
+
+            # All jobs matched, no need to continue
+            if len(section_matching_jobs) == len(jobs):
+                break
+
+        return section_matching_jobs
+
+    @staticmethod
+    def _filter_chunks(filter_chunk_str: str, job_list: "JobList", matching_jobs: list[Job]) -> list[Job]:
+        """Filter jobs by chunks.
+
+        :param filter_chunk_str: filter chunks
+        :param job_list: JobList object
+        :param matching_jobs: list of jobs to filter
+
+        :return: list of jobs matching the filter
+        """
+        final_list = []
+        data = json.loads(Autosubmit._create_json(filter_chunk_str))
+        # Mapping so it is easier to understand
+        dates = 'sds'
+        members = 'ms'
+        chunks = 'cs'
+        date = 'sd'
+        member = 'm'
+
+        selected_dates: set = set()
+        selected_members: set = set()
+
+        # Prune first to reduce number of jobs to check
+        for date_json in data[dates]:
+            if "ANY" == str(date_json[date]).upper():
+                selected_dates = set(job_list._date_list)
+            else:
+                selected_dates.add(date_json[date].upper())
+            for member_json in date_json[members]:
+                if "ANY" == str(member_json[member]).upper():
+                    selected_members.add([member.upper() for member in job_list._member_list])
+                else:
+                    selected_members.add(member_json[member].upper())
+
+        matching_jobs = [job for job in matching_jobs if
+                         (not job.date or date2str(job.date).upper() in selected_dates) and
+                         (not job.member or job.member.upper() in selected_members)]
+
+        # Now, build final list according to the structure in data
+        for date_json in data[dates]:
+            if "ANY" == str(date_json[date]).upper():
+                selected_dates = set(job_list._date_list)
+            else:
+                selected_dates = {date_json[date].upper()}
+            for member_json in date_json[members]:
+                if "ANY" == str(member_json[member]).upper():
+                    selected_members = set([member.upper() for member in job_list._member_list])
+                else:
+                    selected_members = {member_json[member].upper()}
+
+                selected_chunks = member_json[chunks] if "ANY" != str(member_json[chunks][-1]).upper() else job_list._chunk_list
+                final_list.extend([job for job in matching_jobs if
+                                   (not job.date or date2str(job.date).upper() in selected_dates) and
+                                   (not job.member or job.member.upper() in selected_members) and
+                                   (not job.chunk or job.synchronize or job.chunk in selected_chunks)])
+        return final_list
+
+    @staticmethod
+    def filter_jobs_by_chunks_splits(job_list: "JobList", filter_chunks: str) -> list[Job]:
         """Select jobs from *job_list* according to *filter_chunks* specification.
 
         Format is:
             - "ANY" to select all jobs with chunks in all sections
             - "ANY,ANY" to select all jobs with chunks in all sections
             - "ANY",SECTION1,SECTION2" to select all jobs with chunks in SECTION1 and SECTION2
-            - "DATE1,[MEMBER1|MEMBER2|ANY],[CHUNK1|CHUNK2|...],DATE2,[MEMBER1|MEMBER2|ANY],[CHUNK1|CHUNK2|...],...,SECTION1,SECTION2"
+            - "DATE1,[MEMBER1|MEMBER2|ANY],[CHUNK1|CHUNK2|...],DATE2,[MEMBER1|MEMBER2|ANY],[CHUNK1|CHUNK2|...],...,SECTION1 [ SPLITS ],SECTION2"
 
         :param job_list: JobList object
         :param filter_chunks: filter chunks
         :return: list of jobs matching the filter
         """
 
-        def _setup_prune(json_filter: dict[str, Any]) -> tuple[list[str], list[str], int]:
-            """Setup dates, members and chunks from json_filter.
-
-            :param json_filter: json filter with dates, members and chunks
-            :return: tuple of (dates, members, chunks)
-            """
-            dates = []
-            members = []
-            chunks = 0
-            for d_json in json_filter['sds']:
-                if "ANY" == str(d_json['sd']).upper():
-                    return [], [], len(job_list._chunk_list)
-                dates.append(d_json['sd'])
-                for m_json in d_json['ms']:
-                    members.append(m_json['m'])
-                    if str(m_json['cs'][0]).upper() == "ANY":
-                        chunks = len(job_list._chunk_list)
-                    else:
-                        chunks = max(len(m_json['cs']), chunks)
-            chunks = min(chunks, len(job_list._chunk_list))
-            return dates, members, chunks
-
-        def _prune_jobs(jobs: list[Job], dates: list[str], members: list[str], chunks: int) -> list[Job]:
-            """Return jobs from *jobs* that match the given members, dates and chunk limits.
-
-            :param jobs: list of jobs to prune
-            :param dates: list of dates to match
-            :param members: list of members to match
-            :param chunks: maximum chunk number to match
-            :return: pruned list of jobs
-            """
-            if "ANY" in dates:
-                return jobs
-            else:
-                return [j for j in jobs if
-                        (
-                            (j.date and date2str(j.date, "D") in dates)
-                            and (j.member and (("ANY" in members) or (j.member.upper() in members)))
-                            and (not j.synchronize or (j.chunk and j.chunk <= chunks))
-                        )
-                        ]
-
         if not filter_chunks or not isinstance(filter_chunks, str):
             return []
 
-        final_list = []
         filter_chunks = filter_chunks.upper()
-        matching_jobs = job_list.get_job_list()
         if "," in filter_chunks:
             splitted_filters = filter_chunks.split(",")
             fc = splitted_filters[0]
-            sections = splitted_filters[1:]
-            sections = [sect.strip(" ,") for sect in sections]
-            if "ANY" not in sections:
-                matching_jobs = [job for job in matching_jobs if job.section in sections]
+            matching_jobs = Autosubmit._filter_sections_splits(splitted_filters[1:], job_list.get_job_list())
         else:
             fc = filter_chunks
+            matching_jobs = job_list.get_job_list()
 
         if str(fc).upper() != "ANY":
-            data = json.loads(Autosubmit._create_json(fc))
+            final_list = Autosubmit._filter_chunks(fc, job_list, matching_jobs)
+        else:
+            final_list = matching_jobs
 
-            # Prune jobs by selected dates, members, chunks
-            filtered_dates, filtered_members, filtered_chunks = _setup_prune(data)
-            matching_jobs = _prune_jobs(matching_jobs, filtered_dates, filtered_members, filtered_chunks)
-
-            # Now, build final list according to the structure in data
-            for date_json in data['sds']:
-                date = date_json['sd']
-                jobs_of_this_date = [j for j in matching_jobs if date2str(j.date, "D") == date]
-                for member_json in date_json['ms']:
-                    member = member_json['m']
-                    jobs_of_this_member = [j for j in jobs_of_this_date if j.member.upper() == member]
-                    chunks_of_this_member = len(member_json['cs']) if "ANY" != str(member_json['cs'][0]).upper() else len(job_list._chunk_list)
-                    final_list.extend([job for job in jobs_of_this_member if job.chunk <= chunks_of_this_member or job.synchronize])
-
-        return final_list
+        return list(set(final_list))
 
     @staticmethod
     def set_status(expid: str, noplot: bool, save: bool, final: str, filter_list: str, filter_chunks: str,
@@ -5294,6 +5471,7 @@ class Autosubmit:
         """
         if filter_status:
             filter_status = filter_status.upper()
+        # TODO: unify filters. There is already an issue for that
         # TODO: Normalize some filters that are the same ( To avoid changing the usage ... FIX in another PR)
         filter_chunk_section_split = None
         for f in [filter_chunks, filter_type_chunk, filter_type_chunk_split]:
@@ -5372,11 +5550,11 @@ class Autosubmit:
                             for job in job_list.get_job_list():
                                 if job.section == section:
                                     final_list.append(job)
-                if filter_chunks:
+                # TODO: unify filters in the args. There is already an issue for that
+                if filter_chunks or filter_type_chunk or filter_chunk_section_split:
                     start = time.time()
-                    Log.debug(f"Filtering jobs with chunks {filter_chunks}")
                     # The extend is because the code was thought to have multiple filters at the same time
-                    final_list.extend(Autosubmit.select_jobs_by_chunks_splits(job_list, filter_chunks))
+                    final_list.extend(Autosubmit.filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split))
                     final_list = list(set(final_list))
                     Log.info(f"Chunk filtering took {time.time() - start:.2f} seconds.")
 
@@ -5408,12 +5586,7 @@ class Autosubmit:
                         for job in job_list.get_job_list():
                             if job.name in jobs:
                                 final_list.append(job)
-                # All filters should be in a function but no have time to do it
-                # filter_Type_chunk_split == filter_type_chunk, but with the split essentially is the same but not sure about of changing the name to the filter itself
-                if filter_type_chunk_split is not None:
-                    final_list.extend(Autosubmit._apply_ftc(job_list, filter_type_chunk_split))
-                if filter_type_chunk:
-                    final_list.extend(Autosubmit._apply_ftc(job_list, filter_type_chunk))
+
                 # Time to change status
                 final_list = list(set(final_list))
                 performed_changes = {}
@@ -5449,10 +5622,7 @@ class Autosubmit:
                 job_list.update_list(as_conf, False, True)
                 start = time.time()
                 if save and wrongExpid == 0:
-                    for job in final_list:
-                        job.update_parameters(as_conf, set_attributes=True, reset_logs=True)
-                    if final.upper() in [Status.COMPLETED, Status.FAILED, Status.SKIPPED]:
-                        job_list.recover_last_data(final_list)
+                    job_list.recover_last_data(final_list)
                     job_list.save()
                     end = time.time()
                     Log.info(f"JobList saved in {end - start:.2f} seconds.")
