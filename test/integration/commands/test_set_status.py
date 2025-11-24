@@ -85,3 +85,64 @@ def test_set_status(as_exp, slurm_server, reset_target):
         job_list_ = do_setstatus(as_exp, fs=fs, target=target)
         completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
         assert len(completed_jobs) == len(job_list_.get_job_list())
+
+
+@pytest.mark.parametrize(
+    "ftcs_filter, expected_jobs",
+    [
+        # Bad ones
+        ("", 0),
+        ("Any", 0),
+        ("LOCALJOB", 0),
+        ("[", 0),
+        ("]", 0),
+        ("[20200101", 0),
+        ("[20200101 [", 0),
+        ("[20200101 [ fc0", 0),
+        ("[20200101 [ fc0 [", 0),
+        ("[20200101 [ fc0 ]", 0),
+        ("[20200101 [ fc0 1", 0),
+        ("[20200101 [ fc0 [1] ", 0),
+        ("[ fc0 [1] ] ", 0),
+        ("[1]", 0),
+        (",LOCALJOB", 0),
+        ("20200101 [ fc0 [1] ] ]", 0),
+        ("[20200101 [ fc0 [1] ] ],LOCALJOB [", 0),
+        ("[20200101 [ fc0 [1] ] ],LOCALJOB ]", 0),
+        ("[20200101 [ fc0 [1] ] ],LOCALJOB 1", 0),
+
+        # Good ones // Testing chunk_formula
+        ("[20200101 [ fc0 [1] ] ]", 9),
+        ("[20200101 [ fc0 [1] fc1 [1] ] ]", 18),
+        ("[20200101 [ fc0 [1] fc1 [1] ] 20200102 [ fc0 [1] fc1 [1] ] ]", 36),
+        ("[20200101 [ fc0 [1-2] ] ]", 18),
+        ("[20200101 [ fc0 [1-2] fc1 [1-2] ] ]", 36),
+        ("[20200101 [ fc0 [1-2] fc1 [1-2] ] 20200102 [ fc0 [1-2] fc1 [1-2] ] ]", 72),
+
+        # Good ones // Testing sections and splits
+        ("[20200101 [ fc0 [1] ] ],LOCALJOB", 3),
+        ("[20200101 [ fc0 [1] ] ],Any", 9),
+        ("[20200101 [ fc0 [1] ] ],LOCALJOB [2]", 1),
+        ("[20200101 [ fc0 [1] ] ],LOCALJOB [1-2]", 2),
+        ("[20200101 [ fc0 [1] ] ],LOCALJOB [1:2]", 2),
+        ("[20200101 [ fc0 [1] ] ],Any [2]", 3),
+        ("[20200101 [ fc0 [1] ] ],Any [1-2]", 6),
+        ("[20200101 [ fc0 [1] ] ],Any [1:2]", 6),
+
+
+    ],
+)
+def test_set_status_ftcs(as_exp, ftcs_filter, expected_jobs):
+    """Tests the setstatus command with various filters in an offline scenario."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(as_exp.expid, BasicConfig.JOBDATA_DIR, f'job_data_{as_exp.expid}.db')
+    db_manager.initialize()
+    target = "COMPLETED"
+
+    if not expected_jobs:
+        with pytest.raises(AutosubmitCritical) as validation_err:
+            do_setstatus(as_exp, ftcs=ftcs_filter, target=target)
+        print(validation_err.value)
+    else:
+        job_list_ = do_setstatus(as_exp, ftcs=ftcs_filter, target=target)
+        completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
+        assert len(completed_jobs) == expected_jobs

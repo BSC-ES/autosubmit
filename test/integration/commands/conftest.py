@@ -77,12 +77,12 @@ def experiment_data(tmp_path: Path) -> Dict[str, object]:
     """
     return {
         'EXPERIMENT': {
-            'DATELIST': '20200101',
-            'MEMBERS': 'fc0',
+            'DATELIST': '20200101 20200102',
+            'MEMBERS': 'fc0 fc1',
             'CHUNKSIZEUNIT': 'month',
             'SPLITSIZEUNIT': 'day',
             'CHUNKSIZE': 1,
-            'NUMCHUNKS': 1,
+            'NUMCHUNKS': 2,
             'CALENDAR': 'standard',
         }
     }
