@@ -136,6 +136,29 @@ def test_set_status_ftcs(as_exp, ftcs_filter, expected_jobs):
     db_manager.initialize()
     target = "COMPLETED"
 
+    # TODO: We should have one single filter ( fc or fct or ftcs ). Or a different name as they now do the same.
+    if not expected_jobs:
+        with pytest.raises(AutosubmitCritical) as validation_err:
+            do_setstatus(as_exp, fc=ftcs_filter, target=target)
+        print(validation_err.value)
+    else:
+        job_list_ = do_setstatus(as_exp, fc=ftcs_filter, target=target)
+        completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
+        assert len(completed_jobs) == expected_jobs
+
+    reset(as_exp, "WAITING")
+
+    if not expected_jobs:
+        with pytest.raises(AutosubmitCritical) as validation_err:
+            do_setstatus(as_exp, fct=ftcs_filter, target=target)
+        print(validation_err.value)
+    else:
+        job_list_ = do_setstatus(as_exp, fct=ftcs_filter, target=target)
+        completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
+        assert len(completed_jobs) == expected_jobs
+
+    reset(as_exp, "WAITING")
+
     if not expected_jobs:
         with pytest.raises(AutosubmitCritical) as validation_err:
             do_setstatus(as_exp, ftcs=ftcs_filter, target=target)
