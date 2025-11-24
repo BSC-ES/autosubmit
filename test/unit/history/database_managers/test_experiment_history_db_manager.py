@@ -24,7 +24,7 @@ from autosubmit.history.database_managers.experiment_history_db_manager import (
 
 
 def test_create_experiment_history_db_manager_invalid():
-    with pytest.raises(KeyError, ValueError):
+    with pytest.raises(ValueError):
         create_experiment_history_db_manager('banana')
 
 

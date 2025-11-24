@@ -3402,42 +3402,48 @@ class JobList(object):
             return None
 
     def recover_last_data(self):
+        """Recover job_id and log name if missing from the database
         """
-        Recover job_id and log name if missing from the database
-        """
-        job_names = self._get_job_names(status=[Status.COMPLETED, Status.READY, Status.QUEUING, Status.RUNNING])
+        jobs: list["Job"] = self._get_jobs_by_name(status=[Status.COMPLETED, Status.FAILED, Status.SKIPPED], return_only_names=False)
         # Recover job_id and log name if missing
-        if job_names:
+        if jobs:
             exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                             historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR, force_sql_alchemy=True)
-            jobs_data = exp_history.manager.get_jobs_data_last_row(job_names)  # This gets only the last row
-            for job in self.get_job_list():
-                if job.name in jobs_data:
-                    job.id = int(jobs_data[job.name]["job_id"])
-                    job.local_logs = jobs_data[job.name]["out"]
-                    job.remote_logs = jobs_data[job.name]["err"]
-                    job.ready_date = datetime.datetime.fromtimestamp(jobs_data[job.name]["start"]).strftime('%Y%m%d%H%M%S')
-                    if job.status in [Status.COMPLETED, Status.FAILED]:
-                        job.updated_log = True
-                    else:
-                        job.updated_log = False
+            jobs_data = exp_history.manager.get_jobs_data_last_row([job.name for job in jobs])  # This gets only the last row
+            for job in [job for job in jobs if job.name in jobs_data]:
+                job.id = int(jobs_data[job.name]["job_id"])
+                job.local_logs = jobs_data[job.name]["out"]
+                job.remote_logs = jobs_data[job.name]["err"]
+                if job.status == Status.READY:
+                    job.status = Status.WAITING
+                if job.status in [Status.COMPLETED, Status.FAILED, Status.SKIPPED]:
+                    job.log_recovered = True
+                    job.updated_log = True
+                else:
+                    job.updated_log = False
 
-    def _get_job_names(self, status: Optional[list[int]] = None, platform: Platform = None) -> List[str]:
-        """Get a list of all job names in the job list.
+    def _get_jobs_by_name(self, status: Optional[list[int]] = None, platform: Platform = None, return_only_names=False) -> Union[List[str], List["Job"]]:
+        """Return jobs filtered by status and/or platform as names or Job objects.
 
         :param status: Optional list of job statuses to filter by.
-        :type status: Optional[list[Status]]
-        :return: List of job names.
-        :rtype: List[str]
+        :param platform: Optional Platform to filter by.
+        :param return_only_names: If True return list of job names, otherwise Job objects.
+        :return: List of job names or List of Job objects.
         """
-        if status is None:
+        if not status:
             status = []
-        return [job.name for job in self.get_job_list() if (not status or job.status in status) and (not platform or job.platform_name == platform.name)]
+        if return_only_names:
+            return [job.name for job in self.get_job_list() if (not status or job.status in status) and (not platform or job.platform_name == platform.name)]
+        else:
+            return [job for job in self.get_job_list() if (not status or job.status in status) and (not platform or job.platform_name == platform.name)]
 
     def recover_all_completed_jobs_from_exp_history(self, platform: Platform = None) -> set[str]:
-        """Recover all completed jobs from experiment history"""
+        """Recover all completed jobs from experiment history
+        :param platform: Platform to filter by.
+        :return: Set of completed job names.
+        """
 
-        job_names = self._get_job_names(platform=platform)
+        job_names: list[str] = self._get_jobs_by_name(platform=platform, return_only_names=True)
         if job_names:
             exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                             historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR, force_sql_alchemy=True)

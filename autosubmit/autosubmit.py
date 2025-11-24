@@ -3057,7 +3057,7 @@ class Autosubmit:
                     Log.warning(f"Platform {p.name} is not reachable, proceeding with offline recovery for this platform")
                     completed_jobnames.update(job_list.recover_all_completed_jobs_from_exp_history(p))
                 else:
-                    raise AutosubmitCritical(f"Couldn't connect to platform {p.name} during recovery: {message}", 7010)
+                    raise AutosubmitCritical(f"Couldn't connect to platform {p.name} during recovery: {message}", 7050)
             else:
                 # Fetch completed jobs from platform
                 completed_jobnames.update(p.get_completed_job_names())
@@ -3123,7 +3123,6 @@ class Autosubmit:
             platforms_to_test.add(job.platform)
 
         completed_jobnames = Autosubmit.online_recovery(as_conf, platforms_to_test, job_list, offline)
-
         current_active_jobs = job_list.get_in_queue()
         if current_active_jobs and not (force and save):
             raise AutosubmitCritical(f"Experiment can't be recovered due being {len(current_active_jobs)} "

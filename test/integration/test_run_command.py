@@ -110,16 +110,18 @@ def test_run_command_raises_autosubmit(autosubmit_exp: AutosubmitExperimentFixtu
     if 'run' in command:
         with pytest.raises(AutosubmitCritical) as error:
             autosubmit.run_command(args=args)
-            assert str(error.value.code) == '7010'
+        assert str(error.value.code) == '7010'
     elif 'install' in command:
         with pytest.raises(AutosubmitCritical) as error:
             autosubmit.run_command(args=args)
-            assert str(error.value.code) == '7004'
+        assert str(error.value.code) == '7004'
     elif 'recovery' in command:
         with pytest.raises(AutosubmitCritical) as error:
             autosubmit.run_command(args=args)
-            assert str(error.value.code) == '7040'
+        # Can't establish a connection to a platform.
+        assert str(error.value.code) == '7050'
     elif 'provenance' in command:
         with pytest.raises(AutosubmitCritical) as error:
             autosubmit.run_command(args=args)
-            assert str(error.value.code) == '7040'
+        # RO-Crate key is missing
+        assert str(error.value.code) == '7012'
