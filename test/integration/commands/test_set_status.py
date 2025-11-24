@@ -128,8 +128,6 @@ def test_set_status(as_exp, slurm_server, reset_target):
         ("[20200101 [ fc0 [1] ] ],Any [2]", 3),
         ("[20200101 [ fc0 [1] ] ],Any [1-2]", 6),
         ("[20200101 [ fc0 [1] ] ],Any [1:2]", 6),
-
-
     ],
 )
 def test_set_status_ftcs(as_exp, ftcs_filter, expected_jobs):
