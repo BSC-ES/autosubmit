@@ -3220,8 +3220,8 @@ class Autosubmit:
                     expid, job_list.get_job_list(), os.path.join(exp_path, "/tmp/LOG_", expid),
                     output_format=output_type, packages=packages, show=not hide, groups=groups_dict,
                     job_list_object=job_list)
-        except Exception as e:
-            Log.warning(f"An error has occurred while plotting the jobs list after recovery. "
+        except Exception:
+            Log.warning("An error has occurred while plotting the jobs list after recovery. "
                         "Check if you have X11 redirection and an img viewer correctly set. Trace: {str(e)}")
         try:
             if detail:
@@ -5461,8 +5461,8 @@ class Autosubmit:
                 if save and wrongExpid == 0:
                     for job in final_list:
                         job.update_parameters(as_conf, set_attributes=True, reset_logs=True)
-
-                    job_list.recover_last_data()
+                    if final.upper() in [Status.COMPLETED, Status.FAILED, Status.SKIPPED]:
+                        job_list.recover_last_data(final_list)
                     job_list.save()
                     exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                                     historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)

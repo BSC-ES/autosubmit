@@ -3401,26 +3401,40 @@ class JobList(object):
         else:
             return None
 
-    def recover_last_data(self):
-        """Recover job_id and log name if missing from the database
+    def recover_last_data(self, finished_jobs: Optional[list["Job"]] = None) -> None:
+        """Recover job IDs and log names for completed, failed, and skipped jobs from experiment history.
+        :param finished_jobs: Optional list of finished Job objects to recover data for.
+        :return: None
+        :rtype: None
         """
-        jobs: list["Job"] = self._get_jobs_by_name(status=[Status.COMPLETED, Status.FAILED, Status.SKIPPED], return_only_names=False)
+        jobs_ran_atleast_once = False
+        if not finished_jobs:
+            jobs_ran_atleast_once = True
+            finished_jobs: list["Job"] = self._get_jobs_by_name(status=[Status.COMPLETED, Status.FAILED, Status.SKIPPED], return_only_names=False)
         # Recover job_id and log name if missing
-        if jobs:
+        if finished_jobs:
             exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
                                             historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR, force_sql_alchemy=True)
-            jobs_data = exp_history.manager.get_jobs_data_last_row([job.name for job in jobs])  # This gets only the last row
-            for job in [job for job in jobs if job.name in jobs_data]:
+            jobs_data = exp_history.manager.get_jobs_data_last_row([job.name for job in finished_jobs])
+            # Only if we have information already stored, otherwise the job will be downloaded later
+            for job in [job for job in finished_jobs if job.name in jobs_data]:
                 job.id = int(jobs_data[job.name]["job_id"])
                 job.local_logs = jobs_data[job.name]["out"]
                 job.remote_logs = jobs_data[job.name]["err"]
-                if job.status == Status.READY:
-                    job.status = Status.WAITING
-                if job.status in [Status.COMPLETED, Status.FAILED, Status.SKIPPED]:
-                    job.log_recovered = True
-                    job.updated_log = True
-                else:
-                    job.updated_log = False
+                job.log_recovered = True
+                job.updated_log = True
+
+        for job in finished_jobs:
+            # TODO: Another fix will come in 4.2. Currently, if the job has no id, the log will not be recovered properly.
+            if not job.id:
+                job.id = 1
+            # Fixes: https://github.com/BSC-ES/autosubmit/pull/2700#issuecomment-3563572977
+            if not jobs_ran_atleast_once:
+                job.log_recovered = True
+                job.updated_log = True
+
+
+
 
     def _get_jobs_by_name(self, status: Optional[list[int]] = None, platform: Platform = None, return_only_names=False) -> Union[List[str], List["Job"]]:
         """Return jobs filtered by status and/or platform as names or Job objects.

@@ -38,7 +38,6 @@ from autosubmit.history.database_managers import database_models as Models
 from autosubmit.history.database_managers.database_manager import (
     DatabaseManager,
 )
-from autosubmit.log.log import AutosubmitCritical
 
 CURRENT_DB_VERSION = 19  # Update this if you change the database schema
 DB_EXPERIMENT_HEADER_SCHEMA_CHANGES = 14
