@@ -110,6 +110,11 @@ def test_set_status(as_exp, slurm_server, reset_target):
         ("[20200101 [ fc0 [1] ] ],LOCALJOB [", 0),
         ("[20200101 [ fc0 [1] ] ],LOCALJOB ]", 0),
         ("[20200101 [ fc0 [1] ] ],LOCALJOB 1", 0),
+        ("[20200101 [ fc0 [1] ] ],LOCALJOB [[1]]", 0),
+        ("[20200101]", 0),
+        ("[20200101 [fc0] ]", 0),
+        ("[[20200101 [fc0] ]]", 0),
+        ("[[20200101 [ fc0 [1] ] ]]", 0),
 
         # Good ones // Testing chunk_formula
         ("[20200101 [ fc0 [1] ] ]", 9),
@@ -118,6 +123,16 @@ def test_set_status(as_exp, slurm_server, reset_target):
         ("[20200101 [ fc0 [1-2] ] ]", 18),
         ("[20200101 [ fc0 [1-2] fc1 [1-2] ] ]", 36),
         ("[20200101 [ fc0 [1-2] fc1 [1-2] ] 20200102 [ fc0 [1-2] fc1 [1-2] ] ]", 72),
+        ("[20200101 [ Any [1] ] ]", 18),
+        ("[20200101 [ Any [1-2] ] ]", 36),
+        ("[20200101 [ fc0 [Any] ] ]", 18),
+        ("[20200101 [ fc0 [Any] fc1 [Any] ] ]", 36),
+        ("[20200101 [ fc0 [Any] fc1 [Any] ] 20200102 [ fc0 [Any] fc1 [Any] ] ]", 72),
+        ("[ Any [ fc0 [1] ] ]", 18),
+        ("[ Any [ fc0 [1-2] ] ]", 36),
+        ("[ Any [ fc0 [Any] ] ]", 36),
+        ("[ Any [ fc0 [Any] fc1 [Any] ] ]", 72),
+        ("[ Any [ fc0 [Any] fc1 [Any] ] 20200102 [ fc0 [Any] fc1 [Any] ] ]", 72),
 
         # Good ones // Testing sections and splits
         ("[20200101 [ fc0 [1] ] ],LOCALJOB", 3),
@@ -128,10 +143,28 @@ def test_set_status(as_exp, slurm_server, reset_target):
         ("[20200101 [ fc0 [1] ] ],Any [2]", 3),
         ("[20200101 [ fc0 [1] ] ],Any [1-2]", 6),
         ("[20200101 [ fc0 [1] ] ],Any [1:2]", 6),
+        ("[20200101 [ fc0 [1] ] ],Any [Any]", 9),
+        ("[20200101 [ fc0 [1] ] ],Any []", 9),
+
     ],
 )
-def test_set_status_ftcs(as_exp, ftcs_filter, expected_jobs):
-    """Tests the setstatus command with various filters in an offline scenario."""
+def test_set_status_ftcs(as_exp: object, ftcs_filter: str, expected_jobs: int):
+    """Tests the setstatus command with various filters in an offline scenario.
+
+    The conftest as_exp fixture has:
+    - 2 dates: 20200101, 20200102
+    - 2 members: fc0, fc1
+    - Jobs sections: LOCALJOB, PSJOB, SLURMJOB
+    - Each job has 3 splits
+
+    :param as_exp: The autosubmit experiment fixture.
+    :type as_exp: AutosubmitExperiment
+    :param ftcs_filter: The filter to apply.
+    :type ftcs_filter: str
+    :param expected_jobs: The expected number of jobs to be set to COMPLETED.
+    :type expected_jobs: int
+    """
+
     db_manager = SqlAlchemyExperimentHistoryDbManager(as_exp.expid, BasicConfig.JOBDATA_DIR, f'job_data_{as_exp.expid}.db')
     db_manager.initialize()
     target = "COMPLETED"

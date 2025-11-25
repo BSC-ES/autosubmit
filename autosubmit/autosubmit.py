@@ -5182,39 +5182,13 @@ class Autosubmit:
             all_empty = False
 
         if all_empty:
-            raise AutosubmitCritical("At least one filter must be provided and not empty when using -fs, -ft, -fc, -ftc or -ftcs.", 7014)
+            raise AutosubmitCritical("At least one filter must be provided and must be not empty when using -fs, -ft, -fc, -ftc or -ftcs.", 7014)
 
 
     @staticmethod
-    def _split_match(j, split_list) -> bool:
-        return not j.splits or int(j.splits) < 2 or not split_list or str(j.split) in split_list
-
-    @staticmethod
-    def _setup_prune(json_filter: dict[str, Any], job_list) -> tuple[list[str], list[str], int]:
-        """Quick prune to help reduce the number of jobs to be checked later on.
-
-        Setup dates, members and chunks from json_filter.
-
-        :param json_filter: json filter with dates, members and chunks
-        :return: tuple of (dates, members, chunks)
-        """
-        dates = []
-        members = []
-        max_chunks = 0
-        for d_json in json_filter['sds']:
-            if "ANY" == str(d_json['sd']).upper():
-                return [], [], len(job_list._chunk_list)
-            dates.append(d_json['sd'])
-            for m_json in d_json['ms']:
-                members.append(m_json['m'])
-                if "ANY" in str(m_json['cs'][-1]).upper():
-                    max_chunks = job_list._chunk_list[-1]
-                else:
-                    max_chunks = max(int(m_json['cs'][-1]), max_chunks)
-        max_chunks = min(max_chunks, job_list._chunk_list[-1])
-        chunks = list(range(1, max_chunks+1))
-
-        return list(set(dates)), list(set(members)), chunks
+    def _split_match(j: Job, split_list: list[str]) -> bool:
+        """Check if job split matches"""
+        return "ANY" in split_list or not j.splits or int(j.splits) < 2 or not split_list or str(j.split) in split_list
 
     @staticmethod
     def _filter_sections_splits(filter_section_splits: str, jobs: list[Job]) -> list[Job]:
@@ -5231,7 +5205,7 @@ class Autosubmit:
                 job_splits_str = section.strip().split("[")[1].strip(" ]")
                 # splits: can be: [ 1:15 ] [ 1-15 ] [ 1 2 3 4 5 6 ] [ Any ]
                 if "ANY" in job_splits_str.upper() or not job_splits_str.strip():
-                    job_splits = "ANY"
+                    job_splits = ["ANY"]
                 else:
                     for job_split in job_splits_str.split():
                         job_split = job_split.strip()
@@ -5248,7 +5222,7 @@ class Autosubmit:
                         else:
                             job_splits.append(str(job_split))
                         if not job_splits:
-                            job_splits = "ANY"
+                            job_splits = ["ANY"]
 
             if section_name == "ANY":
                 section_matching_jobs.extend([j for j in jobs if Autosubmit._split_match(j, job_splits)])
@@ -5285,15 +5259,16 @@ class Autosubmit:
         selected_dates: set = set()
         selected_members: set = set()
 
-        # Prune first to reduce number of jobs to check
+        # Prune first to reduce the amount of jobs that the chunk filter (last one) has to interate with
+        # Here we want a reduced list of jobs that matches any date or member selected and remove the rest.
         for date_json in data[dates]:
             if "ANY" == str(date_json[date]).upper():
-                selected_dates = set(job_list._date_list)
+                selected_dates = set(date2str(d).upper() for d in job_list._date_list)
             else:
                 selected_dates.add(date_json[date].upper())
             for member_json in date_json[members]:
                 if "ANY" == str(member_json[member]).upper():
-                    selected_members.add([member.upper() for member in job_list._member_list])
+                    selected_members = set(m.upper() for m in job_list._member_list)
                 else:
                     selected_members.add(member_json[member].upper())
 
@@ -5304,12 +5279,12 @@ class Autosubmit:
         # Now, build final list according to the structure in data
         for date_json in data[dates]:
             if "ANY" == str(date_json[date]).upper():
-                selected_dates = set(job_list._date_list)
+                selected_dates = set(date2str(d).upper() for d in job_list._date_list)
             else:
                 selected_dates = {date_json[date].upper()}
             for member_json in date_json[members]:
                 if "ANY" == str(member_json[member]).upper():
-                    selected_members = set([member.upper() for member in job_list._member_list])
+                    selected_members = set([m.upper() for m in job_list._member_list])
                 else:
                     selected_members = {member_json[member].upper()}
 
@@ -5324,19 +5299,13 @@ class Autosubmit:
     def filter_jobs_by_chunks_splits(job_list: "JobList", filter_chunks: str) -> list[Job]:
         """Select jobs from *job_list* according to *filter_chunks* specification.
 
-        Format is:
-            - "ANY" to select all jobs with chunks in all sections
-            - "ANY,ANY" to select all jobs with chunks in all sections
-            - "ANY",SECTION1,SECTION2" to select all jobs with chunks in SECTION1 and SECTION2
-            - "DATE1,[MEMBER1|MEMBER2|ANY],[CHUNK1|CHUNK2|...],DATE2,[MEMBER1|MEMBER2|ANY],[CHUNK1|CHUNK2|...],...,SECTION1 [ SPLITS ],SECTION2"
+        Expected format:
+            - "[ DATE|Any [ MEMBER|Any [ CHUNKS|Any ] ... ] ... ], SECTION1|Any [SPLITS|Any], ..."
 
         :param job_list: JobList object
         :param filter_chunks: filter chunks
         :return: list of jobs matching the filter
         """
-
-        if not filter_chunks or not isinstance(filter_chunks, str):
-            return []
 
         filter_chunks = filter_chunks.upper()
         if "," in filter_chunks:
@@ -5347,10 +5316,7 @@ class Autosubmit:
             fc = filter_chunks
             matching_jobs = job_list.get_job_list()
 
-        if str(fc).upper() != "ANY":
-            final_list = Autosubmit._filter_chunks(fc, job_list, matching_jobs)
-        else:
-            final_list = matching_jobs
+        final_list = Autosubmit._filter_chunks(fc, job_list, matching_jobs)
 
         return list(set(final_list))
 
