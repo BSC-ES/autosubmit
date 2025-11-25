@@ -2278,9 +2278,9 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
     assert parameters["TESTDATES.START_DATE"] == "20200101"
     assert parameters["TESTDATES.START_DATE_WITH_SPECIAL"] == "20200101"
     assert parameters["EXPERIMENT.DATELIST"] == 20200101
-    # TODO: This should be a list, but it isen't. Also adding more that one element in the list is not working either
-    # TODO: This issue doesn't come from this PR and here it was added to test other part of the code
-    # TODO: Needs to be fixed in another PR (as_conf.substitute_dynamic_variables). There is an issue already for that
+    # TODO: This should be a list, but it isn't. Also, adding more than one element to the list is not working either.
+    # TODO: This issue isn't caused by this PR, and it was added here to test another part of the code.
+    # TODO: Needs to be fixed in another PR (as_conf.substitute_dynamic_variables). There is already an issue for that.
     assert parameters["TESTDATES.START_DATE_LIST"] == "20200101"
     assert parameters["TESTDATES.START_DATE_WITH_SPECIAL_LIST"] == "20200101"
     assert parameters["TESTDATES.START_DATE_INT"] == '[[20200101]]'
