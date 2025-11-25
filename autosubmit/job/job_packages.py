@@ -104,6 +104,16 @@ class JobPackageBase(object):
         :rtype: Platform
         """
         return self._platform
+    
+    @property
+    def tmp_path(self):
+        """
+        Returns the tmp path
+
+        :return: tmp path
+        :rtype: String
+        """
+        return self._tmp_path
 
 
     def check_job_files_exists(self, configuration: 'AutosubmitConfig', only_generate: bool) -> None:
