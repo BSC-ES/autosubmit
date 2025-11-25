@@ -5118,10 +5118,6 @@ class Autosubmit:
         """
 
         validation_message = "## -fc // -ftc // -ftcs Validation Message ##"
-
-        if not filter_string or not filter_string.strip():
-            raise AutosubmitCritical("Error in the supplied input for -fc // -ftc // -ftcs.", 7011, validation_message)
-
         filter_string = filter_string.upper().strip()
 
         level = 0

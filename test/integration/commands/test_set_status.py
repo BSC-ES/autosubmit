@@ -21,7 +21,7 @@ def reset(as_exp_, target="WAITING"):
     return job_list_
 
 
-def do_setstatus(as_exp_, fl=None, fc=None, fct=None, ftcs=None, fs=None, target="WAITING"):
+def do_setstatus(as_exp_, fl=None, fc=None, fct=None, ftcs=None, fs=None, ft=None, target="WAITING"):
     target = target.upper()
     as_exp_.autosubmit.set_status(
         as_exp_.expid,
@@ -31,7 +31,7 @@ def do_setstatus(as_exp_, fl=None, fc=None, fct=None, ftcs=None, fs=None, target
         filter_list=fl,
         filter_chunks=fc,
         filter_status=fs,
-        filter_section=None,
+        filter_section=ft,
         filter_type_chunk=fct,
         filter_type_chunk_split=ftcs,
         hide=False,
@@ -55,12 +55,13 @@ def test_set_status(as_exp, slurm_server, reset_target):
     fc_filter = "[20200101 [ fc0 [1] ] ]"
     fct_filter = "[20200101 [ fc0 [1] ] ],LOCALJOB"
     ftcs_filter = "[20200101 [ fc0 [1] ] ],LOCALJOB [2]"
+    ft_filter = "LOCALJOB"
     fs = "WAITING"
     target = "COMPLETED"
 
     job_list_ = do_setstatus(as_exp, fl=fl_filter_names, target=target)
     completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED and job.name in fl_filter_names]
-    assert len(completed_jobs) == 3
+    assert len(completed_jobs) == 24
     reset(as_exp, reset_target)
 
     job_list_ = do_setstatus(as_exp, fc=fc_filter, target=target)
@@ -76,6 +77,11 @@ def test_set_status(as_exp, slurm_server, reset_target):
     job_list_ = do_setstatus(as_exp, ftcs=ftcs_filter, target=target)
     completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED and job.split == 2 and job.section == "LOCALJOB"]
     assert len(completed_jobs) == 1
+    reset(as_exp, reset_target)
+
+    job_list_ = do_setstatus(as_exp, ft=ft_filter, target=target)
+    completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED and job.section == "LOCALJOB"]
+    assert len(completed_jobs) == 3
     reset(as_exp, reset_target)
 
     if reset_target == "RUNNING":
