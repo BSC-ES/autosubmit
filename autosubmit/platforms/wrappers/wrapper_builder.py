@@ -18,9 +18,10 @@ import os
 import random
 import string
 import textwrap
+from autosubmit.platforms.wrappers.flux_yaml_generator import FluxYAML
 from autosubmit.log.log import AutosubmitCritical
 
-from typing import List
+from typing import Dict, List
 
 
 class WrapperDirector:
@@ -137,6 +138,40 @@ class FluxWrapperBuilder(WrapperBuilder):
     This is a special implementation because we use Flux as a wrapper engine inside 
     Slurm allocations, not as a platform.
     """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.rootdir = kwargs.get('rootdir', '')
+        self.tmp_path = kwargs.get('wrapper_data', {}).tmp_path if kwargs.get('wrapper_data', None) else ''
+
+        for job_script in self.job_scripts:
+            job_script_path = f"{self.tmp_path}/{job_script}"
+            job_name = job_script.replace('.cmd', '')
+            job_section = job_name.split('_')[-1]
+            output_file = f"{job_name}.cmd.out.0"
+            error_file = f"{job_name}.cmd.err.0"
+            job_resources = self.jobs_resources.get(job_section, dict())
+            nslots = int(job_resources.get('TASKS', 1))
+            num_nodes = int(job_resources.get('NODES', 0))
+            num_cores = int(job_resources.get('PROCESSORS', 0))
+
+            # Initialize the YAML generator
+            job_yaml = FluxYAML()
+            # TODO: [ENGINES] Add support for exclusive nodes, memory and heterogeneous jobs
+            # Populate the YAML
+            job_yaml.add_slot(nslots=nslots, num_nodes=num_nodes, num_cores=num_cores)
+            job_yaml.add_task(count_per_slot=1)
+
+            # Open the job script to include its content in the YAML
+            with open(job_script_path, 'r') as f:
+                script_content = f.read()
+
+            job_yaml.set_attributes(duration=self.wallclock_by_level, cwd=self.rootdir, job_name=job_name, output_file=output_file, error_file=error_file, script_content=script_content)
+
+            # Replace the job script with its corresponding YAML representation
+            yaml_content = job_yaml.generate_yaml()
+            
+            with open(job_script_path, 'w') as f:
+                f.write(yaml_content)
 
     def build_imports(self):
         return ""
@@ -150,19 +185,18 @@ class FluxWrapperBuilder(WrapperBuilder):
         
         return textwrap.dedent("""
         # Flux script generation
-        cat << 'EOF' > flux_runner.sh
-        #!/bin/bash
+        cat << 'EOF' > flux_runner.py
         {0}
         EOF
 
         # Grant execution permission to the generated script
-        chmod +x flux_runner.sh
+        chmod +x flux_runner.py
 
         # Load user environment
         {1}
 
         # Instantiate Flux within the allocated resources and run the jobs
-        srun --cpu-bind=none flux start --verbose=2 /usr/bin/bash flux_runner.sh
+        srun --cpu-bind=none flux start --verbose=2 python flux_runner.py
         """).format(self._generate_flux_script(), self._custom_environmet_setup(), '\n'.ljust(13))
     
     def _generate_flux_script(self):
@@ -185,49 +219,65 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
     # TODO: [ENGINES] Check retrial behavior
     def _generate_flux_script(self):
         return textwrap.dedent("""
-        max_retries={1}
-        scripts="{0}"
+            import flux
+            import flux.job
 
-        for job_script in $scripts; do
-            fail_count=0
-            completed=0
+            handle = flux.Flux()
+            job_scripts={0}
 
-            while [ $fail_count -le $max_retries ] && [ $completed -eq 0 ]; do
-                # Job info
-                job_name=$(basename "$job_script" .cmd)
-                output_log="${{job_name}}.cmd.out.${{fail_count}}"
-                error_log="${{job_name}}.cmd.err.${{fail_count}}"
+            for job_script in job_scripts:
+                jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
+                jobid = flux.job.submit(handle, jobspec, waitable=True)
+                job_meta = flux.job.get_job(handle, jobid)
+                print("JOB META: " + str(job_meta))
+                print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
+                print("RESOURCES: " + str(jobspec.resources))
+                flux.job.wait(handle, jobid)
+            """).format(self.job_scripts, '\n'.ljust(13))
+        # return textwrap.dedent("""
+        # max_retries={1}
+        # scripts="{0}"
 
-                # Submit the job
-                job_id=$(flux batch --output=$output_log --error=$error_log $job_script)
+        # for job_script in $scripts; do
+        #     fail_count=0
+        #     completed=0
 
-                # Wait for the job to finish
-                flux job wait $job_id
+        #     while [ $fail_count -le $max_retries ] && [ $completed -eq 0 ]; do
+        #         # Job info
+        #         job_name=$(basename "$job_script" .cmd)
+        #         output_log="${{job_name}}.cmd.out.${{fail_count}}"
+        #         error_log="${{job_name}}.cmd.err.${{fail_count}}"
 
-                # Create the STAT file
-                start=$(flux job info $job_id eventlog | grep '"name":"start"' | sed -n 's/.*"timestamp":\\([^,}}]*\\).*/\\1/p')
-                finish=$(flux job info $job_id eventlog | grep '"name":"finish"' | sed -n 's/.*"timestamp":\\([^,}}]*\\).*/\\1/p')
-                stat_filename="${{job_name}}_STAT_${{fail_count}}"
-                echo "${{start%.*}}" > $stat_filename
-                echo "${{finish%.*}}" >> $stat_filename
+        #         # Submit the job
+        #         job_id=$(flux batch --output=$output_log --error=$error_log $job_script)
 
-                # Check if the job completed successfully
-                if [ -f "${{job_name}}_COMPLETED" ]; then
-                    echo "The job $job_name has been COMPLETED"
-                    completed=1
-                else
-                    echo "The job $job_name has FAILED"
-                    fail_count=$((fail_count + 1))
-                fi
-            done
+        #         # Wait for the job to finish
+        #         flux job wait $job_id
 
-            if [ $completed -eq 0 ]; then
-                touch "${{job_name}}_FAILED"
-                touch "WRAPPER_FAILED"
-                exit 1
-            fi
-        done
-        """).format(' '.join(str(s) for s in self.job_scripts), self.retrials, '\n'.ljust(13))
+        #         # Create the STAT file
+        #         start=$(flux job info $job_id eventlog | grep '"name":"start"' | sed -n 's/.*"timestamp":\\([^,}}]*\\).*/\\1/p')
+        #         finish=$(flux job info $job_id eventlog | grep '"name":"finish"' | sed -n 's/.*"timestamp":\\([^,}}]*\\).*/\\1/p')
+        #         stat_filename="${{job_name}}_STAT_${{fail_count}}"
+        #         echo "${{start%.*}}" > $stat_filename
+        #         echo "${{finish%.*}}" >> $stat_filename
+
+        #         # Check if the job completed successfully
+        #         if [ -f "${{job_name}}_COMPLETED" ]; then
+        #             echo "The job $job_name has been COMPLETED"
+        #             completed=1
+        #         else
+        #             echo "The job $job_name has FAILED"
+        #             fail_count=$((fail_count + 1))
+        #         fi
+        #     done
+
+        #     if [ $completed -eq 0 ]; then
+        #         touch "${{job_name}}_FAILED"
+        #         touch "WRAPPER_FAILED"
+        #         exit 1
+        #     fi
+        # done
+        # """).format(' '.join(str(s) for s in self.job_scripts), self.retrials, '\n'.ljust(13))
     
 class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
     def _generate_flux_script(self):
