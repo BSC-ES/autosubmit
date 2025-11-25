@@ -2251,7 +2251,13 @@ class Job(object):
                 as_conf.dynamic_variables[key] = value.replace('^', '')
                 parameters[key] = as_conf.dynamic_variables[key]
             elif isinstance(value, list):
-                as_conf.dynamic_variables[key] = [v.replace('^', '') if isinstance(v, str) else v for v in value]
+                value_list = []
+                for v in value:
+                    if isinstance(v, str):
+                        value_list.append(v.replace('^', ''))
+                    else:
+                        value_list.append(v)
+                as_conf.dynamic_variables[key] = value_list
                 parameters[key] = as_conf.dynamic_variables[key]
         as_conf.special_dynamic_variables = dict()
 
