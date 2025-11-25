@@ -61,7 +61,7 @@ def test_set_status(as_exp, slurm_server, reset_target):
 
     job_list_ = do_setstatus(as_exp, fl=fl_filter_names, target=target)
     completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED and job.name in fl_filter_names]
-    assert len(completed_jobs) == 24
+    assert len(completed_jobs) == 3
     reset(as_exp, reset_target)
 
     job_list_ = do_setstatus(as_exp, fc=fc_filter, target=target)
@@ -81,7 +81,7 @@ def test_set_status(as_exp, slurm_server, reset_target):
 
     job_list_ = do_setstatus(as_exp, ft=ft_filter, target=target)
     completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED and job.section == "LOCALJOB"]
-    assert len(completed_jobs) == 3
+    assert len(completed_jobs) == 24
     reset(as_exp, reset_target)
 
     if reset_target == "RUNNING":

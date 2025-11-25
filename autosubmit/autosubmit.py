@@ -5217,8 +5217,8 @@ class Autosubmit:
                             job_splits += [str(i) for i in range(int(start), int(end) + 1)]
                         else:
                             job_splits.append(str(job_split))
-                        if not job_splits:
-                            job_splits = ["ANY"]
+            if not job_splits:
+                job_splits = ["ANY"]
 
             if section_name == "ANY":
                 section_matching_jobs.extend([j for j in jobs if Autosubmit._split_match(j, job_splits)])
