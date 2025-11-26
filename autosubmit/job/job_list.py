@@ -43,8 +43,9 @@ from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency
 from autosubmit.job.job_utils import transitive_reduction
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
-from autosubmit.platforms.platform import Platform
+from autosubmit.monitor.diagram import JobData
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
+from autosubmit.platforms.platform import Platform
 
 
 class JobList(object):
@@ -399,7 +400,8 @@ class JobList(object):
                                                                                       jobs_data, option, set(),
                                                                                       strip_keys=False)
 
-            if not any(self._strip_key(dependency) == section for dependency in jobs_data.get(section, {}).get(option, {})):
+            if not any(self._strip_key(dependency) == section for dependency in
+                       jobs_data.get(section, {}).get(option, {})):
                 self.dependency_map[section].remove(section)
                 self.dependency_map_with_distances[section].remove(section)
 
@@ -1195,7 +1197,8 @@ class JobList(object):
             edge_added = False
             if any_all_filter:
                 if (parent.chunk and parent.chunk != self.depends_on_previous_chunk.get(parent.section, parent.chunk) or
-                        (parent.running == "chunk" and parent.chunk != chunk_list[-1] and parent.section in self.dependency_map[parent.section]) or
+                        (parent.running == "chunk" and parent.chunk != chunk_list[-1] and parent.section in
+                         self.dependency_map[parent.section]) or
                         self.actual_job_depends_on_previous_chunk or
                         self.actual_job_depends_on_special_chunk or
                         parent.name in special_dependencies
@@ -1209,7 +1212,9 @@ class JobList(object):
                 edge_added = True
             else:
                 # In case we need to improve the perfomance while generating the workflow graph, this could be a point to check. (Workflows with splits and many dependencies).
-                if parent.name not in self.depends_on_previous_special_section.get(job.section, set()) or job.split > 0 or (job.section == parent.section and job.running != "chunk"):
+                if parent.name not in self.depends_on_previous_special_section.get(job.section,
+                                                                                   set()) or job.split > 0 or (
+                        job.section == parent.section and job.running != "chunk"):
                     graph.add_edge(parent.name, job.name)
                     edge_added = True
 
@@ -1701,7 +1706,7 @@ class JobList(object):
                         jobs_to_sort = sorted(jobs_to_sort, key=lambda k: (
                             k.name.split('_')[1], (k.name.split('_')[2]), (int(k.name.split('_')[3])
                                                                            if len(
-                                k.name.split('_')) == 5 else num_chunks + 1)))
+                            k.name.split('_')) == 5 else num_chunks + 1)))
 
                         # Bringing back original job if identified
                         for idx in range(0, len(jobs_to_sort)):
@@ -3183,7 +3188,7 @@ class JobList(object):
 
     @staticmethod
     def retrieve_times(status_code, name, tmp_path, make_exception=False, job_times=None,
-                       seconds=False, job_data_collection=None) -> Union[None, JobRow]:
+                       seconds=False, job_data_collection: Optional['JobData'] = None) -> Union[None, JobRow]:
         """
         Retrieve job timestamps from database.
         :param job_data_collection:
@@ -3300,7 +3305,7 @@ class JobList(object):
 
         seconds_queued = seconds_queued * (-1) if seconds_queued < 0 else seconds_queued
         seconds_running = seconds_running * (-1) if seconds_running < 0 else seconds_running
-        if seconds is False:
+        if seconds:
             queue_time = math.ceil(
                 seconds_queued / 60) if seconds_queued > 0 else 0
             running_time = math.ceil(
@@ -3410,7 +3415,8 @@ class JobList(object):
         jobs_ran_atleast_once = False
         if not finished_jobs:
             jobs_ran_atleast_once = True
-            finished_jobs: list["Job"] = self._get_jobs_by_name(status=[Status.COMPLETED, Status.FAILED, Status.SKIPPED], return_only_names=False)
+            finished_jobs: list["Job"] = self._get_jobs_by_name(
+                status=[Status.COMPLETED, Status.FAILED, Status.SKIPPED], return_only_names=False)
         # Recover job_id and log name if missing
         if finished_jobs:
             exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
@@ -3433,10 +3439,8 @@ class JobList(object):
                 job.log_recovered = True
                 job.updated_log = True
 
-
-
-
-    def _get_jobs_by_name(self, status: Optional[list[int]] = None, platform: Platform = None, return_only_names=False) -> Union[List[str], List["Job"]]:
+    def _get_jobs_by_name(self, status: Optional[list[int]] = None, platform: Platform = None,
+                          return_only_names=False) -> Union[List[str], List["Job"]]:
         """Return jobs filtered by status and/or platform as names or Job objects.
 
         :param status: Optional list of job statuses to filter by.
@@ -3447,9 +3451,11 @@ class JobList(object):
         if not status:
             status = []
         if return_only_names:
-            return [job.name for job in self.get_job_list() if (not status or job.status in status) and (not platform or job.platform_name == platform.name)]
+            return [job.name for job in self.get_job_list() if
+                    (not status or job.status in status) and (not platform or job.platform_name == platform.name)]
         else:
-            return [job for job in self.get_job_list() if (not status or job.status in status) and (not platform or job.platform_name == platform.name)]
+            return [job for job in self.get_job_list() if
+                    (not status or job.status in status) and (not platform or job.platform_name == platform.name)]
 
     def recover_all_completed_jobs_from_exp_history(self, platform: Platform = None) -> set[str]:
         """Recover all completed jobs from experiment history
