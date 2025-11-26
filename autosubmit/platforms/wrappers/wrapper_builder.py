@@ -138,15 +138,15 @@ class FluxWrapperBuilder(WrapperBuilder):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.rootdir = kwargs.get('rootdir', '')
+        cwd = f"{kwargs.get('rootdir', '')}/LOG_{self.expid}"
         self.tmp_path = kwargs.get('wrapper_data', {}).tmp_path if kwargs.get('wrapper_data', None) else ''
 
         for job_script in self.job_scripts:
             job_script_path = f"{self.tmp_path}/{job_script}"
             job_name = job_script.replace('.cmd', '')
             job_section = job_name.split('_')[-1]
-            output_file = f"{job_name}.cmd.out.0"
-            error_file = f"{job_name}.cmd.err.0"
+            output_file = f"{cwd}/{job_name}.cmd.out.0"
+            error_file = f"{cwd}/{job_name}.cmd.err.0"
             job_resources = self.jobs_resources.get(job_section, dict())
             nslots = int(job_resources.get('TASKS', 1))
             num_nodes = int(job_resources.get('NODES', 0))
@@ -163,7 +163,7 @@ class FluxWrapperBuilder(WrapperBuilder):
             with open(job_script_path, 'r') as f:
                 script_content = f.read()
 
-            job_yaml.set_attributes(duration=self.wallclock_by_level, cwd=self.rootdir, job_name=job_name, output_file=output_file, error_file=error_file, script_content=script_content)
+            job_yaml.set_attributes(duration=self.wallclock_by_level, cwd=cwd, job_name=job_name, output_file=output_file, error_file=error_file, script_content=script_content)
 
             # Replace the job script with its corresponding YAML representation
             yaml_content = job_yaml.generate_yaml()
@@ -179,7 +179,7 @@ class FluxWrapperBuilder(WrapperBuilder):
     
     def build_main(self):
         if not self.job_scripts:
-            raise AutosubmitCritical("No job scripts found for building the Flux wrapper.", )
+            raise AutosubmitCritical("No job scripts found for building the Flux wrapper.")
         
         return textwrap.dedent("""
         # Flux script generation
@@ -224,13 +224,23 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
             job_scripts={0}
 
             for job_script in job_scripts:
+                print("Submitting job script: " + job_script)
                 jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
                 jobid = flux.job.submit(handle, jobspec, waitable=True)
                 job_meta = flux.job.get_job(handle, jobid)
                 print("JOB META: " + str(job_meta))
                 print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
                 print("RESOURCES: " + str(jobspec.resources))
-                flux.job.wait(handle, jobid)
+                print("Waiting for job " + str(jobid) + " to finish...")
+                print(flux.job.result(handle, jobid).result)
+                
+                if flux.job.result(handle, jobid).result != "COMPLETED":
+                    print("The job " + job_script + " has FAILED")
+                    open(job_script.replace('.cmd', '_FAILED'),'w').close()
+                    open("WRAPPER_FAILED",'w').close()
+                    exit(1)
+                else:
+                    print("The job " + job_script + " has been COMPLETED")
             """).format(self.job_scripts, '\n'.ljust(13))
         # return textwrap.dedent("""
         # max_retries={1}
