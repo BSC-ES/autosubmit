@@ -38,6 +38,7 @@ release.
 - Standardized the inner_job submission for non-vertical wrappers #1474
 - Fixed an issue with some placeholders not being replaced in templates #2426
 - Could* fix an issue with the HPC* missing variables in the templates #2432
+- Fix for energy data that was not being stored for the last job of the batch #2657 #2418
 
 **Enhancements:**
 
