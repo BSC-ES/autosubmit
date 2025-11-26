@@ -2,7 +2,7 @@
 
 **Bug fixes:**
 
--
+- Fix for energy data that was not being stored for the last job of the batch #2657 #2418
 
 **Enhancements:**
 
