@@ -13,7 +13,7 @@
 # GNU General Public License for more details.
 
 import traceback
-from time import time, sleep
+from time import time
 from typing import Optional
 
 import autosubmit.history.database_managers.database_models as Models
@@ -35,7 +35,8 @@ SECONDS_WAIT_PLATFORM = 60
 
 
 class ExperimentHistory:
-    def __init__(self, expid, jobdata_dir_path=DEFAULT_JOBDATA_DIR, historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR, force_sql_alchemy=False):
+    def __init__(self, expid, jobdata_dir_path=DEFAULT_JOBDATA_DIR, historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR,
+                 force_sql_alchemy=False):
         # Unused arguments, but I didn't want to change every call to this class in this PR
         self.expid = expid
         BasicConfig.read()
@@ -64,7 +65,6 @@ class ExperimentHistory:
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
-
             self.manager = None
 
     def is_header_ready(self):
@@ -104,7 +104,9 @@ class ExperimentHistory:
 
             return None
 
-    def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug", job_id: int = 0, wrapper_queue: str = None, wrapper_code: str = None, children: str = "") -> JobData:
+    def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug",
+                         job_id: int = 0, wrapper_queue: Optional[str] = None, wrapper_code: Optional[str] = None,
+                         children: str = "") -> JobData:
         """
         Updates the start time and other details of a job in the database.
 
@@ -142,9 +144,9 @@ class ExperimentHistory:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
-    def write_finish_time(self, job_name: str, finish: int = 0, status: str = "UNKNOWN", job_id: int = 0, out_file: str = None, err_file: str = None) -> JobData:
-        """
-        Updates the finish time and other details of a job in the database.
+    def write_finish_time(self, job_name: str, finish: int = 0, status: str = "UNKNOWN", job_id: int = 0,
+                          out_file: Optional[str] = None, err_file: Optional[str] = None) -> JobData:
+        """Updates the finish time and other details of a job in the database.
 
         :param job_name: The name of the job.
         :type job_name: str
@@ -182,14 +184,12 @@ class ExperimentHistory:
         Call it in a thread.
         """
         try:
-            sleep(SECONDS_WAIT_PLATFORM)
             ssh_output = platform_obj.check_job_energy(job_data_dc.job_id)
             slurm_monitor = SlurmMonitor(ssh_output)
             self._verify_slurm_monitor(slurm_monitor, job_data_dc)
             job_data_dcs_in_wrapper = self.manager.get_job_data_dcs_last_by_wrapper_code(job_data_dc.wrapper_code)
             job_data_dcs_in_wrapper = sorted([job for job in job_data_dcs_in_wrapper if job.status == "COMPLETED"],
                                              key=lambda x: x._id)
-            job_data_dcs_to_update = []
             if len(job_data_dcs_in_wrapper) > 0:
                 info_handler = PlatformInformationHandler(
                     StraightWrapperAssociationStrategy(self._historiclog_dir_path))
@@ -215,19 +215,17 @@ class ExperimentHistory:
     def _verify_slurm_monitor(self, slurm_monitor, job_data_dc):
         try:
             if slurm_monitor.header.status not in ["COMPLETED", "FAILED"]:
-                self._log.log("Assertion Error on job {0} with ssh_output {1}".format(job_data_dc.job_name,
-                                                                                      slurm_monitor.original_input),
-                              "Slurm status {0} is not COMPLETED nor FAILED for ID {1}.\n".format(
-                                  slurm_monitor.header.status, slurm_monitor.header.name))
+                self._log.log(f"Assertion Error on job {job_data_dc.job_name} with ssh_output {slurm_monitor.original_input}."
+                              f"Slurm status {slurm_monitor.header.status} is not COMPLETED nor FAILED for ID {slurm_monitor.header.name}.\n")
                 Log.debug(
                     f'Historical Database error: Slurm status {slurm_monitor.header.status} is not COMPLETED nor FAILED for ID {slurm_monitor.header.name}.')
             if not slurm_monitor.steps_plus_extern_approximate_header_energy():
-                self._log.log("Assertion Error on job {0} with ssh_output {1}".format(job_data_dc.job_name,
-                                                                                      slurm_monitor.original_input),
-                              "Steps + extern != total energy for ID {0}. Number of steps {1}.\n".format(
-                                  slurm_monitor.header.name, slurm_monitor.step_count))
+                self._log.log(f"Assertion Error on job {job_data_dc.job_name} with ssh_output {slurm_monitor.original_input}."
+                              f"Steps + extern != total energy for ID {slurm_monitor.header.name}."
+                              f"Number of steps {slurm_monitor.step_count}.\n")
                 Log.debug(
-                    f'Historical Database error: Steps + extern != total energy for ID {slurm_monitor.header.name}. Number of steps {slurm_monitor.step_count}.')
+                    f'Historical Database error: Steps + extern != total energy for ID {slurm_monitor.header.name}.'
+                    f'Number of steps {slurm_monitor.step_count}.')
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')

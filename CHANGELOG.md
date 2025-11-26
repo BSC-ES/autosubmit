@@ -67,6 +67,7 @@ release.
 - Tentative *fix for an issue with the HPC* missing variables in the templates #2432
 - Fixed issue where Autosubmit did not retry when there were networking issues in platforms #1369
 - Fixed an issue with additional files not being sent to the remote platform when using wrappers #1484
+- Fix for energy data that was not being stored for the last job of the batch #2657 #2418
 
 **Enhancements:**
 

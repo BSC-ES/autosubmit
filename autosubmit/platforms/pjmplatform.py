@@ -394,9 +394,6 @@ class PJMPlatform(ParamikoPlatform):
     def cancel_job(self, job_id):
         return f'{self.cancel_cmd} {job_id}'
 
-    # def get_job_energy_cmd(self, job_id):
-    #     return 'sacct -n --jobs {0} -o JobId%25,State,NCPUS,NNodes,Submit,Start,End,ConsumedEnergy,MaxRSS%25,AveRSS%25'.format(job_id)
-
     def parse_queue_reason(self, output, job_id):
         # split() is used to remove the trailing whitespace but also \t and multiple spaces
         # split(" ") is not enough

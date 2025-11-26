@@ -19,60 +19,60 @@
 from .platform_monitor import PlatformMonitor
 from .slurm_monitor_item import SlurmMonitorItem
 
+
 class SlurmMonitor(PlatformMonitor):
-  """ Manages Slurm commands interpretation. """
-  def __init__(self, platform_output):
-      super(SlurmMonitor, self).__init__(platform_output)
-      self._identify_input_rows()
+    """ Manages Slurm commands interpretation. """
 
-  @property
-  def steps_energy(self):
-    return sum([step.energy for step in self.input_items if step.is_step])
-    
-  @property
-  def total_energy(self):
-    return max(self.header.energy, self.steps_energy + self.extern.energy)
+    def __init__(self, platform_output):
+        super(SlurmMonitor, self).__init__(platform_output)
+        self._identify_input_rows()
 
-  @property
-  def step_count(self):
-    return len([step for step in self.input_items if step.is_step])
+    @property
+    def steps_energy(self):
+        return sum([step.energy for step in self.input_items if step.is_step])
 
-  def _identify_input_rows(self):
-      lines = self.input.split("\n")
-      self.input_items = [SlurmMonitorItem.from_line(line) for line in lines]        
-  
-  @property
-  def steps(self):
-    return [item for item in self.input_items if item.is_step]
+    @property
+    def total_energy(self):
+        return max(self.header.energy, self.steps_energy + self.extern.energy)
 
-  @property
-  def header(self):
-    # test
-    headers = [header for header in self.input_items if header.is_header]
-    if len(headers) > 0:
-        return headers[0]
-    else:
-        return None
-  
-  @property
-  def batch(self):
-    #test
-    batch = [batch for batch in self.input_items if batch.is_batch]
-    if len(batch) > 0:
-        return batch[0]
-    else:
-        return None
+    @property
+    def step_count(self):
+        return len([step for step in self.input_items if step.is_step])
 
-  @property
-  def extern(self):
-    #test
-    extern = [extern for extern in self.input_items if extern.is_extern]
-    if len(extern) > 0:
-        return extern[0]
-    else:
-        return None
+    def _identify_input_rows(self):
+        lines = self.input.split("\n")
+        self.input_items = [SlurmMonitorItem.from_line(line) for line in lines]
 
-  def steps_plus_extern_approximate_header_energy(self):
-    return abs(self.steps_energy + self.extern.energy - self.header.energy) <= 0.01*self.header.energy
+    @property
+    def steps(self):
+        return [item for item in self.input_items if item.is_step]
 
+    @property
+    def header(self):
+        # test
+        headers = [header for header in self.input_items if header.is_header]
+        if len(headers) > 0:
+            return headers[0]
+        else:
+            return None
 
+    @property
+    def batch(self):
+        # test
+        batch = [batch for batch in self.input_items if batch.is_batch]
+        if len(batch) > 0:
+            return batch[0]
+        else:
+            return None
+
+    @property
+    def extern(self):
+        # test
+        extern = [extern for extern in self.input_items if extern.is_extern]
+        if len(extern) > 0:
+            return extern[0]
+        else:
+            return None
+
+    def steps_plus_extern_approximate_header_energy(self):
+        return abs(self.steps_energy + self.extern.energy - self.header.energy) <= 0.01 * self.header.energy

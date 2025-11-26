@@ -2327,3 +2327,52 @@ def test_update_status(create_jobs: list[Job], status: Status, failed_file,
     assert job.status != status
     job.update_status(as_conf=as_conf, failed_file=failed_file)
     assert job.status == status
+
+
+@pytest.mark.parametrize(
+    'output',
+    [
+        '''15994954        COMPLETED 448 2 2025-02-24T16:11:33 2025-02-24T16:11:42 2025-02-24T16:21:30 883.55K 427K      3486K
+                        15994954.batch  COMPLETED 224 1 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30 497.36K 18111K    18111K
+                        15994954.extern COMPLETED 448 2 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30 883.55K 427K      421K
+                        15994954.0      COMPLETED 224 1 2025-02-24T16:11:47 2025-02-24T16:11:47 2025-02-24T16:11:52 0       3486K     3486K
+                        15994954.1      COMPLETED 448 2 2025-02-24T16:12:17 2025-02-24T16:12:17 2025-02-24T16:21:22 820.90K 29740154K 27008625.50K
+        ''',
+        '''15994954        COMPLETED 448 2 2025-02-24T16:11:33 2025-02-24T16:11:42 2025-02-24T16:21:30 883.55K 427K      3486K
+                    15994954.batch  COMPLETED 224 1 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30 497.36K 18111K    18111K
+                    15994954.extern COMPLETED 448 2 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30 883.55K 427K      421K
+                    15994954.0      COMPLETED 224 1 2025-02-24T16:11:47 2025-02-24T16:11:47 2025-02-24T16:11:52 0       3486K     3486K
+                    15994954.1      COMPLETED 448 2 2025-02-24T16:12:17 2025-02-24T16:12:17 2025-02-24T16:21:22 82.09 29740154K 27008625.50K
+        '''
+    ],
+    ids=["Energy + External is Lower", "Energy + External is Higher"]
+)
+def test_retrieve_logfiles(local, mocker, output):
+    """This tests replicates the behavior of getting the data from the SSH output and handle it to make sure that
+    the data that return will be properly treated and stored.
+    The first input will return a lower absolute value for the energy thus failing the validation
+    The second input will return a higher absolute value for the energy thus succeeding the validation
+    """
+    mocker.patch("autosubmit.history.database_managers.experiment_history_db_manager.ExperimentHistoryDbManager", return_value=mocker.MagicMock())
+    mocker.patch("autosubmit.history.experiment_history.ExperimentHistory", return_value=mocker.MagicMock())
+    mocker.patch("autosubmit.platforms.paramiko_platform.ParamikoPlatform.check_job_energy", return_value=output)
+    job = Job(_EXPID, '1', 'WAITING', 0, None)
+
+    job.platform = local
+
+    Path(job._tmp_path + "/" + job.name).mkdir(parents=True)
+    for i in range (2):
+        Path(job.platform.get_files_path() + f'/test.out.{i}').touch()
+        Path(job.platform.get_files_path() + f'/test.err.{i}').touch()
+        Path(job.platform.get_files_path() + f'/t001_STAT_{i}').touch()
+    job.platform.type = 'slurm'
+    job.platform.remote_log_dir = Path(job.platform.root_dir) / job.platform.config.get("LOCAL_TMP_DIR") / f'LOG_{job.platform.expid}'
+    job.wrapper_type = 'vertical'
+    job.retrials = 1
+    job.script_name = 'test'
+    job.local_logs = 'test_local'
+    job.submit_time_timestamp = '0'
+
+    job.platform.check_file_exists = mocker.MagicMock(return_value=True)
+    job.retrieve_logfiles()
+    assert job.log_recovered
