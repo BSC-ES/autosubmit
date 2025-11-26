@@ -22,7 +22,7 @@ Examples:
 
 ::
 
-    # check for completion files of the current active jobs ( SUBBMITED, QUEUING, RUNNING )
+    # check for completion files of the current active jobs ( SUBMITTED, QUEUING, RUNNING )
     autosubmit recovery <EXPID>
 
     # check for completion files of all jobs
