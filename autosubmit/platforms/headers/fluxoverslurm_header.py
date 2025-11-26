@@ -18,7 +18,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import textwrap
-from autosubmit.log.log import Log
 
 class FluxOverSlurmHeader(object):
     """
@@ -27,7 +26,7 @@ class FluxOverSlurmHeader(object):
 
     SERIAL = textwrap.dedent("""\
 ###############################################################################
-#                   %TASKTYPE% %DEFAULT.EXPID% EXPERIMENT
+# The following lines contain the script. [%TASKTYPE% %DEFAULT.EXPID% EXPERIMENT]
 ###############################################################################
            """)
 

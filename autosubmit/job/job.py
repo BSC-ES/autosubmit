@@ -44,6 +44,7 @@ from autosubmit.log.log import Log, AutosubmitCritical
 from autosubmit.platforms.fluxoverslurm import FluxOverSlurmPlatform
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
+from autosubmit.platforms.wrappers.flux_yaml_generator import FluxYAMLGenerator
 
 if TYPE_CHECKING:
     from autosubmit.platforms.platform import Platform
@@ -2373,13 +2374,20 @@ class Job(object):
     def _get_paramiko_template(self, snippet: 'TemplateSnippet', template, parameters) -> str:
         if self.wrapper_method == 'flux':
             current_platform = FluxOverSlurmPlatform()
+            template_generator = FluxYAMLGenerator(self, parameters)
+            full_template = ''.join([
+                snippet.as_header(current_platform.get_header(self, parameters), self.executable),
+                snippet.as_body(template),
+                snippet.as_tailer()
+            ])
+            return template_generator.generate_template(full_template)
         else:
             current_platform = self._platform
-        return ''.join([
-            snippet.as_header(current_platform.get_header(self, parameters), self.executable),
-            snippet.as_body(template),
-            snippet.as_tailer()
-        ])
+            return ''.join([
+                snippet.as_header(current_platform.get_header(self, parameters), self.executable),
+                snippet.as_body(template),
+                snippet.as_tailer()
+            ])
 
     def queuing_reason_cancel(self, reason):
         try:
