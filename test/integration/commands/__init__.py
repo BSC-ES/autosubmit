@@ -17,7 +17,7 @@
 
 """Autosubmit command tests.
 
-These tests aim to test and emulate some real scenarios that combines the run command with other commands like setstatus, recovery, create ...
+These tests aim to test the different commands provided by Autosubmit.
 
-Due the nature of these tests, they are the slowest tests.
+These tests are, depending on the command, slower than the rest of the integration tests.
 """
