@@ -29,7 +29,7 @@ class FluxYAML:
         self.attributes = {}
 
     # TODO: [ENGINES] Add support for heterogeneous jobs
-    def add_slot(self, label='default', nslots=1, num_nodes=0, num_cores=0, exclusive=False, mem_per_node_gb=0, mem_per_core_gb=0):
+    def add_slot(self, label='task', nslots=1, num_nodes=0, num_cores=0, exclusive=False, mem_per_node_gb=0, mem_per_core_gb=0):
         if num_nodes == 0 and num_cores == 0:
             raise ValueError("No resources to add")
         if num_nodes != 0 and exclusive:
@@ -39,7 +39,7 @@ class FluxYAML:
             'type': 'slot',
             'label': label,
             'count': nslots,
-            'with': []
+            'with': [],
         }
         
         if num_nodes > 0:
@@ -80,7 +80,7 @@ class FluxYAML:
         self.resources.append(resource)
         return len(self.resources) - 1
     
-    def add_task(self, slot_label='default', count_per_slot=0, count_per_node=0):
+    def add_task(self, slot_label='task', count_per_slot=0, count_per_node=0):
         if count_per_slot > 0 and count_per_node > 0:
             raise ValueError("Cannot set both count_per_slot and count_per_node")
         elif count_per_slot == 0 and count_per_node == 0:
@@ -96,7 +96,7 @@ class FluxYAML:
             }
 
         task = {
-            'command': ["flux", "broker", "{{tmpdir}}/script"],
+            'command': ["{{tmpdir}}/script"],
             'slot': slot_label,
             'count': count
         }
@@ -127,7 +127,9 @@ class FluxYAML:
             },
             'files': {
                 'script': {
-                    'data': PreservedScalarString(textwrap.dedent(script_content).strip())
+                    'mode': 33216,
+                    'data': PreservedScalarString(script_content),
+                    'encoding': 'utf-8'
                 }
             }
         }
@@ -136,10 +138,10 @@ class FluxYAML:
         yaml = YAML()
         yaml.default_flow_style = False
         jobspec = {
-            'version': self.version,
             'resources': self.resources,
             'tasks': self.tasks,
-            'attributes': self.attributes
+            'attributes': self.attributes,
+            'version': self.version
         }
         stream = StringIO()
         yaml.dump(jobspec, stream)
