@@ -259,145 +259,148 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
     
 class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
     def _generate_flux_script(self):
-        return textwrap.dedent("""
-        declare -A job_ids
-        scripts="{0}"
+        raise NotImplementedError("Horizontal wrappers with the Flux method are not implemented yet.")
+        # return textwrap.dedent("""
+        # declare -A job_ids
+        # scripts="{0}"
 
-        # Submit the jobs
-        for job_script in $scripts; do
-            job_name=$(basename "$job_script" .cmd)
-            output_log="${{job_name}}.cmd.out.0"
-            error_log="${{job_name}}.cmd.err.0"
+        # # Submit the jobs
+        # for job_script in $scripts; do
+        #     job_name=$(basename "$job_script" .cmd)
+        #     output_log="${{job_name}}.cmd.out.0"
+        #     error_log="${{job_name}}.cmd.err.0"
 
-            job_ids[$job_name]=$(flux batch --output=$output_log --error=$error_log $job_script)
-        done
+        #     job_ids[$job_name]=$(flux batch --output=$output_log --error=$error_log $job_script)
+        # done
 
-        # Wait for the jobs to finish
-        wrapper_failed=0
-        for job_script in $scripts; do
-            job_name=$(basename "$job_script" .cmd)
-            flux job wait ${{job_ids[$job_name]}}
+        # # Wait for the jobs to finish
+        # wrapper_failed=0
+        # for job_script in $scripts; do
+        #     job_name=$(basename "$job_script" .cmd)
+        #     flux job wait ${{job_ids[$job_name]}}
 
-            # Check if the job completed successfully
-            if [ -f "${{job_name}}_COMPLETED" ]; then
-                echo "The job $job_name has been COMPLETED"
-            else
-                echo "The job $job_name has FAILED"
-                touch "${{job_name}}_FAILED"
-                wrapper_failed=1
-            fi
-        done
+        #     # Check if the job completed successfully
+        #     if [ -f "${{job_name}}_COMPLETED" ]; then
+        #         echo "The job $job_name has been COMPLETED"
+        #     else
+        #         echo "The job $job_name has FAILED"
+        #         touch "${{job_name}}_FAILED"
+        #         wrapper_failed=1
+        #     fi
+        # done
 
-        if [ $wrapper_failed -eq 1 ]; then
-            touch "WRAPPER_FAILED"
-            exit 1
-        fi
-        """).format(' '.join(str(s) for s in self.job_scripts), '\n'.ljust(13))
+        # if [ $wrapper_failed -eq 1 ]; then
+        #     touch "WRAPPER_FAILED"
+        #     exit 1
+        # fi
+        # """).format(' '.join(str(s) for s in self.job_scripts), '\n'.ljust(13))
 
 class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
     # TODO: [ENGINES] Observe what happens if a single job arrives. Is it inside another list?
     def _generate_flux_script(self):
-        scripts_str = ''
-        for i, job_list in enumerate(self.job_scripts):
-            scripts_str += f"""scripts[{i}]="{' '.join(str(s) for s in job_list).strip()}"\n"""
+        raise NotImplementedError("Vertical-Horizontal wrappers with the Flux method are not implemented yet.")
+        # scripts_str = ''
+        # for i, job_list in enumerate(self.job_scripts):
+        #     scripts_str += f"""scripts[{i}]="{' '.join(str(s) for s in job_list).strip()}"\n"""
 
-        return textwrap.dedent("""
-        # Job scripts per inner vertical wrapper
-        declare -A scripts
-        {0}
+        # return textwrap.dedent("""
+        # # Job scripts per inner vertical wrapper
+        # declare -A scripts
+        # {0}
 
-        execute_vertical_wrapper()
-        {{
-            scripts=$1
-            for job_script in $scripts; do
-                job_name=$(basename "$job_script" .cmd)
-                output_log="${{job_name}}.cmd.out.0"
-                error_log="${{job_name}}.cmd.err.0"
+        # execute_vertical_wrapper()
+        # {{
+        #     scripts=$1
+        #     for job_script in $scripts; do
+        #         job_name=$(basename "$job_script" .cmd)
+        #         output_log="${{job_name}}.cmd.out.0"
+        #         error_log="${{job_name}}.cmd.err.0"
 
-                # Submit the job
-                job_id=$(flux batch --output=$output_log --error=$error_log $job_script)
+        #         # Submit the job
+        #         job_id=$(flux batch --output=$output_log --error=$error_log $job_script)
 
-                # Wait for the job to finish
-                flux job wait $job_id
+        #         # Wait for the job to finish
+        #         flux job wait $job_id
 
-                # Check if the job completed successfully
-                if [ -f "${{job_name}}_COMPLETED" ]; then
-                    echo "The job $job_name has been COMPLETED"
-                else
-                    echo "The job $job_name has FAILED"
-                    touch "${{job_name}}_FAILED"
-                    touch "WRAPPER_FAILED"
-                    return 1
-                fi
-            done
+        #         # Check if the job completed successfully
+        #         if [ -f "${{job_name}}_COMPLETED" ]; then
+        #             echo "The job $job_name has been COMPLETED"
+        #         else
+        #             echo "The job $job_name has FAILED"
+        #             touch "${{job_name}}_FAILED"
+        #             touch "WRAPPER_FAILED"
+        #             return 1
+        #         fi
+        #     done
 
-            return 0
-        }}
+        #     return 0
+        # }}
 
-        # Execute vertical wrappers in parallel
-        for ((i = 0; i < ${{#scripts[@]}}; i++)); do
-            execute_vertical_wrapper "${{scripts[$i]}}" &
-        done
+        # # Execute vertical wrappers in parallel
+        # for ((i = 0; i < ${{#scripts[@]}}; i++)); do
+        #     execute_vertical_wrapper "${{scripts[$i]}}" &
+        # done
 
-        # Wait for all vertical wrappers (subprocesses) to finish
-        wait
-        """).format(scripts_str, '\n'.ljust(13))
+        # # Wait for all vertical wrappers (subprocesses) to finish
+        # wait
+        # """).format(scripts_str, '\n'.ljust(13))
 
 class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
     def _generate_flux_script(self):
-        scripts_str = ''
-        for i, job_list in enumerate(self.job_scripts):
-            scripts_str += f"""scripts[{i}]="{' '.join(str(s) for s in job_list).strip()}"\n"""
+        raise NotImplementedError("Horizontal-Vertical wrappers with the Flux method are not implemented yet.")
+        # scripts_str = ''
+        # for i, job_list in enumerate(self.job_scripts):
+        #     scripts_str += f"""scripts[{i}]="{' '.join(str(s) for s in job_list).strip()}"\n"""
 
-        return textwrap.dedent("""
-        # Job scripts per inner horizontal wrapper
-        declare -A job_ids
-        declare -A scripts
-        {0}
+        # return textwrap.dedent("""
+        # # Job scripts per inner horizontal wrapper
+        # declare -A job_ids
+        # declare -A scripts
+        # {0}
 
-        execute_horizontal_wrapper()
-        {{
-            scripts=$1
+        # execute_horizontal_wrapper()
+        # {{
+        #     scripts=$1
 
-            # Submit the jobs
-            for job_script in $scripts; do
-                job_name=$(basename "$job_script" .cmd)
-                output_log="${{job_name}}.cmd.out.0"
-                error_log="${{job_name}}.cmd.err.0"
+        #     # Submit the jobs
+        #     for job_script in $scripts; do
+        #         job_name=$(basename "$job_script" .cmd)
+        #         output_log="${{job_name}}.cmd.out.0"
+        #         error_log="${{job_name}}.cmd.err.0"
 
-                job_ids[$job_name]=$(flux batch --output=$output_log --error=$error_log $job_script)
-            done
+        #         job_ids[$job_name]=$(flux batch --output=$output_log --error=$error_log $job_script)
+        #     done
 
-            # Wait for the jobs to finish
-            wrapper_failed=0
-            for job_script in $scripts; do
-                job_name=$(basename "$job_script" .cmd)
-                flux job wait ${{job_ids[$job_name]}}
+        #     # Wait for the jobs to finish
+        #     wrapper_failed=0
+        #     for job_script in $scripts; do
+        #         job_name=$(basename "$job_script" .cmd)
+        #         flux job wait ${{job_ids[$job_name]}}
 
-                # Check if the job completed successfully
-                if [ -f "${{job_name}}_COMPLETED" ]; then
-                    echo "The job $job_name has been COMPLETED"
-                else
-                    echo "The job $job_name has FAILED"
-                    touch "${{job_name}}_FAILED"
-                    wrapper_failed=1
-                fi
-            done
+        #         # Check if the job completed successfully
+        #         if [ -f "${{job_name}}_COMPLETED" ]; then
+        #             echo "The job $job_name has been COMPLETED"
+        #         else
+        #             echo "The job $job_name has FAILED"
+        #             touch "${{job_name}}_FAILED"
+        #             wrapper_failed=1
+        #         fi
+        #     done
 
-            if [ $wrapper_failed -eq 1 ]; then
-                touch "WRAPPER_FAILED"
-            fi
-        }}
+        #     if [ $wrapper_failed -eq 1 ]; then
+        #         touch "WRAPPER_FAILED"
+        #     fi
+        # }}
 
-        # Execute horizontal wrappers
-        for ((i = 0; i < ${{#scripts[@]}}; i++)); do
-            execute_horizontal_wrapper "${{scripts[$i]}}"
+        # # Execute horizontal wrappers
+        # for ((i = 0; i < ${{#scripts[@]}}; i++)); do
+        #     execute_horizontal_wrapper "${{scripts[$i]}}"
 
-            if [ -f "WRAPPER_FAILED" ]; then
-                exit 1
-            fi
-        done
-        """).format(scripts_str, '\n'.ljust(13))
+        #     if [ -f "WRAPPER_FAILED" ]; then
+        #         exit 1
+        #     fi
+        # done
+        # """).format(scripts_str, '\n'.ljust(13))
 
 class PythonWrapperBuilder(WrapperBuilder):
     def get_random_alphanumeric_string(self, letters_count, digits_count):
