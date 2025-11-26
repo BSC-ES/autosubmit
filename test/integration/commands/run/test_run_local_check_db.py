@@ -1,6 +1,5 @@
 from pathlib import Path
 from textwrap import dedent
-from typing import TYPE_CHECKING
 
 import pytest
 from time import sleep
@@ -8,9 +7,6 @@ from time import sleep
 from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
 from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, _assert_db_fields, _assert_files_recovered, run_in_thread
-
-if TYPE_CHECKING:
-    pass
 
 
 # -- Tests
@@ -54,10 +50,10 @@ def test_run_uninterrupted(
         final_status,
         run_type,
         prepare_scratch,
-        common_conf,
+        general_data,
 ):
     yaml = YAML(typ='rt')
-    as_exp = autosubmit_exp(experiment_data=common_conf | yaml.load(jobs_data), include_jobs=False, create=True)
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -134,10 +130,10 @@ def test_run_interrupted(
         final_status,
         wrapper_type,
         prepare_scratch,
-        common_conf,
+        general_data,
 ):
     yaml = YAML(typ='rt')
-    as_exp = autosubmit_exp(experiment_data=common_conf | yaml.load(jobs_data), include_jobs=False, create=True)
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)

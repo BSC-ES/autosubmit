@@ -113,10 +113,10 @@ def test_run_uninterrupted(
         wrapper_type,
         slurm_server: 'DockerContainer',
         prepare_scratch,
-        common_conf,
+        general_data,
 ):
     yaml = YAML(typ='rt')
-    as_exp = autosubmit_exp(experiment_data=common_conf | yaml.load(jobs_data), include_jobs=False, create=True)
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -251,10 +251,10 @@ def test_run_interrupted(
         wrapper_type,
         slurm_server: 'DockerContainer',
         prepare_scratch,
-        common_conf,
+        general_data,
 ):
     yaml = YAML(typ='rt')
-    as_exp = autosubmit_exp(experiment_data=common_conf | yaml.load(jobs_data), include_jobs=False, create=True)
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -309,14 +309,14 @@ def test_run_interrupted(
 ], ids=["Force Failure -> Correct it -> Completed"])
 def test_run_failed_set_to_ready_on_new_run(
         autosubmit_exp,
-        common_conf,
+        general_data,
         jobs_data,
         expected_db_entries,
         final_status,
         wrapper_type):
     yaml = YAML(typ='rt')
     jobs_data_yaml = yaml.load(jobs_data)
-    as_exp = autosubmit_exp(experiment_data=common_conf | jobs_data_yaml, include_jobs=False, create=True)
+    as_exp = autosubmit_exp(experiment_data=general_data | jobs_data_yaml, include_jobs=False, create=True)
     as_conf = as_exp.as_conf
     as_conf.set_last_as_command('run')
 
@@ -326,7 +326,7 @@ def test_run_failed_set_to_ready_on_new_run(
     jobs_data_yaml['JOBS']['job']['SCRIPT'] = """\
                 echo "Hello World with id=READY"
     """
-    as_exp = autosubmit_exp(as_exp.expid, experiment_data=common_conf | jobs_data_yaml, include_jobs=False, create=True)
+    as_exp = autosubmit_exp(as_exp.expid, experiment_data=general_data | jobs_data_yaml, include_jobs=False, create=True)
     as_conf.set_last_as_command('run')
 
     exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)

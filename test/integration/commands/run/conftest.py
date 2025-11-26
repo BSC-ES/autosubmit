@@ -27,13 +27,10 @@ import os
 import pwd
 import sqlite3
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 
 import pytest
 from threading import Thread
-
-if TYPE_CHECKING:
-    pass
 
 # TODO: This should come from a fixture to ensure that the expid is unique per test.
 _EXPID = 't100'
@@ -51,53 +48,6 @@ def set_debug_log_level() -> None:
     """
     from autosubmit.log.log import Log
     Log.set_console_level("DEBUG")
-
-
-@pytest.fixture(scope="function")
-def common_conf(tmp_path) -> dict:
-    return {
-        'PROJECT': {
-            'PROJECT_TYPE': 'none',
-            'PROJECT_DESTINATION': 'dummy_project'
-        },
-        'AUTOSUBMIT': {
-            'WORKFLOW_COMMIT': 'dummy_commit',
-            'LOCAL_ROOT_DIR': str(tmp_path)  # Override root dir to tmp_path
-        },
-        'CONFIG': {
-            "SAFETYSLEEPTIME": 0,
-        },
-        'PLATFORMS': {
-            'TEST_SLURM': {
-                'TYPE': 'slurm',
-                'ADD_PROJECT_TO_HOST': 'False',
-                'HOST': '127.0.0.1',
-                'MAX_WALLCLOCK': '48:00',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch',
-                'TEMP_DIR': '',
-                'USER': 'root',
-                'PROCESSORS': '1',
-                'MAX_PROCESSORS': '128',
-                'PROCESSORS_PER_NODE': '128',
-            },
-            'TEST_PS': {
-                'TYPE': 'PS',
-                'ADD_PROJECT_TO_HOST': 'False',
-                'HOST': '127.0.0.1',
-                'MAX_WALLCLOCK': '48:00',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch',
-                'TEMP_DIR': '',
-                'USER': 'root',
-                'PROCESSORS': '1',
-                'MAX_PROCESSORS': '128',
-                'PROCESSORS_PER_NODE': '128',
-            }
-        }
-    }
 
 
 @pytest.fixture
