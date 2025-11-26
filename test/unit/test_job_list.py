@@ -810,6 +810,6 @@ def test_retrieve_times(job_list, jobs_as_dict, tmp_path, make_exception, second
         for job in completed_jobs:
             job = job_list.get_job_by_name(job.name)
             retrieve_data = job_list.retrieve_times(job.status, job.name, job._tmp_path, make_exception=make_exception,
-                                                    job_times=None, seconds=seconds, job_data_collection=None)
+                                                    seconds=seconds)
             assert retrieve_data.name == job.name
             assert retrieve_data.status == Status.VALUE_TO_KEY[job.status]

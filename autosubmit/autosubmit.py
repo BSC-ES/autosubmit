@@ -2947,7 +2947,7 @@ class Autosubmit:
                 subjobs = []
                 for job in job_list.get_job_list():
                     job_info = JobList.retrieve_times(job.status, job.name, job._tmp_path, make_exception=True,
-                                                      job_times=None, seconds=True, job_data_collection=None)
+                                                      seconds=True)
                     time_total = (job_info.queue_time + job_info.run_time) if job_info else 0
                     subjobs.append(
                         SubJob(job.name,
