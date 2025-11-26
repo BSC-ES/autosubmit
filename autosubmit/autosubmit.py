@@ -5070,7 +5070,7 @@ class Autosubmit:
     def _validate_section_split_formula(section_split_formula: str, validation_message: str) -> str:
         """Validate section/split formula syntax.
 
-        SIM [ Any ], SIM2 [1 2] ], SIM3
+        Expects to receive the second part of the -ftcs filter. ex: SIM [ Any ], SIM2 [1 2], SIM3.
 
         :param section_split_formula: section_split_formula string.
         :param validation_message: Message to append validation errors to.
