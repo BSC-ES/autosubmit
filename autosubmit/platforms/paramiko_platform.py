@@ -747,26 +747,26 @@ class ParamikoPlatform(Platform):
                     Log.debug(f"Error cancelling job {job.id}: {str(e)}")
         return job_status
 
-    def get_completed_job_names(self, job_names_provided: Optional[list[str]] = None) -> list[str]:
+    def get_completed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
         """Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
 
-        :param job_names_provided: If provided, filters the results to include only these job names.
-        :type job_names_provided: Optional[List[str]]
+        :param job_names: If provided, filters the results to include only these job names.
+        :type job_names: Optional[List[str]]
         :return: List of job names with COMPLETED files.
         :rtype: List[str]
         """
-        job_names = []
+        final_job_names = []
         if self.expid in str(self.remote_log_dir):  # Ensure we are in the right experiment
-            if not job_names_provided:
-                cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_COMPLETED' -type f"
+            if not job_names:
+                pattern = "-name '*_COMPLETED'"
             else:
-                patterns = ' -o '.join([f"-name '{name}_COMPLETED'" for name in job_names_provided])
-                cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {patterns} \\) -type f"
+                pattern = ' -o '.join([f"-name '{name}_COMPLETED'" for name in job_names])
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {pattern} \\) -type f"
             self.send_command(cmd)
             output = self.get_ssh_output()
             completed_files = output.strip().split('\n') if output else []
-            job_names = [Path(file).name.replace('_COMPLETED', '') for file in completed_files]
-        return job_names
+            final_job_names = [Path(file).name.replace('_COMPLETED', '') for file in completed_files]
+        return final_job_names
 
     def delete_failed_and_completed_names(self, job_names: list[str]) -> None:
         """Deletes the COMPLETED and FAILED files for the given job names from the remote log directory.

@@ -1097,9 +1097,9 @@ class Platform:
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_completed_job_names(self, job_names_provided: Optional[list[str]] = None) -> list[str]:
+    def get_completed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
         """Get the names of the completed jobs on this platform.
 
-        :param job_names_provided: List of job names to check. If None, all jobs will be checked.
+        :param job_names: List of job names to check. If None, all jobs will be checked.
         :return: List of completed job names.
         """
