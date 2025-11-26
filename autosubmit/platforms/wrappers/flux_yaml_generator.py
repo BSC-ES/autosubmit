@@ -15,11 +15,67 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import textwrap
 from ruamel.yaml import YAML
 from ruamel.yaml.scalarstring import PreservedScalarString
 from io import StringIO
 
-class FluxYAML:
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from autosubmit.job.job import Job
+
+class FluxYAMLGenerator:
+    """
+    Generate a YAML file to submit a job to a Flux system given its specifications.
+    """
+    def __init__(self, job: 'Job', parameters: dict):
+        self.job = job
+        self.parameters = parameters
+
+    # TODO: [ENGINES] Add support for heterogeneous jobs
+    def generate_template(self, template: str) -> str:
+        job_yaml = FluxYAML()
+        yaml_content = ""
+        log_path = self.parameters['HPCLOGDIR']
+        job_name = self.parameters['JOBNAME']
+        job_section = self.parameters['TASKTYPE']
+        expid = self.parameters['DEFAULT.EXPID']
+        wallclock = self._wallclock_to_seconds(self.parameters['WALLCLOCK'])
+        
+        nslots = int(self.parameters['TASKS']) if self.parameters['TASKS'] else 0
+        num_nodes = int(self.parameters['NODES']) if self.parameters['NODES'] else 0
+        num_cores = int(self.parameters['PROCESSORS']) if self.parameters['PROCESSORS'] else 0
+
+        # Output files paths will be replaced in runtime
+        output_file = f"{log_path}/{job_name}.cmd.out.0"
+        error_file = f"{log_path}/{job_name}.cmd.err.0"
+
+        # Populate the YAML
+        job_yaml.add_slot(nslots=nslots, num_nodes=num_nodes, num_cores=num_cores)
+        job_yaml.add_task(count_per_slot=1)
+
+        job_yaml.set_attributes(duration=wallclock, cwd=log_path, job_name=job_name, output_file=output_file, error_file=error_file, script_content=template)
+
+        # Compose template
+        yaml_content += self._get_job_header(job_section, expid)
+        yaml_content += "\n" + job_yaml.generate()
+
+        return yaml_content
+    
+    def _wallclock_to_seconds(self, wallclock: str) -> int:
+        """Convert wallclock time in format HH:MM to total seconds."""
+        h, m = map(int, wallclock.split(':'))
+        return h * 3600 + m * 60
+
+    def _get_job_header(self, tasktype: str, expid: str) -> str:
+        return textwrap.dedent(f"""\
+###############################################################################
+#                   {tasktype} {expid} EXPERIMENT
+###############################################################################
+           """)
+
+class FluxYAML(object):
     def __init__(self):
         # Jobspec attributes
         self.version = 1
@@ -131,7 +187,7 @@ class FluxYAML:
             }
         }
 
-    def generate_yaml(self):
+    def generate(self):
         yaml = YAML()
         yaml.default_flow_style = False
         jobspec = {
