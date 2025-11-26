@@ -18,10 +18,9 @@ import os
 import random
 import string
 import textwrap
-from autosubmit.platforms.wrappers.flux_yaml_generator import FluxYAML
 from autosubmit.log.log import AutosubmitCritical
 
-from typing import Dict, List
+from typing import List
 
 
 class WrapperDirector:
@@ -138,41 +137,6 @@ class FluxWrapperBuilder(WrapperBuilder):
     This is a special implementation because we use Flux as a wrapper engine inside 
     Slurm allocations, not as a platform.
     """
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        cwd = f"{kwargs.get('rootdir', '')}/LOG_{self.expid}"
-        self.tmp_path = kwargs.get('wrapper_data', {}).tmp_path if kwargs.get('wrapper_data', None) else ''
-
-        for job_script in self.job_scripts:
-            job_script_path = f"{self.tmp_path}/{job_script}"
-            job_name = job_script.replace('.cmd', '')
-            job_section = job_name.split('_')[-1]
-            output_file = f"{cwd}/{job_name}.cmd.out.0"
-            error_file = f"{cwd}/{job_name}.cmd.err.0"
-            job_resources = self.jobs_resources.get(job_section, dict())
-            nslots = int(job_resources.get('TASKS', 1))
-            num_nodes = int(job_resources.get('NODES', 0))
-            num_cores = int(job_resources.get('PROCESSORS', 0))
-
-            # Initialize the YAML generator
-            job_yaml = FluxYAML()
-            # TODO: [ENGINES] Add support for exclusive nodes, memory and heterogeneous jobs
-            # Populate the YAML
-            job_yaml.add_slot(nslots=nslots, num_nodes=num_nodes, num_cores=num_cores)
-            job_yaml.add_task(count_per_slot=1)
-
-            # Open the job script to include its content in the YAML
-            with open(job_script_path, 'r') as f:
-                script_content = f.read()
-
-            job_yaml.set_attributes(duration=self.wallclock_by_level, cwd=cwd, job_name=job_name, output_file=output_file, error_file=error_file, script_content=script_content)
-
-            # Replace the job script with its corresponding YAML representation
-            yaml_content = job_yaml.generate_yaml()
-            
-            with open(job_script_path, 'w') as f:
-                f.write(yaml_content)
-
     def build_imports(self):
         return ""
     
@@ -217,8 +181,10 @@ class FluxWrapperBuilder(WrapperBuilder):
 
 class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
     # TODO: [ENGINES] Check retrial behavior
+    # TODO: [ENGINES] Stat file generation, retry management...
     def _generate_flux_script(self):
         return textwrap.dedent("""
+            import os
             import flux
             import flux.job
 
@@ -229,14 +195,16 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
                 print("Submitting job script: " + job_script)
                 jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
                 jobid = flux.job.submit(handle, jobspec, waitable=True)
-                job_meta = flux.job.get_job(handle, jobid)
-                print("JOB META: " + str(job_meta))
                 print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
                 print("RESOURCES: " + str(jobspec.resources))
                 print("Waiting for job " + str(jobid) + " to finish...")
-                print(flux.job.result(handle, jobid).result)
-                
-                if flux.job.result(handle, jobid).result != "COMPLETED":
+                print(flux.job.wait(handle, jobid))
+
+                job_meta = flux.job.get_job(handle, jobid)
+                print("JOB META: " + str(job_meta))
+
+                completed_path = job_script.replace('.cmd', '_COMPLETED')
+                if not os.path.exists(completed_path):
                     print("The job " + job_script + " has FAILED")
                     open(job_script.replace('.cmd', '_FAILED'),'w').close()
                     open("WRAPPER_FAILED",'w').close()
