@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import textwrap
 from ruamel.yaml import YAML
 from ruamel.yaml.scalarstring import PreservedScalarString
 from io import StringIO
@@ -47,7 +46,6 @@ class FluxYAML:
                 'type': 'node',
                 'count': num_nodes,
                 'exclusive': exclusive,
-                'with': []
             }
             if mem_per_node_gb > 0:
                 node['with'].append({
@@ -60,7 +58,6 @@ class FluxYAML:
             core = {
                 'type': 'core',
                 'count': num_cores,
-                'with': []
             }
             if mem_per_core_gb > 0:
                 core['with'].append({
