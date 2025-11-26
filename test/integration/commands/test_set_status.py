@@ -96,7 +96,7 @@ def test_set_status(as_exp, slurm_server, reset_target):
 @pytest.mark.parametrize(
     "ftcs_filter, expected_jobs",
     [
-        # Bad ones
+        # # Bad ones
         ("", 0),
         ("Any", 0),
         ("LOCALJOB", 0),
@@ -113,16 +113,20 @@ def test_set_status(as_exp, slurm_server, reset_target):
         ("[1]", 0),
         (",LOCALJOB", 0),
         ("20200101 [ fc0 [1] ] ]", 0),
-        ("[20200101 [ fc0 [1] ] ],LOCALJOB [", 0),
-        ("[20200101 [ fc0 [1] ] ],LOCALJOB ]", 0),
-        ("[20200101 [ fc0 [1] ] ],LOCALJOB 1", 0),
-        ("[20200101 [ fc0 [1] ] ],LOCALJOB [[1]]", 0),
         ("[20200101]", 0),
         ("[20200101 [fc0] ]", 0),
         ("[[20200101 [fc0] ]]", 0),
         ("[[20200101 [ fc0 [1] ] ]]", 0),
-
-        # Good ones // Testing chunk_formula
+        ("[20200101 [ fc0 [1] ] ],LOCALJOB [", 0),
+        ("[20200101 [ fc0 [1] ] ],LOCALJOB ]", 0),
+        ("[20200101 [ fc0 [1] ] ],LOCALJOB 1", 0),
+        ("[20200101 [ fc0 [1] ] ],LOCALJOB [[1]]", 0),
+        ("[20200101 [ fc0 [1] ] ],LOCALJOB [1-]", 0),
+        ("[20200101 [ fc0 [1] ] ],LOCALJOB [1:]", 0),
+        ("[20200101 [ fc0 [1] ] ],LOCALJOB [-]", 0),
+        ("[20200101 [ fc0 [1] ] ],LOCALJOB [:]", 0),
+        #
+        # # Good ones // Testing chunk_formula
         ("[20200101 [ fc0 [1] ] ]", 9),
         ("[20200101 [ fc0 [1] fc1 [1] ] ]", 18),
         ("[20200101 [ fc0 [1] fc1 [1] ] 20200102 [ fc0 [1] fc1 [1] ] ]", 36),
