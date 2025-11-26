@@ -111,16 +111,6 @@ class JobPackageBase(object):
         :rtype: Platform
         """
         return self._platform
-    
-    @property
-    def tmp_path(self):
-        """
-        Returns the tmp path
-
-        :return: tmp path
-        :rtype: String
-        """
-        return self._tmp_path
 
     @threaded
     def check_scripts(self, jobs: list[Job], configuration: 'AutosubmitConfig', only_generate: bool = False):
