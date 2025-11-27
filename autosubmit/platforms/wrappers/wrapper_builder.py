@@ -181,37 +181,61 @@ class FluxWrapperBuilder(WrapperBuilder):
 
 class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
     # TODO: [ENGINES] Check retrial behavior
-    # TODO: [ENGINES] Stat file generation, retry management...
+    # TODO: [ENGINES] Fix identation in generated script
     def _generate_flux_script(self):
         return textwrap.dedent("""
-            import os
-            import flux
-            import flux.job
+        import os
+        import flux
+        import flux.job
 
-            handle = flux.Flux()
-            job_scripts={0}
+        handle = flux.Flux()
+        job_scripts={0}
+        max_retries={1}
 
-            for job_script in job_scripts:
-                print("Submitting job script: " + job_script)
-                jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
+        for job_script in job_scripts:
+            fail_count=0
+            completed=0
+            jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
+
+            while fail_count <= max_retries and completed == 0:
+                # Submit the job
+                jobspec.stdout = job_script + ".out." + str(fail_count)
+                jobspec.stderr =  job_script + ".err." + str(fail_count)
                 jobid = flux.job.submit(handle, jobspec, waitable=True)
+
+                # Do stuff in the meantime
+                stat_filename = job_script.replace('.cmd', f'_STAT_{{fail_count}}')
+                completed_path = job_script.replace('.cmd', '_COMPLETED')
+
+                # TODO: [ENGINES] Debug info, remove later
                 print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
                 print("RESOURCES: " + str(jobspec.resources))
-                print("Waiting for job " + str(jobid) + " to finish...")
-                print(flux.job.wait(handle, jobid))
 
+                # Wait for the job to finish
+                flux.job.wait(handle, jobid)
+
+                # Create the STAT file
                 job_meta = flux.job.get_job(handle, jobid)
-                print("JOB META: " + str(job_meta))
+                start_time = int(job_meta.get('t_run', 0))
+                finish_time = int(job_meta.get('t_cleanup', 0))
+                with open(stat_filename, 'w') as stat_file:
+                    stat_file.write(f"{{start_time}}\n{{finish_time}}")
 
-                completed_path = job_script.replace('.cmd', '_COMPLETED')
-                if not os.path.exists(completed_path):
-                    print("The job " + job_script + " has FAILED")
-                    open(job_script.replace('.cmd', '_FAILED'),'w').close()
-                    open("WRAPPER_FAILED",'w').close()
-                    exit(1)
-                else:
+                # Check if the job completed successfully
+                if os.path.exists(completed_path):
                     print("The job " + job_script + " has been COMPLETED")
-            """).format(self.job_scripts, '\n'.ljust(13))
+                    completed = 1
+                else:
+                    print("The job " + job_script + " has FAILED")
+                    fail_count += 1
+
+            if completed == 0:
+                open(job_script.replace('.cmd', '_FAILED'),'w').close()
+                open("WRAPPER_FAILED",'w').close()
+                exit(1)
+
+        exit(0)
+        """).format(self.job_scripts, self.retrials, '\n'.ljust(13))
         # return textwrap.dedent("""
         # max_retries={1}
         # scripts="{0}"
