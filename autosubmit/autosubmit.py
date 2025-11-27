@@ -2335,6 +2335,8 @@ class Autosubmit:
                     Log.warning('Git operational check disabled by user')
 
                 Log.debug("Running main running loop")
+                Log.warning("Known issue: Due to recent changes in Autosubmit's script generation, error line numbers in "
+                            "`script.cmd.err` files may be offset by ~5 lines. Please adjust accordingly when debugging.")
                 did_run = False
                 #########################
                 # AUTOSUBMIT - MAIN LOOP

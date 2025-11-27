@@ -12,6 +12,11 @@ use it without a failure, but there will be a warning displayed asking you to
 update your command line. This argument will be completely removed on a later
 release.
 
+**Known issues:**
+
+- Due to a new heredoc blocks to handle failures in the templates, `script.cmd.err` line numbers are offset by ~5 lines (e.g. reported line 10 → actual line 15). #2694 #2718
+- Please adjust accordingly when debugging.
+
 **Bug fixes:**
 
 - Fixed issue with the verification of dirty Git local repositories in operational experiments #2446
