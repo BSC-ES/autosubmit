@@ -684,7 +684,7 @@ def test_get_completed_job_names(provided_jobs: list, real_completed_jobs: list,
         platform.send_command(f"touch {completed_file}", ignore_log=True)
 
     completed_jobs = platform.get_completed_job_names(
-        job_names_provided=provided_jobs
+        job_names=provided_jobs
     )
 
     for job in expected_result:
