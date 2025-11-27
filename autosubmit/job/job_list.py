@@ -3173,8 +3173,7 @@ class JobList(object):
         return job_to_package, package_to_jobs, package_to_package_id, package_to_symbol
 
     @staticmethod
-    def retrieve_times(status_code, name, tmp_path, make_exception=False, job_times=None,
-                       seconds=False, job_data_collection=None) -> Union[None, JobRow]:
+    def retrieve_times(status_code, name, tmp_path, make_exception=False, seconds=False) -> Union[None, JobRow]:
         """
         Retrieve job timestamps from database.
         :param job_data_collection:
@@ -3198,47 +3197,11 @@ class JobList(object):
         energy = 0
         seconds_queued = 0
         seconds_running = 0
-        submit_time = datetime.timedelta()
         start_time = datetime.timedelta()
+        submit_time = datetime.timedelta()
         finish_time = datetime.timedelta()
 
         try:
-            # Getting data from new job database
-            if job_data_collection is not None:
-                job_data = next(
-                    (job for job in job_data_collection if job.job_name == name), None)
-                if job_data:
-                    status = Status.VALUE_TO_KEY[status_code]
-                    if status == job_data.status:
-                        energy = job_data.energy
-                        t_submit = job_data.submit
-                        t_start = job_data.start
-                        t_finish = job_data.finish
-                        # Test if start time does not make sense
-                        if t_start >= t_finish:
-                            if job_times:
-                                _, c_start, c_finish, _, _ = job_times.get(
-                                    name, (0, t_start, t_finish, 0, 0))
-                                t_start = c_start if t_start > c_start else t_start
-                                job_data.start = t_start
-
-                        if seconds is False:
-                            queue_time = math.ceil(
-                                job_data.queuing_time() / 60)
-                            running_time = math.ceil(
-                                job_data.running_time() / 60)
-                        else:
-                            queue_time = job_data.queuing_time()
-                            running_time = job_data.running_time()
-
-                        if status_code in [Status.SUSPENDED]:
-                            t_submit = t_start = t_finish = 0
-
-                        return JobRow(job_data.job_name, int(queue_time), int(running_time), status,
-                                      energy, JobList.ts_to_datetime(t_submit),
-                                      JobList.ts_to_datetime(t_start), JobList.ts_to_datetime(t_finish),
-                                      job_data.ncpus, job_data.run_id)
-
             # Using standard procedure
             if status_code in [Status.RUNNING, Status.SUBMITTED, Status.QUEUING,
                                Status.FAILED] or make_exception is True:
@@ -3270,20 +3233,6 @@ class JobList(object):
             else:
                 # For job times completed we no longer use time-deltas, but timestamps
                 status = Status.VALUE_TO_KEY[status_code]
-                if job_times and status_code not in [Status.READY,
-                                                     Status.WAITING, Status.SUSPENDED]:
-                    if name in list(job_times.keys()):
-                        submit_time, start_time, finish_time, status, detail_id = job_times[
-                            name]
-                        seconds_running = finish_time - start_time
-                        seconds_queued = start_time - submit_time
-                        submit_time = int(submit_time)
-                        start_time = int(start_time)
-                        finish_time = int(finish_time)
-                else:
-                    submit_time = 0
-                    start_time = 0
-                    finish_time = 0
 
         except Exception:
             print((traceback.format_exc()))
@@ -3291,7 +3240,7 @@ class JobList(object):
 
         seconds_queued = seconds_queued * (-1) if seconds_queued < 0 else seconds_queued
         seconds_running = seconds_running * (-1) if seconds_running < 0 else seconds_running
-        if seconds is False:
+        if seconds:
             queue_time = math.ceil(
                 seconds_queued / 60) if seconds_queued > 0 else 0
             running_time = math.ceil(
