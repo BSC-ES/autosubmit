@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 # -- Tests
 
+@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
@@ -104,7 +105,38 @@ if TYPE_CHECKING:
 
     """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
 
-], ids=["Success_simple", "Success_v", "Failed_simple", "Failed_v"])
+    (dedent("""\
+EXPERIMENT:
+    NUMCHUNKS: '2'
+JOBS:
+    job:
+        SCRIPT: |
+            echo "Hello World with id=Success + wrappers"
+            sleep 1
+        PLATFORM: TEST_SLURM
+        RUNNING: chunk
+        wallclock: 00:01
+
+wrappers:
+    wrapper:
+        JOBS_IN_WRAPPER: job
+        TYPE: horizontal
+PLATFORMS:
+    TEST_SLURM:
+        ADD_PROJECT_TO_HOST: 'False'
+        HOST: '127.0.0.1'
+        PROJECT: 'group'
+        QUEUE: 'gp_debug'
+        SCRATCH_DIR: '/tmp/scratch/'
+        TEMP_DIR: ''
+        TYPE: 'slurm'
+        USER: 'root'
+        MAX_WALLCLOCK: '02:00'
+        MAX_PROCESSORS: '4'
+        PROCESSORS_PER_NODE: '4'
+"""), 2, "COMPLETED", "horizontal")
+
+], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper", "Success with horizontal wrapper"])
 def test_run_uninterrupted(
         autosubmit_exp,
         jobs_data: str,
@@ -154,6 +186,7 @@ def test_run_uninterrupted(
         pytest.fail(e_msg)
 
 
+@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
@@ -242,7 +275,38 @@ def test_run_uninterrupted(
 
     """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
 
-], ids=["Success_simple", "Success_v", "Failed_simple", "Failed_v"])
+    (dedent("""\
+EXPERIMENT:
+    NUMCHUNKS: '2'
+JOBS:
+    job:
+        SCRIPT: |
+            echo "Hello World with id=Success + wrappers"
+            sleep 1
+        PLATFORM: TEST_SLURM
+        RUNNING: chunk
+        wallclock: 00:01
+
+wrappers:
+    wrapper:
+        JOBS_IN_WRAPPER: job
+        TYPE: horizontal
+PLATFORMS:
+    TEST_SLURM:
+        ADD_PROJECT_TO_HOST: 'False'
+        HOST: '127.0.0.1'
+        PROJECT: 'group'
+        QUEUE: 'gp_debug'
+        SCRATCH_DIR: '/tmp/scratch/'
+        TEMP_DIR: ''
+        TYPE: 'slurm'
+        USER: 'root'
+        MAX_WALLCLOCK: '02:00'
+        MAX_PROCESSORS: '4'
+        PROCESSORS_PER_NODE: '4'
+"""), 2, "COMPLETED", "horizontal")
+
+], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper", "Success with horizontal wrapper"])
 def test_run_interrupted(
         autosubmit_exp,
         jobs_data: str,
