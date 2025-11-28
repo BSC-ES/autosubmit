@@ -198,7 +198,7 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
                 # Submit the job
                 jobspec.stdout = job_script + ".out." + str(fail_count)
                 jobspec.stderr =  job_script + ".err." + str(fail_count)
-                jobid = flux.job.submit(handle, jobspec, waitable=True)
+                job_id = flux.job.submit(handle, jobspec, waitable=True)
 
                 # Do stuff in the meantime
                 stat_filename = job_script.replace('.cmd', f'_STAT_{{fail_count}}')
@@ -209,10 +209,10 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
                 print("RESOURCES: " + str(jobspec.resources))
 
                 # Wait for the job to finish
-                flux.job.wait(handle, jobid)
+                flux.job.wait(handle, job_id)
 
                 # Create the STAT file
-                job_meta = flux.job.get_job(handle, jobid)
+                job_meta = flux.job.get_job(handle, job_id)
                 start_time = int(job_meta.get('t_run', 0))
                 finish_time = int(job_meta.get('t_cleanup', 0))
                 with open(stat_filename, 'w') as stat_file:
@@ -279,52 +279,61 @@ class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
 class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
     # TODO: [ENGINES] Observe what happens if a single job arrives. Is it inside another list?
     def _generate_flux_script(self):
-        raise NotImplementedError("Vertical-Horizontal wrappers with the Flux method are not implemented yet.")
-        # scripts_str = ''
-        # for i, job_list in enumerate(self.job_scripts):
-        #     scripts_str += f"""scripts[{i}]="{' '.join(str(s) for s in job_list).strip()}"\n"""
+        return textwrap.dedent("""
+        import os
+        import flux
+        import flux.job
+        from threading import Thread
 
-        # return textwrap.dedent("""
-        # # Job scripts per inner vertical wrapper
-        # declare -A scripts
-        # {0}
+        job_scripts={0}
 
-        # execute_vertical_wrapper()
-        # {{
-        #     scripts=$1
-        #     for job_script in $scripts; do
-        #         job_name=$(basename "$job_script" .cmd)
-        #         output_log="${{job_name}}.cmd.out.0"
-        #         error_log="${{job_name}}.cmd.err.0"
+        class VerticalWrapperThread(Thread):
+            def __init__ (self, jobs_list):
+                Thread.__init__(self)
+                self.jobs_list = jobs_list
+                self.handle = flux.Flux()
 
-        #         # Submit the job
-        #         job_id=$(flux batch --output=$output_log --error=$error_log $job_script)
+            def run(self):
+                for job_script in self.jobs_list:
+                    # Submit the job
+                    jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
+                    job_id = flux.job.submit(self.handle, jobspec, waitable=True)
 
-        #         # Wait for the job to finish
-        #         flux job wait $job_id
+                    # Do stuff in the meantime
+                    completed_path = job_script.replace('.cmd', '_COMPLETED')
+                    failed_path = job_script.replace('.cmd', '_FAILED')
 
-        #         # Check if the job completed successfully
-        #         if [ -f "${{job_name}}_COMPLETED" ]; then
-        #             echo "The job $job_name has been COMPLETED"
-        #         else
-        #             echo "The job $job_name has FAILED"
-        #             touch "${{job_name}}_FAILED"
-        #             touch "WRAPPER_FAILED"
-        #             return 1
-        #         fi
-        #     done
+                    # TODO: [ENGINES] Debug info, remove later
+                    print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
+                    print("RESOURCES: " + str(jobspec.resources))
 
-        #     return 0
-        # }}
+                    # Wait for the job to finish
+                    flux.job.wait(self.handle, job_id)
 
-        # # Execute vertical wrappers in parallel
-        # for ((i = 0; i < ${{#scripts[@]}}; i++)); do
-        #     execute_vertical_wrapper "${{scripts[$i]}}" &
-        # done
+                    # Check if the job completed successfully
+                    if os.path.exists(completed_path):
+                        print("The job " + job_script + " has been COMPLETED")
+                    else:
+                        print("The job " + job_script + " has FAILED")
+                        open(failed_path,'w').close()
+                        open("WRAPPER_FAILED",'w').close()
+                        exit(1)
 
-        # # Wait for all vertical wrappers (subprocesses) to finish
-        # wait
-        # """).format(scripts_str, '\n'.ljust(13))
+                exit(0)
+
+        # Execute vertical wrappers in parallel
+        threads = []
+        for jobs_list in job_scripts:
+            thread = VerticalWrapperThread(jobs_list)
+            threads.append(thread)
+            thread.start()
+
+        # Wait for all vertical wrappers to finish
+        for thread in threads:
+            thread.join()
+
+        exit(0)
+        """).format(self.job_scripts)
 
 class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
     def _generate_flux_script(self):
