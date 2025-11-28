@@ -2279,6 +2279,7 @@ class Job(object):
         :type reset_logs: bool
         :return: None
         """
+
         if not set_attributes and as_conf.needs_reload():
             set_attributes = True
 
@@ -2293,6 +2294,8 @@ class Job(object):
             self.update_dict_parameters(as_conf)
         self.init_platform(as_conf)
         parameters = as_conf.load_parameters()
+        # TODO: This shouldn't be neccesary aims to fix 2432 issue
+        as_conf.load_current_hpcarch_parameters(parameters)
         parameters = self.update_current_parameters(as_conf, parameters)
         parameters = self.update_job_parameters(as_conf, parameters, set_attributes)
         parameters = self.update_platform_associated_parameters(as_conf, parameters, parameters['CHUNK'],
