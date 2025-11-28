@@ -192,6 +192,8 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
         for job_script in job_scripts:
             fail_count=0
             completed=0
+            completed_path = job_script.replace('.cmd', '_COMPLETED')
+            failed_path = job_script.replace('.cmd', '_FAILED')
             jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
 
             while fail_count <= max_retries and completed == 0:
@@ -202,7 +204,6 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
 
                 # Do stuff in the meantime
                 stat_filename = job_script.replace('.cmd', f'_STAT_{{fail_count}}')
-                completed_path = job_script.replace('.cmd', '_COMPLETED')
 
                 # TODO: [ENGINES] Debug info, remove later
                 print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
@@ -227,7 +228,7 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
                     fail_count += 1
 
             if completed == 0:
-                open(job_script.replace('.cmd', '_FAILED'),'w').close()
+                open(failed_path,'w').close()
                 open("WRAPPER_FAILED",'w').close()
                 exit(1)
 
