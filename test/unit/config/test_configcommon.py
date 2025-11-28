@@ -132,7 +132,7 @@ def test_yaml_deprecation_warning(tmp_path, autosubmit_config: 'AutosubmitConfig
             PLATFORM = LOCAL
             '''))
         f.flush()
-    as_conf.ini_to_yaml(root_dir=tmp_path, ini_file=str(ini_file))
+    as_conf.ini_to_yaml(root_dir=tmp_path, ini_file=ini_file)
 
     backup_file = Path(f'{ini_file}_AS_v3_backup')
     assert backup_file.exists()
