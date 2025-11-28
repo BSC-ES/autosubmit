@@ -343,55 +343,45 @@ class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
         import os
         import flux
         import flux.job
-        from threading import Thread
 
+        handle = flux.Flux()
         job_scripts={0}
         job_ids = {{}}
 
-        class HorizontalWrapperThread(Thread):
-            def __init__ (self, jobs_list):
-                Thread.__init__(self)
-                self.jobs_list = jobs_list
-                self.handle = flux.Flux()
+        def run_horizontal_wrapper(jobs_list):
+            # Submit the jobs
+            for job_script in jobs_list:
+                jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
+                job_ids[job_script] = flux.job.submit(handle, jobspec, waitable=True)
 
-            def run(self):
-                # Submit the jobs
-                for job_script in self.jobs_list:
-                    jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
-                    job_ids[job_script] = flux.job.submit(self.handle, jobspec, waitable=True)
+                # TODO: [ENGINES] Debug info, remove later
+                print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
+                print("RESOURCES: " + str(jobspec.resources))
 
-                    # TODO: [ENGINES] Debug info, remove later
-                    print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
-                    print("RESOURCES: " + str(jobspec.resources))
+            # Wait for the jobs to finish
+            wrapper_failed = False
+            for job_script in jobs_list:
+                completed_path = job_script.replace('.cmd', '_COMPLETED')
+                failed_path = job_script.replace('.cmd', '_FAILED')
+                flux.job.wait(handle, job_ids[job_script])
 
-                # Wait for the jobs to finish
-                wrapper_failed = False
-                for job_script in self.jobs_list:
-                    completed_path = job_script.replace('.cmd', '_COMPLETED')
-                    failed_path = job_script.replace('.cmd', '_FAILED')
-                    flux.job.wait(self.handle, job_ids[job_script])
+                # Check if the job completed successfully
+                if os.path.exists(completed_path):
+                    print("The job " + job_script + " has been COMPLETED")
+                else:
+                    print("The job " + job_script + " has FAILED")
+                    open(failed_path,'w').close()
+                    wrapper_failed = True        
 
-                    # Check if the job completed successfully
-                    if os.path.exists(completed_path):
-                        print("The job " + job_script + " has been COMPLETED")
-                    else:
-                        print("The job " + job_script + " has FAILED")
-                        open(failed_path,'w').close()
-                        wrapper_failed = True        
+            if wrapper_failed:
+                open("WRAPPER_FAILED",'w').close()
 
-                if wrapper_failed:
-                    open("WRAPPER_FAILED",'w').close()
-
-                exit(0)
+            return
 
         # Execute horizontal wrappers
         for jobs_list in job_scripts:
-            thread = HorizontalWrapperThread(jobs_list)
-            thread.start()
-
-            # Wait for the inner horizontal wrapper to finish
-            thread.join()
-
+            run_horizontal_wrapper(jobs_list)
+                               
             if os.path.exists("WRAPPER_FAILED"):
                 exit(1)
 
