@@ -5095,22 +5095,14 @@ class Autosubmit:
                 if brackets_right > 1:
                     validation_message += f"\n\tToo many closing brackets ']' in section/split entry: {section}."
                 if brackets_left == 1 and brackets_right == 1:
-                    # Check splits
                     splits = section.split('[')[-1].split(']')[0].strip().upper()
-
-                    if ":" in splits or "-" in splits:
-                        if ":" in splits:
-                            splits = splits.split(":")
-                        else:
-                            splits = splits.split("-")
-                        if len(splits) < 2:
+                    if any(char in splits for char in (":", "-")):
+                        start_end = re.split(r'[:\-]', splits)
+                        if len(start_end) < 2:
                             validation_message += f"\n\tIncomplete split range in section/split entry: {splits}."
-                        else:
-                            start = splits[0]
-                            end = splits[-1]
-                            if not start.isdigit() or not end.isdigit():
-                                validation_message += f"\n\tNon-integer split range in section/split entry: {splits}."
-                    elif not all(s.strip().isdigit() or s == "ANY" for s in splits.split()):
+                        elif not (start_end[0].strip().isdigit() and start_end[-1].strip().isdigit()):
+                            validation_message += f"\n\tNon-integer split range in section/split entry: {splits}."
+                    elif not all(p.strip().isdigit() or p.strip().upper() == "ANY" for p in splits.split()):
                         validation_message += f"\n\tNon-integer split in section/split entry: {splits}."
 
         return validation_message
