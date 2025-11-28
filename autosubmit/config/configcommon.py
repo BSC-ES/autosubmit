@@ -712,6 +712,7 @@ class AutosubmitConfig(object):
         if new_file.data.get("AS_MISC", False) and not load_misc:
             self.misc_files.append(yaml_file)
             new_file.data = {}
+        self._delete_autosubmit_calculated_variables(new_file.data)
         return self.unify_conf(current_folder_data, new_file.data)
 
     # noinspection PyMethodMayBeStatic
@@ -1642,6 +1643,18 @@ class AutosubmitConfig(object):
         )
         return parameters
 
+    @staticmethod
+    def _delete_autosubmit_calculated_variables(yaml_data: dict):
+        """Deletes autosubmit calculated variables from a yaml data.
+        :param yaml_data: dict with yaml data
+        :return: None
+        """
+        # Context: It could happen that a %PLACEHOLDER% that references any of these variables, points to a different folder than AS does leading to runtime errors.
+        # TODO: Revise if there could be more AS internally calculated variables to delete
+        keys_to_delete = ["HPCROOTDIR", "HPCLOGDIR", "HPCARCH"]
+        for key in keys_to_delete:
+            yaml_data.pop(key, None)
+
     def load_custom_config(self, current_data, filenames_to_load):
         """Loads custom config files
         :param current_data: dict with current data
@@ -1841,6 +1854,7 @@ class AutosubmitConfig(object):
                 self.misc_data = self.unify_conf(self.misc_data,
                                                  self.load_config_file(self.misc_data, Path(filename), load_misc=True))
             self.load_current_hpcarch_parameters()
+
             self.load_workflow_commit()
             self.dynamic_variables = {}
 
@@ -1869,12 +1883,38 @@ class AutosubmitConfig(object):
                     shell=True
                 ).decode(locale.getpreferredencoding()).strip("\n")
 
-    def load_current_hpcarch_parameters(self) -> None:
-        """Load custom HPCARCH parameters."""
+    def load_current_hpcarch_parameters(self, parameters: Optional[dict] = None) -> None:
+        """Load custom HPCARCH parameters.
+
+        :param parameters: Dictionary to populate with HPC values. If None, use self.experiment_data.
+        """
+        platforms = self.experiment_data.get("PLATFORMS", {})
         hpcarch: str = self.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
-        for name, value in self.experiment_data.get("PLATFORMS", {}).get(hpcarch, {}).items():
-            self.experiment_data[f"HPC{name}"] = value
-        self.experiment_data["HPCARCH"] = hpcarch
+        hpcarch_data: dict = platforms.get(hpcarch, {})
+
+        target = parameters if parameters is not None else self.experiment_data
+
+        for name, value in hpcarch_data.items():
+            target[f"HPC{name}"] = value
+
+        target["HPCARCH"] = hpcarch
+
+        scratch = hpcarch_data.get("SCRATCH_DIR", "")
+        project = hpcarch_data.get("SCRATCH_PROJECT_DIR", hpcarch_data.get("PROJECT", ""))
+        user = hpcarch_data.get("USER", "")
+
+        if scratch and project and user:
+            base = Path(scratch) / project / user
+            target["HPCROOTDIR"] = base / f"LOG_{self.expid}"
+            target["HPCLOGDIR"] = target["HPCROOTDIR"] / f"LOG_{self.expid}"
+        # Default local paths.
+        elif hpcarch.upper() == "LOCAL":
+            target["HPCROOTDIR"] = Path(BasicConfig.LOCAL_ROOT_DIR) / BasicConfig.LOCAL_TMP_DIR / f"LOG_{self.expid}"
+            target["HPCLOGDIR"] = target["HPCROOTDIR"] / f"LOG_{self.expid}"
+
+        if target.get("HPCROOTDIR", None) and target.get("HPCLOGDIR", None):
+            target["HPCROOTDIR"] = str(target["HPCROOTDIR"])
+            target["HPCLOGDIR"] = str(target["HPCLOGDIR"])
 
     def save(self) -> None:
         """Saves the experiment data into the ``experiment_folder/conf/metadata`` folder as a YAML file."""

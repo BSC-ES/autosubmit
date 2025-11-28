@@ -1,10 +1,10 @@
 import pytest
-from typing import Dict
+from typing import Dict, Any
 from pathlib import Path
 
 
 @pytest.fixture(scope="function")
-def general_data(tmp_path: Path) -> Dict[str, object]:
+def general_data(tmp_path: Path) -> Dict[str, Any]:
     """
     Provides part of the `experiment_data` dictionary used by the
     integration tests in `commands`.

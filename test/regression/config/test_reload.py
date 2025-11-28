@@ -271,8 +271,10 @@ def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any)
     parameters_values = ' '.join(map(str, parameters.values()))
     import re
     placeholders = re.findall(r"%\w+%", parameters_values)
+    substituted_during_update_parameters = ['%HPCARCH%', '%HPCLOGDIR%', '%HPCROOTDIR%']
     placeholders_in_parameters = [placeholder for placeholder in placeholders if
-                                  placeholder.strip("%") in parameters.keys()]
+                                  placeholder.strip("%") in parameters.keys() and placeholder not in substituted_during_update_parameters]
+
     assert not placeholders_in_parameters
 
     # Check that all keys are in upper_case

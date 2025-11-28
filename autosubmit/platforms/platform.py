@@ -580,9 +580,6 @@ class Platform:
         as_conf.experiment_data['HPCTEMP_DIR'] = self.temp_dir
         if self.temp_dir is None:
             self.temp_dir = ''
-        as_conf.experiment_data['HPCROOTDIR'] = self.root_dir
-
-        as_conf.experiment_data['HPCLOGDIR'] = self.get_files_path()
 
     def send_file(self, filename: str, check=True) -> bool:
         """Sends a local file to the platform.
