@@ -32,10 +32,9 @@ from typing import Any, Callable, TYPE_CHECKING
 import pytest
 from threading import Thread
 
-from autosubmit.log.log import AutosubmitCritical
 
 if TYPE_CHECKING:
-    from test.integration.conftest import DockerContainer
+    pass
 
 _EXPID = 't000'
 """The experiment ID used throughout the test."""
