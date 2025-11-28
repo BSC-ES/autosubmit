@@ -30,4 +30,4 @@ class FluxOverSlurmHeader(object):
 ###############################################################################
            """)
 
-    PARALLEL = SERIAL # TODO: [ENGINES] Differentiate serial and parallel headers if needed later
+    PARALLEL = SERIAL
