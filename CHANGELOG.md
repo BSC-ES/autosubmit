@@ -37,6 +37,7 @@ release.
 - Fixed 'NoneType' object has no attribute 'set' that would have set a 'NoneType' instead of a 'EventType' #2611 #2583
 - Standardized the inner_job submission for non-vertical wrappers #1474
 - Fixed an issue with some placeholders not being replaced in templates #2426
+- Could* fix an issue with the HPC* missing variables in the templates #2432
 
 **Enhancements:**
 
