@@ -7,6 +7,7 @@ from time import sleep
 
 from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.log.log import AutosubmitCritical
 from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, _assert_db_fields, _assert_files_recovered, run_in_thread
 
 if TYPE_CHECKING:
@@ -396,3 +397,92 @@ def test_run_failed_set_to_ready_on_new_run(
     exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
 
     _assert_exit_code("SUCCESS", exit_code)
+
+
+@pytest.mark.xdist_group("slurm")
+@pytest.mark.timeout(300)
+@pytest.mark.slurm
+@pytest.mark.parametrize("jobs_data,final_status", [
+    (dedent("""\
+PROJECT:
+    PROJECT_TYPE: local
+    PROJECT_DIRECTORY: local_project
+LOCAL:
+    PROJECT_PATH: "tofill"
+JOBS:
+    job:
+        FILE: 
+            - "test.sh"
+            - "additional1.sh"
+            - "additional2.sh"
+        PLATFORM: TEST_SLURM
+        RUNNING: once
+        wallclock: 00:01
+PLATFORMS:
+    TEST_SLURM:
+        ADD_PROJECT_TO_HOST: 'False'
+        HOST: '127.0.0.1'
+        MAX_WALLCLOCK: '00:03'
+        PROJECT: 'group'
+        QUEUE: 'gp_debug'
+        SCRATCH_DIR: '/tmp/scratch/'
+        TEMP_DIR: ''
+        TYPE: 'slurm'
+        USER: 'root'
+    """), "COMPLETED"),
+
+    (dedent("""\
+PROJECT:
+    PROJECT_TYPE: local
+    PROJECT_DIRECTORY: local_project
+LOCAL:
+    PROJECT_PATH: "tofill"
+JOBS:
+    job:
+        FILE: 
+            - "test.sh"
+            - "additional1.sh"
+            - "thisdoesntexists.sh"
+        PLATFORM: TEST_SLURM
+        RUNNING: once
+        wallclock: 00:01
+PLATFORMS:
+    TEST_SLURM:
+        ADD_PROJECT_TO_HOST: 'False'
+        HOST: '127.0.0.1'
+        MAX_WALLCLOCK: '00:03'
+        PROJECT: 'group'
+        QUEUE: 'gp_debug'
+        SCRATCH_DIR: '/tmp/scratch/'
+        TEMP_DIR: ''
+        TYPE: 'slurm'
+        USER: 'root'
+"""), "FAILED"),
+], ids=["All files exist", "One file missing"])
+def test_run_with_additional_files(
+        jobs_data: str,
+        final_status: str,
+        autosubmit_exp,
+        slurm_server: 'DockerContainer',
+        tmp_path,
+):
+    project_path = Path(tmp_path) / "org_templates"
+    jobs_data = jobs_data.replace("tofill", str(project_path))
+    project_path.mkdir(parents=True, exist_ok=True)
+    with open(project_path / "test.sh", 'w') as f:
+        f.write('echo "main script."\n')
+    with open(project_path / "additional1.sh", 'w') as f:
+        f.write('echo "additional file 1."\n')
+    with open(project_path / "additional2.sh", 'w') as f:
+        f.write('echo "additional file 2."\n')
+
+    yaml = YAML(typ='rt')
+    as_exp = autosubmit_exp(experiment_data=yaml.load(jobs_data), include_jobs=False, create=True)
+    as_exp.as_conf.set_last_as_command('run')
+
+    if final_status == "FAILED":
+        with pytest.raises(AutosubmitCritical):
+            as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    else:
+        exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+        _assert_exit_code(final_status, exit_code)

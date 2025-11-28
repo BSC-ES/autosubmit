@@ -27,7 +27,7 @@ import os
 import pwd
 import sqlite3
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, TYPE_CHECKING
 
 import pytest
 from threading import Thread

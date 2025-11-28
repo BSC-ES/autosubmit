@@ -682,7 +682,12 @@ class Platform:
         :return: True if the file was removed, False otherwise.
         :rtype: bool
         """
-        if self.delete_file(f"{job.stat_file[:-1]}{job.fail_count}"):
+        # TODO: After rebasing everything I noticed that sometimes the stat file ends with '_'
+        if job.stat_file.endswith('_'):
+            stat_file_to_delete = f"{job.stat_file}{job.fail_count}"
+        else:
+            stat_file_to_delete = f"{job.stat_file[:-1]}{job.fail_count}"
+        if self.delete_file(stat_file_to_delete):
             Log.debug(f"{job.stat_file[:-1]}{job.fail_count} have been removed")
             return True
         return False
