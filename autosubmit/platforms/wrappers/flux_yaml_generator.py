@@ -84,7 +84,6 @@ class FluxYAML(object):
         self.tasks = []
         self.attributes = {}
 
-    # TODO: [ENGINES] Add support for heterogeneous jobs
     def add_slot(self, label='task', nslots=1, num_nodes=0, num_cores=0, exclusive=False, mem_per_node_gb=0, mem_per_core_gb=0):
         if num_nodes == 0 and num_cores == 0:
             raise ValueError("No resources to add")

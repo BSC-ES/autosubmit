@@ -171,7 +171,6 @@ class FluxWrapperBuilder(WrapperBuilder):
         pass  # pragma: no cover
 
     def _custom_environmet_setup(self):
-        # TODO: [ENGINES] Delete hardcoded flux environment setup
         commands = self.custom_env_setup
         if commands == '':
             commands = "# No commands provided"
