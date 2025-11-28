@@ -34,6 +34,7 @@ class FluxYAMLGenerator:
         self.parameters = parameters
 
     # TODO: [ENGINES] Add support for heterogeneous jobs
+    # TODO: [ENGINES] Fix resource parameters mapping
     def generate_template(self, template: str) -> str:
         job_yaml = FluxYAML()
         yaml_content = ""
@@ -43,11 +44,11 @@ class FluxYAMLGenerator:
         expid = self.parameters['DEFAULT.EXPID']
         wallclock = self._wallclock_to_seconds(self.parameters['WALLCLOCK'])
         
-        nslots = int(self.parameters['TASKS']) if self.parameters['TASKS'] else 0
+        nslots = int(self.parameters['PROCESSORS']) if self.parameters['PROCESSORS'] else 0
         num_nodes = int(self.parameters['NODES']) if self.parameters['NODES'] else 0
-        num_cores = int(self.parameters['PROCESSORS']) if self.parameters['PROCESSORS'] else 0
+        num_cores = int(self.parameters['THREADS']) if self.parameters['THREADS'] else 0
 
-        # Output files paths will be replaced in runtime
+        # When using vertical wrappers, output files paths will be replaced in runtime
         output_file = f"{log_path}/{job_name}.cmd.out.0"
         error_file = f"{log_path}/{job_name}.cmd.err.0"
 
