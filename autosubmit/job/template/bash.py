@@ -23,39 +23,39 @@ _DEFAULT_EXECUTABLE = "/bin/bash\n"
 """The default executable used when none provided."""
 
 _AS_BASH_HEADER = dedent("""\
-        ###################
-        # Autosubmit header
-        ###################
+###################
+# Autosubmit header
+###################
 set -xvu
 declare locale_to_set
-        locale_to_set=$(locale -a | grep ^C.)
+locale_to_set=$(locale -a | grep ^C.)
 export job_name_ptrn='%CURRENT_LOGDIR%/%JOBNAME%'
 
 r=0
 bash -e <<'__AS_CMD__'
 set -xve
-        if [ -z "$locale_to_set" ] ; then
-            # locale installed...
-            export LC_ALL=$locale_to_set
-        else
-            # locale not installed...
-            locale_to_set=$(locale -a | grep ^en_GB.utf8)
-            if [ -z "$locale_to_set" ] ; then
-                export LC_ALL=$locale_to_set
-            else
-                export LC_ALL=C
-            fi 
-        fi
-        echo $(date +%s) > ${job_name_ptrn}_STAT_%FAIL_COUNT%
+if [ -z "$locale_to_set" ] ; then
+    # locale installed...
+    export LC_ALL=$locale_to_set
+else
+    # locale not installed...
+    locale_to_set=$(locale -a | grep ^en_GB.utf8)
+    if [ -z "$locale_to_set" ] ; then
+        export LC_ALL=$locale_to_set
+    else
+        export LC_ALL=C
+    fi 
+fi
+echo $(date +%s) > ${job_name_ptrn}_STAT_%FAIL_COUNT%
 
-        ################### 
-        # AS CHECKPOINT FUNCTION
-        ###################
-        # Creates a new checkpoint file upon call based on the current numbers of calls to the function
-        function as_checkpoint {
-            AS_CHECKPOINT_CALLS=$((AS_CHECKPOINT_CALLS+1))
-            touch ${job_name_ptrn}_CHECKPOINT_${AS_CHECKPOINT_CALLS}
-        }
+################### 
+# AS CHECKPOINT FUNCTION
+###################
+# Creates a new checkpoint file upon call based on the current numbers of calls to the function
+function as_checkpoint {
+    AS_CHECKPOINT_CALLS=$((AS_CHECKPOINT_CALLS+1))
+    touch ${job_name_ptrn}_CHECKPOINT_${AS_CHECKPOINT_CALLS}
+}
 AS_CHECKPOINT_CALLS=0
         %EXTENDED_HEADER%
 set -u
@@ -75,15 +75,15 @@ echo $(date +%s) >> ${job_name_ptrn}_STAT_%FAIL_COUNT%
 if [ $r -ne 0 ]; then
     exit $r
 fi
-        %EXTENDED_TAILER%
-        ###################
-        # Autosubmit tailer
-        ###################
-        set -xuve
-        touch ${job_name_ptrn}_COMPLETED
-        exit 0
-    
-        """)
+%EXTENDED_TAILER%
+###################
+# Autosubmit tailer
+###################
+set -xuve
+touch ${job_name_ptrn}_COMPLETED
+exit 0
+
+""")
 """Autosubmit Bash tailer."""
 
 
