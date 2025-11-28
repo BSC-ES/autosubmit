@@ -161,7 +161,7 @@ class FluxWrapperBuilder(WrapperBuilder):
 
         # Instantiate Flux within the allocated resources and run the jobs
         srun --cpu-bind=none flux start --verbose=2 python flux_runner.py
-        """).format(self._generate_flux_script(), self._custom_environmet_setup(), '\n'.ljust(13))
+        """).format(self._generate_flux_script(), self._custom_environmet_setup())
     
     def _generate_flux_script(self):
         """
@@ -219,7 +219,7 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
                 start_time = int(job_meta.get('t_run', 0))
                 finish_time = int(job_meta.get('t_cleanup', 0))
                 with open(stat_filename, 'w') as stat_file:
-                    stat_file.write(f"{{start_time}}\n{{finish_time}}")
+                    stat_file.write(f"{{start_time}}\\n{{finish_time}}")
 
                 # Check if the job completed successfully
                 if os.path.exists(completed_path):
@@ -235,51 +235,7 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
                 exit(1)
 
         exit(0)
-        """).format(self.job_scripts, self.retrials, '\n'.ljust(13))
-        # return textwrap.dedent("""
-        # max_retries={1}
-        # scripts="{0}"
-
-        # for job_script in $scripts; do
-        #     fail_count=0
-        #     completed=0
-
-        #     while [ $fail_count -le $max_retries ] && [ $completed -eq 0 ]; do
-        #         # Job info
-        #         job_name=$(basename "$job_script" .cmd)
-        #         output_log="${{job_name}}.cmd.out.${{fail_count}}"
-        #         error_log="${{job_name}}.cmd.err.${{fail_count}}"
-
-        #         # Submit the job
-        #         job_id=$(flux batch --output=$output_log --error=$error_log $job_script)
-
-        #         # Wait for the job to finish
-        #         flux job wait $job_id
-
-        #         # Create the STAT file
-        #         start=$(flux job info $job_id eventlog | grep '"name":"start"' | sed -n 's/.*"timestamp":\\([^,}}]*\\).*/\\1/p')
-        #         finish=$(flux job info $job_id eventlog | grep '"name":"finish"' | sed -n 's/.*"timestamp":\\([^,}}]*\\).*/\\1/p')
-        #         stat_filename="${{job_name}}_STAT_${{fail_count}}"
-        #         echo "${{start%.*}}" > $stat_filename
-        #         echo "${{finish%.*}}" >> $stat_filename
-
-        #         # Check if the job completed successfully
-        #         if [ -f "${{job_name}}_COMPLETED" ]; then
-        #             echo "The job $job_name has been COMPLETED"
-        #             completed=1
-        #         else
-        #             echo "The job $job_name has FAILED"
-        #             fail_count=$((fail_count + 1))
-        #         fi
-        #     done
-
-        #     if [ $completed -eq 0 ]; then
-        #         touch "${{job_name}}_FAILED"
-        #         touch "WRAPPER_FAILED"
-        #         exit 1
-        #     fi
-        # done
-        # """).format(' '.join(str(s) for s in self.job_scripts), self.retrials, '\n'.ljust(13))
+        """).format(self.job_scripts, self.retrials)
     
 class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
     def _generate_flux_script(self):
