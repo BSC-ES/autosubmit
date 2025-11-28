@@ -339,60 +339,64 @@ class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
 
 class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
     def _generate_flux_script(self):
-        raise NotImplementedError("Horizontal-Vertical wrappers with the Flux method are not implemented yet.")
-        # scripts_str = ''
-        # for i, job_list in enumerate(self.job_scripts):
-        #     scripts_str += f"""scripts[{i}]="{' '.join(str(s) for s in job_list).strip()}"\n"""
+        return textwrap.dedent("""
+        import os
+        import flux
+        import flux.job
+        from threading import Thread
 
-        # return textwrap.dedent("""
-        # # Job scripts per inner horizontal wrapper
-        # declare -A job_ids
-        # declare -A scripts
-        # {0}
+        job_scripts={0}
+        job_ids = {{}}
 
-        # execute_horizontal_wrapper()
-        # {{
-        #     scripts=$1
+        class HorizontalWrapperThread(Thread):
+            def __init__ (self, jobs_list):
+                Thread.__init__(self)
+                self.jobs_list = jobs_list
+                self.handle = flux.Flux()
 
-        #     # Submit the jobs
-        #     for job_script in $scripts; do
-        #         job_name=$(basename "$job_script" .cmd)
-        #         output_log="${{job_name}}.cmd.out.0"
-        #         error_log="${{job_name}}.cmd.err.0"
+            def run(self):
+                # Submit the jobs
+                for job_script in self.jobs_list:
+                    jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
+                    job_ids[job_script] = flux.job.submit(self.handle, jobspec, waitable=True)
 
-        #         job_ids[$job_name]=$(flux batch --output=$output_log --error=$error_log $job_script)
-        #     done
+                    # TODO: [ENGINES] Debug info, remove later
+                    print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
+                    print("RESOURCES: " + str(jobspec.resources))
 
-        #     # Wait for the jobs to finish
-        #     wrapper_failed=0
-        #     for job_script in $scripts; do
-        #         job_name=$(basename "$job_script" .cmd)
-        #         flux job wait ${{job_ids[$job_name]}}
+                # Wait for the jobs to finish
+                wrapper_failed = False
+                for job_script in self.jobs_list:
+                    completed_path = job_script.replace('.cmd', '_COMPLETED')
+                    failed_path = job_script.replace('.cmd', '_FAILED')
+                    flux.job.wait(self.handle, job_ids[job_script])
 
-        #         # Check if the job completed successfully
-        #         if [ -f "${{job_name}}_COMPLETED" ]; then
-        #             echo "The job $job_name has been COMPLETED"
-        #         else
-        #             echo "The job $job_name has FAILED"
-        #             touch "${{job_name}}_FAILED"
-        #             wrapper_failed=1
-        #         fi
-        #     done
+                    # Check if the job completed successfully
+                    if os.path.exists(completed_path):
+                        print("The job " + job_script + " has been COMPLETED")
+                    else:
+                        print("The job " + job_script + " has FAILED")
+                        open(failed_path,'w').close()
+                        wrapper_failed = True        
 
-        #     if [ $wrapper_failed -eq 1 ]; then
-        #         touch "WRAPPER_FAILED"
-        #     fi
-        # }}
+                if wrapper_failed:
+                    open("WRAPPER_FAILED",'w').close()
 
-        # # Execute horizontal wrappers
-        # for ((i = 0; i < ${{#scripts[@]}}; i++)); do
-        #     execute_horizontal_wrapper "${{scripts[$i]}}"
+                exit(0)
 
-        #     if [ -f "WRAPPER_FAILED" ]; then
-        #         exit 1
-        #     fi
-        # done
-        # """).format(scripts_str, '\n'.ljust(13))
+        # Execute horizontal wrappers
+        for jobs_list in job_scripts:
+            thread = HorizontalWrapperThread(jobs_list)
+            thread.start()
+
+            # Wait for the inner horizontal wrapper to finish
+            thread.join()
+
+            if os.path.exists("WRAPPER_FAILED"):
+                exit(1)
+
+        exit(0)
+        """).format(self.job_scripts)
 
 class PythonWrapperBuilder(WrapperBuilder):
     def get_random_alphanumeric_string(self, letters_count, digits_count):
