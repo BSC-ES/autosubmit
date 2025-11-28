@@ -1912,7 +1912,7 @@ class AutosubmitConfig(object):
             target["HPCROOTDIR"] = Path(BasicConfig.LOCAL_ROOT_DIR) / BasicConfig.LOCAL_TMP_DIR / f"LOG_{self.expid}"
             target["HPCLOGDIR"] = target["HPCROOTDIR"] / f"LOG_{self.expid}"
 
-        if target["HPCROOTDIR"] and target["HPCLOGDIR"]:
+        if target.get("HPCROOTDIR", None) and target.get("HPCLOGDIR", None):
             target["HPCROOTDIR"] = str(target["HPCROOTDIR"])
             target["HPCLOGDIR"] = str(target["HPCLOGDIR"])
 
