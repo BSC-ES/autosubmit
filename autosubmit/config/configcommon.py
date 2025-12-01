@@ -1909,7 +1909,7 @@ class AutosubmitConfig(object):
             target["HPCLOGDIR"] = target["HPCROOTDIR"] / f"LOG_{self.expid}"
         # Default local paths.
         elif hpcarch.upper() == "LOCAL":
-            target["HPCROOTDIR"] = Path(BasicConfig.LOCAL_ROOT_DIR)
+            target["HPCROOTDIR"] = Path(BasicConfig.LOCAL_ROOT_DIR) / BasicConfig.LOCAL_TMP_DIR
             target["HPCLOGDIR"] = target["HPCROOTDIR"] / f"LOG_{self.expid}"
 
         if target.get("HPCROOTDIR", None) and target.get("HPCLOGDIR", None):

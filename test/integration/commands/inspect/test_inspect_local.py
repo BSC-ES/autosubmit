@@ -149,10 +149,11 @@ def test_inspect(
     assert as_conf.experiment_data["HPCROOTDIR"] == str(expected_hpcrootdir)
     assert as_conf.experiment_data["HPCLOGDIR"] == str(expected_hpclogdir)
 
-
     # Run the experiment
     as_exp.autosubmit.inspect(expid=as_exp.expid, lst=None, check_wrapper=False, force=True, filter_chunks=None, filter_section=None, filter_status=None, quick=False)
-
+    assert as_exp.as_conf.experiment_data["HPCARCH"] == "TEST_PS"
+    assert as_exp.as_conf.experiment_data["HPCROOTDIR"] == str(expected_hpcrootdir)
+    assert as_exp.as_conf.experiment_data["HPCLOGDIR"] == str(expected_hpclogdir)
 
     for file in templates_dir.glob(f"{as_exp.expid}*.cmd"):
         content = file.read_text()
