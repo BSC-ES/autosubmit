@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 @pytest.fixture(scope="function")
-def general_data(tmp_path: Path) -> Dict[str, Any]:
+def general_data(tmp_path: Path) -> dict[str, Any]:
     """
     Provides part of the `experiment_data` dictionary used by the
     integration tests in `commands`.
