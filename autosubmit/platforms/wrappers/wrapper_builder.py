@@ -127,6 +127,7 @@ class FluxWrapperBuilder(WrapperBuilder):
     # TODO: [ENGINES] Check error handling behavior
     # TODO: [ENGINES] Command "flux start" is being called multiple times
     # TODO: [ENGINES] Is it necessary to pass the run_id to the inner jobs?
+    # TODO: [ENGINES] Add flux.job.Jobspec.validate_jobspec before submission
     """
     The FluxWrapperBuilder is the responsible for generating the wrapper script
     that will be submitted to Slurm to initialize Flux and submit the inner jobs
