@@ -141,14 +141,19 @@ def test_inspect(
     as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(additional_data), include_jobs=False, create=True)
     as_conf = as_exp.as_conf
     as_conf.set_last_as_command('inspect')
-
-    # Run the experiment
-    as_exp.autosubmit.inspect(expid=as_exp.expid, lst=None, check_wrapper=False, force=True, filter_chunks=None, filter_section=None, filter_status=None, quick=False)
-
     hpcarch_info = as_conf.experiment_data.get('PLATFORMS', {}).get('TEST_PS', {})
     expected_hpcrootdir = Path(hpcarch_info.get('SCRATCH_DIR', '')) / hpcarch_info.get('PROJECT', '') / hpcarch_info.get('USER', '')
     expected_hpclogdir = expected_hpcrootdir / f"LOG_{as_exp.expid}"
     templates_dir = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / as_exp.expid / BasicConfig.LOCAL_TMP_DIR
+    assert as_conf.experiment_data["HPCARCH"] == "TEST_PS"
+    assert as_conf.experiment_data["HPCROOTDIR"] == str(expected_hpcrootdir)
+    assert as_conf.experiment_data["HPCLOGDIR"] == str(expected_hpclogdir)
+
+
+    # Run the experiment
+    as_exp.autosubmit.inspect(expid=as_exp.expid, lst=None, check_wrapper=False, force=True, filter_chunks=None, filter_section=None, filter_status=None, quick=False)
+
+
     for file in templates_dir.glob(f"{as_exp.expid}*.cmd"):
         content = file.read_text()
         assert "HPCARCH=TEST_PS" in content
