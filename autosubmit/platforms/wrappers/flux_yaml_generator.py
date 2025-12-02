@@ -22,6 +22,8 @@ from io import StringIO
 
 from typing import TYPE_CHECKING
 
+from autosubmit.log.log import AutosubmitCritical, Log
+
 if TYPE_CHECKING:
     from autosubmit.job.job import Job
 
@@ -30,7 +32,7 @@ class FluxYAMLGenerator:
     Generate a YAML file to submit a job to a Flux system given its specifications.
     """
     def __init__(self, job: 'Job', parameters: dict):
-        self.job = job
+        # self.job = job
         self.parameters = parameters
 
     # TODO: [ENGINES] Add support for heterogeneous jobs
@@ -38,38 +40,48 @@ class FluxYAMLGenerator:
         """
         Generate the Flux Jobspec YAML representation for the job.
         """
-        job_yaml = FluxYAML()
-
         # Extract job parameters
         log_path = self.parameters['HPCLOGDIR']
         job_name = self.parameters['JOBNAME']
         job_section = self.parameters['TASKTYPE']
         expid = self.parameters['DEFAULT.EXPID']
         wallclock = self._wallclock_to_seconds(self.parameters['WALLCLOCK'])
-        
         nslots = int(self.parameters['PROCESSORS']) if self.parameters['PROCESSORS'] else 0
         num_nodes = int(self.parameters['NODES']) if self.parameters['NODES'] else 0
         num_cores = int(self.parameters['THREADS']) if self.parameters['THREADS'] else 0
         tasks_per_node = int(self.parameters['TASKS']) if self.parameters['TASKS'] else 0
         mem = int(self.parameters['MEMORY']) if self.parameters['MEMORY'] else 0
         mem_per_core = int(self.parameters['MEMORY_PER_TASK']) if self.parameters['MEMORY_PER_TASK'] else 0
-        exclusive = self.parameters['EXCLUSIVE'].lower() == 'true'
+        exclusive = self.parameters['EXCLUSIVE']
 
         # When using vertical wrappers, output files paths will be replaced in runtime
         output_file = f"{log_path}/{job_name}.cmd.out.0"
         error_file = f"{log_path}/{job_name}.cmd.err.0"
 
-        # Populate the YAML
-        job_yaml.add_slot(nslots=nslots, num_nodes=num_nodes, num_cores=num_cores, exclusive=exclusive, mem_per_node_gb=mem, mem_per_core_gb=mem_per_core, tasks_per_node=tasks_per_node)
-        job_yaml.add_task(count_per_slot=1)
-
-        job_yaml.set_attributes(duration=wallclock, cwd=log_path, job_name=job_name, output_file=output_file, error_file=error_file, script_content=template)
+        # Create and populate the YAML
+        job_yaml = FluxYAML(job_name)
+        task_count = job_yaml.add_resource(label="task", nslots=nslots, num_nodes=num_nodes, num_cores=num_cores, 
+                                           exclusive=exclusive, mem_per_node_mb=mem, mem_per_core_mb=mem_per_core, 
+                                           tasks_per_node=tasks_per_node)
+        if task_count > 0:
+            job_yaml.add_task(resource_label="task", count_total=task_count)
+        else:
+            job_yaml.add_task(resource_label="task", count_per_slot=1)
+        job_yaml.set_attributes(duration=wallclock, cwd=log_path, job_name=job_name, output_file=output_file, 
+                                error_file=error_file, script_content=template)
 
         # Compose template
         return self._get_script_section_header(job_section, expid) + "\n" + job_yaml.generate()
     
     def _wallclock_to_seconds(self, wallclock: str) -> int:
-        """Convert wallclock time in format HH:MM to total seconds."""
+        """
+        Convert wallclock time in format HH:MM to total seconds.
+        
+        :param wallclock: Wallclock in HH:MM format.
+
+        :return: Total wallclock in seconds.
+        :rtype: int
+        """
         h, m = map(int, wallclock.split(':'))
         return h * 3600 + m * 60
 
@@ -92,14 +104,15 @@ class FluxYAML(object):
     5. Call 'generate' to produce the YAML string.
 
     Note: Jobspec Version 1 only supports a single resource and task, as defined 
-    by 'Specific Resource Graph Restrictions' and 'Tasks' sections in RFC 25.
+    by 'Specific Resource Graph Restrictions' and 'Tasks' sections in Flux RFC 25.
     """
-    def __init__(self):
+    def __init__(self, job_name: str):
         # Jobspec attributes
         self.version = 1
         self.resources = []
         self.tasks = []
         self.attributes = {}
+        self.job_name = job_name
 
     def generate(self) -> str:
         """
@@ -129,12 +142,11 @@ class FluxYAML(object):
         yaml.dump(jobspec, stream)
         return stream.getvalue()
 
-    # TODO: [ENGINES] URGENT: Implement correct resource parameters mapping
-    def add_slot(self, label: str = 'task', nslots: int = 1, num_nodes: int = 0, num_cores: int = 0, 
-                 exclusive: bool = False, mem_per_node_mb: int = 0, mem_per_core_mb: int = 0,
-                 tasks_per_node: int = 0) -> int:
+    def add_resource(self, label: str = "default", nslots: int = 1, num_nodes: int = 0, num_cores: int = 1,
+                     exclusive: bool = False, mem_per_node_mb: int = 0, mem_per_core_mb: int = 0,
+                     tasks_per_node: int = 0) -> int:
         """
-        Adds a slot resource to the job specification.
+        Adds a resource to the job specification.
         
         :param label: Label for the resource.
         :param nslots: Number of slots.
@@ -145,61 +157,122 @@ class FluxYAML(object):
         :param mem_per_core_mb: Memory per core in MB.
         :param tasks_per_node: Number of tasks per node.
 
-        :return: Index of the added slot resource.
+        :return: The total count to be assigned to the corresponding task. Else, zero.
         :rtype: int
-
-        :raises ValueError: If no resources are specified.
         """
-        if num_nodes == 0 and num_cores == 0:
-            raise ValueError("No resources to add")
+        # Core count must be always set according to Flux RFC 25
+        if num_cores == 0:
+            Log.warning(f"Job {self.job_name} has been asigned zero cores, which is not permitted. Defaulting to 1")
+            num_cores = 1
         
-        resource = {
+        # Create node, slot and core resources based on provided parameters. Node is optional.
+        node = None
+        slot = None
+        task_count = 0
+
+        # TODO: [ENGINES] URGENT: Implement correct resource parameters mapping
+        # TODO: [ENGINES] Refactor the conditional logic
+        if num_nodes > 0 and tasks_per_node > 0:
+            node = self._compose_node_resource(count=num_nodes, exclusive=exclusive, mem_per_node_mb=mem_per_node_mb)
+            slot = self._compose_slot_resource(label=label, count=tasks_per_node)
+        elif num_nodes > 0:
+            node = self._compose_node_resource(count=num_nodes, exclusive=exclusive, mem_per_node_mb=mem_per_node_mb)
+            slot = self._compose_slot_resource(label=label, count=1)
+            task_count = nslots
+        elif tasks_per_node > 0:
+            slot = self._compose_slot_resource(label=label, count=tasks_per_node)
+        else:
+            raise AutosubmitCritical(f"The current resource request for {self.job_name} is not supported \
+                                     when wrapped with the Flux method. If you consider this is an error, \
+                                     please report your case to the Autosubmit developers")
+        
+        core = self._compose_core_resource(count=num_cores, mem_per_core_mb=mem_per_core_mb)
+        
+        # Build the resource hierarchy
+        slot['with'].append(core)
+        resource = slot
+        if num_nodes > 0: # TODO: [ENGINES] Manage case with tasks_per_node but no nodes
+            node['with'].append(slot)
+            resource = node
+
+        self.resources.append(resource)
+        
+        return task_count
+    
+    def _compose_node_resource(self, count: int, exclusive: bool, mem_per_node_mb: int) -> dict:
+        """
+        Composes a node resource dictionary.
+
+        :param count: Number of nodes.
+        :param exclusive: Whether the node is exclusive.
+        :param mem_per_node_mb: Memory per node in MB.
+
+        :return: Node resource dictionary.
+        :rtype: dict
+        """
+        node = {
+            'type': 'node',
+            'count': count,
+            'exclusive': exclusive,
+            'with': []
+        }
+        if mem_per_node_mb > 0:
+            node['with'].append({
+                'type': 'memory',
+                'count': mem_per_node_mb,
+                'unit': 'MB'
+            })
+        return node
+    
+    def _compose_slot_resource(self, label: str, count: int) -> dict:
+        """
+        Composes a slot resource dictionary.
+
+        :param label: Label for the slot.
+        :param count: Number of slots.
+
+        :return: Slot resource dictionary.
+        :rtype: dict
+        """
+        slot = {
             'type': 'slot',
             'label': label,
-            'count': nslots
+            'count': count,
+            'with': []
         }
-        
-        if num_nodes > 0:
-            node = {
-                'type': 'node',
-                'count': num_nodes,
-                'exclusive': exclusive,
-            }
-            if mem_per_node_mb > 0:
-                node['with'].append({
-                    'type': 'memory',
-                    'count': mem_per_node_mb,
-                    'unit': 'MB'
-                })
-
-        if num_cores > 0:
-            core = {
-                'type': 'core',
-                'count': num_cores,
-            }
-            if mem_per_core_mb > 0:
-                core['with'].append({
-                    'type': 'memory',
-                    'count': mem_per_core_mb,
-                    'unit': 'MB'
-                })
-
-        if num_nodes > 0 and num_cores > 0:
-            node['with'].append(core)
-            resource['with'].append(node)
-        elif num_nodes > 0:
-            resource['with'].append(node)
-        elif num_cores > 0:
-            resource['with'].append(core)
-        
-        self.resources.append(resource)
-        return len(self.resources) - 1
+        return slot
     
-    def add_task(self, slot_label: str = 'task', count_per_slot: int = 0, count_total: int = 0) -> int:
+    # TODO: [ENGINES] Core memory should be assigned directly to the slot, not the core
+    def _compose_core_resource(self, count: int, mem_per_core_mb: int) -> dict:
+        """
+        Composes a core resource dictionary.
+
+        :param count: Number of cores.
+        :param mem_per_core_mb: Memory per core in MB.
+
+        :return: Core resource dictionary.
+        :rtype: dict
+        """
+        core = {
+            'type': 'core',
+            'count': count,
+            'with': []
+        }
+        if mem_per_core_mb > 0:
+            core['with'].append({
+                'type': 'memory',
+                'count': mem_per_core_mb,
+                'unit': 'MB'
+            })
+        else:
+            del core['with']
+        return core
+    
+    def add_task(self, resource_label: str = "default", count_per_slot: int = 0, count_total: int = 0) -> int:
         """
         Adds a task to the job specification.
 
-        :param slot_label: Label of the slot resource to bind the task to.
+        :param resource_label: Label of the slot resource to bind the task to.
         :param count_per_slot: Number of task instances per slot.
         :param count_total: Total number of task instances.
 
@@ -224,7 +297,7 @@ class FluxYAML(object):
 
         task = {
             'command': ["{{tmpdir}}/script"],
-            'slot': slot_label,
+            'slot': resource_label,
             'count': count
         }
 
