@@ -22,6 +22,7 @@ import os
 import re
 import traceback
 from contextlib import suppress
+from itertools import groupby
 from pathlib import Path
 from shutil import move
 from time import strftime, localtime, mktime
@@ -43,8 +44,8 @@ from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency
 from autosubmit.job.job_utils import transitive_reduction
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
-from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
+from autosubmit.platforms.platform import Platform
 
 
 class JobList(object):
@@ -2306,17 +2307,19 @@ class JobList(object):
                     jobs.append(job)
         return jobs
 
-    def get_in_queue_grouped_id(self, platform) -> dict[int, list[Job]]:
-        jobs = self.get_in_queue(platform)
-        jobs_by_id = dict()
-        for job in jobs:
-            if job.id not in jobs_by_id:
-                jobs_by_id[job.id] = list()
-            jobs_by_id[job.id].append(job)
-        for job_id in jobs_by_id.keys():
-            if len(jobs_by_id[job_id]) == 1:
-                jobs_by_id[job_id] = jobs_by_id[job_id][0]
-        return jobs_by_id
+    def get_in_queue_grouped_id(self, platform: Platform) -> dict[int, list[Job]]:
+        """Gets the queued jobs, grouped by their IDs.
+
+        Same ID, same dictionary key. Each dictionary value is a list.
+
+        :param platform: Optional platform, if ``None``, will fetch all jobs without a platform.
+        :return: A dictionary where job IDs are keys, and the values are lists with the jobs objects.
+        """
+        jobs: list[Job] = self.get_in_queue(platform)
+        return {
+            job_id: list(jobs)
+            for job_id, jobs in groupby(jobs, key=lambda job: job.id)
+        }
 
     def sort_by_name(self):
         """Returns a list of jobs sorted by name.
