@@ -1904,12 +1904,11 @@ class AutosubmitConfig(object):
         user = hpcarch_data.get("USER", "")
 
         if scratch and project and user:
-            base = Path(scratch) / project / user
-            target["HPCROOTDIR"] = base
+            target["HPCROOTDIR"] = Path(scratch) / project / user / self.expid
             target["HPCLOGDIR"] = target["HPCROOTDIR"] / f"LOG_{self.expid}"
         # Default local paths.
         elif hpcarch.upper() == "LOCAL":
-            target["HPCROOTDIR"] = Path(BasicConfig.LOCAL_ROOT_DIR) / BasicConfig.LOCAL_TMP_DIR
+            target["HPCROOTDIR"] = Path(BasicConfig.LOCAL_ROOT_DIR) / self.expid / BasicConfig.LOCAL_TMP_DIR
             target["HPCLOGDIR"] = target["HPCROOTDIR"] / f"LOG_{self.expid}"
 
         if target.get("HPCROOTDIR", None) and target.get("HPCLOGDIR", None):
