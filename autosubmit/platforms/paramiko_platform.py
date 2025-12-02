@@ -633,8 +633,12 @@ class ParamikoPlatform(Platform):
             self._ftpChannel.remove(str(remote_file))
             return True
         except IOError as e:
-            Log.warning(f'IOError while trying to remove a remote file {str(remote_file)}: {str(e)}')
+            if not str(remote_file).lower().endswith(('.cmd', '_completed', '_stat')):
+                Log.warning(f'IOError while trying to remove a remote file {str(remote_file)}: {str(e)}')
+            else:
+                Log.debug(f'IOError while trying to remove a remote file {str(remote_file)}: {str(e)}')
             return False
+
         except Exception as e:
             # Change to Path
             Log.error(f'Could not remove file {str(remote_file)}, something went wrong with the platform',
