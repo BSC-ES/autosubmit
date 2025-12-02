@@ -793,7 +793,7 @@ class Platform:
         :param complete_path: complete path to the file, includes filename
         :type complete_path: str
         """
-        return NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def generate_submit_script(self) -> None:
         """Opens Submit script file. """
