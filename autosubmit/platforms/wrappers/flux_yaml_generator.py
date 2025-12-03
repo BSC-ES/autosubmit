@@ -24,7 +24,9 @@ from autosubmit.log.log import AutosubmitCritical, Log
 
 class FluxYAMLGenerator:
     """
-    Generate a YAML file to submit a job to a Flux system given its specifications.
+    Generate a YAML file to submit a job to a Flux instance given its parameters.
+
+    :param parameters: Dictionary containing job parameters.
     """
     def __init__(self, parameters: dict):
         self.parameters = parameters
@@ -33,6 +35,11 @@ class FluxYAMLGenerator:
     def generate_template(self, template: str) -> str:
         """
         Generate the Flux Jobspec YAML representation for the job.
+
+        :param template: The script content to be included in the job.
+
+        :return: The complete Flux Jobspec YAML.
+        :rtype: str
         """
         # Extract job parameters
         log_path = self.parameters['HPCLOGDIR']
@@ -99,6 +106,8 @@ class FluxYAML(object):
 
     Note: Jobspec Version 1 only supports a single resource and task, as defined 
     by 'Specific Resource Graph Restrictions' and 'Tasks' sections in Flux RFC 25.
+    
+    :param job_name: Name of the job.
     """
     def __init__(self, job_name: str):
         # Jobspec attributes
