@@ -46,7 +46,7 @@ class FluxYAMLGenerator:
         job_section = self.parameters['TASKTYPE']
         expid = self.parameters['DEFAULT.EXPID']
         wallclock = self._wallclock_to_seconds(self.parameters['WALLCLOCK'])
-        nslots = int(self.parameters['PROCESSORS']) if self.parameters['PROCESSORS'] else 0
+        ntasks = int(self.parameters['PROCESSORS']) if self.parameters['PROCESSORS'] else 0
         num_nodes = int(self.parameters['NODES']) if self.parameters['NODES'] else 0
         num_cores = int(self.parameters['THREADS']) if self.parameters['THREADS'] else 0
         tasks_per_node = int(self.parameters['TASKS']) if self.parameters['TASKS'] else 0
@@ -60,7 +60,7 @@ class FluxYAMLGenerator:
 
         # Create and populate the YAML
         job_yaml = FluxYAML(job_name)
-        task_count = job_yaml.add_resource(label="task", nslots=nslots, num_nodes=num_nodes, num_cores=num_cores, 
+        task_count = job_yaml.add_resource(label="task", ntasks=ntasks, num_nodes=num_nodes, num_cores=num_cores, 
                                            exclusive=exclusive, mem_per_node_mb=mem, mem_per_core_mb=mem_per_core, 
                                            tasks_per_node=tasks_per_node)
         if task_count > 0:
@@ -142,14 +142,14 @@ class FluxYAML(object):
         yaml.dump(jobspec, stream)
         return stream.getvalue()
 
-    def add_resource(self, label: str = "default", nslots: int = 1, num_nodes: int = 0, num_cores: int = 1,
+    def add_resource(self, label: str = "default", ntasks: int = 1, num_nodes: int = 0, num_cores: int = 1,
                      exclusive: bool = False, mem_per_node_mb: int = 0, mem_per_core_mb: int = 0,
                      tasks_per_node: int = 0) -> int:
         """
         Adds a resource to the job specification.
         
         :param label: Label for the resource.
-        :param nslots: Number of slots.
+        :param ntasks: Number of slots.
         :param num_nodes: Number of nodes.
         :param num_cores: Number of cores.
         :param exclusive: Whether the node is exclusive.
@@ -159,47 +159,62 @@ class FluxYAML(object):
 
         :return: The total count to be assigned to the corresponding task. Else, zero.
         :rtype: int
+
+        :raises AutosubmitCritical: If the resource request is not accepted.
         """
         # Core count must be always set according to Flux RFC 25
         if num_cores == 0:
             Log.warning(f"Job {self.job_name} has been asigned zero cores, which is not permitted. Defaulting to 1")
             num_cores = 1
         
-        # Create node, slot and core resources based on provided parameters. Node is optional.
+        # Create node, slot and core resources by mapping the parameters. Node is optional
         node = None
-        slot = None
-        task_count = 0
-
-        # TODO: [ENGINES] URGENT: Implement correct resource parameters mapping
-        # TODO: [ENGINES] Refactor the conditional logic
+        min_nodes = 0
         if num_nodes > 0 and tasks_per_node > 0:
-            node = self._compose_node_resource(count=num_nodes, exclusive=exclusive, mem_per_node_mb=mem_per_node_mb)
-            slot = self._compose_slot_resource(label=label, count=tasks_per_node)
+            nslots = tasks_per_node
         elif num_nodes > 0:
-            node = self._compose_node_resource(count=num_nodes, exclusive=exclusive, mem_per_node_mb=mem_per_node_mb)
-            slot = self._compose_slot_resource(label=label, count=1)
-            task_count = nslots
+            nslots = 1
         elif tasks_per_node > 0:
-            slot = self._compose_slot_resource(label=label, count=tasks_per_node)
+            nslots = tasks_per_node
+            min_nodes = 1
+        elif ntasks > 0:
+            nslots = ntasks
+        elif ntasks == 0:
+            nslots = 1
         else:
-            raise AutosubmitCritical(f"The current resource request for {self.job_name} is not supported \
-                                     when wrapped with the Flux method. If you consider this is an error, \
+            raise AutosubmitCritical(f"The current resource request for {self.job_name} is not accepted \
+                                     when wrapped with the Flux method. If you consider this is a mistake, \
                                      please report your case to the Autosubmit developers")
         
-        core = self._compose_core_resource(count=num_cores, mem_per_core_mb=mem_per_core_mb)
+        # Compose resources
+        if num_nodes > 0 or min_nodes > 0:
+            node = self._compose_node_resource(count=num_nodes, min_count=min_nodes, exclusive=exclusive, mem_per_node_mb=mem_per_node_mb)
+        if nslots > 0:
+            slot = self._compose_slot_resource(label=label, count=nslots)
+        if num_cores > 0:
+            core, memory = self._compose_core_resource(count=num_cores, mem_per_core_mb=mem_per_core_mb)
         
         # Build the resource hierarchy
         slot['with'].append(core)
+        if memory:
+            slot['with'].append(memory)
         resource = slot
-        if num_nodes > 0: # TODO: [ENGINES] Manage case with tasks_per_node but no nodes
+        if node:
             node['with'].append(slot)
             resource = node
-
         self.resources.append(resource)
+
+        # Calculate the total count that must be assigned to the corresponding task
+        task_count = 0
+        if ntasks > 1:
+            if num_nodes > 0 or tasks_per_node > 0:
+                task_count = ntasks
+            else:
+                task_count = 0
         
         return task_count
     
-    def _compose_node_resource(self, count: int, exclusive: bool, mem_per_node_mb: int) -> dict:
+    def _compose_node_resource(self, count: int = 0, min_count: int = 0, exclusive: bool = False, mem_per_node_mb: int = 0) -> dict:
         """
         Composes a node resource dictionary.
 
@@ -209,10 +224,22 @@ class FluxYAML(object):
 
         :return: Node resource dictionary.
         :rtype: dict
+
+        :raises ValueError: If both count and min_count are set.
         """
+        if count <= 0 and min_count <= 0:
+            raise ValueError("Node count must be greater than zero to compose a node resource")
+        if count > 0 and min_count > 0:
+            Log.warning("Cannot set both count and min_count for node resource simultaneously. Ignoring min_count.")
+        
+        if count > 0:
+            node_count = count
+        else:
+            node_count = {'min': min_count}
+        
         node = {
             'type': 'node',
-            'count': count,
+            'count': node_count,
             'exclusive': exclusive,
             'with': []
         }
@@ -224,7 +251,7 @@ class FluxYAML(object):
             })
         return node
     
-    def _compose_slot_resource(self, label: str, count: int) -> dict:
+    def _compose_slot_resource(self, label: str = "default", count: int = 0) -> dict:
         """
         Composes a slot resource dictionary.
 
@@ -233,7 +260,12 @@ class FluxYAML(object):
 
         :return: Slot resource dictionary.
         :rtype: dict
+
+        :raises ValueError: If slot count is not greater than zero.
         """
+        if count <= 0:
+            raise ValueError("Slot count must be greater than zero to compose a slot resource")
+        
         slot = {
             'type': 'slot',
             'label': label,
@@ -242,8 +274,7 @@ class FluxYAML(object):
         }
         return slot
     
-    # TODO: [ENGINES] Core memory should be assigned directly to the slot, not the core
-    def _compose_core_resource(self, count: int, mem_per_core_mb: int) -> dict:
+    def _compose_core_resource(self, count: int = 0, mem_per_core_mb: int = 0) -> dict:
         """
         Composes a core resource dictionary.
 
@@ -252,21 +283,24 @@ class FluxYAML(object):
 
         :return: Core resource dictionary.
         :rtype: dict
+
+        :raises ValueError: If core count is not greater than zero.
         """
+        if count <= 0:
+            raise ValueError("Core count must be greater than zero to compose a core resource")
+        
         core = {
             'type': 'core',
-            'count': count,
-            'with': []
+            'count': count
         }
+        memory = None
         if mem_per_core_mb > 0:
-            core['with'].append({
+            memory = {
                 'type': 'memory',
                 'count': mem_per_core_mb,
                 'unit': 'MB'
-            })
-        else:
-            del core['with']
-        return core
+            }
+        return core, memory
     
     def add_task(self, resource_label: str = "default", count_per_slot: int = 0, count_total: int = 0) -> int:
         """
