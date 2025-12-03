@@ -20,19 +20,13 @@ from ruamel.yaml import YAML
 from ruamel.yaml.scalarstring import PreservedScalarString
 from io import StringIO
 
-from typing import TYPE_CHECKING
-
 from autosubmit.log.log import AutosubmitCritical, Log
-
-if TYPE_CHECKING:
-    from autosubmit.job.job import Job
 
 class FluxYAMLGenerator:
     """
     Generate a YAML file to submit a job to a Flux system given its specifications.
     """
-    def __init__(self, job: 'Job', parameters: dict):
-        # self.job = job
+    def __init__(self, parameters: dict):
         self.parameters = parameters
 
     # TODO: [ENGINES] Add support for heterogeneous jobs
