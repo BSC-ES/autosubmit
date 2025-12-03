@@ -28,6 +28,7 @@ all the grouped tests to the same worker.
 
 import re
 from pathlib import Path
+from textwrap import dedent
 
 import pytest
 
@@ -706,6 +707,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
     assert not slurm_platform.check_remote_permissions()
 
 
+@pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.parametrize(
     "experiment_data",
@@ -892,6 +894,7 @@ def test_simple_workflow_compress_logs_slurm(
         )
 
 
+@pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.parametrize(
     "experiment_data",
@@ -977,6 +980,7 @@ def test_compress_log_missing_tool(
         )
 
 
+@pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.parametrize(
     "experiment_data",
@@ -1027,6 +1031,7 @@ def test_compress_log_fail_command(
     assert result is None
 
 
+@pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.parametrize(
     "experiment_data",
@@ -1146,3 +1151,94 @@ def test_check_if_packages_are_ready_to_build(autosubmit_exp):
 
     job_result, check = packager.check_if_packages_are_ready_to_build()
     assert check and len(job_result) == 3
+
+
+@pytest.mark.docker
+@pytest.mark.slurm
+def test_run_bug_save_wrapper_crashes(
+        autosubmit_exp: 'AutosubmitExperimentFixture',
+        mocker,
+        slurm_server: 'DockerContainer'
+):
+    """In issue 2463, JIRA 794 of DestinE, users reported getting an exception
+    ``'list' object has no attribute 'status'``.
+
+    It appears to be caused by a combination of states of database and pickle,
+    and there could be more than one possible scenario to trigger this issue.
+
+    We identified one, where ``JobList.save_wrappers`` crashed before the
+    job packages databases were populated. The job list persisted to disk as
+    pickle was saved with its jobs ``SUBMITTED``, which then caused a subsequent
+    ``run`` command to trigger this exception (note, that the run is executed
+    without a ``recovery``, which is not quite what happened in other cases).
+
+    This test simulates that scenario. It was written using ``master`` of
+    4.1.15+, then applied to the pull request #2474. The issue of accessing
+    ``status`` of a Python ``list`` object has also been fixed in that pull
+    request -- the fix was postponed to see if we could locate the root
+    cause, even though this may not be the root cause.
+
+    Ref:
+
+    * https://github.com/BSC-ES/autosubmit/issues/2463
+    * https://jira.eduuni.fi/browse/CSCDESTINCLIMADT-794
+    """
+    exp = autosubmit_exp(_EXPID, experiment_data={
+        'JOBS': {
+            'SIM': {
+                'PLATFORM': 'LOCAL_DOCKER',
+                'RUNNING': 'chunk',
+                'SCRIPT': dedent('''\
+                # Fails on the second and third chunks
+                CHUNK="%CHUNK%"
+                if [ "$CHUNK" -eq 1 ]
+                then
+                    echo "OK!"
+                else
+                    echo "Uh oh"
+                    crashit!
+                fi
+                '''),
+                'DEPENDENCIES': {
+                    'SIM-1': {}
+                },
+                'WALLCLOCK': '00:02',
+                'RETRIALS': 5,
+            }
+        },
+        'WRAPPERS': {
+            'WRAPPER_V': {
+                'TYPE': 'vertical',
+                'JOBS_IN_WRAPPER': 'SIM',
+                'RETRIALS': 1
+            }
+        },
+        'PLATFORMS': {
+            'LOCAL_DOCKER': {
+                'ADD_PROJECT_TO_HOST': False,
+                'HOST': '127.0.0.1',
+                'MAX_WALLCLOCK': '00:03',
+                'PROJECT': 'group',
+                'QUEUE': 'gp_debug',
+                'SCRATCH_DIR': '/tmp/scratch/',
+                'TEMP_DIR': '',
+                'TYPE': 'slurm',
+                'USER': 'root',
+                'MAX_PROCESSORS': 1,
+                'PROCESSORS_PER_NODE': 1,
+            }
+        }
+    })
+
+    mocked_job_list_save_wrappers = mocker.patch.object(JobList, 'save_wrappers', side_effect=ValueError)
+
+    with pytest.raises(ValueError):
+        exp.autosubmit.run_experiment(expid=_EXPID)
+
+    mocked_job_list_save_wrappers.reset_mock()
+
+    # NOTE: On ``master`` before the fix (commit d635461f4ecac42985ba584e2cbfa65223ea2151),
+    #       this fails instead of raising ``ValueError``, showing the same exception
+    #       reported by users, ``AttributeError: 'list' object has no attribute 'status'``.
+    with pytest.raises(ValueError):
+        exp.autosubmit.run_experiment(expid=_EXPID)
