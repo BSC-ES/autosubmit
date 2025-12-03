@@ -222,6 +222,83 @@ class FluxYAML(object):
 
         return task_count
 
+    def add_task(self, resource_label: str = "default", count_per_slot: int = 0, count_total: int = 0) -> None:
+        """
+        Adds a task to the job specification.
+
+        :param resource_label: Label of the slot resource to bind the task to.
+        :param count_per_slot: Number of task instances per slot.
+        :param count_total: Total number of task instances.
+
+        :return: None
+
+        :raises ValueError: If both or none of count_per_slot and count_total are set.
+        """
+        if count_per_slot > 0 and count_total > 0:
+            raise ValueError("Cannot set both count_per_slot and count_total simultaneously")
+        elif count_per_slot == 0 and count_total == 0:
+            raise ValueError("Either count_per_slot or count_total must be specified")
+
+        if count_per_slot > 0:
+            count = {
+                'per_slot': count_per_slot,
+            }
+        elif count_total > 0:
+            count = {
+                'total': count_total,
+            }
+
+        task = {
+            'command': ["{{tmpdir}}/script"],
+            'slot': resource_label,
+            'count': count
+        }
+
+        self.tasks.append(task)
+
+    def set_attributes(self, duration: int, cwd: str, job_name: str, output_file: str,
+                       error_file: str, script_content: str) -> None:
+        """
+        Sets the attributes section of the job specification.
+
+        :param duration: Job duration in seconds.
+        :param cwd: Current working directory.
+        :param job_name: Name of the job.
+        :param output_file: Path to the output file.
+        :param error_file: Path to the error file.
+        :param script_content: Content of the script.
+
+        :return: None
+        """
+        self.attributes['system'] = {
+            'duration': duration,
+            'cwd': cwd,
+            'job': {
+                'name': job_name
+            },
+            'shell': {
+                'options': {
+                    'output': {
+                        'stdout': {
+                            'type': 'file',
+                            'path': output_file
+                        },
+                        'stderr': {
+                            'type': 'file',
+                            'path': error_file
+                        }
+                    }
+                }
+            },
+            'files': {
+                'script': {
+                    'mode': 33216,
+                    'data': PreservedScalarString(script_content),
+                    'encoding': 'utf-8'
+                }
+            }
+        }
+
     def _compose_node_resource(self, count: int = 0, min_count: int = 0, exclusive: bool = False, mem_per_node_mb: int = 0) -> dict:
         """
         Composes a node resource dictionary.
@@ -309,80 +386,3 @@ class FluxYAML(object):
                 'unit': 'MB'
             }
         return core, memory
-
-    def add_task(self, resource_label: str = "default", count_per_slot: int = 0, count_total: int = 0) -> None:
-        """
-        Adds a task to the job specification.
-
-        :param resource_label: Label of the slot resource to bind the task to.
-        :param count_per_slot: Number of task instances per slot.
-        :param count_total: Total number of task instances.
-
-        :return: None
-
-        :raises ValueError: If both or none of count_per_slot and count_total are set.
-        """
-        if count_per_slot > 0 and count_total > 0:
-            raise ValueError("Cannot set both count_per_slot and count_total simultaneously")
-        elif count_per_slot == 0 and count_total == 0:
-            raise ValueError("Either count_per_slot or count_total must be specified")
-
-        if count_per_slot > 0:
-            count = {
-                'per_slot': count_per_slot,
-            }
-        elif count_total > 0:
-            count = {
-                'total': count_total,
-            }
-
-        task = {
-            'command': ["{{tmpdir}}/script"],
-            'slot': resource_label,
-            'count': count
-        }
-
-        self.tasks.append(task)
-
-    def set_attributes(self, duration: int, cwd: str, job_name: str, output_file: str,
-                       error_file: str, script_content: str) -> None:
-        """
-        Sets the attributes section of the job specification.
-
-        :param duration: Job duration in seconds.
-        :param cwd: Current working directory.
-        :param job_name: Name of the job.
-        :param output_file: Path to the output file.
-        :param error_file: Path to the error file.
-        :param script_content: Content of the script.
-
-        :return: None
-        """
-        self.attributes['system'] = {
-            'duration': duration,
-            'cwd': cwd,
-            'job': {
-                'name': job_name
-            },
-            'shell': {
-                'options': {
-                    'output': {
-                        'stdout': {
-                            'type': 'file',
-                            'path': output_file
-                        },
-                        'stderr': {
-                            'type': 'file',
-                            'path': error_file
-                        }
-                    }
-                }
-            },
-            'files': {
-                'script': {
-                    'mode': 33216,
-                    'data': PreservedScalarString(script_content),
-                    'encoding': 'utf-8'
-                }
-            }
-        }
