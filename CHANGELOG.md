@@ -37,6 +37,7 @@ release.
 - Fixed 'NoneType' object has no attribute 'set' that would have set a 'NoneType' instead of a 'EventType' #2611 #2583
 - Standardized the inner_job submission for non-vertical wrappers #1474
 - Fixed an issue with some placeholders not being replaced in templates #2426
+- Fixed issue where Autosubmit did not retry when there were networking issues in platforms #1369
 - Could* fix an issue with the HPC* missing variables in the templates #2432
 
 **Enhancements:**
@@ -185,7 +186,7 @@ the filter the jobs. Not using any value for `-fp` still returns all jobs.
 
 **Others:**
 - All autosubmit projects moved to Github.
-- Added Github actions for CI/CD.
+- Added GitHub actions for CI/CD.
 
 4.1.11 - Enhancements, New Features, Documentation, and Bug Fixes
 =================================================================
@@ -241,7 +242,6 @@ Others:
 - #1322: Autosubmit now has a DockerHub organization.
 - #1123: Profiler can now be stopped.
 
-
 4.1.10 - Hotfix
 ===============
 - Fixed an issue with the performance of the log retrieval.
@@ -257,14 +257,12 @@ Others:
 - Fixes an issue with dependency not being linked.
 - Docs improved.
 
-
 4.1.8 - Bug fixes.
 ==================
 - Fixed an issue with a socket connection left open.
 - Fixed an issue with log recovery being disabled by default.
 - Added exclusive parameter
 - Fixed some X11 routines called by default
-
 
 4.1.7 - X11, Migrate, script and Bug fixes
 ==========================================
@@ -312,9 +310,6 @@ Others:
 - Improved error clarity.
 - Added RO-Crate.
 - Added Calendar for splits.
-
-
-
 
 4.1.2 - Bug fixes
 =================
