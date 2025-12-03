@@ -22,12 +22,14 @@ from io import StringIO
 
 from autosubmit.log.log import AutosubmitCritical, Log
 
+
 class FluxYAMLGenerator:
     """
     Generate a YAML file to submit a job to a Flux instance given its parameters.
 
     :param parameters: Dictionary containing job parameters.
     """
+
     def __init__(self, parameters: dict):
         self.parameters = parameters
 
@@ -61,23 +63,23 @@ class FluxYAMLGenerator:
 
         # Create and populate the YAML
         job_yaml = FluxYAML(job_name)
-        task_count = job_yaml.add_resource(label="task", ntasks=ntasks, num_nodes=num_nodes, num_cores=num_cores, 
-                                           exclusive=exclusive, mem_per_node_mb=mem, mem_per_core_mb=mem_per_core, 
+        task_count = job_yaml.add_resource(label="task", ntasks=ntasks, num_nodes=num_nodes, num_cores=num_cores,
+                                           exclusive=exclusive, mem_per_node_mb=mem, mem_per_core_mb=mem_per_core,
                                            tasks_per_node=tasks_per_node)
         if task_count > 0:
             job_yaml.add_task(resource_label="task", count_total=task_count)
         else:
             job_yaml.add_task(resource_label="task", count_per_slot=1)
-        job_yaml.set_attributes(duration=wallclock, cwd=log_path, job_name=job_name, output_file=output_file, 
+        job_yaml.set_attributes(duration=wallclock, cwd=log_path, job_name=job_name, output_file=output_file,
                                 error_file=error_file, script_content=template)
 
         # Compose template
         return self._get_script_section_header(job_section, expid) + "\n" + job_yaml.generate()
-    
+
     def _wallclock_to_seconds(self, wallclock: str) -> int:
         """
         Convert wallclock time in format HH:MM to total seconds.
-        
+
         :param wallclock: Wallclock in HH:MM format.
 
         :return: Total wallclock in seconds.
@@ -92,6 +94,7 @@ class FluxYAMLGenerator:
 #                   {tasktype} {expid} EXPERIMENT
 ###############################################################################
            """)
+
 
 class FluxYAML(object):
     """
@@ -109,6 +112,7 @@ class FluxYAML(object):
 
     :param job_name: Name of the job.
     """
+
     def __init__(self, job_name: str):
         # Jobspec attributes
         self.version = 1
@@ -121,7 +125,7 @@ class FluxYAML(object):
         """
         Generates the YAML representation of the job specification.
         It uses the previously set resources, tasks, and attributes.
-        
+
         :return: YAML string of the job specification.
         :rtype: str
 
@@ -150,7 +154,7 @@ class FluxYAML(object):
                      tasks_per_node: int = 0) -> int:
         """
         Adds a resource to the job specification.
-        
+
         :param label: Label for the resource.
         :param ntasks: Number of slots.
         :param num_nodes: Number of nodes.
@@ -169,7 +173,7 @@ class FluxYAML(object):
         if num_cores == 0:
             Log.warning(f"Job {self.job_name} has been asigned zero cores, which is not permitted. Defaulting to 1")
             num_cores = 1
-        
+
         # Create node, slot and core resources by mapping the parameters. Node is optional
         node = None
         min_nodes = 0
@@ -188,15 +192,16 @@ class FluxYAML(object):
             raise AutosubmitCritical(f"The current resource request for {self.job_name} is not accepted \
                                      when wrapped with the Flux method. If you consider this is a mistake, \
                                      please report your case to the Autosubmit developers")
-        
+
         # Compose resources
         if num_nodes > 0 or min_nodes > 0:
-            node = self._compose_node_resource(count=num_nodes, min_count=min_nodes, exclusive=exclusive, mem_per_node_mb=mem_per_node_mb)
+            node = self._compose_node_resource(count=num_nodes, min_count=min_nodes, exclusive=exclusive,
+                                               mem_per_node_mb=mem_per_node_mb)
         if nslots > 0:
             slot = self._compose_slot_resource(label=label, count=nslots)
         if num_cores > 0:
             core, memory = self._compose_core_resource(count=num_cores, mem_per_core_mb=mem_per_core_mb)
-        
+
         # Build the resource hierarchy
         slot['with'].append(core)
         if memory:
@@ -214,9 +219,9 @@ class FluxYAML(object):
                 task_count = ntasks
             else:
                 task_count = 0
-        
+
         return task_count
-    
+
     def _compose_node_resource(self, count: int = 0, min_count: int = 0, exclusive: bool = False, mem_per_node_mb: int = 0) -> dict:
         """
         Composes a node resource dictionary.
@@ -234,12 +239,12 @@ class FluxYAML(object):
             raise ValueError("Node count must be greater than zero to compose a node resource")
         if count > 0 and min_count > 0:
             Log.warning("Cannot set both count and min_count for node resource simultaneously. Ignoring min_count.")
-        
+
         if count > 0:
             node_count = count
         else:
             node_count = {'min': min_count}
-        
+
         node = {
             'type': 'node',
             'count': node_count,
@@ -253,7 +258,7 @@ class FluxYAML(object):
                 'unit': 'MB'
             })
         return node
-    
+
     def _compose_slot_resource(self, label: str = "default", count: int = 0) -> dict:
         """
         Composes a slot resource dictionary.
@@ -268,7 +273,7 @@ class FluxYAML(object):
         """
         if count <= 0:
             raise ValueError("Slot count must be greater than zero to compose a slot resource")
-        
+
         slot = {
             'type': 'slot',
             'label': label,
@@ -276,7 +281,7 @@ class FluxYAML(object):
             'with': []
         }
         return slot
-    
+
     def _compose_core_resource(self, count: int = 0, mem_per_core_mb: int = 0) -> dict:
         """
         Composes a core resource dictionary.
@@ -291,7 +296,7 @@ class FluxYAML(object):
         """
         if count <= 0:
             raise ValueError("Core count must be greater than zero to compose a core resource")
-        
+
         core = {
             'type': 'core',
             'count': count
@@ -304,7 +309,7 @@ class FluxYAML(object):
                 'unit': 'MB'
             }
         return core, memory
-    
+
     def add_task(self, resource_label: str = "default", count_per_slot: int = 0, count_total: int = 0) -> None:
         """
         Adds a task to the job specification.
@@ -314,14 +319,14 @@ class FluxYAML(object):
         :param count_total: Total number of task instances.
 
         :return: None
-        
+
         :raises ValueError: If both or none of count_per_slot and count_total are set.
         """
         if count_per_slot > 0 and count_total > 0:
             raise ValueError("Cannot set both count_per_slot and count_total simultaneously")
         elif count_per_slot == 0 and count_total == 0:
             raise ValueError("Either count_per_slot or count_total must be specified")
-        
+
         if count_per_slot > 0:
             count = {
                 'per_slot': count_per_slot,
@@ -338,8 +343,8 @@ class FluxYAML(object):
         }
 
         self.tasks.append(task)
-    
-    def set_attributes(self, duration: int, cwd: str, job_name: str, output_file: str, 
+
+    def set_attributes(self, duration: int, cwd: str, job_name: str, output_file: str,
                        error_file: str, script_content: str) -> None:
         """
         Sets the attributes section of the job specification.
