@@ -106,7 +106,7 @@ class FluxYAML(object):
 
     Note: Jobspec Version 1 only supports a single resource and task, as defined 
     by 'Specific Resource Graph Restrictions' and 'Tasks' sections in Flux RFC 25.
-    
+
     :param job_name: Name of the job.
     """
     def __init__(self, job_name: str):
@@ -305,7 +305,7 @@ class FluxYAML(object):
             }
         return core, memory
     
-    def add_task(self, resource_label: str = "default", count_per_slot: int = 0, count_total: int = 0) -> int:
+    def add_task(self, resource_label: str = "default", count_per_slot: int = 0, count_total: int = 0) -> None:
         """
         Adds a task to the job specification.
 
@@ -313,8 +313,7 @@ class FluxYAML(object):
         :param count_per_slot: Number of task instances per slot.
         :param count_total: Total number of task instances.
 
-        :return: Index of the added task.
-        :rtype: int
+        :return: None
         
         :raises ValueError: If both or none of count_per_slot and count_total are set.
         """
@@ -339,7 +338,6 @@ class FluxYAML(object):
         }
 
         self.tasks.append(task)
-        return len(self.tasks) - 1
     
     def set_attributes(self, duration: int, cwd: str, job_name: str, output_file: str, 
                        error_file: str, script_content: str) -> None:
