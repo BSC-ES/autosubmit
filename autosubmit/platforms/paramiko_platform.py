@@ -687,7 +687,7 @@ class ParamikoPlatform(Platform):
             return None
 
     def get_job_energy_cmd(self, job_id):
-        return self.get_ssh_output()
+        raise NotImplementedError  # pragma: no cover
 
     def check_job_energy(self, job_id):
         """Checks job energy and return values. Defined in child classes.
