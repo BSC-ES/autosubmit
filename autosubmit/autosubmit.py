@@ -3004,15 +3004,14 @@ class Autosubmit:
         hpcarch = as_conf.get_platform()
 
         submitter = ParamikoSubmitter(as_conf)
-        platforms = submitter.platforms
 
         platforms_to_test = set()
-        for job in job_list.get_job_list():
-            job.submitter = submitter
-            if not job.platform_name:
-                job.platform_name = hpcarch
-            job.platform = platforms[job.platform_name]
-            platforms_to_test.add(job.platform)
+        for section, section_data in as_conf.jobs_data.items():
+            if "PLATFORM" in section_data and section_data["PLATFORM"] in submitter.platforms:
+                platforms_to_test.add(submitter.platforms[section_data["PLATFORM"]])
+
+        if hpcarch in submitter.platforms:
+            platforms_to_test.add(submitter.platforms[hpcarch])
 
         completed_jobnames = Autosubmit.online_recovery(as_conf, platforms_to_test, job_list, offline)
         current_active_jobs = job_list.get_in_queue()
@@ -3033,20 +3032,25 @@ class Autosubmit:
         if save:
             offline_jobs = []
             for job in current_active_jobs:
-                if offline or not job.platform.connected:
+                if job.platform_name not in submitter.platforms:
                     offline_jobs.append(job.name)
                 else:
-                    job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", hpcarch).upper()
-                    # noinspection PyTypeChecker
                     job.platform = submitter.platforms[job.platform_name]
-                    try:
-                        job.platform.send_command(f"{job.platform.cancel_cmd} {job.id}", ignore_log=True)
-                    except AutosubmitError as e:
-                        # Not sure if this is the best way to check for invalid job id error for non-slurm
-                        if "invalid job id" in e.message.lower():
-                            Log.warning(f"Job {job.name} could not be cancelled because it was not found on the platform")
-                        else:
-                            Log.warning(f"Job {job.name} could not be cancelled: {e.message}")
+                    if offline or not job.platform.connected:
+                        offline_jobs.append(job.name)
+                        continue
+
+                job.platform_name = as_conf.jobs_data.get(job.section, {}).get("PLATFORM", hpcarch).upper()
+                # noinspection PyTypeChecker
+                job.platform = submitter.platforms[job.platform_name]
+                try:
+                    job.platform.send_command(f"{job.platform.cancel_cmd} {job.id}", ignore_log=True)
+                except AutosubmitError as e:
+                    # Not sure if this is the best way to check for invalid job id error for non-slurm
+                    if "invalid job id" in e.message.lower():
+                        Log.warning(f"Job {job.name} could not be cancelled because it was not found on the platform")
+                    else:
+                        Log.warning(f"Job {job.name} could not be cancelled: {e.message}")
             if offline_jobs:
                 Log.warning(f"Jobs {''.join(offline_jobs)} could not be cancelled due to offline mode.")
 

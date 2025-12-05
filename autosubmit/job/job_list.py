@@ -3261,19 +3261,7 @@ class JobList(object):
                 Log.debug(f"Setting job: {job.name} status to: READY (all parents completed)...")
                 job.status = Status.READY
                 job.hold = False
-                if as_conf.get_remote_dependencies() == "true":
-                    all_parents_completed.append(job.name)
 
-        if as_conf.get_remote_dependencies() == "true":
-            for job in self.get_prepared():
-                tmp = [parent for parent in job.parents if
-                       parent.status == Status.COMPLETED or parent.status == Status.SKIPPED]
-                if job.parents is None or len(tmp) == len(job.parents):
-                    job.status = Status.READY
-                    job.hold = False
-                    save = True
-                    Log.debug("A job in prepared status has all parent completed, job:"
-                              f"{job.name} status set to: READY ...")
         return save
 
     def _update_held_jobs(self, as_conf: AutosubmitConfig) -> bool:
