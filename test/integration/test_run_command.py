@@ -54,11 +54,11 @@ def set_up_test(autosubmit_exp, autosubmit, mocker, command: str):
         ['autosubmit', 'configure'],
         ['autosubmit', 'expid', '-dm', '-H', 'local', '-d', 'Tutorial'],
         ['autosubmit', 'delete', _EXPIDS],
-        ['autosubmit', 'monitor', _EXPIDS, '--hide', '--notransitive'],  # TODO
+        ['autosubmit', 'monitor', _EXPIDS, '--hide'],  # TODO
         ['autosubmit', 'stats', _EXPIDS],  # TODO
         ['autosubmit', 'clean', _EXPIDS],
-        # ['autosubmit', 'check', _EXPIDS, '--notransitive'],
-        ['autosubmit', 'inspect', _EXPIDS, '--notransitive'],  # TODO
+        # ['autosubmit', 'check', _EXPIDS],
+        ['autosubmit', 'inspect', _EXPIDS],  # TODO
         ['autosubmit', 'report', _EXPIDS],  # TODO
         ['autosubmit', 'describe', _EXPIDS],
         ['autosubmit', 'migrate', '-fs', 'Any', _EXPIDS],

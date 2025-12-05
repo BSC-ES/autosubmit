@@ -18,7 +18,6 @@
 import atexit
 import multiprocessing
 import os
-import queue  # only for the exception
 import time
 import traceback
 from contextlib import suppress
@@ -42,7 +41,6 @@ if TYPE_CHECKING:
     from autosubmit.job.job_packages import JobPackageBase
     from autosubmit.job.job import Job
     from autosubmit.job.job_list import JobList
-    from autosubmit.job.job_package_persistence import JobPackagePersistence
     from multiprocessing.process import BaseProcess
 
 

@@ -27,7 +27,6 @@ import select
 import socket
 import sys
 import threading
-import time
 from contextlib import suppress
 from pathlib import Path
 from threading import Thread

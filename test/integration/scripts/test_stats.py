@@ -47,7 +47,7 @@ def test_autosubmit_commands_help(autosubmit_exp, mocker):
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
     processes_before_run = Process().children(recursive=True)
-    assert 0 == exp.autosubmit.run_experiment(_EXPID)
+    assert 0 == exp.autosubmit.run_experiment(exp.expid)
     processes_after_run = Process().children(recursive=True)
 
     before = time()

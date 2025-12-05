@@ -31,7 +31,6 @@ from time import sleep
 from typing import List, Optional, Tuple, TYPE_CHECKING, Any, Dict
 
 from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, subs_dates
-from sphinx.builders.gettext import timestamp
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig

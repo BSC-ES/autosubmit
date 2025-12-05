@@ -39,7 +39,7 @@ from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
-from typing import Any, Generator, Optional, Union
+from typing import Any, Generator, Optional, Union, TYPE_CHECKING
 
 from bscearth.utils.date import date2str
 from portalocker import Lock
@@ -76,6 +76,9 @@ from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
+
+if TYPE_CHECKING:
+    from autosubmit.job.job import Job
 
 dialog = None
 
@@ -192,8 +195,6 @@ class Autosubmit:
             subparser = subparsers.add_parser(
                 'run', description="runs specified experiment")
             subparser.add_argument('expid', help='experiment identifier')
-            subparser.add_argument('-nt', '--notransitive', action='store_true',
-                                   default=False, help='Disable transitive reduction')
             subparser.add_argument('-v', '--update_version', action='store_true',
                                    default=False, help='Update experiment version')
             subparser.add_argument('-st', '--start_time', required=False,
@@ -288,8 +289,6 @@ class Autosubmit:
             group2.add_argument('-txtlog', '--txt_logfiles', action='store_true', default=False,
                                 help='Generates only txt status file(AS < 3.12b behaviour)')
 
-            subparser.add_argument('-nt', '--notransitive', action='store_true',
-                                   default=False, help='Disable transitive reduction')
             # subparser.add_argument('-d', '--detail', action='store_true',
             #                        default=False, help='Shows Job List view in terminal')
             subparser.add_argument('-v', '--update_version', action='store_true',
@@ -314,8 +313,6 @@ class Autosubmit:
                                    help='Includes jobs summary in the plot')
             subparser.add_argument('--hide', action='store_true', default=False,
                                    help='hides plot window')
-            subparser.add_argument('-nt', '--notransitive', action='store_true',
-                                   default=False, help='Disable transitive reduction')
             subparser.add_argument('-v', '--update_version', action='store_true',
                                    default=False, help='Update experiment version')
             # Clean
@@ -350,10 +347,6 @@ class Autosubmit:
                      'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
             subparser.add_argument('-expand_status', type=str, help='Select the statuses to be expanded')
             subparser.add_argument(
-                '-nt', '--notransitive', action='store_true', default=False,
-                help='Disable transitive reduction (deprecated)'
-            )
-            subparser.add_argument(
                 '-nl', '--no_recover_logs', action='store_true', default=False,
                 help='Disable logs recovery (deprecated)'
             )
@@ -383,8 +376,6 @@ class Autosubmit:
             subparser = subparsers.add_parser(
                 'inspect', description="Generate all .cmd files")
             subparser.add_argument('expid', help='experiment identifier')
-            subparser.add_argument('-nt', '--notransitive', action='store_true',
-                                   default=False, help='Disable transitive reduction')
             subparser.add_argument(
                 '-f', '--force', action="store_true", help='Overwrite all cmd')
             subparser.add_argument('-cw', '--check_wrapper', action='store_true',
@@ -416,8 +407,6 @@ class Autosubmit:
             subparser = subparsers.add_parser(
                 'check', description="check configuration for specified experiment")
             subparser.add_argument('expid', help='experiment identifier')
-            subparser.add_argument('-nt', '--notransitive', action='store_true',
-                                   default=False, help='Disable transitive reduction')
             subparser.add_argument('-v', '--update_version', action='store_true',
                                    default=False, help='Update experiment version')
             # Describe
@@ -465,8 +454,6 @@ class Autosubmit:
                                         'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
             subparser.add_argument(
                 '-expand_status', type=str, help='Select the statuses to be expanded')
-            subparser.add_argument('-nt', '--notransitive', action='store_true',
-                                   default=False, help='Disable transitive reduction')
             subparser.add_argument('-cw', '--check_wrapper', action='store_true',
                                    default=False, help='Generate possible wrapper in the current workflow')
             subparser.add_argument('-v', '--update_version', action='store_true',
@@ -568,8 +555,6 @@ class Autosubmit:
                                         'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
             subparser.add_argument(
                 '-expand_status', type=str, help='Select the statuses to be expanded')
-            subparser.add_argument('-nt', '--notransitive', action='store_true',
-                                   default=False, help='Disable transitive reduction')
             subparser.add_argument('-cw', '--check_wrapper', action='store_true',
                                    default=False, help='Generate possible wrapper in the current workflow')
             subparser.add_argument('-d', '--detail', action='store_true',
@@ -748,9 +733,6 @@ class Autosubmit:
     @staticmethod
     def run_command(args: argparse.Namespace):
         expid = "None"
-
-        if hasattr(args, 'notransitive') and args.notransitive:
-            warnings.warn('notransitive is deprecated and will be removed in a future major release!')
 
         if hasattr(args, 'expid'):
             expid = args.expid
@@ -1353,7 +1335,7 @@ class Autosubmit:
             dummy: bool = False,
             minimal_configuration: bool = False,
             local: bool = False,
-            parameters: Dict[str, Union[Dict, List, str]] = None
+            parameters: dict[str, Union[dict, list, str]] = None
     ) -> None:
         """Retrieve the configuration from autosubmit.config package.
 
@@ -1739,7 +1721,7 @@ class Autosubmit:
             Log.debug(f"Sleep: {safetysleeptime}")
 
             job_list = Autosubmit.load_job_list(
-                expid, as_conf, notransitive=notransitive, full_load=True)
+                expid, as_conf, full_load=True)
             job_list.clear_wrappers_db(preview=True)
 
             job_list.packages_dict = {}
@@ -2060,7 +2042,6 @@ class Autosubmit:
     @staticmethod
     def prepare_run(
             expid: str,
-            notransitive: bool = False,
             start_time: Optional[str] = None,
             start_after: Optional[str] = None,
             run_only_members: Optional[str] = None,
@@ -2068,9 +2049,9 @@ class Autosubmit:
             check_scripts: bool = False,
             submitter: Optional[ParamikoSubmitter] = None
     ) -> Union[tuple[
-        Union[JobList, Any], Union[Platform, Submitter], Optional[ExperimentHistory], str, AutosubmitConfig, list[
+        Union[JobList, Any], Union[Platform, "ParamikoSubmitter"], Optional[ExperimentHistory], str, AutosubmitConfig, list[
             Any], bool], tuple[
-        Union[JobList, Any], Union[Platform, Submitter], None, None, AutosubmitConfig, list[
+        Union[JobList, Any], Union[Platform, "ParamikoSubmitter"], None, None, AutosubmitConfig, list[
             Any], bool]]:
         """Prepare the run of the experiment.
 
@@ -2122,7 +2103,7 @@ class Autosubmit:
             Log.info("Recovering job_list")
         try:
             job_list = Autosubmit.load_job_list(
-                expid, as_conf, notransitive=notransitive, new=False, full_load=False, submitter=submitter,
+                expid, as_conf, new=False, full_load=False, submitter=submitter,
                 check_failed_jobs=True)
             # New runs, reset failed status to waiting
             if not recover:
@@ -2267,7 +2248,7 @@ class Autosubmit:
                     # This function is called only once, when the experiment is started. It is used to initialize the experiment and to check the correctness of the configuration files.
                     # If there are issues while running, this function will be called again to reinitialize the experiment.
                     job_list, submitter, exp_history, host, as_conf, platforms_to_test, _ = Autosubmit.prepare_run(
-                        expid, notransitive, start_time, start_after, run_only_members)
+                        expid, start_time, start_after, run_only_members)
                 except Exception as e:
                     raise AutosubmitCritical("Error in run initialization", 7014, str(e))  # Changing default to 7014
 
@@ -2396,7 +2377,6 @@ class Autosubmit:
                             try:
                                 job_list, submitter, _, _, as_conf, platforms_to_test, recovery = Autosubmit.prepare_run(
                                     expid,
-                                    notransitive,
                                     start_time,
                                     start_after,
                                     run_only_members,
@@ -2684,10 +2664,10 @@ class Autosubmit:
             as_conf.check_conf_files(False)
             # Getting output type from configuration
             output_type = as_conf.get_output_type()
-            db_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'db')
+            os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'db')
             job_list = Autosubmit.load_job_list(
-                expid, as_conf, notransitive=notransitive, monitor=True, new=False)
-            Log.debug(f"Job list restored from {pkl_dir} files")
+                expid, as_conf, monitor=True, new=False)
+            Log.debug("Job list restored from db")
         except AutosubmitError as e:
             if profile:
                 profiler.stop()
@@ -2848,12 +2828,12 @@ class Autosubmit:
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             as_conf.check_conf_files(False)
 
-            db_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'db')
-            job_list = Autosubmit.load_job_list(expid, as_conf, notransitive=notransitive, new=False)
+            os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'db')
+            job_list = Autosubmit.load_job_list(expid, as_conf, new=False)
             for job in job_list.get_job_list():
                 job.init_runtime_parameters(as_conf, reset_logs=False, called_from_log_recovery=False)
                 job.update_dict_parameters(as_conf)
-            Log.debug(f"Job list restored from {pkl_dir} files")
+            Log.debug("Job list restored from db")
             jobs = StatisticsUtils.filter_by_section(job_list.get_job_list(), filter_type)
             jobs, period_ini, period_fi = StatisticsUtils.filter_by_time_period(jobs, filter_period)
             # Package information
@@ -3023,8 +3003,7 @@ class Autosubmit:
         # Getting output type provided by the user in config, 'pdf' as default
         hpcarch = as_conf.get_platform()
 
-        submitter = Autosubmit._get_submitter(as_conf)
-        submitter.load_platforms(as_conf)
+        submitter = ParamikoSubmitter(as_conf)
         platforms = submitter.platforms
 
         platforms_to_test = set()
@@ -3205,7 +3184,7 @@ class Autosubmit:
             db_dir = os.path.join(
                 BasicConfig.LOCAL_ROOT_DIR, experiment_id, 'db')
             job_list = Autosubmit.load_job_list(
-                experiment_id, as_conf, notransitive=notransitive)
+                experiment_id, as_conf)
             Log.debug("Job list restored from {0} files", db_dir)
 
             Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
@@ -4034,83 +4013,6 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def sqlite_fix(expid, force: bool = False):
-        """Tries to find a backup of the sqlite file and restores it. Verifies that autosubmit is not running on this experiment.
-
-        :param expid: experiment identifier
-        :type expid: str
-        :param force: force the operation without confirmation
-        :type force: bool
-        :return:
-        :rtype:
-        """
-        if BasicConfig.DATABASE_BACKEND != 'sqlite':
-            raise AutosubmitCritical(
-                "This operation is only available when Autosubmit database backend is set to sqlite", 7000)
-        exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
-        tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
-        db_folder_path = os.path.join(exp_path, "db")
-        current_db_path = os.path.join(
-            db_folder_path, f"job_list_{expid}.db")
-        backup_db_path = os.path.join(
-            db_folder_path, f"job_list_{expid}_backup.db")
-        try:
-            with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
-                # Not locked
-                Log.info(f"Looking for backup file {backup_db_path}")
-                if os.path.exists(backup_db_path):
-                    # Backup file exists
-                    Log.info("Backup file found.")
-                    # Make sure backup file is not empty
-                    _stat_b = os.stat(backup_db_path)
-                    if _stat_b.st_size <= 6:
-                        # It is empty -> Return
-                        Log.info(
-                            f"The backup file {backup_db_path} is empty. db restore operation stopped."
-                            f" No changes have been made.")
-                        return
-                    if os.path.exists(current_db_path):
-                        # db file exists
-                        Log.info(f"Current db file {current_db_path} found.")
-                        _stat = os.stat(current_db_path)
-                        if _stat.st_size > 6:
-                            # Greater than 6 bytes -> Not empty
-                            if not force and not Autosubmit._user_yes_no_query(
-                                    f"The current db file {current_pkl_path} is not empty. Do you want to continue?"
-                            ):
-                                # The user chooses not to continue. Operation stopped.
-                                Log.info(
-                                    "db restore operation stopped. No changes have been made.")
-                                return 0
-                            # File not empty: Archive
-                            archive_db_name = os.path.join(db_folder_path,
-                                                           f"{datetime.datetime.today().strftime('%d%m%Y%H%M%S')}"
-                                                           f"_job_list_{expid}.db")
-                            # Waiting for completion
-                            subprocess.call(
-                                ["cp", current_db_path, archive_db_name])
-
-                            if os.path.exists(archive_db_name):
-                                Log.result(f"File {current_db_path} archived as {archive_db_name}.")
-                        else:
-                            # File empty: Delete
-                            result = os.popen(f"rm {current_db_path}")
-                            if result is not None:
-                                Log.info(f"File {current_db_path} deleted.")
-                    # Restore backup file
-                    Log.info(f"Restoring {backup_db_path} into {current_db_path}")
-                    subprocess.call(["mv", backup_db_path, current_db_path])
-
-                    if os.path.exists(current_db_path):
-                        Log.result("db restored.")
-                else:
-                    Log.info(
-                        "Backup file not found. db restore operation stopped. No changes have been made.")
-            return 0
-        except AutosubmitCritical as e:
-            raise AutosubmitCritical(e.message, e.code, e.trace)
-
-    @staticmethod
     def database_backup(expid):
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
             try:
@@ -4534,7 +4436,7 @@ class Autosubmit:
                     if str(rerun).lower() == "true":
                         job_list.rerun(as_conf.get_rerun_jobs(), as_conf)
                     else:
-                        job_list.remove_rerun_only_jobs(notransitive)
+                        job_list.remove_rerun_only_jobs()
                     job_list.clear_generate()
                     as_conf.save()
                     groups_dict = dict()
@@ -5015,18 +4917,18 @@ class Autosubmit:
 
 
     @staticmethod
-    def _split_match(j: Job, split_list: list[str]) -> bool:
+    def _split_match(j: "Job", split_list: list[str]) -> bool:
         """Check if job split matches"""
         return "ANY" in split_list or not j.splits or int(j.splits) < 2 or not split_list or str(j.split) in split_list
 
     @staticmethod
-    def _filter_sections_splits(filter_section_splits: str, jobs: list[Job]) -> list[Job]:
+    def _filter_sections_splits(filter_section_splits: str, jobs: list["Job"]) -> list["Job"]:
         """Filter jobs by sections and splits.
         :param filter_section_splits: filter sections and splits
         :param jobs: list of jobs
         :return: list of jobs matching the filter
         """
-        section_matching_jobs: list[Job] = []
+        section_matching_jobs: list["Job"] = []
         for section in filter_section_splits:
             section_name = section.strip().split("[")[0].strip()
             job_splits = []
@@ -5067,7 +4969,7 @@ class Autosubmit:
         return section_matching_jobs
 
     @staticmethod
-    def _filter_chunks(filter_chunk_str: str, job_list: "JobList", matching_jobs: list[Job]) -> list[Job]:
+    def _filter_chunks(filter_chunk_str: str, job_list: "JobList", matching_jobs: list["Job"]) -> list["Job"]:
         """Filter jobs by chunks.
 
         :param filter_chunk_str: filter chunks
@@ -5125,7 +5027,7 @@ class Autosubmit:
         return final_list
 
     @staticmethod
-    def filter_jobs_by_chunks_splits(job_list: "JobList", filter_chunks: str) -> list[Job]:
+    def filter_jobs_by_chunks_splits(job_list: "JobList", filter_chunks: str) -> list["Job"]:
         """Select jobs from *job_list* according to *filter_chunks* specification.
 
         Expected format:
@@ -5557,7 +5459,7 @@ class Autosubmit:
 
     # TODO: To be moved to utils
     @staticmethod
-    def load_job_list(expid, as_conf, notransitive=False, monitor=False, new=True, full_load=True, submitter=None,
+    def load_job_list(expid, as_conf, monitor=False, new=True, full_load=True, submitter=None,
                       check_failed_jobs=False) -> JobList:
         rerun = as_conf.get_rerun()
         job_list = JobList(expid, as_conf, YAMLParserFactory(), run_mode=True, submitter=submitter)

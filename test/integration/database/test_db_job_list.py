@@ -22,7 +22,6 @@ from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.database.tables import WrapperJobsTable, get_table_from_name, JobsTable, ExperimentStructureTable
 from autosubmit.job.job import Job
@@ -358,7 +357,7 @@ def test_select_latest_inner_jobs(
         _expid: str,
         as_exp: Any,
 ):
-    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+    Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
 
     db_manager = _create_db_manager(schema=_expid)
 
@@ -439,7 +438,7 @@ def test_load_job_by_name(
         _expid: str,
         as_exp: Any,
 ):
-    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+    Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
 
     db_manager = _create_db_manager(schema=_expid)
 
@@ -477,7 +476,7 @@ def test_load_wrapper(
         as_exp: Any,
 ):
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    db_path = exp_path / "db"
+    exp_path / "db"
 
     db_manager = _create_db_manager(schema=_expid)
 
@@ -556,7 +555,7 @@ def test_clear_unused_nodes(
     :param as_exp.as_conf: Fixture to create a test configuration
     :type as_exp.as_conf: Callable
     """
-    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+    Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
 
     db_manager = _create_db_manager(schema=_expid)
 
@@ -674,7 +673,7 @@ def test_clear_unused_nodes(
 def test_backup_and_restore(monkeypatch, tmp_path, _expid, as_db, as_exp: Any):
     """" Test backup of database and restore it afterwards. """
 
-    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+    Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
     if as_db != 'sqlite':
         # TODO: not implemented
         return 0

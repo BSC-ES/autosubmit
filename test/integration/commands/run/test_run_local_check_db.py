@@ -93,7 +93,7 @@ def test_run_uninterrupted(
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
     log_dir = tmp_path / f"LOG_{as_exp.expid}"
-    aslogs_path = Path(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
+    Path(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
     as_conf.set_last_as_command('run')
 
     # as_exp.autosubmit._setup_log_files(

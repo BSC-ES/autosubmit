@@ -24,7 +24,6 @@ from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
 from textwrap import dedent
-from time import time
 from typing import Optional
 
 import pytest
@@ -35,7 +34,7 @@ from mock.mock import patch  # type: ignore
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.configcommon import BasicConfig, YAMLParserFactory
-from autosubmit.job.job import Job
+from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_utils import SubJob, SubJobManager

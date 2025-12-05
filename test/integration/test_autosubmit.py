@@ -35,7 +35,6 @@ from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_packages import JobPackageBase
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.platform import Platform
-from autosubmit.scripts.autosubmit import main
 
 if TYPE_CHECKING:
     from test.integration.conftest import AutosubmitExperimentFixture

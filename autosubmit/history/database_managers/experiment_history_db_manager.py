@@ -52,7 +52,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
 
     def __init__(self, expid: str, jobdata_dir_path=BasicConfig.JOBDATA_DIR):
         """ Requires expid and jobdata_dir_path. """
-        super(ExperimentHistoryDbManager, self).__init__(options['expid'], jobdata_dir_path=BasicConfig.JOBDATA_DIR, local_root_dir_path=BasicConfig.LOCAL_ROOT_DIR)
+        super(ExperimentHistoryDbManager, self).__init__(expid, jobdata_dir_path=jobdata_dir_path)
         self._set_schema_changes()
         self._set_table_queries()
         self.historicaldb_file_path = str(Path(jobdata_dir_path) / f"job_data_{expid}.db")

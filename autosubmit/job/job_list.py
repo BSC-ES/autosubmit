@@ -23,7 +23,6 @@ import re
 import traceback
 from contextlib import suppress
 from pathlib import Path
-from shutil import move
 from time import strftime, localtime, mktime
 from typing import List, Dict, Tuple, Any, Optional, Union, Set
 
@@ -36,17 +35,10 @@ from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job import Job
-from autosubmit.history.experiment_history import ExperimentHistory
-from autosubmit.job import job_utils
-from autosubmit.job.job import Job, WrapperJob
+from autosubmit.job.job import WrapperJob
 from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_packages import JobPackageThread
-from autosubmit.job.job_utils import Dependency
-from autosubmit.job.job_utils import transitive_reduction
-from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
-from autosubmit.platforms.platform import Platform
-from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.job.job_utils import Dependency
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.platforms.platform import Platform
@@ -635,7 +627,6 @@ class JobList(object):
             for wrappable_job, parents in group_by_parent_name.items():
                 # if not loaded already...
                 if not self.get_job_by_name(wrappable_job):
-                    tmp_loaded_jobs = []
                     can_be_loaded = True
                     for edge in parents:
                         p_job = self.get_job_by_name(edge["e_from"])
