@@ -73,6 +73,7 @@ release.
 - docstrings were made more uniform across several functions (should reflect in sphinx docs),
   fixed several ruff and mypy warnings, and did minor refactorings in the code like removing the
   `Submitter` class and using `ParamikoSubmitter` directly (only implementation) #2577
+- Added documentation regarding in-line script definition. 
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 
