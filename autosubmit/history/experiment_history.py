@@ -104,7 +104,8 @@ class ExperimentHistory:
 
             return None
 
-    def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug", job_id: int = 0, wrapper_queue: str = None, wrapper_code: str = None, children: str = "") -> JobData:
+    def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug", job_id: int = 0, wrapper_queue: str = None, wrapper_code: str = None,
+                         children: str = "") -> JobData:
         """
         Updates the start time and other details of a job in the database.
 

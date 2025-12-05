@@ -148,3 +148,20 @@ We close the socket and use that port for our next test. Chances or the
 port being used by multiple tests is smaller than using random or ranges.
 
 See `test/integration/test_utils/networking.py` for more.
+
+## Postgres Database. 
+
+In case you want to do some manual testing with the Postgres backend,
+you can use the following command to start a Postgres container:
+
+```bash
+$ sudo setfacl --modify user:$USER:rw /var/run/docker.sock
+```
+
+```bash
+$ docker run -d --name some-postgres \
+    -e POSTGRES_PASSWORD=mypwd \
+    -e POSTGRES_USER=postgres \
+    -p 5432:5432 \
+    postgres 
+```
