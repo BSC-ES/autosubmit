@@ -2,9 +2,9 @@
 Script templates
 ################
 
-Autosubmit jobs require a ``FILE`` property that points to a
-script template. Script templates can be written in Bash shell,
-R, or Python. By default, the ``TYPE`` property of a job is set
+Autosubmit jobs require a ``FILE`` or ``SCRIPT`` property that points 
+to or defines a script template. Script templates can be written in Bash 
+shell, R, or Python. By default, the ``TYPE`` property of a job is set
 to ``bash``. Template scripts can have any file extension,
 the generated script will have it replaced by ``.cmd``.
 
@@ -138,3 +138,41 @@ For example, `%^model.version%` in `conf.yml` would resolve to `"last"` (from `c
 In this case, the value of `test_in_place` in `conf.yml` would resolve as: `"something/first/something"`
 
 And, the value of `test_at_the_end` would resolve as:  `"something/last/something"`
+
+In-line Scripting
+=================
+
+It is also possible to define a script directly in the yaml configuration file. 
+
+.. note:: If SCRIPT is defined, it will take precedence over FILE. 
+
+If you wish to run only one liner script:
+
+.. code-block:: yaml
+  :emphasize-lines: 6
+  :caption: Job ``JOB_IN_LINE_ONELINER`` that runs sleep 2 
+
+  JOBS:
+    JOB_1:
+      PLATFORM: LOCAL
+      RUNNING: once
+      TYPE: bash # default
+      SCRIPT: sleep 2
+
+In case that your script needs lines, the yaml specification allows to do so with the PIPE character (|).  
+
+.. code-block:: yaml
+  :emphasize-lines: 7,8
+  :caption: Job ``JOB_IN_LINE_MULTILINE`` that runs hello world and sleep  
+
+  JOBS:
+    JOB_1:
+      PLATFORM: LOCAL
+      RUNNING: once
+      TYPE: bash # default
+      SCRIPT: |
+        echo "hello world!"
+        sleep 2
+
+Also, for debugging purposes, if PROJECT_TYPE is set to NONE (see :ref:`develproject`), the SCRIPT directive will overwrite Autosubmit's self-contained dummy templates.
+
