@@ -3247,7 +3247,6 @@ class JobList(object):
         :rtype: bool
         """
         save = False
-        all_parents_completed = []
         for job in self.get_delayed():
             if datetime.datetime.now() >= job.delay_end:
                 job.status = Status.READY
