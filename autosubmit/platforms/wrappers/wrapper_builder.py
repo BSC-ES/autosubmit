@@ -197,12 +197,12 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
             completed_path = job_script.replace('.cmd', '_COMPLETED')
             failed_path = job_script.replace('.cmd', '_FAILED')
             jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
+            jobspec.environment = os.environ.copy()
 
             while fail_count <= max_retries and completed == 0:
                 # Submit the job
                 jobspec.stdout = job_script + ".out." + str(fail_count)
                 jobspec.stderr =  job_script + ".err." + str(fail_count)
-                jobspec.environment = os.environ.copy()
                 job_id = flux.job.submit(handle, jobspec, waitable=True, debug=True)
 
                 # TODO: [ENGINES] Debug info, remove later
@@ -254,6 +254,7 @@ class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
         # Submit the jobs
         for job_script in job_scripts:
             jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
+            jobspec.environment = os.environ.copy()
             job_ids[job_script] = flux.job.submit(handle, jobspec, waitable=True)
 
             # TODO: [ENGINES] Debug info, remove later
@@ -303,6 +304,7 @@ class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
                 for job_script in self.jobs_list:
                     # Submit the job
                     jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
+                    jobspec.environment = os.environ.copy()
                     job_id = flux.job.submit(self.handle, jobspec, waitable=True)
 
                     # Do stuff in the meantime
@@ -356,6 +358,7 @@ class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
             # Submit the jobs
             for job_script in jobs_list:
                 jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
+                jobspec.environment = os.environ.copy()
                 job_ids[job_script] = flux.job.submit(handle, jobspec, waitable=True)
 
                 # TODO: [ENGINES] Debug info, remove later
