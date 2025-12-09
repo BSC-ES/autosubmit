@@ -274,10 +274,11 @@ class JobPackager(object):
                             packages_to_submit.append(package)
                             max_jobs_to_submit = max_jobs_to_submit - 1
                 continue
-            for job in p.jobs:
-                if job.fail_count > 0:
-                    failed_innerjobs = True
-                    break
+            if p.wrapper_policy == "strict":
+                for job in p.jobs:
+                    if job.fail_count > 0:
+                        failed_innerjobs = True
+                        break
 
             min_v, min_h, balanced = self.check_real_package_wrapper_limits(p)
             # if the quantity is enough, make the wrapper

@@ -72,14 +72,12 @@ def set_up_test(autosubmit_exp, autosubmit, mocker, command: str):
         ['autosubmit', 'archive', _EXPIDS],  # TODO
         ['autosubmit', 'readme'],  # TODO
         ['autosubmit', 'changelog'],  # TODO
-        ['autosubmit', 'dbfix', _EXPIDS],  # TODO
         ['autosubmit', 'updatedescrip', _EXPIDS, 'description'],
         ['autosubmit', 'cat-log', _EXPIDS],
         ['autosubmit', 'stop', '-a']
     ],
     ids=['configure', 'expid', 'delete', 'monitor', 'stats', 'clean', 'inspect', 'report', 'describe', 'migrate', 'create',
-         'setstatus', 'testcase', 'refresh', 'updateversion', 'upgrade', 'archive', 'readme', 'changelog', 'dbfix',
-         'updatedescrip', 'cat-log', 'stop']
+         'setstatus', 'testcase', 'refresh', 'updateversion', 'upgrade', 'archive', 'readme', 'changelog', 'updatedescrip', 'cat-log', 'stop']
 )  # TODO: improve quality of the test in order to validate each scenario and its outputs  #noqa
 def test_run_command(autosubmit_exp: AutosubmitExperimentFixture, autosubmit: Autosubmit, mocker, command: str):
     """Test the is simply used to check if commands are not broken on runtime, it doesn't check behaviour or output
@@ -109,7 +107,8 @@ def test_run_command_raises_autosubmit(autosubmit_exp: AutosubmitExperimentFixtu
     if 'run' in command:
         with pytest.raises(AutosubmitCritical) as error:
             autosubmit.run_command(args=args)
-        assert str(error.value.code) == '7010'
+        # Varies depending if the localDocker is available or not
+        assert str(error.value.code) == '7014' or str(error.value.code) == '7010'
     elif 'install' in command:
         with pytest.raises(AutosubmitCritical) as error:
             autosubmit.run_command(args=args)

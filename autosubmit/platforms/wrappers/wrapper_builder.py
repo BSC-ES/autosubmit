@@ -172,7 +172,7 @@ class PythonWrapperBuilder(WrapperBuilder):
 
         return textwrap.dedent(f"""
 class JobThread(Thread):
-    def __init__ (self, template, id_run):
+    def __init__(self, template, id_run):
         Thread.__init__(self)
         self.template = str(template)
         self.id_run = id_run
@@ -180,8 +180,8 @@ class JobThread(Thread):
 
     def run(self):
         jobname = self.template.replace('.cmd', '')
-        out = f"{self.working_dir}/{{self.template}}.out.0"
-        err = f"{self.working_dir}/{{self.template}}.err.0"
+        out = f"{self.working_dir}/{{self.template}}.out.{{self.fail_count}}"
+        err = f"{self.working_dir}/{{self.template}}.err.{{self.fail_count}}"
         template_path = f"{self.working_dir}/{{self.template}}"
         print(out+"\\n")
         print(err+"\\n")
@@ -563,7 +563,7 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
     def build_job_thread(self):  # fastlook
         return textwrap.dedent("""
         class JobThread(Thread):
-            def __init__ (self, template, id_run, retrials, fail_count):
+            def __init__(self, template, id_run, retrials, fail_count):
                 Thread.__init__(self)
                 self.template = template
                 self.id_run = id_run
@@ -605,7 +605,7 @@ class PythonVerticalHorizontalWrapperBuilder(PythonWrapperBuilder):
     def build_joblist_thread(self):
         return textwrap.dedent("""
         class JobListThread(Thread):
-            def __init__ (self, jobs_list, id_run):
+            def __init__(self, jobs_list, id_run):
                 Thread.__init__(self)
                 self.jobs_list = jobs_list
                 self.id_run = id_run
@@ -666,7 +666,7 @@ for i in range(len(pid_list)):
     def build_joblist_thread(self):
         return textwrap.dedent("""
         class JobListThread(Thread):
-            def __init__ (self, jobs_list, id_run, all_cores):
+            def __init__(self, jobs_list, id_run, all_cores):
                 Thread.__init__(self)
                 self.jobs_list = jobs_list
                 self.id_run = id_run

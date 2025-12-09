@@ -1855,7 +1855,7 @@ class Autosubmit:
             raise
         except BaseException:
             raise
-        return 0
+        return 1
 
     @staticmethod
     def generate_scripts_andor_wrappers(as_conf, job_list, only_wrappers=False):

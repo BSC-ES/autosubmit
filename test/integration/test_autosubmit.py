@@ -353,12 +353,6 @@ def test_submit_ready_jobs(autosubmit_exp, mocker):
     packages_to_submit = JobPackageBase(job_list.get_job_list())
     packages_to_submit.name = "test"
     packages_to_submit.x11 = "false"
-
-    with patch("autosubmit.job.job_utils.JobPackagePersistence") as mock_persistence:
-        job_persistence = mock_persistence.return_value.load.return_value = [
-            ['dummy/expid', '0005_job_packages', 'dummy/expid']
-        ]
-
     mocker.patch('autosubmit.platforms.platform.Platform.generate_submit_script', Mock())
     mocker.patch('autosubmit.job.job_packages.JobPackageBase.submit', Mock())
     save, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = platform.submit_ready_jobs(
