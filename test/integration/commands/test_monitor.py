@@ -92,7 +92,6 @@ def test_monitor(autosubmit_exp, wrapper_type, min_trigger_status, from_step, ge
         group_by=None,
         expand=[],
         expand_status=[],
-        detail=True,
         file_format="pdf",
         lst=None,
         filter_chunks=None,

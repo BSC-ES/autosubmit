@@ -310,7 +310,7 @@ def test_set_version(autosubmit_config: 'AutosubmitConfigFactory', experiment_jo
                         }
                     },
                     "STORAGE": {
-                        "TYPE": "pkl",
+                        "TYPE": "sqlite",
                     }
                 },
                 [],

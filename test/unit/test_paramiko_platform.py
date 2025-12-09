@@ -514,6 +514,6 @@ def test_get_completed_job_names(tmp_path, mode):
         job_names = platform.get_completed_job_names()
         expected_job_names = ['job1', 'job2', 'job3']
     else:
-        job_names = platform.get_completed_job_names(job_names_provided=['job1', 'job3'])
+        job_names = platform.get_completed_job_names(job_names=['job1', 'job3'])
         expected_job_names = ['job1', 'job3']
     assert set(job_names) == set(expected_job_names)

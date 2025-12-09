@@ -2325,7 +2325,7 @@ class Autosubmit:
                                 continue
                             Log.info(f"Checking {len(platform_jobs)} jobs for platform {p.name}")
 
-                            if p.check_Alljobs(platform_jobs, as_conf):
+                            if p.check_all_jobs(platform_jobs, as_conf):
                                 job_list.save_jobs()
 
                             for job in platform_jobs:
@@ -2591,7 +2591,6 @@ class Autosubmit:
                 save_1, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = platform.submit_ready_jobs(
                     as_conf,
                     job_list,
-                    platforms_to_test,
                     packages_to_submit,
                     inspect=inspect,
                     only_wrappers=only_wrappers,

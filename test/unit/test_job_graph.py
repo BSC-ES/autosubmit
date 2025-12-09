@@ -516,7 +516,6 @@ def setup_wrappers(job_list, autosubmit_config):
             package['_num_processors'],
             package['platform'],
             as_conf,
-            hold=False
         ))
 
     return jobs, edges, job_list, packages

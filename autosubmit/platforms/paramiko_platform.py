@@ -923,7 +923,7 @@ class ParamikoPlatform(Platform):
                 job_list_cmd = job_list_cmd[:-1]
         return job_list_cmd
 
-    def check_Alljobs(self, job_list: list["Job"], as_conf, retries=5) -> bool:
+    def check_all_jobs(self, job_list: list["Job"], as_conf, retries=5) -> bool:
         """
         Checks jobs running status
 

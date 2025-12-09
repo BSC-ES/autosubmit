@@ -31,7 +31,6 @@ from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import get_experiment_description
 from autosubmit.job.job import Job
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_packages import JobPackageBase
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.platform import Platform
@@ -344,13 +343,13 @@ def test_submit_ready_jobs(autosubmit_exp, mocker):
     }
     platform = Platform('a000', "Platform", platform_config)
 
-    job_list = JobList('a000', exp.as_conf, YAMLParserFactory(), JobListPersistencePkl())
+    job_list = JobList('a000', exp.as_conf, YAMLParserFactory())
 
     for i in range(3):
         job = Job(f"job{i}", i, 2, 0)
         job.section = f"SECTION{i}"
         job.platform = platform
-        job_list._job_list.append(job)
+        job_list.add_job(job)
     packages_to_submit = JobPackageBase(job_list.get_job_list())
     packages_to_submit.name = "test"
     packages_to_submit.x11 = "false"
@@ -363,7 +362,7 @@ def test_submit_ready_jobs(autosubmit_exp, mocker):
     mocker.patch('autosubmit.platforms.platform.Platform.generate_submit_script', Mock())
     mocker.patch('autosubmit.job.job_packages.JobPackageBase.submit', Mock())
     save, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = platform.submit_ready_jobs(
-        exp.as_conf, job_list, job_persistence, [packages_to_submit])
+        exp.as_conf, job_list, [packages_to_submit])
     assert save
     assert len(failed_packages) == 0
     assert error_message == ''

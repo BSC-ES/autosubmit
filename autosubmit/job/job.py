@@ -1532,8 +1532,8 @@ class Job(object):
                 children += list(child.children)
 
     def check_completion(self, default_status=Status.FAILED):
-        """
-        Check the presence of *COMPLETED* file.
+        """Check the presence of *COMPLETED* file on the remote host.
+
         Change status to COMPLETED if *COMPLETED* file exists and to FAILED otherwise.
 
         :param default_status: status to set if job is not completed. By default, it is FAILED
@@ -1745,7 +1745,7 @@ class Job(object):
                     self.het['RESERVATION'].append(str(x))
             self.reservation = str(self.het['RESERVATION'][0])
         else:
-            self.reservation = str(self.reservation)
+            self.reservation = self.reservation if isinstance(self.reservation, str) and self.reservation.strip() else ""
         if type(self.exclusive) is list:
             # Get the exclusive, each element can be only be bool
             self.het['EXCLUSIVE'] = list()
@@ -2874,7 +2874,6 @@ class WrapperJob(Job):
             num_processors: int,
             platform: 'ParamikoPlatform',
             as_config: AutosubmitConfig,
-            hold: bool,
     ):
         super(WrapperJob, self).__init__(name, job_id, status, priority)
         self.failed = False
@@ -2887,7 +2886,6 @@ class WrapperJob(Job):
         self.as_config = as_config
         # save start time, wallclock and processors?!
         self.checked_time = datetime.datetime.now()
-        self.hold = hold
         self.inner_jobs_running: list = list()
         self.is_wrapper = True
 

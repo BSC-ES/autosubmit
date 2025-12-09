@@ -73,13 +73,12 @@ def set_up_test(autosubmit_exp, autosubmit, mocker, command: str):
         ['autosubmit', 'readme'],  # TODO
         ['autosubmit', 'changelog'],  # TODO
         ['autosubmit', 'dbfix', _EXPIDS],  # TODO
-        ['autosubmit', 'pklfix', _EXPIDS],
         ['autosubmit', 'updatedescrip', _EXPIDS, 'description'],
         ['autosubmit', 'cat-log', _EXPIDS],
         ['autosubmit', 'stop', '-a']
     ],
     ids=['configure', 'expid', 'delete', 'monitor', 'stats', 'clean', 'inspect', 'report', 'describe', 'migrate', 'create',
-         'setstatus', 'testcase', 'refresh', 'updateversion', 'upgrade', 'archive', 'readme', 'changelog', 'dbfix', 'pklfix',
+         'setstatus', 'testcase', 'refresh', 'updateversion', 'upgrade', 'archive', 'readme', 'changelog', 'dbfix',
          'updatedescrip', 'cat-log', 'stop']
 )  # TODO: improve quality of the test in order to validate each scenario and its outputs  #noqa
 def test_run_command(autosubmit_exp: AutosubmitExperimentFixture, autosubmit: Autosubmit, mocker, command: str):
@@ -87,7 +86,7 @@ def test_run_command(autosubmit_exp: AutosubmitExperimentFixture, autosubmit: Au
     TODO: commands that have a TODO at its side needs behaviour tests
     """
     args = set_up_test(autosubmit_exp, autosubmit, mocker, command)
-    if 'create' in command or 'pklfix' in command:
+    if 'create' in command:
         assert autosubmit.run_command(args=args) == 0
     else:
         assert autosubmit.run_command(args=args)

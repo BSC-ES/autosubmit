@@ -694,7 +694,7 @@ def test_create_tree_list_grouped_jobs():
         jobs.append(job)
 
     job_list = JobList(expid, None, None, None)
-    job_list._job_list = jobs
+    job_list.job_list = jobs
 
     job_grouping = JobGrouping(
         group_by='date',

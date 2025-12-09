@@ -56,7 +56,6 @@ def test_handle_job_status_line_parametrized(line, check_inner_job_wallclock, ex
             num_processors=1,
             platform=mocker.Mock(),
             as_config=mocker.Mock(),
-            hold=False,
             check_inner_job_wallclock_return=check_inner_job_wallclock
         )
         if not line:

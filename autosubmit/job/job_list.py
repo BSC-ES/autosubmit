@@ -3433,7 +3433,6 @@ class JobList(object):
                 num_processors=package._num_processors,
                 platform=package.platform,
                 as_config=as_conf,
-                hold=hold
             )
             self.job_package_map[int(wrapper_job.id)] = wrapper_job
             self.packages_dict[package.name] = wrapper_job.job_list
@@ -3493,7 +3492,6 @@ class JobList(object):
                 num_processors=wrapper_info["num_processors"],
                 platform=wrapper_info["job_list"][0].platform,
                 as_config=self._as_conf,
-                hold=False,
             )
             wrapper_job.platform_name = wrapper_job.job_list[0].platform_name
 
@@ -4059,7 +4057,6 @@ class JobList(object):
                 job.id = 1
             # Fixes: https://github.com/BSC-ES/autosubmit/pull/2700#issuecomment-3563572977
             if not jobs_ran_atleast_once:
-                job.log_recovered = True
                 job.updated_log = True
 
 

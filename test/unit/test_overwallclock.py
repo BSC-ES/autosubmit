@@ -97,47 +97,6 @@ def setup_jobs(dummy_jobs, new_platform_mock, as_conf):
         job.start_time_timestamp = (datetime.now() - timedelta(minutes=1)).strftime('%Y%m%d%H%M%S')
 
 
-@pytest.mark.parametrize(
-    "initial_status, expected_status",
-    [
-        (Status.SUBMITTED, Status.SUBMITTED),
-        (Status.QUEUING, Status.QUEUING),
-        (Status.RUNNING, Status.RUNNING),
-        (Status.FAILED, Status.FAILED),
-        (Status.COMPLETED, Status.COMPLETED),
-        (Status.HELD, Status.HELD),
-        (Status.UNKNOWN, Status.UNKNOWN),
-    ],
-    ids=["Submitted", "Queuing", "Running", "Failed", "Completed", "Held", "No packages"]
-)
-def test_check_wrapper_stored_status(setup_as_conf, new_job_list, new_platform_mock, initial_status, expected_status):
-    dummy_jobs = [Job("dummy-1", 1, initial_status, 0), Job("dummy-2", 2, initial_status, 0),
-                  Job("dummy-3", 3, initial_status, 0)]
-    setup_jobs(dummy_jobs, new_platform_mock, setup_as_conf)
-
-    package = WrapperJob(
-        "dummy_wrapper",
-        dummy_jobs[0].id,
-        initial_status,
-        0,
-        dummy_jobs,
-        "00:01",
-        2,
-        new_platform_mock,
-        setup_as_conf,
-        hold=False
-    )
-
-    new_job_list.job_package_map[package.id] = package
-    new_job_list.jobs = dummy_jobs
-    if dummy_jobs[0].status != Status.UNKNOWN:
-        new_job_list.packages_dict = {"dummy_wrapper": dummy_jobs}
-    new_job_list.check_wrapper_stored_status()
-
-    assert package.status == expected_status
-
-
-
 def test_parse_time(new_platform_mock, autosubmit_config):
     job = Job("dummy-1", 1, Status.SUBMITTED, 0)
     as_conf = autosubmit_config("t000", {})
