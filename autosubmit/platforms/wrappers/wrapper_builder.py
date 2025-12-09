@@ -200,14 +200,17 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
                 # Submit the job
                 jobspec.stdout = job_script + ".out." + str(fail_count)
                 jobspec.stderr =  job_script + ".err." + str(fail_count)
-                job_id = flux.job.submit(handle, jobspec, waitable=True)
+                jobspec.environment = os.environ.copy()
+                job_id = flux.job.submit(handle, jobspec, waitable=True, debug=True)
+
+                # TODO: [ENGINES] Debug info, remove later
+                for event in flux.job.event_watch(handle, job_id):
+                    print("Event: " + str(event))
+                print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
+                print("RESOURCES: " + str(jobspec.resources))
 
                 # Do stuff in the meantime
                 stat_filename = job_script.replace('.cmd', f'_STAT_{{fail_count}}')
-
-                # TODO: [ENGINES] Debug info, remove later
-                print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
-                print("RESOURCES: " + str(jobspec.resources))
 
                 # Wait for the job to finish
                 flux.job.wait(handle, job_id)
