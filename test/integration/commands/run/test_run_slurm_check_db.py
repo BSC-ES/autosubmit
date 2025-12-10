@@ -244,10 +244,17 @@ wrappers:
         POLICY: FLEXIBLE
 
 """), 2 * 3, "FAILED", "horizontal"),
-], ids=["Success", "Success with wrapper (vertical_wrapper)", "Failure", "Failure with wrapper (vertical_wrapper)",
-        "Success with wrapper (horizontal-vertical)", "Failure with wrapper (horizontal-vertical)",
-        "Success with wrapper (vertical-horizontal)", "Failure with wrapper (vertical-horizontal)",
-        "Success with wrapper (horizontal)", "Failure with wrapper (horizontal)"])
+], ids=["Success",
+        "Success with wrapper (vertical_wrapper)",
+        "Failure",
+        "Failure with wrapper (vertical_wrapper)",
+        "Success with wrapper (horizontal-vertical)",
+        "Failure with wrapper (horizontal-vertical)",
+        "Success with wrapper (vertical-horizontal)",
+        "Failure with wrapper (vertical-horizontal)",
+        "Success with wrapper (horizontal)",
+        "Failure with wrapper (horizontal)"
+        ])
 def test_run_uninterrupted(
         autosubmit_exp,
         jobs_data: str,
@@ -267,18 +274,7 @@ def test_run_uninterrupted(
     log_dir = tmp_path / f"LOG_{as_exp.expid}"
     Path(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
     as_conf.set_last_as_command('run')
-    # as_exp.autosubmit._setup_log_files(
-    #     command="run",
-    #     expids=None,
-    #     expid=as_exp.expid,
-    #     owner=True,
-    #     tmp_path=tmp_path,
-    #     aslogs_path=aslogs_path,
-    #     exp_path=exp_path,
-    #     log_level="DEBUG",
-    #     console_level="DEBUG"
-    # )
-    # Run the experiment
+
     exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
     _assert_exit_code(final_status, exit_code)
 
@@ -536,10 +532,18 @@ wrappers:
         policy: flexible
 
 """), 2 * 3, "FAILED", "horizontal"),
-], ids=["Success", "Success_simple_v", "Faileds", "Failed_simple_v",
-        "Success_hybrid_hv", "Failed_hybrid_hv",
-        "Success_hybrid_vh", "Failed_hybrid_vh",
-        "Success_simple_h", "Failed_simple_h"])
+], ids=[
+        "Success",
+        "Success_simple_v",
+        "Faileds",
+        "Failed_simple_v",
+        "Success_hybrid_hv",
+        "Failed_hybrid_hv",
+        "Success_hybrid_vh",
+        "Failed_hybrid_vh",
+        "Success_simple_h",
+        "Failed_simple_h"
+        ])
 def test_run_interrupted(
         autosubmit_exp,
         jobs_data: str,
@@ -549,6 +553,7 @@ def test_run_interrupted(
         slurm_server: 'DockerContainer',
         prepare_scratch,
         general_data,
+        redirect_log_info
 ):
     yaml = YAML(typ='rt')
     as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
@@ -561,7 +566,7 @@ def test_run_interrupted(
     # Run the experiment
     # This was not being interrupted, so we run it in a thread to simulate the interruption and then stop it.
     run_in_thread(as_exp.autosubmit.run_experiment, expid=as_exp.expid)
-    sleep(2)
+    sleep(1)
     current_statuses = 'SUBMITTED, QUEUING, RUNNING'
     as_exp.autosubmit.stop(
         all_expids=False,
@@ -584,6 +589,7 @@ def test_run_interrupted(
     _assert_files_recovered(files_check_list)
 
     _assert_exit_code(final_status, exit_code)
+
 
 
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [

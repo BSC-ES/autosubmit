@@ -1931,19 +1931,10 @@ class Autosubmit:
             Log.debug(f'Checking Wrapper {str(wrapper_job.id)}')
             wrapper_job.checked_time = datetime.datetime.now()
             wrapper_job.platform.check_job(wrapper_job)
-            try:
-                if wrapper_job.status != wrapper_job.new_status:
-                    Log.info('Wrapper job ' + wrapper_job.name + ' changed from ' + str(
-                        Status.VALUE_TO_KEY[wrapper_job.status]) + ' to status ' + str(
-                        Status.VALUE_TO_KEY[wrapper_job.new_status]))
-                    save = True
-            except Exception:
-                raise AutosubmitCritical(
-                    "Wrapper is in Unknown Status couldn't get wrapper parameters", 7050)
-
             # New status will be saved and inner_jobs will be checked.
             save |= wrapper_job.check_status(wrapper_job.new_status)
             if wrapper_job.status != wrapper_job.new_status:
+                save = True
                 Log.info('Wrapper job ' + wrapper_job.name + ' changed from ' + str(
                     Status.VALUE_TO_KEY[wrapper_job.new_status]) + ' to status ' + str(
                     Status.VALUE_TO_KEY[wrapper_job.status]))

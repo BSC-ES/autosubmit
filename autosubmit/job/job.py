@@ -1492,8 +1492,9 @@ class Job(object):
             self.check_completion(default_status=Status.FAILED if self.new_status in [Status.COMPLETED, Status.FAILED] else Status.UNKNOWN)
         if self.status != self.new_status:
             Log.result(f"Job {self.name} changed from {self.status_str} to {Status.VALUE_TO_KEY.get(self.new_status, 'UNKNOWN')}")
-            Log.status(f"Job {self.name} and id: {self.id} is {self.status_str}")
             self.status = self.new_status
+            Log.status(f"Job {self.name} and id: {self.id} is {self.status_str}")
+
 
         # Read and store metrics here
         try:
@@ -1542,7 +1543,9 @@ class Job(object):
         if self.platform.get_completed_job_names([self.name]):
             self.new_status = Status.COMPLETED
         else:
-            self.new_status = default_status
+            # Only change to default status (likely, FAILED) if the job is in a final state or was running ( can happen in wrappers )
+            if self.status in [Status.COMPLETED, Status.RUNNING, Status.FAILED, Status.UNKNOWN]:
+                self.new_status = default_status
 
     def get_metric_folder(self, as_conf: AutosubmitConfig) -> str:
         """
@@ -2927,9 +2930,12 @@ class WrapperJob(Job):
         :rtype: bool
         """
         save = False
-        if scheduler_fetched_status not in [Status.RUNNING, Status.COMPLETED, Status.FAILED, Status.UNKNOWN]:
-            for job in [job for job in self.job_list if job.status == Status.SUBMITTED]:
-                job.new_status = Status.QUEUING
+        if scheduler_fetched_status not in [Status.COMPLETED, Status.FAILED]:
+            for job in [job for job in self.job_list]:
+                if all(parent.status == Status.COMPLETED for parent in job.parents):
+                    job.new_status = scheduler_fetched_status
+                else:
+                    job.new_status = Status.WAITING
                 job.update_status(self.as_config)
             self.status = scheduler_fetched_status
             return save
@@ -2980,7 +2986,6 @@ class WrapperJob(Job):
                 job.new_status = Status.WAITING
                 job.update_status(self.as_config)
                 save = True
-                Log.status(f"Job {job.name} changed from {job.status_str} to {Status.VALUE_TO_KEY.get(job.new_status, 'UNKNOWN')}")
                 # TODO: Recover  wrapper log here, maybe extend the wrapper table to add the submit, start and end times like normal jobs
                 self.platform.delete_failed_and_completed_names([job.name for job in self.job_list])
 
