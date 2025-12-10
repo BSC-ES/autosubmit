@@ -56,6 +56,15 @@ class WrapperFactory(object):
             kwargs['threads'] = self.threads(str(wrapper_data.threads))
             kwargs['reservation'] = self.reservation(wrapper_data.reservation)
 
+            # When wrapping with Flux, give it control over all resources
+            if wrapper_data.method.lower() == "flux":
+                if wrapper_data.nodes == '':
+                    kwargs['threads'] = self.threads(str(int(wrapper_data.threads) * int(kwargs['num_processors_value'])))
+                else:
+                    kwargs['threads'] = self.threads('')
+                kwargs['num_processors'] = self.processors('')
+                kwargs['tasks'] = self.tasks('')
+
         kwargs["executable"] = wrapper_data.executable
         kwargs['header_directive'] = self.header_directives(**kwargs)
         kwargs['working_dir'] = self.platform.remote_log_dir
