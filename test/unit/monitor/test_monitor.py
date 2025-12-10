@@ -688,13 +688,12 @@ def test_create_tree_list_grouped_jobs():
     hide_groups = False
 
     jobs = []
+    job_list = JobList(expid, None, None, None)
     for i in range(3):
         job = Job(f'job{i}', f'job{i}', Status.WAITING, None, None)
         job.date = datetime.strptime('20240101', '%Y%M%d')
         jobs.append(job)
-
-    job_list = JobList(expid, None, None, None)
-    job_list.job_list = jobs
+        job_list.add_job(job)
 
     job_grouping = JobGrouping(
         group_by='date',

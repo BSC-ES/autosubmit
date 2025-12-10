@@ -608,7 +608,6 @@ def _init_special_conditions(joblist: JobList) -> Tuple[Job, Job, Job, dict, Job
     joblist.add_job(parent2)
     joblist.graph.add_edge(parent.name, job.name)
     joblist.graph.add_edge(parent2.name, job.name)
-    joblist.job_list = [parent, job]
     joblist.add_special_conditions(job, special_conditions, parent)
     special_conditions = {"MIN_TRIGGER_STATUS": "FAILED", "FROM_STEP": 0, "FAIL_OK": False}
     joblist.add_special_conditions(job, special_conditions, parent2)

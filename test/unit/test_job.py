@@ -1531,7 +1531,6 @@ def test_update_status_logs(status: Status, autosubmit_config, mocker):
     assert job.status == status
 
 
-
 @pytest.mark.parametrize(
     'has_completed_files,job_id',
     [

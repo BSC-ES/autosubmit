@@ -1543,9 +1543,7 @@ class Job(object):
         if self.platform.get_completed_job_names([self.name]):
             self.new_status = Status.COMPLETED
         else:
-            # Only change to default status (likely, FAILED) if the job is in a final state or was running ( can happen in wrappers )
-            if self.status in [Status.COMPLETED, Status.RUNNING, Status.FAILED, Status.UNKNOWN]:
-                self.new_status = default_status
+            self.new_status = default_status
 
     def get_metric_folder(self, as_conf: AutosubmitConfig) -> str:
         """
