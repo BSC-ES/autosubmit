@@ -2941,6 +2941,7 @@ class WrapperJob(Job):
         Log.debug(f'Checking {self.name} and id: {self.id} inner jobs status')
         self._check_running_jobs()
 
+        # TODO: It is very probable that weak/conditional dependencies never worked well with wrappers
         if scheduler_fetched_status in [Status.FAILED, Status.UNKNOWN, Status.COMPLETED]:
             completed_names = self.platform.get_completed_job_names([job.name for job in self.job_list])
             failed_names = self.platform.get_failed_job_names([job.name for job in self.job_list])
@@ -2949,6 +2950,8 @@ class WrapperJob(Job):
                     job.new_status = Status.FAILED
                 elif job.name in completed_names:
                     job.new_status = Status.COMPLETED
+                elif all(parent.status == Status.COMPLETED for parent in job.parents if parent in self.job_list):
+                    job.new_status = Status.FAILED
                 else:
                     job.new_status = Status.WAITING
         else:

@@ -555,40 +555,40 @@ def test_run_interrupted(
         general_data,
         redirect_log_info
 ):
-    yaml = YAML(typ='rt')
-    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
-    as_conf = as_exp.as_conf
-    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
-    tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
-    log_dir = tmp_path / f"LOG_{as_exp.expid}"
-    as_conf.set_last_as_command('run')
+        yaml = YAML(typ='rt')
+        as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+        as_conf = as_exp.as_conf
+        exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
+        tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+        log_dir = tmp_path / f"LOG_{as_exp.expid}"
+        as_conf.set_last_as_command('run')
 
-    # Run the experiment
-    # This was not being interrupted, so we run it in a thread to simulate the interruption and then stop it.
-    run_in_thread(as_exp.autosubmit.run_experiment, expid=as_exp.expid)
-    sleep(1)
-    current_statuses = 'SUBMITTED, QUEUING, RUNNING'
-    as_exp.autosubmit.stop(
-        all_expids=False,
-        cancel=False,
-        current_status=current_statuses,
-        expids=as_exp.expid,
-        force=True,
-        force_all=True,
-        status='FAILED')
+        # Run the experiment
+        # This was not being interrupted, so we run it in a thread to simulate the interruption and then stop it.
+        run_in_thread(as_exp.autosubmit.run_experiment, expid=as_exp.expid)
+        sleep(1)
+        current_statuses = 'SUBMITTED, QUEUING, RUNNING'
+        as_exp.autosubmit.stop(
+            all_expids=False,
+            cancel=False,
+            current_status=current_statuses,
+            expids=as_exp.expid,
+            force=True,
+            force_all=True,
+            status='FAILED')
 
-    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+        exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
 
-    # Check and display results
-    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+        # Check and display results
+        run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid)
-    _assert_db_fields(db_check_list)
+        db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid)
+        _assert_db_fields(db_check_list)
 
-    files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
-    _assert_files_recovered(files_check_list)
+        files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
+        _assert_files_recovered(files_check_list)
 
-    _assert_exit_code(final_status, exit_code)
+        _assert_exit_code(final_status, exit_code)
 
 
 
