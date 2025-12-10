@@ -646,7 +646,7 @@ def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubm
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, "t001")
-    tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+    Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
 
     exp.as_conf.experiment_data = {
         'EXPERIMENT': {

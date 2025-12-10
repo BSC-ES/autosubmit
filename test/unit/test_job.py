@@ -31,10 +31,9 @@ from bscearth.utils.date import date2str
 from mock import Mock, MagicMock  # type: ignore
 from mock.mock import patch  # type: ignore
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.configcommon import BasicConfig, YAMLParserFactory
-from autosubmit.job.job import Job, WrapperJob
+from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_utils import SubJob, SubJobManager
@@ -1525,7 +1524,7 @@ def test_update_status_logs(status: Status, autosubmit_config, mocker):
 
     assert job.status == Status.WAITING
 
-    mocked_log = mocker.patch('autosubmit.job.job.Log')
+    mocker.patch('autosubmit.job.job.Log')
 
     job.update_status(as_conf=as_conf, failed_file=False)
 
@@ -1573,7 +1572,7 @@ def test_update_status_completed(has_completed_files: bool, job_id: str, autosub
 
     assert job.status == Status.WAITING
 
-    mocked_log = mocker.patch('autosubmit.job.job.Log')
+    mocker.patch('autosubmit.job.job.Log')
 
     if has_completed_files:
         job_completed_file = Path(

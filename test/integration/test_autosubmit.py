@@ -22,7 +22,7 @@ from os import R_OK, W_OK
 from typing import TYPE_CHECKING
 
 import pytest
-from mock import Mock, patch
+from mock import Mock
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
