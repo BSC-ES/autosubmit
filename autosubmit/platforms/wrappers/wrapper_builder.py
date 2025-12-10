@@ -191,6 +191,10 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
         job_scripts={0}
         max_retries={1}
 
+        # TODO: [ENGINES] Debug info, remove later
+        import subprocess
+        print(subprocess.check_output(["flux", "resource", "info"], text=True))
+
         for job_script in job_scripts:
             fail_count=0
             completed=0
@@ -251,6 +255,10 @@ class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
         job_scripts={0}
         job_ids = {{}}
 
+        # TODO: [ENGINES] Debug info, remove later
+        import subprocess
+        print(subprocess.check_output(["flux", "resource", "info"], text=True))
+
         # Submit the jobs
         for job_script in job_scripts:
             jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
@@ -293,6 +301,10 @@ class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
         from threading import Thread
 
         job_scripts={0}
+
+        # TODO: [ENGINES] Debug info, remove later
+        import subprocess
+        print(subprocess.check_output(["flux", "resource", "info"], text=True))
 
         class VerticalWrapperThread(Thread):
             def __init__ (self, jobs_list):
@@ -353,6 +365,10 @@ class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
         handle = flux.Flux()
         job_scripts={0}
         job_ids = {{}}
+
+        # TODO: [ENGINES] Debug info, remove later
+        import subprocess
+        print(subprocess.check_output(["flux", "resource", "info"], text=True))
 
         def run_horizontal_wrapper(jobs_list):
             # Submit the jobs
