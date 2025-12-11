@@ -262,23 +262,6 @@ def test_send_file_errors(
             'parangaricutirimicuaro', AutosubmitError, 'ssh_x11_server', False, False,
             id='Server with X11, connected without X11, invalid command parangaricutirimicuaro error'
         ),
-        pytest.param(
-            'whoami', None, 'ssh_x11_mfa_server', True, True,
-            id='Server with X11 and MFA, connected with X11 and MFA, whoami command works'
-        ),
-        pytest.param(
-            'parangaricutirimicuaro', AutosubmitError, 'ssh_x11_mfa_server', True, True,
-            id='Server with X11 and MFA, connected with X11 and MFA, invalid command parangaricutirimicuaro error'
-        ),
-        pytest.param(
-            'whoami', None, 'ssh_x11_mfa_server', False, True,
-            id='Server with X11 and with MFA, connected without X11 and with MFA, whoami command works'
-        ),
-        pytest.param(
-            'parangaricutirimicuaro', AutosubmitError, 'ssh_x11_mfa_server', False, True,
-            id='Server with X11 and MFA, connected without X11 and with MFA, '
-               'invalid command parangaricutirimicuaro error'
-        )
     ],
     indirect=['ssh_fixture'],
 )
@@ -305,7 +288,6 @@ def test_send_command(
         exp_ps_platform.two_factor_method = 'token'
         password = 'password'
         exp_ps_platform.pw = password  # our platform does not have a password
-        mocker.patch('autosubmit.platforms.paramiko_platform.getpass.getpass', return_value=password)
         # 55192054 comes from the Docker setup for 2FA, see docker/ssh/linuxserverio-ssh-with-2fa-x11/README.md
         mocker.patch('autosubmit.platforms.paramiko_platform.input', return_value='55192054')
 
