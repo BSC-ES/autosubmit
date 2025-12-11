@@ -316,9 +316,6 @@ class PBSPlatform(ParamikoPlatform):
             return None
         if self.send_command(cmd):
             job_id = self.get_submitted_job_id(self.get_ssh_output())
-            if job:
-                Log.result(f"Job: {job.name} submitted with job_id: {str(job_id).strip()} and workflow commit: "
-                           f"{job.workflow_commit}")
             return job_id
         return None
 
@@ -492,9 +489,9 @@ class PBSPlatform(ParamikoPlatform):
                     lang = 'UTF-8'
 
             if not hold:
-                cmd = (export + self._submit_cmd + job_script + "\n").encode(lang)
+                cmd = (export + self._submit_cmd + job_script).encode(lang)
             else:
-                cmd = (export + self._submit_hold_cmd + job_script + "\n").encode(lang)
+                cmd = (export + self._submit_hold_cmd + job_script).encode(lang)
 
             with open(self._submit_script_path, "ab") as submit_script_file:
                 submit_script_file.write(cmd)

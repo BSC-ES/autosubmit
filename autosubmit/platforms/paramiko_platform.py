@@ -408,10 +408,10 @@ class ParamikoPlatform(Platform):
                 Log.warning("2FA is enabled, this is an experimental feature and it may not work as expected")
                 Log.warning("nohup can't be used as the password will be asked")
                 Log.warning("If you are using a token, please type the token code when asked")
-                if self.two_factor_method == "push":
-                    Log.warning("Please check your phone to complete the 2FA PUSH authentication")
+
                 self.transport = paramiko.Transport((self._host_config['hostname'], port))
                 self.transport.start_client()
+
                 try:
                     self.transport.auth_publickey(self.user, paramiko.Ed25519Key.from_private_key_file(self._host_config_id[0]))
                     self.transport.auth_interactive_dumb(self.user)
@@ -609,9 +609,11 @@ class ParamikoPlatform(Platform):
         try:
             self._ftpChannel.remove(str(remote_file))
             return True
-        except IOError as e:
-            Log.warning(f'IOError while trying to remove a remote file {str(remote_file)}: {str(e)}')
+        except IOError:
+            # No such file
+            # There is no need of logging this as it is expected behaviour when the experiment runs for the first time
             return False
+
         except Exception as e:
             # Change to Path
             Log.error(f'Could not remove file {str(remote_file)}, something went wrong with the platform',
