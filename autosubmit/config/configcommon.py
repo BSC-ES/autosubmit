@@ -14,7 +14,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
 import collections
 import copy
 import json
@@ -38,6 +37,7 @@ from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError
 
 
@@ -138,7 +138,9 @@ class AutosubmitConfig(object):
         return depth
 
     def get_full_config_as_json(self):
-        """Return config as json object"""
+        """
+        Return config as json object
+        """
         try:
             return json.dumps(self.experiment_data)
         except Exception as e:
@@ -185,6 +187,7 @@ class AutosubmitConfig(object):
         :type must_exists: bool
         :return: section value
         :rtype: str
+
         """
         section = [s.upper() for s in section]
         # For text readability
@@ -500,7 +503,8 @@ class AutosubmitConfig(object):
         return normalized_data
 
     def deep_update(self, unified_config, new_dict):
-        """Update a nested dictionary or similar mapping.
+        """
+        Update a nested dictionary or similar mapping.
         Modify ``source`` in place.
         """
         if not isinstance(unified_config, collections.abc.Mapping):
@@ -535,8 +539,18 @@ class AutosubmitConfig(object):
         self._normalize_default_section(data)
         self._normalize_wrappers_section(data)
         self._normalize_jobs_section(data, must_exists)
+        self._normalize_storage(data)
 
         return data
+
+    # ADD QOL
+    @staticmethod
+    def _normalize_storage(data):
+        """Normalize the storage section to a consistent format."""
+        storage = data.get("STORAGE", {})
+        storage_type = storage.get("TYPE", "sqlite").lower()
+        data["STORAGE"] = storage
+        data["STORAGE"]["TYPE"] = storage_type
 
     def _normalize_default_section(self, data_fixed: dict) -> None:
         default_section = data_fixed.get("DEFAULT", {})
@@ -600,6 +614,9 @@ class AutosubmitConfig(object):
             if "WALLCLOCK" in job_data:
                 self._normalize_wallclock(data_fixed)
 
+            if "PLATFORM" in job_data:
+                data_fixed["JOBS"][job]["PLATFORM"] = job_data["PLATFORM"].upper()
+
             self._normalize_notify_on(data_fixed, job)
 
     @staticmethod
@@ -621,6 +638,7 @@ class AutosubmitConfig(object):
                     f"Wallclock {wallclock} is in HH:MM:SS format. Autosubmit does not support the seconds. Truncating to HH:MM")
                 data_fixed["JOBS"][job]["WALLCLOCK"] = wallclock[:5]
 
+    # ADD QOL
     @staticmethod
     def _normalize_dependencies(dependencies: Union[str, dict]) -> dict:
         """
@@ -644,17 +662,17 @@ class AutosubmitConfig(object):
         elif isinstance(dependencies, dict):
             for dependency, dependency_data in dependencies.items():
                 aux_dependencies[dependency.upper()] = dependency_data
-                if type(dependency_data) is dict and dependency_data.get("STATUS", None):
-                    dependency_data["STATUS"] = dependency_data["STATUS"].upper()
-                    if not dependency_data.get("ANY_FINAL_STATUS_IS_VALID", False):
-                        if dependency_data["STATUS"][-1] == "?":
-                            dependency_data["STATUS"] = dependency_data["STATUS"][:-1]
-                            dependency_data["ANY_FINAL_STATUS_IS_VALID"] = True
-                        elif dependency_data["STATUS"] not in ["READY", "DELAYED", "PREPARED", "SKIPPED", "FAILED",
-                                                               "COMPLETED"]:  # May change in future issues.
-                            dependency_data["ANY_FINAL_STATUS_IS_VALID"] = True
-                        else:
-                            dependency_data["ANY_FINAL_STATUS_IS_VALID"] = False
+                if type(dependency_data) is dict:
+                    # Backwards compatibility
+                    user_set_status = dependency_data.pop("MIN_TRIGGER_STATUS", dependency_data.pop("STATUS", None))
+                    if user_set_status:
+                        dependency_data["MIN_TRIGGER_STATUS"] = user_set_status.upper()
+                        # Backwards compatibility
+                        fail_ok = dependency_data.get("FAIL_OK", dependency_data.get("OPTIONAL", False))
+                        dependency_data["FAIL_OK"] = fail_ok
+                        if dependency_data["MIN_TRIGGER_STATUS"][-1] == "?":
+                            dependency_data["MIN_TRIGGER_STATUS"] = dependency_data["MIN_TRIGGER_STATUS"][:-1]
+                            dependency_data["FAIL_OK"] = True
 
         return aux_dependencies
 
@@ -682,7 +700,8 @@ class AutosubmitConfig(object):
         return d
 
     def convert_list_to_string(self, data):
-        """Convert a list to a string
+        """
+        Convert a list to a string
         """
         if type(data) is dict:
             for key, val in data.items():
@@ -693,7 +712,8 @@ class AutosubmitConfig(object):
         return data
 
     def load_config_file(self, current_folder_data, yaml_file, load_misc=False):
-        """Load a config file and parse it
+        """
+        Load a config file and parse it
         :param current_folder_data: current folder data
         :param yaml_file: yaml file to load
         :param load_misc: Whether to load misc files or not
@@ -717,7 +737,8 @@ class AutosubmitConfig(object):
 
     # noinspection PyMethodMayBeStatic
     def get_yaml_filenames_to_load(self, yaml_folder, ignore_minimal=False):
-        """Get all yaml files in a folder and return a list with the filenames
+        """
+        Get all yaml files in a folder and return a list with the filenames
         :param yaml_folder: folder to search for yaml files
         :param ignore_minimal: ignore minimal files
         :return: list of filenames
@@ -735,7 +756,8 @@ class AutosubmitConfig(object):
         return filenames_to_load
 
     def load_config_folder(self, current_data, yaml_folder, ignore_minimal=False):
-        """Load a config folder and return pre and post config
+        """
+        Load a config folder and return pre and post config
         :param current_data: current data to be updated
         :param yaml_folder: folder to load config
         :param ignore_minimal: ignore minimal config files
@@ -793,7 +815,8 @@ class AutosubmitConfig(object):
         return current_data
 
     def parse_data_loops(self, experiment_data):
-        """This function, looks for the FOR keyword, to generates N amount of subsections of the same section.
+        """
+        This function, looks for the FOR keyword, to generates N amount of subsections of the same section.
         Looks for the "NAME" keyword, inside this FOR keyword to determine the name of the new sections
         Experiment_data is the dictionary that contains all the sections, a subsection could be located at the root but also in a nested section
         :param experiment_data: dictionary with all the sections
@@ -844,7 +867,8 @@ class AutosubmitConfig(object):
 
     # noinspection PyMethodMayBeStatic
     def check_dict_keys_type(self, parameters):
-        """Check the type of keys in the parameters dictionary.
+        """
+        Check the type of keys in the parameters dictionary.
         :param parameters: Dictionary containing the parameters of the experiment.
         :return: Type of keys in the parameters dictionary, either "long" or "short".
         """
@@ -956,6 +980,7 @@ class AutosubmitConfig(object):
         :returns: A tuple containing the dynamic variables, the regex pattern, and the start index.
         :rtype: tuple
         """
+
         return copy.deepcopy(self.dynamic_variables), '%[a-zA-Z0-9_.-]*%', 1
 
     def _process_dynamic_variables(
@@ -1191,7 +1216,8 @@ class AutosubmitConfig(object):
         self.check_autosubmit_conf(no_log)
 
     def check_conf_files(self, running_time=False, force_load=True, no_log=False):
-        """Checks configuration files (autosubmit, experiment jobs and platforms), looking for invalid values, missing
+        """
+        Checks configuration files (autosubmit, experiment jobs and platforms), looking for invalid values, missing
         required options. Print results in log
         :param running_time: True if the function is called during the execution of the program
         :type running_time: bool
@@ -1322,7 +1348,13 @@ class AutosubmitConfig(object):
 
         if parser_data.get("STORAGE", None) is None:
             parser_data["STORAGE"] = {}
-        if parser_data["STORAGE"].get('TYPE', "pkl") not in ['pkl', 'db']:
+
+        # Retrocompatibility
+        if parser_data["STORAGE"].get('TYPE', "sqlite") in ['pkl', 'db']:
+            parser_data["STORAGE"] = {}
+            parser_data["STORAGE"]['TYPE'] = 'sqlite'
+
+        if parser_data["STORAGE"].get('TYPE', "sqlite") not in ['sqlite', 'postgres']:
             self.wrong_config["Autosubmit"] += [['storage',
                                                  "TYPE parameter not found"]]
         wrappers_info = parser_data.get("WRAPPERS", {})
@@ -1350,7 +1382,10 @@ class AutosubmitConfig(object):
         return False
 
     def check_platforms_conf(self, no_log=False):
-        """Checks experiment's platforms configuration file."""
+        """
+        Checks experiment's platforms configuration file.
+
+        """
         parser_data = self.experiment_data.get("PLATFORMS", {})
         main_platform_found = False
         if self.hpcarch == "LOCAL":
@@ -1468,7 +1503,8 @@ class AutosubmitConfig(object):
         return False
 
     def check_expdef_conf(self, no_log=False):
-        """Checks experiment's experiment configuration file.
+        """
+        Checks experiment's experiment configuration file.
         :param no_log: if True, it doesn't print any log message
         :type no_log: bool
         :return: True if everything is correct, False if it founds any error
@@ -1579,12 +1615,8 @@ class AutosubmitConfig(object):
                 try:
                     platform_name = self.jobs_data[section.upper()].get('PLATFORM', "").upper()
                 except KeyError:
-                    self.wrong_config["WRAPPERS"] += [
-                        [
-                            wrapper_name,
-                            "JOBS_IN_WRAPPER contains non-defined jobs.  parameter is invalid"
-                        ]
-                    ]
+                    self.wrong_config["WRAPPERS"] += [[wrapper_name,
+                                                       "JOBS_IN_WRAPPER contains non-defined jobs.  parameter is invalid"]]
                     continue
                 if platform_name == "":
                     platform_name = self.get_platform().upper()
@@ -1634,13 +1666,12 @@ class AutosubmitConfig(object):
         """
 
         # parameters.update( dict((name, getattr(BasicConfig, name)) for name in dir(BasicConfig) if not name.startswith('_') and not name=="read"))
-        parameters['ROOTDIR'] = os.path.join(BasicConfig.LOCAL_ROOT_DIR, self.expid)
+        parameters['ROOTDIR'] = os.path.join(
+            BasicConfig.LOCAL_ROOT_DIR, self.expid)
         # get_project_dir expects self.experiment_data to be loaded
         # parameters['PROJDIR'] = self.get_project_dir()
-        parameters['PROJDIR'] = os.path.join(
-            parameters['ROOTDIR'], "proj",
-            parameters.get('PROJECT', {}).get('PROJECT_DESTINATION', "project_files")
-        )
+        parameters['PROJDIR'] = os.path.join(parameters['ROOTDIR'], "proj",
+                                             parameters.get('PROJECT', {}).get('PROJECT_DESTINATION', "project_files"))
         return parameters
 
     @staticmethod
@@ -1656,7 +1687,8 @@ class AutosubmitConfig(object):
             yaml_data.pop(key, None)
 
     def load_custom_config(self, current_data, filenames_to_load):
-        """Loads custom config files
+        """
+        Loads custom config files
         :param current_data: dict with current data
         :param filenames_to_load: list of filenames to load
         :return: current_data_pre,current_data_post with unified data
@@ -1735,22 +1767,6 @@ class AutosubmitConfig(object):
         # Think of it as a tree with two branches that needs to be unified at each level
         return self.unify_conf(self.unify_conf(current_data_pre, current_data), current_data_post)
 
-    def load_list_parameter(self, parameter):
-        """Loads a list parameter
-        :param parameter:
-        :return: list
-        """
-        if type(self.starter_conf[parameter]) is str:
-            if "," in self.starter_conf[parameter]:
-                list_parameters = self.starter_conf[parameter].split(",")
-            else:
-                list_parameters = [self.starter_conf[parameter]]
-        elif type(self.starter_conf[parameter]) is list:
-            list_parameters = self.starter_conf[parameter]
-        else:
-            list_parameters = list(self.starter_conf[parameter])
-        return [parameter.strip(" ") for parameter in list_parameters]
-
     @property
     def is_current_real_user_owner(self) -> bool:
         """
@@ -1761,11 +1777,12 @@ class AutosubmitConfig(object):
 
     @property
     def is_current_logged_user_owner(self) -> bool:
-        """
-        Check if the current user is the owner of the experiment folder
-        :return: bool
-        """
-        return Path(self.experiment_data["ROOTDIR"]).owner() == os.environ.get("USER", None)
+        """Check if the current user is the owner of the experiment folder."""
+        if self.experiment_data.get("ROOTDIR", None):
+            rootdir_path = Path(self.experiment_data["ROOTDIR"])
+            return rootdir_path.exists() and rootdir_path.owner() == os.environ.get("USER", None)
+        else:
+            return False
 
     @staticmethod
     def load_as_env_variables(parameters: dict[str, Any]) -> dict[str, Any]:
@@ -1854,8 +1871,8 @@ class AutosubmitConfig(object):
                 self.misc_data = self.unify_conf(self.misc_data,
                                                  self.load_config_file(self.misc_data, Path(filename), load_misc=True))
             self.load_current_hpcarch_parameters()
-
             self.load_workflow_commit()
+            self.calculate_auto_splits()
             self.dynamic_variables = {}
 
     def _add_autosubmit_dict(self) -> None:
@@ -1940,7 +1957,8 @@ class AutosubmitConfig(object):
                 self.last_experiment_data = {}
 
     def detailed_deep_diff(self, current_data, last_run_data, level=0):
-        """Returns a dictionary with for each key, the difference between the current configuration and the last_run_data
+        """
+        Returns a dictionary with for each key, the difference between the current configuration and the last_run_data
         :param current_data: dictionary with the current data
         :param last_run_data: dictionary with the last_run_data data
         :param level: current level (used for recursion)
@@ -1988,7 +2006,8 @@ class AutosubmitConfig(object):
         return differences
 
     def quick_deep_diff(self, current_data, last_run_data, changed=False):
-        """Returns if there is any difference between the current configuration and the stored one
+        """
+        Returns if there is any difference between the current configuration and the stored one
         :param current_data: dictionary with the current data
         :param last_run_data: dictionary with the stored data
         :param changed: if the configuration changed or not
@@ -2015,7 +2034,8 @@ class AutosubmitConfig(object):
         return changed
 
     def deep_add_missing_starter_conf(self, experiment_data, starter_conf):
-        """Add the missing keys from starter_conf to experiment_data
+        """
+        Add the missing keys from starter_conf to experiment_data
         :param experiment_data:
         :param starter_conf:
         :return:
@@ -2029,7 +2049,8 @@ class AutosubmitConfig(object):
 
     @staticmethod
     def deep_parameters_export(data, default_parameters):
-        """Export all variables of this experiment.
+        """
+        Export all variables of this experiment.
         Resultant format will be Section.{subsections1...subsectionN} = Value.
         In other words, it plain the dictionary into one level.
         """
@@ -2048,14 +2069,16 @@ class AutosubmitConfig(object):
         return parameters_dict
 
     def load_parameters(self):
-        """Load all experiment data
+        """
+        Load all experiment data
         :return: a dictionary containing tuples [parameter_name, parameter_value]
         :rtype: dict
         """
         return self.deep_parameters_export(self.experiment_data, self.default_parameters)
 
     def load_platform_parameters(self):
-        """Load parameters from platform config files.
+        """
+        Load parameters from platform config files.
 
         :return: a dictionary containing tuples [parameter_name, parameter_value]
         :rtype: dict
@@ -2068,7 +2091,8 @@ class AutosubmitConfig(object):
         return parameters
 
     def load_section_parameters(self, job_list, as_conf, submitter):
-        """Load parameters from job config files.
+        """
+        Load parameters from job config files.
 
         :return: a dictionary containing tuples [parameter_name, parameter_value]
         :rtype: dict
@@ -2116,6 +2140,7 @@ class AutosubmitConfig(object):
         :return: jobs_list
         :rtype: str
         """
+
         return self.get_section(['EXPERIMENT', 'TWO_STEP_START'], "")
 
     def get_rerun_jobs(self) -> str:
@@ -2201,7 +2226,8 @@ class AutosubmitConfig(object):
         return str(self.get_section(['GIT', 'FETCH_SINGLE_BRANCH'], "true")).lower()
 
     def get_project_destination(self):
-        """Returns git commit from experiment's config file
+        """
+        Returns git commit from experiment's config file
 
         :return: git commit
         :rtype: str
@@ -2226,7 +2252,8 @@ class AutosubmitConfig(object):
         return "project_files"
 
     def get_svn_project_url(self):
-        """Gets subversion project url
+        """
+        Gets subversion project url
 
         :return: subversion project url
         :rtype: str
@@ -2234,23 +2261,29 @@ class AutosubmitConfig(object):
         return self.get_section(['SVN', 'PROJECT_URL'])
 
     def get_svn_project_revision(self):
-        """Get revision for subversion project
+        """
+        Get revision for subversion project
 
         :return: revision for subversion project
         :rtype: str
         """
         return self.get_section(['SVN', 'PROJECT_REVISION'])
 
-    def get_local_project_path(self):
+    def get_local_project_path(self) -> Path:
         """Gets path to origin for local project
 
         :return: path to local project
-        :rtype: str
+        :rtype: Path
         """
-        return self.get_section(['LOCAL', 'PROJECT_PATH'])
+        path = self.get_section(['LOCAL', 'PROJECT_PATH'])
+        if not path:
+            raise AutosubmitCritical(
+                "Empty project path! Please change this parameter to a valid one.", 7014)
+        return Path(path)
 
     def get_date_list(self):
-        """Returns startdates list from experiment's config file
+        """
+        Returns startdates list from experiment's config file
 
         :return: experiment's startdates
         :rtype: list
@@ -2287,7 +2320,8 @@ class AutosubmitConfig(object):
         return date_list
 
     def get_num_chunks(self):
-        """Returns number of chunks to run for each member
+        """
+        Returns number of chunks to run for each member
 
         :return: number of chunks
         :rtype: int
@@ -2301,13 +2335,15 @@ class AutosubmitConfig(object):
         :return: initial chunk
         :rtype: int
         """
-        chunk_ini = self.get_section(['experiment', 'CHUNKINI'], default)
+        chunk_ini = self.get_section(
+            ['experiment', 'CHUNKINI'], default)
         if not chunk_ini:
             return default
         return int(chunk_ini)
 
     def get_chunk_size_unit(self):
-        """Unit for the chunk length
+        """
+        Unit for the chunk length
 
         :return: Unit for the chunk length  Options: {hour, day, month, year}
         :rtype: str
@@ -2315,18 +2351,21 @@ class AutosubmitConfig(object):
         return self.get_section(['EXPERIMENT', 'CHUNKSIZEUNIT'])
 
     def get_chunk_size(self, default=1):
-        """Chunk Size as defined in the expdef file.
+        """
+        Chunk Size as defined in the expdef file.
 
         :return: Chunksize, 1 as default.
         :rtype: int
         """
-        chunk_size = self.get_section(['experiment', 'CHUNKSIZE'], default)
+        chunk_size = self.get_section(
+            ['experiment', 'CHUNKSIZE'], default)
         if not chunk_size:
             return default
         return int(chunk_size)
 
     def get_member_list(self, run_only=False):
-        """Returns members list from experiment's config file
+        """
+        Returns members list from experiment's config file
 
         :return: experiment's members
         :rtype: list
@@ -2360,7 +2399,8 @@ class AutosubmitConfig(object):
         return member_list
 
     def get_dependencies(self, section="None"):
-        """Returns dependencies list from jobs config file
+        """
+        Returns dependencies list from jobs config file
 
         :return: experiment's members
         :rtype: list
@@ -2371,7 +2411,8 @@ class AutosubmitConfig(object):
             return []
 
     def get_rerun(self):
-        """Returns startdates list from experiment's config file
+        """
+        Returns startdates list from experiment's config file
 
         :return: rerun value
         :rtype: bool
@@ -2398,7 +2439,8 @@ class AutosubmitConfig(object):
             )
 
     def set_last_as_command(self, command):
-        """Set the last autosubmit command used in the experiment's config file
+        """
+        Set the last autosubmit command used in the experiment's config file
         :param command: current autosubmit command
         :return:
         """
@@ -2421,7 +2463,8 @@ class AutosubmitConfig(object):
         os.chmod(misc, 0o755)
 
     def set_version(self, autosubmit_version):
-        """Sets autosubmit's version in autosubmit's config file
+        """
+        Sets autosubmit's version in autosubmit's config file
 
         :param autosubmit_version: autosubmit's version
         :type autosubmit_version: str
@@ -2439,7 +2482,8 @@ class AutosubmitConfig(object):
         os.chmod(version_file, 0o755)
 
     def get_version(self):
-        """Returns version number of the current experiment from autosubmit's config file
+        """
+        Returns version number of the current experiment from autosubmit's config file
 
         :return: version
         :rtype: str
@@ -2452,10 +2496,11 @@ class AutosubmitConfig(object):
         :return: max number of running jobs
         :rtype: int
         """
-        return int(self.get_section(['CONFIG', 'TOTALJOBS'], -1))
+        return int(self.get_section(['CONFIG', 'TOTALJOBS'], 20))
 
     def get_output_type(self):
-        """Returns default output type, pdf if none
+        """
+        Returns default output type, pdf if none
 
         :return: output type
         :rtype: string
@@ -2463,14 +2508,16 @@ class AutosubmitConfig(object):
         return self.get_section(['CONFIG', 'OUTPUT'], 'pdf')
 
     def get_max_wallclock(self):
-        """Returns max wallclock
+        """
+        Returns max wallclock
 
         :rtype: str
         """
         return self.get_section(['CONFIG', 'MAX_WALLCLOCK'], "")
 
     def get_disable_recovery_threads(self, section):
-        """Returns FALSE/TRUE
+        """
+        Returns FALSE/TRUE
         :return: recovery_threads_option
         :rtype: str
         """
@@ -2480,7 +2527,8 @@ class AutosubmitConfig(object):
             return "false"
 
     def get_max_processors(self):
-        """Returns max processors from autosubmit's config file
+        """
+        Returns max processors from autosubmit's config file
 
         :rtype: str
         """
@@ -2492,7 +2540,7 @@ class AutosubmitConfig(object):
         :return: main platforms
         :rtype: int
         """
-        return int(self.get_section(['CONFIG', 'MAXWAITINGJOBS'], -1))
+        return int(self.get_section(['CONFIG', 'MAXWAITINGJOBS'], 20))
 
     def get_default_job_type(self):
         """Returns the default job type from experiment's config file.
@@ -2509,6 +2557,17 @@ class AutosubmitConfig(object):
         :rtype: int
         """
         return int(self.get_section(['CONFIG', 'SAFETYSLEEPTIME'], 10))
+
+    # ADD QOL hint, with..
+    def set_safetysleeptime(self, sleep_time):
+        """Sets autosubmit's version in autosubmit's config file
+
+        :param sleep_time: value to set
+        :type sleep_time: int
+        """
+        content = open(self._conf_parser_file).read()
+        content = content.replace(re.search('SAFETYSLEEPTIME:.*', content).group(0), "SAFETYSLEEPTIME: %d" % sleep_time)
+        open(self._conf_parser_file, 'w').write(content)
 
     def get_retrials(self):
         """Returns max number of retrials for job from autosubmit's config file.
@@ -2691,9 +2750,7 @@ class AutosubmitConfig(object):
          :return: wrapper check time
          :rtype: int
          """
-        wrapper = self.experiment_data.get("WRAPPERS", {})
-
-        return wrapper.get("CHECK_TIME_WRAPPER", self.get_safetysleeptime())
+        return self.experiment_data.get("WRAPPERS", {}).get("CHECK_TIME_WRAPPER", 0)
 
     def get_wrapper_machinefiles(self, wrapper=None) -> str:
         """Returns the strategy for creating the machinefiles in wrapper jobs.
@@ -2738,11 +2795,11 @@ class AutosubmitConfig(object):
         return self.get_section(['COMMUNICATIONS', 'API'], 'paramiko')
 
     def get_storage_type(self) -> str:
-        """Returns the storage system from autosubmit's config file. Pkl by default.
+        """Returns the storage system from autosubmit's config file. Sqlite by default.
 
         :return: communications library
         """
-        return self.get_section(['STORAGE', 'TYPE'], 'pkl')
+        return self.get_section(['STORAGE', 'TYPE'], 'sqlite')
 
     @staticmethod
     def is_valid_mail_address(mail_address):
@@ -2758,7 +2815,7 @@ class AutosubmitConfig(object):
 
     def is_valid_storage_type(self) -> bool:
         storage_type = self.get_storage_type()
-        return storage_type in ['pkl', 'db']
+        return storage_type in ['sqlite', 'postgres']
 
     def is_valid_jobs_in_wrapper(self, wrapper=None) -> bool:
         if wrapper is None:
@@ -2862,6 +2919,64 @@ class AutosubmitConfig(object):
             content = content.replace(match, parameters.get(match[1:-1], ""))
         return content
 
+    # ADD QOL
+
+    def calculate_auto_splits(self):
+        datelist = self.experiment_data.get("EXPERIMENT", {}).get("DATELIST", "")
+        chunks = int(self.experiment_data.get("EXPERIMENT", {}).get("NUMCHUNKS", 1))
+        if not datelist or not chunks:
+            return
+
+        if isinstance(datelist, str) or isinstance(datelist, int):
+            datelist = str(datelist).split()
+
+        for section_name, section_data in self.jobs_data.items():
+            if section_data.get("RUNNING", "once") != "chunk":
+                continue
+
+            if section_data.get("SPLITS", None) == "auto":
+                splits = {}
+                for date_str in datelist:
+                    splits[date_str] = []
+                    date = datetime.strptime(date_str, '%Y%M%d')
+                    for chunk in range(1, chunks + 1):
+                        # Get the real splits for the section
+                        Log.debug(f"Calculating splits for {section_name} on date {date_str} chunk {chunk}")
+                        splits[date_str].append(calendar_chunk_section(self.experiment_data, section_name, date, chunk))
+
+                self.experiment_data["JOBS"][section_name]["SPLITS"] = splits
+
+    def get_wrapped_jobs(self) -> list[str]:
+        """Return the jobs that should be wrapped.
+
+        Read the `WRAPPERS.JOBS_IN_WRAPPER` value from `self.experiment_data` and
+        normalize it to a list of job names.
+
+        :return: Normalized list of job names.
+        :rtype: list[str].
+        """
+        jobs_in_wrapper = self.experiment_data.get("WRAPPERS", {}).get("JOBS_IN_WRAPPER", [])
+        if isinstance(jobs_in_wrapper, str):
+            jobs_in_wrapper = jobs_in_wrapper.split("&") if "&" in jobs_in_wrapper else jobs_in_wrapper.split()
+
+        return [job.strip() for job in jobs_in_wrapper if job.strip()]
+
+    def check_files_loaded(self) -> str:
+        """
+        Returns the contents of all loaded configuration files, with a header indicating the file name.
+        :return: contents of all loaded configuration files
+        :rtype: str
+        """
+        self.reload(True)
+        file_contents = ""
+        for fi in self.current_loaded_files:
+            path = Path(fi)
+            file_contents += f"header:{path}\n"
+            if path.is_file():
+                with path.open("r") as file:
+                    file_contents += file.read()
+        return file_contents
+
     def get_current_wrapper(self, section: str) -> dict:
         """Returns the wrapper configuration for a given job section.
 
@@ -2870,7 +2985,8 @@ class AutosubmitConfig(object):
         :return: wrapper configuration
         :rtype: dict
         """
-        for wrapper in self.experiment_data.get("WRAPPERS", {}).values():
-            if section in wrapper.get("JOBS_IN_WRAPPER", ""):
-                return wrapper
+        if isinstance(self.experiment_data.get("WRAPPERS", {}), dict):
+            for wrapper in self.experiment_data.get("WRAPPERS", {}).values():
+                if isinstance(wrapper, dict) and section in wrapper.get("JOBS_IN_WRAPPER", []):
+                    return wrapper
         return {}

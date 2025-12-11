@@ -54,11 +54,11 @@ def set_up_test(autosubmit_exp, autosubmit, mocker, command: str):
         ['autosubmit', 'configure'],
         ['autosubmit', 'expid', '-dm', '-H', 'local', '-d', 'Tutorial'],
         ['autosubmit', 'delete', _EXPIDS],
-        ['autosubmit', 'monitor', _EXPIDS, '--hide', '--notransitive'],  # TODO
+        ['autosubmit', 'monitor', _EXPIDS, '--hide'],  # TODO
         ['autosubmit', 'stats', _EXPIDS],  # TODO
         ['autosubmit', 'clean', _EXPIDS],
-        # ['autosubmit', 'check', _EXPIDS, '--notransitive'],
-        ['autosubmit', 'inspect', _EXPIDS, '--notransitive'],  # TODO
+        # ['autosubmit', 'check', _EXPIDS],
+        ['autosubmit', 'inspect', _EXPIDS],  # TODO
         ['autosubmit', 'report', _EXPIDS],  # TODO
         ['autosubmit', 'describe', _EXPIDS],
         ['autosubmit', 'migrate', '-fs', 'Any', _EXPIDS],
@@ -72,22 +72,19 @@ def set_up_test(autosubmit_exp, autosubmit, mocker, command: str):
         ['autosubmit', 'archive', _EXPIDS],  # TODO
         ['autosubmit', 'readme'],  # TODO
         ['autosubmit', 'changelog'],  # TODO
-        ['autosubmit', 'dbfix', _EXPIDS],  # TODO
-        ['autosubmit', 'pklfix', _EXPIDS],
         ['autosubmit', 'updatedescrip', _EXPIDS, 'description'],
         ['autosubmit', 'cat-log', _EXPIDS],
         ['autosubmit', 'stop', '-a']
     ],
     ids=['configure', 'expid', 'delete', 'monitor', 'stats', 'clean', 'inspect', 'report', 'describe', 'migrate', 'create',
-         'setstatus', 'testcase', 'refresh', 'updateversion', 'upgrade', 'archive', 'readme', 'changelog', 'dbfix', 'pklfix',
-         'updatedescrip', 'cat-log', 'stop']
+         'setstatus', 'testcase', 'refresh', 'updateversion', 'upgrade', 'archive', 'readme', 'changelog', 'updatedescrip', 'cat-log', 'stop']
 )  # TODO: improve quality of the test in order to validate each scenario and its outputs  #noqa
 def test_run_command(autosubmit_exp: AutosubmitExperimentFixture, autosubmit: Autosubmit, mocker, command: str):
     """Test the is simply used to check if commands are not broken on runtime, it doesn't check behaviour or output
     TODO: commands that have a TODO at its side needs behaviour tests
     """
     args = set_up_test(autosubmit_exp, autosubmit, mocker, command)
-    if 'create' in command or 'pklfix' in command:
+    if 'create' in command:
         assert autosubmit.run_command(args=args) == 0
     else:
         assert autosubmit.run_command(args=args)
@@ -110,7 +107,8 @@ def test_run_command_raises_autosubmit(autosubmit_exp: AutosubmitExperimentFixtu
     if 'run' in command:
         with pytest.raises(AutosubmitCritical) as error:
             autosubmit.run_command(args=args)
-        assert str(error.value.code) == '7010'
+        # Varies depending if the localDocker is available or not
+        assert str(error.value.code) == '7014' or str(error.value.code) == '7010'
     elif 'install' in command:
         with pytest.raises(AutosubmitCritical) as error:
             autosubmit.run_command(args=args)
