@@ -256,6 +256,7 @@ class JobPackageBase(object):
         """ Submit package to the platform. """
         pass  # pragma: no cover
 
+    # ADD QOL
     def process_jobs_to_submit(self, job_id: int, hold: bool = False) -> None:
         for i, job in enumerate(self.jobs):
             job.hold = hold

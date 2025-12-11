@@ -226,8 +226,7 @@ def _check_final_status(
         job_edges_info: Optional[List[Dict[str, Any]]],
         child: Job,
 ) -> Tuple[Optional[str], Optional[int], Optional[bool]]:
-    """
-    Check the final status between a job and its child using edge information.
+    """Check the final status between a job and its child using edge information.
 
     :param job_edges_info: List of edge information dictionaries.
     :type job_edges_info: Optional[List[Dict[str, Any]]]
@@ -318,9 +317,7 @@ class Monitor:
     """Class to handle monitoring of Jobs at HPC."""
 
     def __init__(self, edge_info: Optional[dict[str, Any]] = None) -> None:
-        """
-        Initialize the Monitor class.
-        """
+        """Initialize the Monitor class."""
         if not edge_info:
             self.edge_info = {}
         else:

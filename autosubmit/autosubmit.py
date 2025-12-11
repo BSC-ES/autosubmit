@@ -1966,8 +1966,8 @@ class Autosubmit:
             job_list: JobList,
             expid: str,
     ) -> None:
-        """
-        Check wrappers and inner jobs status also order the non-wrapped jobs to be submitted by active platforms
+        """Check wrappers and inner jobs status also order the non-wrapped jobs to be submitted by active platforms
+
         :param as_conf: a AutosubmitConfig object
         :param job_list: a JobList object
         :param expid: a string with the experiment id
@@ -5452,6 +5452,7 @@ class Autosubmit:
         return test_case_id.strip() != ''
 
     # TODO: To be moved to utils
+    # ADD QOL
     @staticmethod
     def load_job_list(expid, as_conf, monitor=False, new=True, full_load=True, submitter=None,
                       check_failed_jobs=False) -> JobList:

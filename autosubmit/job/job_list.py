@@ -45,10 +45,7 @@ from autosubmit.platforms.platform import Platform
 
 
 class JobList(object):
-    """
-    Class to manage the list of jobs to be run by autosubmit
-
-    """
+    """Class to manage the list of jobs to be run by autosubmit"""
 
     def __init__(self, expid, config, parser_factory, run_mode=False, disable_save=False, submitter=None):
         self._update_file = Path("updated_list_" + expid + ".txt")
@@ -93,10 +90,11 @@ class JobList(object):
         self._set_status_path = Path(BasicConfig.LOCAL_ROOT_DIR / Path(self.expid) / "status")
         self._update_file_path = self._set_status_path / self._update_file
 
+    # ADD QOL ( -> return type)
     @property
     def graph_dict(self):
-        """
-        Converts the graph edges into a dictionary structure matching the ExperimentStructureTable.
+        """Converts the graph edges into a dictionary structure matching the ExperimentStructureTable.
+
         :return: A list of dictionaries representing the edges.
         """
         edges_dict = []
@@ -182,6 +180,7 @@ class JobList(object):
     def run_members(self):
         return self._run_members
 
+    # ADD QOL
     @run_members.setter
     def run_members(self, members):
         if members is not None and len(str(members)) > 0:
@@ -199,15 +198,17 @@ class JobList(object):
         else:
             self._run_members = None
 
+    # ADD QOL (check also tests passing, re-added [:] as here we could have all the jobs loaded
     def _delete_edgeless_jobs(self):
         # indices to delete
-        for job in self.job_list:
+        for job in self.job_list[:]:
             if job.dependencies is not None and job.dependencies not in ["{}", "[]"]:
                 if ((len(job.dependencies) > 0 and not job.has_parents() and not
                 job.has_children()) and str(job.delete_when_edgeless).casefold() ==
                         "true".casefold()):
                     self.graph.remove_node(job.name)
 
+    # ADD QOL ( remove unused parameters)
     def generate(
             self,
             as_conf: AutosubmitConfig,
@@ -266,13 +267,16 @@ class JobList(object):
                                          )
         Log.result("Workflow generation completed.")
 
+    # ADD QOL
     def clear(self) -> None:
         self.graph.clear()
         self.graph.clear_edges()
 
+    # ADD QOL
     def clear_wrappers_db(self, preview=True) -> None:
         self.dbmanager.clear_wrappers(preview=preview)
 
+    # ADD QOL
     def _reset_workflow_graph(self) -> None:
         Log.debug("Resetting the workflow graph to a zero state")
         self.dbmanager.reset_workflow()
@@ -300,8 +304,7 @@ class JobList(object):
             edges: list[dict[str, any]],
             full_load: bool
     ) -> None:
-        """
-        Recreates the internal dependency graph from lists of nodes and edges.
+        """Recreates the internal dependency graph from lists of nodes and edges.
 
         :param nodes: List of node dictionaries, each representing a job node.
         :type nodes: list[dict[str, any]]
@@ -328,14 +331,11 @@ class JobList(object):
             self,
             edge: dict[str, Any]
     ) -> None:
-        """
-        Add an edge to the graph and update the parent relationship for the job nodes.
+        """Add an edge to the graph and update the parent relationship for the job nodes.
 
         :param edge: Dictionary containing edge data with keys 'e_from', 'e_to', 'min_trigger_status', 'completion_status',
                         'from_step', and 'fail_ok'.
         :type edge: dict[str, Any]
-        :return: None
-        :rtype: None
         """
         edge = {
             'e_from': edge['e_from'],
@@ -365,8 +365,7 @@ class JobList(object):
             node: Dict[str, Any],
             connect_to_platform: bool = True,
     ) -> None:
-        """
-        Add a job node to the graph and ensure the platform name is set.
+        """Add a job node to the graph and ensure the platform name is set.
 
         :param node: Dictionary containing job node data.
         :type node: Dict[str, Any]
@@ -390,8 +389,8 @@ class JobList(object):
             job.assign_platform(self.submitter, create=False, new=False)
 
     def _load_graph(self, full_load: bool, load_failed_jobs: bool = False) -> bool:
-        """
-        Loads the job graph from the database, creating nodes and edges.
+        """Loads the job graph from the database, creating nodes and edges.
+
         :param full_load: If True, loads all jobs and edges, otherwise loads only the necessary ones.
         :param load_failed_jobs: If True, loads failed jobs from the database.
         :return: True if there are differences in sections, False otherwise.
@@ -416,8 +415,8 @@ class JobList(object):
         return False if not differences else True
 
     def remove_outdated_information_from_database(self, differences: Dict[str, Any]) -> None:
-        """
-        Removes outdated information from the database based on the differences found in sections.
+        """Removes outdated information from the database based on the differences found in sections.
+
         :param differences: Dictionary containing the differences in sections.
         :type differences: Dict[str, Any]
         """
@@ -428,9 +427,9 @@ class JobList(object):
         self.dbmanager.clear_unused_nodes(differences)
         self.dbmanager.save_sections_data(sections)
 
+    # ADD QOL ( Dict -> dict)
     def compute_section_differences(self) -> Dict[str, Dict[str, Any]]:
-        """
-        Compute the differences between the current sections and the persistent sections in the database.
+        """Compute the differences between the current sections and the persistent sections in the database.
 
         :return: A dictionary mapping section names to their change type and details: 'removed', 'modified', or 'added'.
         :rtype: Dict[str, Dict[str, Any]]
@@ -477,14 +476,15 @@ class JobList(object):
 
         return differences
 
-    def load_sections(self) -> List[Dict[str, Any]]:
-        """
-        Loads the sections from the database.
+    def load_sections(self) -> list[dict[str, Any]]:
+        """Loads the sections from the database.
+
         :return: List of sections.
         """
         Log.debug("Loading sections from database...")
         return [dict(raw_row) for raw_row in self.dbmanager.load_sections_data()]
 
+    # ADD QOL
     def _create_and_add_jobs(
             self, show_log: bool, default_job_type: str, date_list: List[str], member_list: List[str]) -> None:
         if show_log:
@@ -504,6 +504,7 @@ class JobList(object):
         if len(self.graph.edges) > 0:
             self._delete_edgeless_jobs()
 
+    # ADD QOL
     def _initialize_new_jobs(self, changes: bool, new: bool) -> None:
         for job in self.job_list:
             if changes:
@@ -515,39 +516,40 @@ class JobList(object):
             self.graph.nodes[job.name]["job"] = job
 
     def has_parents(self, job_name: str) -> bool:
-        """
-        Check if a job has parents in the graph
+        """Check if a job has parents in the graph
+
         :param job_name: name of the job to check
         :return: True if the job has parents, False otherwise
         """
         return len(self.graph.pred[job_name]) > 0
 
     def has_children(self, job_name: str) -> bool:
-        """
-        Check if a job has children in the graph
+        """Check if a job has children in the graph
+
         :param job_name: name of the job to check
         :return: True if the job has children, False otherwise
         """
         return len(self.graph.succ[job_name]) > 0
 
-    def get_parents_edges(self, job_name: str) -> Dict:
-        """
-        Get the parents of a job in the graph
+    def get_parents_edges(self, job_name: str) -> dict:
+        """Get the parents of a job in the graph
+
         :param job_name: name of the job to check
         :return: list of parents
         """
         names = list(self.graph.predecessors(job_name))
         return {child_name: self.graph.edges[child_name, job_name] for child_name in names}
 
-    def get_children_edges(self, job_name: str) -> Dict:
-        """
-        Get the children of a job in the graph
+    def get_children_edges(self, job_name: str) -> dict:
+        """Get the children of a job in the graph
+
         :param job_name: name of the job to check
         :return: list of children
         """
         names = list(self.graph.successors(job_name))
         return {child_name: self.graph.edges[job_name, child_name] for child_name in names}
 
+    # ADD QOL (remove unused parameters)
     def _save_workflow_state(
             self, as_conf: AutosubmitConfig, create: bool, new: bool
     ) -> None:
@@ -558,9 +560,8 @@ class JobList(object):
             job.assign_platform(self.submitter, create, new)
         Log.info("Save completed.")
 
-    def build_sections_data_to_store(self) -> List[Dict[str, Any]]:
-        """
-        Build a list of dictionaries representing section data for database storage.
+    def build_sections_data_to_store(self) -> list[dict[str, Any]]:
+        """Build a list of dictionaries representing section data for database storage.
 
         :return: List of dictionaries, each representing a section's data.
         :rtype: List[Dict[str, Any]]
@@ -571,7 +572,7 @@ class JobList(object):
         members_ref = str(experiment_section.get("MEMBERS", ""))
         numchunks_ref = int(experiment_section.get("NUMCHUNKS", 1))
         expid_ref = self._as_conf.experiment_data.get("DEFAULT", {}).get("EXPID", "unknown_expid")
-        data_to_store: List[Dict[str, Any]] = []
+        data_to_store: list[dict[str, Any]] = []
         for section_name, section_data in sections.items():
             splits = None if not section_data.get("SPLITS", None) else section_data.get("SPLITS", 0)
             dependencies = None if not section_data.get("DEPENDENCIES", None) else str(
@@ -579,6 +580,7 @@ class JobList(object):
             datelist = datelist_ref if section_data.get("RUNNING", "once") != "once" else None
             members = members_ref if section_data.get("RUNNING", "once") not in ["once", "date"] else None
             numchunks = numchunks_ref if section_data.get("RUNNING", "once") not in ["once", "date", "member"] else None
+            # # ADD QOL ( maybe tests don't pass as now we have splits)
             data_to_store.append({
                 "name": section_name,
                 "splits": str(splits) if splits is not None else None,
@@ -640,6 +642,7 @@ class JobList(object):
                     if can_be_loaded:
                         self.add_job(self.load_job_by_name(wrappable_job))
 
+    # ADD QOL
     def process_wrapper_jobs(self, wrapper_section: str, inner_sections: list[str]) -> None:
         self.load_inner_jobs_by_section(inner_sections)
         try:
@@ -1308,6 +1311,7 @@ class JobList(object):
         self.graph.edges[parent.name, job.name].update(min_trigger_status=min_trigger_status, from_step=from_step,
                                                        fail_ok=fail_ok)
 
+    # ADD QOL
     def _apply_jobs_edge_info(self, job, dependencies):
         filters_to_apply_by_section = dict()
         for key, dependency in dependencies.items():
@@ -1330,6 +1334,7 @@ class JobList(object):
         for key, list_of_parents in parents_by_section.items():
             special_conditions = dict()
             min_trigger_status = filters_to_apply_by_section[key].get("MIN_TRIGGER_STATUS", "COMPLETED")
+            # "?" marks a weak dependency, here we're removing it from the name. ex: "STATUS: COMPLETED?" ( maybe this is already done in the as_conf)
             min_trigger_status = min_trigger_status if "?" != min_trigger_status[-1] else min_trigger_status[:-1]
             special_conditions["MIN_TRIGGER_STATUS"] = min_trigger_status
             special_conditions["FROM_STEP"] = (filters_to_apply_by_section[key].pop("FROM_STEP", 0))
@@ -1582,6 +1587,7 @@ class JobList(object):
 
         return special_dependencies, problematic_dependencies
 
+    # ADD QOL
     def get_filters_to_apply(self, job, dependency):
         filters_to_apply = self._filter_current_job(job, copy.deepcopy(dependency.relationships))
         filters_to_apply.pop("MIN_TRIGGER_STATUS", "COMPLETED")
@@ -1594,7 +1600,7 @@ class JobList(object):
         filters_to_apply.pop("FROM_STEP", 0)
         filters_to_apply.pop("FAIL_OK", False)
 
-        # BACKWARDS COMPATIBILITY
+        # BACKWARDS COMPATIBILITY, at the end the filters_to_apply should only contain filters and discard the rest
         filters_to_apply.pop("OPTIONAL", False)
 
         # If the selected filter is "natural" for all filters_to, trigger the natural dependency
@@ -1954,9 +1960,9 @@ class JobList(object):
             dic_jobs.read_section(section, priority, default_job_type)
             priority += 1
 
+    # ADD QOL Dict -> dict
     def _create_sorted_dict_jobs(self, inner_sections: Any) -> Dict[str, Dict[str, List[Any]]]:
-        """
-        Sort jobs by date, member, and chunk for the specified sections.
+        """Sort jobs by date, member, and chunk for the specified sections.
 
         :param inner_sections: Sections to include in the sorting.
         :type inner_sections: list or str
@@ -2052,6 +2058,7 @@ class JobList(object):
                 # Declare None values as if it were the last items in corresponding list
                 member = self._member_list[-1]
                 fake_job = Job("fake-job", 0, Status.WAITING, 0)
+                # ADD QOL log_process remaining
                 fake_job.__setstate__(job.__getstate__(True), True)
                 # Use it to modify name of fake job
                 fake_job.name = fake_job.name.split('_', 2)[0] + "_" + fake_job.name.split('_', 2)[
@@ -2130,6 +2137,7 @@ class JobList(object):
     def copy_ordered_jobs_by_date_member(self):
         pass  # pragma: no cover
 
+    # ADD QOL ( missing attr, hint)
     def get_ordered_jobs_by_date_member(self, wrapper_name):
         """Get the dictionary of jobs ordered according to wrapper's
         expression divided by date and member.
@@ -2523,9 +2531,7 @@ class JobList(object):
         return in_queue
 
     def update_wrappers_references(self):
-        """
-        Updates the job references after a graph recreation to point to the actual Job objects and remove completed wrappers
-        """
+        """Updates the job references after a graph recreation to point to the actual Job objects and remove completed wrappers"""
 
         for name, jobs in list(self.packages_dict.items()):
             new_jobs = []
@@ -2706,8 +2712,7 @@ class JobList(object):
         return sorted(self.job_list, key=lambda k: k.status)
 
     def save_jobs(self, jobs_to_save: Optional[List[Job]] = None):
-        """Persists the job list
-        """
+        """Persists the job list"""
 
         if not self.disable_save:
             Log.info("Saving jobs to the database...")
@@ -2719,7 +2724,7 @@ class JobList(object):
             Log.info("Jobs saved.")
 
     def load_jobs(self, full_load: bool = False, load_failed_jobs: bool = False,
-                  only_finished: bool = False) -> List[Job]:
+                  only_finished: bool = False) -> list[Job]:
         """Load jobs from the database.
 
         Load job nodes from persistent storage into memory and return them as a list
@@ -2892,14 +2897,13 @@ class JobList(object):
         """ Check if a checkpoint step exists for this edge"""
         return job.get_checkpoint_files(parent.name)
 
-    def check_special_status(self) -> List[Job]:
-        """
-        Check if all parents of a job have the correct status for checkpointing.
+    def check_special_status(self) -> list[Job]:
+        """Check if all parents of a job have the correct status for checkpointing.
 
         :returns: List of jobs that fulfill the special conditions for checkpointing.
-        :rtype: List[Job]
+        :rtype: list[Job]
         """
-        jobs_to_check: List[Job] = []
+        jobs_to_check: list[Job] = []
         for current_job in [current_job for current_job in self.job_list if current_job.status == Status.WAITING]:
             self._check_checkpoint(current_job)
             parents_edge_info = self.get_parents_edges(current_job.name)
@@ -2929,8 +2933,7 @@ class JobList(object):
             parents_edge_info: dict,
             parents_nodes: dict
     ) -> Tuple[List[Job], List[Job]]:
-        """
-        Count the number of completed and non-completed parent jobs for a given job.
+        """Count the number of completed and non-completed parent jobs for a given job.
 
         :param job: The job whose parent statuses are to be checked.
         :type job: Job
@@ -3066,6 +3069,7 @@ class JobList(object):
                 job.id = None
                 Log.info(f"Job {job.name} was marked as COMPLETED but has WAITING parents. Resetting to WAITING.")
 
+    # ADD QOL ( unused parameters)
     def update_list(
             self,
             as_conf: AutosubmitConfig,
@@ -3074,8 +3078,7 @@ class JobList(object):
             submitter: object = None,
             first_time: bool = False
     ) -> bool:
-        """
-        Update the job list, resetting failed jobs and changing to READY all WAITING jobs with all parents in their target status.
+        """Update the job list, resetting failed jobs and changing to READY all WAITING jobs with all parents in their target status.
 
         :param as_conf: Autosubmit configuration object.
         :type as_conf: AutosubmitConfig
@@ -3184,9 +3187,8 @@ class JobList(object):
         return save
 
     def reset_jobs_on_first_run(self) -> None:
-        """
-        Reset fail count for jobs in WAITING, READY, DELAYED, or PREPARED status.
-        """
+        """Reset fail count for jobs in WAITING, READY, DELAYED, or PREPARED status."""
+
         for job in [job for job in self.job_list if job.status in
                                                     [Status.WAITING, Status.READY, Status.DELAYED, Status.PREPARED, Status.FAILED]]:
             job.fail_count = 0
@@ -3209,8 +3211,7 @@ class JobList(object):
         return save_all, save_all
 
     def _sync_completed_jobs(self) -> bool:
-        """
-        Synchronize jobs with parents' completion status. If
+        """Synchronize jobs with parents' completion status. If
 
         :return: True if any job status was updated, False otherwise.
         :rtype: bool
@@ -3237,6 +3238,7 @@ class JobList(object):
                         Log.debug(f"Resetting sync job: {job.name} status to: WAITING for parents completion...")
         return save
 
+    # ADD QOL ( unused parameters )
     def _update_waiting_and_delayed_jobs(self, as_conf: AutosubmitConfig) -> bool:
         """
         Update jobs in WAITING or DELAYED status based on parent completion and delay timers.
@@ -3263,6 +3265,7 @@ class JobList(object):
 
         return save
 
+    # ADD QOL (remove)
     def _update_held_jobs(self, as_conf: AutosubmitConfig) -> bool:
         """
         Update jobs in HELD status, releasing them if all parents are completed.
@@ -3304,8 +3307,7 @@ class JobList(object):
         return save
 
     def _skip_jobs(self, as_conf: AutosubmitConfig) -> bool:
-        """
-        Skip jobs that are skippable and meet the skipping criteria.
+        """Skip jobs that meet the skipping criteria.
 
         :param as_conf: Autosubmit configuration object.
         :type as_conf: AutosubmitConfig
@@ -3327,7 +3329,7 @@ class JobList(object):
                                         job.platform.send_command(job.platform.cancel_cmd +
                                                                   " " + str(job.id), ignore_log=True)
                                 except Exception:
-                                    pass
+                                        pass  # jobid finished already
                                 job.status = Status.SKIPPED
                                 save = True
                     elif job.running == 'member':
@@ -3341,15 +3343,13 @@ class JobList(object):
                                         job.platform.send_command(job.platform.cancel_cmd +
                                                                   " " + str(job.id), ignore_log=True)
                                 except Exception:
-                                    pass
+                                        pass  # job_id finished already
                                 job.status = Status.SKIPPED
                                 save = True
         return save
 
     def fill_parents_children(self):
-        """
-        Fill the job._parents and job._children attributes
-        """
+        """Fill the job._parents and job._children attributes"""
         for u in self.graph:
             self.graph.nodes[u]["job"].parents = set()
             self.graph.nodes[u]["job"].children = set()
@@ -3363,8 +3363,11 @@ class JobList(object):
         self.fill_parents_children()
 
     def assign_unique_fake_id(self, package: Any, max_retries: int = 2) -> None:
-        """
-        Assign a unique fake ID to all jobs in the package, ensuring no collision with existing IDs.
+        """Assign a unique fake ID to all jobs in the package, ensuring no collision with existing IDs.
+
+        This is for the -CW flag, as the wrapper won't be really submitted.
+
+        the wrappers.id db field has a non-nullable flag
 
         :param package: The job package containing jobs to assign the ID.
         :type package: Anyh
@@ -3385,6 +3388,7 @@ class JobList(object):
         else:
             raise RuntimeError("Failed to generate a unique fake ID after multiple attempts.")
 
+    # ADD QOL (remove unused parameter)
     def save_wrappers(
             self,
             packages_to_save: List[Any],
@@ -3393,8 +3397,7 @@ class JobList(object):
             hold: bool = False,
             preview: bool = False
     ) -> None:
-        """
-        Save wrapper jobs for job packages that are not in the failed set.
+        """Save wrapper jobs for job packages that are not in the failed set.
 
         :param packages_to_save: List of job package objects to process.
         :type packages_to_save: List[Any]
@@ -3421,7 +3424,8 @@ class JobList(object):
             # Add a fake id while using inspect -cw, create -cw or monitor -cw
             if preview:
                 self.assign_unique_fake_id(package)
-            # TODO: For another day, tried to change this, results in a circular import
+            # TODO: For another PR, tried to change this, results in a circular import
+            # This is due the fact that the WRAPPERJOB class is derived from the JOB class, when it shouldn't as it contains JOB'S
             from ..job.job import WrapperJob
             wrapper_job = WrapperJob(
                 name=package.name,
@@ -3498,8 +3502,7 @@ class JobList(object):
             self.job_package_map[int(wrapper_job.id)] = wrapper_job
 
     def _wrapper_job_dict(self, wrapper_job: 'WrapperJob') -> Tuple[Dict[str, Any], List[str]]:
-        """
-        Return a dictionary representation of a WrapperJob and its inner jobs for database insertion.
+        """Return a dictionary representation of a WrapperJob and its inner jobs for database insertion.
 
         :param wrapper_job: The wrapper job instance to serialize.
         :type wrapper_job: WrapperJob
@@ -3534,9 +3537,10 @@ class JobList(object):
         ]
         return wrapper_info, wrapper_inner_jobs
 
+    # ADD QOL
     def check_scripts(self, as_conf) -> bool:
         """When we have created the scripts, all parameters should have been substituted.
-        %PARAMETER% handlers not allowed.
+        %PARAMETER% handlers are not allowed.
 
         :param as_conf: experiment configuration
         :type as_conf: AutosubmitConfig
@@ -3618,7 +3622,6 @@ class JobList(object):
         self._chunk_list = list(chunk_list)
         self._date_list = list(date_list)
         Log.info("Adding dependencies...")
-        dependencies = dict()
 
         for job_section in job_sections:
             Log.debug(f"Reading rerun dependencies for {job_section} jobs")
@@ -3632,7 +3635,7 @@ class JobList(object):
                 for job in self.get_jobs_by_section(job_section):
                     for key in dependencies_keys:
                         dependency = dependencies[key]
-                        skip, (chunk, member, date) = JobList._calculate_dependency_metadata(
+                        skip, (_, _, _) = JobList._calculate_dependency_metadata(
                             job.chunk, self._chunk_list, job.member, self._member_list, job.date,
                             self._date_list, dependency)
                         if skip:
@@ -3652,10 +3655,11 @@ class JobList(object):
                          'conf', "jobs_" + self._expid + ".yaml"))
         return jobs_parser
 
+    # ADD QOL (re-added :, check tests are passing)
     def remove_rerun_only_jobs(self) -> None:
         """Removes all jobs to be run only in reruns. """
         flag = False
-        for job in self.job_list:
+        for job in self.job_list[:]:
             if job.rerun_only == "true":
                 self._remove_job(job)
                 flag = True
@@ -3786,7 +3790,7 @@ class JobList(object):
 
     def retrieve_symbols(self):
         """Retrieves dictionaries that map the collection of packages in the experiment
-        to symbols for plotting.
+        to symbols for plotting. (Used by the autosubmit stats command).
         :return: Dictionary mapping package names to symbols.
         :rtype: Dictionary
         """
@@ -4007,7 +4011,7 @@ class JobList(object):
 
         current_status = values[3] if (len(values) > 3 and len(
             values[3]) != 14) else status_from_job
-        # TOTAL_STATS last line has more than 3 items, status is different from db,
+        # TOTAL_STATS last line has more than 3 items, status is different from pkl,
         # and status is not "NA"
         if len(values) > 3 and current_status != status_from_job and current_status != "NA":
             current_status = "SUSPICIOUS"
@@ -4093,9 +4097,7 @@ class JobList(object):
         return set()
 
     def update_db_wrappers(self):
-        """
-        Update the wrapper jobs in the database with the current status of the wrapper jobs in memory.
-        """
+        """Update the wrapper jobs in the database with the current status of the wrapper jobs in memory."""
         if self.job_package_map:
             wrappers = []
             for wrapper_job in self.job_package_map.values():
@@ -4104,8 +4106,8 @@ class JobList(object):
                 self.dbmanager.update_wrapper_status(wrappers)
 
     def get_wrappers_id_from_db(self) -> List[int]:
-        """
-        Get a list of all wrapper job IDs from the database.
+        """Get a list of all wrapper job IDs from the database.
+
         :return: List of wrapper job IDs.
         :rtype: List[int]
         """

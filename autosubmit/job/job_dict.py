@@ -25,7 +25,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical
 
 
-class DicJobs: # To rename to JobBuilder or something like that
+class DicJobs: # Not accurate name, to rename to JobBuilder or something in these lines
     """
     Class to create and build jobs from conf file and to find jobs by start date, member and chunk
 
@@ -63,9 +63,9 @@ class DicJobs: # To rename to JobBuilder or something like that
     def job_list(self, job_list):
         self._job_list = job_list
 
+    # ADD QOL (hints)
     def read_section(self, section, priority, default_job_type):
-        """
-        Read a section from jobs conf and creates all jobs for it
+        """Read a section from jobs conf and creates all jobs for it
 
         :param default_job_type: default type for jobs
         :type default_job_type: str
@@ -78,6 +78,7 @@ class DicJobs: # To rename to JobBuilder or something like that
         splits = parameters[section].get("SPLITS", -1)
         running = str(parameters[section].get('RUNNING', "once")).lower()
 
+        # ADD QOL (CORRECT) Before, the "auto" keyword was found there. Now it is a dictionary containing the SPLITS of each month
         if isinstance(splits, dict) and running != "chunk":
             raise AutosubmitCritical("SPLITS=auto is only allowed for running=chunk")
         elif not isinstance(splits, dict):
@@ -209,6 +210,7 @@ class DicJobs: # To rename to JobBuilder or something like that
                                                         default_job_type,
                                                         self._dic[section][date][member][chunk])
 
+    # ADD QOL
     def _create_jobs_split(self, splits, section, date, member, chunk, priority, default_job_type, section_data):
         if isinstance(splits, dict):
             date_str = date2str(date, self._date_format)
@@ -232,6 +234,7 @@ class DicJobs: # To rename to JobBuilder or something like that
             current_jobs.append(next_level_jobs)
         return current_jobs
 
+    # TODO: For another PR, This is a perfomance hotspot to consider while generating a new job_list with splits
     def get_jobs_filtered(self, section, job, filters_to, natural_date, natural_member, natural_chunk,
                           filters_to_of_parent):
         #  datetime.strptime("20020201", "%Y%m%d")
@@ -271,18 +274,18 @@ class DicJobs: # To rename to JobBuilder or something like that
                 else:
                     if job.running == "once":
                         for key in jobs.keys():
-                            if type(jobs.get(key, None)) is list:
+                            if type(jobs.get(key, None)) is list:  # TODO
                                 for aux_job in jobs[key]:
                                     final_jobs_list.append(aux_job)
-                            elif type(jobs.get(key, None)) is Job:
+                            elif type(jobs.get(key, None)) is Job:  # TODO
                                 final_jobs_list.append(jobs[key])
                             elif type(jobs.get(key, None)) is dict:
                                 jobs_aux = self.update_jobs_filtered(jobs_aux, jobs[key])
                     elif jobs.get(job.date, None):
-                        if type(jobs.get(natural_date, None)) is list:
+                        if type(jobs.get(natural_date, None)) is list:  # TODO
                             for aux_job in jobs[natural_date]:
                                 final_jobs_list.append(aux_job)
-                        elif type(jobs.get(natural_date, None)) is Job:
+                        elif type(jobs.get(natural_date, None)) is Job:  # TODO
                             final_jobs_list.append(jobs[natural_date])
                         elif type(jobs.get(natural_date, None)) is dict:
                             jobs_aux = self.update_jobs_filtered(jobs_aux, jobs[natural_date])

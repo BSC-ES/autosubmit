@@ -104,6 +104,7 @@ class CopyQueue(Queue):
         self.timeout = timeout
         super().__init__(maxsize, ctx=ctx)
 
+    # ADD QOL ( check log_process)
     def put(self, job: Any, block: bool = True, timeout: Optional[float] = None) -> None:
         """Puts a job into the queue if it is not a duplicate.
 

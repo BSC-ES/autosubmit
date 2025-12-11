@@ -117,8 +117,8 @@ class ParamikoSubmitter:
 
     @property
     def platforms_object(self) -> list[Platform]:
-        """
-        Returns a list of all the platforms objects used by the experiment.
+        """Returns a list of all the platforms objects used by the experiment.
+
         :return: List of platform objects
         :rtype: list[Platform]
         """

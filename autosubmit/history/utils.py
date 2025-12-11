@@ -61,7 +61,7 @@ def create_file_with_full_permissions(path: str) -> None:
     os.umask(0)
     os.open(path, os.O_WRONLY | os.O_CREAT, 0o777)
 
-
+# ADD QOL
 def create_path_if_not_exists(path):
     # type : (str) -> bool
     if not os.path.exists(path):

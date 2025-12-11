@@ -622,6 +622,8 @@ class SqlAlchemyExperimentHistoryDbManager:
                 raise Exception("No Experiment Runs registered.")
         return Models.ExperimentRunRow(*row)
 
+    # ADD QOL
+
     def _get_max_experiment_run_id(self):
         experiment_run_table = get_table_with_schema(self.schema, ExperimentRunTable)
         query = select(func.max(experiment_run_table.c.run_id))

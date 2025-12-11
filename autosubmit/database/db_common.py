@@ -151,9 +151,9 @@ def save_experiment(name: str, description: Optional[str], version: Optional[str
 
     try:
         result = queue.get(True, TIMEOUT)
-    except BaseException:
-        raise AutosubmitCritical(
-            "The database process exceeded the timeout limit {0}s. Your experiment {1} couldn't be stored in the database.".format(TIMEOUT, name))
+    except Exception:
+        raise AutosubmitCritical(f"The database process exceeded the timeout limit {TIMEOUT}s. "
+                                 f"Your experiment {name} couldn't be stored in the database.")
     finally:
         proc.terminate()
     return result
@@ -238,9 +238,9 @@ def get_autosubmit_version(expid):
 
     try:
         result = queue.get(True, TIMEOUT)
-    except Exception as e:
+    except Exception:
         raise AutosubmitCritical(f"The database process exceeded the timeout limit {TIMEOUT}s. "
-                                 f"Get experiment {expid} version failed to complete. {str(e)}")
+                                 f"Get experiment {expid} version failed to complete.")
     finally:
         proc.terminate()
     return result
@@ -398,8 +398,10 @@ def _check_experiment_exists(name, error_on_inexistence=True):
 def get_experiment_description(expid: str):
     if BasicConfig.DATABASE_BACKEND == 'postgres':
         return _get_experiment_description_sqlalchemy(expid)
+
+    check_db()
+
     try:
-        check_db()
         (conn, cursor) = open_conn()
     except DbException as e:
         raise AutosubmitCritical(

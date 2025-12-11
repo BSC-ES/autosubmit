@@ -75,7 +75,7 @@ class DbManager:
         with self.engine.connect() as conn:
             result = conn.execute(insert(table), data)
             conn.commit()
-        return result.rowcount
+        return cast(int, result.rowcount)
 
     def select_first_where(self, table_name: str, where: Optional[dict[str, str]]) -> Optional[Any]:
         table = get_table_from_name(schema=self.schema, table_name=table_name)
@@ -95,13 +95,14 @@ class DbManager:
         columns = table.c.keys()
         return [tuple(zip(columns, row)) for row in rows]
 
+    # ADD QOL
+
     def select_where_with_columns(
             self,
             table,
             where
     ) -> List[tuple[tuple[str, Any]]]:
-        """
-        Select rows from a table with specific columns. Return a list of hashable tuples.
+        """Select rows from a table with specific columns. Return a list of hashable tuples.
 
         :param table: Table object or table name to select from.
         :type table: Table
@@ -144,9 +145,10 @@ class DbManager:
             conn.commit()
         return result.rowcount
 
+    # ADD QOL
+
     def delete_where(self, table_name: str, where) -> int:
-        """
-        Delete rows from a table where the specified conditions are met.
+        """Delete rows from a table where the specified conditions are met.
         Supports both equality and 'IN' queries for list values.
 
         :param table_name: Name of the table to delete from.
@@ -230,6 +232,8 @@ class DbManager:
             row = conn.execute(query).scalar()
         return cast(int, row) if row is not None else 0
 
+    # ADD QOL
+    # TODO: Don't mind this function, is half-cook will be done in another PR or maybe not needed at all
     def backup(self):
         if BasicConfig.DATABASE_BACKEND == "sqlite":
             import sqlite3  # Bulk operation , SQLACHEMY is too slow for these operations

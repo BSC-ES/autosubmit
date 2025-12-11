@@ -45,6 +45,7 @@ class ExperimentStatusDbManager(DatabaseManager):
         super(ExperimentStatusDbManager, self).__init__(expid, local_root_dir_path=local_root_dir_path)
         self._as_times_file_path = os.path.join(db_dir_path, BasicConfig.AS_TIMES_DB)
         self._ecearth_file_path = os.path.join(db_dir_path, main_db_name)
+        # ADD QOL
         self._db_file_path = os.path.join(local_root_dir_path, self.expid, "db",
                                            "job_list_{0}.db".format(self.expid))
         self._validate_status_database()
