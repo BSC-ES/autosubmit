@@ -203,7 +203,7 @@ def test_get_header(pbs_platform):
     parameters['CUSTOM_DIRECTIVES'] = ''
 
     pbs_platform.header.HEADER = '%OUT_LOG_DIRECTIVE%%ERR_LOG_DIRECTIVE%%QUEUE_DIRECTIVE%%TASKS_PER_NODE_DIRECTIVE%%THREADS_PER_TASK_DIRECTIVE%%CUSTOM_DIRECTIVES%%ACCOUNT_DIRECTIVE%%NODES_DIRECTIVE%%RESERVATION_DIRECTIVE%%MEMORY_DIRECTIVE%%MEMORY_PER_TASK_DIRECTIVE%'
-    assert pbs_platform.get_header(job, parameters) == 'dummy.cmd.out.0dummy.cmd.err.0'
+    assert pbs_platform.get_header(job, parameters) == 'dummy.cmd.out.0dummy.cmd.err.0PBS -l select=1'
 
     parameters['TASKS'] = '2'
     parameters['NODES'] = '2'
