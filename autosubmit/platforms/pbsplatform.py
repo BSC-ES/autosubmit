@@ -492,9 +492,9 @@ class PBSPlatform(ParamikoPlatform):
                     lang = 'UTF-8'
 
             if not hold:
-                cmd = (export + self._submit_cmd + job_script + "\n").encode(lang)
+                cmd = (export + self._submit_cmd + job_script).encode(lang)
             else:
-                cmd = (export + self._submit_hold_cmd + job_script + "\n").encode(lang)
+                cmd = (export + self._submit_hold_cmd + job_script).encode(lang)
 
             with open(self._submit_script_path, "ab") as submit_script_file:
                 submit_script_file.write(cmd)

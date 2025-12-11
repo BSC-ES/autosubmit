@@ -81,7 +81,7 @@ class PBSHeader(object):
         """
         if parameters['NODES'] != '' and int(parameters['NODES']) > 0:
             return f"PBS -l select={parameters['NODES']}"
-        return ""
+        return "PBS -l select=1"
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_memory_directive(self, job, parameters, het=-1):
