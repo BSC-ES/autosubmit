@@ -1,5 +1,9 @@
 ### 4.1.17: Unreleased
 
+**Bug fixes:**
+
+- Removing the generation of SLURM HEADERS with --cpus-per-task when 1, 0 or none is set #2380
+
 **Enhancements:**
 
 - Fix intermittent failures of unit tests, and enable print of AS exceptions.

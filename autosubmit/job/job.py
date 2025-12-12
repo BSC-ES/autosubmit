@@ -1673,11 +1673,13 @@ class Job(object):
             # Get the max threads, each element can be a str or int
             self.het['NUMTHREADS'] = list()
             if len(self.threads) == 1:
-                for x in range(self.het['HETSIZE']):
-                    self.het['NUMTHREADS'].append(self.threads)
+                if self.threads > 1:
+                    for x in range(self.het['HETSIZE']):
+                        self.het['NUMTHREADS'].append(self.threads)
             else:
                 for x in self.threads:
-                    self.het['NUMTHREADS'].append(str(x))
+                    if x > 1:
+                        self.het['NUMTHREADS'].append(str(x))
 
             self.threads = str(max([int(x) for x in self.threads]))
 
