@@ -229,9 +229,6 @@ class JobPackageBase(object):
         try:
             if not only_generate:
                 Log.debug("Sending Files")
-                # TODO: [ENGINES] Here is where the files are sent to the platform as a compressed tar
-                # "WRAPPER_SCRIPTS.tar", together with the COMMON_SCRIPT, which is the wrapper script
-                # (AS_THREAD_*).
                 self._send_files()
                 Log.debug("Submitting")
                 self._do_submission(hold=hold)
@@ -285,7 +282,7 @@ class JobPackageSimple(JobPackageBase):
         #  Add a property that defines what is a package with wrappers
         # self.name = "simple_package"
 
-        # TODO: [ENGINES] Simple jobs may have been in a wrapper previously, so we reset the wrapper method.
+        # Simple jobs may have been in a wrapper previously, so we reset the wrapper method.
         self._assign_wrapper_method_to_jobs(jobs, None)
 
     def _create_scripts(self, configuration: 'AutosubmitConfig'):
