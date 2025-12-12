@@ -185,11 +185,9 @@ class JobPackageBase(object):
             if len(self.jobs) < thread_number or str(
                     configuration.experiment_data.get("CONFIG", {}).get("ENABLE_WRAPPER_THREADS",
                                                                         "False")).lower() == "false":
-                # TODO: [ENGINES] This function (should) check the scripts validity
                 self.submit_unthreaded(configuration, only_generate)
                 Log.debug("Creating Scripts")
-                # TODO: [ENGINES] Here is where the scripts are created. Both the common script and 
-                # the individual job ones.
+                # Create both the common script and the individual job ones.
                 self._create_scripts(configuration)
             else:
                 lhandle = list()
@@ -212,9 +210,6 @@ class JobPackageBase(object):
         try:
             if not only_generate:
                 Log.debug("Sending Files")
-                # TODO: [ENGINES] Here is where the files are sent to the platform as a compressed tar
-                # "WRAPPER_SCRIPTS.tar", together with the COMMON_SCRIPT, which is the wrapper script
-                # (AS_THREAD_*).
                 self._send_files()
                 Log.debug("Submitting")
                 self._do_submission(hold=hold)
@@ -268,7 +263,7 @@ class JobPackageSimple(JobPackageBase):
         #  Add a property that defines what is a package with wrappers
         # self.name = "simple_package"
 
-        # TODO: [ENGINES] Simple jobs may have been in a wrapper previously, so we reset the wrapper method.
+        # Simple jobs may have been in a wrapper previously, so we reset the wrapper method.
         self._assign_wrapper_method_to_jobs(jobs, None)
 
     def _create_scripts(self, configuration: 'AutosubmitConfig'):
