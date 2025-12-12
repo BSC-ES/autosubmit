@@ -2374,16 +2374,14 @@ class Job(object):
     def _get_paramiko_template(self, snippet: 'TemplateSnippet', template, parameters) -> str:
         if self.wrapper_method == 'flux':
             current_platform = FluxOverSlurmPlatform()
-            template_generator = FluxYAMLGenerator(parameters)
-            full_template = ''.join([
-                snippet.as_header(current_platform.get_header(self, parameters), self.executable),
-                snippet.as_body(template),
-                snippet.as_tailer()
-            ])
-            return template_generator.generate_template(full_template)
+            yaml_generator = FluxYAMLGenerator(parameters)
+            full_template = self._compose_template_from_snippet(snippet, template, parameters, current_platform)
+            return yaml_generator.generate_template(full_template)
         else:
-            current_platform = self._platform
-            return ''.join([
+            return self._compose_template_from_snippet(snippet, template, parameters, self._platform)
+
+    def _compose_template_from_snippet(self, snippet: 'TemplateSnippet', template, parameters, current_platform) -> str:
+        return ''.join([
                 snippet.as_header(current_platform.get_header(self, parameters), self.executable),
                 snippet.as_body(template),
                 snippet.as_tailer()
