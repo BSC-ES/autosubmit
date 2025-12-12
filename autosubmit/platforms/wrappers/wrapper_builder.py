@@ -72,7 +72,7 @@ class WrapperBuilder(object):
     def build_header(self):
         return textwrap.dedent(self.header_directive) + self.build_imports()
 
-    def build_imports(self):
+    def build_imports(self) -> str:
         pass  # pragma: no cover
 
     def build_job_thread(self):
