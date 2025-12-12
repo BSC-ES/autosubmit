@@ -202,7 +202,7 @@ class SlurmHeader(object):
                 return f"SBATCH --cpus-per-task={job.het['NUMTHREADS'][het]}"
         else:
             if parameters['NUMTHREADS'] != '':
-                return "SBATCH --cpus-per-task={0}".format(parameters['NUMTHREADS'])
+                return f"SBATCH --cpus-per-task={parameters['NUMTHREADS']}"
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal

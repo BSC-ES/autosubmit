@@ -204,8 +204,10 @@ class SlurmWrapperFactory(WrapperFactory):
     def exclusive_directive(self, exclusive):
         return '#SBATCH --exclusive'
 
-    def tasks_directive(self, tasks):
-        return f'#SBATCH --ntasks-per-node={tasks}'
+    def tasks_directive(self, tasks) -> str:
+        if tasks and tasks != '':
+            return f'#SBATCH --ntasks-per-node={tasks}'
+        return ''
 
     def nodes_directive(self, nodes):
         return f'#SBATCH -N {nodes}'
@@ -213,8 +215,10 @@ class SlurmWrapperFactory(WrapperFactory):
     def processors_directive(self, processors):
         return f'#SBATCH -n {processors}'
 
-    def threads_directive(self, threads):
-        return f'#SBATCH --cpus-per-task={threads}'
+    def threads_directive(self, threads) -> str:
+        if threads and threads != '':
+            return f'#SBATCH --cpus-per-task={threads}'
+        return ''
 
 
 class PJMWrapperFactory(WrapperFactory):
