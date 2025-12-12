@@ -126,8 +126,6 @@ class WrapperBuilder(object):
         return ''.join(padding + line for line in text.splitlines(True))
 
 class FluxWrapperBuilder(WrapperBuilder):
-    # TODO: [ENGINES] Check error handling behavior
-    # TODO: [ENGINES] Command "flux start" is being called multiple times
     # TODO: [ENGINES] Is it necessary to pass the run_id to the inner jobs?
     # TODO: [ENGINES] Add flux.job.Jobspec.validate_jobspec before submission
     """
@@ -180,7 +178,6 @@ class FluxWrapperBuilder(WrapperBuilder):
             """).format(commands, '\n'.ljust(0))
 
 class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
-    # TODO: [ENGINES] Check retrial behavior
     def _generate_flux_script(self):
         return textwrap.dedent("""
         import os
@@ -292,7 +289,6 @@ class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
         """).format(self.job_scripts)
 
 class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
-    # TODO: [ENGINES] Observe what happens if a single job arrives. Is it inside another list?
     def _generate_flux_script(self):
         return textwrap.dedent("""
         import os
