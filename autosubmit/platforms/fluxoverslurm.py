@@ -16,7 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
-from autosubmit.platforms.headers.fluxoverslurm_header import FluxOverSlurmHeader
+import textwrap
 
 class FluxOverSlurmPlatform(ParamikoPlatform):
     """Class to manage jobs to host using SLURM scheduler."""
@@ -29,3 +29,17 @@ class FluxOverSlurmPlatform(ParamikoPlatform):
         :rtype: None
         """
         self._header = FluxOverSlurmHeader()
+
+
+class FluxOverSlurmHeader(object):
+    """
+    Class to handle the header of a job that runs in a Flux instance inside a Slurm allocation.
+    """
+
+    SERIAL = textwrap.dedent("""\
+###############################################################################
+# The following lines contain the script. [%TASKTYPE% %DEFAULT.EXPID% EXPERIMENT]
+###############################################################################
+           """)
+
+    PARALLEL = SERIAL
