@@ -38,6 +38,7 @@ release.
 - Standardized the inner_job submission for non-vertical wrappers #1474
 - Fixed an issue with some placeholders not being replaced in templates #2426
 - Could* fix an issue with the HPC* missing variables in the templates #2432
+- Fixed "Unexpected error: 'list' object has no attribute 'status'" when running experiments #2463
 
 **Enhancements:**
 
