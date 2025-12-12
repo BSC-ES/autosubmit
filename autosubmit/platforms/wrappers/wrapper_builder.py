@@ -882,19 +882,19 @@ class SrunHorizontalWrapperBuilder(SrunWrapperBuilder):
         """).format(str(scripts_bash), '\n'.ljust(13))
 
     def build_srun_launcher(self, jobs_list, footer=True):
-        srun_launcher = textwrap.dedent("""
+        srun_launcher = textwrap.dedent(f"""
         i=0
         suffix=".cmd"
-        for template in "${{{0}[@]}}"; do
+        for template in "${{{jobs_list}[@]}}"; do
             jobname=${{template%"$suffix"}}
             out="${{template}}.out" 
             err="${{template}}.err"
-            srun --ntasks=1 --cpus-per-task={1} $template > $out 2> $err &
+            srun --ntasks=1 --cpus-per-task={self.threads} $template > $out 2> $err &
             sleep "0.2"
             ((i=i+1))
         done
         wait
-        """).format(jobs_list, self.threads, '\n'.ljust(13))
+        """).format('\n'.ljust(13))
         if footer:
             srun_launcher += self._indent(textwrap.dedent("""
         for template in "${{{0}[@]}}"; do
