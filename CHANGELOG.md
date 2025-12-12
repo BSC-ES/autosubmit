@@ -1,3 +1,17 @@
+### 4.1.17: Unreleased
+
+**Known issues:**
+
+- 
+
+**Bug fixes:**
+
+- Removing the generation of SLURM HEADERS with --cpus-per-task when 1, 0 or none is set #2380
+
+**Enhancements:**
+
+- 
+ 
 ### 4.1.16: Unreleased
 
 This release adds support to Postgres using SQLAlchemy, without removing the
@@ -74,7 +88,7 @@ release.
 - docstrings were made more uniform across several functions (should reflect in sphinx docs),
   fixed several ruff and mypy warnings, and did minor refactorings in the code like removing the
   `Submitter` class and using `ParamikoSubmitter` directly (only implementation) #2577
-- Added documentation regarding in-line script definition. 
+- Added documentation regarding in-line script definition.
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 

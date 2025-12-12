@@ -9,7 +9,7 @@
 #
 #SBATCH -A whatever
 #
-#SBATCH --cpus-per-task=1
+#
 #
 #
 #SBATCH -n 1

@@ -11,7 +11,7 @@
 #
 #SBATCH --cpus-per-task=40
 #SBATCH --ntasks-per-node=90
-#SBATCH --nodes=1
+#
 #
 #
 #SBATCH -t 00:01:00

@@ -141,11 +141,11 @@ class SlurmHeader(object):
         :rtype: str
         """
         if het > -1 and len(job.het['NODES']) > 0:
-            if job.het['NODES'][het] != '':
-                return "SBATCH --nodes={0}".format(job.het['NODES'][het])
+            if job.het['NODES'][het] != '' and int(job.het['NODES'][het]) > 1:
+                return f"SBATCH --nodes={job.het['NODES'][het]}"
         else:
-            if parameters['NODES'] != '':
-                return "SBATCH --nodes={0}".format(parameters['NODES'])
+            if parameters['NODES'] != '' and int(parameters['NODES']) > 1:
+                return f"SBATCH --nodes={parameters['NODES']}"
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
@@ -197,12 +197,12 @@ class SlurmHeader(object):
         :rtype: str
         """
         # There is no threads per task, so directive is empty
-        if het > -1 and len(job.het['NUMTHREADS']) > 0:
-            if job.het['NUMTHREADS'][het] != '':
+        if het > -1 and len(job.het['NUMTHREADS']) > 1:
+            if job.het['NUMTHREADS'][het] != '' and int(job.het['NUMTHREADS'][het]) > 1:
                 return f"SBATCH --cpus-per-task={job.het['NUMTHREADS'][het]}"
         else:
-            if parameters['NUMTHREADS'] != '':
-                return "SBATCH --cpus-per-task={0}".format(parameters['NUMTHREADS'])
+            if parameters['NUMTHREADS'] != '' and int(parameters['NUMTHREADS']) > 1:
+                return f"SBATCH --cpus-per-task={parameters['NUMTHREADS']}"
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
