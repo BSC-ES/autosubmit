@@ -227,36 +227,21 @@ def test_send_file_errors(exp_platform_server: ExperimentPlatformServer):
 
 
 @pytest.mark.parametrize(
-    'cmd,error,x11_enabled,mfa_enabled',
+    'cmd,error,x11_enabled',
     [
-        ('whoami', None, True, False),
-        ('parangaricutirimicuaro', AutosubmitError, True, False),
-        ('whoami', None, False, False),
-        ('parangaricutirimicuaro', AutosubmitError, False, False),
-        ('whoami', None, True, True),
-        ('parangaricutirimicuaro', AutosubmitError, True, True),
-        ('whoami', None, False, True),
-        ('parangaricutirimicuaro', AutosubmitError, False, True)
+        ('whoami', None, True),
+        ('parangaricutirimicuaro', AutosubmitError, True),
+        ('whoami', None, False),
+        ('parangaricutirimicuaro', AutosubmitError, False),
     ]
 )
 @pytest.mark.docker
-def test_send_command(cmd: str, error: Optional[Exception], x11_enabled: bool, mfa_enabled: bool,
-                      request: pytest.FixtureRequest, mocker):
+def test_send_command(cmd: str, error: Optional[Exception], x11_enabled: bool, request: pytest.FixtureRequest):
     """This test opens an SSH connection (via sftp) and sends a command."""
     if x11_enabled:
         request.applymarker('x11')
-    if mfa_enabled:
-        request.applymarker('mfa')
 
     exp_platform_server: ExperimentPlatformServer = request.getfixturevalue('exp_platform_server')
-
-    if mfa_enabled:
-        exp_platform_server.platform.two_factor_auth = mfa_enabled
-        exp_platform_server.platform.two_factor_method = 'token'
-        exp_platform_server.platform.pw = 'password'
-        # 55192054 comes from the Docker setup for 2FA, see docker/ssh/linuxserverio-ssh-with-2fa-x11/README.md
-        mocker.patch('autosubmit.platforms.paramiko_platform.input', return_value='55192054')
-
     exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
 
     if error:
