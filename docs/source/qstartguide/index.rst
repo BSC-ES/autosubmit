@@ -177,7 +177,7 @@ Configuration summary
     * - ``autosubmit_<EXPID>.yml``
       -
         - This file contains the definitions that impact the workflow behavior.
-        - It changes workflow behavior with parameters such as job limitations, remote_dependencies and retrials.
+        - It changes workflow behavior with parameters such as job limitations, remote_dependencies and retries.
         - It extends autosubmit functionalities with parameters such as wrappers and mail notification.
     * - ``proj_<EXPID>.yml``
       -
