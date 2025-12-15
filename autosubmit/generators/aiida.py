@@ -59,6 +59,16 @@ class Generator(AbstractGenerator):
                                     "PROJECT"]   # these are resolved by autosubmit internally
 
     def __init__(self, job_list: JobList, as_conf: AutosubmitConfig, output_dir: str):
+        """
+        Initializes the Generator object.
+
+        :param job_list: The list of jobs to be executed.
+        :type job_list: JobList
+        :param as_conf: The autosubmit configuration.
+        :type as_conf: AutosubmitConfig
+        :param output_dir: The directory where the output files will be generated.
+        :type output_dir: str
+        """
         if not (output_path := Path(output_dir)).exists():
             raise ValueError(f"Given `output_dir` {output_path} does not exist.")
         self._output_path = (output_path / job_list.expid).absolute()
@@ -68,7 +78,16 @@ class Generator(AbstractGenerator):
 
     @classmethod
     def generate(cls, job_list: JobList, as_conf: AutosubmitConfig, **arg_options: dict[str, Any]) -> None:
-        """Generates the workflow from the created autosubmit workflow."""
+        """
+        Generates the workflow from the created autosubmit workflow.
+
+        :param job_list: The list of jobs to be executed.
+        :type job_list: JobList
+        :param as_conf: The autosubmit configuration.
+        :type as_conf: AutosubmitConfig
+        :param arg_options: Additional arguments.
+        :type arg_options: dict[str, Any]
+        """
         output_dir = arg_options.get('output_dir', None)
         if not isinstance(output_dir, str):
             raise ValueError(f"aiida generator requires output dir of type str but got {output_dir}") # TODO improve error message
@@ -80,12 +99,22 @@ class Generator(AbstractGenerator):
 
     @staticmethod
     def get_engine_name() -> str:
-        """The engine name used for the help text."""
+        """
+        Returns the name of the engine.
+
+        :return: The name of the engine.
+        :rtype: str
+        """
         return "AiiDA"
 
     @staticmethod
     def add_parse_args(parser: "argparse.ArgumentParser") -> None:
-        """Adds arguments to the parser that are needed for a specific engine implementation."""
+        """
+        Adds arguments to the parser that are needed for a specific engine implementation.
+
+        :param parser: The parser to which the arguments will be added.
+        :type parser: argparse.ArgumentParser
+        """
         parser.add_argument('-o', '--output_dir', dest="output_dir", default=".", help='Output directory')
 
     def _validate(self) -> None:
