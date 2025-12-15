@@ -9,10 +9,10 @@ from typing import TYPE_CHECKING, Any
 
 from autosubmit.config.configcommon import AutosubmitConfig
 
+from autosubmit.job.job import Job
 from autosubmit.job.job_list import JobList
 from autosubmit.generators import AbstractGenerator
 from autosubmit.platforms.platform import Platform
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
@@ -290,9 +290,9 @@ tasks["{job.name}"] = wg.add_task(
 tasks["{job.name}"].set({{"metadata.options.max_memory_kb": {job.memory}}})"""
             if job.platform.max_wallclock is None:
                 if job.parameters["WALLCLOCK"] != "":
-                    wallclock_seconds = int(ParamikoPlatform.parse_time(job.wallclock).total_seconds())
+                    wallclock_seconds = int(Job.parse_time(job.wallclock).total_seconds())
                 else:
-                    wallclock_seconds = int(ParamikoPlatform.parse_time(job.platform.wallclock).total_seconds())
+                    wallclock_seconds = int(Job.parse_time(job.platform.wallclock).total_seconds())
                 create_task += f"""
 tasks["{job.name}"].set({{"metadata.options.max_wallclock_seconds": {wallclock_seconds}}})"""
             if job.partition != "":
