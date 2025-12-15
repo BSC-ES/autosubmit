@@ -3,6 +3,7 @@ from enum import Enum
 from importlib import import_module
 from typing import TYPE_CHECKING
 from abc import ABC, abstractmethod
+
 if TYPE_CHECKING:
     from autosubmitconfigparser.config.configcommon import AutosubmitConfig
     from autosubmit.job.job_list import JobList
@@ -33,7 +34,7 @@ class AbstractGenerator(ABC):
 
     @classmethod
     @abstractmethod
-    def generate(cls, job_list: JobList, as_conf: AutosubmitConfig, **arg_options) -> None:
+    def generate(cls, job_list: "JobList", as_conf: "AutosubmitConfig", **arg_options) -> None:
         """Generates the workflow from the created autosubmit workflow."""
         raise NotImplementedError
 
