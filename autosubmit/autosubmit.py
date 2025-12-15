@@ -2692,6 +2692,7 @@ class Autosubmit:
                                                inspect=inspect, only_wrappers=only_wrappers)
                 )
                 wrapper_errors.update(packager.wrappers_with_error)
+                save_2 = False
                 # Jobs that are being retrieved in batch. Right now, only available for slurm platforms.
                 if platform.type.lower() in ["slurm", "pjm"] and not inspect and not only_wrappers:
                     # Process the script generated in submit_ready_jobs
