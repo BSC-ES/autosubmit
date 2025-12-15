@@ -425,7 +425,9 @@ class Platform:
                     try:
                         package.submit(as_conf, job_list.parameters, inspect, hold=hold)
                         save = True
-                        if not inspect:
+                        # Save takes 15 seconds per job in operational experiments, but there is no need to save here as the sbatch didn't happen yet
+                        # TODO: apply the same for all platforms and remove the save() calls after each submit()
+                        if not inspect and package.platform.type not in ["slurm", "pjm"]:
                             job_list.save()
                         if package.x11 != "true":
                             valid_packages_to_submit.append(package)
