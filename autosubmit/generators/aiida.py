@@ -1,3 +1,4 @@
+"""The AiiDA generator for Autosubmit."""
 import os
 from pathlib import Path
 from functools import cached_property
@@ -5,15 +6,14 @@ import warnings
 import re
 from ruamel.yaml import YAML
 
-
 from autosubmit.config.configcommon import AutosubmitConfig
 
 from autosubmit.job.job_list import JobList
 from autosubmit.generators import AbstractGenerator
 from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
-
-"""The AiiDA generator for Autosubmit."""
+from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 # Autosubmit Task name separator (not to be confused with task and chunk name separator).
 DEFAULT_SEPARATOR = '_'
@@ -26,7 +26,8 @@ class Generator(AbstractGenerator):
     * header: Information about the generation of the file
     * imports: All required imports
     * init: Initialization of all python resources that need to be instantiated once for the whole script
-    * create_orm_nodes: Creation of all AiiDA's object-relational mapping (ORM) nodes covering the creation of computer and codes
+    * create_orm_nodes: Creation of all AiiDA's object-relational mapping (ORM) nodes covering the
+      creation of computer and codes
     * workgraph_tasks: Creation of the AiiDA-WorkGraph tasks
     * workgraph_deps: Linking of the dependencies between the AiiDA-WorkGraph tasks
     * workgraph_submission: Submission of the AiiDA-WorkGraph
@@ -47,12 +48,12 @@ class Generator(AbstractGenerator):
     # --qos -> CURRENT_QUEUE (job)
     # --partition -> PARTITION (job)
     #
-    SUPPORTED_JOB_KEYWORDS = ["NUMTHREADS", "TASKS", "NODES", "WALLCLOCK", "MEMORY", "PLATFORM",  # these we need to transfer to aiida
+    SUPPORTED_JOB_KEYWORDS = ["NUMTHREADS", "TASKS", "NODES", "WALLCLOCK", "MEMORY", "PLATFORM",
                               "DEPENDENCIES", "FILE", "RUNNING"]  # these are resolved by autosubmit internally
 
-    SUPPORTED_PLATFORM_KEYWORDS = ["TYPE", "HOST", "USER", "QUEUE", "SCRATCH_DIR", "MAX_WALLCLOCK",  #  these we need to transfer to aiida
+    SUPPORTED_PLATFORM_KEYWORDS = ["TYPE", "HOST", "USER", "QUEUE", "SCRATCH_DIR", "MAX_WALLCLOCK",
                                     "PROJECT"]   # these are resolved by autosubmit internally
-    
+
     def __init__(self, job_list: JobList, as_conf: AutosubmitConfig, output_dir: str):
         if not (output_path := Path(output_dir)).exists():
             raise ValueError(f"Given `output_dir` {output_path} does not exist.")
@@ -62,40 +63,46 @@ class Generator(AbstractGenerator):
         self._as_conf = as_conf
 
     @classmethod
-    def generate(cls, job_list: JobList, as_conf: AutosubmitConfig, output_dir: str) -> None:
+    def generate(cls, job_list: JobList, as_conf: AutosubmitConfig, **arg_options) -> None:
+        """Generates the workflow from the created autosubmit workflow."""
+        output_dir = arg_options['output_dir']
         self = cls(job_list, as_conf, output_dir)
         self._validate()
         workflow_script = self._generate_workflow_script()
-        (self._output_path / "submit_aiida_workflow.py").write_text(workflow_script)
-        (self._output_path / "README.md").write_text(self._generate_readme())
-        
+        (self._output_path / "submit_aiida_workflow.py").write_text(workflow_script, encoding="utf-8")
+        (self._output_path / "README.md").write_text(self._generate_readme(), encoding="utf-8")
+
     @staticmethod
     def get_engine_name() -> str:
+        """The engine name used for the help text."""
         return "AiiDA"
 
     @staticmethod
     def add_parse_args(parser) -> None:
+        """Adds arguments to the parser that are needed for a specific engine implementation."""
         parser.add_argument('-o', '--output_dir', dest="output_dir", default=".", help='Output directory')
 
     def _validate(self) -> None:
         """Validate jobs"""
         for job_name, job_conf in self._as_conf.jobs_data.items():
-            for key in job_conf.keys():
+            for key in job_conf:
                 if key not in Generator.SUPPORTED_JOB_KEYWORDS:
-                    msg = f"Found in job {job_name} configuration file key {key} that is not officially supported for AiiDA generator. It might result in an error."
+                    msg = (f"Found in job {job_name} configuration file key {key} that is not officially "
+                           "supported for AiiDA generator. It might result in an error.")
                     warnings.warn(msg)
-        ## validate platforms
+        # validate platforms
         for platform_name, platform_conf in self._as_conf.platforms_data.items():
             # only validate platforms that are used in jobs
-            if platform_name in self._platforms_used_in_job.keys():
+            if platform_name in self._platforms_used_in_job:
                 for key, value in platform_conf.items():
                     if key not in Generator.SUPPORTED_PLATFORM_KEYWORDS and value != '':
-                        msg = f"Found in platform {platform_name} configuration file key {key} that is not supported for AiiDA generator."
+                        msg = (f"Found in platform {platform_name} configuration file key {key} that is not "
+                               "supported for AiiDA generator.")
                         warnings.warn(msg)
-
 
     @cached_property
     def _platforms_used_in_job(self) -> dict[str, Platform]:
+        """Returns a dictionary of platforms used in jobs."""
         platforms_used_in_jobs = {}
         for job in self._job_list.get_all():
             platforms_used_in_jobs[job.platform.name] = job.platform
@@ -107,10 +114,6 @@ class Generator(AbstractGenerator):
         The ``autosubmit create`` command must have been already executed prior
         to calling this function. This is so that the jobs are correctly loaded
         to produce the PyFlow workflow.
-
-        :param job_list: ``JobList`` Autosubmit object, that contains the parameters, jobs, and graph
-        :param as_conf: Autosubmit configuration
-        :param options: a list of strings with arguments (equivalent to sys.argv), passed to argparse
         """
         header = self._generate_header_section()
         imports = self._generate_imports_section()
@@ -121,8 +124,8 @@ class Generator(AbstractGenerator):
         workgraph_submission = self._generate_workgraph_submission_section()
         return header + imports + init + create_orm_nodes + workgraph_tasks + workgraph_deps + workgraph_submission
 
-
     def _generate_header_section(self) -> str:
+        """Generates the header section of the workflow script."""
         return f"""# HEADER
 # This is in autogenerated file from {self._job_list.expid}
 # The computer and codes are defined for the following platforms:
@@ -131,6 +134,7 @@ class Generator(AbstractGenerator):
 """
 
     def _generate_imports_section(self) -> str:
+        """Generates the imports section of the workflow script."""
         return """# IMPORTS
 import aiida
 from aiida import orm
@@ -143,7 +147,8 @@ from ruamel.yaml import YAML
 """
 
     def _generate_init_section(self) -> str:
-        return """# INIT 
+        """Generates the initialization section of the workflow script."""
+        return """# INIT
 aiida.load_profile()
 wg = WorkGraph()
 tasks = {}
@@ -151,15 +156,13 @@ tasks = {}
 """
 
     def _generate_create_orm_nodes_section(self) -> str:
+        """Generates the ORM node creation section of the workflow script."""
         # aiida computer
 
         code_section = "# CREATE_ORM_NODES"
         yaml = YAML()
         for platform in self._platforms_used_in_job.values():
-
-            from autosubmit.platforms.locplatform import LocalPlatform
-            from autosubmit.platforms.slurmplatform import SlurmPlatform
-            if isinstance(platform, LocalPlatform):                       
+            if isinstance(platform, LocalPlatform):
                 computer_setup = {
                     "label": f"{platform.name}",
                     "hostname": f"{platform.host}",
@@ -186,8 +189,8 @@ tasks = {}
                     "scheduler": "core.slurm",
                     "mpirun_command": "mpirun -np {tot_num_mpiprocs}",
                     "mpiprocs_per_machine": platform.processors_per_node,
-                    "default_memory_per_machine": None, # This is specified in the task option
-                    "append_text": "", 
+                    "default_memory_per_machine": None,  # This is specified in the task option
+                    "append_text": "",
                     "prepend_text": "",
                     "use_double_quotes": False,
                     "shebang": "#!/bin/bash",
@@ -234,7 +237,7 @@ except NotExistent:
                 "with_mpi": False
             }
 
-            code_setup_path =  Path(self._output_path / f"{platform.name}/bash@{platform.name}-setup.yml")
+            code_setup_path = Path(self._output_path / f"{platform.name}/bash@{platform.name}-setup.yml")
             code_setup_path.parent.mkdir(exist_ok=True)
             with open(code_setup_path, "w", encoding="utf-8") as f:
                 yaml.dump(code_setup, f)
@@ -252,20 +255,22 @@ except NotExistent:
         code_section += "\n\n"
         return code_section
 
-    def _generate_workgraph_tasks_section(self):
+    def _generate_workgraph_tasks_section(self) -> str:
+        """Generates the WorkGraph tasks section of the workflow script."""
         code_section = "# WORKGRAPH_TASKS"
 
         for job in self._job_list.get_all():
             script_name = job.create_script(self._as_conf)
-            script_path = Path(job._tmp_path, script_name)
-            script_text = open(script_path).read()
-            # Let's drop the Autosubmit header and tailed.
+            script_path = Path(job._tmp_path, script_name) # pylint: disable=protected-access
+            with open(script_path, "r", encoding="utf-8") as f:
+                script_text = f.read()
+            # Let's drop the Autosubmit header and tailer.
             trimmed_script_text = re.findall(
                 r'# Autosubmit job(.*)# Autosubmit tailer',
                 script_text,
-                flags=re.DOTALL | re.MULTILINE)[0][1:-1] 
+                flags=re.DOTALL | re.MULTILINE)[0][1:-1]
             trimmed_script_path = self._output_path / script_name
-            trimmed_script_path.write_text(trimmed_script_text)
+            trimmed_script_path.write_text(trimmed_script_text, encoding="utf-8")
             create_task = f"""
 tasks["{job.name}"] = wg.add_task(
     "workgraph.shelljob",
@@ -287,13 +292,13 @@ tasks["{job.name}"].set({{"metadata.options.max_wallclock_seconds": {wallclock_s
             if job.partition != "":
                 create_task += f"""
 tasks["{job.name}"].set({{"metadata.options.queue_name": "{job.partition}"}})"""
-            
 
             code_section += create_task
         code_section += "\n\n"
         return code_section
 
     def _generate_workgraph_deps_section(self) -> str:
+        """Generates the WorkGraph dependencies section of the workflow script."""
         code_section = "# WORKGRAPH_DEPS"
         for edge in self._job_list.graph.edges:
             code_section += f"""
@@ -301,12 +306,13 @@ tasks["{edge[1]}"].waiting_on.add(tasks["{edge[0]}"])"""
         code_section += "\n\n"
         return code_section
 
-
     def _generate_workgraph_submission_section(self) -> str:
-        return """# WORKGRAPH_SUBMISSION 
+        """Generates the WorkGraph submission section of the workflow script."""
+        return """# WORKGRAPH_SUBMISSION
 wg.run()"""
 
     def _generate_readme(self) -> str:
+        """Generates the README content for the workflow."""
         return f"""### Meta-information
 This file has been auto generated from expid {self._job_list.expid}.
 
@@ -326,7 +332,7 @@ The workflow creates the computer and code nodes as required from the
 autosubmit config. If the computer and code nodes have been already created for
 example through a previous run, they are loaded. If you have changed the
 computer parameters in your autosubmit config, then you need to delete the
-corresponding compute and code nodes. Note that this has the disadvantage thit
+corresponding compute and code nodes. Note that this has the disadvantage that
 it will delete all calculations that are associated with these nodes.
 It is therefore recommended to use the JOB paramaters in autosubmit to override
 certain computer configs.
