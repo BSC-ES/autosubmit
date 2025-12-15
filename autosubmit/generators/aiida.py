@@ -3,7 +3,8 @@ from pathlib import Path
 from functools import cached_property
 import warnings
 import re
-import yaml
+from ruamel.yaml import YAML
+
 
 from autosubmit.config.configcommon import AutosubmitConfig
 
@@ -137,7 +138,7 @@ from aiida_workgraph import WorkGraph
 from aiida.orm.utils.builders.computer import ComputerBuilder
 from aiida.common.exceptions import NotExistent
 from pathlib import Path
-import yaml
+from ruamel.yaml import YAML
 
 """
 
@@ -153,6 +154,7 @@ tasks = {}
         # aiida computer
 
         code_section = "# CREATE_ORM_NODES"
+        yaml = YAML()
         for platform in self._platforms_used_in_job.values():
 
             from autosubmit.platforms.locplatform import LocalPlatform
@@ -195,14 +197,16 @@ tasks = {}
 
             computer_setup_path = Path(self._output_path / f"{platform.name}/{platform.name}-setup.yml")
             computer_setup_path.parent.mkdir(exist_ok=True)
-            computer_setup_path.write_text(yaml.dump(computer_setup))
+            with open(computer_setup_path, "w", encoding="utf-8") as f:
+                yaml.dump(computer_setup, f)
             create_computer = f"""
 try:
     computer = orm.load_computer("{platform.name}")
     print(f"Loaded computer {{computer.label!r}}")
 except NotExistent:
     setup_path = Path("{computer_setup_path}")
-    config_kwargs = yaml.safe_load(setup_path.read_text())
+    with open(setup_path, "r", encoding="utf-8") as f:
+        config_kwargs = YAML(typ='safe').load(f)
     computer = ComputerBuilder(**config_kwargs).new().store()
     computer.configure(safe_interval=5.0)
     computer.set_minimum_job_poll_interval(5.0)
@@ -232,17 +236,19 @@ except NotExistent:
 
             code_setup_path =  Path(self._output_path / f"{platform.name}/bash@{platform.name}-setup.yml")
             code_setup_path.parent.mkdir(exist_ok=True)
-            code_setup_path.write_text(yaml.dump(code_setup))
-            create_code =  f"""
+            with open(code_setup_path, "w", encoding="utf-8") as f:
+                yaml.dump(code_setup, f)
+            create_code = f"""
 try:
     bash_code = orm.load_code("bash@{platform.name}")
 except NotExistent:
     setup_path = Path("{code_setup_path}")
-    setup_kwargs = yaml.safe_load(setup_path.read_text())
+    with open(setup_path, "r", encoding="utf-8") as f:
+        setup_kwargs = YAML(typ='safe').load(f)
     setup_kwargs["computer"] = orm.load_computer(setup_kwargs["computer"])
     bash_code = orm.InstalledCode(**setup_kwargs).store()
     print(f"Created and stored bash@{{computer.label}}")"""
-            code_section += create_computer + create_code
+        code_section += create_computer + create_code
         code_section += "\n\n"
         return code_section
 
