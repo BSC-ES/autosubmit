@@ -1,14 +1,16 @@
+"""This module provides generators to produce workflow configurations for different backend engines."""
 from enum import Enum
 from importlib import import_module
-from typing import AbstractSet, Callable, cast
+from typing import TYPE_CHECKING
 from abc import ABC, abstractmethod
+if TYPE_CHECKING:
+    from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+    from autosubmit.job.job_list import JobList
 
-
-"""This module provides generators to produce workflow configurations for different backend engines."""
 
 class Engine(Enum):
     """Workflow Manager engine flavors."""
-    aiida = 'aiida'
+    AIIDA = 'aiida'
 
     def __str__(self):
         return self.value
@@ -31,12 +33,13 @@ class AbstractGenerator(ABC):
 
     @classmethod
     @abstractmethod
-    def generate(cls, job_list, as_conf, **arg_options) -> None:
+    def generate(cls, job_list: JobList, as_conf: AutosubmitConfig, **arg_options) -> None:
         """Generates the workflow from the created autosubmit workflow."""
         raise NotImplementedError
 
 
 def get_engine_generator(engine: Engine) -> AbstractGenerator:
+    """Returns the generator for the given engine."""
     return import_module(f'autosubmit.generators.{engine.value}').Generator
 
 __all__ = [

@@ -195,7 +195,7 @@ def job_list(as_conf, monkeypatch):
     return job_list
 
 def test_aiida_generator(as_conf, job_list, tmp_path):
-    AiidaGenerator.generate(job_list, as_conf, str(tmp_path))
+    AiidaGenerator.generate(job_list, as_conf, output_dir=str(tmp_path))
     
     generated_paths_in_experiment_folder = set([
         f'{as_conf.expid}_LOCAL_SETUP.cmd',
