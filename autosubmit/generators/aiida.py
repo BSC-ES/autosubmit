@@ -5,6 +5,7 @@ from functools import cached_property
 import warnings
 import re
 from ruamel.yaml import YAML
+from typing import TYPE_CHECKING, Any
 
 from autosubmit.config.configcommon import AutosubmitConfig
 
@@ -14,6 +15,9 @@ from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
+
+if TYPE_CHECKING:
+    import argparse
 
 # Autosubmit Task name separator (not to be confused with task and chunk name separator).
 DEFAULT_SEPARATOR = '_'
@@ -63,9 +67,11 @@ class Generator(AbstractGenerator):
         self._as_conf = as_conf
 
     @classmethod
-    def generate(cls, job_list: JobList, as_conf: AutosubmitConfig, **arg_options) -> None:
+    def generate(cls, job_list: JobList, as_conf: AutosubmitConfig, **arg_options: dict[str, Any]) -> None:
         """Generates the workflow from the created autosubmit workflow."""
-        output_dir = arg_options['output_dir']
+        output_dir = arg_options.get('output_dir', None)
+        if not isinstance(output_dir, str):
+            raise ValueError(f"aiida generator requires output dir of type str but got {output_dir}") # TODO improve error message
         self = cls(job_list, as_conf, output_dir)
         self._validate()
         workflow_script = self._generate_workflow_script()
@@ -78,7 +84,7 @@ class Generator(AbstractGenerator):
         return "AiiDA"
 
     @staticmethod
-    def add_parse_args(parser) -> None:
+    def add_parse_args(parser: "argparse.ArgumentParser") -> None:
         """Adds arguments to the parser that are needed for a specific engine implementation."""
         parser.add_argument('-o', '--output_dir', dest="output_dir", default=".", help='Output directory')
 
