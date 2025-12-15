@@ -79,6 +79,7 @@ release.
   `Submitter` class and using `ParamikoSubmitter` directly (only implementation) #2577
 - Added documentation regarding in-line script definition. 
 - Fixes an issue with general wrapper parameters crashing during runtime when defined. #2743
+- Now Autosubmit supports the 'Flux' wrapping method, submitting the jobs to a Flux instance running inside a Slurm allocation [#2697](https://github.com/BSC-ES/autosubmit/issues/2697)
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 
