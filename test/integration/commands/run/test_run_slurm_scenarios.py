@@ -8,7 +8,6 @@ from time import sleep
 from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical
-from test.integration.commands.conftest import experiment_data, jobs_data
 from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, _assert_db_fields, _assert_files_recovered, run_in_thread
 
 if TYPE_CHECKING:
@@ -541,7 +540,7 @@ def test_run_with_additional_files(
         }
     }
 ], ids=["General wrapper configuration", "Without general wrapper configuration"])
-def test_run_with_additional_files(
+def test_wrapper_config(
         wrappers: str,
         autosubmit_exp,
         slurm_server: 'DockerContainer',
