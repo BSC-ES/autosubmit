@@ -78,6 +78,7 @@ release.
   fixed several ruff and mypy warnings, and did minor refactorings in the code like removing the
   `Submitter` class and using `ParamikoSubmitter` directly (only implementation) #2577
 - Added documentation regarding in-line script definition. 
+- Fixes an issue with general wrapper parameters crashing during runtime when defined. #2743
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 
