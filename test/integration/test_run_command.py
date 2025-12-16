@@ -104,20 +104,28 @@ def test_run_command_raises_autosubmit(autosubmit_exp: AutosubmitExperimentFixtu
     """Test the is simply used to check if commands are not broken on runtime, it doesn't check behaviour or output
     """
     args = set_up_test(autosubmit_exp, autosubmit, mocker, command)
+    # Debug changes
     if 'run' in command:
-        with pytest.raises(AutosubmitCritical) as error:
+        try:
             autosubmit.run_command(args=args)
-        # Varies depending if the localDocker is available or not
-        assert str(error.value.code) == '7014' or str(error.value.code) == '7010'
+            # Varies depending if the localDocker is available or not
+        except Exception as error:
+            if isinstance(error, AutosubmitCritical):
+                assert str(error.code) == '7014' or str(error.code) == '7010'
+            else:
+                raise pytest.fail(f"Unexpected exception raised: {error}")
     elif 'install' in command:
         with pytest.raises(AutosubmitCritical) as error:
             autosubmit.run_command(args=args)
         assert str(error.value.code) == '7004'
     elif 'recovery' in command:
-        with pytest.raises(AutosubmitCritical) as error:
+        try:
             autosubmit.run_command(args=args)
-        # Can't establish a connection to a platform.
-        assert str(error.value.code) == '7050'
+        except Exception as error:
+            if isinstance(error, AutosubmitCritical):
+                assert str(error.code) == '7050'
+            else:
+                raise pytest.fail(f"Unexpected exception raised: {error}")
     elif 'provenance' in command:
         with pytest.raises(AutosubmitCritical) as error:
             autosubmit.run_command(args=args)

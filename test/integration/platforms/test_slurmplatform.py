@@ -1155,6 +1155,7 @@ def test_check_if_packages_are_ready_to_build(autosubmit_exp):
     assert check and len(job_result) == 3
 
 
+@pytest.mark.xdist_group("slurm")
 @pytest.mark.docker
 @pytest.mark.slurm
 def test_run_bug_save_wrapper_crashes(
@@ -1242,4 +1243,5 @@ def test_run_bug_save_wrapper_crashes(
     #       this fails showing the same exception reported by users,
     #       ``AttributeError: 'list' object has no attribute 'status'``. But only after it
     #       failed to save the wrappers (which is why we are mocking it above).
+    JobList.save_wrappers = real_save_wrappers  # restore original
     assert exp.autosubmit.run_experiment(expid=exp.expid) == 0

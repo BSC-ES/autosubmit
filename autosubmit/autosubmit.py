@@ -4397,7 +4397,6 @@ class Autosubmit:
                     num_chunks = as_conf.get_num_chunks()
                     chunk_ini = as_conf.get_chunk_ini()
                     member_list = as_conf.get_member_list()
-                    run_only_members = as_conf.get_member_list(run_only=True)
                     # print("Run only members {0}".format(run_only_members))
                     if len(member_list) != len(set(member_list)):
                         raise AutosubmitCritical(
@@ -5465,7 +5464,6 @@ class Autosubmit:
         """
         rerun = as_conf.get_rerun()
         job_list = JobList(expid, as_conf, YAMLParserFactory(), run_mode=True, submitter=submitter)
-        run_only_members = as_conf.get_member_list(run_only=True)
         date_list = as_conf.get_date_list()
         date_format = ''
         if as_conf.get_chunk_size_unit() == 'hour':

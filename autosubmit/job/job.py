@@ -3097,7 +3097,6 @@ class WrapperJob(Job):
         """
         wait = 2
         retries = 5
-        over_wallclock = False
         content: List[str] = []
         while not content and retries > 0:
             self._platform.send_command(command, False)

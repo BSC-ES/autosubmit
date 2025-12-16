@@ -84,7 +84,6 @@ def test_generate_output(
         exp.as_conf.get_retrials(),
         exp.as_conf.get_default_job_type(),
         wrapper_jobs,
-        run_only_members=exp.as_conf.get_member_list(run_only=True),
         force=True,
         full_load=True
         )
