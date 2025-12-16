@@ -2709,17 +2709,6 @@ class JobList(object):
                     jobs.append(job)
         return jobs
 
-    def get_in_queue_grouped_id(self, platform) -> dict[int, list[Job]]:
-        jobs = self.get_in_queue(platform)
-        jobs_by_id = dict()
-        for job in jobs:
-            if job.id not in jobs_by_id:
-                jobs_by_id[job.id] = list()
-            jobs_by_id[job.id].append(job)
-        for job_id in jobs_by_id.keys():
-            if len(jobs_by_id[job_id]) == 1:
-                jobs_by_id[job_id] = jobs_by_id[job_id][0]
-        return jobs_by_id
 
     def sort_by_name(self):
         """Returns a list of jobs sorted by name.
