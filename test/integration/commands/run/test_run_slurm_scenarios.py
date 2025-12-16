@@ -8,6 +8,7 @@ from time import sleep
 from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical
+from test.integration.commands.conftest import experiment_data, jobs_data
 from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, _assert_db_fields, _assert_files_recovered, run_in_thread
 
 if TYPE_CHECKING:
@@ -513,3 +514,78 @@ def test_run_with_additional_files(
                 command = f"cat {project_remote_path}/{remote_name}"
                 exit_code, output = slurm_server.exec(["bash", "-c", command])
                 assert exit_code == 0, f"File {additional_filename} not found in remote project path."
+
+
+@pytest.mark.xdist_group("slurm")
+@pytest.mark.slurm
+@pytest.mark.parametrize("wrappers", [
+    {
+        "WRAPPERS": {
+            "MAX_WRAPPED": 2,
+            "WRAPPER": {"JOBS_IN_WRAPPER": "job", "TYPE": "horizontal"},
+            "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other", "TYPE": "horizontal"},
+        }
+    },
+    {
+        "WRAPPERS": {
+            "WRAPPER": {
+                "JOBS_IN_WRAPPER": "job",
+                "TYPE": "horizontal",
+                "MAX_WRAPPED": 2,
+            },
+            "SECOND_WRAPPER": {
+                "JOBS_IN_WRAPPER": "other",
+                "TYPE": "horizontal",
+                "MAX_WRAPPED": 2,
+            },
+        }
+    }
+], ids=["General wrapper configuration", "Without general wrapper configuration"])
+def test_run_with_additional_files(
+        wrappers: str,
+        autosubmit_exp,
+        slurm_server: 'DockerContainer',
+        tmp_path,
+):
+    experiment_data = {
+        "EXPERIMENT": {"MEMBERS": "fc0 fc1 fc2 fc3"},
+        "PROJECT": {"PROJECT_TYPE": "None", "PROJECT_DIRECTORY": "local_project"},
+        "JOBS": {
+            "job": {
+                "SCRIPT": "echo 'Hello World'",
+                "PLATFORM": "TEST_SLURM",
+                "RUNNING": "member",
+                "wallclock": "00:01",
+            },
+            "other": {
+                "SCRIPT": "echo 'Hello World'",
+                "PLATFORM": "TEST_SLURM",
+                "RUNNING": "member",
+                "wallclock": "00:01",
+            },
+        },
+        "PLATFORMS": {
+            "TEST_SLURM": {
+                "ADD_PROJECT_TO_HOST": "False",
+                "HOST": "127.0.0.1",
+                "MAX_WALLCLOCK": "00:03",
+                "PROJECT": "group",
+                "QUEUE": "gp_debug",
+                "SCRATCH_DIR": "/tmp/scratch/",
+                "TEMP_DIR": "",
+                "TYPE": "slurm",
+                "USER": "root",
+                "PROCESSORS_PER_NODE": "4",
+                "MAX_PROCESSORS": "4",
+            }
+        },
+    }
+
+    as_exp = autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True)
+    as_exp.as_conf.set_last_as_command('run')
+    as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+
+    templates_dir = Path(tmp_path) / as_exp.expid / "tmp"
+
+    asthread_files = list(templates_dir.rglob("*ASThread*"))
+    assert len(asthread_files) == 2 + 2  # 8 jobs in total, 2 wrappers with max 2 jobs each -> 4 ASThread files expected
