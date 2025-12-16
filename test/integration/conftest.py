@@ -32,10 +32,12 @@ from subprocess import check_output
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 from time import time_ns
-from typing import cast, Any, Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING
+from typing import cast, Any, Callable, Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING
 
 import paramiko  # type: ignore
 import pytest
+from docker import from_env
+from portalocker import Lock, LOCK_EX
 from ruamel.yaml import YAML
 from sqlalchemy import Connection, create_engine, text
 from testcontainers.core.container import DockerContainer  # type: ignore
@@ -45,6 +47,7 @@ from testcontainers.postgres import PostgresContainer  # type: ignore
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.experiment.experiment_common import next_experiment_id
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 # noinspection PyProtectedMember
@@ -54,10 +57,16 @@ from autosubmit.platforms.slurmplatform import SlurmPlatform
 from test.integration.test_utils.networking import get_free_port
 
 if TYPE_CHECKING:
+    from docker.models.containers import Container
     # noinspection PyProtectedMember
     from py._path.local import LocalPath  # type: ignore
     from pytest_mock import MockerFixture
     from pytest import FixtureRequest
+
+_AS_SINGLETON_CONTAINER_LABEL = "pytest.autosubmit.singleton"
+"""Docker container label key for singletons."""
+_AS_SINGLETON_CONTAINER_VALUE = "true"
+"""Docker container label value for singletons."""
 
 _SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
 """This is the vanilla image from LinuxServer.io, with OpenSSH. About 39MB."""
@@ -104,12 +113,45 @@ class AutosubmitExperimentFixture(Protocol):
         ...
 
 
+@pytest.fixture(scope='session')
+def get_next_expid(tmp_path_factory) -> Callable[[], str]:
+    """Returns a factory to retrieve the next Autosubmit experiment ID.
+
+    The returned experiment ID by the factory function is guaranteed to
+    be uniquely throughout the whole test session, even with multiple
+    pytest-xdist processes.
+
+    It uses an OS-level lock for mutual exclusion, and a file to share
+    the last/current expid through all processes (in case pytest-xdist is used).
+    """
+    def _get_next_expid() -> str:
+        shared_tmp_dir = tmp_path_factory.getbasetemp().parent
+        lock_path = shared_tmp_dir / "expid_global.lock"
+
+        expid_file = shared_tmp_dir / "expid_current.txt"
+
+        with Lock(str(lock_path), flags=LOCK_EX, timeout=120):
+            current_expid = "t000"
+
+            if expid_file.exists():
+                current_expid = expid_file.read_text()
+
+            next_expid = next_experiment_id(current_id=current_expid)
+
+            expid_file.write_text(next_expid)
+
+        return next_expid
+
+    return _get_next_expid
+
+
 @pytest.fixture
 def autosubmit_exp(
         autosubmit: Autosubmit,
         request: "FixtureRequest",
         tmp_path: "LocalPath",
         mocker: "MockerFixture",
+        get_next_expid: Callable[[], str]
 ) -> AutosubmitExperimentFixture:
     """Create an instance of ``Autosubmit`` with an experiment.
 
@@ -134,7 +176,6 @@ def autosubmit_exp(
             experiment_data: Optional[dict] = None,
             wrapper: Optional[bool] = False,
             create: Optional[bool] = True,
-            mock_last_name_used: Optional[bool] = True,
             include_jobs: Optional[bool] = False,
             *_,
             **kwargs
@@ -160,35 +201,36 @@ def autosubmit_exp(
         if not Path(BasicConfig.DB_PATH).exists() and not is_postgres:
             autosubmit.install()
 
-        operational = False
-        evaluation = False
-        testcase = True
-        if expid:
-            if mock_last_name_used:
-                mocker.patch('autosubmit.experiment.experiment_common.db_common.last_name_used',
-                             return_value=expid)
-            operational = expid.startswith('o')
-            evaluation = expid.startswith('e')
-            testcase = expid.startswith('t')
-        # Reuse the same expid if already exists and reconfigure it
-        if expid and Path(tmp_path / expid).exists():
-            exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
-        else:
-            expid = autosubmit.expid(
-                description="Pytest experiment (delete me)",
-                hpc="local",
-                copy_id="",
-                dummy=True,
-                minimal_configuration=False,
-                git_repo="",
-                git_branch="",
-                git_as_conf="",
-                operational=operational,
-                testcase=testcase,
-                evaluation=evaluation,
-                use_local_minimal=False
-            )
-            exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
+        if not expid:
+            expid = get_next_expid()
+
+        mocker.patch('autosubmit.experiment.experiment_common.db_common.last_name_used', return_value=expid)
+        operational = expid.startswith('o')
+        evaluation = expid.startswith('e')
+        testcase = expid.startswith('t')
+
+        # Never reuse an experiment or reconfigure in tests for true test isolation.
+        # - https://learn.microsoft.com/en-us/dotnet/core/testing/unit-testing-best-practices#characteristics-of-good-unit-tests
+        # - https://wiki.c2.com/?UnitTestIsolation
+        # - https://www.thoughtworks.com/en-es/insights/blog/testing/ephemeral-testing-environments-kill-darlings
+        if Path(tmp_path / expid).exists():
+            pytest.xfail(f'The test is trying to use {expid} as expid but its directory exists: {str(tmp_path)}!')
+
+        expid = autosubmit.expid(
+            description="Pytest experiment (delete me)",
+            hpc="local",
+            copy_id="",
+            dummy=True,
+            minimal_configuration=False,
+            git_repo="",
+            git_branch="",
+            git_as_conf="",
+            operational=operational,
+            testcase=testcase,
+            evaluation=evaluation,
+            use_local_minimal=False
+        )
+        exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
         conf_dir = exp_path / "conf"
         global_logs = Path(BasicConfig.GLOBAL_LOG_DIR)
         global_logs.mkdir(parents=True, exist_ok=True)
@@ -441,10 +483,10 @@ def ssh_server(mocker, tmp_path, request) -> Generator[DockerContainer, None, No
         # This verifies that the server printed the line, not necessarily the port is available
         wait_for_logs(container, 'sshd is listening on port 2222')
 
-        _wait_for_ssh_port('localhost', ssh_port, 30)
-
         ssh_client = _make_ssh_client(ssh_port, _SSH_DOCKER_PASSWORD, None, mfa)
         mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
+
+        _wait_for_ssh_port('localhost', ssh_port)
 
         ssh_config = Path(tmp_path, '.ssh/ssh_config')
         ssh_config.parent.mkdir(exist_ok=True, parents=True)
@@ -472,14 +514,31 @@ def ssh_server(mocker, tmp_path, request) -> Generator[DockerContainer, None, No
         yield container
 
 
-@pytest.fixture(scope='session')
-def slurm_server(session_mocker, tmp_path_factory):
-    ssh_port = get_free_port()
-    container_name = f'slurm-server-{uuid.uuid4()}'
+def _start_slurm_container(ssh_port: int) -> DockerContainer:
+    """Create and start a Slurm container with TestContainers.
 
+    The container is created with a label that can be used to later retrieve
+    the container without needing its ID. It is designed so that only one
+    container instance is created per test session (a singleton).
+
+    Do not repeat Autosubmit experiment IDs. Do not reuse experiment folders.
+    Doing any of these, will result in pytest failures that i. do not contain
+    any meaningful information in the logs, ii. nothing useful in the ASLOGS or
+    experiment temporary logs, iii. you will have to figure out how to set a
+    breakpoint and inspect what is inside the Slurm server.
+
+    Avoiding these risks will save you & other developers time debugging
+    issues like this.
+
+    :param ssh_port: The SSH port.
+    :return: an instance of a TestContainers container, with a docker container wrapped.
+    """
     docker_args = {
         'cgroupns': 'host',
-        'privileged': True
+        'privileged': True,
+        'labels': {
+            _AS_SINGLETON_CONTAINER_LABEL: _AS_SINGLETON_CONTAINER_VALUE,
+        }
     }
 
     docker_container = DockerContainer(
@@ -493,41 +552,88 @@ def slurm_server(session_mocker, tmp_path_factory):
     if 'GITHUB_ACTION' in os.environ:
         docker_container = docker_container.with_volume_mapping('/sys/fs/cgroup', '/sys/fs/cgroup', mode='rw')
 
-    with docker_container \
-            .with_env('TZ', 'Etc/UTC') \
-            .with_bind_ports(2222, ssh_port) \
-            .with_name(container_name) as container:
-        # TODO: or maybe wait for 'debug:  sched: Running job scheduler for full queue.'?
-        wait_for_logs(container, 'No fed_mgr state file')
+    container = docker_container \
+        .with_env('TZ', 'Etc/UTC') \
+        .with_bind_ports(2222, ssh_port) \
+        .with_name(f'slurm-server-{uuid.uuid4()}')
+    # TODO: or maybe wait for 'debug:  sched: Running job scheduler for full queue.'?
+    container.start()
 
-        container.exec('sinfo')
+    wait_for_logs(container, lambda logs: 'No fed_mgr state file' in logs)
 
-        # What we had in ci.yaml for the old Slurm Docker service:
-        # $ docker cp slurm-container:/root/.ssh/container_root_pubkey /tmp/container_root_pubkey
-        # $ chmod 600 /tmp/container_root_pubkey
-        # Translated into the code below:
-        ssh_key_base_dir = tmp_path_factory.getbasetemp()
-        ssh_key = ssh_key_base_dir / 'container_root_pubkey'
-        check_output(
-            [
-                'docker',
-                'cp',
-                f'{container_name}:/root/.ssh/container_root_pubkey',
-                str(ssh_key)
-            ]
+    container.exec('sinfo')
+
+    return container
+
+
+def get_container_by_id(container_id: str) -> 'Container':
+    """Gets a Docker container by its ID.
+
+    :param: container_id: The ID of the container.
+    :return: A Docker container.
+    """
+    client = from_env()
+    return client.containers.get(container_id)
+
+
+@pytest.fixture(scope="session")
+def slurm_server(tmp_path_factory, session_mocker) -> 'Container':
+    """Session fixture that creates a singleton Slurm server container."""
+    shared_tmp_dir = tmp_path_factory.getbasetemp().parent
+    lock_path = shared_tmp_dir / "slurm_global.lock"
+
+    client = from_env()
+
+    with Lock(filename=str(lock_path), flags=LOCK_EX, timeout=120):
+        containers = client.containers.list(
+            filters={
+                "label": f"{_AS_SINGLETON_CONTAINER_LABEL}={_AS_SINGLETON_CONTAINER_VALUE}"
+            }
         )
-        Path(ssh_key).chmod(0o600)
 
-        ssh_client = _make_ssh_client(ssh_port, password=None, key=ssh_key)
-        session_mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
+        if containers:
+            container = containers[0]
+            container_instance = get_container_by_id(container.id)
+            ssh_port = int(container_instance.ports['2222/tcp'][0]['HostPort'])  # type: ignore
+        else:
+            # Create the container exactly once
+            ssh_port = get_free_port()
+            # noinspection PyProtectedMember
+            container_instance = _start_slurm_container(ssh_port=ssh_port)._container
 
-        # Pytest does NOT patch when using spawn context.
-        session_mocker.patch(
-            'autosubmit.platforms.platform.Platform.get_mp_context',
-            return_value=multiprocessing.get_context('fork')
+    ssh_key = _setup_ssh_key(tmp_path_factory, container_instance.id)
+    ssh_client = _make_ssh_client(ssh_port, password=None, key=ssh_key)
+    session_mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
+    session_mocker.patch(
+        'autosubmit.platforms.platform.Platform.get_mp_context',
+        return_value=multiprocessing.get_context('fork')
+    )
+
+    _wait_for_ssh_port('localhost', ssh_port)
+
+    yield container_instance
+
+
+def pytest_sessionfinish():
+    """Finish pytest session."""
+    with suppress(Exception):
+        from_env().containers.prune(
+            filters={"label": f"{_AS_SINGLETON_CONTAINER_LABEL}={_AS_SINGLETON_CONTAINER_VALUE}"}
         )
 
-        yield container
+
+def _setup_ssh_key(tmp_path_factory, container_id):
+    """Utility to copy the key from the container to the worker's local tmp."""
+    worker_tmp = tmp_path_factory.getbasetemp()
+    ssh_key = worker_tmp / 'container_root_pubkey'
+
+    check_output([
+        'docker', 'cp',
+        f'{container_id}:/root/.ssh/container_root_pubkey',
+        str(ssh_key)
+    ])
+    ssh_key.chmod(0o600)
+    return ssh_key
 
 
 def _setup_pg_db(conn: Connection) -> None:

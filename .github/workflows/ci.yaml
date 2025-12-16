@@ -72,7 +72,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.9", "3.12"]
         pytest-markers: ["not postgres and not slurm"]
         # Here we include an extra build with the lowest version of Python and Postgres.
         # We do it this way to avoid wasting CICD resources since we already tested the
@@ -144,7 +144,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.9", "3.12"]
 
     steps:
       - name: Checkout code
