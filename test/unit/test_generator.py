@@ -1,49 +1,11 @@
 from autosubmit.generators.aiida import Generator as AiidaGenerator
 import pytest
 import os
+from ruamel.yaml import YAML
 
-
-@pytest.fixture
-def as_conf(autosubmit_config):
-    expid = "dummy-id"
-    experiment_data = {
-        "CONFIG": {
-            "AUTOSUBMIT_VERSION": "4.1.9",
-            "MAXWAITINGJOBS": 20,
-            "TOTALJOBS": 20,
-            "SAFETYSLEEPTIME": 10,
-            "RETRIALS": 0,
-            "RELOAD_WHILE_RUNNING": False,
-        },
-        "MAIL": {"NOTIFICATIONS": False, "TO": None},
-        "STORAGE": {"TYPE": "pkl", "COPY_REMOTE_LOGS": True},
-        "DEFAULT": {"EXPID": f"{expid}", "HPCARCH": "LOCAL"},
-        "EXPERIMENT": {
-            "DATELIST": "20000101",
-            "MEMBERS": "fc0",
-            "CHUNKSIZEUNIT": "month",
-            "CHUNKSIZE": 4,
-            "NUMCHUNKS": 2,
-            "CHUNKINI": "",
-            "CALENDAR": "standard",
-        },
-        "PROJECT": {"PROJECT_TYPE": "none", "PROJECT_DESTINATION": ""},
-        "GIT": {
-            "PROJECT_ORIGIN": "",
-            "PROJECT_BRANCH": "",
-            "PROJECT_COMMIT": "",
-            "PROJECT_SUBMODULES": "",
-            "FETCH_SINGLE_BRANCH": True,
-        },
-        "SVN": {"PROJECT_URL": "", "PROJECT_REVISION": ""},
-        "LOCAL": {"PROJECT_PATH": ""},
-        "PROJECT_FILES": {
-            "FILE_PROJECT_CONF": "",
-            "FILE_JOBS_CONF": "",
-            "JOB_SCRIPTS_TYPE": "",
-        },
-        "RERUN": {"RERUN": False, "RERUN_JOBLIST": ""},
-        "JOBS": {
+@pytest.fixture()
+def jobs_data():
+    return {"JOBS": {
             "LOCAL_SETUP": {
                 "FILE": "LOCAL_SETUP.sh",
                 "PLATFORM": "LOCAL",
@@ -98,8 +60,44 @@ def as_conf(autosubmit_config):
                 "RUNNING": "member",
                 "ADDITIONAL_FILES": [],
             },
+        }}
+
+
+@pytest.fixture()
+def expdef_data():
+    expid = "dummy-id"
+    return {
+        "DEFAULT": {"EXPID": f"{expid}", "HPCARCH": "LOCAL"},
+        "EXPERIMENT": {
+            "DATELIST": "20000101",
+            "MEMBERS": "fc0",
+            "CHUNKSIZEUNIT": "month",
+            "CHUNKSIZE": 4,
+            "NUMCHUNKS": 2,
+            "CHUNKINI": "",
+            "CALENDAR": "standard",
         },
-        "PLATFORMS": {
+        "PROJECT": {"PROJECT_TYPE": "none", "PROJECT_DESTINATION": ""},
+        "GIT": {
+            "PROJECT_ORIGIN": "",
+            "PROJECT_BRANCH": "",
+            "PROJECT_COMMIT": "",
+            "PROJECT_SUBMODULES": "",
+            "FETCH_SINGLE_BRANCH": True,
+        },
+        "SVN": {"PROJECT_URL": "", "PROJECT_REVISION": ""},
+        "LOCAL": {"PROJECT_PATH": ""},
+        "PROJECT_FILES": {
+            "FILE_PROJECT_CONF": "",
+            "FILE_JOBS_CONF": "",
+            "JOB_SCRIPTS_TYPE": "",
+        },
+        "RERUN": {"RERUN": False, "RERUN_JOBLIST": ""}
+    }
+
+@pytest.fixture()
+def platforms_data():
+    return {"PLATFORMS": {
             "MARENOSTRUM4": {
                 "TYPE": "slurm",
                 "HOST": "mn1.bsc.es",
@@ -167,36 +165,51 @@ def as_conf(autosubmit_config):
                 "SERIAL_QUEUE": "ns",
                 "MAX_WALLCLOCK": "48:00",
             },
-        },
-        "LOCAL_TMP_DIR": "/dummy/local/temp/dir"
-    }
+        }}
 
-    as_conf = autosubmit_config(expid, experiment_data=experiment_data)
-    return as_conf
+def test_aiida_generator2(mocker, autosubmit_config, autosubmit, expdef_data, jobs_data, platforms_data, tmp_path):
+    from autosubmit.config.basicconfig import BasicConfig
+    from autosubmit.generators import Engine 
 
-@pytest.fixture
-def job_list(as_conf, monkeypatch):
+    expid = expdef_data['DEFAULT']['EXPID']
+    as_conf = autosubmit_config(expid, experiment_data=expdef_data)
+    mocker.patch('autosubmit.autosubmit.BasicConfig', as_conf.basic_config)
+    read_files_mock = mocker.patch('autosubmit.autosubmit.read_files', return_value=None)
+
+    config_path = tmp_path / expid / 'conf'
+    config_path.mkdir(parents=True, exist_ok=True)
+    BasicConfig.LOCAL_ROOT_DIR = tmp_path
+    yaml = YAML()
+    jobs_file_path = config_path / f"jobs_{expid}.yaml"
+    expdef_file_path = config_path / f"expdef_{expid}.yaml"
+    platforms_file_path = config_path / f"platforms_{expid}.yaml"
+
+    with open(jobs_file_path, "w") as f:
+        yaml.dump(jobs_data, f)
+    with open(expdef_file_path, "w") as f:
+        yaml.dump(expdef_data, f)
+    with open(platforms_file_path, "w") as f:
+        yaml.dump(platforms_data, f)
+    read_files_mock.return_value = tmp_path
+
+    # Generate job list data
     from autosubmit.job.job_list import JobList
     orig_generate = JobList.generate
     def mockgenerate(self, *args, **kwargs):
         kwargs['create'] = True
         orig_generate(self, *args, **kwargs)
-
-    monkeypatch.setattr(JobList, 'generate', mockgenerate)
-    from autosubmit.autosubmit import Autosubmit
-
-    job_list = Autosubmit.load_job_list(
+    mocker.patch('autosubmit.job.job_list.JobList.generate', mockgenerate)
+    autosubmit.load_job_list(
         as_conf.expid, as_conf, monitor=False
     )
-    jobs = job_list.get_all()
-    for job in jobs:
-        job._platform = jobs[0].platform # for jobs[0] the local platform is correctly set
-        job.het = {}
-    return job_list
 
-def test_aiida_generator(as_conf, job_list, tmp_path):
-    AiidaGenerator.generate(job_list, as_conf, output_dir=str(tmp_path))
-    
+    # Test generator
+    import argparse
+    generate_folder = tmp_path / "generate"
+    generate_folder.mkdir()
+    args = argparse.Namespace(output_dir=str(generate_folder.absolute()))
+    autosubmit.generate_workflow(expid, Engine('aiida'), args)
+
     generated_paths_in_experiment_folder = set([
         f'{as_conf.expid}_LOCAL_SETUP.cmd',
         f'{as_conf.expid}_REMOTE_SETUP.cmd', # date from experiment data
@@ -210,10 +223,10 @@ def test_aiida_generator(as_conf, job_list, tmp_path):
         "README.md",
         "submit_aiida_workflow.py",
     ])
-    assert set(os.listdir(tmp_path / as_conf.expid)) == generated_paths_in_experiment_folder
+    assert set(os.listdir(generate_folder / as_conf.expid)) == generated_paths_in_experiment_folder
 
     generated_paths_in_local_folder = set([
         "bash@local-setup.yml",
         "local-setup.yml"
     ])
-    assert set(os.listdir(tmp_path / as_conf.expid / "local")) == generated_paths_in_local_folder
+    assert set(os.listdir(generate_folder / as_conf.expid / "local")) == generated_paths_in_local_folder
