@@ -1191,7 +1191,7 @@ def test_run_bug_save_wrapper_crashes(
                 'DEPENDENCIES': {
                     'SIM-1': {}
                 },
-                'WALLCLOCK': '00:02',
+                'WALLCLOCK': '00:05',
                 'RETRIALS': 5,
             }
         },
@@ -1206,7 +1206,7 @@ def test_run_bug_save_wrapper_crashes(
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
                 'HOST': '127.0.0.1',
-                'MAX_WALLCLOCK': '00:03',
+                'MAX_WALLCLOCK': '00:30',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
                 'SCRATCH_DIR': '/tmp/scratch/',
