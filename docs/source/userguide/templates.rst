@@ -19,18 +19,18 @@ the generated script will have it replaced by ``.cmd``.
       RUNNING: once
       TYPE: bash # default
 
-In the example above, the script template ``print_expid.sh``
-file must exist in the Autosubmit Project. When you run
-``autosubmit create`` or ``autosubmit refresh``, Autosubmit
-will copy the Project files, including template scripts, to the
-experiment folder `proj`. The template scripts are then
-preprocessed and the final script is generated when an Autosubmit
-experiment is :ref:`inspected <inspect_cmd>` or
-:doc:`created </userguide/run/index>`.
+In the example above, the script template ``print_expid.sh`` file must exist in the Autosubmit Project.
+When you run ``autosubmit create`` or ``autosubmit refresh``, Autosubmit will copy the Project files,
+including template scripts, to the experiment folder `proj`.
+
+The first time the ``create`` command it performs the equivalent of ``autosubmit refresh``, updating
+the Autosubmit project and it will plot and try to display a new graph. The template scripts are then
+preprocessed and the final script is generated when an Autosubmit experiment is
+:ref:`inspected <inspect_cmd>` or :doc:`created </userguide/run/index>`.
 
 When Autosubmit preprocesses the template script, it replaces placeholders with configuration values.
-A placeholder is any configuration key enclosed in %% (in-place) or in %^% ( postloaded).
-For example, %DEFAULT.EXPID% refers to the Autosubmit configuration value specified in the DEFAULT.EXPID key of the YAML configuration file.
+A placeholder is any configuration key enclosed in %% (in-place) or in %^% (postloaded).
+For example, ``%DEFAULT.EXPID%`` refers to the Autosubmit configuration value specified in the ``DEFAULT.EXPID`` key of the YAML configuration file.
 
 
 Assuming that one of the Autosubmit experiment configuration files

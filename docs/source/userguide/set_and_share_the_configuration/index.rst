@@ -283,4 +283,6 @@ The expid command can copy another user's existing expid to work correctly.
 
 .. warning:: All users must share the same experiment autosubmit.db for this to work. More info at `shared-db <https://autosubmit.readthedocs.io/en/master/installation/index.html#production-environment-installation-shared-filesystem-database>`_
 
-Sharing an experiment configuration across filesystems is possible only by including the same `DEFAULT.CUSTOM_CONFIG` and `GIT.PROJECT_ORIGIN`, `GIT.PROJECT_BRANCH` and `GIT.PROJECT_TAG` inside the expdef.yml file.
+Sharing an experiment configuration across filesystems is possible only by including the same *Git* configuration inside the expdef_<expid>.yml
+
+.. note:: For more information on how to share an experiment see more at the parameters description at :ref:`Git <version_control_ref>`.
