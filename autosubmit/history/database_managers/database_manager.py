@@ -19,20 +19,22 @@ import os
 import sqlite3
 import traceback
 from abc import ABCMeta
+from pathlib import Path
 
 import autosubmit.history.database_managers.database_models as Models
 import autosubmit.history.utils as HUtils
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import Log
 
-DEFAULT_JOBDATA_DIR = os.path.join('/esarchive', 'autosubmit', 'as_metadata', 'data')
-DEFAULT_HISTORICAL_LOGS_DIR = os.path.join('/esarchive', 'autosubmit', 'as_metadata', 'logs')
-DEFAULT_LOCAL_ROOT_DIR = os.path.join('/esarchive', 'autosubmit')
+DEFAULT_JOBDATA_DIR = BasicConfig.JOBDATA_DIR
+DEFAULT_HISTORICAL_LOGS_DIR = BasicConfig.HISTORICAL_LOG_DIR
+DEFAULT_LOCAL_ROOT_DIR = BasicConfig.LOCAL_ROOT_DIR
 
 
 class DatabaseManager(metaclass=ABCMeta):
     """ Simple database manager. Needs expid. """
-    AS_TIMES_DB_NAME = "as_times.db"  # default AS_TIMES location
-    ECEARTH_DB_NAME = "ecearth.db"  # default EC_EARTH_DB_NAME location
+    AS_TIMES_DB_NAME = BasicConfig.AS_TIMES_DB  # default AS_TIMES location
+    ECEARTH_DB_NAME = BasicConfig.DB_FILE  # default EC_EARTH_DB_NAME location
 
     def __init__(self, expid, jobdata_dir_path=DEFAULT_JOBDATA_DIR, local_root_dir_path=DEFAULT_LOCAL_ROOT_DIR):
         self.expid = expid
@@ -54,8 +56,11 @@ class DatabaseManager(metaclass=ABCMeta):
         # type : (str) -> None
         """ creates a database files with full permissions """
         os.umask(0)
-        os.open(path, os.O_WRONLY | os.O_CREAT, 0o776)
+        if not Path(path).parent.exists():
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            os.chmod(Path(path).parent, 0o777)
 
+        os.open(path, os.O_WRONLY | os.O_CREAT, 0o776)
 
     def execute_statement_on_dbfile(self, path, statement):
         # type : (str, str) -> None

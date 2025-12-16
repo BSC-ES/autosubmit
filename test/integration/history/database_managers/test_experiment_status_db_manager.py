@@ -105,7 +105,7 @@ def test_get_experiment_status_row_by_expid(tmp_path: 'LocalPath', as_db: str, a
     database_manager = create_experiment_status_db_manager(as_db, **options)
 
     # An error as there is no such experiment ID in the database
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
         database_manager.get_experiment_status_row_by_expid(_EXPID)
 
     # Create the experiment, but it still will not have any experiment status

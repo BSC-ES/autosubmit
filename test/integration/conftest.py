@@ -480,12 +480,12 @@ def slurm_server(session_mocker, tmp_path_factory):
 
     docker_args = {
         'cgroupns': 'host',
-        'privileged': True
+        'privileged': True,
+        'remove': True,
     }
 
     docker_container = DockerContainer(
         image=_SLURM_DOCKER_IMAGE,
-        remove=True,
         hostname='slurmctld',
         **docker_args
     )
@@ -493,7 +493,6 @@ def slurm_server(session_mocker, tmp_path_factory):
     # TODO: GH needs --volume /sys/fs/cgroup:/sys/fs/cgroup:rw
     if 'GITHUB_ACTION' in os.environ:
         docker_container = docker_container.with_volume_mapping('/sys/fs/cgroup', '/sys/fs/cgroup', mode='rw')
-
     with docker_container \
             .with_env('TZ', 'Etc/UTC') \
             .with_bind_ports(2222, ssh_port) \
@@ -621,7 +620,8 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
         db = request.node.name
         if '[' in db:
             db = db.split('[')[0]
-        db = f'{db}_{time_ns()}'
+        rng = uuid.uuid4().hex[:6]
+        db = f'{db}_{time_ns()}_{rng}'
 
         # Create a new DB to run the current test completely isolated from others.
         # We use the test name, minus the [params], appending the current nanoseconds

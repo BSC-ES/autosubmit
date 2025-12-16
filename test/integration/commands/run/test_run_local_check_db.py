@@ -7,17 +7,16 @@ from time import sleep
 
 from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.log.log import AutosubmitCritical
 from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, _assert_db_fields, _assert_files_recovered, run_in_thread
 
 if TYPE_CHECKING:
-    from testcontainers.core.container import DockerContainer
+    pass
 
 
 # -- Tests
-@pytest.mark.xdist_group("slurm")
-@pytest.mark.docker
-@pytest.mark.slurm
-@pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
+
+@pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,run_type", [
     # Success
     (dedent("""\
 
@@ -28,10 +27,35 @@ if TYPE_CHECKING:
             SCRIPT: |
                 echo "Hello World with id=Success"
                 sleep 1
-            PLATFORM: TEST_PS
+            PLATFORM: LOCAL
             RUNNING: chunk
             wallclock: 00:01
     """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
+    (dedent("""\
+
+    EXPERIMENT:
+        NUMCHUNKS: '3'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World with id=Success"
+                as_checkpoint
+                as_checkpoint
+                sleep 1
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+        checkpoint_job:
+            SCRIPT: |
+                echo "This is a checkpoint job"
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            DEPENDENCIES:
+                job:
+                    STATUS: RUNNING
+                    FROM_STEP: 1
+            wallclock: 00:01
+    """), 6, "COMPLETED", "checkpoint"), # Test checkpoint functionality
 
     # Failure
     (dedent("""\
@@ -42,22 +66,26 @@ if TYPE_CHECKING:
             SCRIPT: |
                 sleep 2
                 d_echo "Hello World with id=FAILED"
-            PLATFORM: TEST_PS
+            PLATFORM: LOCAL
             RUNNING: chunk
             wallclock: 00:01
             retrials: 2  
 
     """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
-], ids=["Success", "Failure"])
+], ids=[
+   "Success",
+   "Checkpoint Test",
+    "Failure",
+])
 def test_run_uninterrupted(
         autosubmit_exp,
         jobs_data: str,
         expected_db_entries,
         final_status,
-        wrapper_type,
-        slurm_server: 'DockerContainer',
+        run_type,
         prepare_scratch,
         general_data,
+        redirect_log_info
 ):
     yaml = YAML(typ='rt')
     as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
@@ -65,8 +93,20 @@ def test_run_uninterrupted(
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
     log_dir = tmp_path / f"LOG_{as_exp.expid}"
+    Path(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
     as_conf.set_last_as_command('run')
 
+    # as_exp.autosubmit._setup_log_files(
+    #     command="run",
+    #     expids=None,
+    #     expid=as_exp.expid,
+    #     owner=True,
+    #     tmp_path=tmp_path,
+    #     aslogs_path=aslogs_path,
+    #     exp_path=exp_path,
+    #     log_level="DEBUG",
+    #     console_level="DEBUG"
+    # )
     # Run the experiment
     exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
     _assert_exit_code(final_status, exit_code)
@@ -97,10 +137,12 @@ def test_run_uninterrupted(
     except AssertionError:
         pytest.fail(e_msg)
 
+    if run_type == "checkpoint":
+        checkpoint_files = list(log_dir.rglob("*CHECKPOINT*"))
+        if not checkpoint_files:
+            pytest.fail(e_msg + f"No *CHECKPOINT* files found in {log_dir}\n")
 
-@pytest.mark.xdist_group("slurm")
-@pytest.mark.docker
-@pytest.mark.slurm
+
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
     (dedent("""\
@@ -126,7 +168,7 @@ def test_run_uninterrupted(
                 SCRIPT: |
                     sleep 2
                     d_echo "Hello World with id=FAILED"
-                PLATFORM: TEST_PS
+                PLATFORM: LOCAL
                 RUNNING: chunk
                 wallclock: 00:01
                 retrials: 2  
@@ -139,7 +181,6 @@ def test_run_interrupted(
         expected_db_entries,
         final_status,
         wrapper_type,
-        slurm_server: 'DockerContainer',
         prepare_scratch,
         general_data,
 ):
@@ -177,3 +218,64 @@ def test_run_interrupted(
     _assert_files_recovered(files_check_list)
 
     _assert_exit_code(final_status, exit_code)
+
+
+@pytest.mark.parametrize("jobs_data,final_status", [
+    (dedent("""\
+PROJECT:
+    PROJECT_TYPE: local
+    PROJECT_DIRECTORY: local_project
+LOCAL:
+    PROJECT_PATH: "tofill"
+JOBS:
+    job:
+        FILE: 
+            - "test.sh"
+            - "additional1.sh"
+            - "additional2.sh"
+        PLATFORM: local
+        RUNNING: once
+        wallclock: 00:01
+    """), "COMPLETED"),
+
+    (dedent("""\
+PROJECT:
+    PROJECT_TYPE: local
+    PROJECT_DIRECTORY: local_project
+LOCAL:
+    PROJECT_PATH: "tofill"
+JOBS:
+    job:
+        FILE: 
+            - "test.sh"
+            - "additional1.sh"
+            - "thisdoesntexists.sh"
+        PLATFORM: local
+        RUNNING: once
+        wallclock: 00:01
+"""), "FAILED"),
+], ids=["All files exist", "One file missing"])
+def test_run_with_additional_files(
+        autosubmit_exp,
+        jobs_data: str,
+        final_status: str,
+):
+
+    project_path = Path(BasicConfig.LOCAL_ROOT_DIR) / "org_templates"
+    project_path.mkdir(parents=True, exist_ok=True)
+    with open(project_path / "test.sh", 'w') as f:
+        f.write('echo "main script."\n')
+    with open(project_path / "additional1.sh", 'w') as f:
+        f.write('echo "additional file 1."\n')
+    with open(project_path / "additional2.sh", 'w') as f:
+        f.write('echo "additional file 2."\n')
+
+    jobs_data = jobs_data.replace("tofill", str(project_path))
+    as_exp = autosubmit_exp(experiment_data=YAML(typ='rt').load(jobs_data), include_jobs=False, create=True)
+    as_exp.autosubmit._check_ownership_and_set_last_command(as_exp.as_conf, as_exp.expid, "run")
+    if final_status == "FAILED":
+        with pytest.raises(AutosubmitCritical):
+            as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    else:
+        exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+        _assert_exit_code(final_status, exit_code)

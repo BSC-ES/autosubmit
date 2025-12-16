@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 # -- Tests
 
 @pytest.mark.xdist_group("slurm")
+@pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
