@@ -22,7 +22,7 @@ from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 from random import seed, randint, choice
 from time import time
-from typing import Any, Optional, Protocol
+from typing import Any, Callable, Optional, Protocol
 
 import pytest
 
@@ -236,3 +236,25 @@ def create_jobs(
         return jobs
 
     return _create_jobs(mocker, request.param[0], request.param[1])
+
+
+job_id = -1
+"""The global sequence of test Job IDs. Starts at 0 (increments+returns)."""
+
+
+@pytest.fixture(scope="session")
+def next_job_id() -> Callable[[], int]:
+    """A fixture that returns a sequence of Job IDs.
+
+    We had a test failing intermittently due to ``randrange`` used to generate job ids:
+    https://github.com/BSC-ES/autosubmit/issues/2744
+
+    This quick-and-dirty solution uses a global sequence to return the next Job ID.
+    """
+
+    def _next_job_id() -> int:
+        global job_id
+        job_id += 1
+        return job_id
+
+    return _next_job_id
