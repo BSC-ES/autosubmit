@@ -53,6 +53,7 @@ def _create_slurm_platform(expid: str, as_conf: AutosubmitConfig):
     return SlurmPlatform(expid, _PLATFORM_NAME, config=as_conf.experiment_data, auth_password=None)
 
 
+@pytest.mark.docker
 @pytest.mark.xdist_group('slurm')
 @pytest.mark.slurm
 def test_create_platform_slurm(
@@ -90,6 +91,7 @@ def test_create_platform_slurm(
 
 
 @pytest.mark.xdist_group('slurm')
+@pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     {
@@ -163,6 +165,9 @@ def test_run_simple_workflow_slurm(
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 
+@pytest.mark.xdist_group("slurm")
+@pytest.mark.docker
+@pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     {
         'JOBS': {
@@ -376,8 +381,6 @@ def test_run_simple_workflow_slurm(
     'Wrapper Horizontal-vertical',
     'Wrapper Vertical-horizontal',
 ])
-@pytest.mark.docker
-@pytest.mark.slurm
 def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 'AutosubmitExperimentFixture',
                                          slurm_server: 'DockerContainer'):
     """Runs a simple Bash script using Slurm."""
@@ -400,6 +403,9 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 
+@pytest.mark.xdist_group("slurm")
+@pytest.mark.docker
+@pytest.mark.slurm
 @pytest.mark.parametrize('experiment_data', [
     {
         'JOBS': {
@@ -636,8 +642,6 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
     'Complex Wrapper vertical-horizontal',
     'Complex Wrapper horizontal-vertical',
 ])
-@pytest.mark.docker
-@pytest.mark.slurm
 def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubmit_exp: 'AutosubmitExperimentFixture',
                                                  slurm_server: 'DockerContainer'):
     """Runs a simple Bash script using Slurm."""
@@ -706,6 +710,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
     assert not slurm_platform.check_remote_permissions()
 
 
+@pytest.mark.xdist_group("slurm")
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.parametrize(
@@ -893,6 +898,7 @@ def test_simple_workflow_compress_logs_slurm(
         )
 
 
+@pytest.mark.xdist_group("slurm")
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.parametrize(
@@ -1030,6 +1036,7 @@ def test_compress_log_fail_command(
     assert result is None
 
 
+@pytest.mark.xdist_group("slurm")
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.parametrize(
@@ -1152,6 +1159,7 @@ def test_check_if_packages_are_ready_to_build(autosubmit_exp):
     assert check and len(job_result) == 3
 
 
+@pytest.mark.xdist_group("slurm")
 @pytest.mark.docker
 @pytest.mark.slurm
 def test_run_bug_save_wrapper_crashes(
