@@ -306,27 +306,28 @@ except NotExistent:
                 flags=re.DOTALL | re.MULTILINE)[0][1:-1]
             trimmed_script_path = self._output_path / script_name
             trimmed_script_path.write_text(trimmed_script_text, encoding="utf-8")
+            sanitized_job_name = self._sanitize_label(job.name)
             create_task = f"""
-tasks["{job.name}"] = wg.add_task(
+tasks["{sanitized_job_name}"] = wg.add_task(
     "workgraph.shelljob",
-    name = "{job.name}",
+    name = "{sanitized_job_name}",
     command = orm.load_code("bash@{job.platform.name}"),
     arguments = ["{{script}}"],
     nodes = {{"script": orm.SinglefileData("{trimmed_script_path}")}}
 )"""
             if job.memory != "":
                 create_task += f"""
-tasks["{job.name}"].set({{"metadata.options.max_memory_kb": {job.memory}}})"""
+tasks["{sanitized_job_name}"].set({{"metadata.options.max_memory_kb": {job.memory}}})"""
             if job.platform.max_wallclock is None:
                 if job.parameters["WALLCLOCK"] != "":
                     wallclock_seconds = int(Job.parse_time(job.wallclock).total_seconds())
                 else:
                     wallclock_seconds = int(Job.parse_time(job.platform.wallclock).total_seconds())
                 create_task += f"""
-tasks["{job.name}"].set({{"metadata.options.max_wallclock_seconds": {wallclock_seconds}}})"""
+tasks["{sanitized_job_name}"].set({{"metadata.options.max_wallclock_seconds": {wallclock_seconds}}})"""
             if job.partition != "":
                 create_task += f"""
-tasks["{job.name}"].set({{"metadata.options.queue_name": "{job.partition}"}})"""
+tasks["{sanitized_job_name}"].set({{"metadata.options.queue_name": "{job.partition}"}})"""
 
             code_section += create_task
         code_section += "\n\n"
@@ -337,7 +338,7 @@ tasks["{job.name}"].set({{"metadata.options.queue_name": "{job.partition}"}})"""
         code_section = "# WORKGRAPH_DEPS"
         for edge in self._job_list.graph.edges:
             code_section += f"""
-tasks["{edge[1]}"].waiting_on.add(tasks["{edge[0]}"])"""
+tasks["{self._sanitize_label(edge[1])}"].waiting_on.add(tasks["{self._sanitize_label(edge[0])}"])"""
         code_section += "\n\n"
         return code_section
 
@@ -372,6 +373,10 @@ it will delete all calculations that are associated with these nodes.
 It is therefore recommended to use the JOB paramaters in autosubmit to override
 certain computer configs.
 """
+    @staticmethod
+    def _sanitize_label(label: str) -> str:
+        return label.replace("-", "_")
+
 
 
 __all__ = [
