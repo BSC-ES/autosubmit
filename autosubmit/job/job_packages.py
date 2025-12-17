@@ -54,8 +54,7 @@ def threaded(fn):
 
 def jobs_in_wrapper_str(as_conf, current_wrapper):
     " transform to string with _ separator the jobs in the wrapper "
-    section_list = as_conf.experiment_data["WRAPPERS"].get(current_wrapper, {}).get("JOBS_IN_WRAPPER", [])
-    return "_".join(section_list)
+    return "_".join(as_conf.experiment_data["WRAPPERS"].get(current_wrapper, {}).get("JOBS_IN_WRAPPER", []))
 
 
 class JobPackageBase(object):

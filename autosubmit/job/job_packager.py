@@ -599,7 +599,7 @@ class JobPackager(object):
             if self.wrapper_type[self.current_wrapper_section] == 'vertical':
                 built_packages_tmp = self._build_vertical_packages(jobs, wrapper_limits, wrapper_info=current_info)
             elif self.wrapper_type[self.current_wrapper_section] == 'horizontal':
-                built_packages_tmp = self._build_horizontal_packages(jobs, wrapper_limits, section_list, wrapper_info=current_info)
+                built_packages_tmp = self._build_horizontal_packages(jobs, wrapper_limits, wrapper_info=current_info)
             elif self.wrapper_type[self.current_wrapper_section] in ['vertical-horizontal', 'horizontal-vertical']:
                 built_packages_tmp.append(self._build_hybrid_package(jobs, wrapper_limits, section_list, wrapper_info=current_info))
             else:
@@ -675,7 +675,7 @@ class JobPackager(object):
         if self.jobs_in_wrapper:
             Log.info("Calculating wrapper packages")
         jobs_by_section["SIMPLE"] = []
-        for wrapper_name,section_name in sections_split.items():
+        for wrapper_name, section_name in sections_split.items():
             for job in jobs_list[:]:
                 if job.section.upper() in section_name.split("&"):
                     jobs_by_section[wrapper_name].append(job)
@@ -687,7 +687,7 @@ class JobPackager(object):
                 del jobs_by_section[wrappers]
         return jobs_by_section
 
-    def _build_horizontal_packages(self, section_list, wrapper_limits, section, wrapper_info={}):
+    def _build_horizontal_packages(self, section_list, wrapper_limits, wrapper_info={}):
         packages = []
         horizontal_packager = JobPackagerHorizontal(section_list, self._platform.max_processors, wrapper_limits,
                                                     wrapper_limits["max"], self._platform.processors_per_node, self.wrapper_method[self.current_wrapper_section])
@@ -733,7 +733,7 @@ class JobPackager(object):
                 break
         return packages
 
-    def _build_hybrid_package(self, jobs_list, wrapper_limits, section,wrapper_info={}):
+    def _build_hybrid_package(self, jobs_list, wrapper_limits, job_sections, wrapper_info={}):
         # self.wrapper_info = wrapper_info
         jobs_resources = dict()
         jobs_resources['MACHINEFILES'] = self._as_config.get_wrapper_machinefiles()
@@ -746,12 +746,12 @@ class JobPackager(object):
         if self.wrapper_type[self.current_wrapper_section] == 'vertical-horizontal':
             return self._build_vertical_horizontal_package(horizontal_packager, jobs_resources, wrapper_info)
         else:
-            return self._build_horizontal_vertical_package(horizontal_packager, section, jobs_resources, wrapper_info)
+            return self._build_horizontal_vertical_package(horizontal_packager, job_sections, jobs_resources, wrapper_info)
 
-    def _build_horizontal_vertical_package(self, horizontal_packager, section, jobs_resources, wrapper_info):
+    def _build_horizontal_vertical_package(self, horizontal_packager, job_sections, jobs_resources, wrapper_info):
         total_wallclock = '00:00'
         horizontal_package = horizontal_packager.build_horizontal_package(wrapper_info=wrapper_info)
-        horizontal_packager.create_sections_order(section)
+        horizontal_packager.create_sections_order(job_sections)
         horizontal_packager.add_sectioncombo_processors(
             horizontal_packager.total_processors)
         horizontal_package.sort(
@@ -763,7 +763,7 @@ class JobPackager(object):
         ## Get the next horizontal packages ##
         max_procs = horizontal_packager.total_processors
         new_package = horizontal_packager.get_next_packages(
-            section, max_wallclock=self._platform.max_wallclock, horizontal_vertical=True, max_procs=max_procs)
+            job_sections, max_wallclock=self._platform.max_wallclock, horizontal_vertical=True, max_procs=max_procs)
 
         if new_package is not None and len(str(new_package)) > 0:
             current_package += new_package
@@ -1072,7 +1072,7 @@ class JobPackagerHorizontal(object):
             next_section_list = []
             for job in self.job_list:
                 for child in job.children:
-                    if job.section == child.section or (job.section in jobs_sections and child.section in jobs_sections.split("&")) \
+                    if job.section == child.section or (job.section in jobs_sections and child.section in jobs_sections) \
                             and child.status in [Status.READY, Status.WAITING]:
                         wrappable = True
                         for other_parent in child.parents:

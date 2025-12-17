@@ -517,7 +517,7 @@ def test_run_with_additional_files(
 
 @pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
-@pytest.mark.parametrize("wrappers, command", [
+@pytest.mark.parametrize("wrappers, run_type", [
     (
         {
             "WRAPPERS": {
@@ -571,11 +571,24 @@ def test_run_with_additional_files(
             }
         },
         "inspect",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "job&other",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "&inspect",
     ),
 ])
 def test_wrapper_config(
         wrappers: str,
-        command: str,
+        run_type: str,
         autosubmit_exp,
         slurm_server: 'DockerContainer',
         tmp_path,
@@ -615,10 +628,10 @@ def test_wrapper_config(
     }
 
     as_exp = autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True)
-    if command == "run":
+    if run_type == "run":
         as_exp.as_conf.set_last_as_command('run')
         as_exp.autosubmit.run_experiment(expid=as_exp.expid)
-    elif command == "inspect":
+    elif run_type == "inspect" or run_type == "&inspect":
         as_exp.as_conf.set_last_as_command('inspect')
         as_exp.autosubmit.inspect(
             expid=as_exp.expid,
@@ -632,4 +645,5 @@ def test_wrapper_config(
         )
     templates_dir = Path(tmp_path) / as_exp.expid / "tmp"
     asthread_files = list(templates_dir.rglob("*ASThread*"))
-    assert len(asthread_files) == 2 + 2  # 8 jobs in total, 2 wrappers with max 2 jobs each -> 4 ASThread files expected
+    if run_type == "run" or run_type == "inspect":
+        assert len(asthread_files) == 2 + 2  # 8 jobs in total, 2 wrappers with max 2 jobs each -> 4 ASThread files expected
