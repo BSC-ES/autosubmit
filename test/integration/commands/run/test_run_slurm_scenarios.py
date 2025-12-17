@@ -612,6 +612,21 @@ def test_wrapper_config_run(
                 "TYPE": "horizontal",
                 "MAX_WRAPPED": 2,
             },
+            "THIRD_WRAPPER": {
+                "JOBS_IN_WRAPPER": "test&test2",
+                "TYPE": "horizontal",
+                "MAX_WRAPPED": 2,
+            },
+            "FOURTH_WRAPPER": {
+                "JOBS_IN_WRAPPER": "test3,test4",
+                "TYPE": "horizontal",
+                "MAX_WRAPPED": 2,
+            },
+            "FIFTH_WRAPPER": {
+                "JOBS_IN_WRAPPER": "test5 test6",
+                "TYPE": "horizontal",
+                "MAX_WRAPPED": 2,
+            },
         }
     }
 ], ids=["General wrapper configuration", "Without general wrapper configuration"])

@@ -53,15 +53,9 @@ def threaded(fn):
 
 
 def jobs_in_wrapper_str(as_conf, current_wrapper):
-    jobs_in_wrapper = as_conf.experiment_data["WRAPPERS"].get(current_wrapper, {}).get("JOBS_IN_WRAPPER", "")
-    if "," in jobs_in_wrapper:
-        jobs_in_wrapper = jobs_in_wrapper.split(",")
-    elif "&" in jobs_in_wrapper:
-        jobs_in_wrapper = jobs_in_wrapper.split("&")
-    else:
-        jobs_in_wrapper = jobs_in_wrapper.split(" ")
-    jobs_in_wrapper = [job.strip(" ,") for job in jobs_in_wrapper]
-    return "_".join(jobs_in_wrapper)
+    " transform to string with _ separator the jobs in the wrapper "
+    section_list = as_conf.experiment_data["WRAPPERS"].get(current_wrapper, {}).get("JOBS_IN_WRAPPER", [])
+    return "_".join(section_list)
 
 
 class JobPackageBase(object):

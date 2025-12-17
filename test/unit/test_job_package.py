@@ -189,7 +189,7 @@ def test_jobs_in_wrapper_str(autosubmit_config):
     as_conf = autosubmit_config('a000', {
         "WRAPPERS": {
             "current_wrapper": {
-                "JOBS_IN_WRAPPER": "job1 job2 job3"
+                "JOBS_IN_WRAPPER": ["job1", "job2", "job3"]
             }
         }
     })

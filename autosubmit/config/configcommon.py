@@ -553,11 +553,24 @@ class AutosubmitConfig(object):
         wrappers = data_fixed.get("WRAPPERS", {})
         for wrapper, wrapper_data in wrappers.items():
             if isinstance(wrapper_data, dict):
-                jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", "")
-                # if it is a list in string format (due to "%" in the string).
-                if "[" in jobs_in_wrapper:
-                    jobs_in_wrapper = jobs_in_wrapper.strip("[]").replace("'", "").replace(" ", "").replace(",", " ")
-                data_fixed["WRAPPERS"][wrapper]["JOBS_IN_WRAPPER"] = jobs_in_wrapper.upper()
+                jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", None)
+                if jobs_in_wrapper:
+                    if not isinstance(jobs_in_wrapper, list) and not isinstance(jobs_in_wrapper, str):
+                        raise AutosubmitCritical(
+                            f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} must be a list or a string",
+                            7014
+                        )
+                if isinstance(jobs_in_wrapper, str):
+                    # if it is a list in string format (due to "%" in the string).
+                    if "[" in jobs_in_wrapper:
+                        jobs_in_wrapper = jobs_in_wrapper.strip("[]").replace("'", "").replace(" ", "").replace(",", " ")
+                    if "," in jobs_in_wrapper:
+                        jobs_in_wrapper = jobs_in_wrapper.split(",")
+                    elif "&" in jobs_in_wrapper:
+                        jobs_in_wrapper = jobs_in_wrapper.split("&")
+                    else:
+                        jobs_in_wrapper = jobs_in_wrapper.split()
+                data_fixed["WRAPPERS"][wrapper]["JOBS_IN_WRAPPER"] = [job.upper().strip(" ,") for job in jobs_in_wrapper]
                 data_fixed["WRAPPERS"][wrapper]["TYPE"] = str(wrapper_data.get("TYPE", "vertical")).lower()
 
     @staticmethod
@@ -1562,20 +1575,7 @@ class AutosubmitConfig(object):
             # continue if it is a global option (non-dicT)
             if type(wrapper_values) is not dict:
                 continue
-
-            jobs_in_wrapper = wrapper_values.get('JOBS_IN_WRAPPER', "")
-            if type(jobs_in_wrapper) is not list:
-                # if it is a list in string format (due "%" in the string).
-                if "[" in jobs_in_wrapper:
-                    jobs_in_wrapper = jobs_in_wrapper.strip("[]")
-                    jobs_in_wrapper = jobs_in_wrapper.replace("'", "")
-                    jobs_in_wrapper = jobs_in_wrapper.replace(" ", "")
-                    jobs_in_wrapper = jobs_in_wrapper.split(",")
-                elif "&" in jobs_in_wrapper:
-                    jobs_in_wrapper = jobs_in_wrapper.split("&")
-                else:
-                    jobs_in_wrapper = jobs_in_wrapper.split(" ")
-            for section in jobs_in_wrapper:
+            for section in wrapper_values.get('JOBS_IN_WRAPPER', []):
                 try:
                     platform_name = self.jobs_data[section.upper()].get('PLATFORM', "").upper()
                 except KeyError:
@@ -2633,15 +2633,8 @@ class AutosubmitConfig(object):
         """
         if wrapper is None:
             return ""
-        aux = wrapper.get('JOBS_IN_WRAPPER', self.experiment_data.get("WRAPPERS", {}).get("JOBS_IN_WRAPPER", ""))
-        aux = aux.split()
-        aux = [x.split("&") for x in aux]
-        jobs_in_wrapper = []
-        for section_list in aux:
-            for section in section_list:
-                jobs_in_wrapper.append(section)
 
-        return jobs_in_wrapper
+        return wrapper.get('JOBS_IN_WRAPPER', self.experiment_data.get("WRAPPERS", {}).get("JOBS_IN_WRAPPER", []))
 
     # noinspection PyMethodMayBeStatic
     def get_extensible_wallclock(self, wrapper=None):

@@ -1966,11 +1966,7 @@ class Job(object):
                                                                         "RETRIALS", 0))
         for wrapper_data in (wrapper for wrapper in as_conf.experiment_data.get("WRAPPERS", {}).values() if
                              type(wrapper) is dict):
-            jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", "").upper()
-            if "," in jobs_in_wrapper:
-                jobs_in_wrapper = jobs_in_wrapper.split(",")
-            else:
-                jobs_in_wrapper = jobs_in_wrapper.split(" ")
+            jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", [])
             if self.section.upper() in jobs_in_wrapper:
                 self.retrials = wrapper_data.get("RETRIALS", self.retrials)
         if not self.splits:

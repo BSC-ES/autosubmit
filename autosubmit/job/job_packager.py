@@ -582,19 +582,13 @@ class JobPackager(object):
             if max_jobs_to_submit == 0:
                 break
             self.current_wrapper_section = wrapper_name
-            section = self._as_config.experiment_data.get("WRAPPERS", {}).get(self.current_wrapper_section, {}).get("JOBS_IN_WRAPPER", "")
+            section_list = self._as_config.experiment_data.get("WRAPPERS", {}).get(self.current_wrapper_section, {}).get("JOBS_IN_WRAPPER", [])
             if not self._platform.allow_wrappers and self.wrapper_type[self.current_wrapper_section] in ['horizontal', 'vertical', 'vertical-horizontal', 'horizontal-vertical']:
                 Log.warning(
                     f"Platform {self._platform.name} does not allow wrappers, submitting jobs individually")
                 for job in jobs:
                     non_wrapped_jobs.append(job)
                 continue
-            if "&" in section:
-                section_list = section.split("&")
-            elif "," in section:
-                section_list = section.split(",")
-            else:
-                section_list = section.split(" ")
             wrapper_limits = self.calculate_wrapper_bounds(section_list)
             current_info = list()
             built_packages_tmp = list()
@@ -605,9 +599,9 @@ class JobPackager(object):
             if self.wrapper_type[self.current_wrapper_section] == 'vertical':
                 built_packages_tmp = self._build_vertical_packages(jobs, wrapper_limits, wrapper_info=current_info)
             elif self.wrapper_type[self.current_wrapper_section] == 'horizontal':
-                built_packages_tmp = self._build_horizontal_packages(jobs, wrapper_limits, section, wrapper_info=current_info)
+                built_packages_tmp = self._build_horizontal_packages(jobs, wrapper_limits, section_list, wrapper_info=current_info)
             elif self.wrapper_type[self.current_wrapper_section] in ['vertical-horizontal', 'horizontal-vertical']:
-                built_packages_tmp.append(self._build_hybrid_package(jobs, wrapper_limits, section, wrapper_info=current_info))
+                built_packages_tmp.append(self._build_hybrid_package(jobs, wrapper_limits, section_list, wrapper_info=current_info))
             else:
                 built_packages_tmp = self._build_vertical_packages(jobs, wrapper_limits, wrapper_info=current_info)
             self._propagate_inner_jobs_ready_date(built_packages_tmp)
