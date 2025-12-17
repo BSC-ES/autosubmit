@@ -1,4 +1,3 @@
-from autosubmit.generators.aiida import Generator as AiidaGenerator
 import pytest
 import os
 from ruamel.yaml import YAML
