@@ -2871,6 +2871,6 @@ class AutosubmitConfig(object):
         :rtype: dict
         """
         for wrapper in self.experiment_data.get("WRAPPERS", {}).values():
-            if isinstance(wrapper, dict) and section in wrapper.get("JOBS_IN_WRAPPER", ""):
+            if isinstance(wrapper, dict) and section in wrapper.get("JOBS_IN_WRAPPER", []):
                 return wrapper
         return {}
