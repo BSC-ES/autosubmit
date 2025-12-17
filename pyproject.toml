@@ -52,7 +52,6 @@ dependencies = [
     "paramiko>=3.5.0",
     "pyparsing==3.3.1",
     "matplotlib<=3.10.8",
-    "typing_extensions==4.*",
     "psutil<=7.2.1",
     "py3dotplus==1.1.0",
     "numpy<3",
@@ -63,8 +62,7 @@ dependencies = [
     "SQLAlchemy~=2.0.23",
     "ruamel.yaml==0.19.1",
     "configobj",
-    "configparser",
-    "types-requests"
+    "configparser"
 ]
 
 [project.urls]
@@ -87,7 +85,9 @@ tests = [
     "ruff==0.14.11",
     "pytest-xdist",
     "testcontainers",
-    "pytest-timeout"
+    "pytest-timeout",
+    "types-requests",
+    "typing_extensions==4.*",
 ]
 docs = [
     "livereload",
@@ -96,7 +96,8 @@ docs = [
     "sphinx-autobuild>=2021.3,<2025.9",
     "sphinx_rtd_theme",
     "sphinx-reredirects>=0.1,<1.2",
-    "sphinx_design"
+    "sphinx_design",
+    "tomli"
 ]
 all = [
     "autosubmit[tests]",

@@ -22,6 +22,8 @@ I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) source
 
 .PHONY: help clean watch html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext as_setup .EXPORT_ALL_VARIABLES
 
+AS_ENV := $(BUILDDIR)/autosubmit/env.mk
+
 # This sets up Autosubmit for Sphinx. It writes experiments to the build directory,
 # inside the sub-directory autosubmit. Note, this is a phony target, and uses
 # `.EXPORT_ALL_VARIABLES`, which was also made phony. All variables defined here
@@ -30,6 +32,11 @@ as_setup: .EXPORT_ALL_VARIABLES
 	$(eval AUTOSUBMIT_DIRECTORY := $(shell realpath -m $(BUILDDIR)/autosubmit))
 	rm -rf $(AUTOSUBMIT_DIRECTORY)
 	$(eval AUTOSUBMIT_CONFIGURATION := $(AUTOSUBMIT_DIRECTORY)/autosubmitrc)
+
+	mkdir -p $(dir $(AS_ENV))
+	echo "export AUTOSUBMIT_DIRECTORY := $(AUTOSUBMIT_DIRECTORY)" > $(AS_ENV)
+	echo "export AUTOSUBMIT_CONFIGURATION := $(AUTOSUBMIT_CONFIGURATION)" >> $(AS_ENV)
+
 	mkdir -p $(AUTOSUBMIT_DIRECTORY)/autosubmit
 	mkdir -p $(AUTOSUBMIT_DIRECTORY)/autosubmit/metadata
 	mkdir -p $(AUTOSUBMIT_DIRECTORY)/autosubmit/metadata/data
@@ -65,7 +72,7 @@ as_setup: .EXPORT_ALL_VARIABLES
 	@echo "Installing Autosubmit..."
 	AUTOSUBMIT_CONFIGURATION=$(AUTOSUBMIT_CONFIGURATION) autosubmit install
 	@echo "Autosubmit installed!"
-	autosubmit -lc DEBUG expid -dm -H "local" -d "Tutorial"
+	AUTOSUBMIT_CONFIGURATION=$(AUTOSUBMIT_CONFIGURATION) autosubmit -lc DEBUG expid -dm -H "local" -d "Tutorial"
 	@echo "Autosubmit Experiment Created!"
 	@echo "Autosubmit Adding a New Platform!"
 	cat platform.yml >> $(AUTOSUBMIT_DIRECTORY)/autosubmit/a000/conf/platforms_a000.yml
@@ -74,6 +81,12 @@ as_setup: .EXPORT_ALL_VARIABLES
 
 # Automatically call Autosubmit's setup target.
 -include as_setup
+
+-include $(BUILDDIR)/autosubmit/env.mk
+
+.DEFAULT_GOAL := html
+
+html dirhtml singlehtml watch latex latexpdf: as_setup
 
 help:
 	env | grep AUTOSUBMIT
