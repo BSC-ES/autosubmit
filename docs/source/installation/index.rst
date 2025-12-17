@@ -359,3 +359,10 @@ As the last step, ensure to install the Autosubmit database. To do so, execute  
     autosubmit install
 
 This command will generate a blank database in the specified configuration path.
+
+Dependencies and licenses
+=========================
+
+The list below includes the runtime software used by Autosubmit and their licenses.
+
+.. dependencies_licenses::
