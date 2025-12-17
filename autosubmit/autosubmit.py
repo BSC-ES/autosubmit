@@ -6037,7 +6037,6 @@ class Autosubmit:
             if len(submitter.platforms) == 0:
                 raise ValueError('Missing platform!')
 
-            packages_persistence = JobPackagePersistence(expid)
             job_list = Autosubmit.load_job_list(expid, as_conf, monitor=False)
 
             Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
@@ -6050,10 +6049,6 @@ class Autosubmit:
                 job.update_parameters(as_conf, job_list.parameters)
 
             job_list.check_scripts(as_conf)
-        except AutosubmitError as e:
-            raise AutosubmitCritical(e.message, e.code, e.trace)
-        except AutosubmitCritical as e:
-            raise
         except BaseException as e:
             raise AutosubmitCritical("Error while checking the configuration files or loading the job_list", 7040,
                                      str(e))
