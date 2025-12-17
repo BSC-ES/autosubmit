@@ -1637,6 +1637,13 @@ class JobList(object):
 
         sections_running_type_map = dict()
         if wrapper_jobs is not None and len(str(wrapper_jobs)) > 0:
+            # TODO: Removing this causes unit tests to fail, need to investigate why in another PR
+            if type(wrapper_jobs) is not list:
+                if "&" in wrapper_jobs:
+                    char = "&"
+                else:
+                    char = " "
+                wrapper_jobs = wrapper_jobs.split(char)
             for section in wrapper_jobs:
                 # RUNNING = once, as default. This value comes from jobs_.yml
                 sections_running_type_map[section] = str(self._config.experiment_data["JOBS"].

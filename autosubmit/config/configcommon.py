@@ -1575,7 +1575,8 @@ class AutosubmitConfig(object):
             # continue if it is a global option (non-dicT)
             if type(wrapper_values) is not dict:
                 continue
-            for section in wrapper_values.get('JOBS_IN_WRAPPER', []):
+            jobs_in_wrapper = wrapper_values.get('JOBS_IN_WRAPPER', [])
+            for section in jobs_in_wrapper:
                 try:
                     platform_name = self.jobs_data[section.upper()].get('PLATFORM', "").upper()
                 except KeyError:

@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
-import collections
 import copy
 import datetime
 import json
