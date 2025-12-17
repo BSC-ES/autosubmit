@@ -1976,7 +1976,7 @@ class Autosubmit:
                     for job in [j for j in jobs if j.status != Status.FAILED]:
                         job_prev_status = job.status
                         # If exist key has been pressed and previous status was running, do not check
-                        if not Autosubmit.exit and job_prev_status != Status.RUNNING:
+                        if not Autosubmit.exit:
                             jobs_to_check[platform_name].append([job, job_prev_status])
         return jobs_to_check, job_changes_tracker
 
