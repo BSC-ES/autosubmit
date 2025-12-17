@@ -517,31 +517,65 @@ def test_run_with_additional_files(
 
 @pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
-@pytest.mark.parametrize("wrappers", [
-    {
-        "WRAPPERS": {
-            "MAX_WRAPPED": 2,
-            "WRAPPER": {"JOBS_IN_WRAPPER": "job", "TYPE": "horizontal"},
-            "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other", "TYPE": "horizontal"},
-        }
-    },
-    {
-        "WRAPPERS": {
-            "WRAPPER": {
-                "JOBS_IN_WRAPPER": "job",
-                "TYPE": "horizontal",
+@pytest.mark.parametrize("wrappers, command", [
+    (
+        {
+            "WRAPPERS": {
                 "MAX_WRAPPED": 2,
-            },
-            "SECOND_WRAPPER": {
-                "JOBS_IN_WRAPPER": "other",
-                "TYPE": "horizontal",
+                "WRAPPER": {"JOBS_IN_WRAPPER": "job", "TYPE": "horizontal"},
+                "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other", "TYPE": "horizontal"},
+            }
+        },
+        "run",
+    ),
+    (
+        {
+            "WRAPPERS": {
+                "WRAPPER": {
+                    "JOBS_IN_WRAPPER": "job",
+                    "TYPE": "horizontal",
+                    "MAX_WRAPPED": 2,
+                },
+                "SECOND_WRAPPER": {
+                    "JOBS_IN_WRAPPER": "other",
+                    "TYPE": "horizontal",
+                    "MAX_WRAPPED": 2,
+                },
+            }
+        },
+        "run",
+    ),
+    (
+        {
+            "WRAPPERS": {
                 "MAX_WRAPPED": 2,
-            },
-        }
-    }
-], ids=["General wrapper configuration", "Without general wrapper configuration"])
-def test_wrapper_config_run(
+                "WRAPPER": {"JOBS_IN_WRAPPER": "job", "TYPE": "horizontal"},
+                "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other", "TYPE": "horizontal"},
+            }
+        },
+        "inspect",
+    ),
+    (
+        {
+            "WRAPPERS": {
+                "WRAPPER": {
+                    "JOBS_IN_WRAPPER": "job",
+                    "TYPE": "horizontal",
+                    "MAX_WRAPPED": 2,
+                },
+                "SECOND_WRAPPER": {
+                    "JOBS_IN_WRAPPER": "other",
+                    "TYPE": "horizontal",
+                    "MAX_WRAPPED": 2,
+                },
+            }
+        },
+        "inspect",
+    ),
+])
+def test_wrapper_config(
         wrappers: str,
+        command: str,
         autosubmit_exp,
         slurm_server: 'DockerContainer',
         tmp_path,
@@ -581,100 +615,21 @@ def test_wrapper_config_run(
     }
 
     as_exp = autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True)
-    as_exp.as_conf.set_last_as_command('run')
-    as_exp.autosubmit.run_experiment(expid=as_exp.expid)
-
+    if command == "run":
+        as_exp.as_conf.set_last_as_command('run')
+        as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    elif command == "inspect":
+        as_exp.as_conf.set_last_as_command('inspect')
+        as_exp.autosubmit.inspect(
+            expid=as_exp.expid,
+            lst=None,
+            check_wrapper=True,
+            force=True,
+            filter_chunks=None,
+            filter_section=None,
+            filter_status=None,
+            quick=False,
+        )
     templates_dir = Path(tmp_path) / as_exp.expid / "tmp"
-
-    asthread_files = list(templates_dir.rglob("*ASThread*"))
-    assert len(asthread_files) == 2 + 2  # 8 jobs in total, 2 wrappers with max 2 jobs each -> 4 ASThread files expected
-
-
-@pytest.mark.xdist_group("slurm")
-@pytest.mark.slurm
-@pytest.mark.parametrize("wrappers", [
-    {
-        "WRAPPERS": {
-            "MAX_WRAPPED": 2,
-            "WRAPPER": {"JOBS_IN_WRAPPER": "job", "TYPE": "horizontal"},
-            "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other", "TYPE": "horizontal"},
-        }
-    },
-    {
-        "WRAPPERS": {
-            "WRAPPER": {
-                "JOBS_IN_WRAPPER": "job",
-                "TYPE": "horizontal",
-                "MAX_WRAPPED": 2,
-            },
-            "SECOND_WRAPPER": {
-                "JOBS_IN_WRAPPER": "other",
-                "TYPE": "horizontal",
-                "MAX_WRAPPED": 2,
-            },
-            "THIRD_WRAPPER": {
-                "JOBS_IN_WRAPPER": "test&test2",
-                "TYPE": "horizontal",
-                "MAX_WRAPPED": 2,
-            },
-            "FOURTH_WRAPPER": {
-                "JOBS_IN_WRAPPER": "test3,test4",
-                "TYPE": "horizontal",
-                "MAX_WRAPPED": 2,
-            },
-            "FIFTH_WRAPPER": {
-                "JOBS_IN_WRAPPER": "test5 test6",
-                "TYPE": "horizontal",
-                "MAX_WRAPPED": 2,
-            },
-        }
-    }
-], ids=["General wrapper configuration", "Without general wrapper configuration"])
-def test_wrapper_config_inspect(
-        wrappers: str,
-        autosubmit_exp,
-        slurm_server: 'DockerContainer',
-        tmp_path,
-):
-    experiment_data = {
-        "EXPERIMENT": {"MEMBERS": "fc0 fc1 fc2 fc3"},
-        "PROJECT": {"PROJECT_TYPE": "None", "PROJECT_DIRECTORY": "local_project"},
-        "JOBS": {
-            "job": {
-                "SCRIPT": "echo 'Hello World'",
-                "PLATFORM": "TEST_SLURM",
-                "RUNNING": "member",
-                "wallclock": "00:01",
-            },
-            "other": {
-                "SCRIPT": "echo 'Hello World'",
-                "PLATFORM": "TEST_SLURM",
-                "RUNNING": "member",
-                "wallclock": "00:01",
-            },
-        },
-        "PLATFORMS": {
-            "TEST_SLURM": {
-                "ADD_PROJECT_TO_HOST": "False",
-                "HOST": "127.0.0.1",
-                "MAX_WALLCLOCK": "00:03",
-                "PROJECT": "group",
-                "QUEUE": "gp_debug",
-                "SCRATCH_DIR": "/tmp/scratch/",
-                "TEMP_DIR": "",
-                "TYPE": "slurm",
-                "USER": "root",
-                "PROCESSORS_PER_NODE": "4",
-                "MAX_PROCESSORS": "4",
-            }
-        },
-    }
-
-    as_exp = autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True)
-    as_exp.as_conf.set_last_as_command('inspect')
-    as_exp.autosubmit.inspect(expid=as_exp.expid, lst=None, check_wrapper=True, force=True, filter_chunks=None, filter_section=None, filter_status=None, quick=False)
-
-    templates_dir = Path(tmp_path) / as_exp.expid / "tmp"
-
     asthread_files = list(templates_dir.rglob("*ASThread*"))
     assert len(asthread_files) == 2 + 2  # 8 jobs in total, 2 wrappers with max 2 jobs each -> 4 ASThread files expected

@@ -1040,7 +1040,7 @@ class JobPackagerHorizontal(object):
         return current_package
 
     def create_sections_order(self, jobs_sections):
-        for i, section in enumerate(jobs_sections.split('&')):
+        for i, section in enumerate(jobs_sections):
             self._sort_order_dict[section] = i
 
     # EXIT FALSE IF A SECTION EXIST AND HAVE LESS PROCESSORS
