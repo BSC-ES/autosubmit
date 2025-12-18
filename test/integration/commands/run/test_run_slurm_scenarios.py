@@ -746,7 +746,13 @@ def test_wrapper_config(
         },
     }
 
+    if run_type.startswith("invalid-inspect"):
+        with pytest.raises(AutosubmitCritical):
+            autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True)
+        return
+
     as_exp = autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True)
+
     if run_type == "run":
         as_exp.as_conf.set_last_as_command('run')
         as_exp.autosubmit.run_experiment(expid=as_exp.expid)
