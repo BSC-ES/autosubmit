@@ -1,3 +1,4 @@
+from getpass import getuser
 from pathlib import Path
 from textwrap import dedent
 from typing import TYPE_CHECKING
@@ -9,6 +10,7 @@ from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical
 from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, _assert_db_fields, _assert_files_recovered, run_in_thread
+from test.integration.conftest import AutosubmitExperimentFixture
 
 if TYPE_CHECKING:
     from testcontainers.core.container import DockerContainer
@@ -505,7 +507,6 @@ def test_run_with_additional_files(
     else:
         exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
         _assert_exit_code(final_status, exit_code)
-
         project_remote_path = f"/tmp/scratch/group/root/{as_exp.expid}/LOG_{as_exp.expid}"
         for additional_filename in ["additional1.sh", "additional2.sh"]:
             for chunk in range(1, 1 + experiment_data_yaml.get("EXPERIMENT", {}).get("NUMCHUNKS", 1)):
@@ -515,6 +516,7 @@ def test_run_with_additional_files(
                 assert exit_code == 0, f"File {additional_filename} not found in remote project path."
 
 
+@pytest.mark.docker
 @pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
 @pytest.mark.parametrize("wrappers, run_type", [
@@ -585,6 +587,19 @@ def test_run_with_additional_files(
             },
             "&inspect",
     ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "job&other",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "quick-inspect",
+    ),
 ])
 def test_wrapper_config(
         wrappers: str,
@@ -631,7 +646,7 @@ def test_wrapper_config(
     if run_type == "run":
         as_exp.as_conf.set_last_as_command('run')
         as_exp.autosubmit.run_experiment(expid=as_exp.expid)
-    elif run_type == "inspect" or run_type == "&inspect":
+    elif run_type == "inspect" or run_type == "&inspect" or run_type == "quick-inspect":
         as_exp.as_conf.set_last_as_command('inspect')
         as_exp.autosubmit.inspect(
             expid=as_exp.expid,
@@ -641,9 +656,62 @@ def test_wrapper_config(
             filter_chunks=None,
             filter_section=None,
             filter_status=None,
-            quick=False,
+            quick=True if run_type == "quick-inspect" else False
         )
     templates_dir = Path(tmp_path) / as_exp.expid / "tmp"
     asthread_files = list(templates_dir.rglob("*ASThread*"))
     if run_type == "run" or run_type == "inspect":
         assert len(asthread_files) == 2 + 2  # 8 jobs in total, 2 wrappers with max 2 jobs each -> 4 ASThread files expected
+
+
+def test_inspect_wrappers(tmp_path, autosubmit_exp: 'AutosubmitExperimentFixture'):
+    """Test inspect with wrappers."""
+    user = getuser()
+    exp = autosubmit_exp(experiment_data={
+        'DEFAULT': {
+            'HPCARCH': 'TEST_PS'
+        },
+        'PLATFORMS': {
+            'TEST_PS': {
+                'CUSTOM_DIR': 'test',
+                'CUSTOM_DIR_POINTS_TO_OTHER_DIR': '%TEST_REFERENCE%',
+                'TYPE': 'ps',
+                'HOST': 'localhost',
+                'USER': user,
+                'SCRATCH_DIR': str(tmp_path),
+                'MAX_WALLCLOCK': '00:30'
+            }
+        },
+        'JOBS': {
+            'A': {
+                'SCRIPT': 'echo "Hello World"',
+                'RUNNING': 'once',
+                'PLATFORM': 'TEST_PS'
+            }
+        },
+        'WRAPPERS': {
+            'MIN_WRAPPED': 1,
+            'TEST_WRAPPER': {
+                'TYPE': 'vertical',
+                'JOBS_IN_WRAPPER': 'A'
+            }
+        }
+    }, include_jobs=False, create=True)
+    exp.as_conf.set_last_as_command('inspect')
+
+    # Inspect
+    exp.autosubmit.inspect(
+        expid=exp.expid,
+        lst=None,  # type: ignore
+        check_wrapper=True,
+        force=True,
+        filter_chunks=None,  # type: ignore
+        filter_section=None,  # type: ignore
+        filter_status=None,  # type: ignore
+        quick=True
+    )
+
+    templates_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR) / exp.expid / BasicConfig.LOCAL_TMP_DIR
+    templates_generated = [t for t in templates_dir.glob(f"{exp.expid}*.cmd")]
+
+    assert len(templates_generated) == 1
