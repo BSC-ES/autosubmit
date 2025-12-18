@@ -374,10 +374,8 @@ class JobsDbManager(DbManager):
             result = conn.execute(query)
             return [dict(row) for row in result.mappings().all()]
 
-    def load_wrappers(self, preview: bool = False, job_list: Any = None) -> Tuple[
-        List[dict[str, Any]], List[dict[str, Any]]]:
-        """
-        Load the wrapper jobs and their associated information from the database.
+    def load_wrappers(self, preview: bool = False, job_list: Any = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Load the wrapper jobs and their associated information from the database.
 
         :param preview: If True, use preview tables; otherwise, use production tables.
         :type preview: bool
@@ -387,10 +385,7 @@ class JobsDbManager(DbManager):
         :rtype: Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]
 
         """
-        if preview:
-            full_load = True
-        else:
-            full_load = False
+        full_load = preview
 
         if preview:
             innerjobs_table: Table = get_table_from_name(schema=self.schema, table_name=PreviewWrapperJobsTable.name)
@@ -533,7 +528,6 @@ class JobsDbManager(DbManager):
 
         self.create_table(experiment_structure_table.name)
         self.delete_all(experiment_structure_table.name)
-        self.create_table(experiment_structure_table.name)
 
     def clear_wrappers(self, preview: bool = True) -> None:
         """
@@ -567,7 +561,7 @@ class JobsDbManager(DbManager):
         for package in packages:
             where = {'id': package['id']}
             values = {'status': Status.VALUE_TO_KEY[int(package['status'])]}
-            self.update_where(wrapper_info_table.name, where, values)
+            self.update_where(wrapper_info_table.name, values, where)
 
     def get_wrappers_id_from_db(self) -> List[int]:
         """

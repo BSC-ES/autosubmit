@@ -2939,7 +2939,7 @@ class AutosubmitConfig(object):
                 splits = {}
                 for date_str in datelist:
                     splits[date_str] = []
-                    date = datetime.strptime(date_str, '%Y%M%d')
+                    date = datetime.strptime(date_str, '%Y%m%d')
                     for chunk in range(1, chunks + 1):
                         # Get the real splits for the section
                         Log.debug(f"Calculating splits for {section_name} on date {date_str} chunk {chunk}")

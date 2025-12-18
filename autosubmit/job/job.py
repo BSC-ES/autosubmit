@@ -168,7 +168,7 @@ class Job(object):
         'parameters', '_tmp_path', '_log_path', '_platform', 'check',
         'check_warnings', '_packed', 'hold', 'distance_weight', 'level', '_export',
         '_dependencies', 'running', 'ext_header_path', 'ext_tailer_path',
-        'edge_info', 'total_jobs', 'max_waiting_jobs', 'exclusive', '_retrials',
+        'total_jobs', 'max_waiting_jobs', 'exclusive', '_retrials',
         'current_checkpoint_step', 'max_checkpoint_step', 'reservation',
         'delete_when_edgeless', 'het', 'updated_log',
         'submit_time_timestamp', 'start_time_timestamp', 'finish_time_timestamp',
