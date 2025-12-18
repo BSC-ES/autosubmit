@@ -676,7 +676,7 @@ def test_run_with_additional_files(
                     },
                 }
             },
-            "invalid-inspect6",
+            "invalid-inspect6-empty",
     ),
     (
             {
@@ -746,7 +746,7 @@ def test_wrapper_config(
         },
     }
 
-    if run_type.startswith("invalid-inspect"):
+    if run_type.startswith("invalid-inspect") and "empty" in run_type:
         with pytest.raises(AutosubmitCritical):
             autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True)
         return
