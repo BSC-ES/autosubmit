@@ -49,7 +49,6 @@ from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import _create_ssh_client
-# noinspection PyProtectedMember
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from test.integration.test_utils.networking import get_free_port
@@ -193,7 +192,7 @@ def autosubmit_exp(
         conf_dir = exp_path / "conf"
         global_logs = Path(BasicConfig.GLOBAL_LOG_DIR)
         global_logs.mkdir(parents=True, exist_ok=True)
-        #TODO: Autosubmit.install issue https://github.com/BSC-ES/autosubmit/issues/1328
+        # TODO: Autosubmit.install issue https://github.com/BSC-ES/autosubmit/issues/1328
         Path(BasicConfig.STRUCTURES_DIR).mkdir(parents=True, exist_ok=True)
         exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
         aslogs_dir = exp_tmp_dir / BasicConfig.LOCAL_ASLOG_DIR

@@ -84,7 +84,7 @@ class Migrate:
                             finished = False
                             pipeline_broke = False
                             Log.info(
-                                "Rsync launched {0} times. Can take up to 150 retrials or until all data is transferred".format(
+                                "Rsync launched {0} times. Can take up to 150 retries or until all data is transferred".format(
                                     rsync_retries + 1))
                             try:
                                 p.send_command(

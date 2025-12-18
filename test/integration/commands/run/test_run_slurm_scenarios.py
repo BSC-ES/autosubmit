@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 # -- Tests
 
+@pytest.mark.docker
 @pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
@@ -187,6 +188,7 @@ def test_run_uninterrupted(
         pytest.fail(e_msg)
 
 
+@pytest.mark.docker
 @pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
@@ -354,6 +356,7 @@ def test_run_interrupted(
     _assert_exit_code(final_status, exit_code)
 
 
+@pytest.mark.docker
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
 
     # Failure
@@ -399,6 +402,7 @@ def test_run_failed_set_to_ready_on_new_run(
     _assert_exit_code("SUCCESS", exit_code)
 
 
+@pytest.mark.docker
 @pytest.mark.xdist_group("slurm")
 @pytest.mark.timeout(300)
 @pytest.mark.slurm
