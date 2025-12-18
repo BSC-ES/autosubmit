@@ -434,7 +434,6 @@ PLATFORMS:
         TYPE: 'slurm'
         USER: 'root'
     """), "COMPLETED"),
-
     (dedent("""\
 PROJECT:
     PROJECT_TYPE: local
@@ -463,25 +462,40 @@ PLATFORMS:
         USER: 'root'
 """), "FAILED"),
 ], ids=["All files exist", "One file missing"])
-def test_run_with_additional_files(
+@pytest.mark.parametrize("include_wrappers", [False, True], ids=["no_wrappers", "wrappers"])
+def test_run_with_additional_files_merged(
         jobs_data: str,
         final_status: str,
+        include_wrappers: bool,
         autosubmit_exp,
         slurm_server: 'DockerContainer',
         tmp_path,
-):
+) -> None:
+    yaml = YAML(typ='rt')
     project_path = Path(tmp_path) / "org_templates"
     jobs_data = jobs_data.replace("tofill", str(project_path))
     project_path.mkdir(parents=True, exist_ok=True)
-    with open(project_path / "test.sh", 'w') as f:
-        f.write('echo "main script."\n')
-    with open(project_path / "additional1.sh", 'w') as f:
-        f.write('echo "additional file 1."\n')
-    with open(project_path / "additional2.sh", 'w') as f:
-        f.write('echo "additional file 2."\n')
 
-    yaml = YAML(typ='rt')
-    as_exp = autosubmit_exp(experiment_data=yaml.load(jobs_data), include_jobs=False, create=True)
+    (project_path / "test.sh").write_text('echo "main script."\n')
+    (project_path / "additional1.sh").write_text('echo "additional file 1."\n')
+    (project_path / "additional2.sh").write_text('echo "additional file 2."\n')
+
+    experiment_data_yaml = yaml.load(jobs_data)
+    if include_wrappers:
+        wrappers_dict = {
+            "WRAPPERS": {
+                "WRAPPER": {
+                    "JOBS_IN_WRAPPER": "job",
+                    "TYPE": "vertical",
+                }
+            },
+            "EXPERIMENT": {
+                "NUMCHUNKS": '2'
+            }
+        }
+        experiment_data_yaml.update(wrappers_dict)
+
+    as_exp = autosubmit_exp(experiment_data=experiment_data_yaml, include_jobs=False, create=True)
     as_exp.as_conf.set_last_as_command('run')
 
     if final_status == "FAILED":
@@ -490,3 +504,10 @@ def test_run_with_additional_files(
     else:
         exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
         _assert_exit_code(final_status, exit_code)
+
+        project_remote_path = f"/tmp/scratch/group/root/{as_exp.expid}/LOG_{as_exp.expid}"
+        for filename in ["additional1.sh", "additional2.sh"]:
+            remote_name = filename.replace(".sh", "_JOB")
+            command = f"cat {project_remote_path}/{remote_name}"
+            exit_code, output = slurm_server.exec(["bash", "-c", command])
+            assert exit_code == 0, f"File {filename} not found in remote project path."
