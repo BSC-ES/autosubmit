@@ -669,7 +669,7 @@ def test_run_with_additional_files(
             {
                 "WRAPPERS": {
                     "WRAPPER": {
-                        "JOBS_IN_WRAPPER": "[',']",
+                        "JOBS_IN_WRAPPER": "[',']",  # it is empty, because the "," is stripped somewhere
                         "TYPE": "horizontal-vertical",
                         "MAX_WRAPPED": 2,
                         "MIN_WRAPPED": 1
@@ -746,9 +746,10 @@ def test_wrapper_config(
         },
     }
 
+    # empty ones raises an Autosubmit error in the create, must be coming from other part of the code
     if run_type.startswith("invalid-inspect") and "empty" in run_type:
         with pytest.raises(AutosubmitCritical):
-            autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True)
+            autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True, check_wrappers=True)
         return
 
     as_exp = autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True)
