@@ -1699,10 +1699,8 @@ class JobList(object):
                         # num_chunks from JOB TYPE (section)
                         # Important to note that the only differentiating factor would be chunk
                         # OR num_chunks
-                        jobs_to_sort = sorted(jobs_to_sort, key=lambda k: (
-                            k.name.split('_')[1], (k.name.split('_')[2]), (int(k.name.split('_')[3])
-                                                                           if len(
-                                k.name.split('_')) == 5 else num_chunks + 1)))
+
+                        jobs_to_sort = sorted(jobs_to_sort, key=lambda k: (k.chunk if k.chunk else num_chunks + 1))
 
                         # Bringing back original job if identified
                         for idx in range(0, len(jobs_to_sort)):

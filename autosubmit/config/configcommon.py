@@ -550,6 +550,9 @@ class AutosubmitConfig(object):
 
     @staticmethod
     def _normalize_wrappers_section(data_fixed: dict) -> None:
+        """Normalize the WRAPPERS section to a consistent format so there is no issues during runtime.
+        :param data_fixed: The input data dictionary to normalize.
+        """
         wrappers = data_fixed.get("WRAPPERS", {})
         for wrapper, wrapper_data in wrappers.items():
             if isinstance(wrapper_data, dict):
@@ -570,7 +573,19 @@ class AutosubmitConfig(object):
                         jobs_in_wrapper = jobs_in_wrapper.split("&")
                     else:
                         jobs_in_wrapper = jobs_in_wrapper.split()
-                data_fixed["WRAPPERS"][wrapper]["JOBS_IN_WRAPPER"] = [job.upper().strip(" ,") for job in jobs_in_wrapper]
+                sanitazed_jobs_in_wrapper = [job.upper().strip(" ,") for job in jobs_in_wrapper]
+                if jobs_in_wrapper is not None:
+                    for element in sanitazed_jobs_in_wrapper:
+                        if not isinstance(element, str):
+                            raise AutosubmitCritical(f"JOBS_IN_WRAPPER in WRAPPERS. {wrapper} must be a list of strings", 7014)
+                        elif "&" in element or "," in element:
+                            raise AutosubmitCritical(f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} contains invalid characters '&' or ','", 7014)
+                    if not sanitazed_jobs_in_wrapper:
+                        raise AutosubmitCritical(
+                            f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} is empty after normalization",
+                            7014
+                        )
+                    data_fixed["WRAPPERS"][wrapper]["JOBS_IN_WRAPPER"] = sanitazed_jobs_in_wrapper
                 data_fixed["WRAPPERS"][wrapper]["TYPE"] = str(wrapper_data.get("TYPE", "vertical")).lower()
 
     @staticmethod

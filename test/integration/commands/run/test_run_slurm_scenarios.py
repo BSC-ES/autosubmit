@@ -524,8 +524,8 @@ def test_run_with_additional_files(
         {
             "WRAPPERS": {
                 "MAX_WRAPPED": 2,
-                "WRAPPER": {"JOBS_IN_WRAPPER": "job", "TYPE": "horizontal"},
-                "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other", "TYPE": "horizontal"},
+                "WRAPPER": {"JOBS_IN_WRAPPER": "job_some", "TYPE": "horizontal"},
+                "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other_some", "TYPE": "horizontal"},
             }
         },
         "run",
@@ -534,12 +534,12 @@ def test_run_with_additional_files(
         {
             "WRAPPERS": {
                 "WRAPPER": {
-                    "JOBS_IN_WRAPPER": "job",
+                    "JOBS_IN_WRAPPER": "job_some",
                     "TYPE": "horizontal",
                     "MAX_WRAPPED": 2,
                 },
                 "SECOND_WRAPPER": {
-                    "JOBS_IN_WRAPPER": "other",
+                    "JOBS_IN_WRAPPER": "other_some",
                     "TYPE": "horizontal",
                     "MAX_WRAPPED": 2,
                 },
@@ -551,8 +551,8 @@ def test_run_with_additional_files(
         {
             "WRAPPERS": {
                 "MAX_WRAPPED": 2,
-                "WRAPPER": {"JOBS_IN_WRAPPER": "job", "TYPE": "horizontal"},
-                "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other", "TYPE": "horizontal"},
+                "WRAPPER": {"JOBS_IN_WRAPPER": "job_some", "TYPE": "horizontal"},
+                "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other_some", "TYPE": "horizontal"},
             }
         },
         "inspect",
@@ -561,12 +561,12 @@ def test_run_with_additional_files(
         {
             "WRAPPERS": {
                 "WRAPPER": {
-                    "JOBS_IN_WRAPPER": "job",
+                    "JOBS_IN_WRAPPER": "job_some",
                     "TYPE": "horizontal",
                     "MAX_WRAPPED": 2,
                 },
                 "SECOND_WRAPPER": {
-                    "JOBS_IN_WRAPPER": "other",
+                    "JOBS_IN_WRAPPER": "other_some",
                     "TYPE": "horizontal",
                     "MAX_WRAPPED": 2,
                 },
@@ -578,7 +578,7 @@ def test_run_with_additional_files(
             {
                 "WRAPPERS": {
                     "WRAPPER": {
-                        "JOBS_IN_WRAPPER": "job&other",
+                        "JOBS_IN_WRAPPER": "job_some&other_some",
                         "TYPE": "horizontal-vertical",
                         "MAX_WRAPPED": 2,
                         "MIN_WRAPPED": 1
@@ -591,7 +591,7 @@ def test_run_with_additional_files(
             {
                 "WRAPPERS": {
                     "WRAPPER": {
-                        "JOBS_IN_WRAPPER": "job&other",
+                        "JOBS_IN_WRAPPER": "job_some&other_some",
                         "TYPE": "horizontal-vertical",
                         "MAX_WRAPPED": 2,
                         "MIN_WRAPPED": 1
@@ -599,6 +599,110 @@ def test_run_with_additional_files(
                 }
             },
             "quick-inspect",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "[1,2,3,4]",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect1",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "[&]",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect2",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "&",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect3",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": ",",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect4",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect-empty-string",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "[',']",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect6",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "['&']",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect8",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": [],
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect-empty-list",
     ),
 ])
 def test_wrapper_config(
@@ -612,13 +716,13 @@ def test_wrapper_config(
         "EXPERIMENT": {"MEMBERS": "fc0 fc1 fc2 fc3"},
         "PROJECT": {"PROJECT_TYPE": "None", "PROJECT_DIRECTORY": "local_project"},
         "JOBS": {
-            "job": {
+            "job_some": {
                 "SCRIPT": "echo 'Hello World'",
                 "PLATFORM": "TEST_SLURM",
                 "RUNNING": "member",
                 "wallclock": "00:01",
             },
-            "other": {
+            "other_some": {
                 "SCRIPT": "echo 'Hello World'",
                 "PLATFORM": "TEST_SLURM",
                 "RUNNING": "member",
@@ -658,6 +762,20 @@ def test_wrapper_config(
             filter_status=None,
             quick=True if run_type == "quick-inspect" else False
         )
+    elif run_type.startswith("invalid-inspect"):
+        as_exp.as_conf.set_last_as_command('inspect')
+        with pytest.raises(AutosubmitCritical):
+            as_exp.autosubmit.inspect(
+                expid=as_exp.expid,
+                lst=None,
+                check_wrapper=True,
+                force=True,
+                filter_chunks=None,
+                filter_section=None,
+                filter_status=None,
+                quick=False
+            )
+        return
     templates_dir = Path(tmp_path) / as_exp.expid / "tmp"
     asthread_files = list(templates_dir.rglob("*ASThread*"))
     if run_type == "run" or run_type == "inspect":
