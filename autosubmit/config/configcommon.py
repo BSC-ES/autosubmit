@@ -29,7 +29,7 @@ from collections import defaultdict
 from contextlib import suppress
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, Iterable
 
 from bscearth.utils.date import parse_date
 from configobj import ConfigObj
@@ -523,17 +523,18 @@ class AutosubmitConfig(object):
                 unified_config[key] = new_dict[key]
         return unified_config
 
-    def normalize_variables(self, data: dict, must_exists: bool) -> dict:
+    def normalize_variables(self, data: dict, must_exists: bool, raise_exception: bool = False) -> dict:
         """
         Apply some memory internal variables to normalize its format. (right now only dependencies)
 
         :param data: The input data dictionary to normalize.
         :param must_exists: If false, add the sections that are not present in the data dictionary.
+        :param raise_exception: If true, raise exception on errors. It is only True after all data is loaded.
         :return: The normalized data dictionary.
         """
         data = self.deep_normalize(data)
         self._normalize_default_section(data)
-        self._normalize_wrappers_section(data)
+        self._normalize_wrappers_section(data, raise_exception)
         self._normalize_jobs_section(data, must_exists)
 
         return data
@@ -549,44 +550,77 @@ class AutosubmitConfig(object):
                 pass
 
     @staticmethod
-    def _normalize_wrappers_section(data_fixed: dict) -> None:
+    def _normalize_jobs_in_wrapper(
+        wrapper: str,
+        wrapper_data: dict[str, Any],
+        job_sections: Iterable[str],
+        raise_exception: bool,
+    ) -> None:
+        """Normalize the JOBS_IN_WRAPPER field for a wrapper.
+
+        Ensure the wrapper includes a non-empty list of valid job section names,
+        optionally raising if the field is missing or invalid.
+        :param wrapper: The name of the wrapper being normalized.
+        :param wrapper_data: The data dictionary for the specific wrapper.
+        :param job_sections: The valid job section names to check against.
+        :param raise_exception: If true, raise exception on errors. It is only True after all data is loaded.
+        :return: None
+        """
+        jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", None)
+
+        if raise_exception and not jobs_in_wrapper:
+            raise AutosubmitCritical(f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} is missing or empty. This is a mandatory parameter.", 7014)
+
+        elif raise_exception and not isinstance(jobs_in_wrapper, list) and not isinstance(jobs_in_wrapper, str):
+            raise AutosubmitCritical(
+                f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} must be a list or a string",
+                7014
+            )
+
+        if isinstance(jobs_in_wrapper, str):
+            # if it is a list in string format (due to "%" in the string).
+            if "[" in jobs_in_wrapper:
+                jobs_in_wrapper = jobs_in_wrapper.strip("[]").replace("'", "").replace(" ", "").replace(",", " ")
+            if "," in jobs_in_wrapper:
+                jobs_in_wrapper = jobs_in_wrapper.split(",")
+            elif "&" in jobs_in_wrapper:
+                jobs_in_wrapper = jobs_in_wrapper.split("&")
+            else:
+                jobs_in_wrapper = jobs_in_wrapper.split()
+
+        sanitized_jobs_in_wrapper = []
+        for job in jobs_in_wrapper:
+            if isinstance(job, str):
+                sanitized_jobs_in_wrapper.append(job.upper().strip())
+            else:
+                sanitized_jobs_in_wrapper.append(job)
+
+        if raise_exception:
+            for element in sanitized_jobs_in_wrapper:
+                if not isinstance(element, str):
+                    raise AutosubmitCritical(f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} must be a list of strings", 7014)
+                elif len(element) == 0:
+                    raise AutosubmitCritical(f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} contains empty job names ( check for double ,, or double && )", 7014)
+                elif element not in job_sections:
+                    raise AutosubmitCritical(f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} contains job: {element} that is not defined in JOBS section", 7014)
+
+        wrapper_data["JOBS_IN_WRAPPER"] = sanitized_jobs_in_wrapper
+
+    @staticmethod
+    def _normalize_wrappers_section(data_fixed: dict, raise_exception: bool = False) -> None:
         """Normalize the WRAPPERS section to a consistent format so there is no issues during runtime.
         :param data_fixed: The input data dictionary to normalize.
+        :param raise_exception: If true, raise exception on errors. It is only True after all data is loaded.
+        :return: None
         """
         wrappers = data_fixed.get("WRAPPERS", {})
         for wrapper, wrapper_data in wrappers.items():
             if isinstance(wrapper_data, dict):
-                jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", None)
-                if jobs_in_wrapper:
-                    if not isinstance(jobs_in_wrapper, list) and not isinstance(jobs_in_wrapper, str):
-                        raise AutosubmitCritical(
-                            f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} must be a list or a string",
-                            7014
-                        )
-                if isinstance(jobs_in_wrapper, str):
-                    # if it is a list in string format (due to "%" in the string).
-                    if "[" in jobs_in_wrapper:
-                        jobs_in_wrapper = jobs_in_wrapper.strip("[]").replace("'", "").replace(" ", "").replace(",", " ")
-                    if "," in jobs_in_wrapper:
-                        jobs_in_wrapper = jobs_in_wrapper.split(",")
-                    elif "&" in jobs_in_wrapper:
-                        jobs_in_wrapper = jobs_in_wrapper.split("&")
-                    else:
-                        jobs_in_wrapper = jobs_in_wrapper.split()
-                sanitazed_jobs_in_wrapper = [job.upper().strip(" ,") for job in jobs_in_wrapper]
-                if jobs_in_wrapper is not None:
-                    for element in sanitazed_jobs_in_wrapper:
-                        if not isinstance(element, str):
-                            raise AutosubmitCritical(f"JOBS_IN_WRAPPER in WRAPPERS. {wrapper} must be a list of strings", 7014)
-                        elif "&" in element or "," in element:
-                            raise AutosubmitCritical(f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} contains invalid characters '&' or ','", 7014)
-                    if not sanitazed_jobs_in_wrapper:
-                        raise AutosubmitCritical(
-                            f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} is empty after normalization",
-                            7014
-                        )
-                    data_fixed["WRAPPERS"][wrapper]["JOBS_IN_WRAPPER"] = sanitazed_jobs_in_wrapper
-                data_fixed["WRAPPERS"][wrapper]["TYPE"] = str(wrapper_data.get("TYPE", "vertical")).lower()
+                AutosubmitConfig._normalize_jobs_in_wrapper(wrapper, wrapper_data, data_fixed.get("JOBS", {}).keys(), raise_exception)
+                if "TYPE" in wrapper_data:
+                    data_fixed["WRAPPERS"][wrapper]["TYPE"] = str(wrapper_data["TYPE"]).lower()
+                elif raise_exception:
+                    raise AutosubmitCritical(f"TYPE in WRAPPERS.{wrapper} is missing. This is a mandatory parameter.", 7014)
 
     @staticmethod
     def _normalize_notify_on(data_fixed: dict, job_section) -> None:
@@ -1860,7 +1894,7 @@ class AutosubmitConfig(object):
                 BasicConfig.LOCAL_ROOT_DIR, self.expid)
             self.experiment_data['PROJDIR'] = self.get_project_dir()
             self.experiment_data.update(BasicConfig().props())
-            self.experiment_data = self.normalize_variables(self.experiment_data, must_exists=True)
+            self.experiment_data = self.normalize_variables(self.experiment_data, must_exists=True, raise_exception=True)
             self.experiment_data = self.deep_read_loops(self.experiment_data)
             self.experiment_data = self.substitute_dynamic_variables(self.experiment_data, in_the_end=True)
             self._add_autosubmit_dict()

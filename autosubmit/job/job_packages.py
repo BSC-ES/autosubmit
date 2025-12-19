@@ -53,7 +53,7 @@ def threaded(fn):
 
 
 def jobs_in_wrapper_str(as_conf: 'AutosubmitConfig', current_wrapper: str) -> list[str]:
-    " transform to string with _ separator the jobs in the wrapper "
+    """Transform to string with _ separator the jobs in the wrapper."""
     return "_".join(as_conf.experiment_data["WRAPPERS"].get(current_wrapper, {}).get("JOBS_IN_WRAPPER", []))
 
 

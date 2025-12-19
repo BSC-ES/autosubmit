@@ -426,6 +426,18 @@ def test_normalize_variables(autosubmit_config, data, expected_data, must_exists
 
 def test_normalize_wrappers_jobs_in_wrapper(autosubmit_config):
     input_data = {
+        "JOBS": {
+            "JOB1": {},
+            "JOB2": {},
+            "JOB3": {},
+            "JOB4": {},
+            "JOB5": {},
+            "JOB6": {},
+            "JOB7": {},
+            "JOB8": {},
+            "JOB9": {},
+            "JOB10": {},
+        },
         'WRAPPERS': {
             "WRAPPER1": {
                 "JOBS_IN_WRAPPER": "job1 job2",
@@ -451,45 +463,55 @@ def test_normalize_wrappers_jobs_in_wrapper(autosubmit_config):
     }
 
     expected_data = {
-            "WRAPPER1": {
-                "JOBS_IN_WRAPPER": ["JOB1", "JOB2"],
-                "TYPE": "vertical"
-            },
-            "WRAPPER2": {
-                "JOBS_IN_WRAPPER": ["JOB3", "JOB4"],
-                "TYPE": "horizontal"
-            },
-            "WRAPPER3": {
-                "JOBS_IN_WRAPPER": ["JOB5", "JOB6"],
-                "TYPE": "horizontal"
-            },
-            "WRAPPER4": {
-                "JOBS_IN_WRAPPER": ["JOB7", "JOB8"],
-                "TYPE": "vertical"
-            },
-            "WRAPPER5": {
-                "JOBS_IN_WRAPPER": ["JOB9", "JOB10"],
-                "TYPE": "horizontal"
-            },
-        }
-
+        "WRAPPER1": {
+            "JOBS_IN_WRAPPER": ["JOB1", "JOB2"],
+            "TYPE": "vertical"
+        },
+        "WRAPPER2": {
+            "JOBS_IN_WRAPPER": ["JOB3", "JOB4"],
+            "TYPE": "horizontal"
+        },
+        "WRAPPER3": {
+            "JOBS_IN_WRAPPER": ["JOB5", "JOB6"],
+            "TYPE": "horizontal"
+        },
+        "WRAPPER4": {
+            "JOBS_IN_WRAPPER": ["JOB7", "JOB8"],
+            "TYPE": "vertical"
+        },
+        "WRAPPER5": {
+            "JOBS_IN_WRAPPER": ["JOB9", "JOB10"],
+            "TYPE": "horizontal"
+        },
+    }
 
     as_conf = autosubmit_config(expid='t000', experiment_data=input_data)
-    as_conf._normalize_wrappers_section(input_data)
+    as_conf._normalize_wrappers_section(input_data, raise_exception=True)
     assert as_conf.experiment_data["WRAPPERS"] == expected_data
-    as_conf._normalize_wrappers_section(input_data)
+    as_conf._normalize_wrappers_section(input_data, raise_exception=True)
     assert as_conf.experiment_data["WRAPPERS"] == expected_data
 
 
-def test_normalize_wrappers_raise_error(autosubmit_config):
+@pytest.mark.parametrize(
+    "wrappers",
+    [
+        pytest.param({"WRAPPER1": {"JOBS_IN_WRAPPER": {"bla": "bla"}, "TYPE": "VERTICAL"}}, id="mapping_not_allowed"),
+        pytest.param({"WRAPPER2": {"JOBS_IN_WRAPPER": 12345, "TYPE": "VERTICAL"}}, id="non_iterable_value"),
+        pytest.param({"WRAPPER3": {"JOBS_IN_WRAPPER": None, "TYPE": "VERTICAL"}}, id="none_value"),
+        pytest.param({"WRAPPER4": {"TYPE": "VERTICAL"}}, id="missing_key"),
+        pytest.param({"WRAPPER5": {"JOBS_IN_WRAPPER": ["JOB1", "NON_EXISTENT_JOB"], "TYPE": "VERTICAL"}}, id="unknown_job"),
+        pytest.param({"WRAPPER6": {"JOBS_IN_WRAPPER": [], "TYPE": "VERTICAL"}}, id="empty_list"),
+        pytest.param({"WRAPPER7": {"JOBS_IN_WRAPPER": ["", " "], "TYPE": "VERTICAL"}}, id="blank_entries"),
+        pytest.param({"WRAPPER8": {"JOBS_IN_WRAPPER": ["JOB1", 123]}, "TYPE": "VERTICAL"}, id="non_string_job_name"),
+        pytest.param({"WRAPPER9": {"JOBS_IN_WRAPPER": ["JOB1"]}}, id="type_not_found"),
+    ],
+)
+def test_normalize_wrappers_raise_error(autosubmit_config, wrappers):
     input_data = {
-        'WRAPPERS': {
-            "WRAPPER1": {
-                "JOBS_IN_WRAPPER": {"bla": "bla"},
-            },
-        }
+        "JOBS": {"JOB1": {}, "JOB2": {}},
+        "WRAPPERS": wrappers,
     }
 
     as_conf = autosubmit_config(expid='t000', experiment_data=input_data)
     with pytest.raises(AutosubmitCritical):
-        as_conf._normalize_wrappers_section(input_data)
+        as_conf._normalize_wrappers_section(input_data, raise_exception=True)
