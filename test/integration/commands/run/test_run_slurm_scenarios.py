@@ -746,32 +746,17 @@ def test_wrapper_config(
         },
     }
 
-    # empty ones raises an Autosubmit error in the create, must be coming from other part of the code
-    if run_type.startswith("invalid-inspect") and "empty" in run_type:
+    if run_type.startswith("invalid"):
         with pytest.raises(AutosubmitCritical):
             autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True, check_wrappers=True)
-        return
+    else:
+        as_exp = autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True)
 
-    as_exp = autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True)
-
-    if run_type == "run":
-        as_exp.as_conf.set_last_as_command('run')
-        as_exp.autosubmit.run_experiment(expid=as_exp.expid)
-    elif run_type == "inspect" or run_type == "&inspect" or run_type == "quick-inspect":
-        as_exp.as_conf.set_last_as_command('inspect')
-        as_exp.autosubmit.inspect(
-            expid=as_exp.expid,
-            lst=None,
-            check_wrapper=True,
-            force=True,
-            filter_chunks=None,
-            filter_section=None,
-            filter_status=None,
-            quick=True if run_type == "quick-inspect" else False
-        )
-    elif run_type.startswith("invalid-inspect"):
-        as_exp.as_conf.set_last_as_command('inspect')
-        with pytest.raises(AutosubmitCritical):
+        if run_type == "run":
+            as_exp.as_conf.set_last_as_command('run')
+            as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+        else:
+            as_exp.as_conf.set_last_as_command('inspect')
             as_exp.autosubmit.inspect(
                 expid=as_exp.expid,
                 lst=None,
@@ -780,13 +765,12 @@ def test_wrapper_config(
                 filter_chunks=None,
                 filter_section=None,
                 filter_status=None,
-                quick=False
+                quick=True if run_type == "quick-inspect" else False
             )
-        return
-    templates_dir = Path(tmp_path) / as_exp.expid / "tmp"
-    asthread_files = list(templates_dir.rglob("*ASThread*"))
-    if run_type == "run" or run_type == "inspect":
-        assert len(asthread_files) == 2 + 2  # 8 jobs in total, 2 wrappers with max 2 jobs each -> 4 ASThread files expected
+        templates_dir = Path(tmp_path) / as_exp.expid / "tmp"
+        asthread_files = list(templates_dir.rglob("*ASThread*"))
+        if run_type == "run" or run_type == "inspect":
+            assert len(asthread_files) == 2 + 2  # 8 jobs in total, 2 wrappers with max 2 jobs each -> 4 ASThread files expected
 
 
 def test_inspect_wrappers(tmp_path, autosubmit_exp: 'AutosubmitExperimentFixture'):
