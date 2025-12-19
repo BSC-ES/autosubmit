@@ -408,6 +408,8 @@ def test_run_failed_set_to_ready_on_new_run(
 @pytest.mark.slurm
 @pytest.mark.parametrize("jobs_data,final_status", [
     (dedent("""\
+EXPERIMENT:
+    NUMCHUNKS: 2
 PROJECT:
     PROJECT_TYPE: local
     PROJECT_DIRECTORY: local_project
@@ -420,7 +422,7 @@ JOBS:
             - "additional1.sh"
             - "additional2.sh"
         PLATFORM: TEST_SLURM
-        RUNNING: once
+        RUNNING: chunk
         wallclock: 00:01
 PLATFORMS:
     TEST_SLURM:
@@ -434,7 +436,6 @@ PLATFORMS:
         TYPE: 'slurm'
         USER: 'root'
     """), "COMPLETED"),
-
     (dedent("""\
 PROJECT:
     PROJECT_TYPE: local
@@ -448,7 +449,9 @@ JOBS:
             - "additional1.sh"
             - "thisdoesntexists.sh"
         PLATFORM: TEST_SLURM
-        RUNNING: once
+        DEPENDENCIES:
+          job-1:
+        RUNNING: chunk
         wallclock: 00:01
 PLATFORMS:
     TEST_SLURM:
@@ -463,25 +466,37 @@ PLATFORMS:
         USER: 'root'
 """), "FAILED"),
 ], ids=["All files exist", "One file missing"])
+@pytest.mark.parametrize("include_wrappers", [False, True], ids=["no_wrappers", "wrappers"])
 def test_run_with_additional_files(
         jobs_data: str,
         final_status: str,
+        include_wrappers: bool,
         autosubmit_exp,
         slurm_server: 'DockerContainer',
         tmp_path,
 ):
+    yaml = YAML(typ='rt')
     project_path = Path(tmp_path) / "org_templates"
     jobs_data = jobs_data.replace("tofill", str(project_path))
     project_path.mkdir(parents=True, exist_ok=True)
-    with open(project_path / "test.sh", 'w') as f:
-        f.write('echo "main script."\n')
-    with open(project_path / "additional1.sh", 'w') as f:
-        f.write('echo "additional file 1."\n')
-    with open(project_path / "additional2.sh", 'w') as f:
-        f.write('echo "additional file 2."\n')
 
-    yaml = YAML(typ='rt')
-    as_exp = autosubmit_exp(experiment_data=yaml.load(jobs_data), include_jobs=False, create=True)
+    (project_path / "test.sh").write_text('echo "main script."\n')
+    (project_path / "additional1.sh").write_text('echo "additional file 1."\n')
+    (project_path / "additional2.sh").write_text('echo "additional file 2."\n')
+
+    experiment_data_yaml = yaml.load(jobs_data)
+    if include_wrappers:
+        wrappers_dict = {
+            "WRAPPERS": {
+                "WRAPPER": {
+                    "JOBS_IN_WRAPPER": "JOB",
+                    "TYPE": "vertical",
+                }
+            },
+        }
+        experiment_data_yaml.update(wrappers_dict)
+
+    as_exp = autosubmit_exp(experiment_data=experiment_data_yaml, include_jobs=False, create=True)
     as_exp.as_conf.set_last_as_command('run')
 
     if final_status == "FAILED":
@@ -490,3 +505,11 @@ def test_run_with_additional_files(
     else:
         exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
         _assert_exit_code(final_status, exit_code)
+
+        project_remote_path = f"/tmp/scratch/group/root/{as_exp.expid}/LOG_{as_exp.expid}"
+        for additional_filename in ["additional1.sh", "additional2.sh"]:
+            for chunk in range(1, 1 + experiment_data_yaml.get("EXPERIMENT", {}).get("NUMCHUNKS", 1)):
+                remote_name = additional_filename.replace(".sh", f'_20000101_fc0_{chunk}_JOB')
+                command = f"cat {project_remote_path}/{remote_name}"
+                exit_code, output = slurm_server.exec(["bash", "-c", command])
+                assert exit_code == 0, f"File {additional_filename} not found in remote project path."

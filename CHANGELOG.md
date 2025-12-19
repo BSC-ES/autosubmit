@@ -41,6 +41,7 @@ release.
 - Fixed "Unexpected error: 'list' object has no attribute 'status'" when running experiments #2463
 - Tentative *fix for an issue with the HPC* missing variables in the templates #2432
 - Fixed issue where Autosubmit did not retry when there were networking issues in platforms #1369
+- Fixed an issue with additional files not being sent to the remote platform when using wrappers #1484
 
 **Enhancements:**
 
