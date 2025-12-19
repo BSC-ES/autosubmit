@@ -496,14 +496,14 @@ def test_normalize_wrappers_jobs_in_wrapper(autosubmit_config):
     "wrappers",
     [
         pytest.param({"WRAPPER1": {"JOBS_IN_WRAPPER": {"bla": "bla"}, "TYPE": "VERTICAL"}}, id="mapping_not_allowed"),
-        pytest.param({"WRAPPER2": {"JOBS_IN_WRAPPER": 12345, "TYPE": "VERTICAL"}}, id="non_iterable_value"),
+        pytest.param({"WRAPPER2": {"JOBS_IN_WRAPPER": 12345, "TYPE": "VERTICAL"}}, id="non_string_single_value"),
         pytest.param({"WRAPPER3": {"JOBS_IN_WRAPPER": None, "TYPE": "VERTICAL"}}, id="none_value"),
         pytest.param({"WRAPPER4": {"TYPE": "VERTICAL"}}, id="missing_key"),
         pytest.param({"WRAPPER5": {"JOBS_IN_WRAPPER": ["JOB1", "NON_EXISTENT_JOB"], "TYPE": "VERTICAL"}}, id="unknown_job"),
         pytest.param({"WRAPPER6": {"JOBS_IN_WRAPPER": [], "TYPE": "VERTICAL"}}, id="empty_list"),
         pytest.param({"WRAPPER7": {"JOBS_IN_WRAPPER": ["", " "], "TYPE": "VERTICAL"}}, id="blank_entries"),
         pytest.param({"WRAPPER8": {"JOBS_IN_WRAPPER": ["JOB1", 123]}, "TYPE": "VERTICAL"}, id="non_string_job_name"),
-        pytest.param({"WRAPPER9": {"JOBS_IN_WRAPPER": ["JOB1"]}}, id="type_not_found"),
+        pytest.param({"WRAPPER9": {"JOBS_IN_WRAPPER": ["JOB1"]}}, id="type_variable_not_found"),
     ],
 )
 def test_normalize_wrappers_raise_error(autosubmit_config, wrappers):
