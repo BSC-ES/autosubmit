@@ -52,16 +52,9 @@ def threaded(fn):
     return wrapper
 
 
-def jobs_in_wrapper_str(as_conf, current_wrapper):
-    jobs_in_wrapper = as_conf.experiment_data["WRAPPERS"].get(current_wrapper, {}).get("JOBS_IN_WRAPPER", "")
-    if "," in jobs_in_wrapper:
-        jobs_in_wrapper = jobs_in_wrapper.split(",")
-    elif "&" in jobs_in_wrapper:
-        jobs_in_wrapper = jobs_in_wrapper.split("&")
-    else:
-        jobs_in_wrapper = jobs_in_wrapper.split(" ")
-    jobs_in_wrapper = [job.strip(" ,") for job in jobs_in_wrapper]
-    return "_".join(jobs_in_wrapper)
+def jobs_in_wrapper_str(as_conf: 'AutosubmitConfig', current_wrapper: str) -> list[str]:
+    """Transform to string with _ separator the jobs in the wrapper."""
+    return "_".join(as_conf.experiment_data["WRAPPERS"].get(current_wrapper, {}).get("JOBS_IN_WRAPPER", []))
 
 
 class JobPackageBase(object):

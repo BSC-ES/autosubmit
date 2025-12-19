@@ -1,3 +1,4 @@
+from getpass import getuser
 from pathlib import Path
 from textwrap import dedent
 from typing import TYPE_CHECKING
@@ -9,6 +10,7 @@ from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical
 from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, _assert_db_fields, _assert_files_recovered, run_in_thread
+from test.integration.conftest import AutosubmitExperimentFixture
 
 if TYPE_CHECKING:
     from testcontainers.core.container import DockerContainer
@@ -505,7 +507,6 @@ def test_run_with_additional_files(
     else:
         exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
         _assert_exit_code(final_status, exit_code)
-
         project_remote_path = f"/tmp/scratch/group/root/{as_exp.expid}/LOG_{as_exp.expid}"
         for additional_filename in ["additional1.sh", "additional2.sh"]:
             for chunk in range(1, 1 + experiment_data_yaml.get("EXPERIMENT", {}).get("NUMCHUNKS", 1)):
@@ -513,3 +514,313 @@ def test_run_with_additional_files(
                 command = f"cat {project_remote_path}/{remote_name}"
                 exit_code, output = slurm_server.exec(["bash", "-c", command])
                 assert exit_code == 0, f"File {additional_filename} not found in remote project path."
+
+
+@pytest.mark.docker
+@pytest.mark.xdist_group("slurm")
+@pytest.mark.slurm
+@pytest.mark.parametrize("wrappers, run_type", [
+    (
+        {
+            "WRAPPERS": {
+                "MAX_WRAPPED": 2,
+                "WRAPPER": {"JOBS_IN_WRAPPER": "job_some", "TYPE": "horizontal"},
+                "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other_some", "TYPE": "horizontal"},
+            }
+        },
+        "run",
+    ),
+    (
+        {
+            "WRAPPERS": {
+                "WRAPPER": {
+                    "JOBS_IN_WRAPPER": "job_some",
+                    "TYPE": "horizontal",
+                    "MAX_WRAPPED": 2,
+                },
+                "SECOND_WRAPPER": {
+                    "JOBS_IN_WRAPPER": "other_some",
+                    "TYPE": "horizontal",
+                    "MAX_WRAPPED": 2,
+                },
+            }
+        },
+        "run",
+    ),
+    (
+        {
+            "WRAPPERS": {
+                "MAX_WRAPPED": 2,
+                "WRAPPER": {"JOBS_IN_WRAPPER": "job_some", "TYPE": "horizontal"},
+                "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other_some", "TYPE": "horizontal"},
+            }
+        },
+        "inspect",
+    ),
+    (
+        {
+            "WRAPPERS": {
+                "WRAPPER": {
+                    "JOBS_IN_WRAPPER": "job_some",
+                    "TYPE": "horizontal",
+                    "MAX_WRAPPED": 2,
+                },
+                "SECOND_WRAPPER": {
+                    "JOBS_IN_WRAPPER": "other_some",
+                    "TYPE": "horizontal",
+                    "MAX_WRAPPED": 2,
+                },
+            }
+        },
+        "inspect",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "job_some&other_some",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "&inspect",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "job_some&other_some",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "quick-inspect",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "[1,2,3,4]",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect1",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "[&]",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect2",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "&",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect3",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": ",",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect4",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect-empty-string",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "[',']",  # it is empty, because the "," is stripped somewhere
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect6-empty",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "['&']",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect8",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": [],
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect-empty-list",
+    ),
+])
+def test_wrapper_config(
+        wrappers: str,
+        run_type: str,
+        autosubmit_exp,
+        slurm_server: 'DockerContainer',
+        tmp_path,
+):
+    experiment_data = {
+        "EXPERIMENT": {"MEMBERS": "fc0 fc1 fc2 fc3"},
+        "PROJECT": {"PROJECT_TYPE": "None", "PROJECT_DIRECTORY": "local_project"},
+        "JOBS": {
+            "job_some": {
+                "SCRIPT": "echo 'Hello World'",
+                "PLATFORM": "TEST_SLURM",
+                "RUNNING": "member",
+                "wallclock": "00:01",
+            },
+            "other_some": {
+                "SCRIPT": "echo 'Hello World'",
+                "PLATFORM": "TEST_SLURM",
+                "RUNNING": "member",
+                "wallclock": "00:01",
+            },
+        },
+        "PLATFORMS": {
+            "TEST_SLURM": {
+                "ADD_PROJECT_TO_HOST": "False",
+                "HOST": "127.0.0.1",
+                "MAX_WALLCLOCK": "00:03",
+                "PROJECT": "group",
+                "QUEUE": "gp_debug",
+                "SCRATCH_DIR": "/tmp/scratch/",
+                "TEMP_DIR": "",
+                "TYPE": "slurm",
+                "USER": "root",
+                "PROCESSORS_PER_NODE": "4",
+                "MAX_PROCESSORS": "4",
+            }
+        },
+    }
+
+    if run_type.startswith("invalid"):
+        with pytest.raises(AutosubmitCritical):
+            autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True, check_wrappers=True)
+    else:
+        as_exp = autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True)
+
+        if run_type == "run":
+            as_exp.as_conf.set_last_as_command('run')
+            as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+        else:
+            as_exp.as_conf.set_last_as_command('inspect')
+            as_exp.autosubmit.inspect(
+                expid=as_exp.expid,
+                lst=None,
+                check_wrapper=True,
+                force=True,
+                filter_chunks=None,
+                filter_section=None,
+                filter_status=None,
+                quick=True if run_type == "quick-inspect" else False
+            )
+        templates_dir = Path(tmp_path) / as_exp.expid / "tmp"
+        asthread_files = list(templates_dir.rglob("*ASThread*"))
+        if run_type == "run" or run_type == "inspect":
+            assert len(asthread_files) == 2 + 2  # 8 jobs in total, 2 wrappers with max 2 jobs each -> 4 ASThread files expected
+
+
+def test_inspect_wrappers(tmp_path, autosubmit_exp: 'AutosubmitExperimentFixture'):
+    """Test inspect with wrappers."""
+    user = getuser()
+    exp = autosubmit_exp(experiment_data={
+        'DEFAULT': {
+            'HPCARCH': 'TEST_PS'
+        },
+        'PLATFORMS': {
+            'TEST_PS': {
+                'CUSTOM_DIR': 'test',
+                'CUSTOM_DIR_POINTS_TO_OTHER_DIR': '%TEST_REFERENCE%',
+                'TYPE': 'ps',
+                'HOST': 'localhost',
+                'USER': user,
+                'SCRATCH_DIR': str(tmp_path),
+                'MAX_WALLCLOCK': '00:30'
+            }
+        },
+        'JOBS': {
+            'A': {
+                'SCRIPT': 'echo "Hello World"',
+                'RUNNING': 'once',
+                'PLATFORM': 'TEST_PS'
+            }
+        },
+        'WRAPPERS': {
+            'MIN_WRAPPED': 1,
+            'TEST_WRAPPER': {
+                'TYPE': 'vertical',
+                'JOBS_IN_WRAPPER': 'A'
+            }
+        }
+    }, include_jobs=False, create=True)
+    exp.as_conf.set_last_as_command('inspect')
+
+    # Inspect
+    exp.autosubmit.inspect(
+        expid=exp.expid,
+        lst=None,  # type: ignore
+        check_wrapper=True,
+        force=True,
+        filter_chunks=None,  # type: ignore
+        filter_section=None,  # type: ignore
+        filter_status=None,  # type: ignore
+        quick=True
+    )
+
+    templates_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR) / exp.expid / BasicConfig.LOCAL_TMP_DIR
+    templates_generated = [t for t in templates_dir.glob(f"{exp.expid}*.cmd")]
+
+    assert len(templates_generated) == 1

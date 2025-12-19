@@ -1637,13 +1637,13 @@ class JobList(object):
 
         sections_running_type_map = dict()
         if wrapper_jobs is not None and len(str(wrapper_jobs)) > 0:
+            # TODO: Removing this causes unit tests to fail, need to investigate why in another PR
             if type(wrapper_jobs) is not list:
                 if "&" in wrapper_jobs:
                     char = "&"
                 else:
                     char = " "
                 wrapper_jobs = wrapper_jobs.split(char)
-
             for section in wrapper_jobs:
                 # RUNNING = once, as default. This value comes from jobs_.yml
                 sections_running_type_map[section] = str(self._config.experiment_data["JOBS"].
@@ -1699,10 +1699,8 @@ class JobList(object):
                         # num_chunks from JOB TYPE (section)
                         # Important to note that the only differentiating factor would be chunk
                         # OR num_chunks
-                        jobs_to_sort = sorted(jobs_to_sort, key=lambda k: (
-                            k.name.split('_')[1], (k.name.split('_')[2]), (int(k.name.split('_')[3])
-                                                                           if len(
-                                k.name.split('_')) == 5 else num_chunks + 1)))
+
+                        jobs_to_sort = sorted(jobs_to_sort, key=lambda k: (k.chunk if k.chunk else num_chunks + 1))
 
                         # Bringing back original job if identified
                         for idx in range(0, len(jobs_to_sort)):
