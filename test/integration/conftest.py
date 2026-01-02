@@ -20,6 +20,7 @@ import configparser
 import multiprocessing
 import os
 import socket
+import tempfile
 import time
 import uuid
 from contextlib import suppress
@@ -63,8 +64,10 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
     from pytest import FixtureRequest
 
-_AS_SINGLETON_CONTAINER_LABEL = "pytest.autosubmit.singleton"
-"""Docker container label key for singletons."""
+_AS_SLURM_CONTAINER_LABEL = "pytest.slurm.singleton"
+"""Docker container label key for Slurm singleton."""
+_AS_GIT_CONTAINER_LABEL = "pytest.git.singleton"
+"""Docker container label key for Git singleton."""
 _AS_SINGLETON_CONTAINER_VALUE = "true"
 """Docker container label value for singletons."""
 
@@ -77,6 +80,9 @@ _SSH_DOCKER_PASSWORD = 'password'
 
 _SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1'
 """The Slurm Docker image. About 600 MB. It contains 2 cores, 1 node."""
+
+_GIT_DOCKER_IMAGE = 'githttpd/githttpd:latest'
+"""The Git image used for tests where Autosubmit needs to clone a repository."""
 
 _PG_USER = 'postgres'
 _PG_PASSWORD = 'postgres'
@@ -131,8 +137,7 @@ def get_next_expid(tmp_path_factory) -> Callable[[], str]:
         expid_file = shared_tmp_dir / "expid_current.txt"
 
         with Lock(str(lock_path), flags=LOCK_EX, timeout=120):
-            current_expid = "t000"
-
+            current_expid = 't000'
             if expid_file.exists():
                 current_expid = expid_file.read_text()
 
@@ -401,29 +406,76 @@ def paramiko_platform() -> Iterator[ParamikoPlatform]:
     local_root_dir.cleanup()
 
 
+def _start_git_container(git_repos_path: Path, http_port: int) -> DockerContainer:
+    """Start a Docker container with Git.
+
+    The repository will be available with the base name of the path given,
+    with the TCP/80 port mapped to the host ``http_port``.
+    """
+    docker_args = {
+        'labels': {
+            _AS_GIT_CONTAINER_LABEL: _AS_SINGLETON_CONTAINER_VALUE,
+        }
+    }
+
+    docker_container = DockerContainer(
+        image=_GIT_DOCKER_IMAGE,
+        remove=True,
+        **docker_args
+    )
+
+    container = docker_container \
+        .with_bind_ports(80, http_port) \
+        .with_volume_mapping(str(git_repos_path), '/opt/git-server', mode='rw')
+    container.start()
+
+    wait_for_logs(container, "Command line: 'httpd -D FOREGROUND'")
+
+    container.exec('whoami')
+
+    # The docker image ``githttpd/githttpd`` creates an HTTP server for Git
+    # repositories, using the volume bound onto ``/opt/git-server`` as base
+    # for any subdirectory, the Git URL becoming ``git/{subdirectory-name}}``.
+    return container
+
+
 @pytest.fixture(scope="session")
-def git_server(tmp_path_factory) -> Generator[tuple[DockerContainer, Path, str], None, None]:
+def git_server(git_repos_shared_dir) -> tuple['Container', Path, str]:
     # Start a container to server it -- otherwise, we would have to use
     # `git -c protocol.file.allow=always submodule ...`, and we cannot
     # change how Autosubmit uses it in `autosubmit create` (due to bad
     # code design choices).
-    base_path = tmp_path_factory.mktemp('git_repos_base')
+    shared_tmp_dir = git_repos_shared_dir
+    lock_path = shared_tmp_dir / "git_global.lock"
 
+    client = from_env()
+
+    base_path = shared_tmp_dir / 'git_repos_base'
     git_repos_path = base_path / 'git_repos'
     git_repos_path.mkdir(exist_ok=True, parents=True)
 
-    http_port = get_free_port()
+    with Lock(filename=str(lock_path), flags=LOCK_EX, timeout=120):
+        containers = client.containers.list(
+            filters={
+                "label": f"{_AS_GIT_CONTAINER_LABEL}={_AS_SINGLETON_CONTAINER_VALUE}"
+            }
+        )
 
-    image = 'githttpd/githttpd:latest'
-    with DockerContainer(image=image, remove=True) \
-            .with_bind_ports(80, http_port) \
-            .with_volume_mapping(str(git_repos_path), '/opt/git-server', mode='rw') as container:
-        wait_for_logs(container, "Command line: 'httpd -D FOREGROUND'")
+        if containers:
+            container = containers[0]
+            container_instance = get_container_by_id(container.id)
+            http_port = int(container_instance.ports['80/tcp'][0]['HostPort'])  # type: ignore
+        else:
+            # Create the container exactly once
+            http_port = get_free_port()
+            # noinspection PyProtectedMember
+            container_instance = _start_git_container(git_repos_path, http_port)._container
 
-        # The docker image ``githttpd/githttpd`` creates an HTTP server for Git
-        # repositories, using the volume bound onto ``/opt/git-server`` as base
-        # for any subdirectory, the Git URL becoming ``git/{subdirectory-name}}``.
-        yield container, git_repos_path, f'http://localhost:{http_port}/git'
+    repo_url = f'http://localhost:{http_port}/git'
+
+    _wait_for_tcp_port('localhost', http_port)
+
+    yield container_instance, git_repos_path, repo_url
 
 
 @pytest.fixture
@@ -442,7 +494,7 @@ def _markers_contain(request: "FixtureRequest", txt: str) -> bool:
     return any(marker.name == txt for marker in markers)
 
 
-def _wait_for_ssh_port(host, port, timeout=30):
+def _wait_for_tcp_port(host, port, timeout=30):
     """Tries to connect to host and port until it works or the timeout is reached."""
     start = time.time()
     while True:
@@ -451,7 +503,7 @@ def _wait_for_ssh_port(host, port, timeout=30):
                 return
         except OSError:
             if time.time() - start > timeout:
-                raise TimeoutError(f"SSH not ready at {host}:{port}")
+                raise TimeoutError(f"TCP connection not ready at {host}:{port}")
             time.sleep(1)
 
 
@@ -486,7 +538,7 @@ def ssh_server(mocker, tmp_path, request) -> Generator[DockerContainer, None, No
         ssh_client = _make_ssh_client(ssh_port, _SSH_DOCKER_PASSWORD, None, mfa)
         mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
 
-        _wait_for_ssh_port('localhost', ssh_port)
+        _wait_for_tcp_port('localhost', ssh_port)
 
         ssh_config = Path(tmp_path, '.ssh/ssh_config')
         ssh_config.parent.mkdir(exist_ok=True, parents=True)
@@ -537,7 +589,7 @@ def _start_slurm_container(ssh_port: int) -> DockerContainer:
         'cgroupns': 'host',
         'privileged': True,
         'labels': {
-            _AS_SINGLETON_CONTAINER_LABEL: _AS_SINGLETON_CONTAINER_VALUE,
+            _AS_SLURM_CONTAINER_LABEL: _AS_SINGLETON_CONTAINER_VALUE,
         }
     }
 
@@ -556,9 +608,9 @@ def _start_slurm_container(ssh_port: int) -> DockerContainer:
         .with_env('TZ', 'Etc/UTC') \
         .with_bind_ports(2222, ssh_port) \
         .with_name(f'slurm-server-{uuid.uuid4()}')
-    # TODO: or maybe wait for 'debug:  sched: Running job scheduler for full queue.'?
     container.start()
 
+    # TODO: or maybe wait for 'debug:  sched: Running job scheduler for full queue.'?
     wait_for_logs(container, lambda logs: 'No fed_mgr state file' in logs)
 
     container.exec('sinfo')
@@ -587,7 +639,7 @@ def slurm_server(tmp_path_factory, session_mocker) -> 'Container':
     with Lock(filename=str(lock_path), flags=LOCK_EX, timeout=120):
         containers = client.containers.list(
             filters={
-                "label": f"{_AS_SINGLETON_CONTAINER_LABEL}={_AS_SINGLETON_CONTAINER_VALUE}"
+                "label": f"{_AS_SLURM_CONTAINER_LABEL}={_AS_SINGLETON_CONTAINER_VALUE}"
             }
         )
 
@@ -609,17 +661,9 @@ def slurm_server(tmp_path_factory, session_mocker) -> 'Container':
         return_value=multiprocessing.get_context('fork')
     )
 
-    _wait_for_ssh_port('localhost', ssh_port)
+    _wait_for_tcp_port('localhost', ssh_port)
 
     yield container_instance
-
-
-def pytest_sessionfinish():
-    """Finish pytest session."""
-    with suppress(Exception):
-        from_env().containers.prune(
-            filters={"label": f"{_AS_SINGLETON_CONTAINER_LABEL}={_AS_SINGLETON_CONTAINER_VALUE}"}
-        )
 
 
 def _setup_ssh_key(tmp_path_factory, container_id):
@@ -781,3 +825,45 @@ def wait_child(timeout, retry=3):
         return wrapper
 
     return the_real_decorator
+
+
+def pytest_configure(config):
+    if not hasattr(config, 'workerinput'):
+        # This is the pytest-xdist master
+        config._git_repos_shared_dir = Path(
+            tempfile.mkdtemp(prefix="git_repos_base_")
+        )
+
+
+def pytest_configure_node(node):
+    # noinspection PyProtectedMember
+    node.workerinput["git_repos_shared_dir"] = str(
+        node.config._git_repos_shared_dir
+    )
+
+
+@pytest.fixture(scope='session')
+def git_repos_shared_dir(request):
+    config = request.config
+
+    if hasattr(config, 'workerinput'):
+        # pytest-xdist worker
+        return Path(config.workerinput['git_repos_shared_dir'])
+    else:
+        # pytest-xdist master
+        # noinspection PyProtectedMember
+        return config._git_repos_shared_dir
+
+
+def pytest_sessionfinish():
+    """Finish pytest session."""
+    # Say by to Slurm containers;
+    with suppress(Exception):
+        from_env().containers.prune(
+            filters={"label": f"{_AS_SLURM_CONTAINER_LABEL}={_AS_SINGLETON_CONTAINER_VALUE}"}
+        )
+    # and to SSH containers.
+    with suppress(Exception):
+        from_env().containers.prune(
+            filters={"label": f"{_AS_GIT_CONTAINER_LABEL}={_AS_SINGLETON_CONTAINER_VALUE}"}
+        )
