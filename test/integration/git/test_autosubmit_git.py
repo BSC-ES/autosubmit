@@ -16,14 +16,12 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Integration tests for ``autosubmit_git``."""
-
 from contextlib import nullcontext as does_not_raise
 from getpass import getuser
 from pathlib import Path
-from typing import Callable, ContextManager, Generator, Union
+from typing import Callable, ContextManager, Union, TYPE_CHECKING
 
 import pytest
-from test.integration.conftest import DockerContainer
 
 from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
 from autosubmit.log.log import AutosubmitCritical
@@ -31,7 +29,8 @@ from test.integration.test_utils.git import (
     create_git_repository, git_commit_all_in_dir, git_clone_repository, git_add_submodule
 )
 
-_EXPID = 'a000'
+if TYPE_CHECKING:
+    from docker.models.containers import Container
 
 
 # git operational check
@@ -71,12 +70,12 @@ def _get_experiment_data(tmp_path) -> dict:
 @pytest.mark.parametrize(
     "project_type,commit,push,expid,expected",
     [
-        ('git', False, False, 'o001', pytest.raises(AutosubmitCritical)),
-        ('git', True, False, 'o001', pytest.raises(AutosubmitCritical)),
-        ('git', True, True, 'o001', does_not_raise()),
-        ('git', False, False, 'a001', does_not_raise()),
-        ('git', True, False, 'a001', does_not_raise()),
-        ('git', True, True, 'a001', does_not_raise()),
+        ('git', False, False, 'o810', pytest.raises(AutosubmitCritical)),
+        ('git', True, False, 'o811', pytest.raises(AutosubmitCritical)),
+        ('git', True, True, 'o812', does_not_raise()),
+        ('git', False, False, 'a810', does_not_raise()),
+        ('git', True, False, 'a811', does_not_raise()),
+        ('git', True, True, 'a812', does_not_raise()),
     ],
     ids=[
         'NOK: Did not commit nor push an operational experiment',
@@ -126,16 +125,16 @@ def test_git_local_dirty(
 @pytest.mark.parametrize(
     "commit_git,push_git,commit_submodule,push_submodule,expid,expected",
     [
-        (False, False, False, False, 'o001', pytest.raises(AutosubmitCritical)),
-        (False, False, True, False, 'o001', pytest.raises(AutosubmitCritical)),
-        (False, False, True, True, 'o001', pytest.raises(AutosubmitCritical)),
-        (True, False, True, True, 'o001', pytest.raises(AutosubmitCritical)),
-        (True, True, True, True, 'o001', does_not_raise()),
-        (False, False, False, False, 'a001', does_not_raise()),
-        (False, False, True, False, 'a001', does_not_raise()),
-        (False, False, True, True, 'a001', does_not_raise()),
-        (True, False, True, True, 'a001', does_not_raise()),
-        (True, True, True, True, 'a001', does_not_raise()),
+        (False, False, False, False, 'o800', pytest.raises(AutosubmitCritical)),
+        (False, False, True, False, 'o801', pytest.raises(AutosubmitCritical)),
+        (False, False, True, True, 'o802', pytest.raises(AutosubmitCritical)),
+        (True, False, True, True, 'o803', pytest.raises(AutosubmitCritical)),
+        (True, True, True, True, 'o804', does_not_raise()),
+        (False, False, False, False, 'a800', does_not_raise()),
+        (False, False, True, False, 'a801', does_not_raise()),
+        (False, False, True, True, 'a802', does_not_raise()),
+        (True, False, True, True, 'a803', does_not_raise()),
+        (True, True, True, True, 'a804', does_not_raise()),
     ],
     ids=[
         'NOK: Did not commit nor push repository and submodule of an operational experiment',
@@ -156,6 +155,7 @@ def test_git_local_dirty(
         'OK: Committed and pushed the submodule, and committed and pushed the repository of a common experiment',
     ]
 )
+@pytest.mark.git
 @pytest.mark.docker
 def test_git_submodules_dirty(
         commit_git: bool,
@@ -165,7 +165,7 @@ def test_git_submodules_dirty(
         expid: str,
         expected: ContextManager,
         autosubmit_exp: Callable,
-        git_server: Generator[tuple[DockerContainer, Path, str], None, None],
+        git_server: tuple['Container', Path, str],
         tmp_path
 ) -> None:
     """Tests that Autosubmit detects dirty local Git submodules, especially with operational experiments.
@@ -177,10 +177,10 @@ def test_git_submodules_dirty(
     expected to fail, raising an error when the experiment is operational.
     """
 
-    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str # type: ignore
+    _, git_repos_path, git_url = git_server  # type: Container, Path, str # type: ignore
 
-    git_repo = git_repos_path / 'git_repository'
-    git_submodule = git_repos_path / 'git_submodule'
+    git_repo = git_repos_path / f'git_repository_{expid}'
+    git_submodule = git_repos_path / f'git_submodule_{expid}'
 
     # Create main repository and submodule repository.
     create_git_repository(git_repo, bare=True)
@@ -190,7 +190,7 @@ def test_git_submodules_dirty(
     git_submodule_url = f'{git_url}/{git_submodule.name}'
 
     # Add submodule repository as a submodule in the main repository.
-    temp_clone = tmp_path / 'git_clone'
+    temp_clone = tmp_path / f'git_clone_{expid}'
     git_clone_repository(git_repo_url, temp_clone)
     submodule_name = git_submodule.name
     git_add_submodule(git_submodule_url, temp_clone, name=submodule_name, push=True)
@@ -227,16 +227,18 @@ def test_git_submodules_dirty(
         (False, 0)
     ]
 )
+@pytest.mark.git
 @pytest.mark.docker
 def test_git_operational_experiment_toggle_flag(
         git_operational_check_enabled: bool,
         expected: Union[int, Exception],
         autosubmit_exp: Callable,
-        git_server: Generator[tuple[DockerContainer, Path, str], None, None],
+        git_server: tuple['Container', Path, str],
         tmp_path,
         mocker,
         autosubmit,
-        request
+        request,
+        get_next_expid: Callable[[], str]
 ) -> None:
     """Tests running an operational works as expected when the toggle flag is used.
 
@@ -249,9 +251,9 @@ def test_git_operational_experiment_toggle_flag(
     Autosubmit ignores that, warning the user about it though.
     """
     mocked_log = mocker.patch('autosubmit.autosubmit.Log')
-    expid = 'o001'
+    expid = 'o900'
 
-    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str # type: ignore
+    _, git_repos_path, git_url = git_server  # type: Container, Path, str # type: ignore
 
     test_name = request.node.name
     git_repo = git_repos_path / f'git_repository_{test_name}'
@@ -296,10 +298,10 @@ def test_git_operational_experiment_toggle_flag(
 
 # -- clean_git
 
-def test_clean_git_not_a_dir(autosubmit_exp, mocker):
+def test_clean_git_not_a_dir(autosubmit_exp, mocker, get_next_expid: Callable[[], str]):
     """Test that cleaning Git fails when the project directory is actually a file."""
     mocked_log = mocker.patch('autosubmit.git.autosubmit_git.Log')
-    exp = autosubmit_exp(_EXPID, {})
+    exp = autosubmit_exp(get_next_expid(), {})
     as_conf = exp.as_conf
 
     # Remove proj dir, replacing by a file.
@@ -312,10 +314,10 @@ def test_clean_git_not_a_dir(autosubmit_exp, mocker):
     assert mocked_log.debug.call_args_list[1][0][0] == 'Not a directory... SKIPPING!'
 
 
-def test_clean_git_not_a_git_repo(autosubmit_exp, mocker):
+def test_clean_git_not_a_git_repo(autosubmit_exp, mocker, get_next_expid: Callable[[], str]):
     """Test that cleaning Git fails when the project directory is not a Git repository."""
     mocked_log = mocker.patch('autosubmit.git.autosubmit_git.Log')
-    exp = autosubmit_exp(_EXPID, {})
+    exp = autosubmit_exp(get_next_expid(), {})
     as_conf = exp.as_conf
 
     # Missing .git folder.
@@ -327,13 +329,16 @@ def test_clean_git_not_a_git_repo(autosubmit_exp, mocker):
     assert mocked_log.debug.call_args_list[1][0][0] == 'Not a git repository... SKIPPING!'
 
 
+@pytest.mark.git
+@pytest.mark.docker
 def test_clean_git_not_committed(
         tmp_path,
         autosubmit_exp,
-        git_server: Generator[tuple[DockerContainer, Path, str], None, None]
+        git_server: tuple['Container', Path, str],
+        get_next_expid: Callable[[], str]
 ):
     """Test that cleaning Git fails when the project directory has new files not committed yet."""
-    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str  # type: ignore
+    _, git_repos_path, git_url = git_server  # type: Container, Path, str  # type: ignore
 
     git_repo = git_repos_path / test_clean_git_not_committed.__name__
     create_git_repository(git_repo, bare=True)
@@ -344,7 +349,7 @@ def test_clean_git_not_committed(
     experiment_data['PROJECT']['PROJECT_TYPE'] = 'git'
     experiment_data['GIT']['PROJECT_ORIGIN'] = git_repo_url
 
-    as_exp = autosubmit_exp(_EXPID, experiment_data)
+    as_exp = autosubmit_exp(get_next_expid(), experiment_data)
     as_conf = as_exp.as_conf
     proj_dir = Path(as_conf.get_project_dir())
 
@@ -356,13 +361,16 @@ def test_clean_git_not_committed(
     assert str(cm.value.code) == '7013'
 
 
+@pytest.mark.git
+@pytest.mark.docker
 def test_clean_git_not_pushed(
         tmp_path,
         autosubmit_exp,
-        git_server: Generator[tuple[DockerContainer, Path, str], None, None]
+        git_server: tuple['Container', Path, str],
+        get_next_expid: Callable[[], str]
 ):
     """Test that cleaning Git fails when the project directory has staged changed not pushed."""
-    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str  # type: ignore
+    _, git_repos_path, git_url = git_server  # type: Container, Path, str  # type: ignore
 
     git_repo = git_repos_path / test_clean_git_not_pushed.__name__
     create_git_repository(git_repo, bare=True)
@@ -373,7 +381,7 @@ def test_clean_git_not_pushed(
     experiment_data['PROJECT']['PROJECT_TYPE'] = 'git'
     experiment_data['GIT']['PROJECT_ORIGIN'] = git_repo_url
 
-    as_exp = autosubmit_exp(_EXPID, experiment_data)
+    as_exp = autosubmit_exp(get_next_expid(), experiment_data)
     as_conf = as_exp.as_conf
     proj_dir = Path(as_conf.get_project_dir())
 
@@ -386,15 +394,18 @@ def test_clean_git_not_pushed(
     assert str(cm.value.code) == '7064'
 
 
+@pytest.mark.git
+@pytest.mark.docker
 def test_clean_git(
         tmp_path,
         autosubmit_exp,
-        git_server: Generator[tuple[DockerContainer, Path, str], None, None]
+        git_server: tuple['Container', Path, str],
+        get_next_expid: Callable[[], str]
 ):
     """Test that cleaning Git fails when the project commit cannot be recorded."""
-    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str  # type: ignore
+    _, git_repos_path, git_url = git_server  # type: Container, Path, str  # type: ignore
 
-    git_repo = git_repos_path / test_clean_git_not_pushed.__name__
+    git_repo = git_repos_path / test_clean_git.__name__
     create_git_repository(git_repo, bare=True)
 
     git_repo_url = f'{git_url}/{git_repo.name}'
@@ -403,7 +414,7 @@ def test_clean_git(
     experiment_data['PROJECT']['PROJECT_TYPE'] = 'git'
     experiment_data['GIT']['PROJECT_ORIGIN'] = git_repo_url
 
-    as_exp = autosubmit_exp(_EXPID, experiment_data)
+    as_exp = autosubmit_exp(get_next_expid(), experiment_data)
     as_conf = as_exp.as_conf
 
     proj_dir = Path(as_conf.get_project_dir())
