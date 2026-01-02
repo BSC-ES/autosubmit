@@ -22,7 +22,7 @@ import socket
 from dataclasses import dataclass
 from getpass import getuser
 from pathlib import Path
-from typing import cast, Generator, Optional, Protocol, Union, TYPE_CHECKING
+from typing import cast, Callable, Generator, Optional, Protocol, Union, TYPE_CHECKING
 
 import paramiko
 import pytest
@@ -38,14 +38,13 @@ from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
-    from _pytest._py.path import LocalPath
-    from testcontainers.sftp import DockerContainer
-    from test.integration.conftest import AutosubmitExperiment
     from autosubmit.platforms.psplatform import PsPlatform
     from autosubmit.platforms.slurmplatform import SlurmPlatform
+    from docker.models.containers import Container
+    from _pytest._py.path import LocalPath
     from pytest import FixtureRequest
+    from test.integration.conftest import AutosubmitExperiment
 
-_EXPID = 't000'
 _PLATFORM_NAME = 'TEST_PS_PLATFORM'
 _PLATFORM_REMOTE_DIR = '/app/'
 _PLATFORM_PROJECT = 'test'
@@ -56,7 +55,7 @@ class ExperimentPlatformServer:
     """Data holder for fixture objects."""
     experiment: 'AutosubmitExperiment'
     platform: 'PsPlatform'
-    ssh_server: 'DockerContainer'
+    ssh_server: 'Container'
 
 
 @pytest.fixture(scope='module', autouse=True)
@@ -74,17 +73,22 @@ def ssh_config() -> Generator[Path, None, None]:
         ssh_config.unlink(missing_ok=True)
 
 
-@pytest.fixture()
-def exp_platform_server(autosubmit_exp, ssh_server: 'DockerContainer', request) -> ExperimentPlatformServer:
+@pytest.fixture
+def exp_platform_server(
+        autosubmit_exp,
+        ssh_server: 'DockerContainer',
+        request,
+        get_next_expid: Callable[[], str]
+) -> ExperimentPlatformServer:
     """Fixture that returns an Autosubmit experiment, a platform, and the (Docker) server used."""
     user = getuser()
     test_name = request.node.name
     platform_scratch_dir = Path(_PLATFORM_REMOTE_DIR, test_name)
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(get_next_expid(), experiment_data={
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'TYPE': 'ps',
-                'HOST': ssh_server.get_docker_client().host(),
+                'HOST': 'localhost',
                 'PROJECT': _PLATFORM_PROJECT,
                 'USER': user,
                 'SCRATCH_DIR': str(platform_scratch_dir),
@@ -137,12 +141,12 @@ class CreateJobParametersPlatformFixture(Protocol):
 
 
 @pytest.fixture
-def create_job_parameters_platform(autosubmit_exp) -> CreateJobParametersPlatformFixture:
+def create_job_parameters_platform(autosubmit_exp, get_next_expid: Callable[[], str]) -> CreateJobParametersPlatformFixture:
     def job_parameters_platform(experiment_data: dict) -> JobParametersPlatform:
-        exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, include_jobs=True)
+        exp = autosubmit_exp(get_next_expid(), experiment_data=experiment_data, include_jobs=True)
         slurm_platform: 'SlurmPlatform' = cast('SlurmPlatform', exp.platform)
 
-        job = Job(f"{_EXPID}_SIM", 10000, Status.SUBMITTED, 0)
+        job = Job(f"{exp.expid}_SIM", 10000, Status.SUBMITTED, 0)
         job.section = 'SIM'
         job.het = {}
         job._platform = slurm_platform
@@ -159,6 +163,7 @@ def create_job_parameters_platform(autosubmit_exp) -> CreateJobParametersPlatfor
 
 
 @pytest.mark.docker
+@pytest.mark.ssh
 @pytest.mark.parametrize(
     'filename',
     [
@@ -203,7 +208,7 @@ def test_send_file(filename: str, exp_platform_server: ExperimentPlatformServer,
         exp.expid,
         f'LOG_{exp.expid}/{filename}'
     )
-    result = ssh_server.exec(f'ls {str(file)}')
+    result = ssh_server.exec_run(f'ls {str(file)}')
     assert result.exit_code == 0
 
 
@@ -514,6 +519,7 @@ def test_fs_operations(exp_platform_server: 'ExperimentPlatformServer', request)
     ]
 )
 @pytest.mark.docker
+@pytest.mark.ssh
 def test_exec_command_with_x11(x11_enabled: bool, user_or_false: Union[str, bool], request: pytest.FixtureRequest):
     """Tests connecting and executing a command when X11 is enabled and when it is disabled (parameters).
 
@@ -533,16 +539,17 @@ def test_exec_command_with_x11(x11_enabled: bool, user_or_false: Union[str, bool
     ps_platform.connect(as_conf=exp.as_conf, reconnect=False, log_recovery_process=False)
     assert ps_platform.local_x11_display
 
-    _, stdout, _ = ps_platform.exec_command('whoami', x11=True)
+    stdin, stdout, stderr = ps_platform.exec_command('whoami', x11=True)
 
     if type(user_or_false) is bool:
-        assert user_or_false == stdout
+        assert user_or_false == stdout, f"Invalid value for stdout: {stderr, stdout}"
     else:
-        assert isinstance(stdout, ChannelFile)
+        assert isinstance(stdout, ChannelFile), f"Invalid value for stdout: {stderr, stdout}"
         assert user_or_false == stdout.readline().decode('UTF-8').strip()
 
 
 @pytest.mark.x11
+@pytest.mark.ssh
 def test_xclock(exp_platform_server: ExperimentPlatformServer):
     """Tests connecting and executing a command when X11 is enabled and when it is disabled (parameters).
 
@@ -559,11 +566,14 @@ def test_xclock(exp_platform_server: ExperimentPlatformServer):
 
     _, stdout, stderr = ps_platform.exec_command('timeout 1 xclock', x11=True)
 
-    assert isinstance(stdout, ChannelFile)
-    assert isinstance(stderr, ChannelFile)
+    assert isinstance(stdout, ChannelFile), stdout
+    assert isinstance(stderr, ChannelFile), stderr
 
-    assert ''.join(stdout.readlines()) == ''
-    assert ''.join(stderr.readlines()) == ''
+    out_content = ''.join(stdout.readlines())
+    err_content = ''.join(stderr.readlines())
+
+    assert out_content == '', out_content
+    assert err_content == '', err_content
 
 
 @pytest.mark.docker
@@ -813,7 +823,8 @@ def test__load_ssh_config_missing_ssh_config(
 
 
 @pytest.mark.docker
-def test_test_connection(exp_platform_server: 'ExperimentPlatformServer', ssh_server: 'DockerContainer'):
+@pytest.mark.ssh
+def test_test_connection(exp_platform_server: 'ExperimentPlatformServer'):
     """Test that we can access files, send new files, move, delete."""
     exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
 
@@ -823,9 +834,9 @@ def test_test_connection(exp_platform_server: 'ExperimentPlatformServer', ssh_se
 
 
 @pytest.mark.docker
-def test_failed_connection_raises_as_error(autosubmit_exp, tmp_path):
+def test_failed_connection_raises_as_error(autosubmit_exp, tmp_path, get_next_expid: Callable[[], str]):
     """Test that failing to restore a connection, even with retries, results in ``AutosubmitError``."""
-    exp = autosubmit_exp(_EXPID, {})
+    exp = autosubmit_exp(get_next_expid(), {})
     platform_config = {
         "LOCAL_ROOT_DIR": exp.as_conf.basic_config.LOCAL_ROOT_DIR,
         "LOCAL_TMP_DIR": str(tmp_path),

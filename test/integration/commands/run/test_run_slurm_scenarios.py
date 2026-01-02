@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.timeout(300)
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
@@ -194,6 +195,7 @@ def test_run_uninterrupted(
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.timeout(300)
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
@@ -409,6 +411,7 @@ def test_run_failed_set_to_ready_on_new_run(
 @pytest.mark.docker
 @pytest.mark.timeout(300)
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize("jobs_data,final_status", [
     (dedent("""\
 EXPERIMENT:
@@ -519,6 +522,7 @@ def test_run_with_additional_files(
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.timeout(300)
 @pytest.mark.parametrize("wrappers, run_type", [
     (

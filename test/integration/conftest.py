@@ -68,6 +68,8 @@ _AS_SLURM_CONTAINER_LABEL = "pytest.slurm.singleton"
 """Docker container label key for Slurm singleton."""
 _AS_GIT_CONTAINER_LABEL = "pytest.git.singleton"
 """Docker container label key for Git singleton."""
+_AS_SSH_CONTAINER_LABEL = "pytest.ssh.singleton"
+"""Docker container label key for SSH singleton."""
 _AS_SINGLETON_CONTAINER_VALUE = "true"
 """Docker container label value for singletons."""
 
@@ -215,7 +217,8 @@ def autosubmit_exp(
         testcase = expid.startswith('t')
 
         # Never reuse an experiment or reconfigure in tests for true test isolation.
-        # - https://learn.microsoft.com/en-us/dotnet/core/testing/unit-testing-best-practices#characteristics-of-good-unit-tests
+        # - https://learn.microsoft.com/en-us/dotnet/core/testing/unit-testing-best-
+        #   practices#characteristics-of-good-unit-tests
         # - https://wiki.c2.com/?UnitTestIsolation
         # - https://www.thoughtworks.com/en-es/insights/blog/testing/ephemeral-testing-environments-kill-darlings
         if Path(tmp_path / expid).exists():
@@ -507,63 +510,106 @@ def _wait_for_tcp_port(host, port, timeout=30):
             time.sleep(1)
 
 
-@pytest.fixture
-def ssh_server(mocker, tmp_path, request) -> Generator[DockerContainer, None, None]:
-    ssh_port = get_free_port()
-
+def _start_ssh_container(ssh_port: int, mfa=False, x11=False) -> DockerContainer:
+    """Create and start a Docker SSH container for SSH."""
     user = getuser() or "unknown"
     user_pw = getpwnam(user)
     uid = user_pw.pw_uid
     gid = user_pw.pw_gid
 
+    ssh_image = _SSH_DOCKER_IMAGE_X11_MFA if mfa or x11 else _SSH_DOCKER_IMAGE
+
+    docker_args = {
+        'labels': {
+            _AS_SSH_CONTAINER_LABEL: _AS_SINGLETON_CONTAINER_VALUE,
+        }
+    }
+
+    docker_container = DockerContainer(
+        image=ssh_image,
+        remove=True,
+        hostname='openssh-server',
+        **docker_args
+    )
+
+    container = docker_container \
+        .with_env('TZ', 'Etc/UTC') \
+        .with_env('SUDO_ACCESS', 'false') \
+        .with_env('USER_NAME', user) \
+        .with_env('USER_PASSWORD', 'password') \
+        .with_env('PUID', str(uid)) \
+        .with_env('PGID', str(gid)) \
+        .with_env('UMASK', '000') \
+        .with_env('PASSWORD_ACCESS', 'true') \
+        .with_env('MFA', str(mfa).lower()) \
+        .with_bind_ports(2222, ssh_port)
+    container.start()
+
+    # This verifies that the server printed the line, not necessarily the port is available
+    wait_for_logs(container, 'sshd is listening on port 2222')
+
+    container.exec('whoami')
+
+    return container
+
+
+@pytest.fixture
+def ssh_server(session_mocker, request, tmp_path_factory, tmp_path) -> 'Container':
+    """Start a single Docker container serving SSH for integration tests."""
+    shared_tmp_dir = tmp_path_factory.getbasetemp().parent
+    lock_path = shared_tmp_dir / "ssh_global.lock"
+
     mfa = _markers_contain(request, 'mfa')
     x11 = _markers_contain(request, 'x11')
 
-    ssh_image = _SSH_DOCKER_IMAGE_X11_MFA if mfa or x11 else _SSH_DOCKER_IMAGE
+    client = from_env()
 
-    with DockerContainer(image=ssh_image, remove=True, hostname='openssh-server') \
-            .with_env('TZ', 'Etc/UTC') \
-            .with_env('SUDO_ACCESS', 'false') \
-            .with_env('USER_NAME', user) \
-            .with_env('USER_PASSWORD', 'password') \
-            .with_env('PUID', str(uid)) \
-            .with_env('PGID', str(gid)) \
-            .with_env('UMASK', '000') \
-            .with_env('PASSWORD_ACCESS', 'true') \
-            .with_env('MFA', str(mfa).lower()) \
-            .with_bind_ports(2222, ssh_port) as container:
-        # This verifies that the server printed the line, not necessarily the port is available
-        wait_for_logs(container, 'sshd is listening on port 2222')
+    with Lock(filename=str(lock_path), flags=LOCK_EX, timeout=120):
+        containers = client.containers.list(
+            filters={
+                "label": f"{_AS_SSH_CONTAINER_LABEL}={_AS_SINGLETON_CONTAINER_VALUE}"
+            }
+        )
 
-        ssh_client = _make_ssh_client(ssh_port, _SSH_DOCKER_PASSWORD, None, mfa)
-        mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
+        if containers:
+            container = containers[0]
+            container_instance = get_container_by_id(container.id)
+            ssh_port = int(container_instance.ports['2222/tcp'][0]['HostPort'])  # type: ignore
+        else:
+            # Create the container exactly once
+            ssh_port = get_free_port()
+            # noinspection PyProtectedMember
+            container_instance = _start_ssh_container(ssh_port, mfa=mfa, x11=x11)._container
 
-        _wait_for_tcp_port('localhost', ssh_port)
+    ssh_client = _make_ssh_client(ssh_port, _SSH_DOCKER_PASSWORD, None, mfa)
+    session_mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
 
-        ssh_config = Path(tmp_path, '.ssh/ssh_config')
-        ssh_config.parent.mkdir(exist_ok=True, parents=True)
-        ssh_config.touch()
-        ssh_config.write_text(dedent(f"""\
-        Host localhost
-            Hostname localhost
-            User {user}
-            ForwardX11 yes
-            Port 22
-        """))
-        if mfa:
-            # It uses a Transport and not an SSH client directly. Ideally, we would be able
-            # to use just one way
-            original_paramiko_config = paramiko.SSHConfig()
-            with open(ssh_config) as f:
-                original_paramiko_config.parse(f)
-            modified_config = original_paramiko_config.lookup('localhost')
-            modified_config['port'] = f'{ssh_port}'
+    ssh_config = Path(tmp_path, '.ssh/ssh_config')
+    ssh_config.parent.mkdir(exist_ok=True, parents=True)
+    ssh_config.touch()
+    ssh_config.write_text(dedent(f"""\
+            Host localhost
+                Hostname localhost
+                User {getuser()}
+                ForwardX11 yes
+                Port 22
+            """))
+    if mfa:
+        # It uses a Transport and not an SSH client directly. Ideally, we would be able
+        # to use just one way
+        original_paramiko_config = paramiko.SSHConfig()
+        with open(ssh_config) as f:
+            original_paramiko_config.parse(f)
+        modified_config = original_paramiko_config.lookup('localhost')
+        modified_config['port'] = f'{ssh_port}'
 
-            paramiko_config: paramiko.SSHConfig = mocker.MagicMock(spec=paramiko.SSHConfig)
-            paramiko_config.lookup = lambda *args, **kwargs: modified_config
-            mocker.patch('autosubmit.platforms.paramiko_platform.paramiko.SSHConfig', return_value=paramiko_config)
+        paramiko_config: paramiko.SSHConfig = session_mocker.MagicMock(spec=paramiko.SSHConfig)
+        paramiko_config.lookup = lambda *args, **kwargs: modified_config
+        session_mocker.patch('autosubmit.platforms.paramiko_platform.paramiko.SSHConfig', return_value=paramiko_config)
 
-        yield container
+    _wait_for_tcp_port('localhost', ssh_port)
+
+    yield container_instance
 
 
 def _start_slurm_container(ssh_port: int) -> DockerContainer:
@@ -800,7 +846,9 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
         raise ValueError(f'Unsupported database backend: {backend}')
 
     BasicConfig.read()
-    with suppress(AutosubmitCritical):  # ( TODO: check which functions call as_db twice or if this is used in combination other fixture that calls autosubmit.install)
+    # TODO: check which functions call as_db twice or if this
+    #       is used in combination other fixture that calls autosubmit.install
+    with suppress(AutosubmitCritical):
         autosubmit.install()
 
     return backend
@@ -814,6 +862,7 @@ def wait_child(timeout, retry=3):
         def wrapper(*args, **kwargs):
             retries = 0
             while retries < retry:
+                # noinspection PyBroadException
                 try:
                     value = function(*args, **kwargs)
                     if value is None:
@@ -855,15 +904,40 @@ def git_repos_shared_dir(request):
         return config._git_repos_shared_dir
 
 
-def pytest_sessionfinish():
+def pytest_sessionstart(session):
+    # Only run on pytest-xdist master.
+    if hasattr(session.config, "workerinput"):
+        return
+
+    # noinspection PyProtectedMember
+    tmp_path_factory = session.config._tmp_path_factory
+
+    shared_tmp_dir = tmp_path_factory.getbasetemp().parent
+
+    expid_file = shared_tmp_dir / "expid_current.txt"
+
+    if expid_file.exists():
+        expid_file.unlink()
+
+
+# noinspection PyUnusedLocal
+def pytest_sessionfinish(session, exitstatus):
     """Finish pytest session."""
-    # Say by to Slurm containers;
+    if hasattr(session.config, "workerinput"):
+        return
+
+    # Say bye to Slurm containers;
     with suppress(Exception):
         from_env().containers.prune(
             filters={"label": f"{_AS_SLURM_CONTAINER_LABEL}={_AS_SINGLETON_CONTAINER_VALUE}"}
         )
-    # and to SSH containers.
+    # and to Git containers;
     with suppress(Exception):
         from_env().containers.prune(
             filters={"label": f"{_AS_GIT_CONTAINER_LABEL}={_AS_SINGLETON_CONTAINER_VALUE}"}
+        )
+    # and to SSH containers.
+    with suppress(Exception):
+        from_env().containers.prune(
+            filters={"label": f"{_AS_SSH_CONTAINER_LABEL}={_AS_SINGLETON_CONTAINER_VALUE}"}
         )

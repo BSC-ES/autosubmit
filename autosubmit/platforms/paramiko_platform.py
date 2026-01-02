@@ -1218,7 +1218,7 @@ class ParamikoPlatform(Platform):
                 if not self.connected or not self.transport or not self.transport.active:
                     self.restore_connection(None)
                 else:
-                    Log.info('The SSH transport is still active, will not try to reconnect')
+                    Log.warning(f'The SSH transport is still active, will not try to reconnect: {str(e)}')
                 # TODO: We need to understand why we are increasing in increments of 60 seconds, then document it.
                 # new_timeout = timeout + 60
                 # Log.info(f"Increasing Paramiko channel timeout from {timeout} to {new_timeout}")

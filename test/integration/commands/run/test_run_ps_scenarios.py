@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
     (dedent("""\
@@ -102,6 +103,7 @@ def test_run_uninterrupted(
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
     (dedent("""\
