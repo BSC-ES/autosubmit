@@ -57,6 +57,7 @@ def _create_slurm_platform(expid: str, as_conf: AutosubmitConfig):
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 def test_create_platform_slurm(
         autosubmit_exp,
         slurm_server: 'DockerContainer',
@@ -93,6 +94,7 @@ def test_create_platform_slurm(
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize('experiment_data', [
     {
         'JOBS': {
@@ -167,6 +169,7 @@ def test_run_simple_workflow_slurm(
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize('experiment_data', [
     {
         'JOBS': {
@@ -404,6 +407,7 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize('experiment_data', [
     {
         'JOBS': {
@@ -665,6 +669,7 @@ def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubm
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer'):
     exp = autosubmit_exp(experiment_data={
         'JOBS': {
@@ -710,6 +715,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize(
     "experiment_data",
     [
@@ -897,6 +903,7 @@ def test_simple_workflow_compress_logs_slurm(
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize(
     "experiment_data",
     [
@@ -983,6 +990,7 @@ def test_compress_log_missing_tool(
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize(
     "experiment_data",
     [
@@ -1034,6 +1042,7 @@ def test_compress_log_fail_command(
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize(
     "experiment_data",
     [
@@ -1155,6 +1164,7 @@ def test_check_if_packages_are_ready_to_build(autosubmit_exp):
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 def test_run_bug_save_wrapper_crashes(
         autosubmit_exp: 'AutosubmitExperimentFixture',
         mocker,

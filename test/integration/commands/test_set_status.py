@@ -46,6 +46,7 @@ def do_setstatus(as_exp_, fl=None, fc=None, fct=None, ftcs=None, fs=None, ft=Non
 
 
 @pytest.mark.docker
+@pytest.mark.ssh
 @pytest.mark.slurm
 @pytest.mark.parametrize("reset_target", ["RUNNING", "WAITING"], ids=["Online", "Offline"])
 def test_set_status(as_exp, slurm_server, reset_target):

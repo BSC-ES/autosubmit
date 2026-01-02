@@ -72,6 +72,7 @@ def job_names_to_recover(job_list):
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize("active_jobs,force", [
     (True, True),
     (True, False),

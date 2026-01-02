@@ -19,28 +19,19 @@
 import configparser
 import multiprocessing
 import os
-import socket
-import tempfile
-import time
-import uuid
 from contextlib import suppress
 from dataclasses import dataclass
-from getpass import getuser
 from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
-from pwd import getpwnam
-from subprocess import check_output
 from tempfile import TemporaryDirectory
-from textwrap import dedent
 from time import time_ns
-from typing import cast, Any, Callable, Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING
+from typing import cast, Any, Callable, Generator, Iterator, Optional, Protocol, TYPE_CHECKING
 
 import paramiko  # type: ignore
 import pytest
-from docker import from_env
 from portalocker import Lock, LOCK_EX
 from ruamel.yaml import YAML
-from sqlalchemy import Connection, create_engine, text
+from sqlalchemy import create_engine
 from testcontainers.core.container import DockerContainer  # type: ignore
 from testcontainers.core.waiting_utils import wait_for_logs  # type: ignore
 from testcontainers.postgres import PostgresContainer  # type: ignore
@@ -51,38 +42,24 @@ from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.experiment.experiment_common import next_experiment_id
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
-# noinspection PyProtectedMember
-from autosubmit.platforms.paramiko_platform import _create_ssh_client
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from test.integration.test_utils.networking import get_free_port
+from test.integration.test_utils.docker import (
+    get_git_container, get_slurm_container, get_ssh_container,
+    stop_test_containers
+)
+from test.integration.test_utils.networking import get_free_port, wait_for_tcp_port
+from test.integration.test_utils.postgres import setup_pg_db
+from test.integration.test_utils.pytest import get_next_pytest_base_temp
 
 if TYPE_CHECKING:
     from docker.models.containers import Container
     # noinspection PyProtectedMember
+    from _pytest.tmpdir import TempPathFactory
+    # noinspection PyProtectedMember
     from py._path.local import LocalPath  # type: ignore
     from pytest_mock import MockerFixture
     from pytest import FixtureRequest
-
-_AS_SLURM_CONTAINER_LABEL = "pytest.slurm.singleton"
-"""Docker container label key for Slurm singleton."""
-_AS_GIT_CONTAINER_LABEL = "pytest.git.singleton"
-"""Docker container label key for Git singleton."""
-_AS_SINGLETON_CONTAINER_VALUE = "true"
-"""Docker container label value for singletons."""
-
-_SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
-"""This is the vanilla image from LinuxServer.io, with OpenSSH. About 39MB."""
-_SSH_DOCKER_IMAGE_X11_MFA = 'autosubmit/linuxserverio-ssh-2fa-x11:latest'
-"""This is our test image, built on top of LinuxServer.io's, but with MFA and X11. About 395MB."""
-_SSH_DOCKER_PASSWORD = 'password'
-"""Common password used in SSH containers; we mock the SSH Client of Paramiko to avoid hassle with keys."""
-
-_SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1'
-"""The Slurm Docker image. About 600 MB. It contains 2 cores, 1 node."""
-
-_GIT_DOCKER_IMAGE = 'githttpd/githttpd:latest'
-"""The Git image used for tests where Autosubmit needs to clone a repository."""
 
 _PG_USER = 'postgres'
 _PG_PASSWORD = 'postgres'
@@ -130,6 +107,7 @@ def get_next_expid(tmp_path_factory) -> Callable[[], str]:
     It uses an OS-level lock for mutual exclusion, and a file to share
     the last/current expid through all processes (in case pytest-xdist is used).
     """
+
     def _get_next_expid() -> str:
         shared_tmp_dir = tmp_path_factory.getbasetemp().parent
         lock_path = shared_tmp_dir / "expid_global.lock"
@@ -215,7 +193,8 @@ def autosubmit_exp(
         testcase = expid.startswith('t')
 
         # Never reuse an experiment or reconfigure in tests for true test isolation.
-        # - https://learn.microsoft.com/en-us/dotnet/core/testing/unit-testing-best-practices#characteristics-of-good-unit-tests
+        # - https://learn.microsoft.com/en-us/dotnet/core/testing/unit-testing-best-
+        #   practices#characteristics-of-good-unit-tests
         # - https://wiki.c2.com/?UnitTestIsolation
         # - https://www.thoughtworks.com/en-es/insights/blog/testing/ephemeral-testing-environments-kill-darlings
         if Path(tmp_path / expid).exists():
@@ -328,66 +307,6 @@ def autosubmit_exp(
     return cast(AutosubmitExperimentFixture, _create_autosubmit_exp)
 
 
-class MakeSSHClientFixture(Protocol):
-    def __call__(
-            self,
-            ssh_port: int,
-            password: Optional[str],
-            key: Optional[Union['Path', str]]) -> paramiko.SSHClient:
-        ...
-
-
-# noinspection PyUnusedLocal
-def _make_ssh_client(ssh_port: int, password: Optional[str], key: Optional[Union['Path', str]],
-                     mfa: Optional[bool] = False) -> paramiko.SSHClient:
-    """Creates the SSH client
-
-    It modifies the list of arguments so that the port is always
-    the Docker container port.
-
-    Once the list of arguments is patched, we call the original
-    function to connect to the SSH server.
-
-    :return: A normal Paramiko SSH Client, but that used the Docker SSH port and password to connect.
-    """
-    ssh_client = _create_ssh_client()
-
-    orig_ssh_client_connect = ssh_client.connect
-
-    def _ssh_connect(*args, **kwargs):
-        """Mock call.
-
-        The SSH port is always set to the Docker container port, discarding
-        any values provided by the user.
-
-        If the user does not provide a kwarg password, we set the password to the
-        Docker password.
-        """
-        if 'port' in kwargs:
-            del kwargs['port']
-            kwargs['port'] = ssh_port
-        if 'password' not in kwargs:
-            kwargs['password'] = password
-            kwargs['look_for_keys'] = False
-            kwargs['allow_agent'] = False
-        if len(args) > 1:
-            # tuple to list, and then replace the port...
-            args = [x for x in args]
-            args[1] = ssh_port
-
-        if key is not None:
-            kwargs['key_filename'] = str(key)
-
-        ssh_timeout = 180  # 3 minutes
-        for timeout in ['banner_timeout', 'auth_timeout', 'channel_timeout']:
-            kwargs[timeout] = ssh_timeout
-
-        return orig_ssh_client_connect(*args, **kwargs)
-
-    ssh_client.connect = _ssh_connect
-    return ssh_client
-
-
 @pytest.fixture
 def paramiko_platform() -> Iterator[ParamikoPlatform]:
     local_root_dir = TemporaryDirectory()
@@ -406,39 +325,6 @@ def paramiko_platform() -> Iterator[ParamikoPlatform]:
     local_root_dir.cleanup()
 
 
-def _start_git_container(git_repos_path: Path, http_port: int) -> DockerContainer:
-    """Start a Docker container with Git.
-
-    The repository will be available with the base name of the path given,
-    with the TCP/80 port mapped to the host ``http_port``.
-    """
-    docker_args = {
-        'labels': {
-            _AS_GIT_CONTAINER_LABEL: _AS_SINGLETON_CONTAINER_VALUE,
-        }
-    }
-
-    docker_container = DockerContainer(
-        image=_GIT_DOCKER_IMAGE,
-        remove=True,
-        **docker_args
-    )
-
-    container = docker_container \
-        .with_bind_ports(80, http_port) \
-        .with_volume_mapping(str(git_repos_path), '/opt/git-server', mode='rw')
-    container.start()
-
-    wait_for_logs(container, "Command line: 'httpd -D FOREGROUND'")
-
-    container.exec('whoami')
-
-    # The docker image ``githttpd/githttpd`` creates an HTTP server for Git
-    # repositories, using the volume bound onto ``/opt/git-server`` as base
-    # for any subdirectory, the Git URL becoming ``git/{subdirectory-name}}``.
-    return container
-
-
 @pytest.fixture(scope="session")
 def git_server(git_repos_shared_dir) -> tuple['Container', Path, str]:
     # Start a container to server it -- otherwise, we would have to use
@@ -448,34 +334,18 @@ def git_server(git_repos_shared_dir) -> tuple['Container', Path, str]:
     shared_tmp_dir = git_repos_shared_dir
     lock_path = shared_tmp_dir / "git_global.lock"
 
-    client = from_env()
-
     base_path = shared_tmp_dir / 'git_repos_base'
     git_repos_path = base_path / 'git_repos'
     git_repos_path.mkdir(exist_ok=True, parents=True)
 
-    with Lock(filename=str(lock_path), flags=LOCK_EX, timeout=120):
-        containers = client.containers.list(
-            filters={
-                "label": f"{_AS_GIT_CONTAINER_LABEL}={_AS_SINGLETON_CONTAINER_VALUE}"
-            }
-        )
-
-        if containers:
-            container = containers[0]
-            container_instance = get_container_by_id(container.id)
-            http_port = int(container_instance.ports['80/tcp'][0]['HostPort'])  # type: ignore
-        else:
-            # Create the container exactly once
-            http_port = get_free_port()
-            # noinspection PyProtectedMember
-            container_instance = _start_git_container(git_repos_path, http_port)._container
+    container = get_git_container(lock_path, git_repos_path)
+    http_port = int(container_instance.ports['80/tcp'][0]['HostPort'])  # type: ignore
 
     repo_url = f'http://localhost:{http_port}/git'
 
-    _wait_for_tcp_port('localhost', http_port)
+    wait_for_tcp_port('localhost', http_port)
 
-    yield container_instance, git_repos_path, repo_url
+    yield container, git_repos_path, repo_url
 
 
 @pytest.fixture
@@ -484,148 +354,54 @@ def ps_platform() -> PsPlatform:
     return platform
 
 
-def _markers_contain(request: "FixtureRequest", txt: str) -> bool:
-    """Check if a marker is used in the test.
-
-    Returns ``True`` if the caller test is decorated with a
-    marker that matches the given text. Otherwise, ``False``.
-    """
-    markers = request.node.iter_markers()
-    return any(marker.name == txt for marker in markers)
+def _mock_ssh_config(ssh_config_path: Path, mocker: 'MockerFixture'):
+    ssh_config = paramiko.SSHConfig()
+    with open(ssh_config_path, 'r') as f:
+        ssh_config.parse(f)
+    return mocker.patch('autosubmit.platforms.paramiko_platform._load_ssh_config', return_value=ssh_config)
 
 
-def _wait_for_tcp_port(host, port, timeout=30):
-    """Tries to connect to host and port until it works or the timeout is reached."""
-    start = time.time()
-    while True:
-        try:
-            with socket.create_connection((host, port), timeout=2):
-                return
-        except OSError:
-            if time.time() - start > timeout:
-                raise TimeoutError(f"TCP connection not ready at {host}:{port}")
-            time.sleep(1)
-
-
-@pytest.fixture
-def ssh_server(mocker, tmp_path, request) -> Generator[DockerContainer, None, None]:
-    ssh_port = get_free_port()
-
-    user = getuser() or "unknown"
-    user_pw = getpwnam(user)
-    uid = user_pw.pw_uid
-    gid = user_pw.pw_gid
-
-    mfa = _markers_contain(request, 'mfa')
-    x11 = _markers_contain(request, 'x11')
-
-    ssh_image = _SSH_DOCKER_IMAGE_X11_MFA if mfa or x11 else _SSH_DOCKER_IMAGE
-
-    with DockerContainer(image=ssh_image, remove=True, hostname='openssh-server') \
-            .with_env('TZ', 'Etc/UTC') \
-            .with_env('SUDO_ACCESS', 'false') \
-            .with_env('USER_NAME', user) \
-            .with_env('USER_PASSWORD', 'password') \
-            .with_env('PUID', str(uid)) \
-            .with_env('PGID', str(gid)) \
-            .with_env('UMASK', '000') \
-            .with_env('PASSWORD_ACCESS', 'true') \
-            .with_env('MFA', str(mfa).lower()) \
-            .with_bind_ports(2222, ssh_port) as container:
-        # This verifies that the server printed the line, not necessarily the port is available
-        wait_for_logs(container, 'sshd is listening on port 2222')
-
-        ssh_client = _make_ssh_client(ssh_port, _SSH_DOCKER_PASSWORD, None, mfa)
-        mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
-
-        _wait_for_tcp_port('localhost', ssh_port)
-
-        ssh_config = Path(tmp_path, '.ssh/ssh_config')
-        ssh_config.parent.mkdir(exist_ok=True, parents=True)
-        ssh_config.touch()
-        ssh_config.write_text(dedent(f"""\
-        Host localhost
-            Hostname localhost
-            User {user}
-            ForwardX11 yes
-            Port 22
-        """))
-        if mfa:
-            # It uses a Transport and not an SSH client directly. Ideally, we would be able
-            # to use just one way
-            original_paramiko_config = paramiko.SSHConfig()
-            with open(ssh_config) as f:
-                original_paramiko_config.parse(f)
-            modified_config = original_paramiko_config.lookup('localhost')
-            modified_config['port'] = f'{ssh_port}'
-
-            paramiko_config: paramiko.SSHConfig = mocker.MagicMock(spec=paramiko.SSHConfig)
-            paramiko_config.lookup = lambda *args, **kwargs: modified_config
-            mocker.patch('autosubmit.platforms.paramiko_platform.paramiko.SSHConfig', return_value=paramiko_config)
-
-        yield container
-
-
-def _start_slurm_container(ssh_port: int) -> DockerContainer:
-    """Create and start a Slurm container with TestContainers.
-
-    The container is created with a label that can be used to later retrieve
-    the container without needing its ID. It is designed so that only one
-    container instance is created per test session (a singleton).
-
-    Do not repeat Autosubmit experiment IDs. Do not reuse experiment folders.
-    Doing any of these, will result in pytest failures that i. do not contain
-    any meaningful information in the logs, ii. nothing useful in the ASLOGS or
-    experiment temporary logs, iii. you will have to figure out how to set a
-    breakpoint and inspect what is inside the Slurm server.
-
-    Avoiding these risks will save you & other developers time debugging
-    issues like this.
-
-    :param ssh_port: The SSH port.
-    :return: an instance of a TestContainers container, with a docker container wrapped.
-    """
-    docker_args = {
-        'cgroupns': 'host',
-        'privileged': True,
-        'labels': {
-            _AS_SLURM_CONTAINER_LABEL: _AS_SINGLETON_CONTAINER_VALUE,
-        }
-    }
-
-    docker_container = DockerContainer(
-        image=_SLURM_DOCKER_IMAGE,
-        remove=True,
-        hostname='slurmctld',
-        **docker_args
-    )
-
-    # TODO: GH needs --volume /sys/fs/cgroup:/sys/fs/cgroup:rw
-    if 'GITHUB_ACTION' in os.environ:
-        docker_container = docker_container.with_volume_mapping('/sys/fs/cgroup', '/sys/fs/cgroup', mode='rw')
-
-    container = docker_container \
-        .with_env('TZ', 'Etc/UTC') \
-        .with_bind_ports(2222, ssh_port) \
-        .with_name(f'slurm-server-{uuid.uuid4()}')
-    container.start()
-
-    # TODO: or maybe wait for 'debug:  sched: Running job scheduler for full queue.'?
-    wait_for_logs(container, lambda logs: 'No fed_mgr state file' in logs)
-
-    container.exec('sinfo')
-
+@pytest.fixture(scope='session')
+def ssh_server(tmp_path_factory: 'TempPathFactory', session_mocker: 'MockerFixture') -> 'Container':
+    """Start a single Docker container serving SSH for integration tests."""
+    shared_tmp_dir = tmp_path_factory.getbasetemp()
+    lock_path = shared_tmp_dir / "ssh_vanilla_global.lock"
+    ssh_dir = Path(shared_tmp_dir, 'ssh/')
+    ssh_dir.mkdir(exist_ok=True)
+    container, ssh_port, ssh_config = get_ssh_container(lock_path, ssh_dir, mfa=False, x11=False)
+    _mock_ssh_config(ssh_config, session_mocker)
     return container
 
 
-def get_container_by_id(container_id: str) -> 'Container':
-    """Gets a Docker container by its ID.
+@pytest.fixture(scope='session')
+def ssh_x11_server(tmp_path_factory: 'TempPathFactory', session_mocker: 'MockerFixture') -> 'Container':
+    """Get a running SSH server with X11 enabled (no MFA)."""
+    shared_tmp_dir = tmp_path_factory.getbasetemp()
+    lock_path = shared_tmp_dir / "ssh_x11_global.lock"
+    ssh_dir = Path(shared_tmp_dir, 'ssh/')
+    ssh_dir.mkdir(exist_ok=True)
+    container, ssh_port, ssh_config = get_ssh_container(lock_path, ssh_dir, mfa=False, x11=True)
+    _mock_ssh_config(ssh_config, session_mocker)
+    return container
 
-    :param: container_id: The ID of the container.
-    :return: A Docker container.
+
+@pytest.fixture(scope='function')
+def ssh_x11_mfa_server(tmp_path, mocker: 'MockerFixture') -> 'Container':
+    """Get a running SSH server with X11 and MFA enabled.
+
+    We cannot have a singleton X11+MFA because the MFA-enabled containers
+    must ask the user for the MFA token. And for testing, we used a setup
+    where instead of setting up proper 2FA, we use backup codes.
+
+    And since backup codes can be used exactly once, if we used a singleton
+    container then it would be able to be used in exactly one test case.
     """
-    client = from_env()
-    return client.containers.get(container_id)
+    lock_path = tmp_path / "ssh_x11_mfa_global.lock"  # not really important as it's not a singleton
+    ssh_dir = Path(tmp_path, 'ssh/')
+    ssh_dir.mkdir()
+    container, ssh_port, ssh_config = get_ssh_container(lock_path, ssh_dir, mfa=True, x11=True, singleton=False)
+    _mock_ssh_config(ssh_config, mocker)
+    yield container
 
 
 @pytest.fixture(scope="session")
@@ -633,76 +409,25 @@ def slurm_server(tmp_path_factory, session_mocker) -> 'Container':
     """Session fixture that creates a singleton Slurm server container."""
     shared_tmp_dir = tmp_path_factory.getbasetemp().parent
     lock_path = shared_tmp_dir / "slurm_global.lock"
-
-    client = from_env()
-
-    with Lock(filename=str(lock_path), flags=LOCK_EX, timeout=120):
-        containers = client.containers.list(
-            filters={
-                "label": f"{_AS_SLURM_CONTAINER_LABEL}={_AS_SINGLETON_CONTAINER_VALUE}"
-            }
-        )
-
-        if containers:
-            container = containers[0]
-            container_instance = get_container_by_id(container.id)
-            ssh_port = int(container_instance.ports['2222/tcp'][0]['HostPort'])  # type: ignore
-        else:
-            # Create the container exactly once
-            ssh_port = get_free_port()
-            # noinspection PyProtectedMember
-            container_instance = _start_slurm_container(ssh_port=ssh_port)._container
-
-    ssh_key = _setup_ssh_key(tmp_path_factory, container_instance.id)
-    ssh_client = _make_ssh_client(ssh_port, password=None, key=ssh_key)
-    session_mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
+    container, ssh_port = get_slurm_container(lock_path)
+    # TODO: Needed? If so, explain why.
     session_mocker.patch(
         'autosubmit.platforms.platform.Platform.get_mp_context',
         return_value=multiprocessing.get_context('fork')
     )
-
-    _wait_for_tcp_port('localhost', ssh_port)
-
-    yield container_instance
+    wait_for_tcp_port('localhost', ssh_port)
+    return container
 
 
-def _setup_ssh_key(tmp_path_factory, container_id):
-    """Utility to copy the key from the container to the worker's local tmp."""
-    worker_tmp = tmp_path_factory.getbasetemp()
-    ssh_key = worker_tmp / 'container_root_pubkey'
+@pytest.fixture
+def ssh_fixture(request):
+    """Used for indirect Pytest parameters resolution.
 
-    check_output([
-        'docker', 'cp',
-        f'{container_id}:/root/.ssh/container_root_pubkey',
-        str(ssh_key)
-    ])
-    ssh_key.chmod(0o600)
-    return ssh_key
-
-
-def _setup_pg_db(conn: Connection) -> None:
-    """Reset the database.
-
-    Drops all schemas except the system ones and restoring the public schema.
-
-    :param conn: Database connection.
+    See ``test_paramiko_platform.py`` for an example use case.
     """
-    # Get all schema names that are not from the system
-    results = conn.execute(
-        text("""SELECT schema_name FROM information_schema.schemata
-               WHERE schema_name NOT LIKE 'pg_%'
-               AND schema_name != 'information_schema'""")
-    ).all()
-    schema_names = [res[0] for res in results]
-
-    # Drop all schemas
-    for schema_name in schema_names:
-        conn.execute(text(f"""DROP SCHEMA IF EXISTS "{schema_name}" CASCADE"""))
-
-    # Restore default public schema
-    conn.execute(text("CREATE SCHEMA public"))
-    conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
-    conn.execute(text("GRANT ALL ON SCHEMA public TO postgres"))
+    if hasattr(request, 'param'):
+        return request.getfixturevalue(request.param)
+    return None
 
 
 @pytest.fixture(scope='session', autouse=True)
@@ -732,7 +457,7 @@ def postgres_server(request: 'FixtureRequest') -> Generator[Optional[PostgresCon
                 .with_bind_ports(5432, pg_random_port) as container:
             # Setup database
             with create_engine(conn_url).connect() as conn:
-                _setup_pg_db(conn)
+                setup_pg_db(conn)
                 conn.commit()
 
             yield container
@@ -800,70 +525,161 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
         raise ValueError(f'Unsupported database backend: {backend}')
 
     BasicConfig.read()
-    with suppress(AutosubmitCritical):  # ( TODO: check which functions call as_db twice or if this is used in combination other fixture that calls autosubmit.install)
+    # TODO: check which functions call as_db twice or if this
+    #       is used in combination other fixture that calls autosubmit.install
+    with suppress(AutosubmitCritical):
         autosubmit.install()
 
     return backend
 
 
-def wait_child(timeout, retry=3):
-    """A parametrized fixture that will retry function X amount of times waiting for a child process to be executed.
+@pytest.fixture(scope='session')
+def git_repos_shared_dir(request) -> Path:
+    """Fixture to return the Git repository used by the Git singleton container.
 
-    In case it still fails after X retries an exception is thrown."""
-    def the_real_decorator(function):
-        def wrapper(*args, **kwargs):
-            retries = 0
-            while retries < retry:
-                try:
-                    value = function(*args, **kwargs)
-                    if value is None:
-                        return
-                except Exception:
-                    time.sleep(timeout)
-                    retries += 1
+    This directory is mapped in an HTTPD virtual directory, from where Git
+    repositories are served. If you create a folder inside this shared directory
+    it will be a new Git repository (i.e. make them unique).
+    """
+    config = request.config
+    is_xdist_master = not hasattr(config, "workerinput")
 
-        return wrapper
+    if is_xdist_master:
+        # pytest-xdist master
+        # noinspection PyProtectedMember
+        return config._git_repos_shared_dir
 
-    return the_real_decorator
-
-
-def pytest_configure(config):
-    if not hasattr(config, 'workerinput'):
-        # This is the pytest-xdist master
-        config._git_repos_shared_dir = Path(
-            tempfile.mkdtemp(prefix="git_repos_base_")
-        )
+    # pytest-xdist worker
+    return Path(config.workerinput['git_repos_shared_dir'])
 
 
-def pytest_configure_node(node):
+# --- Pytest hooks
+
+# Pytest hooks. Review pytest docs for changes in case of problems.
+#
+# Before session (showing a few):
+#
+# - ``pytest_addoption``
+# - ``pytest_load_initial_conftests``
+# - ``pytest_cmdline_main``
+# - ``pytest_configure``
+# - ``pytest_configure_node``
+#
+# NOTE: ``pytest_configure_node`` is not a pytest hook, but a pytest-xdist
+#       hook! It's called before the session starts, and can add configuration
+#       for xdist nodes/workers like folders to be shared by all nodes.
+#
+# When session is created:
+#
+# - ``pytest_sessionstart``
+#
+# Then come the collection phase hooks (``pytest_collection``, ``pytest_collect_file``, ...).
+#
+# Followed by test execution (our fixtures are included there), reporting execution,
+# and finally the session end hooks:
+#
+# - ``pytest_sessionfinish``
+# - ``pytest_unconfigure``
+#
+# Try to keep these hooks together or troubleshooting it might be really challenging,
+# even if other code is added below, when adding new hooks, please include them near
+# these existing ones.
+#
+# Finally, remember that pytest-xdist will fork a new process per session, so hooks
+# that have sessions (including our ``pytest.fixture(scope=session|function|etc.)``)
+# are all executed as many times as processes/workers we have in pytest-xdist.
+#
+# Refs:
+# - https://github.com/pytest-dev/pytest/issues/3261#issuecomment-3380604983
+# - https://pytest-xdist.readthedocs.io/en/stable/how-it-works.html
+
+def pytest_configure(config) -> None:
+    is_xdist_master = not hasattr(config, "workerinput")
+
+    if not is_xdist_master:
+        return
+
+    # The rest of the code only runs on pytest-xdist master.
+    stop_test_containers()
+
+    # This hook is called before the one-or-many pytest-xdist nodes
+    # are created, so we create the shared directories here, to then
+    # use them in ``pytest_configure_node`` (next function).
+    #
+    # Also, remember to use private attributes to avoid conflicts with
+    # pytest attributes, or attributes set by other libraries. An
+    # attribute like ``_test`` has high risk of conflicts and weird
+    # bugs.
+
+    next_pytest_folder = get_next_pytest_base_temp()
+
+    # NOTE: Do NOT call ``.mkdir`` yet. Pytest will create a directory
+    #       upon starting a new session.
+
+    git_repos_path = Path(next_pytest_folder, 'git_repos')
+    config._git_repos_shared_dir = git_repos_path
+
+
+def pytest_configure_node(node) -> None:
+    """Pytest hook to configure workers.
+
+    Ref: https://github.com/pytest-dev/pytest-xdist/blob/
+         2e1b1ad03f2c285639f40b1365fbbb1c447997c2/src/xdist/newhooks.py#L73-L75
+    """
+    # These directories are created in the last hook of pytest before
+    # this hook is called, and before the pytest-xdist workers are launched
+    # and the pytest sessions start.
+    #
+    # This allows to give all the pytest-xdist workers the same shared
+    # directory to load things like common SSH keys or Git repositories
+    # to be used by the singleton Docker containers used in our tests.
+    # We are doing this as spawning one container per test started causing
+    # slowness and resource contention in our tests.
+
+    # NOTE: Do not call ``.mkdir`` on these folders yet.
+
     # noinspection PyProtectedMember
     node.workerinput["git_repos_shared_dir"] = str(
         node.config._git_repos_shared_dir
     )
 
 
-@pytest.fixture(scope='session')
-def git_repos_shared_dir(request):
-    config = request.config
+def pytest_sessionstart(session) -> None:
+    config = session.config
+    is_xdist_master = not hasattr(config, "workerinput")
 
-    if hasattr(config, 'workerinput'):
-        # pytest-xdist worker
-        return Path(config.workerinput['git_repos_shared_dir'])
-    else:
-        # pytest-xdist master
-        # noinspection PyProtectedMember
-        return config._git_repos_shared_dir
+    if not is_xdist_master:
+        return
+
+    # The rest of the code only runs on pytest-xdist master.
+
+    # noinspection PyProtectedMember
+    tmp_path_factory = session.config._tmp_path_factory
+
+    # Calling ``.getbasetemp`` is dangerous as it is called by
+    # Pytest and must create a base path **per-session**. However,
+    # in this case it is safe because we already have a session,
+    # and the next time Pytest calls it, it knows there is already
+    # a session and ``._basetemp`` created, so it re-uses that.
+    _ = tmp_path_factory.getbasetemp()
+
+    # Now call ``.mkdir`` for the shared folders.
+
+    # noinspection PyProtectedMember
+    config._git_repos_shared_dir.mkdir()
 
 
-def pytest_sessionfinish():
+# noinspection PyUnusedLocal
+def pytest_sessionfinish(session, exitstatus) -> None:
     """Finish pytest session."""
-    # Say by to Slurm containers;
-    with suppress(Exception):
-        from_env().containers.prune(
-            filters={"label": f"{_AS_SLURM_CONTAINER_LABEL}={_AS_SINGLETON_CONTAINER_VALUE}"}
-        )
-    # and to SSH containers.
-    with suppress(Exception):
-        from_env().containers.prune(
-            filters={"label": f"{_AS_GIT_CONTAINER_LABEL}={_AS_SINGLETON_CONTAINER_VALUE}"}
-        )
+    config = session.config
+    is_xdist_master = not hasattr(config, "workerinput")
+
+    if not is_xdist_master:
+        return
+
+    # The rest of the code only runs on pytest-xdist master.
+
+    stop_test_containers()
+
+# --- Pytest hooks
