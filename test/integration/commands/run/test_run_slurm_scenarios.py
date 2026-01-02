@@ -1,26 +1,28 @@
 from getpass import getuser
 from pathlib import Path
 from textwrap import dedent
+from time import sleep
 from typing import TYPE_CHECKING
 
 import pytest
-from time import sleep
-
 from ruamel.yaml import YAML
+
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical
-from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, _assert_db_fields, _assert_files_recovered, run_in_thread
+from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, \
+    _assert_db_fields, _assert_files_recovered, run_in_thread
 from test.integration.conftest import AutosubmitExperimentFixture
 
 if TYPE_CHECKING:
-    from testcontainers.core.container import DockerContainer
+    from docker.models.containers import Container
 
 
 # -- Tests
 
 @pytest.mark.docker
-@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
+@pytest.mark.ssh
+@pytest.mark.timeout(300)
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
     (dedent("""\
@@ -147,12 +149,13 @@ def test_run_uninterrupted(
         expected_db_entries,
         final_status,
         wrapper_type,
-        slurm_server: 'DockerContainer',
+        slurm_server: 'Container',
         prepare_scratch,
         general_data,
 ):
     yaml = YAML(typ='rt')
     as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp.expid)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -191,8 +194,9 @@ def test_run_uninterrupted(
 
 
 @pytest.mark.docker
-@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
+@pytest.mark.ssh
+@pytest.mark.timeout(300)
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
     (dedent("""\
@@ -318,12 +322,13 @@ def test_run_interrupted(
         expected_db_entries,
         final_status,
         wrapper_type,
-        slurm_server: 'DockerContainer',
+        slurm_server: 'Container',
         prepare_scratch,
         general_data,
 ):
     yaml = YAML(typ='rt')
     as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp.expid)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -360,7 +365,6 @@ def test_run_interrupted(
 
 @pytest.mark.docker
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
-
     # Failure
     (dedent("""\
     CONFIG:
@@ -405,9 +409,9 @@ def test_run_failed_set_to_ready_on_new_run(
 
 
 @pytest.mark.docker
-@pytest.mark.xdist_group("slurm")
 @pytest.mark.timeout(300)
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize("jobs_data,final_status", [
     (dedent("""\
 EXPERIMENT:
@@ -474,7 +478,7 @@ def test_run_with_additional_files(
         final_status: str,
         include_wrappers: bool,
         autosubmit_exp,
-        slurm_server: 'DockerContainer',
+        slurm_server: 'Container',
         tmp_path,
 ):
     yaml = YAML(typ='rt')
@@ -512,13 +516,14 @@ def test_run_with_additional_files(
             for chunk in range(1, 1 + experiment_data_yaml.get("EXPERIMENT", {}).get("NUMCHUNKS", 1)):
                 remote_name = additional_filename.replace(".sh", f'_20000101_fc0_{chunk}_JOB')
                 command = f"cat {project_remote_path}/{remote_name}"
-                exit_code, output = slurm_server.exec(["bash", "-c", command])
+                exit_code, output = slurm_server.exec_run(["bash", "-c", command])
                 assert exit_code == 0, f"File {additional_filename} not found in remote project path."
 
 
 @pytest.mark.docker
-@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
+@pytest.mark.ssh
+@pytest.mark.timeout(300)
 @pytest.mark.parametrize("wrappers, run_type", [
     (
         {
@@ -709,7 +714,7 @@ def test_wrapper_config(
         wrappers: str,
         run_type: str,
         autosubmit_exp,
-        slurm_server: 'DockerContainer',
+        slurm_server: 'Container',
         tmp_path,
 ):
     experiment_data = {

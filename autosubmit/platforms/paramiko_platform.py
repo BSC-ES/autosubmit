@@ -19,6 +19,7 @@ import datetime
 import getpass
 import hashlib
 import locale
+import logging
 import os
 import random
 import re
@@ -216,6 +217,7 @@ class ParamikoPlatform(Platform):
                     self.restore_connection(as_conf)
                     message = "OK"
                 except Exception as e:
+                    Log.log.log(logging.DEBUG, f'SSH test connection error: {str(e)}', exc_info=e)
                     message = str(e)
                 if message.find("t accept remote connections") == -1:
                     try:
@@ -419,7 +421,8 @@ class ParamikoPlatform(Platform):
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, timeout=60, banner_timeout=60)
                         except Exception as e:
-                            Log.warning(f'SSH connection to {self._host_config["hostname"]} failed, will try again'
+                            Log.warning(f'SSH connection to {self.user}@{self._host_config["hostname"]} -p {port} '
+                                        f'failed (certificate: {self._host_config_id}), will try again '
                                         f'disabling RSA algorithms sha-256 and sha-512, error: {str(e)}')
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, timeout=60, banner_timeout=60,
@@ -1215,7 +1218,7 @@ class ParamikoPlatform(Platform):
                 if not self.connected or not self.transport or not self.transport.active:
                     self.restore_connection(None)
                 else:
-                    Log.info('The SSH transport is still active, will not try to reconnect')
+                    Log.warning(f'The SSH transport is still active, will not try to reconnect: {str(e)}')
                 # TODO: We need to understand why we are increasing in increments of 60 seconds, then document it.
                 # new_timeout = timeout + 60
                 # Log.info(f"Increasing Paramiko channel timeout from {timeout} to {new_timeout}")
