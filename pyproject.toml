@@ -81,7 +81,7 @@ postgres = ["psycopg2"]
 tests = [
     # TODO: remove mock by pytest-mock
     "mock",
-    "pytest>=8.2,<8.5",
+    "pytest>=8.2,<9.1",
     "pytest-cov",
     "pytest-mock",
     "ruff==0.14.10",
