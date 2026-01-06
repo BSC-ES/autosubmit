@@ -93,7 +93,7 @@ docs = [
     "livereload",
     "pydata-sphinx-theme>=0.16.1,<0.17",
     "sphinx>=5,<9",
-    "sphinx-autobuild>=2021.3,<2024.11",
+    "sphinx-autobuild>=2021.3,<2025.9",
     "sphinx_rtd_theme",
     "sphinx-reredirects==0.1.*",
     "sphinx_design"
