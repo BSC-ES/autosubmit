@@ -23,7 +23,7 @@ from autosubmit.platforms.wrappers.flux_yaml_generator import FluxYAMLGenerator,
 def test_generate_template():
     """ Tests the generation of a Flux jobspec. """
     parameters = {
-        'HPCLOGDIR': '/tmp/logs',
+        'CURRENT_LOGDIR': '/tmp/logs',
         'JOBNAME': 'a000_20250101_fc0_1_SIM',
         'TASKTYPE': 'SIM',
         'DEFAULT.EXPID': 'a000',
@@ -292,7 +292,7 @@ def test_set_attributes(yaml):
     assert yaml.attributes['system']['files']['script']['data'] == "echo hello\n"
 
 def test_compose_node_resource_invalid_inputs(yaml):
-    # Zero count and min_count
+    # Zero count
     with pytest.raises(ValueError):
         yaml._compose_node_resource()
 
@@ -300,25 +300,15 @@ def test_compose_node_resource_invalid_inputs(yaml):
     with pytest.raises(ValueError):
         yaml._compose_node_resource(count=-1)
 
-    # Negative min_count
-    with pytest.raises(ValueError):
-        yaml._compose_node_resource(min_count=-1)
-
     # Negative mem_per_node_mb
     with pytest.raises(ValueError):
         yaml._compose_node_resource(mem_per_node_mb=-1)
 
 def test_compose_node_resource(yaml):
-    # count, min_count and mem_per_node_mb set
-    node_dict = yaml._compose_node_resource(count=4, min_count=4, mem_per_node_mb=2048)
+    # count and mem_per_node_mb set
+    node_dict = yaml._compose_node_resource(count=4, mem_per_node_mb=2048)
     assert "'count': 4" in str(node_dict)
     assert "'memory', 'count': 2048" in str(node_dict)
-    assert "'count': {'min'" not in str(node_dict)
-
-    # Only min_count set
-    node_dict = yaml._compose_node_resource(count=0, min_count=4)
-    assert "'node', 'count': {'min': 4}" in str(node_dict)
-    assert "memory" not in str(node_dict)
 
 
 def test_compose_slot_resource_invalid_inputs(yaml):
