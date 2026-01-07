@@ -44,7 +44,7 @@ class FluxYAMLGenerator:
         :rtype: str
         """
         # Extract job parameters
-        log_path = self.parameters['HPCLOGDIR']
+        log_path = self.parameters['CURRENT_LOGDIR']
         job_name = self.parameters['JOBNAME']
         job_section = self.parameters['TASKTYPE']
         expid = self.parameters['DEFAULT.EXPID']
@@ -167,6 +167,7 @@ class FluxYAML(object):
         :return: The total count to be assigned to the corresponding task. Else, zero.
         :rtype: int
 
+        :raises ValueError: If any input parameter is invalid.
         :raises AutosubmitCritical: If the resource request is not accepted.
         """
         # Check input validity
@@ -182,14 +183,13 @@ class FluxYAML(object):
 
         # Create node, slot and core resources by mapping the parameters. Node is optional
         node = None
-        min_nodes = 0
         if num_nodes > 0 and tasks_per_node > 0:
             nslots = tasks_per_node
         elif num_nodes > 0:
             nslots = 1
         elif tasks_per_node > 0:
             nslots = tasks_per_node
-            min_nodes = 1
+            num_nodes = 0
         elif ntasks > 0:
             nslots = ntasks
         elif ntasks == 0:
@@ -200,8 +200,8 @@ class FluxYAML(object):
                                      please report your case to the Autosubmit developers")
 
         # Compose resources
-        if num_nodes > 0 or min_nodes > 0:
-            node = self._compose_node_resource(count=num_nodes, min_count=min_nodes, exclusive=exclusive,
+        if num_nodes > 0:
+            node = self._compose_node_resource(count=num_nodes, exclusive=exclusive,
                                                mem_per_node_mb=mem_per_node_mb)
         if nslots > 0:
             slot = self._compose_slot_resource(label=label, count=nslots)
@@ -238,7 +238,8 @@ class FluxYAML(object):
 
         :return: None
 
-        :raises ValueError: If both or none of count_per_slot and count_total are set.
+        :raises ValueError: If any input parameter is invalid or if both or none of 
+        count_per_slot and count_total are set.
         """
         # Check input validity
         if count_per_slot < 0 or count_total < 0:
@@ -282,6 +283,8 @@ class FluxYAML(object):
         :param script_content: Content of the script.
 
         :return: None
+
+        :raises ValueError: If any input parameter is invalid.
         """
         # Validate inputs
         if duration <= 0:
@@ -326,7 +329,7 @@ class FluxYAML(object):
             }
         }
 
-    def _compose_node_resource(self, count: int = 0, min_count: int = 0, exclusive: bool = False, mem_per_node_mb: int = 0) -> dict:
+    def _compose_node_resource(self, count: int = 0, exclusive: bool = False, mem_per_node_mb: int = 0) -> dict:
         """
         Composes a node resource dictionary.
 
@@ -337,21 +340,14 @@ class FluxYAML(object):
         :return: Node resource dictionary.
         :rtype: dict
 
-        :raises ValueError: If both count and min_count are set.
+        :raises ValueError: If the count value is not greater than zero.
         """
-        if count <= 0 and min_count <= 0:
+        if count <= 0:
             raise ValueError("Node count must be greater than zero to compose a node resource")
-        if count > 0 and min_count > 0:
-            Log.warning("Cannot set both count and min_count for node resource simultaneously. Ignoring min_count.")
-
-        if count > 0:
-            node_count = count
-        else:
-            node_count = {'min': min_count}
 
         node = {
             'type': 'node',
-            'count': node_count,
+            'count': count,
             'exclusive': exclusive,
             'with': []
         }
@@ -373,7 +369,7 @@ class FluxYAML(object):
         :return: Slot resource dictionary.
         :rtype: dict
 
-        :raises ValueError: If slot count is not greater than zero.
+        :raises ValueError: If any input parameter is invalid.
         """
         if count <= 0:
             raise ValueError("Slot count must be greater than zero to compose a slot resource")
@@ -398,7 +394,7 @@ class FluxYAML(object):
         :return: Core resource dictionary.
         :rtype: dict
 
-        :raises ValueError: If core count is not greater than zero.
+        :raises ValueError: If any input parameter is invalid.
         """
         if count <= 0:
             raise ValueError("Core count must be greater than zero to compose a core resource")
