@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -169,7 +169,13 @@ class FluxYAML(object):
 
         :raises AutosubmitCritical: If the resource request is not accepted.
         """
-        # Core count must be always set according to Flux RFC 25
+        # Check input validity
+        if ntasks < 0 or num_nodes < 0 or num_cores < 0 or mem_per_node_mb < 0 or mem_per_core_mb < 0 or tasks_per_node < 0:
+            raise ValueError(f"Some resource request for {self.job_name} is negative.")
+        if label is None or label.strip() == "":
+            raise ValueError(f"Resource label for job {self.job_name} cannot be empty.")
+        
+        # Core count must be always set, according to Flux RFC 25
         if num_cores == 0:
             Log.warning(f"Job {self.job_name} has been asigned zero cores, which is not permitted. Defaulting to 1")
             num_cores = 1
@@ -234,6 +240,13 @@ class FluxYAML(object):
 
         :raises ValueError: If both or none of count_per_slot and count_total are set.
         """
+        # Check input validity
+        if count_per_slot < 0 or count_total < 0:
+            raise ValueError("Task count values cannot be negative")
+        if resource_label is None or resource_label.strip() == "":
+            raise ValueError("Resource label for task cannot be empty.")
+
+        # Check that only one of the count parameters is set
         if count_per_slot > 0 and count_total > 0:
             raise ValueError("Cannot set both count_per_slot and count_total simultaneously")
         elif count_per_slot == 0 and count_total == 0:
@@ -270,6 +283,20 @@ class FluxYAML(object):
 
         :return: None
         """
+        # Validate inputs
+        if duration <= 0:
+            raise ValueError("Job duration must be greater than zero")
+        if cwd is None or cwd.strip() == "":
+            raise ValueError("Current working directory cannot be empty")
+        if job_name is None or job_name.strip() == "":
+            raise ValueError("Job name cannot be empty")
+        if output_file is None or output_file.strip() == "":
+            raise ValueError("Output file path cannot be empty")
+        if error_file is None or error_file.strip() == "":
+            raise ValueError("Error file path cannot be empty")
+        if script_content is None or script_content.strip() == "":
+            raise ValueError("Script content cannot be empty")
+        
         self.attributes['system'] = {
             'duration': duration,
             'cwd': cwd,
@@ -350,6 +377,8 @@ class FluxYAML(object):
         """
         if count <= 0:
             raise ValueError("Slot count must be greater than zero to compose a slot resource")
+        if label is None or label.strip() == "":
+            raise ValueError("Slot label cannot be empty.")
 
         slot = {
             'type': 'slot',
@@ -373,6 +402,8 @@ class FluxYAML(object):
         """
         if count <= 0:
             raise ValueError("Core count must be greater than zero to compose a core resource")
+        if mem_per_core_mb < 0:
+            raise ValueError("Memory per core cannot be negative.")
 
         core = {
             'type': 'core',
