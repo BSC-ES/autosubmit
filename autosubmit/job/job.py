@@ -2253,8 +2253,10 @@ class Job(object):
 
         # Only replace CURRENT_ placeholders when requested and dynamic_variables exists.
         if replace_by_empty:
-            for key in as_conf.dynamic_variables.keys():
-                parameters[key] = ""
+            placeholder_pattern = re.compile(r'%[^%]+%')
+            for key, value in as_conf.dynamic_variables.items():
+                if value not in as_conf.default_parameters:
+                    parameters[key] = placeholder_pattern.sub("", value)
             as_conf.dynamic_variables = dict()
 
         return parameters
