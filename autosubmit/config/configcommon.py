@@ -73,11 +73,8 @@ class AutosubmitConfig(object):
         self.starter_conf: dict = {}
         self.misc_files = []
         self.misc_data: dict = {}
-        self.default_parameters = {'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%',
-                                   'M': '%M%', 'M_': '%M_%', 'm': '%m%', 'm_': '%m_%'}
-
+        self.default_parameters: dict = {'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%', 'M': '%M%', 'M_': '%M_%', 'm': '%m%', 'm_': '%m_%'}
         self.metadata_folder = Path(self.conf_folder_yaml) / "metadata"
-
         self._platforms_parser = None
         self._platforms_parser_file = None
         self._exp_parser_file = None
@@ -551,10 +548,10 @@ class AutosubmitConfig(object):
 
     @staticmethod
     def _normalize_jobs_in_wrapper(
-        wrapper: str,
-        wrapper_data: dict[str, Any],
-        job_sections: Iterable[str],
-        raise_exception: bool,
+            wrapper: str,
+            wrapper_data: dict[str, Any],
+            job_sections: Iterable[str],
+            raise_exception: bool,
     ) -> None:
         """Normalize the JOBS_IN_WRAPPER field for a wrapper.
 
@@ -1907,6 +1904,16 @@ class AutosubmitConfig(object):
 
             self.load_workflow_commit()
             self.dynamic_variables = {}
+            self.extend_default_parameters()
+
+    def extend_default_parameters(self):
+        """ Extend the default parameters list with those defined in the experiment data. """
+        user_defined = self.experiment_data.get("DEFAULT", {}).get("PARAMETERS", [])
+        if isinstance(user_defined, list):
+            for param in user_defined:
+                if param not in self.default_parameters.keys():
+                    self.default_parameters[param] = f"%{param}%"
+        self.default_parameters.update(user_defined)
 
     def _add_autosubmit_dict(self) -> None:
         """Add the AUTOSUBMIT namespace to the experiment data."""
