@@ -1917,7 +1917,8 @@ class AutosubmitConfig(object):
 
     def set_default_parameters(self) -> None:
         """Sets the default parameters for the experiment."""
-        self.default_parameters: dict = {'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%', 'M': '%M%', 'M_': '%M_%', 'm': '%m%', 'm_': '%m_%'}
+        self.default_parameters: dict = {'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%', 'M': '%M%', 'M_': '%M_%',
+                                         'm': '%m%', 'm_': '%m_%'}
         user_defined = self.experiment_data.get("CONFIG", {}).get("SAFE_PLACEHOLDERS", [])
 
         if isinstance(user_defined, str):
