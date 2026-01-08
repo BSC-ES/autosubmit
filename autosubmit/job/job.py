@@ -2650,7 +2650,7 @@ class Job(object):
                                       section=self.section, chunk=self.chunk,
                                       platform=self.platform_name, job_id=self.id, wrapper_queue=self._wrapper_queue,
                                       wrapper_code=2 if not self.packed else 1,
-                                      children=self.children_names_str, workflow_commit=self.workflow_commit)
+                                      children=self.children_names_str, workflow_commit=self.workflow_commit, split=self.split if self.split else None, splits=self.splits if self.splits else None)
 
     def update_start_time(self, count=-1):
         """Updates the job's start time based on the count of retries.
