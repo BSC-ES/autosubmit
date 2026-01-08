@@ -56,6 +56,8 @@ class FluxYAMLGenerator:
         mem = int(self.parameters['MEMORY']) if self.parameters['MEMORY'] else 0
         mem_per_core = int(self.parameters['MEMORY_PER_TASK']) if self.parameters['MEMORY_PER_TASK'] else 0
         exclusive = self.parameters['EXCLUSIVE']
+        if isinstance(exclusive, str):
+            exclusive = exclusive.lower() in ('true', '1', 'yes')
 
         # When using vertical wrappers, output files paths will be replaced in runtime
         output_file = f"{log_path}/{job_name}.cmd.out.0"
