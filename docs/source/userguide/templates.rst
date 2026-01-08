@@ -29,8 +29,24 @@ experiment is :ref:`inspected <inspect_cmd>` or
 :doc:`created </userguide/run/index>`.
 
 When Autosubmit preprocesses the template script, it replaces placeholders with configuration values.
+
 A placeholder is any configuration key enclosed in %% (in-place) or in %^% ( postloaded).
+
 For example, %DEFAULT.EXPID% refers to the Autosubmit configuration value specified in the DEFAULT.EXPID key of the YAML configuration file.
+
+.. warning::
+
+   If you want a placeholder to remain unsubstituted, list its name (without surrounding ``%``) under the ``CONFIG.SAFE_PLACEHOLDERS`` key in your YAML configuration. Placeholders listed there will be kept as-is (e.g. ``%CURRENT_PROJECT%`` remains ``%CURRENT_PROJECT%``).
+
+   Example:
+
+   .. code-block:: yaml
+
+     CONFIG:
+       SAFE_PLACEHOLDERS:
+         - CURRENT_PROJECT
+         - ANOTHER_VAR
+
 
 
 Assuming that one of the Autosubmit experiment configuration files
@@ -175,4 +191,3 @@ In case that your script needs lines, the yaml specification allows to do so wit
         sleep 2
 
 Also, for debugging purposes, if PROJECT_TYPE is set to NONE (see :ref:`develproject`), the SCRIPT directive will overwrite Autosubmit's self-contained dummy templates.
-

@@ -188,6 +188,7 @@ def test_check_conf_files_errors(error: Exception, expected: Exception,
     with pytest.raises(expected):
         as_conf.reload.side_effect = as_conf.check_conf_files()
 
+
 @pytest.mark.parametrize(
     'experiment_job,expected',
     [
@@ -233,3 +234,35 @@ def test_set_version(autosubmit_config: 'AutosubmitConfigFactory', experiment_jo
     as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data=experiment_job)
     as_conf.ignore_file_path = True
     assert as_conf.check_jobs_conf() == expected
+
+
+@pytest.mark.parametrize(
+    'experiment_data, raise_error',
+    [
+        [{}, False],
+        [{'CONFIG': {"SAFE_PLACEHOLDERS": "some"}}, False],
+        [{'CONFIG': {"SAFE_PLACEHOLDERS": "some some"}}, False],
+        [{'CONFIG': {"SAFE_PLACEHOLDERS": "some, some"}}, False],
+        [{'CONFIG': {"SAFE_PLACEHOLDERS": ["some", "some"]}}, False],
+        [{'CONFIG': {"SAFE_PLACEHOLDERS": 123}}, True],
+    ], ids=[
+        'empty_experiment_data',
+        'single_safe_placeholder',
+        'multiple_safe_placeholders_space',
+        'multiple_safe_placeholders_comma',
+        'safe_placeholders_as_list',
+        'invalid_safe_placeholders_type'
+    ]
+)
+def test_set_default_parameters(autosubmit_config: 'AutosubmitConfigFactory', experiment_data, raise_error, tmp_path):
+    """Test that default parameters are set correctly."""
+
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data=experiment_data)
+    if raise_error:
+        with pytest.raises(AutosubmitCritical):
+            as_conf.set_default_parameters()
+    else:
+        as_conf.set_default_parameters()
+        if experiment_data:
+            assert "some" in as_conf.default_parameters.keys()
+            assert "%some%" in as_conf.default_parameters.values()

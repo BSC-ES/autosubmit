@@ -2253,8 +2253,12 @@ class Job(object):
 
         # Only replace CURRENT_ placeholders when requested and dynamic_variables exists.
         if replace_by_empty:
-            for key in as_conf.dynamic_variables.keys():
-                parameters[key] = ""
+            placeholder_pattern = re.compile(r'%[^%]+%')
+            for key, value in as_conf.dynamic_variables.items():
+                for placeholder in re.findall(placeholder_pattern, value):
+                    if placeholder not in as_conf.default_parameters.values():
+                        value = value.replace(placeholder, "")
+                parameters[key] = value
             as_conf.dynamic_variables = dict()
 
         return parameters
@@ -2298,7 +2302,6 @@ class Job(object):
                                                                 set_attributes)
         parameters = self.update_wrapper_parameters(as_conf, parameters)
         parameters = self.update_placeholders(as_conf, parameters, replace_by_empty=True)
-        parameters.update(as_conf.default_parameters)
         if set_attributes:
             self.update_job_variables_final_values(parameters)
         for event in self.platform.worker_events:  # keep alive log retrieval workers.
