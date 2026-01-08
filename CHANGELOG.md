@@ -1,4 +1,4 @@
-### 4.1.16: Unreleased
+### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
 This release adds support to Postgres using SQLAlchemy, without removing the
 SQLite support. By default, Autosubmit will use SQLite. Postgres support is
@@ -79,6 +79,8 @@ release.
   `Submitter` class and using `ParamikoSubmitter` directly (only implementation) #2577
 - Added documentation regarding in-line script definition. 
 - Fixes an issue with general wrapper parameters crashing during runtime when defined. #2743
+- Added a new configuration parameter to list a safe-list of placeholders that can be used in templates as they are, example: "%CUSTOM_MYVAR%" -> "%CUSTOM_MYVAR%".
+
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 
