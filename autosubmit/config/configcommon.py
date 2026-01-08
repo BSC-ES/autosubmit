@@ -1925,7 +1925,7 @@ class AutosubmitConfig(object):
             if "," in user_defined:
                 user_defined = [param.strip() for param in user_defined.split(",")]
             else:
-                user_defined = [user_defined.strip()]
+                user_defined = [param.strip() for param in user_defined.split(" ")]
 
         elif not isinstance(user_defined, list):
             raise AutosubmitCritical("CONFIG.SAFE_PLACEHOLDERS must be a list of placeholders names or a string.")
