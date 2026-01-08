@@ -1929,10 +1929,8 @@ class AutosubmitConfig(object):
         elif not isinstance(user_defined, list):
             raise AutosubmitCritical("DEFAULT.PARAMETERS must be a list of parameter names or a string.")
 
-        for param in (p for p in user_defined if p not in self._default_parameters.keys()):
+        for param in (p for p in user_defined if p not in self.default_parameters.keys()):
             self.default_parameters[param] = f"%{param}%"
-
-        self.default_parameters.update(user_defined)
 
     def _add_autosubmit_dict(self) -> None:
         """Add the AUTOSUBMIT namespace to the experiment data."""
