@@ -2255,8 +2255,9 @@ class Job(object):
         if replace_by_empty:
             placeholder_pattern = re.compile(r'%[^%]+%')
             for key, value in as_conf.dynamic_variables.items():
-                if value not in as_conf.default_parameters:
-                    parameters[key] = placeholder_pattern.sub("", value)
+                for placeholder in re.findall(placeholder_pattern, value):
+                    if placeholder not in as_conf.default_parameters.values():
+                        value = value.replace(placeholder, "")
             as_conf.dynamic_variables = dict()
 
         return parameters
