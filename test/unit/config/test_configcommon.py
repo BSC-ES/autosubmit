@@ -241,13 +241,17 @@ def test_set_version(autosubmit_config: 'AutosubmitConfigFactory', experiment_jo
     [
         [{}, False],
         [{'CONFIG': {"SAFE_PLACEHOLDERS": "some"}}, False],
-        [{'CONFIG': {"SAFE_PLACEHOLDERS": ["some"]}}, False],
+        [{'CONFIG': {"SAFE_PLACEHOLDERS": "some some"}}, False],
+        [{'CONFIG': {"SAFE_PLACEHOLDERS": "some, some"}}, False],
+        [{'CONFIG': {"SAFE_PLACEHOLDERS": ["some", "some"]}}, False],
         [{'CONFIG': {"SAFE_PLACEHOLDERS": 123}}, True],
     ], ids=[
-        'no_config',
-        'safe_placeholders_string',
-        'safe_placeholders_list',
-        'safe_placeholders_invalid_type'
+        'empty_experiment_data',
+        'single_safe_placeholder',
+        'multiple_safe_placeholders_space',
+        'multiple_safe_placeholders_comma',
+        'safe_placeholders_as_list',
+        'invalid_safe_placeholders_type'
     ]
 )
 def test_set_default_parameters(autosubmit_config: 'AutosubmitConfigFactory', experiment_data, raise_error, tmp_path):
