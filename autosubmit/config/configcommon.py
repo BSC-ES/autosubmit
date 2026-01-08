@@ -1927,7 +1927,7 @@ class AutosubmitConfig(object):
                 user_defined = [user_defined.strip()]
 
         elif not isinstance(user_defined, list):
-            raise AutosubmitCritical("DEFAULT.PARAMETERS must be a list of parameter names or a string.")
+            raise AutosubmitCritical("CONFIG.SAFE_PLACEHOLDERS must be a list of placeholders names or a string.")
 
         for param in (p for p in user_defined if p not in self.default_parameters.keys()):
             self.default_parameters[param] = f"%{param}%"
