@@ -1,28 +1,4 @@
-### 4.1.17: Unreleased
-
-**Bug fixes:**
-
-- Removing the generation of SLURM HEADERS with --cpus-per-task when 1, 0 or none is set #2380
-- The `migrate` command was removed as it had been broken since the release of
-  AS 4. This command will be reintroduced in the future with updated syntax and
-  with new tests and documentation.
-- Replaced regex by YAML parsing/writing when copying experiments to avoid edge 
-  cases when replacing values (e.g. NOTIFY.TO, CHUNKS_TO) #2665
-- Fix experiment not being copied when running `testcase` command #2799
-- Fixed bug where placeholder variables were not removed when they referenced
-  `HPC*` variables (e.g. `%HPC_DN_SERVER%` of a user platform) #2574
-- Used a Shell trap-function to detect when an Autosubmit job is signalled to stop
-  and to handle non-zero exit codes writing the `_STAT` files (for GUI/metrics) #2788 #2807
-- Do not print warning if an experiment has been successfully deleted #2334 #2793
-
-**Enhancements:**
-
-- Fix intermittent failures of unit tests, and enable print of AS exceptions.
-  Changes and improvements to fixtures and pytest organisation and setup #2745
-- Removed broken migrate command #2617
-- Allow users to delete multiple experiments #1216 #2793
-
-### 4.1.16: Unreleased
+### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
 This release adds support to Postgres using SQLAlchemy, without removing the
 SQLite support. By default, Autosubmit will use SQLite. Postgres support is
@@ -35,11 +11,6 @@ The `--notransitive` argument has been deprecated in all commands. You may still
 use it without a failure, but there will be a warning displayed asking you to
 update your command line. This argument will be completely removed on a later
 release.
-
-**Known issues:**
-
-- Due to a new heredoc blocks to handle failures in the templates, `script.cmd.err` line numbers are offset by ~5 lines (e.g. reported line 10 → actual line 15). #2694 #2718
-- Please adjust accordingly when debugging.
 
 **Bug fixes:**
 
@@ -67,6 +38,18 @@ release.
 - Tentative *fix for an issue with the HPC* missing variables in the templates #2432
 - Fixed issue where Autosubmit did not retry when there were networking issues in platforms #1369
 - Fixed an issue with additional files not being sent to the remote platform when using wrappers #1484
+- Removing the generation of SLURM HEADERS with --cpus-per-task when 1, 0 or none is set #2380
+- The `migrate` command was removed as it had been broken since the release of
+  AS 4. This command will be reintroduced in the future with updated syntax and
+  with new tests and documentation.
+- Replaced regex by YAML parsing/writing when copying experiments to avoid edge 
+  cases when replacing values (e.g. NOTIFY.TO, CHUNKS_TO) #2665
+- Fix experiment not being copied when running `testcase` command #2799
+- Fixed bug where placeholder variables were not removed when they referenced
+  `HPC*` variables (e.g. `%HPC_DN_SERVER%` of a user platform) #2574
+- Used a Shell trap-function to detect when an Autosubmit job is signalled to stop
+  and to handle non-zero exit codes writing the `_STAT` files (for GUI/metrics) #2788 #2807
+- Do not print warning if an experiment has been successfully deleted #2334 #2793
 
 **Enhancements:**
 
@@ -105,6 +88,11 @@ release.
 - Improved submission time for slurm and pjm jobs #2742
 - Added documentation regarding in-line script definition. 
 - Fixes an issue with general wrapper parameters crashing during runtime when defined. #2743
+- Added a new configuration parameter to list a safe-list of placeholders that can be used in templates as they are, example: "%CUSTOM_MYVAR%" -> "%CUSTOM_MYVAR%".
+- Fix intermittent failures of unit tests, and enable print of AS exceptions.
+  Changes and improvements to fixtures and pytest organisation and setup #2745
+- Removed broken migrate command #2617
+- Allow users to delete multiple experiments #1216 #2793
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 
