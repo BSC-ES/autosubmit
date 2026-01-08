@@ -74,7 +74,7 @@ def test_create_platform_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -107,7 +107,7 @@ def test_create_platform_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -137,7 +137,7 @@ def test_create_platform_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -208,7 +208,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -245,7 +245,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -282,7 +282,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -319,7 +319,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -356,7 +356,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -502,7 +502,7 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -620,7 +620,7 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -688,7 +688,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -730,7 +730,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
             "PLATFORMS": {
                 _PLATFORM_NAME: {
                     "ADD_PROJECT_TO_HOST": False,
-                    "HOST": "127.0.0.1",
+                    "HOST": "localhost",
                     "MAX_WALLCLOCK": "00:03",
                     "PROJECT": "group",
                     "QUEUE": "gp_debug",
@@ -753,7 +753,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
             "PLATFORMS": {
                 _PLATFORM_NAME: {
                     "ADD_PROJECT_TO_HOST": False,
-                    "HOST": "127.0.0.1",
+                    "HOST": "localhost",
                     "MAX_WALLCLOCK": "00:03",
                     "PROJECT": "group",
                     "QUEUE": "gp_debug",
@@ -777,7 +777,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
             "PLATFORMS": {
                 _PLATFORM_NAME: {
                     "ADD_PROJECT_TO_HOST": False,
-                    "HOST": "127.0.0.1",
+                    "HOST": "localhost",
                     "MAX_WALLCLOCK": "00:03",
                     "PROJECT": "group",
                     "QUEUE": "gp_debug",
@@ -809,7 +809,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
             "PLATFORMS": {
                 _PLATFORM_NAME: {
                     "ADD_PROJECT_TO_HOST": False,
-                    "HOST": "127.0.0.1",
+                    "HOST": "localhost",
                     "MAX_WALLCLOCK": "00:03",
                     "PROJECT": "group",
                     "QUEUE": "gp_debug",
@@ -918,7 +918,7 @@ def test_simple_workflow_compress_logs_slurm(
             "PLATFORMS": {
                 _PLATFORM_NAME: {
                     "ADD_PROJECT_TO_HOST": False,
-                    "HOST": "127.0.0.1",
+                    "HOST": "localhost",
                     "MAX_WALLCLOCK": "00:03",
                     "PROJECT": "group",
                     "QUEUE": "gp_debug",
@@ -1005,7 +1005,7 @@ def test_compress_log_missing_tool(
             "PLATFORMS": {
                 _PLATFORM_NAME: {
                     "ADD_PROJECT_TO_HOST": False,
-                    "HOST": "127.0.0.1",
+                    "HOST": "localhost",
                     "MAX_WALLCLOCK": "00:03",
                     "PROJECT": "group",
                     "QUEUE": "gp_debug",
@@ -1057,7 +1057,7 @@ def test_compress_log_fail_command(
             "PLATFORMS": {
                 _PLATFORM_NAME: {
                     "ADD_PROJECT_TO_HOST": False,
-                    "HOST": "127.0.0.1",
+                    "HOST": "localhost",
                     "MAX_WALLCLOCK": "00:03",
                     "PROJECT": "group",
                     "QUEUE": "gp_debug",
@@ -1080,7 +1080,7 @@ def test_compress_log_fail_command(
             "PLATFORMS": {
                 _PLATFORM_NAME: {
                     "ADD_PROJECT_TO_HOST": False,
-                    "HOST": "127.0.0.1",
+                    "HOST": "localhost",
                     "MAX_WALLCLOCK": "00:03",
                     "PROJECT": "group",
                     "QUEUE": "gp_debug",
@@ -1216,7 +1216,7 @@ def test_run_bug_save_wrapper_crashes(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:30',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',

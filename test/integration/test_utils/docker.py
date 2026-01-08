@@ -193,7 +193,7 @@ def _start_slurm_container(ssh_port: int) -> DockerContainer:
     return container
 
 
-def get_slurm_container(lock_path: Path) -> tuple['Container', int]:
+def get_slurm_container(lock_path: Path, ssh_path: Path) -> tuple['Container', int, Path]:
     """Get a running Slurm container and its SSH port."""
     client = from_env()
 
@@ -207,14 +207,23 @@ def get_slurm_container(lock_path: Path) -> tuple['Container', int]:
         if containers:
             container = containers[0]
             container_instance = get_container_by_id(container.id)
+            ssh_config = ssh_path / 'config_slurm'
             ssh_port = int(container.ports['2222/tcp'][0]['HostPort'])  # type: ignore
         else:
             # Create the container exactly once
             ssh_port = get_free_port()
+            priv, pubkey, ssh_config = create_ssh_keypair_and_config(ssh_port, ssh_path, 'config_slurm')
             # noinspection PyProtectedMember
             container_instance = _start_slurm_container(ssh_port=ssh_port)._container
 
-    return container_instance, ssh_port
+            ssh_authorized_keys = Path('/root/.ssh/authorized_keys')
+            exec_result = _write_authorized_keys(container_instance, pubkey, ssh_authorized_keys)
+            exit_code = exec_result.exit_code
+
+            if exit_code != 0:
+                raise RuntimeError(f'Failed to write authorized_keys to test container {container_instance.id}')
+
+    return container_instance, ssh_port, ssh_config
 
 
 def _write_authorized_keys(container: 'Container', public_key: Path, authorized_keys: Path) -> 'ExecResult':
@@ -223,7 +232,7 @@ def _write_authorized_keys(container: 'Container', public_key: Path, authorized_
     # escape single quotes for shell
     safe_key = key_content.replace("'", "'\"'\"'")
     return container.exec_run(
-        f"sh -c 'echo \"{safe_key}\" > {authorized_keys} && chmod 600 {authorized_keys}'"
+        f"sh -c 'echo \"{safe_key}\" >> {authorized_keys} && chmod 600 {authorized_keys}'"
     )
 
 
@@ -270,7 +279,6 @@ def _start_ssh_container(ssh_port: int, priv_pub_key: tuple[Path, Path], mfa=Fal
     if exec_result.exit_code != 0:
         raise RuntimeError(f'Failed to run whoami on test container {container.id}')
 
-    # _, public_key = create_ssh_keypair(ssh_port, home_dir)
     public_key = priv_pub_key[1]
     exec_result = _write_authorized_keys(container, public_key, Path('/config/.ssh/authorized_keys'))
     exit_code = exec_result.exit_code
@@ -323,7 +331,6 @@ def get_ssh_container(
             # Create the container exactly once
             ssh_port = get_free_port()
             priv, pubkey, ssh_config = create_ssh_keypair_and_config(ssh_port, ssh_path)
-
             # noinspection PyProtectedMember
             container_instance = _start_ssh_container(ssh_port, (priv, pubkey), mfa=mfa, x11=x11)._container
             # NOTE: In the call above, the ``DockerContainer`` returned by the start

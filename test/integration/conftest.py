@@ -32,8 +32,6 @@ import pytest
 from portalocker import Lock, LOCK_EX
 from ruamel.yaml import YAML
 from sqlalchemy import create_engine
-from testcontainers.core.container import DockerContainer  # type: ignore
-from testcontainers.core.waiting_utils import wait_for_logs  # type: ignore
 from testcontainers.postgres import PostgresContainer  # type: ignore
 
 from autosubmit.autosubmit import Autosubmit
@@ -60,6 +58,7 @@ if TYPE_CHECKING:
     from py._path.local import LocalPath  # type: ignore
     from pytest_mock import MockerFixture
     from pytest import FixtureRequest
+    from testcontainers.core.container import DockerContainer  # type: ignore
 
 _PG_USER = 'postgres'
 _PG_PASSWORD = 'postgres'
@@ -339,7 +338,7 @@ def git_server(git_repos_shared_dir) -> tuple['Container', Path, str]:
     git_repos_path.mkdir(exist_ok=True, parents=True)
 
     container = get_git_container(lock_path, git_repos_path)
-    http_port = int(container_instance.ports['80/tcp'][0]['HostPort'])  # type: ignore
+    http_port = int(container.ports['80/tcp'][0]['HostPort'])  # type: ignore
 
     repo_url = f'http://localhost:{http_port}/git'
 
@@ -409,7 +408,10 @@ def slurm_server(tmp_path_factory, session_mocker) -> 'Container':
     """Session fixture that creates a singleton Slurm server container."""
     shared_tmp_dir = tmp_path_factory.getbasetemp().parent
     lock_path = shared_tmp_dir / "slurm_global.lock"
-    container, ssh_port = get_slurm_container(lock_path)
+    ssh_dir = Path(shared_tmp_dir, 'ssh/')
+    ssh_dir.mkdir(exist_ok=True)
+    container, ssh_port, ssh_config = get_slurm_container(lock_path, ssh_dir)
+    _mock_ssh_config(ssh_config, session_mocker)
     # TODO: Needed? If so, explain why.
     session_mocker.patch(
         'autosubmit.platforms.platform.Platform.get_mp_context',
@@ -464,7 +466,7 @@ def postgres_server(request: 'FixtureRequest') -> Generator[Optional[PostgresCon
 
 
 @pytest.fixture(params=['postgres', 'sqlite'])
-def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPath', postgres_server: DockerContainer,
+def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPath', postgres_server: 'DockerContainer',
           autosubmit_exp):
     """A parametrized fixture that creates the autosubmitrc file for databases.
 

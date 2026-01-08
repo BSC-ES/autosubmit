@@ -22,16 +22,18 @@ from getpass import getuser
 from pathlib import Path
 from subprocess import check_output
 from textwrap import dedent
-from typing import Optional, Protocol, Union
+from typing import Optional, Protocol, Union, TYPE_CHECKING
 
 import paramiko.ssh_exception
 from cryptography.hazmat.primitives import asymmetric
 from cryptography.hazmat.primitives import serialization
-from paramiko import AutoAddPolicy, SSHClient, SSHConfig, SSHException, Transport  # type: ignore
 
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import _create_ssh_client
 from test.integration.test_utils.networking import wait_for_tcp_port
+
+if TYPE_CHECKING:
+    from paramiko import SSHClient
 
 __all__ = [
     'MakeSSHClientFixture',
@@ -47,13 +49,13 @@ class MakeSSHClientFixture(Protocol):
             self,
             ssh_port: int,
             password: Optional[str],
-            key: Optional[Union['Path', str]]) -> SSHClient:
+            key: Optional[Union['Path', str]]) -> 'SSHClient':
         ...
 
 
 # noinspection PyUnusedLocal
 def make_ssh_client(ssh_port: int, password: Optional[str], key: Optional[Union['Path', str]],
-                    mfa: Optional[bool] = False) -> SSHClient:
+                    mfa: Optional[bool] = False) -> 'SSHClient':
     """Creates the SSH client
 
     It modifies the list of arguments so that the port is always
@@ -105,6 +107,9 @@ def make_ssh_client(ssh_port: int, password: Optional[str], key: Optional[Union[
 def _generate_ssh_keypair(path: Path):
     """Generates an ed25519 private/public key pair and saves them as ``path{|.pub}``."""
 
+    if path.exists() and path.with_suffix(path.suffix + ".pub").exists():
+        return path, path.with_suffix(path.suffix + ".pub")
+
     # From: https://github.com/paramiko/paramiko/issues/1136#issuecomment-1160771520
     c_ed25519key = asymmetric.ed25519.Ed25519PrivateKey.generate()  # type: ignore
     private_key = c_ed25519key.private_bytes(encoding=serialization.Encoding.PEM,
@@ -132,7 +137,8 @@ def _generate_ssh_keypair(path: Path):
 
 def create_ssh_keypair_and_config(
         ssh_port: int,
-        base_dir: Path
+        base_dir: Path,
+        config_filename='config'
 ) -> tuple[Path, Path, Path]:
     """Sets up ``$HOME/.ssh/config`` file for SSH.
 
@@ -160,10 +166,10 @@ def create_ssh_keypair_and_config(
     ssh_key_path = Path(base_dir, "test_key")
     private_key, public_key = _generate_ssh_keypair(ssh_key_path)
 
-    ssh_config = Path(base_dir, 'config')
+    ssh_config = Path(base_dir, config_filename)
     ssh_config.write_text(
         dedent(f"""\
-            Host localhost
+            Host localhost 127.0.0.1
                 Hostname localhost
                 User {getuser()}
                 ForwardX11 yes
