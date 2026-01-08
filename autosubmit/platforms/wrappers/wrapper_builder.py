@@ -68,6 +68,7 @@ class WrapperBuilder(object):
         if "wallclock_by_level" in list(kwargs.keys()):
             self.wallclock_by_level = kwargs['wallclock_by_level']
         self.working_dir = kwargs.get('working_dir', '')
+        self.wrapper_name = kwargs['name']
 
     def build_header(self):
         return textwrap.dedent(self.header_directive) + self.build_imports()
@@ -146,21 +147,25 @@ class FluxWrapperBuilder(WrapperBuilder):
         if not self.job_scripts:
             raise AutosubmitCritical("No job scripts found for building the Flux wrapper.")
         
+        # Get an unique identifier for the script name
+        unique_part = '_'.join(self.wrapper_name.split('_')[2:])
+        script_name = f"flux_runner_{unique_part}.py"
+        
         return textwrap.dedent("""
         # Flux script generation
-        cat << 'EOF' > flux_runner.py
+        cat << 'EOF' > {2}
         {0}
         EOF
 
         # Grant execution permission to the generated script
-        chmod +x flux_runner.py
+        chmod +x {2}
 
         # Load user environment
         {1}
 
         # Instantiate Flux within the allocated resources and run the jobs
-        srun --cpu-bind=none flux start --verbose=2 python flux_runner.py
-        """).format(self._generate_flux_script(), self._custom_environmet_setup())
+        srun --cpu-bind=none flux start --verbose=2 python {2}
+        """).format(self._generate_flux_script(), self._custom_environmet_setup(), script_name)
     
     def _generate_flux_script(self):
         """
