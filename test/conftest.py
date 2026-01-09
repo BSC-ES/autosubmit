@@ -31,6 +31,7 @@ from autosubmit.config.basicconfig import generate_dirs, BasicConfig
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
     from py._path.local import LocalPath  # type: ignore
+    from _pytest.tmpdir import TempPathFactory
     from pytest import FixtureRequest
 
 
@@ -177,3 +178,31 @@ def test_tmp_path(tmp_path: 'LocalPath', request: 'FixtureRequest') -> Path:
     test_path = tmp_path / test_name
     test_path.mkdir()
     return Path(test_path)
+
+
+@pytest.fixture(scope='session', autouse=True)
+def do_not_touch_user_home(tmp_path_factory: 'TempPathFactory') -> None:
+    """Fixture to change the environment variable $HOME.
+
+    Autosubmit by default uses the user home directory. However, for testing
+    we do not need, nor should, modify anything in the user directory.
+
+    Autosubmit uses configuration to load the experiments, database, and other
+    files. However, the SSH keys are still loaded from the user directory.
+
+    This fixture is mainly to avoid tests passing just because they were
+    resolved by the user home directory's SSH config, and also to avoid
+    any test from modifying that file, or any other user file.
+    """
+    home_dir = tmp_path_factory.getbasetemp().parent
+    os.environ["HOME"] = str(home_dir)
+    os.environ["USERPROFILE"] = str(home_dir)
+
+    # Git global configuration for tests
+    git_config = Path(home_dir, 'git_config')
+    git_config.write_text(dedent('''\
+    [user]
+    name = Autosubmit
+    email = autosubmit@localhost
+    '''))
+    os.environ["GIT_CONFIG_GLOBAL"] = str(git_config)

@@ -19,7 +19,7 @@ import os
 from getpass import getuser
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Generator, Optional
+from typing import Generator, Optional, TYPE_CHECKING
 
 import pytest
 
@@ -29,6 +29,9 @@ from autosubmit.log.log import AutosubmitError, AutosubmitCritical
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException, _get_user_config_file
 from autosubmit.platforms.psplatform import PsPlatform
+
+if TYPE_CHECKING:
+    from _pytest._py.path import LocalPath
 
 
 @pytest.fixture
@@ -555,3 +558,35 @@ def test_get_file_errors(exception_message: bool, must_exist: bool, ignore_log: 
         assert mocked_log.printlog.call_count == 0
     else:
         assert mocked_log.printlog.call_count == len(messages)
+
+
+def test__load_ssh_config_missing_ssh_config(
+        tmp_path: 'LocalPath',
+        mocker
+):
+    """Test that the user is warned when the expected SSH file cannot be located."""
+    mocked_log = mocker.patch('autosubmit.platforms.paramiko_platform.Log')
+    experiment_data = {
+        "ROOTDIR": str(tmp_path),
+        "PROJDIR": str(tmp_path),
+        "LOCAL_TMP_DIR": str(tmp_path),
+        "LOCAL_ROOT_DIR": str(tmp_path),
+        "AS_ENV_CURRENT_USER": "dummy",
+    }
+    platform = ParamikoPlatform(expid='a000', name='local', config=experiment_data)
+    platform.config['AS_ENV_SSH_CONFIG_PATH'] = str(tmp_path / 'you-cannot-find-me')
+
+    as_conf = mocker.MagicMock()
+    as_conf.is_current_real_user_owner = False
+
+    # TODO: We must be able to test that we are not loading the right SSH, without a mock here.
+    mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', side_effect=ValueError)
+    # mocker.
+
+    with pytest.raises(AutosubmitError):
+        try:
+            platform.connect(as_conf, reconnect=False, log_recovery_process=False)
+        finally:
+            platform.close_connection()
+
+    assert mocked_log.warning.called

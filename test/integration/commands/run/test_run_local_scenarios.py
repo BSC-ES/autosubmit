@@ -54,6 +54,7 @@ def test_run_uninterrupted(
 ):
     yaml = YAML(typ='rt')
     as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp.expid)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -134,6 +135,7 @@ def test_run_interrupted(
 ):
     yaml = YAML(typ='rt')
     as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp.expid)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)

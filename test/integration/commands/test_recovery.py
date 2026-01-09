@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.data_classes.job_data import JobData
@@ -9,6 +9,9 @@ import pytest
 from autosubmit.log.log import AutosubmitCritical
 
 from autosubmit.history.database_managers.experiment_history_db_manager import SqlAlchemyExperimentHistoryDbManager
+
+if TYPE_CHECKING:
+    from docker.models.containers import Container
 
 
 @pytest.fixture(scope="function")
@@ -31,7 +34,7 @@ def job_list(as_exp, submitter):
 
 
 @pytest.fixture(scope="function")
-def prepare_scratch(as_exp, tmp_path: Path, job_list, job_names_to_recover, slurm_server) -> Any:
+def prepare_scratch(as_exp, tmp_path: Path, job_list, job_names_to_recover, slurm_server: 'Container') -> Any:
     """Generates some completed and stat files in the scratch directory to simulate completed jobs.
 
     :param as_exp: The Autosubmit experiment object.
@@ -48,8 +51,8 @@ def prepare_scratch(as_exp, tmp_path: Path, job_list, job_names_to_recover, slur
     slurm_root = f"/tmp/scratch/group/root/{as_exp.expid}/"
     log_dir = Path(slurm_root) / f'LOG_{as_exp.expid}/'
     local_completed_dir = tmp_path / as_exp.expid / "tmp" / f'LOG_{as_exp.expid}/'
-    slurm_server.exec(
-        f'mkdir -p {log_dir}')  # combining this with the touch, makes the touch generates a folder instead of a file. I have no idea why.
+    # combining this with the touch, makes the touch generates a folder instead of a file. I have no idea why.
+    slurm_server.exec_run(f'mkdir -p {log_dir}')
 
     cmds = []
     for name in job_names_to_recover:
@@ -59,7 +62,7 @@ def prepare_scratch(as_exp, tmp_path: Path, job_list, job_names_to_recover, slur
         else:
             cmds.append(f'touch {log_dir}/{name}_COMPLETED')
     full_cmd = " && ".join(cmds)
-    slurm_server.exec(full_cmd)
+    slurm_server.exec_run(full_cmd)
 
 
 @pytest.fixture(scope="function")
@@ -67,6 +70,9 @@ def job_names_to_recover(job_list):
     return [job.name for job in job_list.get_job_list() if job.split == 1 or job.split == 3]
 
 
+@pytest.mark.docker
+@pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize("active_jobs,force", [
     (True, True),
     (True, False),
@@ -78,7 +84,6 @@ def job_names_to_recover(job_list):
     "No_Active_jobs&Force == recover_all",
     "No_Active_jobs&No_Force == recover_all",
 ])
-@pytest.mark.slurm
 def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_names_to_recover, active_jobs, force):
     """Test the recovery of an experiment.
 

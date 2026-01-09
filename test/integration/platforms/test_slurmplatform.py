@@ -28,6 +28,7 @@ all the grouped tests to the same worker.
 
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -42,9 +43,11 @@ from autosubmit.job.job_packager import JobPackager
 from autosubmit.log.utils import is_gzip_file, is_xz_file
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from test.integration.conftest import AutosubmitExperimentFixture, DockerContainer
+from test.integration.conftest import AutosubmitExperimentFixture
 
-_EXPID = 't001'
+if TYPE_CHECKING:
+    from docker.models.containers import Container
+    from testcontainers.core.container import DockerContainer
 
 _PLATFORM_NAME = 'TEST_SLURM'
 
@@ -54,14 +57,14 @@ def _create_slurm_platform(expid: str, as_conf: AutosubmitConfig):
 
 
 @pytest.mark.docker
-@pytest.mark.xdist_group('slurm')
 @pytest.mark.slurm
+@pytest.mark.ssh
 def test_create_platform_slurm(
         autosubmit_exp,
         slurm_server: 'DockerContainer',
 ):
     """Test the Slurm platform object creation."""
-    exp = autosubmit_exp('t000', experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'JOBS': {
             'SIM': {
                 'PLATFORM': _PLATFORM_NAME,
@@ -72,7 +75,7 @@ def test_create_platform_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -91,8 +94,8 @@ def test_create_platform_slurm(
 
 
 @pytest.mark.docker
-@pytest.mark.xdist_group('slurm')
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize('experiment_data', [
     {
         'JOBS': {
@@ -105,7 +108,7 @@ def test_create_platform_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -135,7 +138,7 @@ def test_create_platform_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -158,13 +161,16 @@ def test_run_simple_workflow_slurm(
         slurm_server: 'DockerContainer'
 ):
     """Runs a simple Bash script using Slurm."""
-    exp = autosubmit_exp('t001', experiment_data=experiment_data)
+    exp = autosubmit_exp(experiment_data=experiment_data)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 
+@pytest.mark.docker
+@pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize('experiment_data', [
     {
         'JOBS': {
@@ -203,7 +209,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -240,7 +246,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -277,7 +283,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -314,7 +320,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -351,7 +357,7 @@ def test_run_simple_workflow_slurm(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -378,12 +384,10 @@ def test_run_simple_workflow_slurm(
     'Wrapper Horizontal-vertical',
     'Wrapper Vertical-horizontal',
 ])
-@pytest.mark.docker
-@pytest.mark.slurm
 def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 'AutosubmitExperimentFixture',
                                          slurm_server: 'DockerContainer'):
     """Runs a simple Bash script using Slurm."""
-    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, wrapper=True)
+    exp = autosubmit_exp(experiment_data=experiment_data, wrapper=True)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.as_conf.experiment_data = {
@@ -403,6 +407,8 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
 
 
 @pytest.mark.docker
+@pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize('experiment_data', [
     {
         'JOBS': {
@@ -497,7 +503,7 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -615,7 +621,7 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -639,13 +645,11 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
     'Complex Wrapper vertical-horizontal',
     'Complex Wrapper horizontal-vertical',
 ])
-@pytest.mark.docker
-@pytest.mark.slurm
 def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubmit_exp: 'AutosubmitExperimentFixture',
                                                  slurm_server: 'DockerContainer'):
     """Runs a simple Bash script using Slurm."""
 
-    exp = autosubmit_exp('t002', experiment_data=experiment_data, wrapper=True)
+    exp = autosubmit_exp(experiment_data=experiment_data, wrapper=True)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.as_conf.experiment_data = {
@@ -666,8 +670,9 @@ def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubm
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer'):
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'JOBS': {
             'SIM_V_H': {
                 'DEPENDENCIES': {
@@ -684,7 +689,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
+                'HOST': 'localhost',
                 'MAX_WALLCLOCK': '00:03',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
@@ -711,6 +716,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize(
     "experiment_data",
     [
@@ -725,7 +731,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
             "PLATFORMS": {
                 _PLATFORM_NAME: {
                     "ADD_PROJECT_TO_HOST": False,
-                    "HOST": "127.0.0.1",
+                    "HOST": "localhost",
                     "MAX_WALLCLOCK": "00:03",
                     "PROJECT": "group",
                     "QUEUE": "gp_debug",
@@ -748,7 +754,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
             "PLATFORMS": {
                 _PLATFORM_NAME: {
                     "ADD_PROJECT_TO_HOST": False,
-                    "HOST": "127.0.0.1",
+                    "HOST": "localhost",
                     "MAX_WALLCLOCK": "00:03",
                     "PROJECT": "group",
                     "QUEUE": "gp_debug",
@@ -772,7 +778,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
             "PLATFORMS": {
                 _PLATFORM_NAME: {
                     "ADD_PROJECT_TO_HOST": False,
-                    "HOST": "127.0.0.1",
+                    "HOST": "localhost",
                     "MAX_WALLCLOCK": "00:03",
                     "PROJECT": "group",
                     "QUEUE": "gp_debug",
@@ -804,7 +810,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
             "PLATFORMS": {
                 _PLATFORM_NAME: {
                     "ADD_PROJECT_TO_HOST": False,
-                    "HOST": "127.0.0.1",
+                    "HOST": "localhost",
                     "MAX_WALLCLOCK": "00:03",
                     "PROJECT": "group",
                     "QUEUE": "gp_debug",
@@ -841,7 +847,7 @@ def test_simple_workflow_compress_logs_slurm(
     """Test compressing remote logs in a simple workflow using Slurm."""
     with_wrapper = "WRAPPERS" in experiment_data
 
-    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, wrapper=with_wrapper, include_jobs=False)
+    exp = autosubmit_exp(experiment_data=experiment_data, wrapper=with_wrapper, include_jobs=False)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
@@ -898,6 +904,7 @@ def test_simple_workflow_compress_logs_slurm(
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize(
     "experiment_data",
     [
@@ -912,7 +919,7 @@ def test_simple_workflow_compress_logs_slurm(
             "PLATFORMS": {
                 _PLATFORM_NAME: {
                     "ADD_PROJECT_TO_HOST": False,
-                    "HOST": "127.0.0.1",
+                    "HOST": "localhost",
                     "MAX_WALLCLOCK": "00:03",
                     "PROJECT": "group",
                     "QUEUE": "gp_debug",
@@ -935,7 +942,7 @@ def test_compress_log_missing_tool(
     slurm_server: "DockerContainer",
     mocker,
 ):
-    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, include_jobs=False)
+    exp = autosubmit_exp(experiment_data=experiment_data, include_jobs=False)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
@@ -984,6 +991,7 @@ def test_compress_log_missing_tool(
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize(
     "experiment_data",
     [
@@ -998,7 +1006,7 @@ def test_compress_log_missing_tool(
             "PLATFORMS": {
                 _PLATFORM_NAME: {
                     "ADD_PROJECT_TO_HOST": False,
-                    "HOST": "127.0.0.1",
+                    "HOST": "localhost",
                     "MAX_WALLCLOCK": "00:03",
                     "PROJECT": "group",
                     "QUEUE": "gp_debug",
@@ -1021,7 +1029,7 @@ def test_compress_log_fail_command(
     slurm_server: "DockerContainer",
     mocker,
 ):
-    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
+    exp = autosubmit_exp(experiment_data=experiment_data)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     mocker.patch(
@@ -1035,6 +1043,7 @@ def test_compress_log_fail_command(
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize(
     "experiment_data",
     [
@@ -1049,7 +1058,7 @@ def test_compress_log_fail_command(
             "PLATFORMS": {
                 _PLATFORM_NAME: {
                     "ADD_PROJECT_TO_HOST": False,
-                    "HOST": "127.0.0.1",
+                    "HOST": "localhost",
                     "MAX_WALLCLOCK": "00:03",
                     "PROJECT": "group",
                     "QUEUE": "gp_debug",
@@ -1072,7 +1081,7 @@ def test_compress_log_fail_command(
             "PLATFORMS": {
                 _PLATFORM_NAME: {
                     "ADD_PROJECT_TO_HOST": False,
-                    "HOST": "127.0.0.1",
+                    "HOST": "localhost",
                     "MAX_WALLCLOCK": "00:03",
                     "PROJECT": "group",
                     "QUEUE": "gp_debug",
@@ -1094,10 +1103,9 @@ def test_compress_log_fail_command(
 def test_remove_files_on_transfer_slurm(
     experiment_data: dict,
     autosubmit_exp: "AutosubmitExperimentFixture",
-    slurm_server: "DockerContainer",
+    slurm_server: "Container",
 ):
-    _NEW_EXPID = "t444"  # Use a different EXPID to avoid conflicts
-    exp = autosubmit_exp(_NEW_EXPID, experiment_data=experiment_data)
+    exp = autosubmit_exp(experiment_data=experiment_data)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
@@ -1111,7 +1119,7 @@ def test_remove_files_on_transfer_slurm(
         f"LOG_{exp.expid}",
     )
 
-    result = slurm_server.exec(f"ls {remote_logs_dir}")
+    result = slurm_server.exec_run(f"ls {remote_logs_dir}")
     filenames = result.output.decode().strip().split("\n")
 
     for filename in filenames:
@@ -1119,15 +1127,15 @@ def test_remove_files_on_transfer_slurm(
 
 
 def test_check_if_packages_are_ready_to_build(autosubmit_exp):
-    exp = autosubmit_exp('a000', experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
     platform_config = {
         "LOCAL_ROOT_DIR": exp.as_conf.basic_config.LOCAL_ROOT_DIR,
         "LOCAL_TMP_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR+'exp_tmp_dir'),
         "LOCAL_ASLOG_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR+'aslogs_dir')
     }
-    platform = SlurmPlatform('a000', "wrappers_test", platform_config)
+    platform = SlurmPlatform(exp.expid, "wrappers_test", platform_config)
 
-    job_list = JobList('a000', exp.as_conf, YAMLParserFactory(), JobListPersistencePkl())
+    job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory(), JobListPersistencePkl())
     for i in range(3):
         job = Job(f"job{i}", i, Status.READY, 0)
         job.section = f"SECTION{i}"
@@ -1157,6 +1165,7 @@ def test_check_if_packages_are_ready_to_build(autosubmit_exp):
 
 @pytest.mark.docker
 @pytest.mark.slurm
+@pytest.mark.ssh
 def test_run_bug_save_wrapper_crashes(
         autosubmit_exp: 'AutosubmitExperimentFixture',
         mocker,
@@ -1185,7 +1194,7 @@ def test_run_bug_save_wrapper_crashes(
     * https://github.com/BSC-ES/autosubmit/issues/2463
     * https://jira.eduuni.fi/browse/CSCDESTINCLIMADT-794
     """
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'JOBS': {
             'SIM': {
                 'PLATFORM': _PLATFORM_NAME,
@@ -1194,7 +1203,7 @@ def test_run_bug_save_wrapper_crashes(
                 'DEPENDENCIES': {
                     'SIM-1': {}
                 },
-                'WALLCLOCK': '00:02',
+                'WALLCLOCK': '00:05',
                 'RETRIALS': 5,
             }
         },
@@ -1208,8 +1217,8 @@ def test_run_bug_save_wrapper_crashes(
         'PLATFORMS': {
             _PLATFORM_NAME: {
                 'ADD_PROJECT_TO_HOST': False,
-                'HOST': '127.0.0.1',
-                'MAX_WALLCLOCK': '00:03',
+                'HOST': 'localhost',
+                'MAX_WALLCLOCK': '00:30',
                 'PROJECT': 'group',
                 'QUEUE': 'gp_debug',
                 'SCRATCH_DIR': '/tmp/scratch/',
