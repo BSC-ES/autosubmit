@@ -29,7 +29,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal, \
     JobPackageSimpleWrapped, JobPackageHorizontalVertical, JobPackageVerticalHorizontal, JobPackageBase
 from autosubmit.job.template import Language
-from autosubmit.log.log import Log, AutosubmitCritical
+from autosubmit.log.log import Log
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -404,9 +404,8 @@ class JobPackager(object):
                     max_jobs_to_submit = self.handle_flexible_policy(p, packages_to_submit, max_jobs_to_submit, err_message)
             if self.wrappers_with_error:
                 for job_names, err_message in self.wrappers_with_error.items():
-                    Log.error(f"Wrapped jobs with deadlock issues: [{job_names}].")
-                    Log.error(err_message)
-                raise AutosubmitCritical("Critical error in wrapper policy", 7014)
+                    Log.debug(f"Wrapped jobs with deadlock issues: [{job_names}].")
+                    Log.debug(err_message)
         return max_jobs_to_submit
 
     def error_message_policy(self, min_h: int, min_v: int, wrapper_limits: dict, balanced: bool,
