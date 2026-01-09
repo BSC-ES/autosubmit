@@ -2689,33 +2689,38 @@ class Autosubmit:
                                                inspect=inspect, only_wrappers=only_wrappers)
                 )
                 wrapper_errors.update(packager.wrappers_with_error)
-                # Jobs that are being retrieved in batch. Right now, only available for slurm platforms.
-
-                if not inspect and len(valid_packages_to_submit) > 0:
-                    job_list.save()
                 save_2 = False
+                # Jobs that are being retrieved in batch. Right now, only available for slurm platforms.
                 if platform.type.lower() in ["slurm", "pjm"] and not inspect and not only_wrappers:
                     # Process the script generated in submit_ready_jobs
                     save_2, valid_packages_to_submit = platform.process_batch_ready_jobs(valid_packages_to_submit,
                                                                                          failed_packages,
                                                                                          error_message="")
-                    if not inspect and len(valid_packages_to_submit) > 0:
-                        job_list.save()
+                if not inspect and len(valid_packages_to_submit) > 0:
+                    job_list.save()
                 # Save wrappers(jobs that has the same id) to be visualized and checked in other parts of the code
                 job_list.save_wrappers(valid_packages_to_submit, failed_packages, as_conf, packages_persistence,
                                        hold=hold, inspect=inspect)
                 if error_message != "":
                     raise AutosubmitCritical(f"Submission Failed due wrong configuration:{error_message}", 7014)
-
-            if wrapper_errors and not any_job_submitted and len(job_list.get_in_queue()) == 0:
-                # Deadlock situation
-                err_msg = ""
-                for wrapper in wrapper_errors:
-                    err_msg += f"wrapped_jobs:{wrapper} in {wrapper_errors[wrapper]}\n"
-                raise AutosubmitCritical(err_msg, 7014)
+            Autosubmit.check_deadlock(wrapper_errors, any_job_submitted, job_list)
             return save_1 or save_2
         except Exception:
             raise
+
+    @staticmethod
+    def check_deadlock(wrapper_errors: dict, any_job_submitted: bool, job_list: JobList) -> None:
+        """Check for deadlock situations and raise an exception if detected.
+        :param wrapper_errors: Dictionary of wrapper errors.
+        :param any_job_submitted: Boolean indicating if any job was submitted.
+        :param job_list: JobList object containing the jobs.
+        """
+        if wrapper_errors and not any_job_submitted and len(job_list.get_in_queue()) == 0:
+            # Deadlock situation
+            err_msg = ""
+            for wrapper in wrapper_errors:
+                err_msg += f"wrapped_jobs:{wrapper} in {wrapper_errors[wrapper]}\n"
+            raise AutosubmitCritical(err_msg, 7014)
 
     @staticmethod
     def monitor(expid: str, file_format: str, lst: str, filter_chunks: str, filter_status: str, filter_section: str,

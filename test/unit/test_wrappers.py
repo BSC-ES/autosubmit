@@ -1987,15 +1987,12 @@ class TestWrappers:
 
             self.job_packager.wrapper_policy["WRAPPER_V"] = "mixed"
             packages_to_submit = []
-            with pytest.raises(AutosubmitCritical):
-                self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit,
-                                                                        max_jobs_to_submit, wrapper_limits)
+            self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit, max_jobs_to_submit, wrapper_limits)
+            assert len(self.job_packager.wrappers_with_error) > 0
             self.job_packager.wrapper_policy["WRAPPER_V"] = "strict"
             packages_to_submit = []
-            with pytest.raises(AutosubmitCritical):
-                self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit,
-                                                                        max_jobs_to_submit, wrapper_limits)
-
+            self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit,max_jobs_to_submit, wrapper_limits)
+            assert len(self.job_packager.wrappers_with_error) > 0
     # def test_build_packages(self):
     # want to test self.job_packager.build_packages()
     # TODO: implement this test in the future
@@ -2258,8 +2255,10 @@ def test_process_not_wrappeable_packages_no_more_remaining_jobs(setup, not_wrapp
             "strict_one_job", "mixed_one_job", "flexible_one_job"])
 def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wrappeable_package_info,
                                                                    packages_to_submit, max_jobs_to_submit, expected,
-                                                                   unparsed_policy):
+                                                                   unparsed_policy, autosubmit):
     job_packager, vertical_package = setup
+    job_list = JobList("t000", job_packager._as_config, YAMLParserFactory(),
+                       JobListPersistencePkl())
     if unparsed_policy == "mixed_failed":
         policy = "mixed"
     elif unparsed_policy.endswith("_one_job"):
@@ -2283,17 +2282,12 @@ def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wr
     job.section = "SECTION1"
     job.platform = job_packager._platform
     job_packager._jobs_list._job_list.append(job)
-    if unparsed_policy in ["flexible", "mixed_failed", "flexible_one_job"]:
-        result = job_packager.process_not_wrappeable_packages(not_wrappeable_package_info, packages_to_submit,
-                                                              max_jobs_to_submit, wrapper_limits)
-    elif unparsed_policy in ["strict", "mixed", "strict_one_job", "mixed_one_job"]:
+    result = job_packager.process_not_wrappeable_packages(not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, wrapper_limits)
+    if unparsed_policy in ["strict", "mixed", "strict_one_job", "mixed_one_job"]:
         with pytest.raises(AutosubmitCritical):
-            job_packager.process_not_wrappeable_packages(not_wrappeable_package_info, packages_to_submit,
-                                                         max_jobs_to_submit, wrapper_limits)
-        result = 100
+            autosubmit.check_deadlock(job_packager.wrappers_with_error, False, job_list)
     else:
-        result = job_packager.process_not_wrappeable_packages(not_wrappeable_package_info, packages_to_submit,
-                                                              max_jobs_to_submit, wrapper_limits)
+        autosubmit.check_deadlock(job_packager.wrappers_with_error, False, job_list)
     assert result == expected
 
 
