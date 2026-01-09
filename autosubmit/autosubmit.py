@@ -2395,16 +2395,24 @@ class Autosubmit:
                                        hold=hold, inspect=inspect)
                 if error_message != "":
                     raise AutosubmitCritical(f"Submission Failed due wrong configuration:{error_message}", 7014)
-
-            if wrapper_errors and not any_job_submitted and len(job_list.get_in_queue()) == 0:
-                # Deadlock situation
-                err_msg = ""
-                for wrapper in wrapper_errors:
-                    err_msg += f"wrapped_jobs:{wrapper} in {wrapper_errors[wrapper]}\n"
-                raise AutosubmitCritical(err_msg, 7014)
+            Autosubmit.check_deadlock(wrapper_errors, any_job_submitted, job_list)
             return save_1 or save_2
         except Exception:
             raise
+
+    @staticmethod
+    def check_deadlock(wrapper_errors: dict, any_job_submitted: bool, job_list: JobList) -> None:
+        """Check for deadlock situations and raise an exception if detected.
+        :param wrapper_errors: Dictionary of wrapper errors.
+        :param any_job_submitted: Boolean indicating if any job was submitted.
+        :param job_list: JobList object containing the jobs.
+        """
+        if wrapper_errors and not any_job_submitted and len(job_list.get_in_queue()) == 0:
+            # Deadlock situation
+            err_msg = ""
+            for wrapper in wrapper_errors:
+                err_msg += f"wrapped_jobs:{wrapper} in {wrapper_errors[wrapper]}\n"
+            raise AutosubmitCritical(err_msg, 7014)
 
     @staticmethod
     def monitor(expid: str, file_format: str, lst: str, filter_chunks: str, filter_status: str, filter_section: str,
