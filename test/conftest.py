@@ -197,3 +197,12 @@ def do_not_touch_user_home(tmp_path_factory: 'TempPathFactory') -> None:
     home_dir = tmp_path_factory.getbasetemp().parent
     os.environ["HOME"] = str(home_dir)
     os.environ["USERPROFILE"] = str(home_dir)
+
+    # Git global configuration for tests
+    git_config = Path(home_dir, 'git_config')
+    git_config.write_text(dedent('''\
+    [user]
+    name = Autosubmit
+    email = autosubmit@localhost
+    '''))
+    os.environ["GIT_CONFIG_GLOBAL"] = str(git_config)

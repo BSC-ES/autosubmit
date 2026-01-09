@@ -337,8 +337,8 @@ def git_server(git_repos_shared_dir) -> tuple['Container', Path, str]:
     git_repos_path = base_path / 'git_repos'
     git_repos_path.mkdir(exist_ok=True, parents=True)
 
-    container = get_git_container(lock_path, git_repos_path)
-    http_port = int(container.ports['80/tcp'][0]['HostPort'])  # type: ignore
+    container, http_port = get_git_container(lock_path, git_repos_path)
+    # http_port = int(container.ports['80/tcp'][0]['HostPort'])  # type: ignore
 
     repo_url = f'http://localhost:{http_port}/git'
 

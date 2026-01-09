@@ -397,12 +397,20 @@ def test_run_failed_set_to_ready_on_new_run(
     exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
     _assert_exit_code(final_status, exit_code)
 
-    jobs_data_yaml['JOBS']['job']['SCRIPT'] = """\
-                echo "Hello World with id=READY"
-    """
-    as_exp = autosubmit_exp(as_exp.expid, experiment_data=general_data | jobs_data_yaml, include_jobs=False, create=True)
-    as_conf.set_last_as_command('run')
+    # The experiment must have failed above with a final status.
+    # But the job script has d_echo, so here we replace it, and
+    # run it again. It should succeed now.
+    yaml_with_jobs = Path(as_exp.exp_path, 'conf/additional_data.yml')
+    with open(yaml_with_jobs, 'r') as f:
+        data = yaml.load(f)
+    data["JOBS"]["job"]["SCRIPT"] = 'echo "Hello World with id=READY"'
+    with yaml_with_jobs.open("w") as f:
+        yaml.dump(data, f)
 
+    as_conf.set_last_as_command('create')
+    assert 0 == as_exp.autosubmit.create(as_exp.expid, noplot=True, hide=False, force=True, check_wrappers=False)
+
+    as_conf.set_last_as_command('run')
     exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
 
     _assert_exit_code("SUCCESS", exit_code)

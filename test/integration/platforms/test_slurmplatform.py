@@ -43,10 +43,11 @@ from autosubmit.job.job_packager import JobPackager
 from autosubmit.log.utils import is_gzip_file, is_xz_file
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from test.integration.conftest import AutosubmitExperimentFixture, DockerContainer
+from test.integration.conftest import AutosubmitExperimentFixture
 
 if TYPE_CHECKING:
     from docker.models.containers import Container
+    from testcontainers.core.container import DockerContainer
 
 _PLATFORM_NAME = 'TEST_SLURM'
 

@@ -330,7 +330,7 @@ def get_ssh_container(
         else:
             # Create the container exactly once
             ssh_port = get_free_port()
-            priv, pubkey, ssh_config = create_ssh_keypair_and_config(ssh_port, ssh_path)
+            priv, pubkey, ssh_config = create_ssh_keypair_and_config(ssh_port, ssh_path, 'config')
             # noinspection PyProtectedMember
             container_instance = _start_ssh_container(ssh_port, (priv, pubkey), mfa=mfa, x11=x11)._container
             # NOTE: In the call above, the ``DockerContainer`` returned by the start
