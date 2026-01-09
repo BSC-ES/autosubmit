@@ -29,7 +29,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal, \
     JobPackageSimpleWrapped, JobPackageHorizontalVertical, JobPackageVerticalHorizontal, JobPackageBase
 from autosubmit.job.template import Language
-from autosubmit.log.log import Log, AutosubmitCritical
+from autosubmit.log.log import Log
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
