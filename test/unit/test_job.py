@@ -2219,7 +2219,7 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
                 "MAX_WALLCLOCK": "02:00",
                 "MODULES_PROFILE_PATH": None,
                 "OPA_CUSTOM_DIRECTIVES": "whatever",
-                "TEST_UNDEFINED_LIST": ['%UNDEFINED%', 0],
+                "TEST_UNDEFINED_LIST": ['%UNDEFINED%'],
                 "OPA_EXCLUSIVE": False,
                 "OPA_MAX_PROC": 2,
                 "OPA_PROCESSORS": 112,
