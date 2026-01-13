@@ -67,7 +67,6 @@ class WrapperBuilder(object):
         if "wallclock_by_level" in list(kwargs.keys()):
             self.wallclock_by_level = kwargs['wallclock_by_level']
         self.working_dir = kwargs.get('working_dir', '')
-        self.wrapper_name = kwargs['name']
 
 
     def build_header(self):
@@ -137,7 +136,15 @@ class ParslWrapperBuilder(WrapperBuilder):
     allocations, not as a platform.
     """
     def build_imports(self):
-        return ""
+        return textwrap.dedent("""
+        import parsl
+        from parsl import bash_app, Config
+        from parsl.executors import HighThroughputExecutor
+        from parsl.providers import LocalProvider
+        from parsl.launchers import SimpleLauncher
+        import subprocess
+        import sys, traceback
+        """)
     
     def build_job_thread(self):
         return ""
@@ -145,26 +152,57 @@ class ParslWrapperBuilder(WrapperBuilder):
     def build_main(self):
         if not self.job_scripts:
             raise AutosubmitCritical("No job scripts found for building the Parsl wrapper.")
-        
-        # Get an unique identifier for the script name
-        unique_part = '_'.join(self.wrapper_name.split('_')[2:])
-        script_name = f"parsl_runner_{unique_part}.py"
-        
+        env_setup = self.custom_env_setup or ""
         return textwrap.dedent("""
-        # Parsl script generation
-        cat << 'EOF' > {2}
-        {0}
-        EOF
+        # Run the environment configuration instructions under an interactive-like shell
+        env_setup = {0}
+        if env_setup.strip():
+            completed = subprocess.run(["bash", "-lc", env_setup])
+            raise SystemExit(completed.returncode)
 
-        # Grant execution permission to the generated script
-        chmod +x {2}
-
-        # Load user environment
+        # Parsl configuration
         {1}
+        parsl.load(config)
 
-        # Run the Parsl script in the allocated resources
-        srun --cpu-bind=none python {2}
-        """).format(self._generate_parsl_script(), self._custom_environmet_setup(), script_name)
+        # Tasks definition
+        {2}
+                               
+        # Running tasks with Parsl
+        try:
+            {3}
+        except Exception as e:
+            print(f"An error occurred: {{e}}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            exit(1)
+        finally:
+            parsl.dfk().cleanup()   # Stop executors and terminate workers
+            parsl.clear()           # Clear Parsl config
+        """).format(repr(env_setup), self._generate_parsl_config(), self._generate_tasks(), self._generate_parsl_script())
+    
+    def _generate_parsl_config(self):
+        """
+        Generates the Parsl configuration for the wrapper script.
+        """
+        return textwrap.dedent("""
+        config = Config(
+            executors=[
+                HighThroughputExecutor(
+                    label='marenostrum5_htex',
+                    cores_per_worker={0},
+                    max_workers_per_node={1},
+                    provider=LocalProvider(
+                        launcher=SimpleLauncher()
+                    )
+                )
+            ]
+        )
+        """).format(12, 6) # TODO: [ENGINES] Delete hardcoded values
+    
+    def _generate_tasks(self):
+        """
+        Generates the Parsl tasks for the wrapper script according to job sections.
+        """
+        pass    # TODO: [ENGINES] Implement _generate_tasks
     
     def _generate_parsl_script(self):
         """
@@ -172,14 +210,6 @@ class ParslWrapperBuilder(WrapperBuilder):
         of its inner jobs.
         """
         pass  # pragma: no cover
-
-    def _custom_environmet_setup(self):
-        commands = self.custom_env_setup
-        if commands == '':
-            commands = "# No commands provided"
-        return textwrap.dedent("""\
-            {0}
-            """).format(commands, '\n'.ljust(0))
 
 class ParslVerticalWrapperBuilder(ParslWrapperBuilder):
     def _generate_parsl_script(self):   # TODO: [ENGINES] Implement vertical parsl script
