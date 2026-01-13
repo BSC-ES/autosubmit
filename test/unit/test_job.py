@@ -2188,7 +2188,7 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
                 "WALLCLOCK": "00:30",
                 "JOB_HAS_PRIO": "whatever",
                 "WRAPPER_HAS_PRIO": "%CURRENT_NOT_EXISTENT_PLACEHOLDER%",
-            }
+            },
         },
         "LIST_INT": [20200101],
         "TESTDATES": {
@@ -2219,6 +2219,7 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
                 "MAX_WALLCLOCK": "02:00",
                 "MODULES_PROFILE_PATH": None,
                 "OPA_CUSTOM_DIRECTIVES": "whatever",
+                "TEST_UNDEFINED_LIST": ['%UNDEFINED%'],
                 "OPA_EXCLUSIVE": False,
                 "OPA_MAX_PROC": 2,
                 "OPA_PROCESSORS": 112,
@@ -2244,6 +2245,7 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
         "ROOTDIR": "bla",
         "TIMEFORMAT": "%keep_format_as_INTRODUCED%",
         "SMTP_SERVER": "",
+        "TEST_EMPTY": "%CURRENT_TEST_EMPTY%",
         "STARTDATES": ["20200101"],
         "STORAGE": {},
         "STRUCTURES_DIR": "/bla",
@@ -2275,6 +2277,11 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
             if value.startswith("%") and value.endswith("%") and key not in as_conf.default_parameters.keys():
                 if key != "TIMEFORMAT":  # TIMEFORMAT is a special case to keep the format introduced by the user
                     placeholders_not_resolved.append(key)
+        elif isinstance(value, list):
+            for element in value:
+                if isinstance(element, str):
+                    if element.startswith("%") and element.endswith("%") and key not in as_conf.default_parameters.keys():
+                        placeholders_not_resolved.append(key)
     assert not placeholders_not_resolved, f"Placeholders not resolved: {placeholders_not_resolved}"
     assert parameters["CURRENT_NEVER_RESOLVED"] == ""
     assert parameters["CURRENT_JOB_HAS_PRIO"] == "whatever"
