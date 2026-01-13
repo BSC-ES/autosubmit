@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -18,22 +18,21 @@
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 import textwrap
 
-class FluxOverSlurmPlatform(ParamikoPlatform):
+class ParslOverSlurmPlatform(ParamikoPlatform):
     """Class to manage jobs to host using SLURM scheduler."""
 
     def __init__(self) -> None:
         """
-        The FluxOverSlurm platform provides an interface to facilitate building 
-        batch scripts that will run on a Flux instance inside a Slurm allocation.
+        The ParslOverSlurm platform provides an interface to facilitate building 
+        Parsl scripts that will run on a remote platform.
 
         :rtype: None
         """
-        self._header = FluxOverSlurmHeader()
+        self._header = ParslOverSlurmHeader()
 
-
-class FluxOverSlurmHeader(object):
+class ParslOverSlurmHeader(object):
     """
-    Class to handle the header of a job that runs in a Flux instance inside a Slurm allocation.
+    Class to handle the header of a job that runs with Parsl.
     """
 
     SERIAL = textwrap.dedent("""\

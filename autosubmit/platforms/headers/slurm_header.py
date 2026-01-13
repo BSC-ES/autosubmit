@@ -292,7 +292,7 @@ class SlurmHeader(object):
 
         language = kwargs["executable"]
 
-        if kwargs["method"] == 'srun' or kwargs["method"] == 'flux':
+        if kwargs["method"] == 'srun': # TODO: [ENGINES] Check if needed for Parsl wrappers
             if language is None or len(language) == 0:
                 language = "#!/bin/bash"
             return language + wr_header

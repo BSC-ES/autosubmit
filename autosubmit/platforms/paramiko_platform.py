@@ -1561,7 +1561,7 @@ class ParamikoPlatform(Platform):
             if hasattr(self.header, 'get_threads_per_task'):
                 header = header.replace(
                     '%THREADS_PER_TASK_DIRECTIVE%', self.header.get_threads_per_task(job, parameters))
-            if hasattr(self.header, 'get_wallclock_directive'):
+            if hasattr(self.header, 'get_wallclock_directive'): # TODO: [ENGINES] Check if it's needed for Parsl
                 header = header.replace(
                     '%WALLCLOCK_DIRECTIVE%', self.header.get_wallclock_directive(job, parameters))
             if job.x11:

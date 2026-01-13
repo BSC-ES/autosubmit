@@ -41,10 +41,9 @@ from autosubmit.job.job_utils import get_job_package_code, get_split_size_unit, 
 from autosubmit.job.metrics_processor import UserMetricProcessor
 from autosubmit.job.template import get_template_snippet, Language
 from autosubmit.log.log import Log, AutosubmitCritical
-from autosubmit.platforms.fluxoverslurm import FluxOverSlurmPlatform
+from autosubmit.platforms.parsloverslurm import ParslOverSlurmPlatform
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
-from autosubmit.platforms.wrappers.flux_yaml_generator import FluxYAMLGenerator
 
 if TYPE_CHECKING:
     from autosubmit.platforms.platform import Platform
@@ -2385,20 +2384,29 @@ class Job(object):
         return self._get_paramiko_template(snippet, template, parameters)
 
     def _get_paramiko_template(self, snippet: 'TemplateSnippet', template, parameters) -> str:
-        if self.wrapper_method == 'flux':
-            current_platform = FluxOverSlurmPlatform()
-            yaml_generator = FluxYAMLGenerator(parameters)
-            full_template = self._compose_template_from_snippet(snippet, template, parameters, current_platform)
-            return yaml_generator.generate_template(full_template)
-        else:
-            return self._compose_template_from_snippet(snippet, template, parameters, self._platform)
-
-    def _compose_template_from_snippet(self, snippet: 'TemplateSnippet', template, parameters, current_platform) -> str:
+        current_platform = self._platform
         return ''.join([
                 snippet.as_header(current_platform.get_header(self, parameters), self.executable),
                 snippet.as_body(template),
                 snippet.as_tailer()
             ])
+    # TODO: [ENGINES] Check if needed for Parsl wrappers
+
+    # def _get_paramiko_template(self, snippet: 'TemplateSnippet', template, parameters) -> str:
+    #     if self.wrapper_method == 'parsl':
+    #         current_platform = ParslOverSlurmPlatform()
+    #         yaml_generator = FluxYAMLGenerator(parameters)
+    #         full_template = self._compose_template_from_snippet(snippet, template, parameters, current_platform)
+    #         return yaml_generator.generate_template(full_template)
+    #     else:
+    #         return self._compose_template_from_snippet(snippet, template, parameters, self._platform)
+
+    # def _compose_template_from_snippet(self, snippet: 'TemplateSnippet', template, parameters, current_platform) -> str:
+    #     return ''.join([
+    #             snippet.as_header(current_platform.get_header(self, parameters), self.executable),
+    #             snippet.as_body(template),
+    #             snippet.as_tailer()
+    #         ])
 
     def queuing_reason_cancel(self, reason):
         try:
