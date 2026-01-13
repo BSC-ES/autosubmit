@@ -2242,11 +2242,21 @@ class Job(object):
         if replace_by_empty:
             placeholder_pattern = re.compile(r'%[^%]+%')
             for key, value in as_conf.dynamic_variables.items():
-                for placeholder in re.findall(placeholder_pattern, value):
-                    if placeholder not in as_conf.default_parameters.values():
-                        value = value.replace(placeholder, "")
-                parameters[key] = value
-            as_conf.dynamic_variables = dict()
+                if isinstance(value, str):
+                    for placeholder in re.findall(placeholder_pattern, value):
+                        if placeholder not in as_conf.default_parameters.values():
+                            value = value.replace(placeholder, "")
+                    parameters[key] = value
+                elif isinstance(value, list):
+                    cleaned_list = []
+                    for item in value:
+                        if isinstance(item, str):
+                            for placeholder in re.findall(placeholder_pattern, item):
+                                if placeholder not in as_conf.default_parameters.values():
+                                    item = item.replace(placeholder, "")
+                        cleaned_list.append(item)
+                    parameters[key] = cleaned_list
+            as_conf.dynamic_variables = {}
 
         return parameters
 

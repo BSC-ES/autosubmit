@@ -51,6 +51,7 @@ release.
   and to handle non-zero exit codes writing the `_STAT` files (for GUI/metrics) #2788 #2807
 - Fixed an issue with MIXED and STRICT wrapper policies raising the error prematurely #2770
 - Do not print warning if an experiment has been successfully deleted #2334 #2793
+- Fixed an issue with undefined variables inside a list #2773
 
 **Enhancements:**
 
