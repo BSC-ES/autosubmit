@@ -44,6 +44,7 @@ release.
 - Fixed issue where Autosubmit did not retry when there were networking issues in platforms #1369
 - Fixed an issue with additional files not being sent to the remote platform when using wrappers #1484
 - Fixed an issue with MIXED and STRICT wrapper policies raising the error prematurely #2770
+- Fixed an issue with undefined variables inside a list #2773
 
 **Enhancements:**
 
