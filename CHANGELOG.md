@@ -1,4 +1,4 @@
-### 4.1.16: Unreleased
+### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
 This release adds support to Postgres using SQLAlchemy, without removing the
 SQLite support. By default, Autosubmit will use SQLite. Postgres support is
@@ -37,11 +37,14 @@ release.
 - Fixed 'NoneType' object has no attribute 'set' that would have set a 'NoneType' instead of a 'EventType' #2611 #2583
 - Standardized the inner_job submission for non-vertical wrappers #1474
 - Fixed an issue with some placeholders not being replaced in templates #2426
+- Fixed issue where Autosubmit did not retry when there were networking issues in platforms #1369
 - Could* fix an issue with the HPC* missing variables in the templates #2432
 - Fixed "Unexpected error: 'list' object has no attribute 'status'" when running experiments #2463
 - Tentative *fix for an issue with the HPC* missing variables in the templates #2432
 - Fixed issue where Autosubmit did not retry when there were networking issues in platforms #1369
 - Fixed an issue with additional files not being sent to the remote platform when using wrappers #1484
+- Fixed an issue with MIXED and STRICT wrapper policies raising the error prematurely #2770
+- Fixed an issue with undefined variables inside a list #2773
 
 **Enhancements:**
 
@@ -77,8 +80,11 @@ release.
 - docstrings were made more uniform across several functions (should reflect in sphinx docs),
   fixed several ruff and mypy warnings, and did minor refactorings in the code like removing the
   `Submitter` class and using `ParamikoSubmitter` directly (only implementation) #2577
+- Improved submission time for slurm and pjm jobs #2742
 - Added documentation regarding in-line script definition. 
 - Fixes an issue with general wrapper parameters crashing during runtime when defined. #2743
+- Added a new configuration parameter to list a safe-list of placeholders that can be used in templates as they are, example: "%CUSTOM_MYVAR%" -> "%CUSTOM_MYVAR%".
+
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 
