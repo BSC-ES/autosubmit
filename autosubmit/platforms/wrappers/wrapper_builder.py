@@ -126,16 +126,15 @@ class WrapperBuilder(object):
         padding = amount * ch
         return ''.join(padding + line for line in text.splitlines(True))
 
-class FluxWrapperBuilder(WrapperBuilder):
+class ParslWrapperBuilder(WrapperBuilder):
     # TODO: [ENGINES] Is it necessary to pass the run_id to the inner jobs?
-    # TODO: [ENGINES] Add flux.job.Jobspec.validate_jobspec before submission
     """
-    The FluxWrapperBuilder is the responsible for generating the wrapper script
-    that will be submitted to Slurm to initialize Flux and submit the inner jobs
-    to the Flux scheduler inside the allocation.
+    The ParslWrapperBuilder is the responsible for generating the wrapper script
+    that will be submitted to Slurm to initialize submit the inner jobs to the platform
+    using the Parsl workflow manager inside the allocation.
     
-    This is a special implementation because we use Flux as a wrapper engine inside 
-    Slurm allocations, not as a platform.
+    This is a special implementation because we use Parsl as a wrapper engine inside 
+    allocations, not as a platform.
     """
     def build_imports(self):
         return ""
@@ -145,14 +144,14 @@ class FluxWrapperBuilder(WrapperBuilder):
     
     def build_main(self):
         if not self.job_scripts:
-            raise AutosubmitCritical("No job scripts found for building the Flux wrapper.")
+            raise AutosubmitCritical("No job scripts found for building the Parsl wrapper.")
         
         # Get an unique identifier for the script name
         unique_part = '_'.join(self.wrapper_name.split('_')[2:])
-        script_name = f"flux_runner_{unique_part}.py"
+        script_name = f"parsl_runner_{unique_part}.py"
         
         return textwrap.dedent("""
-        # Flux script generation
+        # Parsl script generation
         cat << 'EOF' > {2}
         {0}
         EOF
@@ -163,13 +162,13 @@ class FluxWrapperBuilder(WrapperBuilder):
         # Load user environment
         {1}
 
-        # Instantiate Flux within the allocated resources and run the jobs
-        srun --cpu-bind=none flux start --verbose=2 python {2}
-        """).format(self._generate_flux_script(), self._custom_environmet_setup(), script_name)
+        # Run the Parsl script in the allocated resources
+        srun --cpu-bind=none python {2}
+        """).format(self._generate_parsl_script(), self._custom_environmet_setup(), script_name)
     
-    def _generate_flux_script(self):
+    def _generate_parsl_script(self):
         """
-        Each Flux wrapper type implements its own script given the dependencies
+        Each Parsl wrapper type implements its own script given the dependencies
         of its inner jobs.
         """
         pass  # pragma: no cover
@@ -182,234 +181,24 @@ class FluxWrapperBuilder(WrapperBuilder):
             {0}
             """).format(commands, '\n'.ljust(0))
 
-class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
-    def _generate_flux_script(self):
+class ParslVerticalWrapperBuilder(ParslWrapperBuilder):
+    def _generate_parsl_script(self):   # TODO: [ENGINES] Implement vertical parsl script
         return textwrap.dedent("""
-        import os
-        import flux
-        import flux.job
-
-        handle = flux.Flux()
-        job_scripts={0}
-        max_retries={1}
-
-        # TODO: [ENGINES] Debug info, remove later
-        import subprocess
-        print(subprocess.check_output(["flux", "resource", "info"], text=True))
-
-        for job_script in job_scripts:
-            fail_count=0
-            completed=0
-            completed_path = job_script.replace('.cmd', '_COMPLETED')
-            failed_path = job_script.replace('.cmd', '_FAILED')
-            jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
-            jobspec.environment = os.environ.copy()
-
-            while fail_count <= max_retries and completed == 0:
-                # Submit the job
-                jobspec.stdout = job_script + ".out." + str(fail_count)
-                jobspec.stderr =  job_script + ".err." + str(fail_count)
-                job_id = flux.job.submit(handle, jobspec, waitable=True, debug=True)
-
-                # TODO: [ENGINES] Debug info, remove later
-                for event in flux.job.event_watch(handle, job_id):
-                    print("Event: " + str(event))
-                print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
-                print("RESOURCES: " + str(jobspec.resources))
-
-                # Do stuff in the meantime
-                stat_filename = job_script.replace('.cmd', f'_STAT_{{fail_count}}')
-
-                # Wait for the job to finish
-                flux.job.wait(handle, job_id)
-
-                # Create the STAT file
-                job_meta = flux.job.get_job(handle, job_id)
-                start_time = int(job_meta.get('t_run', 0))
-                finish_time = int(job_meta.get('t_cleanup', 0))
-                with open(stat_filename, 'w') as stat_file:
-                    stat_file.write(f"{{start_time}}\\n{{finish_time}}")
-
-                # Check if the job completed successfully
-                if os.path.exists(completed_path):
-                    print("The job " + job_script + " has been COMPLETED")
-                    completed = 1
-                else:
-                    print("The job " + job_script + " has FAILED")
-                    fail_count += 1
-
-            if completed == 0:
-                open(failed_path,'w').close()
-                open("WRAPPER_FAILED",'w').close()
-                exit(1)
-
-        exit(0)
         """).format(self.job_scripts, self.retrials)
     
-class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
-    def _generate_flux_script(self):
+class ParslHorizontalWrapperBuilder(ParslWrapperBuilder):
+    def _generate_parsl_script(self):   # TODO: [ENGINES] Implement horizontal parsl script
         return textwrap.dedent("""
-        import os
-        import flux
-        import flux.job
-
-        handle = flux.Flux()
-        job_scripts={0}
-        job_ids = {{}}
-
-        # TODO: [ENGINES] Debug info, remove later
-        import subprocess
-        print(subprocess.check_output(["flux", "resource", "info"], text=True))
-
-        # Submit the jobs
-        for job_script in job_scripts:
-            jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
-            jobspec.environment = os.environ.copy()
-            job_ids[job_script] = flux.job.submit(handle, jobspec, waitable=True)
-
-            # TODO: [ENGINES] Debug info, remove later
-            print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
-            print("RESOURCES: " + str(jobspec.resources))
-
-        # Wait for the jobs to finish
-        wrapper_failed = False
-        for job_script in job_scripts:
-            completed_path = job_script.replace('.cmd', '_COMPLETED')
-            failed_path = job_script.replace('.cmd', '_FAILED')
-            flux.job.wait(handle, job_ids[job_script])
-            
-            # Check if the job completed successfully
-            if os.path.exists(completed_path):
-                print("The job " + job_script + " has been COMPLETED")
-            else:
-                print("The job " + job_script + " has FAILED")
-                open(failed_path,'w').close()
-                wrapper_failed = True        
-
-        if wrapper_failed:
-            open("WRAPPER_FAILED",'w').close()
-            exit(1)
-
-        exit(0)
         """).format(self.job_scripts)
 
-class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
-    def _generate_flux_script(self):
+class ParslVerticalHorizontalWrapperBuilder(ParslWrapperBuilder):
+    def _generate_parsl_script(self):   # TODO: [ENGINES] Implement vertical-horizontal parsl script
         return textwrap.dedent("""
-        import os
-        import flux
-        import flux.job
-        from threading import Thread
-
-        job_scripts={0}
-
-        # TODO: [ENGINES] Debug info, remove later
-        import subprocess
-        print(subprocess.check_output(["flux", "resource", "info"], text=True))
-
-        class VerticalWrapperThread(Thread):
-            def __init__ (self, jobs_list):
-                Thread.__init__(self)
-                self.jobs_list = jobs_list
-                self.handle = flux.Flux()
-
-            def run(self):
-                for job_script in self.jobs_list:
-                    # Submit the job
-                    jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
-                    jobspec.environment = os.environ.copy()
-                    job_id = flux.job.submit(self.handle, jobspec, waitable=True)
-
-                    # Do stuff in the meantime
-                    completed_path = job_script.replace('.cmd', '_COMPLETED')
-                    failed_path = job_script.replace('.cmd', '_FAILED')
-
-                    # TODO: [ENGINES] Debug info, remove later
-                    print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
-                    print("RESOURCES: " + str(jobspec.resources))
-
-                    # Wait for the job to finish
-                    flux.job.wait(self.handle, job_id)
-
-                    # Check if the job completed successfully
-                    if os.path.exists(completed_path):
-                        print("The job " + job_script + " has been COMPLETED")
-                    else:
-                        print("The job " + job_script + " has FAILED")
-                        open(failed_path,'w').close()
-                        open("WRAPPER_FAILED",'w').close()
-                        exit(1)
-
-                exit(0)
-
-        # Execute vertical wrappers in parallel
-        threads = []
-        for jobs_list in job_scripts:
-            thread = VerticalWrapperThread(jobs_list)
-            threads.append(thread)
-            thread.start()
-
-        # Wait for all vertical wrappers to finish
-        for thread in threads:
-            thread.join()
-
-        exit(0)
         """).format(self.job_scripts)
 
-class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
-    def _generate_flux_script(self):
+class ParslHorizontalVerticalWrapperBuilder(ParslWrapperBuilder):
+    def _generate_parsl_script(self):   # TODO: [ENGINES] Implement horizontal-vertical parsl script
         return textwrap.dedent("""
-        import os
-        import flux
-        import flux.job
-
-        handle = flux.Flux()
-        job_scripts={0}
-        job_ids = {{}}
-
-        # TODO: [ENGINES] Debug info, remove later
-        import subprocess
-        print(subprocess.check_output(["flux", "resource", "info"], text=True))
-
-        def run_horizontal_wrapper(jobs_list):
-            # Submit the jobs
-            for job_script in jobs_list:
-                jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
-                jobspec.environment = os.environ.copy()
-                job_ids[job_script] = flux.job.submit(handle, jobspec, waitable=True)
-
-                # TODO: [ENGINES] Debug info, remove later
-                print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
-                print("RESOURCES: " + str(jobspec.resources))
-
-            # Wait for the jobs to finish
-            wrapper_failed = False
-            for job_script in jobs_list:
-                completed_path = job_script.replace('.cmd', '_COMPLETED')
-                failed_path = job_script.replace('.cmd', '_FAILED')
-                flux.job.wait(handle, job_ids[job_script])
-
-                # Check if the job completed successfully
-                if os.path.exists(completed_path):
-                    print("The job " + job_script + " has been COMPLETED")
-                else:
-                    print("The job " + job_script + " has FAILED")
-                    open(failed_path,'w').close()
-                    wrapper_failed = True        
-
-            if wrapper_failed:
-                open("WRAPPER_FAILED",'w').close()
-
-            return
-
-        # Execute horizontal wrappers
-        for jobs_list in job_scripts:
-            run_horizontal_wrapper(jobs_list)
-                               
-            if os.path.exists("WRAPPER_FAILED"):
-                exit(1)
-
-        exit(0)
         """).format(self.job_scripts)
 
 class PythonWrapperBuilder(WrapperBuilder):

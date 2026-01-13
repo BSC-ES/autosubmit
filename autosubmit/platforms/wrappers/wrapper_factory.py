@@ -21,8 +21,8 @@ from autosubmit.platforms.wrappers.wrapper_builder import (
     WrapperDirector, PythonVerticalWrapperBuilder, PythonHorizontalWrapperBuilder,
     PythonHorizontalVerticalWrapperBuilder, PythonVerticalHorizontalWrapperBuilder, BashHorizontalWrapperBuilder,
     BashVerticalWrapperBuilder, SrunHorizontalWrapperBuilder, SrunVerticalHorizontalWrapperBuilder,
-    FluxHorizontalWrapperBuilder, FluxVerticalWrapperBuilder, FluxHorizontalVerticalWrapperBuilder,
-    FluxVerticalHorizontalWrapperBuilder
+    ParslVerticalWrapperBuilder, ParslHorizontalWrapperBuilder, ParslVerticalHorizontalWrapperBuilder,
+    ParslHorizontalVerticalWrapperBuilder
 )
 
 
@@ -56,8 +56,8 @@ class WrapperFactory(object):
             kwargs['threads'] = self.threads(wrapper_data.threads)
             kwargs['reservation'] = self.reservation(wrapper_data.reservation)
 
-            # When wrapping with Flux, give it control over all resources
-            if wrapper_data.method.lower() == "flux":
+            # When wrapping with Parsl, give it control over all resources
+            if wrapper_data.method.lower() == "parsl":
                 if wrapper_data.nodes == '':
                     kwargs['threads'] = self.threads(str(int(wrapper_data.threads) * int(kwargs['num_processors_value'])))
                 else:
@@ -176,8 +176,8 @@ class WrapperFactory(object):
 class SlurmWrapperFactory(WrapperFactory):
 
     def vertical_wrapper(self, **kwargs):
-        if kwargs["method"] == 'flux':
-            return FluxVerticalWrapperBuilder(**kwargs)
+        if kwargs["method"] == 'parsl':
+            return ParslVerticalWrapperBuilder(**kwargs)
         else:
             return PythonVerticalWrapperBuilder(**kwargs)
 
@@ -185,22 +185,22 @@ class SlurmWrapperFactory(WrapperFactory):
 
         if kwargs["method"] == 'srun':
             return SrunHorizontalWrapperBuilder(**kwargs)
-        elif kwargs["method"] == 'flux':
-            return FluxHorizontalWrapperBuilder(**kwargs)
+        elif kwargs["method"] == 'parsl':
+            return ParslHorizontalWrapperBuilder(**kwargs)
         else:
             return PythonHorizontalWrapperBuilder(**kwargs)
 
     def hybrid_wrapper_horizontal_vertical(self, **kwargs):
-        if kwargs["method"] == 'flux':
-            return FluxHorizontalVerticalWrapperBuilder(**kwargs)
+        if kwargs["method"] == 'parsl':
+            return ParslHorizontalVerticalWrapperBuilder(**kwargs)
         else:
             return PythonHorizontalVerticalWrapperBuilder(**kwargs)
 
     def hybrid_wrapper_vertical_horizontal(self, **kwargs):
         if kwargs["method"] == 'srun':
             return SrunVerticalHorizontalWrapperBuilder(**kwargs)
-        elif kwargs["method"] == 'flux':
-            return FluxVerticalHorizontalWrapperBuilder(**kwargs)
+        elif kwargs["method"] == 'parsl':
+            return ParslVerticalHorizontalWrapperBuilder(**kwargs)
         else:
             return PythonVerticalHorizontalWrapperBuilder(**kwargs)
 
@@ -241,7 +241,7 @@ class SlurmWrapperFactory(WrapperFactory):
 class PJMWrapperFactory(WrapperFactory):
 
     def vertical_wrapper(self, **kwargs):
-        if kwargs["method"] == 'flux':
+        if kwargs["method"] == 'parsl':
             raise NotImplementedError(self.exception)   # pragma: no cover
         else:
             return PythonVerticalWrapperBuilder(**kwargs)
@@ -250,13 +250,13 @@ class PJMWrapperFactory(WrapperFactory):
 
         if kwargs["method"] == 'srun':
             return SrunHorizontalWrapperBuilder(**kwargs)
-        elif kwargs["method"] == 'flux':
+        elif kwargs["method"] == 'parsl':
             raise NotImplementedError(self.exception)   # pragma: no cover
         else:
             return PythonHorizontalWrapperBuilder(**kwargs)
 
     def hybrid_wrapper_horizontal_vertical(self, **kwargs):
-        if kwargs["method"] == 'flux':
+        if kwargs["method"] == 'parsl':
             raise NotImplementedError(self.exception)   # pragma: no cover
         else:
             return PythonHorizontalVerticalWrapperBuilder(**kwargs)
@@ -264,7 +264,7 @@ class PJMWrapperFactory(WrapperFactory):
     def hybrid_wrapper_vertical_horizontal(self, **kwargs):
         if kwargs["method"] == 'srun':
             return SrunVerticalHorizontalWrapperBuilder(**kwargs)
-        elif kwargs["method"] == 'flux':
+        elif kwargs["method"] == 'parsl':
             raise NotImplementedError(self.exception)   # pragma: no cover
         else:
             return PythonVerticalHorizontalWrapperBuilder(**kwargs)
@@ -301,13 +301,13 @@ class PJMWrapperFactory(WrapperFactory):
 class EcWrapperFactory(WrapperFactory):
 
     def vertical_wrapper(self, **kwargs):
-        if kwargs["method"] == 'flux':
+        if kwargs["method"] == 'parsl':
             raise NotImplementedError(self.exception)   # pragma: no cover
         else:
             return BashVerticalWrapperBuilder(**kwargs)
 
     def horizontal_wrapper(self, **kwargs):
-        if kwargs["method"] == 'flux':
+        if kwargs["method"] == 'parsl':
             raise NotImplementedError(self.exception)   # pragma: no cover
         else:
             return BashHorizontalWrapperBuilder(**kwargs)
