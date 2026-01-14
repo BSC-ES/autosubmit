@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import collections
 import copy
 import inspect
 import shutil
@@ -2129,6 +2130,8 @@ class FakeBasicConfig:
     LOCAL_PROJ_DIR = '/dummy/local/proj/dir'
     DEFAULT_PLATFORMS_CONF = ''
     DEFAULT_JOBS_CONF = ''
+
+
 @pytest.fixture(scope='function')
 def setup(autosubmit_config, tmpdir):
     experiment_id = 'random-id'
@@ -2291,16 +2294,22 @@ def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wr
     assert result == expected
 
 
-def test_build_imports():
+@pytest.fixture
+def wrapper_data():
+    WrapperData = collections.namedtuple('WrapperData', ['custom_env_setup'])
+    return WrapperData(custom_env_setup='')
+
+
+def test_build_imports(wrapper_data):
     kwargs:dict = {'header_directive': True, 'jobs_scripts': ["test"], 'threads': 2, 'num_processors': True,
-                   'num_processors_value': True, 'expid': True}
+                   'num_processors_value': True, 'expid': True, 'wrapper_data': wrapper_data}
     vh_wrapper = SrunVerticalHorizontalWrapperBuilder(**kwargs).build_imports()
     assert type(vh_wrapper) is str and '("t" "e" "s" "t" )' in vh_wrapper
 
 
-def test_build_srun_launcher():
+def test_build_srun_launcher(wrapper_data):
     kwargs:dict = {'header_directive': True, 'jobs_scripts': ["test"], 'threads': 2, 'num_processors': True,
-                   'num_processors_value': True, 'expid': True}
+                   'num_processors_value': True, 'expid': True, 'wrapper_data': wrapper_data}
     vh_wrapper = SrunVerticalHorizontalWrapperBuilder(**kwargs).build_srun_launcher("job1, job2, job3, job4, job5")
     assert type(vh_wrapper) is str and "job1, job2, job3, job4, job5" in vh_wrapper
 
