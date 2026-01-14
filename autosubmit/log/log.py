@@ -51,7 +51,12 @@ class AutosubmitError(Exception):
         return self.message if not self.trace else f'{self.trace} {self.message}'
 
     def __str__(self):
-        return " "
+        msg = self.message
+        if self.code:
+            msg += f"\nError code: {self.code}"
+        if self.trace:
+            msg += f"\nDetails:\n{self.trace}"
+        return msg
 
 
 class AutosubmitCritical(Exception):
@@ -69,7 +74,12 @@ class AutosubmitCritical(Exception):
         self.trace = trace
 
     def __str__(self) -> str:
-        return " "
+        msg = self.message
+        if self.code:
+            msg += f"\nError code: {self.code}"
+        if self.trace:
+            msg += f"\nDetails:\n{self.trace}"
+        return msg
 
 
 class LogFormatter:

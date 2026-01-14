@@ -47,9 +47,9 @@ jobs:
       - name: Unit tests
         run: |
           pytest \
+            -n $(nproc) \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
-            --dist load \
             test/unit -m "not postgres"
 
       - name: Coverage report
@@ -72,7 +72,9 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        # NOTE: We use 3.11 and not the latest 3.12 as the debugger of 3.12 is buggy
+        #       and 3.11 is the current version used at the BSC ES department.
+        python-version: ["3.9", "3.11"]
         pytest-markers: ["not postgres and not slurm"]
         # Here we include an extra build with the lowest version of Python and Postgres.
         # We do it this way to avoid wasting CICD resources since we already tested the
@@ -120,9 +122,9 @@ jobs:
           export DISPLAY=:99
           
           pytest \
+            -n $(nproc) \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
-            --dist load \
             test/integration \
             -m "${{ matrix.pytest-markers }}"
 
@@ -144,7 +146,9 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        # NOTE: We use 3.11 and not the latest 3.12 as the debugger of 3.12 is buggy
+        #       and 3.11 is the current version used at the BSC ES department.
+        python-version: ["3.9", "3.12"]
 
     steps:
       - name: Checkout code
@@ -167,6 +171,7 @@ jobs:
       - name: Regression tests
         run: |
           pytest \
+            -n $(nproc) \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
             test/regression \
@@ -219,10 +224,10 @@ jobs:
       - name: Integration tests
         run: |
           pytest \
+            -n $(nproc) \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
             test/integration \
-            --capture=no \
             -m 'slurm'
 
       - name: Coverage report

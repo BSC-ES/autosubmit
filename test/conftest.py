@@ -31,6 +31,7 @@ from autosubmit.config.basicconfig import generate_dirs, BasicConfig
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
     from py._path.local import LocalPath  # type: ignore
+    from _pytest.tmpdir import TempPathFactory
     from pytest import FixtureRequest
 
 
@@ -177,3 +178,51 @@ def test_tmp_path(tmp_path: 'LocalPath', request: 'FixtureRequest') -> Path:
     test_path = tmp_path / test_name
     test_path.mkdir()
     return Path(test_path)
+
+
+@pytest.fixture(scope='session', autouse=True)
+def do_not_touch_user_home(tmp_path_factory: 'TempPathFactory') -> None:
+    """Fixture to change the environment variable $HOME.
+
+    Autosubmit by default uses the user home directory. However, for testing
+    we do not need, nor should, modify anything in the user directory.
+
+    Autosubmit uses configuration to load the experiments, database, and other
+    files. However, the SSH keys are still loaded from the user directory.
+
+    This fixture is mainly to avoid tests passing just because they were
+    resolved by the user home directory's SSH config, and also to avoid
+    any test from modifying that file, or any other user file.
+    """
+    home_dir = tmp_path_factory.getbasetemp()
+    os.environ["HOME"] = str(home_dir)
+    os.environ["USERPROFILE"] = str(home_dir)
+
+    # Git global configuration for tests
+    git_config = Path(home_dir, 'git_config')
+    git_config.write_text(dedent('''\
+    [user]
+    name = Autosubmit
+    email = autosubmit@localhost
+    '''))
+    os.environ["GIT_CONFIG_GLOBAL"] = str(git_config)
+
+
+@pytest.fixture(scope='session', autouse=True)
+def avoid_long_sleep_time(session_mocker):
+    """Avoid long sleep time in Autosubmit.
+
+    Debugging a test in Autosubmit that was taking 1 minute, 83.5% of the time was
+    spent in ``time.sleep``. Even though we have the safety sleep time very low in
+    our fixtures, there are other parts of the code in Autosubmit that call it too.
+
+    This fixture will call the real sleep function with a maximum of 1 second.
+    """
+    import time
+    real_sleep = time.sleep
+
+    def my_sleep(s):
+        s = min(1, s)
+        real_sleep(s)
+
+    session_mocker.patch('time.sleep', side_effect=my_sleep)

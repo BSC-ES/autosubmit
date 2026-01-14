@@ -22,6 +22,14 @@ from pathlib import Path
 from subprocess import check_output
 from tempfile import TemporaryDirectory
 
+__all__ = [
+    'create_git_repository',
+    'git_add_submodule',
+    'git_clone_repository',
+    'git_commit_all_in_dir'
+]
+
+
 # TODO: Rename branch to main to match the other repositories; note that this
 #       needs to wait until our laptops & CICD env are using Git 2.28+, in order
 #       to use the --initial-branch=main (the -c init.defaultBranch option is

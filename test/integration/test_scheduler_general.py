@@ -230,6 +230,9 @@ def test_scheduler_job_types(scheduler, job_type, autosubmit, autosubmit_exp: Ca
     if not expected_data:
         assert False, f"Could not find the expected data for {scheduler} and {job_type}"
 
+    # Replace the expid
+    expected_data = expected_data.replace('t000', expid)
+
     # Get the actual default parameters for the scheduler
     if job_type == "DEFAULT":
         actual = Path(exp_path, f"tmp/{expid}_BASE_{scheduler}.cmd").read_text()
