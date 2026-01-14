@@ -188,9 +188,13 @@ class ParslWrapperBuilder(WrapperBuilder):
             executors=[
                 HighThroughputExecutor(
                     label='marenostrum5_htex',
-                    cores_per_worker={0},
-                    max_workers_per_node={1},
+                    cores_per_worker=12,        # TODO: [ENGINES] Make this configurable
+                    max_workers_per_node=6,     # TODO: [ENGINES] Make this configurable
+                    working_dir='.',            # TODO: [ENGINES] Make this configurable
                     provider=LocalProvider(
+                        nodes_per_block=2,      # TODO: [ENGINES] Make this configurable
+                        init_blocks=1,
+                        max_blocks=1,
                         launcher=SimpleLauncher()
                     )
                 )
@@ -198,11 +202,15 @@ class ParslWrapperBuilder(WrapperBuilder):
         )
         """).format(12, 6) # TODO: [ENGINES] Delete hardcoded values
     
-    def _generate_tasks(self):
+    def _generate_tasks(self):  # TODO: [ENGINES] Implement _generate_tasks
         """
         Generates the Parsl tasks for the wrapper script according to job sections.
         """
-        pass    # TODO: [ENGINES] Implement _generate_tasks
+        return textwrap.dedent("""
+        @bash_app(executors=['marenostrum5_htex'])
+        def task(jobname: str, n_cores: int) -> str:
+            return f"srun -n {{n_cores}} ./{{jobname}}"
+        """)
     
     def _generate_parsl_script(self):
         """

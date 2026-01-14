@@ -37,7 +37,7 @@ class ParslOverSlurmHeader(object):
 
     SERIAL = textwrap.dedent("""\
 ###############################################################################
-# The following lines contain the script. [%TASKTYPE% %DEFAULT.EXPID% EXPERIMENT]
+#                   %TASKTYPE% %DEFAULT.EXPID% EXPERIMENT
 ###############################################################################
            """)
 

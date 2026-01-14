@@ -2384,7 +2384,10 @@ class Job(object):
         return self._get_paramiko_template(snippet, template, parameters)
 
     def _get_paramiko_template(self, snippet: 'TemplateSnippet', template, parameters) -> str:
-        current_platform = self._platform
+        if self.wrapper_method == 'parsl':
+            current_platform = ParslOverSlurmPlatform()
+        else:
+            current_platform = self._platform
         return ''.join([
                 snippet.as_header(current_platform.get_header(self, parameters), self.executable),
                 snippet.as_body(template),
