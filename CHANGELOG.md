@@ -1,3 +1,10 @@
+### 4.1.17: Unreleased
+
+**Enhancements:**
+
+- Fix intermittent failures of unit tests, and enable print of AS exceptions.
+  Changes and improvements to fixtures and pytest organisation and setup #2745
+
 ### 4.1.16: Unreleased
 
 This release adds support to Postgres using SQLAlchemy, without removing the

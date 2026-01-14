@@ -17,7 +17,13 @@
 
 """Networking utilities for integration tests."""
 
-from socket import socket
+from socket import socket, create_connection
+from time import sleep, time
+
+__all__ = [
+    'get_free_port',
+    'wait_for_tcp_port'
+]
 
 
 def get_free_port() -> int:
@@ -45,3 +51,16 @@ def get_free_port() -> int:
     with socket() as s:
         s.bind(('', 0))
         return s.getsockname()[1]
+
+
+def wait_for_tcp_port(host, port, timeout=30):
+    """Tries to connect to host and port until it works or the timeout is reached."""
+    start = time()
+    while True:
+        try:
+            with create_connection((host, port), timeout=2):
+                return
+        except OSError:
+            if time() - start > timeout:
+                raise TimeoutError(f"TCP connection not ready at {host}:{port}")
+            sleep(5)

@@ -15,22 +15,31 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import argparse
 from pathlib import Path
+from typing import Callable, TYPE_CHECKING
 
 import pytest
 from ruamel.yaml import YAML
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.log.log import AutosubmitCritical
-from test.integration.conftest import AutosubmitExperimentFixture
 
-_EXPIDS = 'z000'
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
+    from test.integration.conftest import AutosubmitExperiment, AutosubmitExperimentFixture
 
-def set_up_test(autosubmit_exp, autosubmit, mocker, command: str):
-    fake_jobs: dict = YAML().load(Path(__file__).resolve().parents[1] / "files/fake-jobs.yml")
-    fake_platforms: dict = YAML().load(Path(__file__).resolve().parents[1] / "files/fake-platforms.yml")
-    autosubmit_exp(
-        _EXPIDS,
+
+def set_up_test(
+        expid: str,
+        command: list[str],
+        autosubmit_exp: 'AutosubmitExperimentFixture',
+        mocker
+) -> tuple['AutosubmitExperiment', argparse.Namespace, list[str]]:
+    test_files_path = Path(__file__).resolve().parents[1]
+    fake_jobs: dict = YAML().load(test_files_path / "files/fake-jobs.yml")
+    fake_platforms: dict = YAML().load(test_files_path / "files/fake-platforms.yml")
+    exp = autosubmit_exp(
+        expid=expid,
         experiment_data={
             'DEFAULT': {
                 'HPCARCH': 'TEST_SLURM'
@@ -43,9 +52,11 @@ def set_up_test(autosubmit_exp, autosubmit, mocker, command: str):
     if 'delete' in command:
         mocker.patch('autosubmit.autosubmit.Autosubmit._user_yes_no_query', return_value=True)
 
+    command = [c.format(expid=expid) for c in command]
+
     mocker.patch('sys.argv', command)
-    _, args = autosubmit.parse_args()
-    return args
+    _, args = exp.autosubmit.parse_args()
+    return exp, args, command
 
 
 @pytest.mark.parametrize(
@@ -53,75 +64,110 @@ def set_up_test(autosubmit_exp, autosubmit, mocker, command: str):
     [
         ['autosubmit', 'configure'],
         ['autosubmit', 'expid', '-dm', '-H', 'local', '-d', 'Tutorial'],
-        ['autosubmit', 'delete', _EXPIDS],
-        ['autosubmit', 'monitor', _EXPIDS, '--hide', '--notransitive'],  # TODO
-        ['autosubmit', 'stats', _EXPIDS],  # TODO
-        ['autosubmit', 'clean', _EXPIDS],
-        # ['autosubmit', 'check', _EXPIDS, '--notransitive'],
-        ['autosubmit', 'inspect', _EXPIDS, '--notransitive'],  # TODO
-        ['autosubmit', 'report', _EXPIDS],  # TODO
-        ['autosubmit', 'describe', _EXPIDS],
-        ['autosubmit', 'migrate', '-fs', 'Any', _EXPIDS],
-        ['autosubmit', 'create', _EXPIDS, '--hide'],
-        ['autosubmit', 'setstatus', _EXPIDS, '-t', 'READY', '-fs', 'WAITING', '--hide'], # TODO
+        ['autosubmit', 'delete', '{expid}'],
+        ['autosubmit', 'monitor', '{expid}', '--hide', '--notransitive'],  # TODO
+        ['autosubmit', 'stats', '{expid}'],  # TODO
+        ['autosubmit', 'clean', '{expid}'],
+        # ['autosubmit', 'check', '{expid}', '--notransitive'],
+        ['autosubmit', 'inspect', '{expid}', '--notransitive'],  # TODO
+        ['autosubmit', 'report', '{expid}'],  # TODO
+        ['autosubmit', 'describe', '{expid}'],
+        ['autosubmit', 'migrate', '-fs', 'Any', '{expid}'],
+        ['autosubmit', 'create', '{expid}', '--hide'],
+        ['autosubmit', 'setstatus', '{expid}', '-t', 'READY', '-fs', 'WAITING', '--hide'],  # TODO
         ['autosubmit', 'testcase', '-dm', '-H', 'local', '-d', 'Tutorial', '-c', '1', '-m', 'fc0', '-s', '19651101'],
         # TODO
-        ['autosubmit', 'refresh', _EXPIDS],  # TODO
-        ['autosubmit', 'updateversion', _EXPIDS],  # TODO
-        ['autosubmit', 'upgrade', _EXPIDS],  # TODO
-        ['autosubmit', 'archive', _EXPIDS],  # TODO
+        ['autosubmit', 'refresh', '{expid}'],  # TODO
+        ['autosubmit', 'updateversion', '{expid}'],  # TODO
+        ['autosubmit', 'upgrade', '{expid}'],  # TODO
+        ['autosubmit', 'archive', '{expid}'],  # TODO
         ['autosubmit', 'readme'],  # TODO
         ['autosubmit', 'changelog'],  # TODO
-        ['autosubmit', 'dbfix', _EXPIDS],  # TODO
-        ['autosubmit', 'pklfix', _EXPIDS],
-        ['autosubmit', 'updatedescrip', _EXPIDS, 'description'],
-        ['autosubmit', 'cat-log', _EXPIDS],
+        ['autosubmit', 'dbfix', '{expid}'],  # TODO
+        ['autosubmit', 'pklfix', '{expid}'],
+        ['autosubmit', 'updatedescrip', '{expid}', 'description'],
+        ['autosubmit', 'cat-log', '{expid}'],
         ['autosubmit', 'stop', '-a']
     ],
-    ids=['configure', 'expid', 'delete', 'monitor', 'stats', 'clean', 'inspect', 'report', 'describe', 'migrate', 'create',
-         'setstatus', 'testcase', 'refresh', 'updateversion', 'upgrade', 'archive', 'readme', 'changelog', 'dbfix', 'pklfix',
-         'updatedescrip', 'cat-log', 'stop']
-)  # TODO: improve quality of the test in order to validate each scenario and its outputs  #noqa
-def test_run_command(autosubmit_exp: AutosubmitExperimentFixture, autosubmit: Autosubmit, mocker, command: str):
+    ids=[
+        'configure',
+        'expid',
+        'delete',
+        'monitor',
+        'stats',
+        'clean',
+        'inspect',
+        'report',
+        'describe',
+        'migrate',
+        'create',
+        'setstatus',
+        'testcase',
+        'refresh',
+        'updateversion',
+        'upgrade',
+        'archive',
+        'readme',
+        'changelog',
+        'dbfix',
+        'pklfix',
+        'updatedescrip',
+        'cat-log',
+        'stop'
+    ]
+)
+def test_run_command(
+        command: list[str],
+        autosubmit_exp: 'AutosubmitExperimentFixture',
+        mocker: 'MockerFixture',
+        get_next_expid: Callable[[], str]):
     """Test the is simply used to check if commands are not broken on runtime, it doesn't check behaviour or output
+
+    TODO: improve quality of the test in order to validate each scenario and its outputs
     TODO: commands that have a TODO at its side needs behaviour tests
     """
-    args = set_up_test(autosubmit_exp, autosubmit, mocker, command)
+    exp, args, command = set_up_test(get_next_expid(), command, autosubmit_exp, mocker)
     if 'create' in command or 'pklfix' in command:
-        assert autosubmit.run_command(args=args) == 0
+        assert exp.autosubmit.run_command(args=args) == 0
     else:
-        assert autosubmit.run_command(args=args)
+        assert exp.autosubmit.run_command(args=args)
 
 
 @pytest.mark.parametrize(
     'command',
     [
         ['autosubmit', 'install'],
-        ['autosubmit', '-lc', 'ERROR', '-lf', 'WARNING', 'run', _EXPIDS],
-        ['autosubmit', 'recovery', _EXPIDS, '--hide'],
-        ['autosubmit', 'provenance', _EXPIDS, '--rocrate'],
+        ['autosubmit', '-lc', 'ERROR', '-lf', 'WARNING', 'run', '{expid}'],
+        ['autosubmit', 'recovery', '{expid}', '--hide'],
+        ['autosubmit', 'provenance', '{expid}', '--rocrate'],
     ],
     ids=['install', 'run', 'recovery', 'provenance']
 )
-def test_run_command_raises_autosubmit(autosubmit_exp: AutosubmitExperimentFixture, autosubmit: Autosubmit, mocker, command: str):
-    """Test the is simply used to check if commands are not broken on runtime, it doesn't check behaviour or output
+def test_run_command_raises_autosubmit(
+        command: list[str],
+        autosubmit_exp: 'AutosubmitExperimentFixture',
+        mocker: 'MockerFixture',
+        get_next_expid: Callable[[], str]):
+    """Test the is simply used to check if commands are not broken on runtime.
+
+    It doesn't check behaviour or output.
     """
-    args = set_up_test(autosubmit_exp, autosubmit, mocker, command)
+    exp, args, command = set_up_test(get_next_expid(), command, autosubmit_exp, mocker)
     if 'run' in command:
         with pytest.raises(AutosubmitCritical) as error:
-            autosubmit.run_command(args=args)
+            exp.autosubmit.run_command(args=args)
         assert str(error.value.code) == '7010'
     elif 'install' in command:
         with pytest.raises(AutosubmitCritical) as error:
-            autosubmit.run_command(args=args)
+            exp.autosubmit.run_command(args=args)
         assert str(error.value.code) == '7004'
     elif 'recovery' in command:
         with pytest.raises(AutosubmitCritical) as error:
-            autosubmit.run_command(args=args)
+            exp.autosubmit.run_command(args=args)
         # Can't establish a connection to a platform.
         assert str(error.value.code) == '7050'
     elif 'provenance' in command:
         with pytest.raises(AutosubmitCritical) as error:
-            autosubmit.run_command(args=args)
+            exp.autosubmit.run_command(args=args)
         # RO-Crate key is missing
         assert str(error.value.code) == '7012'

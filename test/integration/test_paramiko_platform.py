@@ -22,7 +22,7 @@ import socket
 from dataclasses import dataclass
 from getpass import getuser
 from pathlib import Path
-from typing import cast, Generator, Optional, Protocol, Union, TYPE_CHECKING
+from typing import cast, Any, Callable, Optional, Protocol, Union, TYPE_CHECKING
 
 import paramiko
 import pytest
@@ -37,76 +37,66 @@ from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 if TYPE_CHECKING:
-    # noinspection PyProtectedMember
-    from _pytest._py.path import LocalPath
-    from testcontainers.sftp import DockerContainer
-    from test.integration.conftest import AutosubmitExperiment
     from autosubmit.platforms.psplatform import PsPlatform
     from autosubmit.platforms.slurmplatform import SlurmPlatform
+    from docker.models.containers import Container
+    # noinspection PyProtectedMember
+    from _pytest._py.path import LocalPath
     from pytest import FixtureRequest
+    from testcontainers.core.container import DockerContainer  # type: ignore
+    from test.integration.conftest import AutosubmitExperiment
 
-_EXPID = 't000'
 _PLATFORM_NAME = 'TEST_PS_PLATFORM'
 _PLATFORM_REMOTE_DIR = '/app/'
 _PLATFORM_PROJECT = 'test'
 
 
-@dataclass
-class ExperimentPlatformServer:
-    """Data holder for fixture objects."""
-    experiment: 'AutosubmitExperiment'
-    platform: 'PsPlatform'
-    ssh_server: 'DockerContainer'
-
-
-@pytest.fixture(scope='module', autouse=True)
-def ssh_config() -> Generator[Path, None, None]:
-    # Paramiko platform relies on parsing the SSH config file, failing if it does not exist.
-    ssh_config = Path('~/.ssh/config').expanduser()
-    delete_ssh_config = False
-    if not ssh_config.exists():
-        ssh_config.parent.mkdir(parents=True, exist_ok=True)
-        ssh_config.touch(exist_ok=False)
-        delete_ssh_config = True
-    yield ssh_config
-    # Now we remove so that the user can create one if s/he so desires.
-    if delete_ssh_config:
-        ssh_config.unlink(missing_ok=True)
-
-
-@pytest.fixture()
-def exp_platform_server(autosubmit_exp, ssh_server: 'DockerContainer', request) -> ExperimentPlatformServer:
-    """Fixture that returns an Autosubmit experiment, a platform, and the (Docker) server used."""
-    user = getuser()
-    test_name = request.node.name
-    platform_scratch_dir = Path(_PLATFORM_REMOTE_DIR, test_name)
-    exp = autosubmit_exp(_EXPID, experiment_data={
-        'PLATFORMS': {
-            _PLATFORM_NAME: {
-                'TYPE': 'ps',
-                'HOST': ssh_server.get_docker_client().host(),
-                'PROJECT': _PLATFORM_PROJECT,
-                'USER': user,
-                'SCRATCH_DIR': str(platform_scratch_dir),
-                'ADD_PROJECT_TO_HOST': 'False',
-                'MAX_WALLCLOCK': '48:00',
-                'DISABLE_RECOVERY_THREADS': 'True'
-            }
-        },
-        'JOBS': {
-            # FIXME: This is poorly designed. First, to load platforms you need an experiment
-            #        (even if you are in test/code mode). Then, platforms only get the user
-            #        populated by a submitter. This is strange, as the information about the
-            #        user is in the ``AutosubmitConfig``, and the platform has access to the
-            #        ``AutosubmitConfig``. It is just never accessing the user (expid, yes).
-            'BECAUSE_YOU_NEED_AT_LEAST_ONE_JOB_USING_THE_PLATFORM': {
-                'RUNNING': 'once',
-                'SCRIPT': "sleep 0",
-                'PLATFORM': _PLATFORM_NAME
+@pytest.fixture
+def get_experiment(autosubmit_exp) -> Callable[['FixtureRequest'], 'AutosubmitExperiment']:
+    def _get_experiment(request: 'FixtureRequest') -> 'AutosubmitExperiment':
+        test_name = request.node.name
+        platform_scratch_dir = Path(_PLATFORM_REMOTE_DIR, test_name)
+        # TODO: The necessity to create a fixture here, instead of using ``autosubmit_exp``,
+        #       shows that we need to rethink the design of how platforms are loaded. In our
+        #       code we have the configuration object here, but it'd be simpler to maybe
+        #       have a utility code or fixture that given an object or some value, it creates
+        #       the platform and maybe the configuration to be inserted here... or the
+        #       configuration being created from the objects... It is really cumbersome
+        #       to use Autosubmit API directly, especially what came from config-parser
+        #       (which is new in AS4, but already feels like legacy sometimes).
+        experiment_data = {
+            'PLATFORMS': {
+                _PLATFORM_NAME: {
+                    'TYPE': 'ps',
+                    'HOST': 'localhost',
+                    'PROJECT': _PLATFORM_PROJECT,
+                    'USER': getuser(),
+                    'SCRATCH_DIR': str(platform_scratch_dir),
+                    'ADD_PROJECT_TO_HOST': 'False',
+                    'MAX_WALLCLOCK': '48:00',
+                    'DISABLE_RECOVERY_THREADS': 'True'
+                }
+            },
+            'JOBS': {
+                # FIXME: This is poorly designed. First, to load platforms you need an experiment
+                #        (even if you are in test/code mode). Then, platforms only get the user
+                #        populated by a submitter. This is strange, as the information about the
+                #        user is in the ``AutosubmitConfig``, and the platform has access to the
+                #        ``AutosubmitConfig``. It is just never accessing the user (expid, yes).
+                'BECAUSE_YOU_NEED_AT_LEAST_ONE_JOB_USING_THE_PLATFORM': {
+                    'RUNNING': 'once',
+                    'SCRIPT': "sleep 0",
+                    'PLATFORM': _PLATFORM_NAME
+                }
             }
         }
-    })
 
+        return autosubmit_exp(experiment_data=experiment_data)
+
+    return _get_experiment
+
+
+def _get_platform(exp: 'AutosubmitExperiment') -> 'PsPlatform':
     # We load the platforms with the submitter so that the platforms have all attributes.
     # NOTE: The set up of platforms is done partially in the platform constructor and
     #       partially by a submitter (i.e., they are tightly coupled, which makes it hard
@@ -116,7 +106,7 @@ def exp_platform_server(autosubmit_exp, ssh_server: 'DockerContainer', request) 
     assert submitter.platforms
     ps_platform: 'PsPlatform' = cast('PsPlatform', submitter.platforms[_PLATFORM_NAME])
 
-    return ExperimentPlatformServer(exp, ps_platform, ssh_server)
+    return ps_platform
 
 
 @dataclass
@@ -131,18 +121,21 @@ class CreateJobParametersPlatformFixture(Protocol):
     def __call__(
             self,
             experiment_data: Optional[dict] = None,
-            /
+            /,
+            *args: Any,
+            **kwargs: Any
     ) -> JobParametersPlatform:
         ...
 
 
 @pytest.fixture
-def create_job_parameters_platform(autosubmit_exp) -> CreateJobParametersPlatformFixture:
-    def job_parameters_platform(experiment_data: dict) -> JobParametersPlatform:
-        exp = autosubmit_exp(_EXPID, experiment_data=experiment_data, include_jobs=True)
+def create_job_parameters_platform(
+        autosubmit_exp, get_next_expid: Callable[[], str]) -> CreateJobParametersPlatformFixture:
+    def job_parameters_platform(experiment_data: Optional[dict]) -> JobParametersPlatform:
+        exp = autosubmit_exp(get_next_expid(), experiment_data=experiment_data, include_jobs=True)
         slurm_platform: 'SlurmPlatform' = cast('SlurmPlatform', exp.platform)
 
-        job = Job(f"{_EXPID}_SIM", 10000, Status.SUBMITTED, 0)
+        job = Job(f"{exp.expid}_SIM", 10000, Status.SUBMITTED, 0)
         job.section = 'SIM'
         job.het = {}
         job._platform = slurm_platform
@@ -158,7 +151,6 @@ def create_job_parameters_platform(autosubmit_exp) -> CreateJobParametersPlatfor
     return job_parameters_platform
 
 
-@pytest.mark.docker
 @pytest.mark.parametrize(
     'filename',
     [
@@ -167,7 +159,14 @@ def create_job_parameters_platform(autosubmit_exp) -> CreateJobParametersPlatfor
     ],
     ids=['filename', 'filename_long_path']
 )
-def test_send_file(filename: str, exp_platform_server: ExperimentPlatformServer, request):
+@pytest.mark.ssh
+@pytest.mark.docker
+def test_send_file(
+        filename: str,
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        request: 'FixtureRequest',
+        ssh_server: 'Container'
+):
     """This test opens an SSH connection (via sftp) and sends a file to the remote location.
 
     It launches a Docker Image using the testcontainers library.
@@ -175,109 +174,160 @@ def test_send_file(filename: str, exp_platform_server: ExperimentPlatformServer,
     test_name = request.node.name
     user = getuser()
 
-    exp = exp_platform_server.experiment
-    ps_platform = exp_platform_server.platform
-    ssh_server = exp_platform_server.ssh_server
+    exp = get_experiment(request)
+    exp_ps_platform = _get_platform(exp)
 
-    ps_platform.connect(as_conf=exp.as_conf, reconnect=False, log_recovery_process=False)
-    assert ps_platform.check_remote_permissions()
+    try:
+        exp_ps_platform.connect(as_conf=exp.as_conf, reconnect=False, log_recovery_process=False)
+        assert exp_ps_platform.check_remote_permissions()
 
-    platform_tmp_path = Path(ps_platform.tmp_path)
+        platform_tmp_path = Path(exp_ps_platform.tmp_path)
 
-    # generate the file
-    if "/" in filename:
-        filename_dir = Path(filename).parent
-        Path(platform_tmp_path, filename_dir).mkdir(parents=True, exist_ok=True)
-        filename = Path(filename).name
+        # generate the file
+        if "/" in filename:
+            filename_dir = Path(filename).parent
+            Path(platform_tmp_path, filename_dir).mkdir(parents=True, exist_ok=True)
+            filename = Path(filename).name
 
-    with open(str(Path(platform_tmp_path, filename)), 'w') as f:
-        f.write('test')
+        with open(str(Path(platform_tmp_path, filename)), 'w') as f:
+            f.write('test')
 
-    assert ps_platform.send_file(filename)
+        assert exp_ps_platform.send_file(filename)
 
-    file = Path(
-        _PLATFORM_REMOTE_DIR,
-        test_name,
-        _PLATFORM_PROJECT,
-        user,
-        exp.expid,
-        f'LOG_{exp.expid}/{filename}'
-    )
-    result = ssh_server.exec(f'ls {str(file)}')
-    assert result.exit_code == 0
+        file = Path(
+            _PLATFORM_REMOTE_DIR,
+            test_name,
+            _PLATFORM_PROJECT,
+            user,
+            exp.expid,
+            f'LOG_{exp.expid}/{filename}'
+        )
+        result = ssh_server.exec_run(f'ls {str(file)}')
+        assert result.exit_code == 0
+    finally:
+        exp_ps_platform.close_connection()
 
 
-def test_send_file_errors(exp_platform_server: ExperimentPlatformServer):
+def test_send_file_errors(
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server: 'DockerContainer'
+):
     """Test possible errors when sending a file."""
-    exp = exp_platform_server.experiment
-    ps_platform = exp_platform_server.platform
+    exp = get_experiment(request)
+    exp_ps_platform = _get_platform(exp)
 
-    ps_platform.connect(as_conf=exp.as_conf, reconnect=False, log_recovery_process=False)
-    assert ps_platform.check_remote_permissions()
+    try:
+        exp_ps_platform.connect(as_conf=exp.as_conf, reconnect=False, log_recovery_process=False)
+        assert exp_ps_platform.check_remote_permissions()
 
-    # Without this, the code will perform a check where it will reconnect.
-    check = False
+        # Without this, the code will perform a check where it will reconnect.
+        check = False
 
-    # Fails if the connection is not active.
-    ps_platform.close_connection()
-    with pytest.raises(AutosubmitError) as cm:
-        ps_platform.send_file(__file__, check=check)
-    assert 'Connection does not appear to be active' in str(cm.value.message)
+        # Fails if the connection is not active.
+        exp_ps_platform.close_connection()
+        with pytest.raises(AutosubmitError) as cm:
+            exp_ps_platform.send_file(__file__, check=check)
+        assert 'Connection does not appear to be active' in str(cm.value.message)
 
-    # Fails if there is a Python error.
-    ps_platform._ftpChannel = None
-    with pytest.raises(AutosubmitError) as cm:
-        ps_platform.send_file('this-file-does-not-exist', check=check)
-    assert 'An unexpected error occurred' in str(cm.value.message)
+        # Fails if there is a Python error.
+        exp_ps_platform._ftpChannel = None
+        with pytest.raises(AutosubmitError) as cm:
+            exp_ps_platform.send_file('this-file-does-not-exist', check=check)
+        assert 'An unexpected error occurred' in str(cm.value.message)
+    finally:
+        exp_ps_platform.close_connection()
 
 
 @pytest.mark.parametrize(
-    'cmd,error,x11_enabled,mfa_enabled',
+    'cmd,error,ssh_fixture,x11_enabled,mfa_enabled',
     [
-        ('whoami', None, True, False),
-        ('parangaricutirimicuaro', AutosubmitError, True, False),
-        ('whoami', None, False, False),
-        ('parangaricutirimicuaro', AutosubmitError, False, False),
-        ('whoami', None, True, True),
-        ('parangaricutirimicuaro', AutosubmitError, True, True),
-        ('whoami', None, False, True),
-        ('parangaricutirimicuaro', AutosubmitError, False, True)
-    ]
+        pytest.param(
+            'whoami', None, 'ssh_x11_server', True, False,
+            id='Server with X11, connected with X11, whoami command works'
+        ),
+        pytest.param(
+            'parangaricutirimicuaro', AutosubmitError, 'ssh_x11_server', True, False,
+            id='Server with X11, connected with X11, invalid command parangaricutirimicuaro error'
+        ),
+        pytest.param(
+            'whoami', None, 'ssh_server', False, False,
+            id='Server without X11, whoami command works'
+        ),
+        pytest.param(
+            'whoami', None, 'ssh_x11_server', False, False,
+            id='Server with X11, connected without X11, whoami command works'
+        ),
+        pytest.param(
+            'parangaricutirimicuaro', AutosubmitError, 'ssh_x11_server', False, False,
+            id='Server with X11, connected without X11, invalid command parangaricutirimicuaro error'
+        ),
+        pytest.param(
+            'whoami', None, 'ssh_x11_mfa_server', True, True,
+            id='Server with X11 and MFA, connected with X11 and MFA, whoami command works'
+        ),
+        pytest.param(
+            'parangaricutirimicuaro', AutosubmitError, 'ssh_x11_mfa_server', True, True,
+            id='Server with X11 and MFA, connected with X11 and MFA, invalid command parangaricutirimicuaro error'
+        ),
+        pytest.param(
+            'whoami', None, 'ssh_x11_mfa_server', False, True,
+            id='Server with X11 and with MFA, connected without X11 and with MFA, whoami command works'
+        ),
+        pytest.param(
+            'parangaricutirimicuaro', AutosubmitError, 'ssh_x11_mfa_server', False, True,
+            id='Server with X11 and MFA, connected without X11 and with MFA, '
+               'invalid command parangaricutirimicuaro error'
+        )
+    ],
+    indirect=['ssh_fixture'],
 )
+@pytest.mark.x11
+@pytest.mark.mfa
+@pytest.mark.ssh
 @pytest.mark.docker
-def test_send_command(cmd: str, error: Optional[Exception], x11_enabled: bool, mfa_enabled: bool,
-                      request: pytest.FixtureRequest, mocker):
+def test_send_command(
+        cmd: str, error: Optional[Exception],
+        ssh_fixture: 'DockerContainer',
+        mfa_enabled: bool,
+        x11_enabled: bool,
+        mocker,
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment']
+):
     """This test opens an SSH connection (via sftp) and sends a command."""
-    if x11_enabled:
-        request.applymarker('x11')
-    if mfa_enabled:
-        request.applymarker('mfa')
-
-    exp_platform_server: ExperimentPlatformServer = request.getfixturevalue('exp_platform_server')
+    exp = get_experiment(request)
+    exp_ps_platform = _get_platform(exp)
 
     if mfa_enabled:
-        exp_platform_server.platform.two_factor_auth = mfa_enabled
-        exp_platform_server.platform.two_factor_method = 'token'
-        exp_platform_server.platform.pw = 'password'
+        # NOTE: The container is configured for
+        exp_ps_platform.two_factor_auth = mfa_enabled
+        exp_ps_platform.two_factor_method = 'token'
+        password = 'password'
+        exp_ps_platform.pw = password  # our platform does not have a password
+        mocker.patch('autosubmit.platforms.paramiko_platform.getpass.getpass', return_value=password)
         # 55192054 comes from the Docker setup for 2FA, see docker/ssh/linuxserverio-ssh-with-2fa-x11/README.md
         mocker.patch('autosubmit.platforms.paramiko_platform.input', return_value='55192054')
 
-    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
+    try:
+        exp_ps_platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
 
-    if error:
-        assert exp_platform_server.platform.get_ssh_output_err() == ''
-        with pytest.raises(error):  # type: ignore
-            exp_platform_server.platform.send_command(cmd, ignore_log=False, x11=x11_enabled)
+        if error:
+            assert exp_ps_platform.get_ssh_output_err() == ''
+            with pytest.raises(error):  # type: ignore
+                exp_ps_platform.send_command(cmd, ignore_log=False, x11=x11_enabled)
 
-        stderr = exp_platform_server.platform.get_ssh_output_err()
-        assert 'command not found' in stderr
-    else:
-        assert exp_platform_server.platform.get_ssh_output() == ''
-        assert exp_platform_server.platform.send_command(cmd, ignore_log=False, x11=x11_enabled)
+            stderr = exp_ps_platform.get_ssh_output_err()
+            assert 'command not found' in stderr
+        else:
+            assert exp_ps_platform.get_ssh_output() == ''
+            assert exp_ps_platform.send_command(cmd, ignore_log=False, x11=x11_enabled)
 
-        stdout = exp_platform_server.platform.get_ssh_output()
-        user = getuser()
-        assert user in stdout
+            stdout = exp_ps_platform.get_ssh_output()
+            user = getuser()
+            assert user in stdout
+    finally:
+        exp_ps_platform.close_connection()
 
 
 @pytest.mark.parametrize(
@@ -288,89 +338,145 @@ def test_send_command(cmd: str, error: Optional[Exception], x11_enabled: bool, m
         ('whoami', 120)
     ]
 )
+@pytest.mark.ssh
 @pytest.mark.docker
 def test_send_command_timeout_error_exec_command(
-        cmd: str, timeout: Optional[int], exp_platform_server: 'AutosubmitExperiment', mocker):
+        cmd: str,
+        timeout: Optional[int],
+        mocker,
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server: 'DockerContainer'
+):
     """Test that the correct timeout is used, and that ``exec_command`` raises ``AutosubmitError``."""
-    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
+    exp = get_experiment(request)
+    exp_ps_platform = _get_platform(exp)
 
-    # Capture platform log.
-    mocked_log = mocker.patch('autosubmit.platforms.paramiko_platform.Log')
-    # Simulate an error occurred, and retrying did not fix it.
-    mocker.patch.object(exp_platform_server.platform, 'exec_command', return_value=(False, False, False))
+    try:
+        exp_ps_platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
 
-    with pytest.raises(AutosubmitError) as cm:
-        exp_platform_server.platform.send_command(command=cmd, ignore_log=False, x11=False)
+        # Capture platform log.
+        mocked_log = mocker.patch('autosubmit.platforms.paramiko_platform.Log')
+        # Simulate an error occurred, and retrying did not fix it.
+        mocker.patch.object(exp_ps_platform, 'exec_command', return_value=(False, False, False))
 
-    assert mocked_log.debug.called
-    assert f'send_command timeout used: {str(timeout)}' in mocked_log.debug.call_args[0][0]
+        with pytest.raises(AutosubmitError) as cm:
+            exp_ps_platform.send_command(command=cmd, ignore_log=False, x11=False)
 
-    assert 'Failed to send' in str(cm.value.message)
-    assert 6005 == cm.value.code
+        assert mocked_log.debug.called
+        assert f'send_command timeout used: {str(timeout)}' in mocked_log.debug.call_args[0][0]
+
+        assert 'Failed to send' in str(cm.value.message)
+        assert 6005 == cm.value.code
+    finally:
+        exp_ps_platform.close_connection()
 
 
+@pytest.mark.ssh
 @pytest.mark.docker
-def test_exec_command(exp_platform_server: 'ExperimentPlatformServer'):
+def test_exec_command(
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server: 'DockerContainer'
+):
     """This test opens an SSH connection (via sftp) and executes a command."""
-    user = getuser() or "unknown"
-    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
+    exp = get_experiment(request)
+    exp_ps_platform = _get_platform(exp)
 
-    stdin, stdout, stderr = exp_platform_server.platform.exec_command('whoami')
-    assert stdin is not False
-    assert stderr is not False
-    # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
-    assert isinstance(stdout, ChannelFile)
-    assert user == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
+    try:
+        exp_ps_platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
+
+        stdin, stdout, stderr = exp_ps_platform.exec_command('whoami')
+        assert stdin is not False
+        assert stderr is not False
+        # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
+        assert isinstance(stdout, ChannelFile)
+        assert getuser() == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
+    finally:
+        exp_ps_platform.close_connection()
 
 
 @pytest.mark.parametrize(
-    'command,x11,expected',
+    'ssh_fixture,command,x11,expected',
     [
-        ('whoami', False, getuser() or "unknown"),
-        ('parangaricutirimicuaro', False, ''),
-        ('whoami', True, getuser() or "unknown"),
-        ('parangaricutirimicuaro', True, ''),
+        pytest.param(
+            'ssh_server', 'whoami', False, getuser(), id='valid command no X11'
+        ),
+        pytest.param(
+            'ssh_server', 'parangaricutirimicuaro', False, '', id='invalid command no X11'
+        ),
+        pytest.param(
+            'ssh_x11_server', 'whoami', True, getuser(), id='valid command X11'
+        ),
+        pytest.param(
+            'ssh_x11_server', 'parangaricutirimicuaro', True, '', id='invalid command X11'
+        )
     ],
-    ids=[
-        "valid command no X11",
-        "invalid command no X11",
-        "valid command X11",
-        "invalid command X11"
-    ]
+    indirect=['ssh_fixture']
 )
+@pytest.mark.x11
+@pytest.mark.ssh
 @pytest.mark.docker
-def test_exec_command_invalid_command(command: str, expected: str, x11: bool, request: 'pytest.FixtureRequest'):
-    """This test opens an SSH connection (via sftp) and executes an invalid command."""
-    if x11:
-        request.applymarker('x11')
-    exp_platform_server: 'ExperimentPlatformServer' = request.getfixturevalue('exp_platform_server')
+def test_exec_command_invalid_command(
+        ssh_fixture: 'DockerContainer',
+        command: str,
+        x11: bool,
+        expected: str,
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+):
+    """This test opens an SSH connection (via sftp) and executes an invalid command.
 
-    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
+    Some tests have X11 enabled, and others do not.
+    """
+    exp = get_experiment(request)
+    exp_ps_platform = _get_platform(exp)
 
-    stdin, stdout, stderr = exp_platform_server.platform.exec_command(command, x11=x11)
-    assert isinstance(stdout, ChannelFile)
-    assert stdin is not False
-    assert stderr is not False
-    # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
-    assert expected == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
+    try:
+        exp_ps_platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
+
+        stdin, stdout, stderr = exp_ps_platform.exec_command(command, x11=x11)
+
+        # It must be able to connect, so no False's here
+        assert isinstance(stdout, ChannelFile)
+        assert stdin is not False
+        assert stderr is not False
+
+        if expected:
+            # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
+            assert expected == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
+        else:
+            err_output = str(''.join([x.decode('UTF-8').strip() for x in stderr.readlines()]))
+            # cmd not found error
+            assert command in err_output
+    finally:
+        exp_ps_platform.close_connection()
 
 
+@pytest.mark.ssh
 @pytest.mark.docker
-def test_exec_command_after_a_reset(exp_platform_server: 'ExperimentPlatformServer'):
+def test_exec_command_after_a_reset(
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server: 'DockerContainer'
+):
     """Test that after a connection reset we are still able to execute commands."""
-    user = getuser() or "unknown"
-    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
+    exp = get_experiment(request)
+    exp_ps_platform = _get_platform(exp)
 
-    exp_platform_server.platform.reset()
+    try:
+        exp_ps_platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
+        exp_ps_platform.reset()
+        exp_ps_platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
 
-    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
-
-    stdin, stdout, stderr = exp_platform_server.platform.exec_command('whoami')
-    assert isinstance(stdout, ChannelFile)
-    assert stdin is not False
-    assert stderr is not False
-    # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
-    assert user == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
+        stdin, stdout, stderr = exp_ps_platform.exec_command('whoami')
+        assert isinstance(stdout, ChannelFile)
+        assert stdin is not False
+        assert stderr is not False
+        # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
+        assert getuser() == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
+    finally:
+        exp_ps_platform.close_connection()
 
 
 @pytest.mark.parametrize(
@@ -382,40 +488,51 @@ def test_exec_command_after_a_reset(exp_platform_server: 'ExperimentPlatformServ
         [False, 2, "whoami"]
     ]
 )
+@pytest.mark.x11
+@pytest.mark.ssh
 @pytest.mark.docker
-def test_exec_command_ssh_session_not_active(x11: bool, retries: int, command: str, request: 'FixtureRequest'):
+def test_exec_command_ssh_session_not_active(
+        x11: bool,
+        retries: int,
+        command: str,
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_x11_server
+):
     """This test that we retry even if the SSH session gets closed."""
-    if x11:
-        request.applymarker('x11')
+    exp = get_experiment(request)
+    exp_ps_platform = _get_platform(exp)
 
-    exp_platform_server: 'ExperimentPlatformServer' = request.getfixturevalue('exp_platform_server')
-    user = getuser() or "unknown"
-    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
+    user = getuser()
 
-    # NOTE: We could simulate it the following way:
-    #           ex = paramiko.SSHException('SSH session not active')
-    #           mocker.patch.object(ps_platform.transport, 'open_session', side_effect=ex)
-    #       But while that's OK, we can also avoid mocking by simply
-    #       closing the connection.
+    try:
+        exp_ps_platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
 
-    assert exp_platform_server.platform.transport
-    exp_platform_server.platform.transport.close()
+        # NOTE: We could simulate it the following way:
+        #           ex = paramiko.SSHException('SSH session not active')
+        #           mocker.patch.object(ps_platform.transport, 'open_session', side_effect=ex)
+        #       But while that's OK, we can also avoid mocking by simply
+        #       closing the connection.
 
-    stdin, stdout, stderr = exp_platform_server.platform.exec_command(
-        command,
-        x11=x11,
-        retries=retries
-    )
+        assert exp_ps_platform.transport
+        exp_ps_platform.transport.close()
 
-    # This will be true iff the ``ps_platform.restore_connection(None)`` ran without errors.
-    assert isinstance(stdout, ChannelFile)
-    assert stdin is not False
-    assert stderr is not False
-    # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
-    assert user == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
+        stdin, stdout, stderr = exp_ps_platform.exec_command(
+            command,
+            x11=x11,
+            retries=retries
+        )
+
+        # This will be true iff the ``ps_platform.restore_connection(None)`` ran without errors.
+        assert isinstance(stdout, ChannelFile)
+        assert stdin is not False
+        assert stderr is not False
+        # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
+        assert user == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
+    finally:
+        exp_ps_platform.close_connection()
 
 
-@pytest.mark.docker
 @pytest.mark.parametrize(
     'error',
     [
@@ -429,121 +546,169 @@ def test_exec_command_ssh_session_not_active(x11: bool, retries: int, command: s
         'socket error'
     ]
 )
-def test_exec_command_socket_error(error: Exception, exp_platform_server: 'ExperimentPlatformServer', mocker):
+@pytest.mark.ssh
+@pytest.mark.docker
+def test_exec_command_socket_error(
+        error: Exception,
+        mocker,
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server: 'DockerContainer'
+):
     """Test that the command is retried and succeeds even when a socket error occurs."""
-    user = getuser() or "unknown"
-    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
+    exp = get_experiment(request)
+    ps_platform = _get_platform(exp)
 
-    exp_platform_server.platform.transport.close()
+    user = getuser()
+    try:
+        ps_platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
 
-    mocker.patch.object(exp_platform_server.platform.transport, 'open_session', side_effect=error)
+        ps_platform.transport.close()
 
-    stdin, stdout, stderr = exp_platform_server.platform.exec_command('whoami')
-    assert stdin is not False
-    assert stderr is not False
-    # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
-    assert user == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
+        mocker.patch.object(ps_platform.transport, 'open_session', side_effect=error)
+
+        stdin, stdout, stderr = ps_platform.exec_command('whoami')
+        assert stdin is not False
+        assert stderr is not False
+        # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
+        assert user == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
+    finally:
+        ps_platform.close_connection()
 
 
+@pytest.mark.ssh
 @pytest.mark.docker
-def test_exec_command_ssh_session_not_active_cannot_restore(exp_platform_server: 'ExperimentPlatformServer', mocker):
+def test_exec_command_ssh_session_not_active_cannot_restore(
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server,
+        mocker
+):
     """Test that when an error occurs, and it cannot restore, then we return falsey values."""
-    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
+    exp = get_experiment(request)
+    exp_ps_platform = _get_platform(exp)
 
-    exp_platform_server.platform.close_connection()
+    try:
+        exp_ps_platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
 
-    # This dummy mock prevents the platform from being able to restore its connection.
-    mocker.patch.object(exp_platform_server.platform, 'restore_connection')
+        exp_ps_platform.close_connection()
 
-    stdin, stdout, stderr = exp_platform_server.platform.exec_command('whoami')
-    assert stdin is False
-    assert stdout is False
-    assert stderr is False
+        # This dummy mock prevents the platform from being able to restore its connection.
+        mocker.patch.object(exp_ps_platform, 'restore_connection')
+
+        stdin, stdout, stderr = exp_ps_platform.exec_command('whoami')
+        assert stdin is False
+        assert stdout is False
+        assert stderr is False
+    finally:
+        exp_ps_platform.close_connection()
 
 
+@pytest.mark.ssh
 @pytest.mark.docker
-def test_fs_operations(exp_platform_server: 'ExperimentPlatformServer', request):
+def test_fs_operations(
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server,
+        tmp_path: 'LocalPath'
+):
     """Test that we can access files, send new files, move, delete."""
+    exp = get_experiment(request)
+    exp_ps_platform = _get_platform(exp)
+
     test_name = request.node.name
     user = getuser()
 
-    local_file = Path(exp_platform_server.platform.tmp_path, 'test.txt')
+    local_file = Path(exp_ps_platform.tmp_path, 'test.txt')
     text = 'Lorem ipsum'
 
     with open(local_file, 'w+') as f:
         f.write(text)
 
-    remote_file = Path(_PLATFORM_REMOTE_DIR, test_name, _PLATFORM_PROJECT, user, exp_platform_server.experiment.expid,
-                       f'LOG_{exp_platform_server.experiment.expid}', local_file.name)
+    remote_file = Path(_PLATFORM_REMOTE_DIR, test_name, _PLATFORM_PROJECT, user, exp.expid,
+                       f'LOG_{exp.expid}', local_file.name)
 
-    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
+    try:
+        exp_ps_platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
 
-    file_not_found = Path('/app', test_name, 'this-file-does-not-exist')
+        file_not_found = Path('/app', test_name, 'this-file-does-not-exist')
 
-    assert exp_platform_server.platform.send_file(local_file.name)
+        assert exp_ps_platform.send_file(local_file.name)
 
-    contents = exp_platform_server.platform.read_file(str(remote_file))
-    assert contents
-    assert contents.decode('UTF-8').strip() == text
-    assert exp_platform_server.platform.read_file(str(file_not_found)) is None
+        contents = exp_ps_platform.read_file(str(remote_file))
+        assert contents
+        assert contents.decode('UTF-8').strip() == text
+        assert exp_ps_platform.read_file(str(file_not_found)) is None
 
-    file_size: Optional[int] = exp_platform_server.platform.get_file_size(str(remote_file))
-    assert file_size
-    assert file_size > 0
-    assert exp_platform_server.platform.get_file_size(str(file_not_found)) is None
+        file_size: Optional[int] = exp_ps_platform.get_file_size(str(remote_file))
+        assert file_size
+        assert file_size > 0
+        assert exp_ps_platform.get_file_size(str(file_not_found)) is None
 
-    assert exp_platform_server.platform.check_absolute_file_exists(str(remote_file))
-    assert not exp_platform_server.platform.check_absolute_file_exists(str(file_not_found))
+        assert exp_ps_platform.check_absolute_file_exists(str(remote_file))
+        assert not exp_ps_platform.check_absolute_file_exists(str(file_not_found))
 
-    assert exp_platform_server.platform.move_file(str(remote_file), str(file_not_found), must_exist=False)
+        assert exp_ps_platform.move_file(str(remote_file), str(file_not_found), must_exist=False)
 
-    # Here, the variable names are misleading, as we moved the existing file over the non-existing one.
-    assert not exp_platform_server.platform.delete_file(str(remote_file))
-    assert exp_platform_server.platform.delete_file(str(file_not_found))
+        # Here, the variable names are misleading, as we moved the existing file over the non-existing one.
+        assert not exp_ps_platform.delete_file(str(remote_file))
+        assert exp_ps_platform.delete_file(str(file_not_found))
+    finally:
+        exp_ps_platform.close_connection()
 
 
 @pytest.mark.parametrize(
-    'x11_enabled,user_or_false',
+    'ssh_fixture,x11,user_or_false',
     [
-        [True, getuser()],
-        [False, False]
+        pytest.param(
+            'ssh_x11_server',
+            True,
+            getuser(),
+            id='X11 enabled and everything works'
+        ),
+        pytest.param(
+            'ssh_x11_server',
+            False,
+            getuser(),
+            id='X11 disabled and everything still works'
+        )
     ],
-    ids=[
-        'X11 enabled and everything works',
-        'No X11, returns a False bool'
-    ]
+    indirect=['ssh_fixture']
 )
+@pytest.mark.x11
+@pytest.mark.ssh
 @pytest.mark.docker
-def test_exec_command_with_x11(x11_enabled: bool, user_or_false: Union[str, bool], request: pytest.FixtureRequest):
-    """Tests connecting and executing a command when X11 is enabled and when it is disabled (parameters).
+def test_exec_command_with_x11(
+        ssh_fixture: 'DockerContainer',
+        x11: bool,
+        user_or_false: Union[str, bool],
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment']
+):
+    """Tests connecting and executing a command when X11 is enabled and when it is disabled (parameters)."""
+    exp = get_experiment(request)
+    ps_platform = _get_platform(exp)
 
-    Note, that we dynamically add the ``pytest.marker.x11`` based on a parameters.
+    try:
+        ps_platform.connect(as_conf=exp.as_conf, reconnect=False, log_recovery_process=False)
+        assert ps_platform.local_x11_display
 
-    Also, after applying or not that marker, then we load ``exp_platform_server`` as that will load
-    the other fixture ``ssh_server`` that uses the ``x11`` marker to customize the SSH image used.
-    """
-    if x11_enabled:
-        request.applymarker('x11')
+        stdin, stdout, stderr = ps_platform.exec_command('whoami', x11=x11)
 
-    exp_platform_server: ExperimentPlatformServer = request.getfixturevalue('exp_platform_server')
-
-    exp = exp_platform_server.experiment
-    ps_platform = exp_platform_server.platform
-
-    ps_platform.connect(as_conf=exp.as_conf, reconnect=False, log_recovery_process=False)
-    assert ps_platform.local_x11_display
-
-    _, stdout, _ = ps_platform.exec_command('whoami', x11=True)
-
-    if type(user_or_false) is bool:
-        assert user_or_false == stdout
-    else:
-        assert isinstance(stdout, ChannelFile)
+        assert isinstance(stdout, ChannelFile), f"Invalid value for stdout: {stderr, stdout}"
         assert user_or_false == stdout.readline().decode('UTF-8').strip()
+    finally:
+        ps_platform.close_connection()
 
 
 @pytest.mark.x11
-def test_xclock(exp_platform_server: ExperimentPlatformServer):
+@pytest.mark.ssh
+@pytest.mark.docker
+def test_xclock(
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_x11_server
+):
     """Tests connecting and executing a command when X11 is enabled and when it is disabled (parameters).
 
     Note, that we dynamically add the ``pytest.marker.x11`` based on a parameters.
@@ -551,54 +716,82 @@ def test_xclock(exp_platform_server: ExperimentPlatformServer):
     Also, after applying or not that marker, then we load ``exp_platform_server`` as that will load
     the other fixture ``ssh_server`` that uses the ``x11`` marker to customize the SSH image used.
     """
-    exp = exp_platform_server.experiment
-    ps_platform = exp_platform_server.platform
+    exp = get_experiment(request)
+    exp_ps_platform = _get_platform(exp)
 
-    ps_platform.connect(as_conf=exp.as_conf, reconnect=False, log_recovery_process=False)
-    assert ps_platform.local_x11_display
+    try:
+        exp_ps_platform.connect(as_conf=exp.as_conf, reconnect=False, log_recovery_process=False)
+        assert exp_ps_platform.local_x11_display
 
-    _, stdout, stderr = ps_platform.exec_command('timeout 1 xclock', x11=True)
+        _, stdout, stderr = exp_ps_platform.exec_command('timeout 1 xclock', x11=True)
 
-    assert isinstance(stdout, ChannelFile)
-    assert isinstance(stderr, ChannelFile)
+        assert isinstance(stdout, ChannelFile), stdout
+        assert isinstance(stderr, ChannelFile), stderr
 
-    assert ''.join(stdout.readlines()) == ''
-    assert ''.join(stderr.readlines()) == ''
+        out_content = ''.join(stdout.readlines())
+        err_content = ''.join(stderr.readlines())
+
+        assert out_content == '', out_content
+        assert err_content == '', err_content
+    finally:
+        exp_ps_platform.close_connection()
 
 
+@pytest.mark.ssh
 @pytest.mark.docker
-def test_test_connection_already_connected(exp_platform_server: ExperimentPlatformServer):
+def test_test_connection_already_connected(
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server
+):
     """Test that calling ``test_connection`` does not interfere with an existing connection."""
-    as_conf = exp_platform_server.experiment.as_conf
-    platform = exp_platform_server.platform
+    exp = get_experiment(request)
+    platform = _get_platform(exp)
+    as_conf = exp.as_conf
 
-    platform.connect(as_conf, reconnect=False, log_recovery_process=False)
+    try:
+        platform.connect(as_conf, reconnect=False, log_recovery_process=False)
 
-    assert platform.connected
-    assert platform.test_connection(as_conf) is None
-    assert platform.connected
+        assert platform.connected
+        assert platform.test_connection(as_conf) is None
+        assert platform.connected
+    finally:
+        platform.close_connection()
 
 
+@pytest.mark.ssh
 @pytest.mark.docker
-def test_test_connection_new_connection(exp_platform_server: ExperimentPlatformServer):
+def test_test_connection_new_connection(
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server
+):
     """Test that calling ``test_connection`` creates a new connection."""
-    as_conf = exp_platform_server.experiment.as_conf
-    platform = exp_platform_server.platform
+    exp = get_experiment(request)
+    platform = _get_platform(exp)
+    as_conf = exp.as_conf
 
     assert not platform.connected
     assert platform.test_connection(as_conf) == 'OK'
     assert platform.connected
 
 
+@pytest.mark.ssh
 @pytest.mark.docker
-def test_test_connection_exceptions(mocker, exp_platform_server: ExperimentPlatformServer):
+def test_test_connection_exceptions(
+        mocker,
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server
+):
     """Test that ``reset`` raising an error, this error is handled correctly.
 
     Note that the behavior is a bit confusing, as depending on the exception
     raised we will re-raise it or raise another type. Thus, the ``raises(exception)``.
     """
-    as_conf = exp_platform_server.experiment.as_conf
-    platform = exp_platform_server.platform
+    exp = get_experiment(request)
+    platform = _get_platform(exp)
+    as_conf = exp.as_conf
 
     # NOTE: pytest.parametrize normally would be better here, but it takes a lot
     #       longer to create a new container, so in this case we are re-using it
@@ -626,11 +819,18 @@ def test_test_connection_exceptions(mocker, exp_platform_server: ExperimentPlatf
             assert isinstance(cm.value, AutosubmitCritical)
 
 
+@pytest.mark.ssh
 @pytest.mark.docker
-def test_test_restore_fails_random(mocker, exp_platform_server: ExperimentPlatformServer):
+def test_test_restore_fails_random(
+        mocker,
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server
+):
     """Test when ``restore`` raises a random exception we return a timeout message to the user (?)."""
-    as_conf = exp_platform_server.experiment.as_conf
-    platform = exp_platform_server.platform
+    exp = get_experiment(request)
+    platform = _get_platform(exp)
+    as_conf = exp.as_conf
 
     error_message = 'I am random'
 
@@ -648,11 +848,18 @@ def test_test_restore_fails_random(mocker, exp_platform_server: ExperimentPlatfo
     assert message == 'Timeout connection'
 
 
+@pytest.mark.ssh
 @pytest.mark.docker
-def test_test_restore_fails_does_not_accept(mocker, exp_platform_server: ExperimentPlatformServer):
+def test_test_restore_fails_does_not_accept(
+        mocker,
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server
+):
     """Test when ``restore`` raises a random exception which message includes certain text it returns it."""
-    as_conf = exp_platform_server.experiment.as_conf
-    platform = exp_platform_server.platform
+    exp = get_experiment(request)
+    platform = _get_platform(exp)
+    as_conf = exp.as_conf
 
     # TODO: This looks a bit fragile/buggy?
     error_message = 'The plot accept remote connections! Fear not!'
@@ -670,8 +877,10 @@ def test_test_restore_fails_does_not_accept(mocker, exp_platform_server: Experim
     ['1', '2'],
     ids=['serial', 'parallel']
 )
+@pytest.mark.ssh
 @pytest.mark.docker
-def test_get_header_serial_parallel(processors: str, create_job_parameters_platform):
+def test_get_header_serial_parallel(
+        processors: str, create_job_parameters_platform: CreateJobParametersPlatformFixture):
     """Test that when a job contains heterogeneous dictionary it calculates the het/ header."""
     # TODO: There is something wrong here, as only Slurm header contains this function,
     #       but this is not really enforced (no common interface, the code looks a bit
@@ -689,7 +898,7 @@ def test_get_header_serial_parallel(processors: str, create_job_parameters_platf
     assert header
 
 
-def test_get_header_job_het(create_job_parameters_platform):
+def test_get_header_job_het(create_job_parameters_platform: CreateJobParametersPlatformFixture):
     """Test that when a job contains heterogeneous dictionary it calculates the het/ header."""
     # TODO: There is something wrong here, as only Slurm header contains this function,
     #       but this is not really enforced (no common interface, the code looks a bit
@@ -721,7 +930,6 @@ def test_get_header_job_het(create_job_parameters_platform):
     assert header.count('hetjob') > 0
 
 
-@pytest.mark.docker
 @pytest.mark.parametrize(
     'provided_jobs,real_completed_jobs,expected_result',
     [
@@ -736,26 +944,36 @@ def test_get_header_job_het(create_job_parameters_platform):
         'No completed jobs when no provided list'
     ]
 )
-def test_get_completed_job_names(provided_jobs: list, real_completed_jobs: list,
-                                 expected_result: list, exp_platform_server: ExperimentPlatformServer):
-    as_conf = exp_platform_server.experiment.as_conf
-    platform = exp_platform_server.platform
-    platform.connect(as_conf, reconnect=False, log_recovery_process=False)
-    platform.remote_log_dir = f"/tmp/{platform.expid}/autosubmit_test_logs/"
-    platform.send_command(f"mkdir -p {platform.remote_log_dir}", ignore_log=True)
-    for job_name in real_completed_jobs:
-        completed_file = Path(platform.remote_log_dir) / f"{job_name}_COMPLETED"
-        platform.send_command(f"touch {completed_file}", ignore_log=True)
-
-    completed_jobs = platform.get_completed_job_names(
-        job_names=provided_jobs
-    )
-
-    for job in expected_result:
-        assert job in completed_jobs
-
-
+@pytest.mark.ssh
 @pytest.mark.docker
+def test_get_completed_job_names(
+        provided_jobs: list[str],
+        real_completed_jobs: list[str],
+        expected_result: list[str],
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server
+):
+    exp = get_experiment(request)
+    platform = _get_platform(exp)
+    try:
+        platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
+        platform.remote_log_dir = f"/tmp/{platform.expid}/autosubmit_test_logs/"
+        platform.send_command(f"mkdir -p {platform.remote_log_dir}", ignore_log=True)
+        for job_name in real_completed_jobs:
+            completed_file = Path(platform.remote_log_dir) / f"{job_name}_COMPLETED"
+            platform.send_command(f"touch {completed_file}", ignore_log=True)
+
+        completed_jobs = platform.get_completed_job_names(
+            job_names=provided_jobs
+        )
+
+        for job in expected_result:
+            assert job in completed_jobs
+    finally:
+        platform.close_connection()
+
+
 @pytest.mark.parametrize(
     'jobs_to_delete,real_completed_jobs,expected_result',
     [
@@ -770,62 +988,69 @@ def test_get_completed_job_names(provided_jobs: list, real_completed_jobs: list,
         'Delete no completed jobs when no completed jobs'
     ]
 )
-def test_deleted_failed_and_completed_names(jobs_to_delete: list, real_completed_jobs: list,
-                                            expected_result: list, exp_platform_server: ExperimentPlatformServer):
-    as_conf = exp_platform_server.experiment.as_conf
-    platform = exp_platform_server.platform
-    platform.connect(as_conf, reconnect=False, log_recovery_process=False)
-    platform.remote_log_dir = f"/tmp/{platform.expid}/autosubmit_test_logs/"
-    platform.send_command(f"mkdir -p {platform.remote_log_dir}", ignore_log=True)
-    for job_name in real_completed_jobs:
-        completed_file = Path(platform.remote_log_dir) / f"{job_name}_COMPLETED"
-        platform.send_command(f"touch {completed_file}", ignore_log=True)
-
-    platform.delete_failed_and_completed_names(
-        job_names=jobs_to_delete
-    )
-
-    # assert
-    platform.send_command(
-        f"ls -1 {platform.remote_log_dir}/*_COMPLETED | xargs -n1 basename", ignore_log=True
-    )
-    for job in expected_result:
-        assert job in platform.get_ssh_output()
-
-
-def test__load_ssh_config_missing_ssh_config(
-        exp_platform_server: 'ExperimentPlatformServer', tmp_path: 'LocalPath', mocker):
-    """Test that the user is warned when the expected SSH file cannot be located."""
-    mocked_log = mocker.patch('autosubmit.platforms.paramiko_platform.Log')
-
-    exp_platform_server.platform.config['AS_ENV_SSH_CONFIG_PATH'] = str(tmp_path / 'you-cannot-find-me')
-
-    as_conf = mocker.MagicMock()
-    as_conf.is_current_real_user_owner = False
-
-    # TODO: We must be able to test that we are not loading the right SSH, without a mock here.
-    mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', side_effect=ValueError)
-
-    with pytest.raises(AutosubmitError):
-        exp_platform_server.platform.connect(as_conf, reconnect=False, log_recovery_process=False)
-
-    assert mocked_log.warning.called
-
-
+@pytest.mark.ssh
 @pytest.mark.docker
-def test_test_connection(exp_platform_server: 'ExperimentPlatformServer', ssh_server: 'DockerContainer'):
+def test_deleted_failed_and_completed_names(
+        jobs_to_delete: list[str],
+        real_completed_jobs: list[str],
+        expected_result: list[str],
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server
+):
+    exp = get_experiment(request)
+    platform = _get_platform(exp)
+    try:
+        platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
+        platform.remote_log_dir = f"/tmp/{platform.expid}/autosubmit_test_logs/"
+        platform.send_command(f"mkdir -p {platform.remote_log_dir}", ignore_log=True)
+        for job_name in real_completed_jobs:
+            completed_file = Path(platform.remote_log_dir) / f"{job_name}_COMPLETED"
+            platform.send_command(f"touch {completed_file}", ignore_log=True)
+
+        platform.delete_failed_and_completed_names(
+            job_names=jobs_to_delete
+        )
+
+        # assert
+        platform.send_command(
+            f"ls -1 {platform.remote_log_dir}/*_COMPLETED | xargs -n1 basename", ignore_log=True
+        )
+        for job in expected_result:
+            assert job in platform.get_ssh_output()
+    finally:
+        platform.close_connection()
+
+
+@pytest.mark.ssh
+@pytest.mark.docker
+def test_test_connection(
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server
+):
     """Test that we can access files, send new files, move, delete."""
-    exp_platform_server.platform.connect(None, reconnect=False, log_recovery_process=False)
+    exp = get_experiment(request)
+    exp_ps_platform = _get_platform(exp)
+    try:
+        exp_ps_platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
 
-    # TODO: This function is odd, if it reconnects, it will return ``"OK"``, but when it's all good
-    #       then it will return ``None``.
-    assert None is exp_platform_server.platform.test_connection(None)
+        # TODO: This function is odd, if it reconnects, it will return ``"OK"``, but when it's all good
+        #       then it will return ``None``.
+        assert None is exp_ps_platform.test_connection(None)
+    finally:
+        exp_ps_platform.close_connection()
 
 
+@pytest.mark.ssh
 @pytest.mark.docker
-def test_failed_connection_raises_as_error(autosubmit_exp, tmp_path):
+def test_failed_connection_raises_as_error(
+        autosubmit_exp,
+        tmp_path,
+        ssh_server: 'DockerContainer'
+):
     """Test that failing to restore a connection, even with retries, results in ``AutosubmitError``."""
-    exp = autosubmit_exp(_EXPID, {})
+    exp = autosubmit_exp()
     platform_config = {
         "LOCAL_ROOT_DIR": exp.as_conf.basic_config.LOCAL_ROOT_DIR,
         "LOCAL_TMP_DIR": str(tmp_path),

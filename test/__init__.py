@@ -20,3 +20,31 @@
 These folders contain all the tests run to ensure the quality of the code in the Autosubmit tool,
 here you can find Unit, Integration, and Regression Tests.
 """
+
+import os
+
+import pytest
+
+
+# This might help when you have no clue about what's happening.
+# from autosubmit.log.log import Log
+# Log.set_console_level('DEBUG')
+
+
+@pytest.fixture(scope='session', autouse=True)
+def disable_system_clear(session_mocker):
+    """Fixture that disables ``os.system('clear')``.
+
+    Autosubmit clears the terminal in certain command calls, which makes
+    a lot harder to investigate when you chained shell commands with ``&&``
+    or you have multiple Pytest tests in a session, as you will have only
+    the last log in the terminal.
+    """
+    real_os_system = os.system
+
+    def ignore_clear(cmd):
+        if cmd == "clear":
+            return 0
+        return real_os_system(cmd)
+
+    session_mocker.patch("os.system", side_effect=ignore_clear)

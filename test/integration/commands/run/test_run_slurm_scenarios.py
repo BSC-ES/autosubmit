@@ -1,30 +1,32 @@
 from getpass import getuser
 from pathlib import Path
 from textwrap import dedent
+from time import sleep
 from typing import TYPE_CHECKING
 
 import pytest
-from time import sleep
-
 from ruamel.yaml import YAML
+
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical
-from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, _assert_db_fields, _assert_files_recovered, run_in_thread
+from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, \
+    _assert_db_fields, _assert_files_recovered, run_in_thread
 from test.integration.conftest import AutosubmitExperimentFixture
 
 if TYPE_CHECKING:
-    from testcontainers.core.container import DockerContainer
+    from docker.models.containers import Container
 
 
 # -- Tests
 
 @pytest.mark.docker
-@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
+@pytest.mark.ssh
+@pytest.mark.timeout(300)
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
     (dedent("""\
-    
+
     EXPERIMENT:
         NUMCHUNKS: '3'
     JOBS:
@@ -65,7 +67,7 @@ if TYPE_CHECKING:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
             policy: flexible
-    
+
         wrapper2:
             JOBS_IN_WRAPPER: job2
             TYPE: vertical
@@ -147,12 +149,14 @@ def test_run_uninterrupted(
         expected_db_entries,
         final_status,
         wrapper_type,
-        slurm_server: 'DockerContainer',
+        slurm_server: 'Container',
         prepare_scratch,
         general_data,
+        mocker
 ):
     yaml = YAML(typ='rt')
     as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp.expid)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -191,8 +195,9 @@ def test_run_uninterrupted(
 
 
 @pytest.mark.docker
-@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
+@pytest.mark.ssh
+@pytest.mark.timeout(300)
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
     (dedent("""\
@@ -311,19 +316,26 @@ PLATFORMS:
         PROCESSORS_PER_NODE: '4'
 """), 2, "COMPLETED", "horizontal")
 
-], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper", "Success with horizontal wrapper"])
+], ids=[
+    "Success",
+    "Success with wrapper",
+    "Failure",
+    "Failure with wrapper",
+    "Success with horizontal wrapper"
+])
 def test_run_interrupted(
         autosubmit_exp,
         jobs_data: str,
         expected_db_entries,
         final_status,
         wrapper_type,
-        slurm_server: 'DockerContainer',
+        slurm_server: 'Container',
         prepare_scratch,
         general_data,
 ):
     yaml = YAML(typ='rt')
     as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp.expid)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
@@ -358,9 +370,10 @@ def test_run_interrupted(
     _assert_exit_code(final_status, exit_code)
 
 
+@pytest.mark.ssh
+@pytest.mark.slurm
 @pytest.mark.docker
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
-
     # Failure
     (dedent("""\
     CONFIG:
@@ -383,7 +396,9 @@ def test_run_failed_set_to_ready_on_new_run(
         jobs_data,
         expected_db_entries,
         final_status,
-        wrapper_type):
+        wrapper_type,
+        slurm_server
+):
     yaml = YAML(typ='rt')
     jobs_data_yaml = yaml.load(jobs_data)
     as_exp = autosubmit_exp(experiment_data=general_data | jobs_data_yaml, include_jobs=False, create=True)
@@ -393,21 +408,29 @@ def test_run_failed_set_to_ready_on_new_run(
     exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
     _assert_exit_code(final_status, exit_code)
 
-    jobs_data_yaml['JOBS']['job']['SCRIPT'] = """\
-                echo "Hello World with id=READY"
-    """
-    as_exp = autosubmit_exp(as_exp.expid, experiment_data=general_data | jobs_data_yaml, include_jobs=False, create=True)
-    as_conf.set_last_as_command('run')
+    # The experiment must have failed above with a final status.
+    # But the job script has d_echo, so here we replace it, and
+    # run it again. It should succeed now.
+    yaml_with_jobs = Path(as_exp.exp_path, 'conf/additional_data.yml')
+    with open(yaml_with_jobs, 'r') as f:
+        data = yaml.load(f)
+    data["JOBS"]["job"]["SCRIPT"] = 'echo "Hello World with id=READY"'
+    with yaml_with_jobs.open("w") as f:
+        yaml.dump(data, f)
 
+    as_conf.set_last_as_command('create')
+    assert 0 == as_exp.autosubmit.create(as_exp.expid, noplot=True, hide=False, force=True, check_wrappers=False)
+
+    as_conf.set_last_as_command('run')
     exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
 
     _assert_exit_code("SUCCESS", exit_code)
 
 
 @pytest.mark.docker
-@pytest.mark.xdist_group("slurm")
 @pytest.mark.timeout(300)
 @pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize("jobs_data,final_status", [
     (dedent("""\
 EXPERIMENT:
@@ -474,7 +497,7 @@ def test_run_with_additional_files(
         final_status: str,
         include_wrappers: bool,
         autosubmit_exp,
-        slurm_server: 'DockerContainer',
+        slurm_server: 'Container',
         tmp_path,
 ):
     yaml = YAML(typ='rt')
@@ -512,67 +535,68 @@ def test_run_with_additional_files(
             for chunk in range(1, 1 + experiment_data_yaml.get("EXPERIMENT", {}).get("NUMCHUNKS", 1)):
                 remote_name = additional_filename.replace(".sh", f'_20000101_fc0_{chunk}_JOB')
                 command = f"cat {project_remote_path}/{remote_name}"
-                exit_code, output = slurm_server.exec(["bash", "-c", command])
+                exit_code, output = slurm_server.exec_run(["bash", "-c", command])
                 assert exit_code == 0, f"File {additional_filename} not found in remote project path."
 
 
 @pytest.mark.docker
-@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
+@pytest.mark.ssh
+@pytest.mark.timeout(300)
 @pytest.mark.parametrize("wrappers, run_type", [
     (
-        {
-            "WRAPPERS": {
-                "MAX_WRAPPED": 2,
-                "WRAPPER": {"JOBS_IN_WRAPPER": "job_some", "TYPE": "horizontal"},
-                "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other_some", "TYPE": "horizontal"},
-            }
-        },
-        "run",
+            {
+                "WRAPPERS": {
+                    "MAX_WRAPPED": 2,
+                    "WRAPPER": {"JOBS_IN_WRAPPER": "job_some", "TYPE": "horizontal"},
+                    "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other_some", "TYPE": "horizontal"},
+                }
+            },
+            "run",
     ),
     (
-        {
-            "WRAPPERS": {
-                "WRAPPER": {
-                    "JOBS_IN_WRAPPER": "job_some",
-                    "TYPE": "horizontal",
-                    "MAX_WRAPPED": 2,
-                },
-                "SECOND_WRAPPER": {
-                    "JOBS_IN_WRAPPER": "other_some",
-                    "TYPE": "horizontal",
-                    "MAX_WRAPPED": 2,
-                },
-            }
-        },
-        "run",
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "job_some",
+                        "TYPE": "horizontal",
+                        "MAX_WRAPPED": 2,
+                    },
+                    "SECOND_WRAPPER": {
+                        "JOBS_IN_WRAPPER": "other_some",
+                        "TYPE": "horizontal",
+                        "MAX_WRAPPED": 2,
+                    },
+                }
+            },
+            "run",
     ),
     (
-        {
-            "WRAPPERS": {
-                "MAX_WRAPPED": 2,
-                "WRAPPER": {"JOBS_IN_WRAPPER": "job_some", "TYPE": "horizontal"},
-                "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other_some", "TYPE": "horizontal"},
-            }
-        },
-        "inspect",
+            {
+                "WRAPPERS": {
+                    "MAX_WRAPPED": 2,
+                    "WRAPPER": {"JOBS_IN_WRAPPER": "job_some", "TYPE": "horizontal"},
+                    "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other_some", "TYPE": "horizontal"},
+                }
+            },
+            "inspect",
     ),
     (
-        {
-            "WRAPPERS": {
-                "WRAPPER": {
-                    "JOBS_IN_WRAPPER": "job_some",
-                    "TYPE": "horizontal",
-                    "MAX_WRAPPED": 2,
-                },
-                "SECOND_WRAPPER": {
-                    "JOBS_IN_WRAPPER": "other_some",
-                    "TYPE": "horizontal",
-                    "MAX_WRAPPED": 2,
-                },
-            }
-        },
-        "inspect",
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "job_some",
+                        "TYPE": "horizontal",
+                        "MAX_WRAPPED": 2,
+                    },
+                    "SECOND_WRAPPER": {
+                        "JOBS_IN_WRAPPER": "other_some",
+                        "TYPE": "horizontal",
+                        "MAX_WRAPPED": 2,
+                    },
+                }
+            },
+            "inspect",
     ),
     (
             {
@@ -709,7 +733,7 @@ def test_wrapper_config(
         wrappers: str,
         run_type: str,
         autosubmit_exp,
-        slurm_server: 'DockerContainer',
+        slurm_server: 'Container',
         tmp_path,
 ):
     experiment_data = {
@@ -748,7 +772,8 @@ def test_wrapper_config(
 
     if run_type.startswith("invalid"):
         with pytest.raises(AutosubmitCritical):
-            autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True, check_wrappers=True)
+            autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True,
+                           check_wrappers=True)
     else:
         as_exp = autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True)
 
@@ -770,7 +795,8 @@ def test_wrapper_config(
         templates_dir = Path(tmp_path) / as_exp.expid / "tmp"
         asthread_files = list(templates_dir.rglob("*ASThread*"))
         if run_type == "run" or run_type == "inspect":
-            assert len(asthread_files) == 2 + 2  # 8 jobs in total, 2 wrappers with max 2 jobs each -> 4 ASThread files expected
+            assert len(
+                asthread_files) == 2 + 2  # 8 jobs in total, 2 wrappers with max 2 jobs each -> 4 ASThread files expected
 
 
 def test_inspect_wrappers(tmp_path, autosubmit_exp: 'AutosubmitExperimentFixture'):

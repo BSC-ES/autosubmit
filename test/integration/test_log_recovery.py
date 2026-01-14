@@ -48,9 +48,14 @@ def test_log_recovery_no_keep_alive(prepare_test, local, mocker, as_conf):
     mocker.patch('autosubmit.platforms.platform.max', return_value=1)
     mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
     local.spawn_log_retrieval_process(as_conf)
-    assert local.log_recovery_process.is_alive()
-    time.sleep(2)
-    assert local.log_recovery_process.is_alive() is False
+    is_alive = local.log_recovery_process.is_alive()
+    assert is_alive, 'Log recovery process is not alive'
+
+    start = time.time()
+    while local.log_recovery_process.is_alive() and time.time() - start < 10:
+        time.sleep(1)
+
+    assert not local.log_recovery_process.is_alive(), 'Log recovery process is still alive'
     local.cleanup_event.set()
 
 

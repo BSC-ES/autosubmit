@@ -18,12 +18,17 @@
 import logging
 from contextlib import nullcontext as does_not_raise
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from autosubmit.log.log import (
     AutosubmitError, AutosubmitCritical, LogFormatter, Log, StatusFilter, StatusFailedFilter
 )
+from autosubmit.log.utils import compress_xz, find_uncompressed_files, is_xz_file
+
+if TYPE_CHECKING:
+    from pytest_mock import MockFixture
 
 
 def test_autosubmit_error_default_values():
@@ -33,7 +38,7 @@ def test_autosubmit_error_default_values():
     assert as_error.code == 6000
     assert as_error.trace is None
 
-    assert str(as_error) == " "
+    assert str(as_error) == "Unhandled Error\nError code: 6000"
 
     assert as_error.error_message == as_error.message
 
@@ -45,9 +50,15 @@ def test_autosubmit_error_constructor():
     assert as_error.code == 6500
     assert as_error.trace == "test"
 
-    assert str(as_error) == " "
+    assert str(as_error) == "abc\nError code: 6500\nDetails:\ntest"
 
     assert as_error.error_message == "test abc"
+
+
+
+def test_autosubmit_error_error_message():
+    ae = AutosubmitError(trace='ERROR!')
+    assert 'ERROR! Unhandled Error' == ae.error_message
 
 
 def test_autosubmit_critical_default_values():
@@ -57,7 +68,7 @@ def test_autosubmit_critical_default_values():
     assert as_error.code == 7000
     assert as_error.trace is None
 
-    assert str(as_error) == " "
+    assert str(as_error) == "Unhandled Error\nError code: 7000"
 
 
 def test_autosubmit_critical_constructor():
@@ -67,7 +78,7 @@ def test_autosubmit_critical_constructor():
     assert as_error.code == 6500
     assert as_error.trace == "test"
 
-    assert str(as_error) == " "
+    assert str(as_error) == "abc\nError code: 6500\nDetails:\ntest"
 
 
 @pytest.mark.parametrize('to_file', [False, True])
@@ -329,3 +340,70 @@ def test_set_file_more_than_10_files(test_tmp_path: Path, mocker):
     assert len(list(test_tmp_path.iterdir())) == 20
     assert not Path(test_tmp_path / '0_test.tmp').exists()
     assert Path(test_tmp_path / '100_test.tmp').exists()
+
+
+def test_log_not_format():
+    """
+    Smoke test if the log messages are sent correctly
+    when having a formattable message that it is not
+    intended to be formatted
+    """
+
+    def _send_messages(msg: str):
+        Log.debug(msg)
+        Log.info(msg)
+        Log.result(msg)
+        Log.warning(msg)
+        Log.error(msg)
+        Log.critical(msg)
+        Log.status(msg)
+        Log.status_failed(msg)
+
+    # Standard messages
+    msg = "Test"
+    _send_messages(msg)
+
+    # Format messages
+    msg = "Test {foo, bar}"
+    _send_messages(msg)
+
+
+def test_set_file_retrial(mocker: "MockFixture"):
+    max_retries = 3
+
+    # Make os.path.split raise an exception
+    mocker.patch("os.path.split", side_effect=Exception("Mocked exception"))
+
+    sleep = mocker.patch("autosubmit.log.log.sleep")
+
+    with pytest.raises(AutosubmitCritical):
+        Log.set_file("imaginary.log", max_retries=max_retries, timeout=1)
+
+    assert sleep.call_count == max_retries - 1
+
+
+def test_compress_xz(tmp_path: Path):
+    """Test xz compression.
+
+    It creates a text file and compresses it with xz.
+    Checks that it is created and is a valid xz file containing the single text file.
+    """
+    test_content = "Test content foo bar"
+
+    test_path = tmp_path / "test-dir"
+    test_path.mkdir()
+    input_file = test_path / "test-input.txt"
+
+    with open(input_file, "w") as f:
+        f.write(test_content)
+
+    output_file = test_path / "test-compressed.xz"
+    compress_xz(input_file, output_file, preset=9, extreme=True)
+
+    assert Path(output_file).exists()
+    assert is_xz_file(output_file)
+    assert len(find_uncompressed_files(str(test_path))) == 1
+
+    # Cover nonexistent path
+    with pytest.raises(FileNotFoundError):
+        find_uncompressed_files(str(tmp_path.joinpath("nonexistent_path")))

@@ -1,9 +1,25 @@
+# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 from pathlib import Path
 from textwrap import dedent, indent
 from typing import Any
 
 import pytest
-
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
@@ -122,7 +138,11 @@ def test_inspect(
         additional_data: str,
         general_data: dict[str, Any],
 ):
-    """Test inspect command for local platform with different job types to see that HPC parameters are correctly set in the job scripts."""
+    """Test inspect command for local platform.
+
+    Test it with different job types to see that HPC parameters
+    are correctly set in the job scripts.
+    """
     yaml = YAML(typ='rt')
     general_data['DEFAULT']['HPCARCH'] = 'TEST_PS'
     general_data['PLATFORMS']['TEST_PS']['CUSTOM_DIR'] = 'test'
@@ -143,10 +163,15 @@ def test_inspect(
     as_conf.set_last_as_command('inspect')
 
     # Run the experiment
-    as_exp.autosubmit.inspect(expid=as_exp.expid, lst=None, check_wrapper=False, force=True, filter_chunks=None, filter_section=None, filter_status=None, quick=False)
+    as_exp.autosubmit.inspect(expid=as_exp.expid, lst=None, check_wrapper=False, force=True,
+                              filter_chunks=None, filter_section=None, filter_status=None, quick=False)
 
     hpcarch_info = as_conf.experiment_data.get('PLATFORMS', {}).get('TEST_PS', {})
-    expected_hpcrootdir = Path(hpcarch_info.get('SCRATCH_DIR', '')) / hpcarch_info.get('PROJECT', '') / hpcarch_info.get('USER', '')
+    expected_hpcrootdir = Path(
+        hpcarch_info.get('SCRATCH_DIR', ''),
+        hpcarch_info.get('PROJECT', ''),
+        hpcarch_info.get('USER', '')
+    )
     expected_hpclogdir = expected_hpcrootdir / f"LOG_{as_exp.expid}"
     templates_dir = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / as_exp.expid / BasicConfig.LOCAL_TMP_DIR
     for file in templates_dir.glob(f"{as_exp.expid}*.cmd"):

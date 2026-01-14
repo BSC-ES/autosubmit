@@ -27,17 +27,13 @@ import os
 import pwd
 import sqlite3
 from pathlib import Path
+from threading import Thread
 from typing import Any, Callable, TYPE_CHECKING
 
 import pytest
-from threading import Thread
-
 
 if TYPE_CHECKING:
     pass
-
-_EXPID = 't000'
-"""The experiment ID used throughout the test."""
 
 
 # TODO expand the tests (Ecplatform, PJM) whenever possible
@@ -63,17 +59,19 @@ def prepare_scratch(tmp_path: Path) -> Any:
     :return: Configured experiment object.
     :rtype: Any
     """
-    run_tmpdir = tmp_path
 
-    dummy_dir = run_tmpdir / f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/dummy_dir"
-    real_data = run_tmpdir / f"scratch/whatever/{run_tmpdir.owner()}/{_EXPID}/real_data"
-    dummy_dir.mkdir(parents=True)
-    real_data.mkdir(parents=True)
+    def _prepare_scratch(expid: str) -> None:
+        dummy_dir = tmp_path / f"scratch/whatever/{tmp_path.owner()}/{expid}/dummy_dir"
+        real_data = tmp_path / f"scratch/whatever/{tmp_path.owner()}/{expid}/real_data"
+        dummy_dir.mkdir(parents=True)
+        real_data.mkdir(parents=True)
 
-    with open(dummy_dir / 'dummy_file', 'w') as f:
-        f.write('dummy data')
+        with open(dummy_dir / 'dummy_file', 'w') as f:
+            f.write('dummy data')
 
-    (real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
+        (real_data / 'dummy_symlink').symlink_to(dummy_dir / 'dummy_file')
+
+    return _prepare_scratch
 
 
 # --- Internal utility functions.
