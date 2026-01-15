@@ -1873,7 +1873,7 @@ Manage job dependencies for a given job and update the dependency graph.
 
     def get_completed(self, platform=None, wrapper=False):
         """
- Returns a list of completed jobs
+        Returns a list of completed jobs
 
         :param wrapper:
         :param platform: job platform
@@ -1961,7 +1961,7 @@ Manage job dependencies for a given job and update the dependency graph.
 
     def get_queuing(self, platform=None, wrapper=False):
         """
-            Returns a list of jobs queuing.
+        Returns a list of jobs queuing.
 
         :param wrapper:
         :param platform: job platform
@@ -1977,7 +1977,7 @@ Manage job dependencies for a given job and update the dependency graph.
 
     def get_failed(self, platform=None, wrapper=False):
         """
- Returns a list of failed jobs.
+        Returns a list of failed jobs.
 
         :param wrapper:
         :param platform: job platform
@@ -2195,7 +2195,7 @@ Manage job dependencies for a given job and update the dependency graph.
 
     def get_delayed(self, platform=None):
         """
-                                                      Returns a list of delayed jobs.
+        Returns a list of delayed jobs.
 
         :param platform: job platform
         :type platform: HPCPlatform
@@ -2208,7 +2208,7 @@ Manage job dependencies for a given job and update the dependency graph.
 
     def get_waiting(self, platform=None, wrapper=False):
         """
- Returns a list of jobs waiting.
+        Returns a list of jobs waiting.
 
         :param wrapper:
         :param platform: job platform
@@ -2283,7 +2283,7 @@ Manage job dependencies for a given job and update the dependency graph.
 
     def get_active(self, platform=None, wrapper=False):
         """
-            Returns a list of active jobs (In platforms queue + Ready).
+        Returns a list of active jobs (In platforms queue + Ready).
 
         :param wrapper:
         :param platform: job platform
@@ -2353,7 +2353,7 @@ Manage job dependencies for a given job and update the dependency graph.
 
     def get_in_queue_grouped_id(self, platform: Platform) -> dict[int, list[Job]]:
         """
-                Gets the queued jobs, grouped by their IDs.
+        Gets the queued jobs, grouped by their IDs.
         Same ID, same dictionary key. Each dictionary value is a list.
 
         :param platform: Optional platform, if ``None``, will fetch all jobs without a platform.
@@ -2403,7 +2403,7 @@ Returns a list of jobs sorted by id.
 
     def load(self, create=False, backup=False):
         """
- Recreates a stored job list from the persistence.
+        Recreates a stored job list from the persistence.
 
         :return: loaded job list object
         :rtype: JobList
@@ -2513,8 +2513,7 @@ Returns a list of jobs sorted by id.
         """
         Updates jobs list on the fly from and update file
 
-        :param store_change: if True, renames the update
-        file to avoid reloading it at the next iteration
+        :param store_change: if True, renames the update file to avoid reloading it at the next iteration
         """
         if os.path.exists(os.path.join(self._persistence_path, self._update_file)):
             Log.info(f"Loading updated list: {os.path.join(self._persistence_path, self._update_file)}")
@@ -2923,7 +2922,7 @@ Returns a list of jobs sorted by id.
 
     def check_scripts(self, as_conf) -> bool:
         """
- When we have created the scripts, all parameters should have been substituted.
+        When we have created the scripts, all parameters should have been substituted.
         %PARAMETER% handlers not allowed.
 
         :param as_conf: experiment configuration
@@ -2958,7 +2957,7 @@ Returns a list of jobs sorted by id.
 
     def _remove_job(self, job):
         """
- Remove a job from the list.
+        Remove a job from the list.
 
         :param job: job to remove
         :type job: Job
@@ -3243,11 +3242,8 @@ Returns a list of jobs sorted by id.
     @staticmethod
     def retrieve_times(status_code, name, tmp_path, make_exception=False, job_times=None,
                        seconds=False, job_data_collection: Optional['JobData'] = None) -> Union[None, JobRow]:
-        """
-        Retrieve job timestamps from database.
+        """Retrieve job timestamps from database.
 
-        :param job_data_collection:
-        :param seconds:
         :param status_code: Code of the Status of the job
         :type status_code: Integer
         :param name: Name of the job
@@ -3257,13 +3253,14 @@ Returns a list of jobs sorted by id.
         :param make_exception: flag for testing purposes
         :type make_exception: Boolean
         :param job_times: Detail from as_times.job_times for the experiment
-        :type job_times: Dictionary Key: job name, Value: 5-tuple (submit time,
-        start time, finish time, status, detail id)
-        :return: minutes the job has been queuing, minutes the job has been running,
-        and the text that represents it
-        :rtype: int, int, str
+        :type job_times: Dictionary Key: job name, Value: 5-tuple (submit time, start time, finish time, status, detail id)
+        :param seconds: seconds
+        :type seconds: bool
+        :param job_data_collection: Collection of Jobs
+        :type job_data_collection: JobData
+        :return: minutes the job has been queuing, minutes the job has been running, and the text that represents it
+        :rtype: JobRow
         """
-        status = "NA"
         energy = 0
         seconds_queued = 0
         seconds_running = 0
