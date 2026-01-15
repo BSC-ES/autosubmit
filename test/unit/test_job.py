@@ -2361,10 +2361,11 @@ def test_update_status(create_jobs: list[Job], status: Status, failed_file,
     ids=["Energy + External is Lower", "Energy + External is Higher"]
 )
 def test_retrieve_logfiles(local, mocker, output):
-    """This tests replicates the behavior of getting the data from the SSH output and handle it to make sure that
-    the data that return will be properly treated and stored.
-    The first input will return a lower absolute value for the energy thus failing the validation
-    The second input will return a higher absolute value for the energy thus succeeding the validation
+    """This test replicates the behavior of retrieving data from the SSH output and processing it to ensure that the
+    returned data is properly handled and stored.
+    The first input returns a lower absolute energy value, causing the validation to fail.
+    The second input returns a higher absolute energy value, causing the validation to succeed.
+    These tests replicate the behavior of getting the data from the SSH output and handle it to make sure that
     """
     mocker.patch("autosubmit.history.database_managers.experiment_history_db_manager.ExperimentHistoryDbManager", return_value=mocker.MagicMock())
     mocker.patch("autosubmit.history.experiment_history.ExperimentHistory", return_value=mocker.MagicMock())

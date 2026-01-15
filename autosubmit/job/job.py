@@ -152,7 +152,7 @@ class Job(object):
         'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        '_log_recovered', 'packed_during_building', 'workflow_commit', 'thread_write_finish'
+        '_log_recovered', 'packed_during_building', 'workflow_commit'
     )
 
     def __setstate__(self, state):
