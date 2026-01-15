@@ -39,6 +39,9 @@ release.
 - Fixed an issue with some placeholders not being replaced in templates #2426
 - Could* fix an issue with the HPC* missing variables in the templates #2432
 - Fixed "Unexpected error: 'list' object has no attribute 'status'" when running experiments #2463
+- Tentative *fix for an issue with the HPC* missing variables in the templates #2432
+- Fixed issue where Autosubmit did not retry when there were networking issues in platforms #1369
+- Fixed an issue with additional files not being sent to the remote platform when using wrappers #1484
 
 **Enhancements:**
 
@@ -75,6 +78,7 @@ release.
   fixed several ruff and mypy warnings, and did minor refactorings in the code like removing the
   `Submitter` class and using `ParamikoSubmitter` directly (only implementation) #2577
 - Added documentation regarding in-line script definition. 
+- Fixes an issue with general wrapper parameters crashing during runtime when defined. #2743
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 
@@ -187,7 +191,7 @@ the filter the jobs. Not using any value for `-fp` still returns all jobs.
 
 **Others:**
 - All autosubmit projects moved to Github.
-- Added Github actions for CI/CD.
+- Added GitHub actions for CI/CD.
 
 4.1.11 - Enhancements, New Features, Documentation, and Bug Fixes
 =================================================================
@@ -243,7 +247,6 @@ Others:
 - #1322: Autosubmit now has a DockerHub organization.
 - #1123: Profiler can now be stopped.
 
-
 4.1.10 - Hotfix
 ===============
 - Fixed an issue with the performance of the log retrieval.
@@ -259,14 +262,12 @@ Others:
 - Fixes an issue with dependency not being linked.
 - Docs improved.
 
-
 4.1.8 - Bug fixes.
 ==================
 - Fixed an issue with a socket connection left open.
 - Fixed an issue with log recovery being disabled by default.
 - Added exclusive parameter
 - Fixed some X11 routines called by default
-
 
 4.1.7 - X11, Migrate, script and Bug fixes
 ==========================================
@@ -314,9 +315,6 @@ Others:
 - Improved error clarity.
 - Added RO-Crate.
 - Added Calendar for splits.
-
-
-
 
 4.1.2 - Bug fixes
 =================

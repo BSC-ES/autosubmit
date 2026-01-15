@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
-import collections
 import copy
 import datetime
 import json
@@ -1760,13 +1759,10 @@ class Autosubmit:
                 wrapped_sections = list()
                 if check_wrapper:
                     for wrapper_data in as_conf.experiment_data.get("WRAPPERS", {}).values():
-                        jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", "").upper()
-                        if "," in jobs_in_wrapper:
-                            jobs_in_wrapper = jobs_in_wrapper.split(",")
-                        else:
-                            jobs_in_wrapper = jobs_in_wrapper.split(" ")
-                        wrapped_sections.extend(jobs_in_wrapper)
-                    wrapped_sections = list(set(wrapped_sections))
+                        if isinstance(wrapper_data, dict):
+                            jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", [])
+                            wrapped_sections.extend(jobs_in_wrapper)
+                            wrapped_sections = list(set(wrapped_sections))
                 jobs_aux = list()
                 sections_added = set()
                 for job in jobs:
@@ -1976,7 +1972,7 @@ class Autosubmit:
                     for job in [j for j in jobs if j.status != Status.FAILED]:
                         job_prev_status = job.status
                         # If exist key has been pressed and previous status was running, do not check
-                        if not Autosubmit.exit and job_prev_status != Status.RUNNING:
+                        if not Autosubmit.exit:
                             jobs_to_check[platform_name].append([job, job_prev_status])
         return jobs_to_check, job_changes_tracker
 
@@ -5783,8 +5779,8 @@ class Autosubmit:
                 date_format = 'M'
         wrapper_jobs = dict()
         for wrapper_section, wrapper_data in as_conf.experiment_data.get("WRAPPERS", {}).items():
-            if isinstance(wrapper_data, collections.abc.Mapping):
-                wrapper_jobs[wrapper_section] = wrapper_data.get("JOBS_IN_WRAPPER", "")
+            if isinstance(wrapper_data, dict):
+                wrapper_jobs[wrapper_section] = wrapper_data.get("JOBS_IN_WRAPPER", [])
 
         job_list.generate(as_conf, date_list, as_conf.get_member_list(), as_conf.get_num_chunks(),
                           as_conf.get_chunk_ini(),

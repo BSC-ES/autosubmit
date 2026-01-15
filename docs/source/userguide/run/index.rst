@@ -446,3 +446,43 @@ To stop immediately experiment <EXPID>:
 
 .. important:: In case you want to restart the experiment, you must follow the
     :ref:`workflow_recovery` procedure, explained below, in order to properly resynchronize all completed jobs.
+
+
+Retries
+-------
+
+For remote platforms, there are at least two parts where retries happen
+(if you use wrappers you may have others), when Autosubmit **connects** to
+the remote platform, and when Autosubmit **executes** a command.
+
+When Autosubmit **connects** to a remote platform, it will use the ``host``
+value of the platform configuration. This value can contain a single
+host name, or a list of host names using commas (*,*) as separators.
+
+Right now Autosubmit has a hard-coded number of retries for connecting
+to remote platforms. It will try to connect to the platform, without
+interval, **retrying connecting twice (``2``)**. It will write to logs in
+``INFO`` and ``WARNING`` levels information about the retries, like
+whether it is retrying to connect, and what is the current retry number.
+
+When Autosubmit retries connecting to a platform with multiple hosts
+separated by comma, the first connection uses the first host name. If it
+retries the connection, the next executions will exclude the first host,
+and then randomly select one of the remaining host names.
+
+For **executing** commands on remote platforms, Autosubmit uses another
+hard-coded value of ``3`` retries, without interval between each retry.
+Autosubmit will submit the command to be executed via SSH. If the command
+fails on the remote platform, **Autosubmit will not retry** the command.
+
+As an example, if you try to run an executable such as ``Rscript``, but this
+executable does not exist on the remote platform, Autosubmit will log the error,
+and mark the job as ``FAILED``.
+
+However, if you have a networking issue between Autosubmit and your remote
+platform, then Autosubmit will log in ``INFO`` and ``WARNING`` and **will
+retry executing the command up to hard-coded ``3`` retries**.
+
+.. note::
+  We already have an issue created to make these retry settings configurable
+  by users and site admins.

@@ -52,16 +52,9 @@ def threaded(fn):
     return wrapper
 
 
-def jobs_in_wrapper_str(as_conf, current_wrapper):
-    jobs_in_wrapper = as_conf.experiment_data["WRAPPERS"].get(current_wrapper, {}).get("JOBS_IN_WRAPPER", "")
-    if "," in jobs_in_wrapper:
-        jobs_in_wrapper = jobs_in_wrapper.split(",")
-    elif "&" in jobs_in_wrapper:
-        jobs_in_wrapper = jobs_in_wrapper.split("&")
-    else:
-        jobs_in_wrapper = jobs_in_wrapper.split(" ")
-    jobs_in_wrapper = [job.strip(" ,") for job in jobs_in_wrapper]
-    return "_".join(jobs_in_wrapper)
+def jobs_in_wrapper_str(as_conf: 'AutosubmitConfig', current_wrapper: str) -> list[str]:
+    """Transform to string with _ separator the jobs in the wrapper."""
+    return "_".join(as_conf.experiment_data["WRAPPERS"].get(current_wrapper, {}).get("JOBS_IN_WRAPPER", []))
 
 
 class JobPackageBase(object):
@@ -655,6 +648,10 @@ class JobPackageThread(JobPackageBase):
         self.platform.send_command(f"cd {self.platform.get_files_path()}; tar -xvf {output_filepath}")
         Log.debug("Send_file: common_script")
         self.platform.send_file(self._common_script)
+        for job in self.jobs:
+            for f in job.additional_files:
+                real_name = job.construct_real_additional_file_name(f)
+                self.platform.send_file(real_name)
 
     def _do_submission(self, job_scripts: dict[str, str] = None, hold: bool = False) -> None:
         """
