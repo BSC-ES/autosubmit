@@ -27,12 +27,11 @@ import subprocess
 import traceback
 from collections import defaultdict
 from contextlib import suppress
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Optional, Union, Iterable
 
 from bscearth.utils.date import parse_date
-from configobj import ConfigObj
 from pyparsing import nestedExpr
 from ruamel.yaml import YAML
 
@@ -163,16 +162,8 @@ class AutosubmitConfig(object):
         )
         return str(dir_templates)
 
-    def get_x11(self, section: str) -> str:
-        """Active X11 for this section
-        :param section: job type
-        :type section: str
-        :return: false/true
-        :rtype: str
-        """
-        return str(self.get_section([section, 'X11'], "false")).lower()
-
-    def get_section(self, section: list[str], d_value: Union[str, Any] = "", must_exists=False) -> str:
+    def get_section(self, section: list[str], d_value: Union[str, Any] = "",
+                    must_exists=False) -> Union[str, numbers.Number]:
         """Gets any section.
 
         If it does not exist in the dictionary it returns ``None``, or and error if it must exist.
@@ -219,93 +210,6 @@ class AutosubmitConfig(object):
         """
         return self.jobs_data.get(section, {}).get('WCHUNKINC', "")
 
-    def get_synchronize(self, section: str) -> str:
-        """Gets wallclock for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: wallclock time
-        :rtype: str
-        """
-        return self.get_section([section, 'SYNCHRONIZE'], "")
-
-    def get_processors(self, section: str) -> str:
-        """Gets processors needed for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: wallclock time
-        :rtype: str
-        """
-        return str(self.get_section([section, 'PROCESSORS'], 1))
-
-    def get_threads(self, section: str) -> str:
-        """Gets threads needed for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: threads needed
-        :rtype: str
-        """
-
-        return str(self.get_section([section, 'THREADS'], 1))
-
-    def get_tasks(self, section: str) -> str:
-        """Gets tasks needed for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: tasks (processes) per host
-        :rtype: str
-        """
-        return str(self.get_section([section, 'TASKS'], ""))
-
-    def get_scratch_free_space(self, section: str) -> int:
-        """Gets scratch free space needed for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: percentage of scratch free space needed
-        :rtype: int
-        """
-        return int(self.get_section([section, 'SCRATCH_FREE_SPACE'], ""))
-
-    def get_memory(self, section: str) -> str:
-        """Gets memory needed for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: memory needed
-        :rtype: str
-        """
-        return str(self.get_section([section, 'MEMORY'], ""))
-
-    def get_memory_per_task(self, section: str) -> str:
-        """Gets memory per task needed for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: memory per task needed
-        :rtype: str
-        """
-        return str(self.get_section([section, 'MEMORY_PER_TASK'], ""))
-
-    def get_migrate_user_to(self, section: str) -> str:
-        """Returns the user to change to from platform config file.
-
-        :return: migrate user to
-        :rtype: str
-        """
-        return self.get_section([section, 'USER_TO'], "")
-
-    def get_migrate_duplicate(self, section: str) -> str:
-        """Returns the user to change to from platform config file.
-
-        :return: migrate user to
-        :rtype: str
-        """
-        return str(self.get_section([section, 'SAME_USER'], "false")).lower()
-
     def get_current_user(self, section: str) -> str:
         """Returns the user to be changed from platform config file.
 
@@ -329,119 +233,6 @@ class AutosubmitConfig(object):
         :rtype: str
         """
         return self.get_section([section, 'PROJECT'], "")
-
-    def set_new_user(self, section: str, new_user: str) -> None:
-        """Sets new user for given platform.
-
-        :param new_user:
-        :param section: platform name
-        :type: str
-        """
-
-        with open(self._platforms_parser_file) as p_file:
-            content_line = p_file.readline()
-            content_to_mod = ""
-            content = ""
-            mod = False
-            while content_line:
-                if re.search(section, content_line):
-                    mod = True
-                if mod:
-                    content_to_mod += content_line
-                else:
-                    content += content_line
-                content_line = p_file.readline()
-        if mod:
-            old_user = self.get_current_user(section)
-            content_to_mod = content_to_mod.replace(re.search(
-                'USER:.*', content_to_mod).group(0)[1:], "USER: " + new_user)
-            content_to_mod = content_to_mod.replace(re.search(
-                'USER_TO:.*', content_to_mod).group(0)[1:], "USER_TO: " + old_user)
-        open(self._platforms_parser_file, 'w').write(content)
-        open(self._platforms_parser_file, 'a').write(content_to_mod)
-
-    def set_new_host(self, section: str, new_host: str) -> None:
-        """Sets new host for given platform
-        :param new_host:
-        :param section: platform name
-        :type: str
-        """
-        with open(self._platforms_parser_file) as p_file:
-            content_line = p_file.readline()
-            content_to_mod = ""
-            content = ""
-            mod = False
-            while content_line:
-                if re.search(section, content_line):
-                    mod = True
-                if mod:
-                    content_to_mod += content_line
-                else:
-                    content += content_line
-                content_line = p_file.readline()
-        if mod:
-            old_host = self.get_current_host(section)
-            content_to_mod = content_to_mod.replace(re.search(
-                'HOST:.*', content_to_mod).group(0)[1:], "HOST: " + new_host)
-            content_to_mod = content_to_mod.replace(re.search(
-                'HOST_TO:.*', content_to_mod).group(0)[1:], "HOST_TO: " + old_host)
-        open(self._platforms_parser_file, 'w').write(content)
-        open(self._platforms_parser_file, 'a').write(content_to_mod)
-
-    def get_migrate_project_to(self, section: str) -> str:
-        """Returns the project to change to from platform config file.
-
-        :return: migrate project to
-        :rtype: str
-        """
-        return self.get_section([section, 'PROJECT_TO'], "")
-
-    def get_migrate_host_to(self, section: str) -> str:
-        """Returns the host to change to from platform config file.
-
-        :return: host_to
-        :rtype: str
-        """
-        return self.get_section([section, 'HOST_TO'], "")
-
-    def set_new_project(self, section: str, new_project: str) -> None:
-        """Sets new project for given platform
-        :param new_project:
-        :param section: platform name
-        :type: str
-        """
-        with open(self._platforms_parser_file) as p_file:
-            content_line = p_file.readline()
-            content_to_mod = ""
-            content = ""
-            mod = False
-            while content_line:
-                if re.search(section, content_line):
-                    mod = True
-                if mod:
-                    content_to_mod += content_line
-                else:
-                    content += content_line
-                content_line = p_file.readline()
-        if mod:
-            old_project = self.get_current_project(section)
-            content_to_mod = content_to_mod.replace(re.search(
-                "PROJECT:.*", content_to_mod).group(0)[1:], "PROJECT: " + new_project)
-            content_to_mod = content_to_mod.replace(re.search(
-                "PROJECT_TO:.*", content_to_mod).group(0)[1:], "PROJECT_TO: " + old_project)
-        open(self._platforms_parser_file, 'w').write(content)
-        open(self._platforms_parser_file, 'a').write(content_to_mod)
-
-    def get_custom_directives(self, section: str) -> str:
-        """Gets custom directives needed for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: custom directives needed
-        :rtype: str
-        """
-        directives = self.get_section([section, 'CUSTOM_DIRECTIVES'], "")
-        return directives
 
     def show_messages(self) -> bool:
 
@@ -1662,27 +1453,11 @@ class AutosubmitConfig(object):
                     Log.result('wrappers OK')
                 return True
 
-    # noinspection PyMethodMayBeStatic
-    def file_modified(self, file, prev_mod_time):
-        """Function to check if a file has been modified.
-
-        :param file: path
-        :param prev_mod_time: previous modification time
-        :return: tuple[bool, datetime]
-        """
-        file_mod_time = datetime.fromtimestamp(file.lstat().st_mtime)  # This is a datetime.datetime object!
-
-        max_delay = timedelta(seconds=1)
-
-        modified = prev_mod_time is None or prev_mod_time - file_mod_time > max_delay
-        return modified, file_mod_time
-
     def load_common_parameters(self, parameters: dict) -> dict:
         """Loads common parameters not specific to a job neither a platform
         :param parameters:
         :return:
         """
-
         # parameters.update( dict((name, getattr(BasicConfig, name)) for name in dir(BasicConfig) if not name.startswith('_') and not name=="read"))
         parameters['ROOTDIR'] = os.path.join(BasicConfig.LOCAL_ROOT_DIR, self.expid)
         # get_project_dir expects self.experiment_data to be loaded
@@ -1784,22 +1559,6 @@ class AutosubmitConfig(object):
         # Unifies all ``pre`` and ``post`` data.
         # Think of it as a tree with two branches that needs to be unified at each level
         return self.unify_conf(self.unify_conf(current_data_pre, current_data), current_data_post)
-
-    def load_list_parameter(self, parameter):
-        """Loads a list parameter
-        :param parameter:
-        :return: list
-        """
-        if type(self.starter_conf[parameter]) is str:
-            if "," in self.starter_conf[parameter]:
-                list_parameters = self.starter_conf[parameter].split(",")
-            else:
-                list_parameters = [self.starter_conf[parameter]]
-        elif type(self.starter_conf[parameter]) is list:
-            list_parameters = self.starter_conf[parameter]
-        else:
-            list_parameters = list(self.starter_conf[parameter])
-        return [parameter.strip(" ") for parameter in list_parameters]
 
     @property
     def is_current_real_user_owner(self) -> bool:
@@ -2106,51 +1865,6 @@ class AutosubmitConfig(object):
         """
         return self.deep_parameters_export(self.experiment_data, self.default_parameters)
 
-    def load_platform_parameters(self):
-        """Load parameters from platform config files.
-
-        :return: a dictionary containing tuples [parameter_name, parameter_value]
-        :rtype: dict
-        """
-        parameters = dict()
-        for section in self._platforms_parser.sections():
-            for option in self._platforms_parser.options(section):
-                parameters[section + "_" +
-                           option] = self._platforms_parser.get(section, option)
-        return parameters
-
-    def load_section_parameters(self, job_list, as_conf, submitter):
-        """Load parameters from job config files.
-
-        :return: a dictionary containing tuples [parameter_name, parameter_value]
-        :rtype: dict
-        """
-        as_conf.check_conf_files(False)
-
-        job_list_by_section = defaultdict()
-        parameters = defaultdict()
-        for job in job_list.get_job_list():
-            if not job.platform_name:
-                job.platform_name = self.hpcarch
-            if job.section not in list(job_list_by_section.keys()):
-                job_list_by_section[job.section] = [job]
-            else:
-                job_list_by_section[job.section].append(job)
-            try:
-                job.platform = submitter.platforms[job.platform_name]
-            except KeyError:
-                job.platform = submitter.platforms["LOCAL"]
-
-        for section in list(job_list_by_section.keys()):
-            job_list_by_section[section][0].update_parameters(
-                as_conf, job_list.parameters)
-            section_list = list(job_list_by_section[section][0].parameters.keys())
-            for section_param in section_list:
-                if section_param not in list(job_list.parameters.keys()):
-                    parameters[section + "_" +
-                               section_param] = job_list_by_section[section][0].parameters[section_param]
-        return parameters
-
     def get_project_type(self) -> str:
         """Returns project type from experiment config file.
 
@@ -2411,17 +2125,6 @@ class AutosubmitConfig(object):
             member_list.append(string_member)
         return member_list
 
-    def get_dependencies(self, section="None"):
-        """Returns dependencies list from jobs config file
-
-        :return: experiment's members
-        :rtype: list
-        """
-        try:
-            return self.get_section([section, "DEPENDENCIES"], "")
-        except KeyError:
-            return []
-
     def get_rerun(self):
         """Returns startdates list from experiment's config file
 
@@ -2521,16 +2224,6 @@ class AutosubmitConfig(object):
         """
         return self.get_section(['CONFIG', 'MAX_WALLCLOCK'], "")
 
-    def get_disable_recovery_threads(self, section):
-        """Returns FALSE/TRUE
-        :return: recovery_threads_option
-        :rtype: str
-        """
-        if self.platforms_data.get(section, "false") != "false":
-            return str(self.platforms_data[section].get('DISABLE_RECOVERY_THREADS', "false")).lower()
-        else:
-            return "false"
-
     def get_max_processors(self):
         """Returns max processors from autosubmit's config file
 
@@ -2587,65 +2280,6 @@ class AutosubmitConfig(object):
         return str(self.get_section(['MAIL', 'NOTIFICATIONS'], "false")).lower()
 
     # based on https://github.com/cbirajdar/properties-to-yaml-converter/blob/master/properties_to_yaml.py
-    @staticmethod
-    def ini_to_yaml(root_dir: Path, ini_file: Path) -> None:
-        # Based on http://stackoverflow.com/a/3233356
-        def update_dict(original_dict: dict, updated_dict: collections.abc.Mapping) -> dict:
-            for k, v in updated_dict.items():
-                if isinstance(v, collections.abc.Mapping):
-                    r = update_dict(original_dict.get(k, {}), v)
-                    original_dict[k] = r
-                else:
-                    original_dict[k] = updated_dict[k]
-            return original_dict
-
-        ini_file = Path(ini_file)
-        # Read the file name from command line argument
-        input_file = str(ini_file)
-        backup_path = root_dir / Path(ini_file.name + "_AS_v3_backup")
-        if not backup_path.exists():
-            Log.info(f"Backup stored at {backup_path}")
-            shutil.copyfile(ini_file, backup_path)
-        # Read key=value property configs in python dictionary
-
-        content = open(input_file, 'r', encoding=locale.getlocale()[1]).read()
-        regex = r"\=( )*\[[\[\]\'_0-9.\"#A-Za-z \-,]*\]"
-
-        matches = re.finditer(regex, content, flags=re.IGNORECASE)
-
-        for matchNum, match in enumerate(matches, start=1):
-            print(match.group())
-            subs_string = "= " + "\"" + match.group()[2:] + "\""
-            regex_sub = match.group()
-            content = re.sub(re.escape(regex_sub), subs_string, content)
-
-        open(input_file, 'w', encoding=locale.getlocale()[1]).write(content)
-        config_dict = ConfigObj(input_file, stringify=True, list_values=False, interpolation=False, unrepr=False)
-
-        # Store the result in yaml_dict
-        yaml_dict: dict = {}
-
-        for key, value in config_dict.items():
-            config_keys = key.split(".")
-
-            for config_key in reversed(config_keys):
-                value = {config_key: value}
-
-            yaml_dict = update_dict(yaml_dict, value)
-
-        final_dict = {}
-        if input_file.find("platform") != -1:
-            final_dict["PLATFORMS"] = yaml_dict
-        elif input_file.find("job") != -1:
-            final_dict["JOBS"] = yaml_dict
-        else:
-            final_dict = yaml_dict
-            # Write resultant dictionary to the yaml file
-        yaml_file = open(input_file, 'w', encoding=locale.getlocale()[1])
-        yaml = YAML()
-        yaml.dump(final_dict, yaml_file)
-        ini_file.rename(Path(root_dir, ini_file.stem + ".yml"))
-
     def get_wrapper_type(self, wrapper=None) -> Optional[str]:
         """Returns what kind of wrapper (VERTICAL, MIXED-VERTICAL, HORIZONTAL, HYBRID, MULTI NONE) the user
         has configured in the autosubmit's config.
@@ -2749,15 +2383,6 @@ class AutosubmitConfig(object):
             wrapper = {}
         return wrapper.get('MACHINEFILES', self.experiment_data.get("WRAPPERS", {}).get("MACHINEFILES", ""))
 
-    def get_export(self, section: str) -> str:
-        """Gets command line for being submitted with.
-
-        :param section: job type
-        :type section: str
-        :return: wallclock time
-        """
-        return self.get_section([section, 'EXPORT'], "")
-
     def get_copy_remote_logs(self) -> str:
         """
         Returns if the user has enabled the logs local copy from autosubmit's config file
@@ -2796,14 +2421,6 @@ class AutosubmitConfig(object):
             return True
         else:
             return False
-
-    def is_valid_communications_library(self) -> bool:
-        library = self.get_communications_library()
-        return library in ['paramiko']
-
-    def is_valid_storage_type(self) -> bool:
-        storage_type = self.get_storage_type()
-        return storage_type in ['pkl', 'db']
 
     def is_valid_jobs_in_wrapper(self, wrapper=None) -> bool:
         if wrapper is None:

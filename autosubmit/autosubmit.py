@@ -49,6 +49,7 @@ import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 import autosubmit.statistics.utils as StatisticsUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.utils import copy_as_config
 from autosubmit.config.upgrade_scripts import upgrade_scripts
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import (
@@ -1232,23 +1233,6 @@ class Autosubmit:
         return error_message
 
     @staticmethod
-    def copy_as_config(exp_id, copy_id):
-        for conf_file in os.listdir(os.path.join(BasicConfig.LOCAL_ROOT_DIR, copy_id, "conf")):
-            # Copy only relevant files
-            if conf_file.endswith((".conf", ".yml", ".yaml")):
-                shutil.copy(os.path.join(BasicConfig.LOCAL_ROOT_DIR, copy_id, "conf", conf_file),
-                            os.path.join(BasicConfig.LOCAL_ROOT_DIR, exp_id, "conf",
-                                         conf_file.replace(copy_id, exp_id)))
-            # if ends with .conf convert it to AS4 yaml file
-            if conf_file.endswith(".conf"):
-                try:
-                    AutosubmitConfig.ini_to_yaml(Path(BasicConfig.LOCAL_ROOT_DIR, exp_id, 'conf'),
-                                                 Path(BasicConfig.LOCAL_ROOT_DIR, exp_id, "conf",
-                                                      conf_file.replace(copy_id, exp_id)))
-                except Exception as e:
-                    Log.warning(f"Error converting {conf_file.replace(copy_id, exp_id)} to yml: {str(e)}")
-
-    @staticmethod
     def generate_as_config(
             exp_id: str,
             dummy: bool=False,
@@ -1512,7 +1496,7 @@ class Autosubmit:
         try:
             if copy_id != '' and copy_id is not None:
                 # Copy the configuration from selected experiment
-                Autosubmit.copy_as_config(exp_id, copy_id)
+                copy_as_config(exp_id, copy_id)
             else:
                 # Create a new configuration
                 Autosubmit.generate_as_config(exp_id, dummy, minimal_configuration, use_local_minimal)

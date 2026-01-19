@@ -22,8 +22,8 @@ from textwrap import dedent
 
 import pytest
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.utils import copy_as_config
 from autosubmit.log.log import AutosubmitCritical
 from test.unit.conftest import AutosubmitConfigFactory
 
@@ -52,7 +52,7 @@ def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
                 '''))
         file.flush()
 
-    Autosubmit.copy_as_config('a001', 'a000')
+    copy_as_config('a001', 'a000')
 
     new_yaml_file = Path(new_file.parent, new_file.stem).with_suffix('.yml')
 

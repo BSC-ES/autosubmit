@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.upgrade_scripts import ini_to_yaml
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 
 if TYPE_CHECKING:
@@ -123,7 +124,7 @@ def test_yaml_deprecation_warning(tmp_path, autosubmit_config: 'AutosubmitConfig
     created. All without warnings being raised (i.e. they were suppressed).
     """
 
-    as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data={})
+    autosubmit_config(expid='a000', experiment_data={})
     ini_file = tmp_path / 'a000_jobs.ini'
     with open(ini_file, 'w+') as f:
         f.write(dedent('''\
@@ -132,7 +133,7 @@ def test_yaml_deprecation_warning(tmp_path, autosubmit_config: 'AutosubmitConfig
             PLATFORM = LOCAL
             '''))
         f.flush()
-    as_conf.ini_to_yaml(root_dir=tmp_path, ini_file=str(ini_file))
+    ini_to_yaml(root_dir=tmp_path, ini_file=str(ini_file))
 
     backup_file = Path(f'{ini_file}_AS_v3_backup')
     assert backup_file.exists()
