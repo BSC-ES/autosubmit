@@ -1,13 +1,30 @@
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 """This module provides generators to produce workflow configurations for different backend engines."""
+
+from abc import ABC, abstractmethod
 from enum import Enum
 from importlib import import_module
 from typing import TYPE_CHECKING
 
-from abc import ABC, abstractmethod
-
 if TYPE_CHECKING:
     import argparse
-    from autosubmitconfigparser.config.configcommon import AutosubmitConfig
+    from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.job.job_list import JobList
 
 
@@ -79,7 +96,9 @@ def get_engine_generator(engine: Engine) -> AbstractGenerator:
     """
     return import_module(f'autosubmit.generators.{engine.value}').Generator
 
+
 __all__ = [
+    'AbstractGenerator',
     'Engine',
     'get_engine_generator'
 ]

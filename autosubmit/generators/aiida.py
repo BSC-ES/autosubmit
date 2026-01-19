@@ -1,19 +1,37 @@
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 """The AiiDA generator for Autosubmit."""
+
 import os
-from pathlib import Path
-from functools import cached_property
-import warnings
 import re
-from ruamel.yaml import YAML
+import warnings
+from functools import cached_property
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from autosubmit.config.configcommon import AutosubmitConfig
+from ruamel.yaml import YAML
 
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.generators import AbstractGenerator
 from autosubmit.job.job import Job
 from autosubmit.job.job_list import JobList
-from autosubmit.generators import AbstractGenerator
-from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 if TYPE_CHECKING:
@@ -56,7 +74,7 @@ class Generator(AbstractGenerator):
                               "DEPENDENCIES", "FILE", "RUNNING"]  # these are resolved by autosubmit internally
 
     SUPPORTED_PLATFORM_KEYWORDS = ["TYPE", "HOST", "USER", "QUEUE", "SCRATCH_DIR", "MAX_WALLCLOCK",
-                                    "PROJECT"]   # these are resolved by autosubmit internally
+                                   "PROJECT"]   # these are resolved by autosubmit internally
 
     def __init__(self, job_list: JobList, as_conf: AutosubmitConfig, output_dir: str):
         """
@@ -90,7 +108,8 @@ class Generator(AbstractGenerator):
         """
         output_dir = arg_options.get('output_dir', None)
         if not isinstance(output_dir, str):
-            raise ValueError(f"aiida generator requires output dir of type str but got {output_dir}") # TODO improve error message
+            # TODO improve error message
+            raise ValueError(f"aiida generator requires output dir of type str but got {output_dir}")
         self = cls(job_list, as_conf, output_dir)
         self._validate()
         workflow_script = self._generate_workflow_script()
@@ -218,7 +237,7 @@ tasks = {}
                     "label": f"{platform.name}",
                     "hostname": f"{platform.host}",
                     "work_dir": f"{platform.scratch}",
-                    #username": f"{platform.user}", does not work
+                    # username": f"{platform.user}", does not work
                     "description": "",
                     "transport": "core.ssh",
                     "scheduler": "core.slurm",
@@ -296,7 +315,9 @@ except NotExistent:
 
         for job in self._job_list.get_all():
             script_name = job.create_script(self._as_conf)
-            script_path = Path(job._tmp_path, script_name) # pylint: disable=protected-access
+            # noinspection PyProtectedMember
+            # pylint: disable=protected-access
+            script_path = Path(job._tmp_path, script_name)
             with open(script_path, "r", encoding="utf-8") as f:
                 script_text = f.read()
             # Let's drop the Autosubmit header and tailer.
@@ -370,13 +391,13 @@ example through a previous run, they are loaded. If you have changed the
 computer parameters in your autosubmit config, then you need to delete the
 corresponding compute and code nodes. Note that this has the disadvantage that
 it will delete all calculations that are associated with these nodes.
-It is therefore recommended to use the JOB paramaters in autosubmit to override
+It is therefore recommended to use the JOB parameters in autosubmit to override
 certain computer configs.
 """
+
     @staticmethod
     def _sanitize_label(label: str) -> str:
         return label.replace("-", "_")
-
 
 
 __all__ = [

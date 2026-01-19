@@ -38,7 +38,7 @@ from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
-from typing import Generator, Optional, Union 
+from typing import Generator, Optional, Union
 
 from bscearth.utils.date import date2str
 from portalocker import Lock
@@ -58,6 +58,7 @@ from autosubmit.database.db_common import (
 from autosubmit.database.db_structure import get_structure
 from autosubmit.experiment.detail_updater import ExperimentDetails
 from autosubmit.experiment.experiment_common import copy_experiment, new_experiment, create_required_folders
+from autosubmit.generators import Engine, get_engine_generator
 from autosubmit.git.autosubmit_git import AutosubmitGit
 from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
 from autosubmit.helpers.processes import process_id
@@ -79,7 +80,6 @@ from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
-from autosubmit.generators import Engine, get_engine_generator
 
 dialog = None
 
@@ -738,7 +738,8 @@ class Autosubmit:
                 'generate', description='Generate a workflow definition for a different workflow engine',
                 argument_default=argparse.SUPPRESS)
             subparser.add_argument('expid', help='experiment identifier')
-            subsubparser = subparser.add_subparsers(title="engines", dest='engine', required=True, description='Workflow engine identifier')
+            subsubparser = subparser.add_subparsers(
+                title="engines", dest='engine', required=True, description='Workflow engine identifier')
             for engine in Engine:
                 generator_class = get_engine_generator(engine)
                 parser_engine = subsubparser.add_parser(engine.value, help=f"{generator_class.get_engine_name()}")
