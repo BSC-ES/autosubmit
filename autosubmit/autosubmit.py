@@ -34,7 +34,6 @@ import warnings
 from collections import defaultdict
 from configparser import ConfigParser
 from contextlib import suppress
-from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
@@ -50,6 +49,7 @@ import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 import autosubmit.statistics.utils as StatisticsUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.upgrade_scripts import upgrade_scripts
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import (
     create_db, delete_experiment, get_experiment_description, get_autosubmit_version, check_experiment_exists,
@@ -57,11 +57,14 @@ from autosubmit.database.db_common import (
 )
 from autosubmit.database.db_structure import get_structure
 from autosubmit.experiment.detail_updater import ExperimentDetails
-from autosubmit.experiment.experiment_common import copy_experiment, new_experiment, create_required_folders
+from autosubmit.experiment.experiment_common import (
+    check_ownership, copy_experiment, new_experiment, create_required_folders
+)
 from autosubmit.git.autosubmit_git import AutosubmitGit
 from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
 from autosubmit.helpers.processes import process_id
 from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, strtobool
+from autosubmit.helpers.version import get_version
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.job.job import Job
@@ -150,14 +153,9 @@ class Autosubmit:
     if not os.path.exists(os.path.join(script_dir, 'VERSION')):
         script_dir = os.path.join(script_dir, os.path.pardir)
 
-    version_path = os.path.join(script_dir, 'VERSION')
     readme_path = os.path.join(script_dir, 'README.md')
     changes_path = os.path.join(script_dir, 'CHANGELOG.md')
-    if os.path.isfile(version_path):
-        with open(version_path) as f:
-            autosubmit_version = f.read().strip()
-    else:
-        autosubmit_version = version("autosubmit")  # from importlib.metadata
+    autosubmit_version = get_version()
 
     exit = False
 
@@ -837,7 +835,7 @@ class Autosubmit:
         elif args.command == 'updateversion':
             return Autosubmit.update_version(args.expid)
         elif args.command == 'upgrade':
-            return Autosubmit.upgrade_scripts(args.expid, files=args.files)
+            return upgrade_scripts(args.expid, files=args.files)
         elif args.command == 'provenance':
             return Autosubmit.provenance(args.expid, rocrate=args.rocrate)
         elif args.command == 'archive':
@@ -1067,39 +1065,11 @@ class Autosubmit:
     @staticmethod
     def _check_ownership_and_set_last_command(as_conf, expid, command):
         if command not in ["monitor", "describe", "delete", "report", "stats", "dbfix"]:
-            owner, eadmin, current_owner = Autosubmit._check_ownership(expid, raise_error=True)
+            owner, eadmin, current_owner = check_ownership(expid, raise_error=True)
         else:
-            owner, eadmin, current_owner = Autosubmit._check_ownership(expid, raise_error=False)
+            owner, eadmin, current_owner = check_ownership(expid, raise_error=False)
         if owner:
             as_conf.set_last_as_command(command)
-        return owner, eadmin, current_owner
-
-    @staticmethod
-    def _check_ownership(expid, raise_error=False):
-        """Check if the user owns and if it is eadmin.
-
-        :return: the owner, eadmin and current_owner
-        :rtype: boolean, boolean, str
-        """
-        current_owner = None
-        eadmin = False
-        owner = False
-        current_user_id = os.getuid()
-        admin_user = "eadmin"  # to be improved in #944
-        try:
-            eadmin = current_user_id == pwd.getpwnam(admin_user).pw_uid
-        except Exception:
-            Log.info(f"Autosubmit admin user: {admin_user} is not set")
-        current_owner_id = Path(BasicConfig.LOCAL_ROOT_DIR, expid).stat().st_uid
-        try:
-            current_owner = pwd.getpwuid(current_owner_id).pw_name
-        except (TypeError, KeyError):
-            Log.warning(f"Current owner of experiment {expid} could not be retrieved. The owner is no longer in the "
-                        f"system database.")
-        if current_owner_id == current_user_id:
-            owner = True
-        elif raise_error:
-            raise AutosubmitCritical(f"You don't own the experiment {expid}.", 7012)
         return owner, eadmin, current_owner
 
     @staticmethod
@@ -1140,7 +1110,7 @@ class Autosubmit:
             Log.printlog("Experiment directory does not exist.", Log.WARNING)
             return False
 
-        owner, eadmin, _ = Autosubmit._check_ownership(expid_delete)
+        owner, eadmin, _ = check_ownership(expid_delete)
         if not (owner or (force and eadmin)):
             Autosubmit._raise_permission_error(eadmin, expid_delete)
 
@@ -1654,7 +1624,7 @@ class Autosubmit:
          """
         try:
             Log.info(f"Inspecting experiment {expid}")
-            Autosubmit._check_ownership(expid, raise_error=True)
+            check_ownership(expid, raise_error=True)
             exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
             tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
             if os.path.exists(os.path.join(tmp_path, 'autosubmit.lock')):
@@ -3101,7 +3071,7 @@ class Autosubmit:
         if not save:
             Log.warning("Changes will be NOT saved to the jobList. Use -s option to save")
 
-        Autosubmit._check_ownership(expid, raise_error=True)
+        check_ownership(expid, raise_error=True)
         exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
         as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
         as_conf.check_conf_files(True)
@@ -3245,7 +3215,7 @@ class Autosubmit:
         """
         migrate = Migrate(experiment_id, only_remote)
         if offer:
-            Autosubmit._check_ownership(experiment_id, raise_error=True)
+            check_ownership(experiment_id, raise_error=True)
             migrate.migrate_offer_remote()
             if not only_remote:  # Local migrate
                 try:
@@ -3920,7 +3890,7 @@ class Autosubmit:
         :type expid: str
         """
         try:
-            Autosubmit._check_ownership(expid, raise_error=True)
+            check_ownership(expid, raise_error=True)
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             as_conf.reload(force_load=True)
             # as_conf.check_conf_files(False)
@@ -3949,7 +3919,7 @@ class Autosubmit:
         :param expid: experiment identifier
         :type expid: str
         """
-        Autosubmit._check_ownership(expid, raise_error=True)
+        check_ownership(expid, raise_error=True)
 
         as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
         as_conf.reload(force_load=True)
@@ -3968,154 +3938,6 @@ class Autosubmit:
         Log.info("Experiment found.")
         Log.info(f"Setting {expid} description to '{new_description}'")
         return update_experiment_description_version(expid, description=new_description)
-
-    # fastlook
-    @staticmethod
-    def update_old_script(root_dir, template_path, as_conf):
-        # Do a backup and tries to update
-        warn = ""
-        substituted = ""
-        Log.info(f"Checking {template_path}")
-        if template_path.exists():
-            backup_path = root_dir / Path(template_path.name + "_AS_v3_backup_placeholders")
-            if not backup_path.exists():
-                Log.info(f"Backup stored at {backup_path}")
-                shutil.copyfile(template_path, backup_path)
-            template_content = open(template_path, 'r', encoding=locale.getlocale()[1]).read()
-            # Look for %_%
-            variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content, flags=re.IGNORECASE)
-            variables = [variable[1:-1].upper() for variable in variables]
-            results = {}
-            # Change format
-            for old_format_key in variables:
-                for key in as_conf.load_parameters().keys():
-                    key_affix = key.split(".")[-1]
-                    if key_affix == old_format_key:
-                        if old_format_key not in results:
-                            results[old_format_key] = set()
-
-                        results[old_format_key].add("%" + key.strip("'") + "%")
-            for key, new_key in results.items():
-                if len(new_key) > 1:
-                    if list(new_key)[0].find("JOBS") > -1 or list(new_key)[0].find("PLATFORMS") > -1:
-                        pass
-                    else:
-                        warn += (f"{key} couldn't translate to {new_key} since it is a duplicate variable. "
-                                 f"Please chose one of the keys value.\n")
-                else:
-                    new_key = new_key.pop().upper()
-                    substituted += f"{key.upper()} translated to {new_key}\n"
-                    template_content = re.sub('%(?<!%%)' + key + '%(?!%%)', new_key, template_content, flags=re.I)
-            # write_it
-            # Deletes unused keys from confs
-            if template_path.name.lower().find("autosubmit") > -1:
-                template_content = re.sub('(?m)^( )*(EXPID:)( )*[a-zA-Z0-9._-]*(\n)*', "", template_content, flags=re.I)
-            # Write final result
-            open(template_path, "w").write(template_content)
-
-        if warn == "" and substituted == "":
-            Log.result(f"Completed check for {template_path}.\nNo %_% variables found.")
-        else:
-            Log.result(f"Completed check for {template_path}")
-
-        return warn, substituted
-
-    @staticmethod
-    def upgrade_scripts(expid: str, files="") -> bool:
-        def get_files(root_dir_, extensions, files=""):
-            all_files = []
-            if len(files) > 0:
-                for ext in extensions:
-                    all_files.extend(root_dir_.rglob(ext))
-            else:
-                if ',' in files:
-                    files = files.split(',')
-                elif ' ' in files:
-                    files = files.split(' ')
-                for file in files:
-                    all_files.append(file)
-            return all_files
-
-        Log.info("Checking if experiment exists...")
-        try:
-            # Check that the user is the owner and the configuration is well configured
-            Autosubmit._check_ownership(expid, raise_error=True)
-            folder = Path(BasicConfig.LOCAL_ROOT_DIR) / expid / "conf"
-            factory = YAMLParserFactory()
-            # update scripts to yml format
-            for f in folder.rglob("*.yml"):
-                # Tries to convert an invalid yml to correct one
-                try:
-                    parser = factory.create_parser()
-                    parser.load(Path(f))
-                except BaseException:
-                    try:
-                        AutosubmitConfig.ini_to_yaml(f.parent, Path(f))
-                    except BaseException:
-                        Log.warning(f"Couldn't convert conf file to yml: {f.parent}")
-                        return False
-
-            # Converts all ini into yaml
-            Log.info("Converting all .conf files into .yml.")
-            for f in folder.rglob("*.conf"):
-                if not Path(f.stem + ".yml").exists():
-                    try:
-                        AutosubmitConfig.ini_to_yaml(Path(f).parent, Path(f))
-                    except Exception:
-                        Log.warning(f"Couldn't convert conf file to yml: {Path(f).parent}")
-                        return False
-            as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
-            as_conf.reload(force_load=True)
-            # Load current variables
-            as_conf.check_conf_files()
-            # Load current parameters ( this doesn't read job parameters)
-            as_conf.load_parameters()
-
-        except (AutosubmitError, AutosubmitCritical):
-            raise
-        # Update configuration files
-        warn = ""
-        substituted = ""
-        root_dir = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / expid / "conf"
-        Log.info("Looking for %_% variables inside conf files")
-        for f in get_files(root_dir, ('*.yml', '*.yaml', '*.conf')):
-            template_path = root_dir / Path(f).name
-            try:
-                w, s = Autosubmit.update_old_script(root_dir, template_path, as_conf)
-                if w != "":
-                    warn += f"Warnings for: {template_path.name}\n{w}\n"
-                if s != "":
-                    substituted += f"Variables changed for: {template_path.name}\n{s}\n"
-            except BaseException as e:
-                Log.printlog(f"Couldn't read {template_path} template.\ntrace:{str(e)}")
-        if substituted != "" and warn != "":
-            Log.result(substituted)
-            Log.result(warn)
-        # Update templates
-        root_dir = Path(as_conf.get_project_dir())
-        template_path = Path()
-        warn = ""
-        substituted = ""
-        Log.info("Looking for %_% variables inside templates")
-        for section, value in as_conf.jobs_data.items():
-            try:
-                template_path = root_dir / Path(value.get("FILE", ""))
-                w, s = Autosubmit.update_old_script(template_path.parent, template_path, as_conf)
-                if w != "":
-                    warn += f"Warnings for: {template_path.name}\n{w}\n"
-                if s != "":
-                    substituted += f"Variables changed for: {template_path.name}\n{s}\n"
-            except BaseException as e:
-                Log.printlog(f"Couldn't read {template_path} template.\ntrace:{str(e)}")
-        if substituted != "":
-            Log.printlog(substituted, Log.RESULT)
-        if warn != "":
-            Log.printlog(warn, Log.ERROR)
-        Log.info(f"Changing {expid} experiment version from {as_conf.get_version()} to "
-                 f"{Autosubmit.autosubmit_version}")
-        as_conf.set_version(Autosubmit.autosubmit_version)
-        update_experiment_description_version(expid, version=Autosubmit.autosubmit_version)
-        return True
 
     @staticmethod
     def pkl_fix(expid: str, force: bool = False) -> int:
@@ -4577,7 +4399,7 @@ class Autosubmit:
 
         # checking if there is a lock file to avoid multiple running on the same expid
         try:
-            Autosubmit._check_ownership(expid, raise_error=True)
+            check_ownership(expid, raise_error=True)
             exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
             tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
             with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1) as fh:
@@ -5362,7 +5184,7 @@ class Autosubmit:
         for f in [filter_chunks, filter_type_chunk, filter_type_chunk_split]:
             filter_chunk_section_split = f if f else filter_chunk_section_split
 
-        Autosubmit._check_ownership(expid, raise_error=True)
+        check_ownership(expid, raise_error=True)
         exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
         tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
         try:
