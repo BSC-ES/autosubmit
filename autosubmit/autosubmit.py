@@ -34,7 +34,6 @@ import warnings
 from collections import defaultdict
 from configparser import ConfigParser
 from contextlib import suppress
-from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
@@ -50,6 +49,8 @@ import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 import autosubmit.statistics.utils as StatisticsUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.utils import copy_as_config
+from autosubmit.config.upgrade_scripts import upgrade_scripts
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import (
     create_db, get_experiment_description, get_autosubmit_version, check_experiment_exists,
@@ -63,6 +64,7 @@ from autosubmit.experiment.experiment_common import (
 from autosubmit.git.autosubmit_git import AutosubmitGit
 from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
 from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, user_yes_no_query
+from autosubmit.helpers.version import get_version
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.job.job import Job
@@ -143,20 +145,15 @@ class Autosubmit:
         """Get the current voltage. """
         return self.experiment_data
 
-    # Get the version number from the relevant file. If not, from autosubmit package
+    # Get the version number from the relevant file. If not, from the autosubmit package
     script_dir = os.path.abspath(os.path.dirname(__file__))
 
     if not os.path.exists(os.path.join(script_dir, 'VERSION')):
         script_dir = os.path.join(script_dir, os.path.pardir)
 
-    version_path = os.path.join(script_dir, 'VERSION')
     readme_path = os.path.join(script_dir, 'README.md')
     changes_path = os.path.join(script_dir, 'CHANGELOG.md')
-    if os.path.isfile(version_path):
-        with open(version_path) as f:
-            autosubmit_version = f.read().strip()
-    else:
-        autosubmit_version = version("autosubmit")  # from importlib.metadata
+    autosubmit_version = get_version()
 
     exit = False
 
@@ -169,9 +166,9 @@ class Autosubmit:
 
     @staticmethod
     def parse_args() -> tuple[int, Optional[argparse.Namespace]]:
-        """Parse arguments given to an executable and start execution of command given.
+        """Parse arguments given to an executable and start execution of the command given.
 
-        Returns a tuple with the exit code (``status``), and an optional list of
+        Returns a tuple with the exit code (``status``) and an optional list of
         arguments for ``argparse``. The list of arguments is only ever returned
         when the arguments are valid for the execution of a subcommand. Otherwise,
         they will be ``None``.
@@ -812,7 +809,7 @@ class Autosubmit:
             # update proj files
             subparser = subparsers.add_parser('upgrade', description='Updates autosubmit 3 proj files to autosubmit 4')
             subparser.add_argument('expid', help='experiment identifier')
-            subparser.add_argument('-f', '--files', default='', type=str, help='list of files')
+            subparser.add_argument('-f', '--files', nargs='+', default=[], type=str, help='list of files')
             # Readme
             subparsers.add_parser('readme', description='show readme')
 
@@ -959,7 +956,7 @@ class Autosubmit:
         elif args.command == 'updateversion':
             return Autosubmit.update_version(args.expid)
         elif args.command == 'upgrade':
-            return Autosubmit.upgrade_scripts(args.expid, files=args.files)
+            return upgrade_scripts(args.expid, files=args.files)
         elif args.command == 'provenance':
             return Autosubmit.provenance(args.expid, rocrate=args.rocrate)
         elif args.command == 'archive':
@@ -1196,22 +1193,6 @@ class Autosubmit:
         return owner, eadmin, current_owner
 
     @staticmethod
-    def copy_as_config(exp_id, copy_id):
-        for conf_file in os.listdir(Path(BasicConfig.LOCAL_ROOT_DIR, copy_id, "conf")):
-            # Copy only relevant files
-            if conf_file.endswith((".conf", ".yml", ".yaml")):
-                shutil.copy(Path(BasicConfig.LOCAL_ROOT_DIR, copy_id, "conf", conf_file),
-                            Path(BasicConfig.LOCAL_ROOT_DIR, exp_id, "conf", conf_file.replace(copy_id, exp_id)))
-            # if ends with .conf convert it to AS4 yaml file
-            if conf_file.endswith(".conf"):
-                try:
-                    AutosubmitConfig.ini_to_yaml(Path(BasicConfig.LOCAL_ROOT_DIR, exp_id, 'conf'),
-                                                 Path(BasicConfig.LOCAL_ROOT_DIR, exp_id, "conf",
-                                                      conf_file.replace(copy_id, exp_id)))
-                except Exception as e:
-                    Log.warning(f"Error converting {conf_file.replace(copy_id, exp_id)} to yml: {str(e)}")
-
-    @staticmethod
     def generate_as_config(
             exp_id: str,
             dummy: bool = False,
@@ -1403,32 +1384,26 @@ class Autosubmit:
             create_required_folders(exp_id, exp_folder)
         except OSError as e:
             with suppress(Exception):
-                Autosubmit._delete_expid(exp_id, True)
+                delete_experiment(exp_id, True)
             raise AutosubmitCritical(f"Error while creating the experiment structure: {str(e)}", 7011)
 
         # Create the experiment configuration
         Log.info("Generating config files...")
         try:
             if copy_id != '' and copy_id is not None:
-                # Copy the configuration from selected experiment
-                Autosubmit.copy_as_config(exp_id, copy_id)
+                # Copy the configuration from the selected experiment
+                copy_as_config(exp_id, copy_id)
             else:
                 # Create a new configuration
                 Autosubmit.generate_as_config(exp_id, dummy, minimal_configuration, use_local_minimal)
         except Exception as e:
-            try:
-                Autosubmit._delete_expid(exp_id, True)
-            except Exception:
-                pass
+            delete_experiment(exp_id, True)
             raise AutosubmitCritical(f"Error while creating the experiment configuration: {str(e)}", 7011)
         # Change template values by default values specified from the commandline
         try:
             as_conf_default_values(Autosubmit.autosubmit_version, exp_id, hpc, minimal_configuration, git_repo, git_branch, git_as_conf)
         except Exception as e:
-            try:
-                Autosubmit._delete_expid(exp_id, True)
-            except Exception:
-                pass
+            delete_experiment(exp_id, True)
             raise AutosubmitCritical(f"Error while setting the default values: {str(e)}", 7011)
 
         # Try to update the experiment details
@@ -3571,154 +3546,6 @@ class Autosubmit:
         Log.info("Experiment found.")
         Log.info(f"Setting {expid} description to '{new_description}'")
         return update_experiment_description_version(expid, description=new_description)
-
-    # fastlook
-    @staticmethod
-    def update_old_script(root_dir, template_path, as_conf):
-        # Do a backup and tries to update
-        warn = ""
-        substituted = ""
-        Log.info(f"Checking {template_path}")
-        if template_path.exists():
-            backup_path = root_dir / Path(template_path.name + "_AS_v3_backup_placeholders")
-            if not backup_path.exists():
-                Log.info(f"Backup stored at {backup_path}")
-                shutil.copyfile(template_path, backup_path)
-            template_content = open(template_path, 'r', encoding=locale.getlocale()[1]).read()
-            # Look for %_%
-            variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content, flags=re.IGNORECASE)
-            variables = [variable[1:-1].upper() for variable in variables]
-            results = {}
-            # Change format
-            for old_format_key in variables:
-                for key in as_conf.load_parameters().keys():
-                    key_affix = key.split(".")[-1]
-                    if key_affix == old_format_key:
-                        if old_format_key not in results:
-                            results[old_format_key] = set()
-
-                        results[old_format_key].add("%" + key.strip("'") + "%")
-            for key, new_key in results.items():
-                if len(new_key) > 1:
-                    if list(new_key)[0].find("JOBS") > -1 or list(new_key)[0].find("PLATFORMS") > -1:
-                        pass
-                    else:
-                        warn += (f"{key} couldn't translate to {new_key} since it is a duplicate variable. "
-                                 f"Please chose one of the keys value.\n")
-                else:
-                    new_key = new_key.pop().upper()
-                    substituted += f"{key.upper()} translated to {new_key}\n"
-                    template_content = re.sub('%(?<!%%)' + key + '%(?!%%)', new_key, template_content, flags=re.I)
-            # write_it
-            # Deletes unused keys from confs
-            if template_path.name.lower().find("autosubmit") > -1:
-                template_content = re.sub('(?m)^( )*(EXPID:)( )*[a-zA-Z0-9._-]*(\n)*', "", template_content, flags=re.I)
-            # Write final result
-            open(template_path, "w").write(template_content)
-
-        if warn == "" and substituted == "":
-            Log.result(f"Completed check for {template_path}.\nNo %_% variables found.")
-        else:
-            Log.result(f"Completed check for {template_path}")
-
-        return warn, substituted
-
-    @staticmethod
-    def upgrade_scripts(expid: str, files="") -> bool:
-        def get_files(root_dir_, extensions, files=""):
-            all_files = []
-            if len(files) > 0:
-                for ext in extensions:
-                    all_files.extend(root_dir_.rglob(ext))
-            else:
-                if ',' in files:
-                    files = files.split(',')
-                elif ' ' in files:
-                    files = files.split(' ')
-                for file in files:
-                    all_files.append(file)
-            return all_files
-
-        Log.info("Checking if experiment exists...")
-        try:
-            # Check that the user is the owner and the configuration is well configured
-            check_ownership(expid, raise_error=True)
-            folder = Path(BasicConfig.LOCAL_ROOT_DIR) / expid / "conf"
-            factory = YAMLParserFactory()
-            # update scripts to yml format
-            for f in folder.rglob("*.yml"):
-                # Tries to convert an invalid yml to correct one
-                try:
-                    parser = factory.create_parser()
-                    parser.load(Path(f))
-                except BaseException:
-                    try:
-                        AutosubmitConfig.ini_to_yaml(f.parent, Path(f))
-                    except BaseException:
-                        Log.warning(f"Couldn't convert conf file to yml: {f.parent}")
-                        return False
-
-            # Converts all ini into yaml
-            Log.info("Converting all .conf files into .yml.")
-            for f in folder.rglob("*.conf"):
-                if not Path(f.stem + ".yml").exists():
-                    try:
-                        AutosubmitConfig.ini_to_yaml(Path(f).parent, Path(f))
-                    except Exception:
-                        Log.warning(f"Couldn't convert conf file to yml: {Path(f).parent}")
-                        return False
-            as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
-            as_conf.reload(force_load=True)
-            # Load current variables
-            as_conf.check_conf_files()
-            # Load current parameters ( this doesn't read job parameters)
-            as_conf.load_parameters()
-
-        except (AutosubmitError, AutosubmitCritical):
-            raise
-        # Update configuration files
-        warn = ""
-        substituted = ""
-        root_dir = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / expid / "conf"
-        Log.info("Looking for %_% variables inside conf files")
-        for f in get_files(root_dir, ('*.yml', '*.yaml', '*.conf')):
-            template_path = root_dir / Path(f).name
-            try:
-                w, s = Autosubmit.update_old_script(root_dir, template_path, as_conf)
-                if w != "":
-                    warn += f"Warnings for: {template_path.name}\n{w}\n"
-                if s != "":
-                    substituted += f"Variables changed for: {template_path.name}\n{s}\n"
-            except BaseException as e:
-                Log.printlog(f"Couldn't read {template_path} template.\ntrace:{str(e)}")
-        if substituted != "" and warn != "":
-            Log.result(substituted)
-            Log.result(warn)
-        # Update templates
-        root_dir = Path(as_conf.get_project_dir())
-        template_path = Path()
-        warn = ""
-        substituted = ""
-        Log.info("Looking for %_% variables inside templates")
-        for section, value in as_conf.jobs_data.items():
-            try:
-                template_path = root_dir / Path(value.get("FILE", ""))
-                w, s = Autosubmit.update_old_script(template_path.parent, template_path, as_conf)
-                if w != "":
-                    warn += f"Warnings for: {template_path.name}\n{w}\n"
-                if s != "":
-                    substituted += f"Variables changed for: {template_path.name}\n{s}\n"
-            except BaseException as e:
-                Log.printlog(f"Couldn't read {template_path} template.\ntrace:{str(e)}")
-        if substituted != "":
-            Log.printlog(substituted, Log.RESULT)
-        if warn != "":
-            Log.printlog(warn, Log.ERROR)
-        Log.info(f"Changing {expid} experiment version from {as_conf.get_version()} to "
-                 f"{Autosubmit.autosubmit_version}")
-        as_conf.set_version(Autosubmit.autosubmit_version)
-        update_experiment_description_version(expid, version=Autosubmit.autosubmit_version)
-        return True
 
     @staticmethod
     def pkl_fix(expid: str, force: bool = False) -> int:
