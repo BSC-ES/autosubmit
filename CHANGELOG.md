@@ -6,6 +6,9 @@
 - The `migrate` command was removed as it had been broken since the release of
   AS 4. This command will be reintroduced in the future with updated syntax and
   with new tests and documentation.
+- Replaced regex by YAML parsing/writing when copying experiments to avoid edge 
+  cases when replacing values (e.g. NOTIFY.TO, CHUNKS_TO) #2665
+- Fix experiment not being copied when running `testcase` command #2799
 
 **Enhancements:**
 

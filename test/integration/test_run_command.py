@@ -87,7 +87,8 @@ def set_up_test(
         ['autosubmit', 'pklfix', '{expid}'],
         ['autosubmit', 'updatedescrip', '{expid}', 'description'],
         ['autosubmit', 'cat-log', '{expid}'],
-        ['autosubmit', 'stop', '-a']
+        ['autosubmit', 'stop', '-a'],
+        ['autosubmit', 'testcase', '-y', '{expid}', '-H', 'Marenostrum5', '-d', 'Tsuite MAIN - IFS-FESOM tco79, historical, version fesom_ensemble_gen, sdate 19900101, 2 monthly chunks with DQC, AQUA, TRANSFER, WIPE, SYNC_LRA (MN5)',],
     ],
     ids=[
         'configure',
@@ -113,7 +114,8 @@ def set_up_test(
         'pklfix',
         'updatedescrip',
         'cat-log',
-        'stop'
+        'stop',
+        'testcase copy',
     ]
 )
 def test_run_command(
