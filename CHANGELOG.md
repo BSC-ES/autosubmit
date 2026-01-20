@@ -6,12 +6,18 @@
 - The `migrate` command was removed as it had been broken since the release of
   AS 4. This command will be reintroduced in the future with updated syntax and
   with new tests and documentation.
+- Restructured how copy is processed to avoid edge cases being impacted 
+  by data cleanup from previous experiments #2665
 
 **Enhancements:**
 
 - Fix intermittent failures of unit tests, and enable print of AS exceptions.
   Changes and improvements to fixtures and pytest organisation and setup #2745
 - Removed broken migrate command #2617
+
+- **Bug fixes:**
+
+- jobs not properly copied when creating new exp with jobs written in one line #2665
 
 ### 4.1.16: Unreleased
 
