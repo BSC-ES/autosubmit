@@ -1195,14 +1195,15 @@ class Autosubmit:
         :rtype: str
         """
         message_parts = [
-            f"The {expid_delete} experiment was removed from the local disk and from the database.\n",
-            "Note that this action does not delete any data written by the experiment.\n",
-            "Complete list of files/directories deleted:\n"
+            f"The {expid_delete} experiment was removed from the local disk and from the database.",
+            "Note that this action does not delete any data written by the experiment.",
+            "Complete list of files/directories deleted:",
+            ""
         ]
-        message_parts.extend(f"{path}\n" for path in experiment_path.rglob('*'))
-        message_parts.append(f"{structure_db_path}\n")
-        message_parts.append(f"{job_data_db_path}.db\n")
-        message_parts.append(f"{job_data_db_path}.sql\n")
+        message_parts.extend(f"{path}" for path in experiment_path.rglob('*'))
+        message_parts.append(f"{structure_db_path}")
+        message_parts.append(f"{job_data_db_path}.db")
+        message_parts.append(f"{job_data_db_path}.sql")
         message = '\n'.join(message_parts)
         return message
 
