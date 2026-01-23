@@ -155,9 +155,9 @@ def upgrade_scripts(expid: str, files="") -> bool:
             template_path = exp_project_dir / Path(value.get("FILE", ""))
             w, s = _update_old_script(template_path.parent, template_path, as_conf)
             if w != "":
-                warnings += f"Warnings for: {template_path.name}\n{w}\n"
+                warnings.append(f"Warnings for: {template_path.name}\n{w}\n")
             if s != "":
-                substituted += f"Variables changed for: {template_path.name}\n{s}\n"
+                substituted.append(f"Variables changed for: {template_path.name}\n{s}\n")
         except Exception as e:
             Log.printlog(f"Couldn't read {template_path} template.\ntrace:{str(e)}")
 
@@ -240,7 +240,8 @@ def _update_old_script(
         if not backup_path.exists():
             Log.info(f"Backup stored at {backup_path}")
             shutil.copyfile(template_path, backup_path)
-        template_content = open(template_path, 'r', encoding=locale.getlocale()[1]).read()
+        with open(template_path, 'r', encoding=locale.getlocale()[1]) as f:
+            template_content = f.read()
         # Look for %_%
         variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content, flags=re.IGNORECASE)
         variables = [variable[1:-1].upper() for variable in variables]
