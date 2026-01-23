@@ -126,11 +126,11 @@ def calendar_split_size_isvalid(date_str, split_size, split_unit,
     else:
         split_size_in_hours = split_size
 
-    if split_size_in_hours != chunk_size_in_hours:
-        Log.warning(
-            f"After calculations, the total sizes are: SplitSize*SplitUnitSize:{split_size_in_hours} hours, ChunkSize*ChunkUnitsize:{chunk_size_in_hours} hours.")
-    else:
-        Log.debug(f"Split size in hours: {split_size_in_hours}, Chunk size in hours: {chunk_size_in_hours}")
+    # if split_size_in_hours != chunk_size_in_hours:
+    #     Log.warning(
+    #         f"After calculations, the total sizes are: SplitSize*SplitUnitSize:{split_size_in_hours} hours, ChunkSize*ChunkUnitsize:{chunk_size_in_hours} hours.")
+    # else:
+    #     Log.debug(f"Split size in hours: {split_size_in_hours}, Chunk size in hours: {chunk_size_in_hours}")
     return split_size_in_hours <= chunk_size_in_hours
 
 
@@ -189,7 +189,7 @@ def calendar_chunk_section(exp_data, section, date, chunk) -> int:
             raise AutosubmitCritical(
                 f"The number of splits is not an integer. Autosubmit can't continue.\nYou can modify the SPLITPOLICY parameter in the section {section} to 'flexible' to roundup the number. Or change the SPLITSIZE parameter to a value in which the division is an integer.")
         splits = math.ceil(splits)
-        Log.info(f"For the section {section} with date:{date2str(chunk_start)} the number of splits is {splits}.")
+        #Log.debug(f"For the section {section} with date:{date2str(chunk_start)} the number of splits is {splits}.")
     return splits
 
 

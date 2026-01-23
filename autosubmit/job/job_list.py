@@ -227,6 +227,7 @@ class JobList(object):
             force: bool = False,
             full_load: bool = False,
             check_failed_jobs: bool = False,
+            monitor: bool = False,
     ) -> None:
         """Generates the workflow graph based on the provided configuration and parameters.
         :param as_conf: Autosubmit configuration object.
@@ -243,6 +244,7 @@ class JobList(object):
         :param force: If True, forces regeneration of the workflow graph.
         :param full_load: If True, loads the full graph from the database.
         :param check_failed_jobs: If True, checks for failed jobs during loading.
+        :param monitor: If True, the edges won't be removed even if there are differences in sections.
         """
         changes = False
         if force:
@@ -254,13 +256,13 @@ class JobList(object):
         )
 
         if not force:
-            changes = self._load_graph(full_load, load_failed_jobs=check_failed_jobs)
+            changes = self._load_graph(full_load, load_failed_jobs=check_failed_jobs, monitor=monitor)
 
         if changes or not self.run_mode:
             Log.info("Checking for new jobs...")
             self._create_and_add_jobs(show_log, default_job_type, date_list, member_list)
 
-        if changes or new:
+        if not monitor and (changes or new):
             Log.info("Initializing new jobs...")
             self._initialize_new_jobs(changes, new)
 
@@ -413,21 +415,19 @@ class JobList(object):
         if connect_to_platform:
             job.assign_platform(self.submitter, create=False, new=False)
 
-    def _load_graph(self, full_load: bool, load_failed_jobs: bool = False) -> bool:
+    def _load_graph(self, full_load: bool, load_failed_jobs: bool = False, monitor: bool = False) -> bool:
         """Loads the job graph from the database, creating nodes and edges.
 
         :param full_load: If True, loads all jobs and edges, otherwise loads only the necessary ones.
         :param load_failed_jobs: If True, loads failed jobs from the database.
+        :param monitor: If True, the edges won't be removed even if there are differences in sections.
         :return: True if there are differences in sections, False otherwise.
         """
         Log.info("Looking for new jobs...")
-        differences = self.compute_section_differences()
-        if not differences:
-            Log.info("No differences found in sections, loading graph from database...")
-        else:
-            Log.info("Differences found in sections, updating graph...")
+        differences = {} if monitor else self.compute_section_differences()
+        if differences:
+            Log.warning("Differences found in sections, updating graph...")
             self.remove_outdated_information_from_database(differences)
-
         if differences:
             full_load = True
         Log.info("Loading jobs and edges from database...")
@@ -545,7 +545,7 @@ class JobList(object):
             if new:
                 job.status = Status.READY if not self.has_parents(job.name) else Status.WAITING
             else:
-                job.status = Status.READY if not self.has_parents(job.name) else job.status
+                job.status = Status.READY if not self.has_parents(job.name) and Status.WAITING else job.status
             self.graph.nodes[job.name]["job"] = job
 
     def has_parents(self, job_name: str) -> bool:
@@ -722,7 +722,8 @@ class JobList(object):
         sections_gen = (section for section in jobs_data.keys())
         for job_section in sections_gen:
             jobs_gen = (job for job in dic_jobs.get_jobs(job_section))
-            dependencies_keys = jobs_data.get(job_section, {}).get(option, None)
+            # This was affecting the main self.as_conf.experiment_data
+            dependencies_keys = copy.deepcopy(jobs_data.get(job_section, {}).get(option, None))
             dependencies = JobList._manage_dependencies(dependencies_keys, dic_jobs) \
                 if dependencies_keys else {}
             for job in jobs_gen:
@@ -816,7 +817,8 @@ class JobList(object):
             # No changes, no need to recalculate dependencies
             Log.debug(f"Adding dependencies for {job_section} jobs")
             # If it does not have dependencies, just append it to job_list and continue
-            dependencies_keys = jobs_data.get(job_section, {}).get(option, None)
+            # This was affecting the main self.as_conf.experiment_data
+            dependencies_keys = copy.deepcopy(jobs_data.get(job_section, {}).get(option, None))
             # call function if dependencies_key is not None
             dependencies = JobList._manage_dependencies(dependencies_keys, dic_jobs) \
                 if dependencies_keys else {}
@@ -2692,7 +2694,19 @@ class JobList(object):
                      and job.log_recovery_call_count > job.fail_count)
             )
         ]
+        # update edges completion status before removing them
         for job in (job for job in jobs_to_unload):
+            for child in job.children:
+                self.graph.edges[job.name, child.name]['completion_status'] = "COMPLETED"
+            for parent in job.parents:
+                if self.graph.has_edge(parent.name, job.name):
+                    self.graph.edges[parent.name, job.name]['completion_status'] = "COMPLETED"
+        if jobs_to_unload:
+            self.save_edges()
+        for job in (job for job in jobs_to_unload):
+            for child in job.children:
+                if self.graph.has_edge(job.name, child.name):
+                    self.graph.remove_edge(job.name, child.name)
             for parent in job.parents:
                 if self.graph.has_edge(parent.name, job.name):
                     self.graph.remove_edge(parent.name, job.name)
@@ -3107,11 +3121,13 @@ class JobList(object):
         :type child: Job
         """
         for parent in finished_parents:
-            self.graph.edges[parent.name, child.name]['completion_status'] = "COMPLETED"
+            if self.graph.edges.get((parent.name, child.name)):
+                self.graph.edges[parent.name, child.name]['completion_status'] = "COMPLETED"
 
         for parent in non_finished_parents:
-            status = "RUNNING" if parent.status == Status.RUNNING else "WAITING"
-            self.graph.edges[parent.name, child.name]['completion_status'] = status
+            if self.graph.edges.get((parent.name, child.name)):
+                status = "RUNNING" if parent.status == Status.RUNNING else "WAITING"
+                self.graph.edges[parent.name, child.name]['completion_status'] = status
 
     def _recover_log(self, job: Job) -> None:
         """Recover the log for a given job.
@@ -3295,7 +3311,7 @@ class JobList(object):
             job.id = None
             job.wrapper_type = None
             save_all = True
-            Log.debug(f"JOB: {job.name} was set to READY all parents are in the desired status.")
+            Log.result(f"JOB: {job.name} was set to READY all parents are in the desired status.")
         return save_all, save_all
 
     def _sync_completed_jobs(self) -> bool:
@@ -3344,12 +3360,35 @@ class JobList(object):
         for job in self.get_waiting():
             tmp = [parent for parent in job.parents if
                    parent.status == Status.COMPLETED or parent.status == Status.SKIPPED]
-            if job.parents is None or len(tmp) == len(job.parents):
+
+            if not job.parents or (len(tmp) == len(job.parents) and self.check_all_edges_fail_ok(job)):
                 Log.debug(f"Setting job: {job.name} status to: READY (all parents completed)...")
                 job.status = Status.READY
                 job.hold = False
 
         return save
+
+    def check_all_edges_fail_ok(self, current_job: Job) -> bool:
+        """Check if all edges have fail_ok set to True for a given job.
+
+        Jobs:
+          Job:
+            DEPENDENCIES:
+             JOB-1:
+               STATUS: FAILED? -> ok
+               STATUS: FAILED -> not ok
+
+        :param current_job: The job to check.
+        :type current_job: Job
+        :return: True if all edges have fail_ok set to True, False otherwise.
+        :rtype: bool
+        """
+        for parent in current_job.parents:
+            edge_info = self.graph.edges.get((parent.name, current_job.name), {})
+            if not edge_info.get("fail_ok", False):
+                return False
+        return True
+
 
     def _skip_jobs(self, as_conf: AutosubmitConfig) -> bool:
         """Skip jobs that meet the skipping criteria.

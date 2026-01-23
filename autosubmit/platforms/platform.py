@@ -804,11 +804,11 @@ class Platform:
 
     def add_job_to_log_recover(self, job):
         if job.id and int(job.id) != 0:
-            Log.info(f"Adding job {job.name} and retry number:{job.fail_count} to the log recovery queue.")
             self.recovery_queue.put(job)
+            Log.debug(f"Added job {job.name} and retry number:{job.fail_count} to the log recovery queue.")
         else:
             Log.warning(
-                f"Job {job.name} and retry number:{job.fail_count} has no job id. Autosubmit will no record this retry.")
+                f"Job {job.name} and retry number:{job.fail_count} has no job id. Autosubmit will no record this retry. This shouldn't happen!")
         job.updated_log += 1
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:

@@ -1426,7 +1426,7 @@ class Job(object):
         total_platform = self._max_possible_wallclock()
         if not total_platform:
             total_platform = total
-        if total > total_platform:
+        if total > (total_platform * 1.30):
             Log.warning(
                 f"Job {self.name} has a wallclock time '{total} seconds' higher than the maximum allowed by the platform '{total_platform} seconds' "
                 f"Setting wallclock time to the maximum allowed by the platform.")
@@ -2580,7 +2580,7 @@ class Job(object):
         for i, log_file in enumerate(self.local_logs):
             for ext in compress_ext:
                 _aux_path = Path(self._tmp_path, f"LOG_{self.expid}").joinpath(log_file + ext)
-                Log.debug(f"Checking existence of log file: {_aux_path}")
+                #Log.debug(f"Checking existence of log file: {_aux_path}")
                 if _aux_path.exists():
                     Log.debug(f"Found compressed log file: {_aux_path}")
                     _aux_local_logs[i] += ext

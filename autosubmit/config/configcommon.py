@@ -1832,6 +1832,11 @@ class AutosubmitConfig(object):
                         return True
         return False
 
+    def load_starter_conf(self):
+        """Loads the expid/conf folder"""
+        for filename in self.get_yaml_filenames_to_load(self.conf_folder_yaml):
+            self.experiment_data = self.unify_conf(self.experiment_data, self.load_config_file(self.experiment_data, Path(filename)))
+
     def reload(self, force_load=False, only_experiment_data=False):
         """Reloads the configuration files
         :param force_load: If True, reloads all the files, if False, reloads only the modified files
@@ -2937,9 +2942,9 @@ class AutosubmitConfig(object):
                 for date_str in datelist:
                     splits[date_str] = []
                     date = datetime.strptime(date_str, '%Y%m%d')
+                    Log.debug(f"Calculating splits for {section_name} on date {date_str} with {chunks} chunks...This may take a while")
                     for chunk in range(1, chunks + 1):
                         # Get the real splits for the section
-                        Log.debug(f"Calculating splits for {section_name} on date {date_str} chunk {chunk}")
                         splits[date_str].append(calendar_chunk_section(self.experiment_data, section_name, date, chunk))
 
                 self.experiment_data["JOBS"][section_name]["SPLITS"] = splits

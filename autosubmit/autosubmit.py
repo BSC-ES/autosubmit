@@ -2649,7 +2649,7 @@ class Autosubmit:
             output_type = as_conf.get_output_type()
             os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'db')
             job_list = Autosubmit.load_job_list(
-                expid, as_conf, monitor=True, new=False)
+                expid, as_conf, monitor=True, new=False, run_mode=False)
             Log.debug("Job list restored from db")
         except AutosubmitError as e:
             if profile:
@@ -5403,7 +5403,7 @@ class Autosubmit:
     # TODO: To be moved to utils
     @staticmethod
     def load_job_list(expid, as_conf, monitor=False, new=True, full_load=True, submitter=None,
-                      check_failed_jobs=False) -> JobList:
+                      check_failed_jobs=False, run_mode=False) -> JobList:
         """Load the JobList for a given experiment.
         :param expid: experiment id
         :param as_conf: autosubmit configuration
@@ -5412,10 +5412,11 @@ class Autosubmit:
         :param full_load: whether to load all job data or not
         :param submitter: submitter to be used
         :param check_failed_jobs: whether to check failed jobs or not
+        :param run_mode: whether to load the job list in run mode or not
         :return: JobList object
         """
         rerun = as_conf.get_rerun()
-        job_list = JobList(expid, as_conf, YAMLParserFactory(), run_mode=True, submitter=submitter)
+        job_list = JobList(expid, as_conf, YAMLParserFactory(), run_mode=run_mode, submitter=submitter)
         date_list = as_conf.get_date_list()
         date_format = ''
         if as_conf.get_chunk_size_unit() == 'hour':
@@ -5435,7 +5436,7 @@ class Autosubmit:
                           as_conf.experiment_data, date_format, as_conf.get_retrials(),
                           as_conf.get_default_job_type(),
                           new=new, full_load=full_load,
-                          check_failed_jobs=check_failed_jobs)
+                          check_failed_jobs=check_failed_jobs, monitor=monitor)
 
         if str(rerun).lower() == "true":
             rerun_jobs = as_conf.get_rerun_jobs()

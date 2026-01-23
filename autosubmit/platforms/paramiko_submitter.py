@@ -226,8 +226,6 @@ class ParamikoSubmitter:
 
             remote_platform.processors_per_node = section_platform.get('PROCESSORS_PER_NODE', "1")
             remote_platform.custom_directives = section_platform.get('CUSTOM_DIRECTIVES', "")
-            if len(remote_platform.custom_directives) > 0:
-                Log.debug(f'Custom directives for {platform_used}: {remote_platform.custom_directives}')
             remote_platform.scratch_free_space = str(section_platform.get('SCRATCH_FREE_SPACE', False)).lower()
             try:
                 remote_platform.root_dir = os.path.join(remote_platform.scratch, remote_platform.project,
