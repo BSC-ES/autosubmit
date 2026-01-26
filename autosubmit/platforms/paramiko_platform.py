@@ -1247,7 +1247,7 @@ class ParamikoPlatform(Platform):
         """
         lang = locale.getlocale()[1] or locale.getdefaultlocale()[1] or 'UTF-8'
         if "rsync" in command or "find" in command or "convertLink" in command:
-            timeout = None  # infinite timeout on migrate command
+            timeout = None  # infinite timeout on migrate command  # TODO: still needed?
         elif "rm" in command:
             timeout = 60
         else:
